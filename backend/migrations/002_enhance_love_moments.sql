@@ -11,10 +11,10 @@ ADD COLUMN photo_id UUID,
 ADD FOREIGN KEY (photo_id) REFERENCES photos(id) ON DELETE SET NULL;
 
 -- Create index for photo_id lookups
-CREATE INDEX IF NOT EXISTS idx_love_moments_photo ON love_moments(photo_id);
+CREATE INDEX idx_love_moments_photo ON love_moments(photo_id);
 
 -- Create index for roleplay script queries
-CREATE INDEX IF NOT EXISTS idx_love_moments_roleplay ON love_moments(roleplay_script);
+CREATE INDEX idx_love_moments_roleplay ON love_moments(roleplay_script);
 
 -- Update the existing records to have NULL values for new fields (already done by ALTER TABLE)
 -- This migration is backward compatible 

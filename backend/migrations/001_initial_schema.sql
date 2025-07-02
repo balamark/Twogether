@@ -1,13 +1,12 @@
 -- Initial schema for Twogether app
--- Creating tables for users, couples, love moments, achievements, coins, and photos
--- Compatible with both PostgreSQL and SQLite
+-- PostgreSQL-specific migration
 
--- Enable UUID extension for PostgreSQL (will be ignored by SQLite)
+-- Enable UUID extension for PostgreSQL
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Users table
-CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY,
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     nickname VARCHAR(50) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
@@ -16,11 +15,11 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Index for faster email lookups
-CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX idx_users_email ON users(email);
 
 -- Couples table
-CREATE TABLE IF NOT EXISTS couples (
-    id UUID PRIMARY KEY,
+CREATE TABLE couples (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user1_id UUID NOT NULL,
     user2_id UUID NOT NULL,
     couple_name VARCHAR(100),
@@ -33,11 +32,11 @@ CREATE TABLE IF NOT EXISTS couples (
 );
 
 -- Index for faster couple lookups
-CREATE INDEX IF NOT EXISTS idx_couples_users ON couples(user1_id, user2_id);
+CREATE INDEX idx_couples_users ON couples(user1_id, user2_id);
 
 -- Love moments table
-CREATE TABLE IF NOT EXISTS love_moments (
-    id UUID PRIMARY KEY,
+CREATE TABLE love_moments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     couple_id UUID NOT NULL,
     recorded_by UUID NOT NULL,
     moment_date TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -48,13 +47,13 @@ CREATE TABLE IF NOT EXISTS love_moments (
 );
 
 -- Indexes for faster queries
-CREATE INDEX IF NOT EXISTS idx_love_moments_couple ON love_moments(couple_id);
-CREATE INDEX IF NOT EXISTS idx_love_moments_date ON love_moments(moment_date);
-CREATE INDEX IF NOT EXISTS idx_love_moments_created ON love_moments(created_at);
+CREATE INDEX idx_love_moments_couple ON love_moments(couple_id);
+CREATE INDEX idx_love_moments_date ON love_moments(moment_date);
+CREATE INDEX idx_love_moments_created ON love_moments(created_at);
 
 -- Achievements table
-CREATE TABLE IF NOT EXISTS achievements (
-    id UUID PRIMARY KEY,
+CREATE TABLE achievements (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     couple_id UUID NOT NULL,
     badge_type VARCHAR(50) NOT NULL,
     earned_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -64,11 +63,11 @@ CREATE TABLE IF NOT EXISTS achievements (
 );
 
 -- Index for faster achievement lookups
-CREATE INDEX IF NOT EXISTS idx_achievements_couple ON achievements(couple_id);
+CREATE INDEX idx_achievements_couple ON achievements(couple_id);
 
 -- Coin transactions table
-CREATE TABLE IF NOT EXISTS coin_transactions (
-    id UUID PRIMARY KEY,
+CREATE TABLE coin_transactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     couple_id UUID NOT NULL,
     amount INTEGER NOT NULL,
     transaction_type VARCHAR(10) NOT NULL CHECK(transaction_type IN ('earn', 'spend')),
@@ -80,12 +79,12 @@ CREATE TABLE IF NOT EXISTS coin_transactions (
 );
 
 -- Index for faster coin transaction queries
-CREATE INDEX IF NOT EXISTS idx_coin_transactions_couple ON coin_transactions(couple_id);
-CREATE INDEX IF NOT EXISTS idx_coin_transactions_date ON coin_transactions(transaction_date);
+CREATE INDEX idx_coin_transactions_couple ON coin_transactions(couple_id);
+CREATE INDEX idx_coin_transactions_date ON coin_transactions(transaction_date);
 
 -- Photos table
-CREATE TABLE IF NOT EXISTS photos (
-    id UUID PRIMARY KEY,
+CREATE TABLE photos (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     couple_id UUID NOT NULL,
     file_path VARCHAR(255) NOT NULL,
     file_name VARCHAR(255) NOT NULL,
@@ -96,11 +95,11 @@ CREATE TABLE IF NOT EXISTS photos (
 );
 
 -- Index for faster photo queries
-CREATE INDEX IF NOT EXISTS idx_photos_couple ON photos(couple_id);
-CREATE INDEX IF NOT EXISTS idx_photos_memory_date ON photos(memory_date);
+CREATE INDEX idx_photos_couple ON photos(couple_id);
+CREATE INDEX idx_photos_memory_date ON photos(memory_date);
 
 -- Create a view for coin balances
-CREATE VIEW IF NOT EXISTS coin_balances AS
+CREATE VIEW coin_balances AS
 SELECT 
     couple_id,
     SUM(CASE WHEN transaction_type = 'earn' THEN amount ELSE -amount END) as balance,
