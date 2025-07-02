@@ -145,6 +145,50 @@ docker compose logs -f        # Follow all logs in real-time
 docker compose logs --tail=50 # Last 50 lines from all services
 ```
 
+## 🔧 Process Management
+
+### Check Running Processes
+```bash
+# Check what's running on port 8080
+lsof -i :8080
+
+# Check all Twogether processes  
+ps aux | grep twogether
+
+# Check Docker containers
+docker compose ps
+```
+
+### Kill Processes
+```bash
+# Kill specific process by PID
+kill <PID>
+
+# Kill all processes on port 8080
+lsof -ti:8080 | xargs kill -9
+
+# Kill by process name
+pkill -f twogether-backend
+
+# Stop Docker containers
+docker compose down
+```
+
+### Troubleshooting "Address already in use"
+```bash
+# 1. Check what's using the port
+lsof -i :8080
+
+# 2. Kill the process
+kill <PID_from_step_1>
+
+# 3. Or kill all processes on port 8080
+lsof -ti:8080 | xargs kill -9
+
+# 4. Then restart your service
+cd backend && DATABASE_URL="postgresql://twogether:twogether_dev_password@localhost:5432/twogether_dev" cargo run
+```
+
 ## 📁 項目結構
 
 ```
