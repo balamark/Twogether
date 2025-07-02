@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: twogether-postgres
+    environment:
+      POSTGRES_DB: twogether_dev
+      POSTGRES_USER: twogether
+      POSTGRES_PASSWORD: twogether_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/migrations:/docker-entrypoint-initdb.d
+    restart: unless-stopped
+
+  # Optional: PostgreSQL Admin Interface
+  adminer:
+    image: adminer:4.8.1
+    container_name: twogether-adminer
+    ports:
+      - "8081:8080"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  postgres_data: 
