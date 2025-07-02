@@ -2,7 +2,6 @@ import axios from 'axios';
 
 // API Configuration
 const API_BASE_URL = 'http://localhost:8080/api';
-const USE_BACKEND = true; // Toggle between localStorage and backend
 
 // Types
 interface IntimateRecord {
@@ -29,9 +28,11 @@ interface ApiIntimateRecord {
   duration?: string;
   location?: string;
   roleplay_script?: string;
+  photo_url?: string;
   coins_earned?: number;
   activity_type?: string;
   created_at: string;
+  recorded_by_nickname: string;
 }
 
 // API Client
@@ -56,38 +57,26 @@ apiClient.interceptors.request.use((config) => {
 class ApiService {
   // Intimate Records
   async getIntimateRecords(): Promise<IntimateRecord[]> {
-    if (!USE_BACKEND) {
-      // Use localStorage
-      const saved = localStorage.getItem('intimateRecords');
-      return saved ? JSON.parse(saved) : [];
-    }
-
     try {
       const response = await apiClient.get('/love-moments');
       return response.data.map(this.transformApiRecord);
     } catch (error) {
       console.error('Failed to fetch intimate records:', error);
-      // Fallback to localStorage
-      const saved = localStorage.getItem('intimateRecords');
-      return saved ? JSON.parse(saved) : [];
+      throw error;
+    }
+  }
+
+  async getIntimateRecord(id: string): Promise<IntimateRecord> {
+    try {
+      const response = await apiClient.get(`/love-moments/${id}`);
+      return this.transformApiRecord(response.data);
+    } catch (error) {
+      console.error('Failed to fetch intimate record:', error);
+      throw error;
     }
   }
 
   async createIntimateRecord(record: Omit<IntimateRecord, 'id' | 'timestamp'>): Promise<IntimateRecord> {
-    const newRecord: IntimateRecord = {
-      ...record,
-      id: Date.now(),
-      timestamp: new Date().toISOString(),
-    };
-
-    if (!USE_BACKEND) {
-      // Use localStorage
-      const existing = await this.getIntimateRecords();
-      const updated = [...existing, newRecord];
-      localStorage.setItem('intimateRecords', JSON.stringify(updated));
-      return newRecord;
-    }
-
     try {
       const apiPayload = {
         moment_date: new Date(`${record.date}T${record.time}`).toISOString(),
@@ -97,17 +86,37 @@ class ApiService {
         location: record.location,
         roleplay_script: record.roleplayScript,
         activity_type: record.activityType || 'regular',
+        photo_id: null, // Will be set after photo upload
       };
 
       const response = await apiClient.post('/love-moments', apiPayload);
       return this.transformApiRecord(response.data);
     } catch (error) {
       console.error('Failed to create intimate record:', error);
-      // Fallback to localStorage
-      const existing = await this.getIntimateRecords();
-      const updated = [...existing, newRecord];
-      localStorage.setItem('intimateRecords', JSON.stringify(updated));
-      return newRecord;
+      throw error;
+    }
+  }
+
+  // Photo Upload
+  async uploadPhoto(file: File, caption?: string): Promise<{ id: string; url: string }> {
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+      if (caption) {
+        formData.append('caption', caption);
+      }
+      formData.append('memory_date', new Date().toISOString());
+
+      const response = await apiClient.post('/photos', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      return response.data;
+    } catch (error) {
+      console.error('Failed to upload photo:', error);
+      throw error;
     }
   }
 
@@ -124,26 +133,16 @@ class ApiService {
 
   // Coins
   async getTotalCoins(): Promise<number> {
-    if (!USE_BACKEND) {
-      return parseInt(localStorage.getItem('totalCoins') || '0');
-    }
-
     try {
       const response = await apiClient.get('/coins/balance');
       return response.data.balance || 0;
     } catch (error) {
       console.error('Failed to fetch coins:', error);
-      return parseInt(localStorage.getItem('totalCoins') || '0');
+      throw error;
     }
   }
 
   async updateCoins(amount: number): Promise<void> {
-    if (!USE_BACKEND) {
-      const current = await this.getTotalCoins();
-      localStorage.setItem('totalCoins', (current + amount).toString());
-      return;
-    }
-
     try {
       await apiClient.post('/coins/transaction', {
         amount: Math.abs(amount),
@@ -152,27 +151,12 @@ class ApiService {
       });
     } catch (error) {
       console.error('Failed to update coins:', error);
-      // Fallback to localStorage
-      const current = await this.getTotalCoins();
-      localStorage.setItem('totalCoins', (current + amount).toString());
+      throw error;
     }
   }
 
   // Authentication
   async login(email: string, password: string): Promise<{ token: string; user: any }> {
-    if (!USE_BACKEND) {
-      // Mock login for localStorage mode
-      const mockUser = {
-        id: Date.now().toString(),
-        email,
-        nickname: email.split('@')[0],
-      };
-      const mockToken = 'mock-token-' + Date.now();
-      localStorage.setItem('authToken', mockToken);
-      localStorage.setItem('authUser', JSON.stringify(mockUser));
-      return { token: mockToken, user: mockUser };
-    }
-
     const response = await apiClient.post('/auth/login', { email, password });
     const { token, user } = response.data;
     
@@ -183,19 +167,6 @@ class ApiService {
   }
 
   async register(email: string, nickname: string, password: string): Promise<{ token: string; user: any }> {
-    if (!USE_BACKEND) {
-      // Mock register for localStorage mode
-      const mockUser = {
-        id: Date.now().toString(),
-        email,
-        nickname,
-      };
-      const mockToken = 'mock-token-' + Date.now();
-      localStorage.setItem('authToken', mockToken);
-      localStorage.setItem('authUser', JSON.stringify(mockUser));
-      return { token: mockToken, user: mockUser };
-    }
-
     const response = await apiClient.post('/auth/register', { email, nickname, password });
     const { token, user } = response.data;
     
@@ -210,16 +181,16 @@ class ApiService {
     localStorage.removeItem('authUser');
   }
 
-  // Helper method to transform API records to frontend format
   private transformApiRecord(apiRecord: ApiIntimateRecord): IntimateRecord {
     const momentDate = new Date(apiRecord.moment_date);
     return {
-      id: parseInt(apiRecord.id) || Date.now(),
+      id: parseInt(apiRecord.id.replace(/-/g, '').substring(0, 8), 16), // Convert UUID to number
       date: momentDate.toISOString().split('T')[0],
-      time: momentDate.toTimeString().slice(0, 5),
+      time: momentDate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false }),
       mood: '💕', // Default mood
       notes: apiRecord.notes,
       timestamp: apiRecord.created_at,
+      photo: apiRecord.photo_url,
       description: apiRecord.description,
       duration: apiRecord.duration,
       location: apiRecord.location,
@@ -229,20 +200,15 @@ class ApiService {
     };
   }
 
-  // Health check
   async healthCheck(): Promise<boolean> {
-    if (!USE_BACKEND) return true;
-    
     try {
-      await apiClient.get('/health');
-      return true;
+      const response = await apiClient.get('/health');
+      return response.status === 200;
     } catch (error) {
-      console.error('Backend health check failed:', error);
       return false;
     }
   }
 }
 
-// Export singleton instance
 export const apiService = new ApiService();
 export default apiService; 

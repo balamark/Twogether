@@ -226,6 +226,9 @@ const LoveTimeApp = () => {
     }
   ]);
 
+  const [selectedRecord, setSelectedRecord] = useState<IntimateRecord | null>(null);
+  const [showRecordDetail, setShowRecordDetail] = useState(false);
+
   // File input refs
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -629,19 +632,44 @@ const LoveTimeApp = () => {
       const isNewScript = roleplayScript ? !intimateRecords.some(r => r.roleplayScript === roleplayScript) : false;
       const coinsEarned = calculateCoins(activityType, duration, isNewScript);
       
+      let photoId: string | null = null;
+      
+      // Upload photo if provided
+      if (photo) {
+        try {
+          // Convert base64 to File object
+          const response = await fetch(photo);
+          const blob = await response.blob();
+          const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+          
+          const photoResponse = await apiService.uploadPhoto(file, description);
+          photoId = photoResponse.id;
+        } catch (photoError) {
+          console.error('Photo upload failed:', photoError);
+          showNotification({
+            type: 'warning',
+            title: '照片上傳失敗',
+            message: '記錄已保存，但照片上傳失敗',
+            duration: 5000
+          });
+        }
+      }
+      
       // Create record using API service
-      const newRecord = await apiService.createIntimateRecord({
+      const recordData = {
         date,
         time,
         mood,
         notes,
-        photo,
+        photo: photoId ? `/api/photos/${photoId}/file` : undefined,
         description,
         duration,
         location,
         roleplayScript,
         activityType
-      });
+      };
+      
+      const newRecord = await apiService.createIntimateRecord(recordData);
       
       // Update local state
       setIntimateRecords(prev => [...prev, newRecord]);
@@ -666,6 +694,31 @@ const LoveTimeApp = () => {
         title: '記錄失敗',
         message: '無法保存記錄，請稍後再試',
         duration: 5000
+      });
+    }
+  };
+
+  const showRecordDetails = async (recordId: number) => {
+    try {
+      // Find record in local state first
+      const localRecord = intimateRecords.find(r => r.id === recordId);
+      if (localRecord) {
+        setSelectedRecord(localRecord);
+        setShowRecordDetail(true);
+        return;
+      }
+      
+      // If not found locally, fetch from API
+      const record = await apiService.getIntimateRecord(recordId.toString());
+      setSelectedRecord(record);
+      setShowRecordDetail(true);
+    } catch (error) {
+      console.error('Error fetching record details:', error);
+      showNotification({
+        type: 'warning',
+        title: '載入失敗',
+        message: '無法載入記錄詳情',
+        duration: 3000
       });
     }
   };
@@ -1446,53 +1499,60 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
           <h3 className="text-xl font-bold text-gray-800 mb-4">最近的親密記錄</h3>
           <div className="space-y-3">
             {intimateRecords.slice(-5).reverse().map((record) => (
-              <div key={record.id} className="p-4 bg-pink-50 rounded-lg">
-                <div className="flex items-start space-x-4">
-                  {record.photo && (
-                    <img 
-                      src={record.photo} 
-                      alt="記憶照片" 
-                      className="w-16 h-16 object-cover rounded-lg"
-                    />
-                  )}
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <Heart className="w-5 h-5 text-pink-500" />
-                      <span className="font-medium text-gray-800">{record.date}</span>
-                      <span className="text-sm text-gray-600">{record.time}</span>
-                      <span className="text-xl">{record.mood}</span>
-                    </div>
-                    
-                    {record.description && (
-                      <p className="text-sm text-gray-700 mb-1">{record.description}</p>
-                    )}
-                    
-                    <div className="flex flex-wrap gap-2 text-xs text-gray-500">
-                      {record.duration && (
-                        <span className="flex items-center">
-                          <Clock className="w-3 h-3 mr-1" />
-                          {record.duration}
-                        </span>
-                      )}
-                      {record.location && (
-                        <span className="flex items-center">
-                          <MapPin className="w-3 h-3 mr-1" />
-                          {record.location}
-                        </span>
-                      )}
-                      {record.roleplayScript && (
-                        <span className="flex items-center text-purple-600">
-                          <Play className="w-3 h-3 mr-1" />
-                          {record.roleplayScript}
-                        </span>
+              <div 
+                key={record.id} 
+                className="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => showRecordDetails(record.id)}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="text-2xl">{record.mood}</div>
+                    <div>
+                      <div className="font-medium text-gray-800">
+                        {record.date} {record.time}
+                      </div>
+                      {record.description && (
+                        <div className="text-sm text-gray-600 mt-1">
+                          {record.description}
+                        </div>
                       )}
                     </div>
-                    
-                    {record.notes && (
-                      <p className="text-sm text-gray-600 mt-2 italic">"{record.notes}"</p>
-                    )}
                   </div>
+                  {record.photo && (
+                    <div className="flex-shrink-0">
+                      <img 
+                        src={record.photo} 
+                        alt="記憶照片" 
+                        className="w-12 h-12 rounded-lg object-cover"
+                      />
+                    </div>
+                  )}
                 </div>
+                
+                <div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-2">
+                  {record.duration && (
+                    <span className="flex items-center">
+                      <Clock className="w-3 h-3 mr-1" />
+                      {record.duration}
+                    </span>
+                  )}
+                  {record.location && (
+                    <span className="flex items-center">
+                      <MapPin className="w-3 h-3 mr-1" />
+                      {record.location}
+                    </span>
+                  )}
+                  {record.roleplayScript && (
+                    <span className="flex items-center text-purple-600">
+                      <Play className="w-3 h-3 mr-1" />
+                      {record.roleplayScript}
+                    </span>
+                  )}
+                </div>
+                
+                {record.notes && (
+                  <p className="text-sm text-gray-600 mt-2 italic">"{record.notes}"</p>
+                )}
               </div>
             ))}
             {intimateRecords.length === 0 && (
@@ -2504,6 +2564,99 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
       {/* Modals */}
       {showAuthModal && <AuthModal />}
       {showScriptUploadModal && <ScriptUploadModal />}
+
+      {/* Record Detail Modal */}
+      {showRecordDetail && selectedRecord && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-gray-800">親密時光詳情</h3>
+                <button
+                  onClick={() => setShowRecordDetail(false)}
+                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Basic Info */}
+                <div className="flex items-center space-x-4">
+                  <div className="text-4xl">{selectedRecord.mood}</div>
+                  <div>
+                    <div className="text-xl font-medium text-gray-800">
+                      {selectedRecord.date} {selectedRecord.time}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {new Date(selectedRecord.timestamp).toLocaleString('zh-TW')}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Photo */}
+                {selectedRecord.photo && (
+                  <div className="text-center">
+                    <img 
+                      src={selectedRecord.photo} 
+                      alt="記憶照片" 
+                      className="max-w-full max-h-96 rounded-lg mx-auto shadow-lg"
+                    />
+                  </div>
+                )}
+
+                {/* Description */}
+                {selectedRecord.description && (
+                  <div>
+                    <h4 className="font-medium text-gray-800 mb-2">描述</h4>
+                    <p className="text-gray-700 bg-gray-50 p-3 rounded-lg">
+                      {selectedRecord.description}
+                    </p>
+                  </div>
+                )}
+
+                {/* Details */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {selectedRecord.duration && (
+                    <div className="flex items-center space-x-2">
+                      <Clock className="w-5 h-5 text-pink-500" />
+                      <span className="text-gray-700">持續時間: {selectedRecord.duration}</span>
+                    </div>
+                  )}
+                  {selectedRecord.location && (
+                    <div className="flex items-center space-x-2">
+                      <MapPin className="w-5 h-5 text-pink-500" />
+                      <span className="text-gray-700">地點: {selectedRecord.location}</span>
+                    </div>
+                  )}
+                  {selectedRecord.roleplayScript && (
+                    <div className="flex items-center space-x-2">
+                      <Play className="w-5 h-5 text-purple-500" />
+                      <span className="text-gray-700">劇本: {selectedRecord.roleplayScript}</span>
+                    </div>
+                  )}
+                  {selectedRecord.coinsEarned && (
+                    <div className="flex items-center space-x-2">
+                      <Coins className="w-5 h-5 text-yellow-500" />
+                      <span className="text-gray-700">獲得金幣: {selectedRecord.coinsEarned}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Notes */}
+                {selectedRecord.notes && (
+                  <div>
+                    <h4 className="font-medium text-gray-800 mb-2">備註</h4>
+                    <p className="text-gray-700 bg-pink-50 p-3 rounded-lg italic">
+                      "{selectedRecord.notes}"
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

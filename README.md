@@ -147,18 +147,21 @@ Twogether/
 
 ### 前端架構特點
 
-#### 雙模式 API 服務
+#### 完整後端 API 集成
 ```typescript
-// 支持 localStorage 和後端 API 兩種模式
-const USE_BACKEND = true; // 切換模式
+// 完全使用後端 API 進行數據管理
+const response = await apiClient.get('/love-moments');
+return response.data.map(transformApiRecord);
 
-// 自動降級策略
-if (USE_BACKEND) {
-  try {
-    return await backendCall();
-  } catch {
-    return localStorageCall(); // 自動降級
-  }
+// 包含錯誤處理和用戶友好提示
+try {
+  await apiService.createIntimateRecord(data);
+} catch (error) {
+  showNotification({
+    type: 'warning',
+    title: '記錄失敗',
+    message: '無法保存記錄，請稍後再試'
+  });
 }
 ```
 

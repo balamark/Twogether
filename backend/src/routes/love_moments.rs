@@ -4,9 +4,9 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use chrono::{DateTime, Duration, Utc};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use chrono::{DateTime, Duration, Utc};
 use validator::Validate;
 
 use crate::{
@@ -98,6 +98,13 @@ async fn create_love_moment(
     // Check for achievements (first moment, weekly goals, etc.)
     check_and_award_achievements(&state, couple_id).await?;
 
+    // Get photo URL if photo_id is provided
+    let photo_url = if let Some(photo_id) = payload.photo_id {
+        Some(format!("/api/photos/{}/file", photo_id))
+    } else {
+        None
+    };
+
     Ok(Json(LoveMomentResponse {
         id: moment_id,
         moment_date: payload.moment_date,
@@ -106,7 +113,7 @@ async fn create_love_moment(
         duration: payload.duration,
         location: payload.location,
         roleplay_script: payload.roleplay_script,
-        photo_url: None, // TODO: Implement photo URL generation
+        photo_url,
         recorded_by_nickname: claims.nickname,
         created_at: now,
     }))
@@ -131,9 +138,9 @@ async fn get_love_moments(
     .await?
     .ok_or_else(|| AppError::NotFound("您還沒有配對".to_string()))?;
 
-    // Use a simple query for now - TODO: implement proper filtering later
+    // Query with photo information
     let moments = sqlx::query!(
-        "SELECT lm.id, lm.moment_date, lm.notes, lm.description, lm.duration, lm.location, lm.roleplay_script, lm.created_at, u.nickname as recorded_by_nickname
+        "SELECT lm.id, lm.moment_date, lm.notes, lm.description, lm.duration, lm.location, lm.roleplay_script, lm.photo_id, lm.created_at, u.nickname as recorded_by_nickname
          FROM love_moments lm
          JOIN users u ON lm.recorded_by = u.id
          WHERE lm.couple_id = $1
@@ -145,6 +152,8 @@ async fn get_love_moments(
     .await?;
 
     let response_moments: Vec<LoveMomentResponse> = moments.into_iter().map(|moment| {
+        let photo_url = moment.photo_id.map(|id| format!("/api/photos/{}/file", id));
+        
         LoveMomentResponse {
             id: moment.id,
             moment_date: moment.moment_date,
@@ -153,7 +162,7 @@ async fn get_love_moments(
             duration: moment.duration,
             location: moment.location,
             roleplay_script: moment.roleplay_script,
-            photo_url: None, // TODO: Implement photo URL generation
+            photo_url,
             recorded_by_nickname: moment.recorded_by_nickname,
             created_at: moment.created_at.unwrap_or_else(|| Utc::now()),
         }
@@ -173,7 +182,7 @@ async fn get_love_moment(
         .map_err(|_| AppError::Auth("無效的用戶ID".to_string()))?;
 
     let moment = sqlx::query!(
-        "SELECT lm.id, lm.moment_date, lm.notes, lm.description, lm.duration, lm.location, lm.roleplay_script, lm.created_at, u.nickname as recorded_by_nickname
+        "SELECT lm.id, lm.moment_date, lm.notes, lm.description, lm.duration, lm.location, lm.roleplay_script, lm.photo_id, lm.created_at, u.nickname as recorded_by_nickname
          FROM love_moments lm
          JOIN users u ON lm.recorded_by = u.id
          JOIN couples c ON lm.couple_id = c.id
@@ -185,6 +194,8 @@ async fn get_love_moment(
     .await?
     .ok_or_else(|| AppError::NotFound("愛的時光記錄不存在".to_string()))?;
 
+    let photo_url = moment.photo_id.map(|id| format!("/api/photos/{}/file", id));
+
     let response = LoveMomentResponse {
         id: moment.id,
         moment_date: moment.moment_date,
@@ -193,7 +204,7 @@ async fn get_love_moment(
         duration: moment.duration,
         location: moment.location,
         roleplay_script: moment.roleplay_script,
-        photo_url: None, // TODO: Implement photo URL generation
+        photo_url,
         recorded_by_nickname: moment.recorded_by_nickname,
         created_at: moment.created_at.unwrap_or_else(|| Utc::now()),
     };

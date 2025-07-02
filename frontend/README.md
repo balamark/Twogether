@@ -47,18 +47,21 @@ frontend/
 
 ### 🔌 API 服務層 (services/api.ts)
 
-#### 雙模式支持
+#### 完整後端集成
 ```typescript
-const USE_BACKEND = true; // 切換 localStorage 或後端 API
+// 完全使用後端 API 進行數據管理
+const response = await apiClient.get('/love-moments');
+return response.data.map(this.transformApiRecord);
 
-// 自動降級策略
-if (USE_BACKEND) {
-  try {
-    return await backendApiCall();
-  } catch (error) {
-    console.warn('Backend unavailable, falling back to localStorage');
-    return localStorageCall();
-  }
+// 錯誤處理和用戶提示
+try {
+  await apiService.createIntimateRecord(data);
+} catch (error) {
+  showNotification({
+    type: 'warning', 
+    title: '記錄失敗',
+    message: '無法保存記錄，請稍後再試'
+  });
 }
 ```
 
