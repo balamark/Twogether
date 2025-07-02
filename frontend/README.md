@@ -143,6 +143,34 @@ npm run lint
 npm run format
 ```
 
+## 📋 查看日誌
+
+### 開發模式日誌
+```bash
+# 當使用 npm run dev 運行時，日誌會顯示在運行前端的終端中
+# 包含 Vite 構建信息、熱重載狀態、錯誤信息等
+```
+
+### Docker Compose 日誌
+```bash
+# 查看前端容器日誌
+docker compose logs frontend
+docker compose logs -f frontend  # 實時跟蹤日誌
+
+# 查看所有服務日誌  
+docker compose logs           # 所有日誌
+docker compose logs -f        # 實時跟蹤所有日誌
+docker compose logs --tail=50 # 最後50行日誌
+```
+
+### 瀏覽器開發者工具
+```bash
+# 在瀏覽器中按 F12 或右鍵 -> 檢查元素
+# Console 標籤: JavaScript 錯誤和 console.log 輸出
+# Network 標籤: API 請求和響應
+# Application 標籤: localStorage 和其他存儲
+```
+
 ### 🧪 性能優化
 
 #### React 優化策略

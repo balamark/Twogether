@@ -1,5 +1,5 @@
-use sqlx::{PgPool, Pool, Postgres};
-use crate::error::{AppError, Result};
+use sqlx::PgPool;
+use crate::error::Result;
 
 #[derive(Clone)]
 pub struct Database {

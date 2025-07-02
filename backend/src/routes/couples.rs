@@ -17,26 +17,26 @@ pub fn routes() -> Router<AppState> {
         .route("/", get(get_couple))
 }
 
-/// Create a couple relationship
+/// Create or join a couple
 /// POST /api/couples
 async fn create_couple(
-    State(state): State<AppState>,
-    claims: Claims,
+    State(_state): State<AppState>,
+    _claims: Claims,
 ) -> Result<Json<serde_json::Value>> {
-    // TODO: Implement couple creation
+    // TODO: Implement couple creation/joining
     Ok(Json(serde_json::json!({
-        "message": "Couple creation - Coming soon! 即將推出情侶配對功能！"
+        "message": "Couple creation - Coming soon! 創建情侶檔案即將推出！"
     })))
 }
 
 /// Get couple information
 /// GET /api/couples
 async fn get_couple(
-    State(state): State<AppState>,
-    claims: Claims,
+    State(_state): State<AppState>,
+    _claims: Claims,
 ) -> Result<Json<serde_json::Value>> {
-    // TODO: Implement get couple info
+    // TODO: Implement couple retrieval
     Ok(Json(serde_json::json!({
-        "message": "Couple info retrieval - Coming soon!"
+        "message": "Couple management - Coming soon! 情侶檔案即將推出！"
     })))
 } 

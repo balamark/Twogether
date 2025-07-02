@@ -102,6 +102,49 @@ npm install
 npm run dev
 ```
 
+## 🚀 To start the development servers:
+
+```bash
+# Option 1: Use our convenient script
+./scripts/dev-start.sh backend    # Terminal 1
+./scripts/dev-start.sh frontend   # Terminal 2
+
+# Option 2: Manual startup
+cd backend && DATABASE_URL="postgresql://twogether:twogether_dev_password@localhost:5432/twogether_dev" cargo run
+cd frontend && npm run dev
+```
+
+## 📋 View Logs
+
+### Backend Logs
+```bash
+# If running with cargo run - check the terminal where backend is running
+# If using Docker Compose:
+docker compose logs backend
+docker compose logs -f backend  # Follow logs in real-time
+```
+
+### Frontend Logs  
+```bash
+# If running with npm run dev - check the terminal where frontend is running
+# If using Docker Compose:
+docker compose logs frontend
+docker compose logs -f frontend  # Follow logs in real-time
+```
+
+### Database Logs
+```bash
+docker compose logs postgres
+docker compose logs -f postgres  # Follow logs in real-time
+```
+
+### All Container Logs
+```bash
+docker compose logs           # All logs
+docker compose logs -f        # Follow all logs in real-time
+docker compose logs --tail=50 # Last 50 lines from all services
+```
+
 ## 📁 項目結構
 
 ```

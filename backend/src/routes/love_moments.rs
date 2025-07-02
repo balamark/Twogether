@@ -4,7 +4,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use uuid::Uuid;
 use chrono::{DateTime, Duration, Utc};
 use validator::Validate;
@@ -16,6 +16,7 @@ use crate::{
 };
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // These fields will be used for filtering in future implementation
 pub struct LoveMomentsQuery {
     pub limit: Option<i64>,
     pub offset: Option<i64>,
@@ -124,7 +125,7 @@ async fn create_love_moment(
 async fn get_love_moments(
     State(state): State<AppState>,
     claims: Claims,
-    Query(query): Query<LoveMomentsQuery>,
+    Query(_query): Query<LoveMomentsQuery>,
 ) -> Result<Json<Vec<LoveMomentResponse>>> {
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| AppError::Auth("無效的用戶ID".to_string()))?;

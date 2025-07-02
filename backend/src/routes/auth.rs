@@ -1,13 +1,11 @@
 use axum::{
     extract::State,
-    http::StatusCode,
     response::Json,
     routing::{get, post},
     Router,
 };
 use chrono::{Duration, Utc};
 use jsonwebtoken::{encode, EncodingKey, Header};
-use serde_json::json;
 use uuid::Uuid;
 use validator::Validate;
 

@@ -15,7 +15,7 @@ use anyhow::anyhow;
 
 use crate::{
     error::{AppError, Result},
-    models::{Claims, CreatePhotoRequest, PhotoResponse},
+    models::{Claims, PhotoResponse},
     AppState,
 };
 

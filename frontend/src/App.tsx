@@ -2524,14 +2524,14 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
         <div className="text-center mb-8">
           <div className="flex items-center justify-center space-x-4 mb-4">
             <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600">
-              愛的時光
+              Twogether 圖在一起
             </h1>
             <div className="flex items-center space-x-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-full">
               <Coins className="w-5 h-5" />
               <span className="font-bold">{totalCoins}</span>
             </div>
           </div>
-          <p className="text-gray-600">為愛而生的親密時光管理應用</p>
+          <p className="text-gray-600">為熱戀中的你們，記錄每一段親密時光</p>
         </div>
 
         {/* Navigation */}
