@@ -1,9 +1,10 @@
 version: '3.8'
 
 services:
+  # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
-    container_name: twogether-postgres
+    container_name: twogether_postgres
     environment:
       POSTGRES_DB: twogether_dev
       POSTGRES_USER: twogether
@@ -14,16 +15,68 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/migrations:/docker-entrypoint-initdb.d
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U twogether -d twogether_dev"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
-  # Optional: PostgreSQL Admin Interface
-  adminer:
-    image: adminer:4.8.1
-    container_name: twogether-adminer
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: twogether_backend
+    environment:
+      DATABASE_URL: postgresql://twogether:twogether_dev_password@postgres:5432/twogether_dev
+      JWT_SECRET: twogether-dev-secret-key-change-in-production
+      CORS_ORIGIN: http://localhost:5173
+      PORT: 8080
+      ENVIRONMENT: development
     ports:
-      - "8081:8080"
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./uploads:/app/uploads
+
+  # Frontend (Vite dev server)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: twogether_frontend
+    environment:
+      VITE_API_BASE_URL: http://localhost:8080/api
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    restart: unless-stopped
+
+  # pgAdmin for database management (development only)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: twogether_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@twogether.dev
+      PGADMIN_DEFAULT_PASSWORD: admin123
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
     depends_on:
       - postgres
     restart: unless-stopped
+    profiles:
+      - dev
 
 volumes:
-  postgres_data: 
+  postgres_data:
+    driver: local
+
+networks:
+  default:
+    name: twogether_network 

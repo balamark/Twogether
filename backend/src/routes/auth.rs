@@ -38,7 +38,7 @@ async fn register(
 
     // Check if user already exists
     let existing_user = sqlx::query_as::<_, User>(
-        "SELECT * FROM users WHERE email = ?"
+        "SELECT * FROM users WHERE email = $1"
     )
     .bind(&payload.email)
     .fetch_optional(&state.db.pool)
@@ -56,9 +56,9 @@ async fn register(
     let now = Utc::now();
 
     sqlx::query(
-        "INSERT INTO users (id, nickname, email, password_hash, created_at) VALUES (?, ?, ?, ?, ?)"
+        "INSERT INTO users (id, nickname, email, password_hash, created_at) VALUES ($1, $2, $3, $4, $5)"
     )
-    .bind(user_id.to_string())
+    .bind(user_id)
     .bind(&payload.nickname)
     .bind(&payload.email)
     .bind(&password_hash)
@@ -96,7 +96,7 @@ async fn login(
 
     // Find user by email
     let user = sqlx::query_as::<_, User>(
-        "SELECT * FROM users WHERE email = ?"
+        "SELECT * FROM users WHERE email = $1"
     )
     .bind(&payload.email)
     .fetch_optional(&state.db.pool)
@@ -110,9 +110,9 @@ async fn login(
 
     // Update last login
     let now = Utc::now();
-    sqlx::query("UPDATE users SET last_login = ? WHERE id = ?")
+    sqlx::query("UPDATE users SET last_login = $1 WHERE id = $2")
         .bind(now)
-        .bind(user.id.to_string())
+        .bind(user.id)
         .execute(&state.db.pool)
         .await?;
 
@@ -143,9 +143,9 @@ async fn me(
         .map_err(|_| AppError::Auth("無效的用戶ID".to_string()))?;
 
     let user = sqlx::query_as::<_, User>(
-        "SELECT * FROM users WHERE id = ?"
+        "SELECT * FROM users WHERE id = $1"
     )
-    .bind(user_id.to_string())
+    .bind(user_id)
     .fetch_optional(&state.db.pool)
     .await?
     .ok_or_else(|| AppError::NotFound("用戶不存在".to_string()))?;
