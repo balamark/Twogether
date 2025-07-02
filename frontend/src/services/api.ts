@@ -2,7 +2,7 @@ import axios from 'axios';
 
 // API Configuration
 const API_BASE_URL = 'http://localhost:8080/api';
-const USE_BACKEND = false; // Toggle between localStorage and backend
+const USE_BACKEND = true; // Toggle between localStorage and backend
 
 // Types
 interface IntimateRecord {
