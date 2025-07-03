@@ -4,13 +4,14 @@ use axum::{
 };
 use serde_json::{json, Value};
 use sqlx::PgPool;
-use tower::ServiceExt;
+use tower::util::ServiceExt;
 use uuid::Uuid;
 
 mod common;
 use common::{setup_test_app, TestApp};
 
 #[tokio::test]
+#[ignore] // Skip in CI since no database is available
 async fn test_pairing_code_flow_complete() {
     let app = setup_test_app().await;
     
@@ -43,6 +44,7 @@ async fn test_pairing_code_flow_complete() {
 }
 
 #[tokio::test]
+#[ignore] // Skip in CI since no database is available
 async fn test_pairing_code_validation_errors() {
     let app = setup_test_app().await;
     
@@ -72,6 +74,7 @@ async fn test_pairing_code_validation_errors() {
 }
 
 #[tokio::test]
+#[ignore] // Skip in CI since no database is available
 async fn test_generate_pairing_code_restrictions() {
     let app = setup_test_app().await;
     
@@ -98,6 +101,7 @@ async fn test_generate_pairing_code_restrictions() {
 }
 
 #[tokio::test]
+#[ignore] // Skip in CI since no database is available
 async fn test_already_paired_user_restrictions() {
     let app = setup_test_app().await;
     
