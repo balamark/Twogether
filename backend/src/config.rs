@@ -9,6 +9,9 @@ pub struct Config {
     pub port: u16,
     pub max_file_size: usize,
     pub environment: String,
+    pub supabase_url: String,
+    pub supabase_anon_key: String,
+    pub supabase_service_role_key: String,
 }
 
 impl Config {
@@ -50,7 +53,31 @@ impl Config {
                 .unwrap_or_else(|_| "10485760".to_string()) // 10MB default
                 .parse()
                 .unwrap_or(10 * 1024 * 1024),
-            environment,
+            environment: environment.clone(),
+            supabase_url: env::var("SUPABASE_URL")
+                .unwrap_or_else(|_| {
+                    if environment == "production" {
+                        panic!("SUPABASE_URL must be set in production")
+                    } else {
+                        "https://your-project.supabase.co".to_string()
+                    }
+                }),
+            supabase_anon_key: env::var("SUPABASE_ANON_KEY")
+                .unwrap_or_else(|_| {
+                    if environment == "production" {
+                        panic!("SUPABASE_ANON_KEY must be set in production")
+                    } else {
+                        "your-anon-key".to_string()
+                    }
+                }),
+            supabase_service_role_key: env::var("SUPABASE_SERVICE_ROLE_KEY")
+                .unwrap_or_else(|_| {
+                    if environment == "production" {
+                        panic!("SUPABASE_SERVICE_ROLE_KEY must be set in production")
+                    } else {
+                        "your-service-role-key".to_string()
+                    }
+                }),
         })
     }
     

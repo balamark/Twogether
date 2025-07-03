@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Heart, Calendar, BarChart3, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Upload, Play, Coins, Star, CheckCircle, Plus, X, User, ShoppingBag } from 'lucide-react';
+import { Heart, Calendar, BarChart3, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Upload, Play, Coins, Plus, X, User, ShoppingBag } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import RoleplayView from './components/RoleplayView';
+import { AchievementsView } from './components/AchievementsView';
+import Header from './components/Header';
+import { NotificationContainer } from './components/ErrorNotification';
 import { apiService } from './services/api';
 
 interface IntimateRecord {
@@ -9,7 +12,7 @@ interface IntimateRecord {
   date: string;
   time: string;
   mood: string;
-  notes: string;
+  notes?: string;
   timestamp: string;
   photo?: string;
   description?: string;
@@ -38,7 +41,7 @@ interface JourneyMilestone {
 
 interface Notification {
   id: string;
-  type: 'success' | 'info' | 'warning';
+  type: 'success' | 'error' | 'info' | 'warning';
   title: string;
   message: string;
   coins?: number;
@@ -272,31 +275,82 @@ const LoveTimeApp = () => {
     return Math.random().toString(36).substr(2, 8).toUpperCase();
   };
 
-  const handleLogin = (email: string, nickname: string) => {
-    const user: User = {
-      id: Date.now().toString(),
-      email,
-      nickname,
-      partnerCode: generatePartnerCode(),
-      createdAt: new Date().toISOString()
-    };
-    
-    setAuthState({
-      user,
-      isAuthenticated: true,
-      partnerConnected: false
-    });
-    
-    setNicknames(prev => ({ ...prev, partner1: nickname }));
-    localStorage.setItem('authState', JSON.stringify({ user, isAuthenticated: true, partnerConnected: false }));
-    setShowAuthModal(false);
-    
-    showNotification({
-      type: 'success',
-      title: '登入成功！',
-      message: `歡迎 ${nickname}！你的配對碼是 ${user.partnerCode}`,
-      duration: 8000
-    });
+  const handleLogin = async (email: string, password: string, nickname: string) => {
+    try {
+      const authResult = await apiService.login(email, password);
+      
+      const user: User = {
+        id: authResult.user.id || Date.now().toString(),
+        email: authResult.user.email,
+        nickname: authResult.user.nickname,
+        partnerCode: generatePartnerCode(),
+        createdAt: authResult.user.created_at || new Date().toISOString()
+      };
+      
+      setAuthState({
+        user,
+        isAuthenticated: true,
+        partnerConnected: false
+      });
+      
+      setNicknames(prev => ({ ...prev, partner1: nickname }));
+      localStorage.setItem('authState', JSON.stringify({ user, isAuthenticated: true, partnerConnected: false }));
+      setShowAuthModal(false);
+      
+      showNotification({
+        type: 'success',
+        title: '登入成功！',
+        message: `歡迎回來 ${nickname}！`,
+        duration: 5000
+      });
+    } catch (error: any) {
+      console.error('Login error:', error);
+      showNotification({
+        type: 'error',
+        title: '登入失敗',
+        message: error.message || '登入過程中發生錯誤，請檢查帳號密碼',
+        duration: 5000
+      });
+    }
+  };
+
+  const handleRegister = async (email: string, nickname: string, password: string) => {
+    try {
+      const authResult = await apiService.register(email, nickname, password);
+      
+      const user: User = {
+        id: authResult.user.id || Date.now().toString(),
+        email: authResult.user.email,
+        nickname: authResult.user.nickname,
+        partnerCode: generatePartnerCode(),
+        createdAt: authResult.user.created_at || new Date().toISOString()
+      };
+      
+      setAuthState({
+        user,
+        isAuthenticated: true,
+        partnerConnected: false
+      });
+      
+      setNicknames(prev => ({ ...prev, partner1: nickname }));
+      localStorage.setItem('authState', JSON.stringify({ user, isAuthenticated: true, partnerConnected: false }));
+      setShowAuthModal(false);
+      
+      showNotification({
+        type: 'success',
+        title: '註冊成功！',
+        message: `歡迎 ${nickname}！已為你創建新帳號`,
+        duration: 5000
+      });
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      showNotification({
+        type: 'error',
+        title: '註冊失敗',
+        message: error.message || '註冊過程中發生錯誤，請檢查輸入資料',
+        duration: 5000
+      });
+    }
   };
 
   const handlePartnerConnect = (_partnerCode: string) => {
@@ -312,49 +366,29 @@ const LoveTimeApp = () => {
     });
   };
 
-  // Notification Component
-  const NotificationContainer = () => (
-    <div className="fixed top-4 right-4 z-50 space-y-2">
-      {notifications.map(notification => (
-        <div
-          key={notification.id}
-          className={`p-4 rounded-lg shadow-lg max-w-sm transform transition-all duration-300 ${
-            notification.type === 'success' ? 'bg-green-500 text-white' :
-            notification.type === 'info' ? 'bg-blue-500 text-white' :
-            'bg-yellow-500 text-white'
-          }`}
-        >
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center space-x-2 mb-1">
-                {notification.type === 'success' && <CheckCircle className="w-5 h-5" />}
-                {notification.coins && (
-                  <div className="flex items-center space-x-1">
-                    <Coins className="w-4 h-4" />
-                    <span className="font-bold">+{notification.coins}</span>
-                  </div>
-                )}
-              </div>
-              <h4 className="font-bold">{notification.title}</h4>
-              <p className="text-sm opacity-90">{notification.message}</p>
-              {notification.badge && (
-                <div className="flex items-center space-x-1 mt-2">
-                  <Star className="w-4 h-4" />
-                  <span className="text-sm">獲得徽章: {notification.badge}</span>
-                </div>
-              )}
-            </div>
-            <button
-              onClick={() => setNotifications(prev => prev.filter(n => n.id !== notification.id))}
-              className="ml-2 opacity-70 hover:opacity-100"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+  const handleLogout = async () => {
+    try {
+      await apiService.logout();
+      setAuthState({
+        user: null,
+        isAuthenticated: false,
+        partnerConnected: false
+      });
+      showNotification({
+        type: 'info',
+        title: '已登出',
+        message: '感謝使用 Twogether'
+      });
+    } catch (error: any) {
+      showNotification({
+        type: 'error',
+        title: '登出失敗',
+        message: error.message || '登出過程中發生錯誤'
+      });
+    }
+  };
+
+
 
   // Coin activities configuration
   const coinActivities: { [key: string]: CoinActivity } = {
@@ -451,34 +485,87 @@ const LoveTimeApp = () => {
 
   // Load saved data on component mount - only once
   useEffect(() => {
-    const loadData = async () => {
+    const loadInitialData = () => {
+      // Load localStorage data first (doesn't require authentication)
+      const savedMilestones = JSON.parse(localStorage.getItem('journeyMilestones') || '[]');
+      const savedAuth = JSON.parse(localStorage.getItem('authState') || '{}');
+      const savedCustomGifts = JSON.parse(localStorage.getItem('customGifts') || '[]');
+      const savedCustomScripts = JSON.parse(localStorage.getItem('customScripts') || '[]');
+      
+      setJourneyMilestones(savedMilestones);
+      setCustomGifts(savedCustomGifts);
+      setCustomScripts(savedCustomScripts);
+      
+      // Only set auth state if we have both user and valid token
+      const authToken = localStorage.getItem('authToken');
+      if (savedAuth.user && authToken) {
+        setAuthState(savedAuth);
+      } else {
+        // Clear invalid auth state
+        localStorage.removeItem('authState');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('authUser');
+      }
+    };
+
+    loadInitialData();
+  }, []);
+
+  // Load authenticated data when user logs in
+  useEffect(() => {
+    const loadAuthenticatedData = async () => {
+      if (!authState.isAuthenticated) return;
+      
+      // Check if we have valid token before making API calls
+      if (!apiService.hasValidToken()) {
+        // No valid token, clear auth state
+        setAuthState({
+          user: null,
+          isAuthenticated: false,
+          partnerConnected: false
+        });
+        localStorage.removeItem('authState');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('authUser');
+        return;
+      }
+      
       try {
-        // Load data using API service
+        // Load data using API service (requires authentication)
         const [
           savedRecords,
           savedNicknames,
           savedCoins
         ] = await Promise.all([
-          apiService.getIntimateRecords(),
-          apiService.getNicknames(),
-          apiService.getTotalCoins()
+          apiService.getIntimateRecords().catch(() => []), // Fallback to empty array
+          apiService.getNicknames().catch(() => ({ partner1: '親愛的', partner2: '寶貝' })), // Fallback to defaults
+          apiService.getTotalCoins().catch(() => 0) // Fallback to 0
         ]);
-
-        // Load localStorage-only data (until backend implements these)
-        const savedMilestones = JSON.parse(localStorage.getItem('journeyMilestones') || '[]');
-        const savedAuth = JSON.parse(localStorage.getItem('authState') || '{}');
-        const savedCustomGifts = JSON.parse(localStorage.getItem('customGifts') || '[]');
-        const savedCustomScripts = JSON.parse(localStorage.getItem('customScripts') || '[]');
         
         setIntimateRecords(savedRecords);
         if (savedNicknames.partner1) setNicknames(savedNicknames);
-        setJourneyMilestones(savedMilestones);
         setTotalCoins(savedCoins);
-        if (savedAuth.user) setAuthState(savedAuth);
-        setCustomGifts(savedCustomGifts);
-        setCustomScripts(savedCustomScripts);
       } catch (error) {
-        console.error('Error loading saved data:', error);
+        console.error('Error loading authenticated data:', error);
+        
+        // If it's an authentication error, clear auth state
+        if (error instanceof Error && (error.message.includes('登錄已過期') || error.message.includes('401'))) {
+          setAuthState({
+            user: null,
+            isAuthenticated: false,
+            partnerConnected: false
+          });
+          localStorage.removeItem('authState');
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('authUser');
+          showNotification({
+            type: 'warning',
+            title: '登錄已過期',
+            message: '請重新登錄以繼續使用',
+            duration: 5000
+          });
+        }
+        
         // Fallback to localStorage if API fails
         try {
           const savedRecords = JSON.parse(localStorage.getItem('intimateRecords') || '[]');
@@ -494,8 +581,8 @@ const LoveTimeApp = () => {
       }
     };
 
-    loadData();
-  }, []);
+    loadAuthenticatedData();
+  }, [authState.isAuthenticated]);
 
   // Save data whenever records, nicknames, milestones, or coins change
   useEffect(() => {
@@ -620,7 +707,7 @@ const LoveTimeApp = () => {
     date: string, 
     time: string, 
     mood: string, 
-    notes: string,
+    notes?: string,
     photo?: string,
     description?: string,
     duration?: string,
@@ -687,12 +774,12 @@ const LoveTimeApp = () => {
         coins: coinsEarned,
         duration: 6000
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error adding intimate record:', error);
       showNotification({
-        type: 'warning',
+        type: 'error',
         title: '記錄失敗',
-        message: '無法保存記錄，請稍後再試',
+        message: error.message || '無法保存記錄，請檢查網絡連接',
         duration: 5000
       });
     }
@@ -1207,9 +1294,17 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
   ];
 
   const CalendarView = () => {
+    // Helper function to get current time in HH:MM format
+    const getCurrentTime = () => {
+      const now = new Date();
+      const hours = now.getHours().toString().padStart(2, '0');
+      const minutes = now.getMinutes().toString().padStart(2, '0');
+      return `${hours}:${minutes}`;
+    };
+
     const [recordForm, setRecordForm] = useState({
       date: selectedDate,
-      time: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false }),
+      time: getCurrentTime(),
       mood: '💕',
       notes: '',
       description: '',
@@ -1252,21 +1347,42 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
     };
 
     const handleSubmitRecord = async () => {
+      // Validate required fields
+      if (!recordForm.date) {
+        showNotification({
+          type: 'error',
+          title: '驗證錯誤',
+          message: '請選擇日期',
+          duration: 5000
+        });
+        return;
+      }
+
+      if (!recordForm.time) {
+        showNotification({
+          type: 'error',
+          title: '驗證錯誤',
+          message: '請選擇時間',
+          duration: 5000
+        });
+        return;
+      }
+
       await addIntimateRecord(
         recordForm.date,
         recordForm.time,
         recordForm.mood,
-        recordForm.notes,
+        recordForm.notes || undefined, // Convert empty string to undefined
         recordForm.photo,
-        recordForm.description,
-        recordForm.duration,
-        recordForm.location,
-        recordForm.roleplayScript
+        recordForm.description || undefined, // Convert empty string to undefined
+        recordForm.duration || undefined,
+        recordForm.location || undefined,
+        recordForm.roleplayScript || undefined
       );
       setShowRecordModal(false);
       setRecordForm({
         date: selectedDate,
-        time: new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false }),
+        time: getCurrentTime(),
         mood: '💕',
         notes: '',
         description: '',
@@ -1702,15 +1818,29 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
 
   // Authentication Modal Component
   const AuthModal = () => {
-    const [isLogin, setIsLogin] = useState(true);
+    const [authMode, setAuthMode] = useState<'login' | 'register' | 'partner'>('login');
     const [email, setEmail] = useState('');
     const [nickname, setNickname] = useState('');
+    const [password, setPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
     const [partnerCode, setPartnerCode] = useState('');
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      if (isLogin) {
-        handleLogin(email, nickname);
+      
+      if (authMode === 'login') {
+        handleLogin(email, password, nickname);
+      } else if (authMode === 'register') {
+        if (password !== confirmPassword) {
+          showNotification({
+            type: 'error',
+            title: '密碼不匹配',
+            message: '請確認兩次輸入的密碼相同',
+            duration: 3000
+          });
+          return;
+        }
+        handleRegister(email, nickname, password);
       } else {
         handlePartnerConnect(partnerCode);
       }
@@ -1721,7 +1851,8 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
         <div className="bg-white rounded-lg p-6 max-w-md w-full">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-bold text-pink-700">
-              {isLogin ? '登入愛的時光' : '連接伴侶'}
+              {authMode === 'login' ? '登入愛的時光' : 
+               authMode === 'register' ? '註冊新帳號' : '連接伴侶'}
             </h3>
             <button
               onClick={() => setShowAuthModal(false)}
@@ -1732,7 +1863,56 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {isLogin ? (
+            {authMode === 'login' ? (
+              <>
+                <div>
+                  <label htmlFor="auth-email" className="block text-sm font-medium text-gray-700 mb-2">
+                    電子郵件
+                  </label>
+                  <input
+                    id="auth-email"
+                    name="auth-email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                    placeholder="輸入你的電子郵件"
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="auth-password" className="block text-sm font-medium text-gray-700 mb-2">
+                    密碼
+                  </label>
+                  <input
+                    id="auth-password"
+                    name="auth-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                    placeholder="輸入你的密碼"
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="auth-nickname" className="block text-sm font-medium text-gray-700 mb-2">
+                    暱稱
+                  </label>
+                  <input
+                    id="auth-nickname"
+                    name="auth-nickname"
+                    type="text"
+                    value={nickname}
+                    onChange={(e) => setNickname(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                    placeholder="輸入你的暱稱"
+                    required
+                  />
+                </div>
+              </>
+            ) : authMode === 'register' ? (
               <>
                 <div>
                   <label htmlFor="auth-email" className="block text-sm font-medium text-gray-700 mb-2">
@@ -1764,6 +1944,38 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
                     required
                   />
                 </div>
+                <div>
+                  <label htmlFor="auth-password" className="block text-sm font-medium text-gray-700 mb-2">
+                    密碼
+                  </label>
+                  <input
+                    id="auth-password"
+                    name="auth-password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                    placeholder="輸入你的密碼"
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="auth-confirm-password" className="block text-sm font-medium text-gray-700 mb-2">
+                    確認密碼
+                  </label>
+                  <input
+                    id="auth-confirm-password"
+                    name="auth-confirm-password"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                    placeholder="再次輸入密碼"
+                    required
+                    minLength={6}
+                  />
+                </div>
               </>
             ) : (
               <div>
@@ -1787,17 +1999,44 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
               type="submit"
               className="w-full bg-gradient-to-r from-pink-500 to-rose-600 text-white py-3 rounded-lg hover:from-pink-600 hover:to-rose-700 transition-colors"
             >
-              {isLogin ? '開始愛的旅程' : '連接伴侶'}
+              {authMode === 'login' ? '開始愛的旅程' : 
+               authMode === 'register' ? '註冊帳號' : '連接伴侶'}
             </button>
           </form>
 
-          <div className="mt-4 text-center">
-            <button
-              onClick={() => setIsLogin(!isLogin)}
-              className="text-pink-600 hover:text-pink-700 text-sm"
-            >
-              {isLogin ? '已有帳號？連接伴侶' : '還沒帳號？立即註冊'}
-            </button>
+          <div className="mt-4 text-center space-y-2">
+            {authMode === 'login' && (
+              <>
+                <button
+                  onClick={() => setAuthMode('register')}
+                  className="text-pink-600 hover:text-pink-700 text-sm block w-full"
+                >
+                  還沒帳號？立即註冊
+                </button>
+                <button
+                  onClick={() => setAuthMode('partner')}
+                  className="text-pink-600 hover:text-pink-700 text-sm block w-full"
+                >
+                  已有帳號？連接伴侶
+                </button>
+              </>
+            )}
+            {authMode === 'register' && (
+              <button
+                onClick={() => setAuthMode('login')}
+                className="text-pink-600 hover:text-pink-700 text-sm block w-full"
+              >
+                已有帳號？立即登入
+              </button>
+            )}
+            {authMode === 'partner' && (
+              <button
+                onClick={() => setAuthMode('login')}
+                className="text-pink-600 hover:text-pink-700 text-sm block w-full"
+              >
+                還沒帳號？立即註冊
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -2475,6 +2714,7 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
   const navItems = [
     { id: 'foreplay', label: '前戲探索', icon: Sparkles },
     { id: 'record', label: '記錄時光', icon: Calendar },
+    { id: 'achievements', label: '成就統計', icon: Trophy },
     { id: 'stats', label: '親密統計', icon: BarChart3 },
     { id: 'shop', label: '金幣商店', icon: ShoppingBag },
     { id: 'games', label: '情趣遊戲', icon: Gamepad2 },
@@ -2488,6 +2728,7 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
     switch (currentView) {
       case 'foreplay': return <ForeplayView />;
       case 'record': return <CalendarView />;
+      case 'achievements': return <AchievementsView />;
       case 'stats': return <StatsView />;
       case 'shop': return <CoinShopView />;
       case 'games': return <GamesView />;
@@ -2509,28 +2750,35 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
         setJourneyMilestones={setJourneyMilestones}
         authState={authState}
         setShowAuthModal={setShowAuthModal}
+        onAuthStateUpdate={setAuthState}
       />;
       default: return <ForeplayView />;
     }
   };
 
+  const closeNotification = (id: string) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-100 via-purple-50 to-indigo-100">
+      {/* Header */}
+      <Header
+        authState={authState}
+        totalCoins={totalCoins}
+        onShowAuthModal={() => setShowAuthModal(true)}
+        onLogout={handleLogout}
+      />
+      
       {/* Notification Container */}
-      <NotificationContainer />
+      <NotificationContainer 
+        notifications={notifications}
+        onClose={closeNotification}
+      />
       
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
+        {/* Tagline */}
         <div className="text-center mb-8">
-          <div className="flex items-center justify-center space-x-4 mb-4">
-            <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600">
-              Twogether 圖在一起
-            </h1>
-            <div className="flex items-center space-x-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-full">
-              <Coins className="w-5 h-5" />
-              <span className="font-bold">{totalCoins}</span>
-            </div>
-          </div>
           <p className="text-gray-600">為熱戀中的你們，記錄每一段親密時光</p>
         </div>
 

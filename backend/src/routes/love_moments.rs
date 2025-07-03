@@ -39,6 +39,8 @@ async fn create_love_moment(
     claims: Claims,
     Json(payload): Json<CreateLoveMomentRequest>,
 ) -> Result<Json<LoveMomentResponse>> {
+    tracing::debug!("Creating love moment for user {}", claims.sub);
+    
     // Validate input
     payload.validate().map_err(|e| {
         AppError::Validation(format!("驗證失敗: {}", e))
@@ -53,10 +55,15 @@ async fn create_love_moment(
         user_id
     )
     .fetch_optional(&state.db.pool)
-    .await?
-    .ok_or_else(|| AppError::NotFound("您還沒有配對。請先創建情侶檔案。".to_string()))?;
+    .await?;
 
-    let couple_id = couple.id;
+    if couple.is_none() {
+        tracing::warn!("User {} attempted to create love moment but has no couple", user_id);
+        return Err(AppError::NotFound("您還沒有配對。請先創建情侶檔案。".to_string()));
+    }
+
+    let couple_id = couple.unwrap().id;
+    tracing::debug!("Found couple {} for user {}", couple_id, user_id);
 
     // Create love moment
     let moment_id = Uuid::new_v4();
@@ -101,7 +108,16 @@ async fn create_love_moment(
 
     // Get photo URL if photo_id is provided
     let photo_url = if let Some(photo_id) = payload.photo_id {
-        Some(format!("/api/photos/{}/file", photo_id))
+        // Get the actual storage URL from the database
+        let photo = sqlx::query!(
+            "SELECT storage_url FROM photos WHERE id = $1",
+            photo_id
+        )
+        .fetch_optional(&state.db.pool)
+        .await?;
+        
+        photo.and_then(|p| p.storage_url)
+            .or_else(|| Some(state.supabase_storage.get_photo_url(couple_id, photo_id)))
     } else {
         None
     };
@@ -127,6 +143,8 @@ async fn get_love_moments(
     claims: Claims,
     Query(_query): Query<LoveMomentsQuery>,
 ) -> Result<Json<Vec<LoveMomentResponse>>> {
+    tracing::debug!("Fetching love moments for user {}", claims.sub);
+    
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| AppError::Auth("無效的用戶ID".to_string()))?;
 
@@ -136,24 +154,36 @@ async fn get_love_moments(
         user_id
     )
     .fetch_optional(&state.db.pool)
-    .await?
-    .ok_or_else(|| AppError::NotFound("您還沒有配對".to_string()))?;
+    .await?;
 
-    // Query with photo information
+    if couple.is_none() {
+        tracing::warn!("User {} attempted to fetch love moments but has no couple", user_id);
+        return Err(AppError::NotFound("您還沒有配對".to_string()));
+    }
+
+    let couple_id = couple.unwrap().id;
+    tracing::debug!("Found couple {} for user {}", couple_id, user_id);
+
+    // Query with photo information including storage URLs
     let moments = sqlx::query!(
-        "SELECT lm.id, lm.moment_date, lm.notes, lm.description, lm.duration, lm.location, lm.roleplay_script, lm.photo_id, lm.created_at, u.nickname as recorded_by_nickname
+        "SELECT lm.id, lm.moment_date, lm.notes, lm.description, lm.duration, lm.location, lm.roleplay_script, lm.photo_id, lm.created_at, u.nickname as recorded_by_nickname, p.storage_url
          FROM love_moments lm
          JOIN users u ON lm.recorded_by = u.id
+         LEFT JOIN photos p ON lm.photo_id = p.id
          WHERE lm.couple_id = $1
          ORDER BY lm.moment_date DESC
          LIMIT 100",
-        couple.id
+        couple_id
     )
     .fetch_all(&state.db.pool)
     .await?;
 
     let response_moments: Vec<LoveMomentResponse> = moments.into_iter().map(|moment| {
-        let photo_url = moment.photo_id.map(|id| format!("/api/photos/{}/file", id));
+        let photo_url = moment.photo_id.map(|photo_id| {
+            moment.storage_url.unwrap_or_else(|| {
+                state.supabase_storage.get_photo_url(couple_id, photo_id)
+            })
+        });
         
         LoveMomentResponse {
             id: moment.id,
@@ -179,23 +209,37 @@ async fn get_love_moment(
     claims: Claims,
     Path(moment_id): Path<Uuid>,
 ) -> Result<Json<LoveMomentResponse>> {
+    tracing::debug!("Fetching love moment {} for user {}", moment_id, claims.sub);
+    
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| AppError::Auth("無效的用戶ID".to_string()))?;
 
     let moment = sqlx::query!(
-        "SELECT lm.id, lm.moment_date, lm.notes, lm.description, lm.duration, lm.location, lm.roleplay_script, lm.photo_id, lm.created_at, u.nickname as recorded_by_nickname
+        "SELECT lm.id, lm.moment_date, lm.notes, lm.description, lm.duration, lm.location, lm.roleplay_script, lm.photo_id, lm.created_at, u.nickname as recorded_by_nickname, p.storage_url, c.id as couple_id
          FROM love_moments lm
          JOIN users u ON lm.recorded_by = u.id
          JOIN couples c ON lm.couple_id = c.id
+         LEFT JOIN photos p ON lm.photo_id = p.id
          WHERE lm.id = $1 AND (c.user1_id = $2 OR c.user2_id = $2)",
         moment_id,
         user_id
     )
     .fetch_optional(&state.db.pool)
-    .await?
-    .ok_or_else(|| AppError::NotFound("愛的時光記錄不存在".to_string()))?;
+    .await?;
 
-    let photo_url = moment.photo_id.map(|id| format!("/api/photos/{}/file", id));
+    if moment.is_none() {
+        tracing::warn!("Love moment {} not found or not accessible by user {}", moment_id, user_id);
+        return Err(AppError::NotFound("愛的時光記錄不存在".to_string()));
+    }
+
+    let moment = moment.unwrap();
+    tracing::debug!("Found love moment {} for couple {}", moment_id, moment.couple_id);
+
+    let photo_url = moment.photo_id.map(|photo_id| {
+        moment.storage_url.unwrap_or_else(|| {
+            state.supabase_storage.get_photo_url(moment.couple_id, photo_id)
+        })
+    });
 
     let response = LoveMomentResponse {
         id: moment.id,

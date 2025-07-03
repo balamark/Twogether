@@ -1,7 +1,10 @@
 use axum::{
     async_trait,
-    extract::FromRequestParts,
-    http::{header::AUTHORIZATION, request::Parts},
+    extract::{FromRequestParts, State},
+    http::{header::AUTHORIZATION, request::Parts, Request, StatusCode},
+    middleware::Next,
+    response::Response,
+    body::Body,
 };
 use jsonwebtoken::{decode, DecodingKey, Validation};
 
@@ -10,6 +13,40 @@ use crate::{
     models::Claims,
     AppState,
 };
+
+pub async fn require_auth(
+    State(state): State<AppState>,
+    request: Request<Body>,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    let auth_header = request
+        .headers()
+        .get(AUTHORIZATION)
+        .and_then(|header| header.to_str().ok());
+
+    match auth_header {
+        Some(auth_str) if auth_str.starts_with("Bearer ") => {
+            let token = auth_str.strip_prefix("Bearer ").unwrap();
+            
+            // Validate the token
+            match decode::<Claims>(
+                token,
+                &DecodingKey::from_secret(state.config.jwt_secret.as_ref()),
+                &Validation::default(),
+            ) {
+                Ok(_) => Ok(next.run(request).await),
+                Err(e) => {
+                    tracing::warn!("Invalid token: {}", e);
+                    Err(StatusCode::UNAUTHORIZED)
+                }
+            }
+        }
+        _ => {
+            tracing::warn!("Missing or invalid Authorization header");
+            Err(StatusCode::UNAUTHORIZED)
+        }
+    }
+}
 
 #[async_trait]
 impl FromRequestParts<AppState> for Claims {

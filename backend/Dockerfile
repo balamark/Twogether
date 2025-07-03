@@ -1,5 +1,5 @@
 # Multi-stage build for Rust backend
-FROM rust:1.75-slim as builder
+FROM rust:nightly as builder
 
 # Install required dependencies
 RUN apt-get update && apt-get install -y \
@@ -11,15 +11,18 @@ RUN apt-get update && apt-get install -y \
 # Create app directory
 WORKDIR /app
 
-# Copy cargo files
+# Copy workspace cargo files
 COPY Cargo.toml Cargo.lock ./
+COPY backend/Cargo.toml ./backend/Cargo.toml
 
 # Copy source code
-COPY src ./src
-COPY migrations ./migrations
+COPY backend/src ./backend/src
+COPY backend/migrations ./backend/migrations
+COPY backend/.sqlx ./backend/.sqlx
 
-# Build the application
-RUN cargo build --release
+# Build the application with SQLx offline mode
+ENV SQLX_OFFLINE=true
+RUN cd backend && cargo build --release
 
 # Runtime stage
 FROM debian:bookworm-slim
@@ -29,6 +32,7 @@ RUN apt-get update && apt-get install -y \
     ca-certificates \
     libpq5 \
     libssl3 \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create app user
@@ -41,7 +45,7 @@ WORKDIR /app
 COPY --from=builder /app/target/release/twogether-backend /app/twogether-backend
 
 # Copy migrations
-COPY --from=builder /app/migrations /app/migrations
+COPY --from=builder /app/backend/migrations /app/migrations
 
 # Create uploads directory
 RUN mkdir -p /app/uploads && chown -R appuser:appuser /app

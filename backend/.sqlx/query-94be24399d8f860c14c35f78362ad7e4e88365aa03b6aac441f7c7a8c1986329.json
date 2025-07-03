@@ -1,0 +1,89 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT lm.id, lm.moment_date, lm.notes, lm.description, lm.duration, lm.location, lm.roleplay_script, lm.photo_id, lm.created_at, u.nickname as recorded_by_nickname, p.storage_url, c.id as couple_id\n         FROM love_moments lm\n         JOIN users u ON lm.recorded_by = u.id\n         JOIN couples c ON lm.couple_id = c.id\n         LEFT JOIN photos p ON lm.photo_id = p.id\n         WHERE lm.id = $1 AND (c.user1_id = $2 OR c.user2_id = $2)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "moment_date",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "notes",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "duration",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "location",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "roleplay_script",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "photo_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 8,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "recorded_by_nickname",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "storage_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "couple_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "94be24399d8f860c14c35f78362ad7e4e88365aa03b6aac441f7c7a8c1986329"
+}

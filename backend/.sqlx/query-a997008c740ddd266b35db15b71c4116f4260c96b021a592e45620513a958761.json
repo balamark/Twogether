@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DATE(moment_date) as moment_date \n         FROM love_moments \n         WHERE couple_id = $1 \n         ORDER BY moment_date DESC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "moment_date",
+        "type_info": "Date"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "a997008c740ddd266b35db15b71c4116f4260c96b021a592e45620513a958761"
+}

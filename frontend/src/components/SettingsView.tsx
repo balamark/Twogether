@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { User, Users, CheckCircle } from 'lucide-react';
+import { apiService } from '../services/api';
+import ErrorNotification from './ErrorNotification';
 
 interface Nicknames {
   partner1: string;
@@ -32,6 +34,13 @@ interface AuthState {
   partnerConnected: boolean;
 }
 
+interface ApiError {
+  error: string;
+  error_code: string;
+  status: number;
+  timestamp: string;
+}
+
 interface SettingsViewProps {
   nicknames: Nicknames;
   handleNicknameChange: (partner: 'partner1' | 'partner2', value: string) => void;
@@ -39,6 +48,7 @@ interface SettingsViewProps {
   setJourneyMilestones: React.Dispatch<React.SetStateAction<JourneyMilestone[]>>;
   authState: AuthState;
   setShowAuthModal: React.Dispatch<React.SetStateAction<boolean>>;
+  onAuthStateUpdate?: (authState: AuthState) => void;
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({
@@ -47,8 +57,85 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   journeyMilestones,
   setJourneyMilestones,
   authState,
-  setShowAuthModal
+  setShowAuthModal,
+  onAuthStateUpdate
 }) => {
+  const [pairingCode, setPairingCode] = useState('');
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const handleGenerateCode = async () => {
+    try {
+      setError(null);
+      setSuccess(null);
+      const response = await apiService.generatePairingCode();
+      setGeneratedCode(response.code);
+      setSuccess('配對碼已生成，請分享給您的伴侶');
+    } catch (err: any) {
+      console.error('Generate pairing code error:', err);
+      const apiError = err.response?.data as ApiError;
+      if (apiError?.error_code === 'ALREADY_PAIRED') {
+        setError('您已經有配對的伴侶了，無法生成新的配對碼');
+      } else if (apiError?.error_code === 'CODE_EXISTS') {
+        setError('您已有一個有效的配對碼，請等待其過期後再生成新的配對碼');
+      } else {
+        setError(err.message || '生成配對碼失敗，請稍後再試');
+      }
+    }
+  };
+
+  const handlePairWithCode = async () => {
+    try {
+      setError(null);
+      setSuccess(null);
+      if (!pairingCode.trim()) {
+        setError('請輸入配對碼');
+        return;
+      }
+      
+      const coupleResult = await apiService.createCouple({ pairingCode: pairingCode.trim() });
+      
+      // Update authentication state to reflect pairing
+      if (authState.user && onAuthStateUpdate) {
+        const updatedAuthState = {
+          ...authState,
+          partnerConnected: true,
+          user: {
+            ...authState.user,
+            partnerId: coupleResult.id
+          }
+        };
+        
+        // Update local state and localStorage
+        localStorage.setItem('authState', JSON.stringify(updatedAuthState));
+        
+        // Update parent component's auth state
+        onAuthStateUpdate(updatedAuthState);
+      }
+      
+      setSuccess('配對成功！您現在已經與伴侶連結');
+      setPairingCode('');
+      
+    } catch (err: any) {
+      console.error('Pair with code error:', err);
+      const apiError = err.response?.data as ApiError;
+      
+      // Handle specific error cases
+      if (apiError?.error_code === 'NOT_FOUND') {
+        setError('配對碼無效或已過期，請確認配對碼是否正確或請您的伴侶重新生成');
+      } else if (apiError?.error_code === 'ALREADY_PAIRED') {
+        setError('您已經有配對的伴侶了，無法使用配對碼');
+      } else if (apiError?.error_code === 'CODE_EXPIRED') {
+        setError('此配對碼已過期，請您的伴侶重新生成');
+      } else if (apiError?.error_code === 'SELF_PAIRING') {
+        setError('無法使用自己生成的配對碼進行配對');
+      } else {
+        setError(err.message || '配對失敗，請稍後再試');
+      }
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-6 rounded-2xl">
@@ -157,7 +244,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* Authentication Section */}
+      {/* Authentication and Pairing Section */}
       {!authState.isAuthenticated ? (
         <div className="bg-white rounded-2xl shadow-lg p-6">
           <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
@@ -176,9 +263,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="bg-white rounded-2xl shadow-lg p-6">
           <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
             <Users className="w-5 h-5 mr-2 text-green-500" />
-            配對狀態
+            情侶配對
           </h3>
-          <div className="space-y-4">
+          
+          {/* User Status */}
+          <div className="space-y-4 mb-6">
             <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
               <div>
                 <p className="font-medium text-green-800">已登入</p>
@@ -187,29 +276,106 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               <CheckCircle className="w-6 h-6 text-green-500" />
             </div>
             
-            {!authState.partnerConnected ? (
-              <div className="p-4 bg-yellow-50 rounded-lg">
-                <p className="font-medium text-yellow-800 mb-2">配對碼</p>
-                <div className="flex items-center space-x-2">
-                  <span className="bg-yellow-200 px-3 py-1 rounded font-mono text-lg">
-                    {authState.user?.partnerCode}
-                  </span>
-                  <button
-                    onClick={() => navigator.clipboard.writeText(authState.user?.partnerCode || '')}
-                    className="text-yellow-600 hover:text-yellow-700"
-                  >
-                    複製
-                  </button>
-                </div>
-                <p className="text-sm text-yellow-600 mt-2">分享此碼給你的伴侶來連接帳號</p>
-              </div>
-            ) : (
+            {authState.partnerConnected ? (
               <div className="p-4 bg-green-50 rounded-lg">
                 <p className="font-medium text-green-800">✓ 已與伴侶連接</p>
                 <p className="text-sm text-green-600">你們可以分享愛的時光了！</p>
               </div>
+            ) : (
+              <div className="p-4 bg-yellow-50 rounded-lg">
+                <p className="font-medium text-yellow-800 mb-2">等待配對</p>
+                <p className="text-sm text-yellow-600">使用下方功能與伴侶建立連接</p>
+              </div>
             )}
           </div>
+
+          {/* Generate Code Section */}
+          {!authState.partnerConnected && (
+            <>
+              <div className="mb-6">
+                <h4 className="text-lg font-medium mb-2">生成配對碼</h4>
+                <p className="text-gray-600 mb-4">
+                  生成一個配對碼並分享給您的伴侶，讓他們可以與您配對。
+                  配對碼有效期為24小時。
+                </p>
+                <button
+                  onClick={handleGenerateCode}
+                  className="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600 transition-colors"
+                >
+                  生成配對碼
+                </button>
+                {generatedCode && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                    <p className="text-gray-700">您的配對碼：</p>
+                    <div className="flex items-center space-x-2 mt-2">
+                      <span className="bg-yellow-200 px-3 py-1 rounded font-mono text-lg">
+                        {generatedCode}
+                      </span>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(generatedCode)}
+                        className="text-yellow-600 hover:text-yellow-700"
+                      >
+                        複製
+                      </button>
+                    </div>
+                    <p className="text-sm text-gray-500 mt-2">
+                      此配對碼將在24小時後失效
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Enter Code Section */}
+              <div className="border-t pt-6">
+                <h4 className="text-lg font-medium mb-2">輸入配對碼</h4>
+                <p className="text-gray-600 mb-4">
+                  如果您的伴侶已經生成了配對碼，請在此輸入以完成配對。
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={pairingCode}
+                    onChange={(e) => setPairingCode(e.target.value.toUpperCase())}
+                    placeholder="輸入配對碼"
+                    className="flex-1 border rounded px-3 py-2 font-mono"
+                    maxLength={8}
+                  />
+                  <button
+                    onClick={handlePairWithCode}
+                    className="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600 transition-colors"
+                  >
+                    配對
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Error/Success Messages */}
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mt-4">
+          <span className="block sm:inline">{error}</span>
+          <button
+            className="absolute top-0 bottom-0 right-0 px-4 py-3"
+            onClick={() => setError(null)}
+          >
+            <span className="sr-only">關閉</span>
+            <span className="text-2xl">&times;</span>
+          </button>
+        </div>
+      )}
+      {success && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mt-4">
+          <span className="block sm:inline">{success}</span>
+          <button
+            className="absolute top-0 bottom-0 right-0 px-4 py-3"
+            onClick={() => setSuccess(null)}
+          >
+            <span className="sr-only">關閉</span>
+            <span className="text-2xl">&times;</span>
+          </button>
         </div>
       )}
     </div>

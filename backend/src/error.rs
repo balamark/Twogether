@@ -3,90 +3,80 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use bcrypt::BcryptError;
 use serde_json::json;
+use sqlx::migrate::MigrateError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum AppError {
-    #[error("Database error: {0}")]
-    Database(#[from] sqlx::Error),
-    
-    #[error("Migration error: {0}")]
-    Migration(#[from] sqlx::migrate::MigrateError),
-    
-    #[error("Authentication error: {0}")]
-    Auth(String),
-    
-    #[error("Validation error: {0}")]
+    #[error("驗證錯誤: {0}")]
     Validation(String),
-    
-    #[error("Not found: {0}")]
+
+    #[error("認證錯誤: {0}")]
+    Auth(String),
+
+    #[error("資源不存在: {0}")]
     NotFound(String),
-    
-    #[error("Unauthorized")]
-    Unauthorized,
-    
-    #[error("Forbidden")]
-    Forbidden,
-    
-    #[error("Internal server error: {0}")]
-    Internal(#[from] anyhow::Error),
-    
-    #[error("Bad request: {0}")]
-    BadRequest(String),
-    
-    #[error("Conflict: {0}")]
+
+    #[error("資源衝突: {0}")]
     Conflict(String),
-    
-    #[error("JWT error: {0}")]
-    Jwt(#[from] jsonwebtoken::errors::Error),
-    
-    #[error("BCrypt error: {0}")]
-    BCrypt(#[from] bcrypt::BcryptError),
-    
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
+
+    #[error("請求錯誤: {0}")]
+    BadRequest(String),
+
+    #[error("內部錯誤: {0}")]
+    Internal(#[from] anyhow::Error),
+
+    #[error("資料庫錯誤: {0}")]
+    Database(#[from] sqlx::Error),
+}
+
+// Implement From<BcryptError> for AppError
+impl From<BcryptError> for AppError {
+    fn from(error: BcryptError) -> Self {
+        AppError::Internal(anyhow::anyhow!("密碼加密錯誤: {}", error))
+    }
+}
+
+// Implement From<MigrateError> for AppError
+impl From<MigrateError> for AppError {
+    fn from(error: MigrateError) -> Self {
+        AppError::Internal(anyhow::anyhow!("資料庫遷移錯誤: {}", error))
+    }
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        let (status, error_message) = match self {
-            AppError::Database(ref e) => {
-                tracing::error!("Database error: {:?}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Database error occurred")
-            }
-            AppError::Migration(ref e) => {
-                tracing::error!("Migration error: {:?}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Database migration error")
-            }
-            AppError::Auth(ref msg) => (StatusCode::UNAUTHORIZED, msg.as_str()),
-            AppError::Validation(ref msg) => (StatusCode::BAD_REQUEST, msg.as_str()),
-            AppError::NotFound(ref msg) => (StatusCode::NOT_FOUND, msg.as_str()),
-            AppError::Unauthorized => (StatusCode::UNAUTHORIZED, "Unauthorized"),
-            AppError::Forbidden => (StatusCode::FORBIDDEN, "Forbidden"),
-            AppError::Internal(ref e) => {
+        let (status, error_code, error_message) = match self {
+            AppError::Validation(msg) => (StatusCode::UNPROCESSABLE_ENTITY, "VALIDATION_ERROR", msg),
+            AppError::Auth(msg) => (StatusCode::UNAUTHORIZED, "UNAUTHORIZED", msg),
+            AppError::NotFound(msg) => (StatusCode::NOT_FOUND, "NOT_FOUND", msg),
+            AppError::Conflict(msg) => (StatusCode::CONFLICT, "CONFLICT", msg),
+            AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, "BAD_REQUEST", msg),
+            AppError::Internal(e) => {
                 tracing::error!("Internal error: {:?}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal server error")
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "INTERNAL_ERROR",
+                    "內部錯誤，請稍後再試".to_string(),
+                )
             }
-            AppError::BadRequest(ref msg) => (StatusCode::BAD_REQUEST, msg.as_str()),
-            AppError::Conflict(ref msg) => (StatusCode::CONFLICT, msg.as_str()),
-            AppError::Jwt(ref e) => {
-                tracing::error!("JWT error: {:?}", e);
-                (StatusCode::UNAUTHORIZED, "Invalid token")
-            }
-            AppError::BCrypt(ref e) => {
-                tracing::error!("BCrypt error: {:?}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Password processing error")
-            }
-            AppError::Io(ref e) => {
-                tracing::error!("IO error: {:?}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "File operation error")
+            AppError::Database(e) => {
+                tracing::error!("Database error: {:?}", e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "DATABASE_ERROR",
+                    "資料庫錯誤，請稍後再試".to_string(),
+                )
             }
         };
 
         let body = Json(json!({
-            "error": error_message,
-            "status": status.as_u16()
+            "error": {
+                "code": error_code,
+                "message": error_message,
+            }
         }));
 
         (status, body).into_response()

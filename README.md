@@ -42,28 +42,72 @@
 - **硬幣系統**: 交易記錄和餘額管理
 - **照片存儲**: 文件管理和元數據存儲
 
+## 🎯 最新改進
+
+### ✅ **增強日誌記錄與錯誤處理**
+- 詳細的請求/響應日誌記錄，包含執行時間
+- 中英文友好的錯誤提示信息
+- 結構化日誌，支持多種級別 (debug, info, warn, error)
+- 日誌文件輸出 (`logs/backend.log`, `logs/frontend.log`) 便於調試
+- 改進的 API 錯誤處理，提供具體錯誤代碼和用戶友好消息
+
+### ✅ **改進用戶界面**
+- 登錄/註冊移至右上角標頭 (符合行業標準)
+- 專業的標頭組件，包含用戶下拉菜單
+- 增強的通知系統，更好的錯誤顯示
+- 清晰的模塊化組件分離
+- 更好的響應式設計和可訪問性
+
+### ✅ **Supabase 雲端存儲集成**
+- 照片存儲從數據庫 BLOB 遷移到 Supabase 雲端存儲
+- 更好的性能和可擴展性
+- 免費套餐限額充足 (1GB 存儲, 2GB 流量)
+- 全球 CDN 自動加速照片載入
+- 詳見 [SUPABASE_SETUP.md](SUPABASE_SETUP.md)
+
+### ✅ **本地開發環境優化**
+- 解決 Docker 編譯問題，推薦本地開發
+- 使用 `./start-dev.sh` 一鍵啟動開發環境
+- PostgreSQL 運行在 Docker，後端+前端本地運行
+- SQLx 離線模式，加快編譯速度
+- 完整的數據庫遷移系統
+
 ## 🚀 快速開始
 
 ### 環境要求
 - Node.js 18+ (前端)
 - Rust 1.70+ (後端)
 - PostgreSQL 15+ (數據庫)
-- Docker & Docker Compose (可選，用於開發環境)
+- Docker & Docker Compose (用於數據庫)
+- Supabase 帳號 (用於照片存儲)
 
-### 使用 Docker Compose (推薦)
+### 本地開發環境 (推薦)
 
 ```bash
-# 克隆項目
+# 1. 克隆項目
 git clone <repository-url>
 cd Twogether
 
-# 啟動完整開發環境
-docker-compose up -d
+# 2. 設置 Supabase 存儲
+# 請參考 SUPABASE_SETUP.md 詳細指南
+# 然後更新 start-dev.sh 中的憑證
+
+# 3. 啟動開發環境
+./start-dev.sh
 
 # 訪問應用
 # 前端: http://localhost:5173
 # 後端 API: http://localhost:8080
 # 數據庫管理: http://localhost:5050 (pgAdmin)
+```
+
+### Docker Compose (有編譯問題)
+
+⚠️ **注意**: Docker 構建目前有 Rust 依賴問題，建議使用本地開發環境。
+
+```bash
+# 如果要嘗試 Docker (可能失敗)
+docker-compose up --build
 ```
 
 ### 手動安裝
@@ -337,3 +381,159 @@ async fn main() -> Result<()> {
 ---
 
 **讓愛情更有趣，讓回憶更珍貴** ❤️ 
+
+## 💝 配對流程說明
+
+### 步驟 1：用戶註冊/登錄
+1. 第一個用戶註冊帳號（例如：用戶A）
+2. 登錄後會看到未配對狀態
+3. 在設置頁面可以生成配對碼
+
+### 步驟 2：生成配對碼
+1. 用戶A在設置頁面點擊「生成配對碼」
+2. 系統生成8位字母數字組合（例如：X5RX6S7D）
+3. 配對碼有效期24小時
+4. 將配對碼分享給伴侶（用戶B）
+
+### 步驟 3：伴侶配對
+1. 用戶B需要先註冊自己的帳號
+2. 登錄後在設置頁面輸入配對碼
+3. 點擊「配對」按鈕
+4. 系統驗證配對碼並建立伴侶關係
+
+### 預期行為
+- ✅ 配對成功後，兩個用戶都會看到「已與伴侶連接」狀態
+- ✅ 可以開始記錄和分享愛的時光
+- ✅ 數據會在兩個帳號間同步
+- ✅ 配對碼會被標記為已使用
+
+### 常見問題排查
+
+#### 問題：配對後顯示登錄頁面
+**原因**：前端在配對成功後沒有正確更新認證狀態
+**解決方案**：
+1. 檢查瀏覽器控制台是否有錯誤
+2. 確認 API 響應包含正確的用戶信息
+3. 檢查 localStorage 中的認證狀態
+4. 重新刷新頁面嘗試
+
+#### 問題：配對碼無效
+**可能原因**：
+- 配對碼已過期（24小時後失效）
+- 配對碼已被使用
+- 輸入錯誤（區分大小寫）
+- 生成配對碼的用戶已有伴侶
+
+#### 問題：無法生成配對碼
+**可能原因**：
+- 用戶已有配對的伴侶
+- 已有未過期的配對碼存在
+- 認證 token 無效
+
+## 🧪 測試用例
+
+### 後端測試
+
+#### 配對碼生成測試
+```bash
+# 測試生成配對碼（需要有效的 JWT token）
+curl -X POST http://localhost:8080/api/couples/pairing-code \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>"
+
+# 預期響應：
+{
+  "code": "X5RX6S7D",
+  "expires_at": "2025-07-04T13:28:47Z"
+}
+```
+
+#### 使用配對碼創建伴侶關係
+```bash
+# 測試使用配對碼配對
+curl -X POST http://localhost:8080/api/couples \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <partner-jwt-token>" \
+  -d '{"pairing_code": "X5RX6S7D"}'
+
+# 預期響應：
+{
+  "id": "uuid",
+  "couple_name": null,
+  "anniversary_date": null,
+  "user1_nickname": "用戶A暱稱",
+  "user2_nickname": "用戶B暱稱",
+  "created_at": "2025-07-03T13:28:47Z",
+  "pairing_code": null
+}
+```
+
+#### 錯誤情況測試
+```bash
+# 測試過期/無效配對碼
+curl -X POST http://localhost:8080/api/couples \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <jwt-token>" \
+  -d '{"pairing_code": "INVALID1"}'
+
+# 預期響應：
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "配對碼無效或已過期"
+  }
+}
+```
+
+### 前端測試
+
+#### 手動測試流程
+1. **用戶A註冊測試**
+   - 郵箱：`user-a@test.com`
+   - 暱稱：`測試用戶A`
+   - 密碼：`password123`
+
+2. **生成配對碼**
+   - 登錄後進入設置頁面
+   - 點擊「生成配對碼」
+   - 驗證配對碼顯示
+
+3. **用戶B註冊測試**
+   - 郵箱：`user-b@test.com`
+   - 暱稱：`測試用戶B`
+   - 密碼：`password123`
+
+4. **配對測試**
+   - 用戶B登錄後進入設置頁面
+   - 輸入用戶A的配對碼
+   - 點擊「配對」
+   - 驗證配對成功消息
+   - 檢查是否正確更新認證狀態
+
+#### 自動化測試
+```javascript
+// 配對流程端到端測試
+describe('Pairing Flow', () => {
+  it('should complete pairing process successfully', async () => {
+    // 1. 用戶A註冊
+    const userA = await registerUser('user-a@test.com', '測試用戶A', 'password123');
+    
+    // 2. 生成配對碼
+    const pairingCode = await generatePairingCode(userA.token);
+    expect(pairingCode.code).toMatch(/^[A-Z0-9]{8}$/);
+    
+    // 3. 用戶B註冊
+    const userB = await registerUser('user-b@test.com', '測試用戶B', 'password123');
+    
+    // 4. 使用配對碼配對
+    const coupleResult = await pairWithCode(userB.token, pairingCode.code);
+    expect(coupleResult.user1_nickname).toBe('測試用戶A');
+    expect(coupleResult.user2_nickname).toBe('測試用戶B');
+    
+    // 5. 驗證配對狀態
+    const userACouple = await getCouple(userA.token);
+    const userBCouple = await getCouple(userB.token);
+    expect(userACouple.id).toBe(userBCouple.id);
+  });
+});
+```

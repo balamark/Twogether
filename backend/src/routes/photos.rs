@@ -8,10 +8,7 @@ use axum::{
 };
 use uuid::Uuid;
 use chrono::Utc;
-use std::path::PathBuf;
-use tokio::fs;
-use tokio::io::AsyncWriteExt;
-use anyhow::anyhow;
+// use anyhow::anyhow; // Not needed for database storage
 
 use crate::{
     error::{AppError, Result},
@@ -52,6 +49,7 @@ async fn upload_photo(
     let mut file_data: Vec<u8> = Vec::new();
     let mut caption: Option<String> = None;
     let mut memory_date = Utc::now();
+    let mut mime_type = String::from("image/jpeg");
 
     // Process multipart form data
     while let Some(field) = multipart.next_field().await.map_err(|e| {
@@ -65,7 +63,12 @@ async fn upload_photo(
                     .ok_or_else(|| AppError::BadRequest("文件名不能為空".to_string()))?
                     .to_string();
                 
-                // Validate file extension
+                // Get MIME type from field
+                if let Some(content_type) = field.content_type() {
+                    mime_type = content_type.to_string();
+                }
+                
+                // Validate file extension and MIME type
                 let extension = std::path::Path::new(&file_name)
                     .extension()
                     .and_then(|ext| ext.to_str())
@@ -113,7 +116,7 @@ async fn upload_photo(
         return Err(AppError::BadRequest("沒有找到上傳的文件".to_string()));
     }
 
-    // Generate unique filename
+    // Generate unique filename for reference
     let photo_id = Uuid::new_v4();
     let extension = std::path::Path::new(&file_name)
         .extension()
@@ -122,44 +125,45 @@ async fn upload_photo(
     
     let unique_filename = format!("{}_{}.{}", couple_id, photo_id, extension);
     
-    // Create upload directory if it doesn't exist
-    let upload_dir = PathBuf::from(&state.config.upload_path);
-    fs::create_dir_all(&upload_dir).await.map_err(|e| {
-        AppError::Internal(anyhow!("創建上傳目錄失敗: {}", e))
-    })?;
-
-    // Save file to disk
-    let file_path = upload_dir.join(&unique_filename);
-    let mut file = fs::File::create(&file_path).await.map_err(|e| {
-        AppError::Internal(anyhow!("創建文件失敗: {}", e))
-    })?;
-    
-    file.write_all(&file_data).await.map_err(|e| {
-        AppError::Internal(anyhow!("寫入文件失敗: {}", e))
+    // Upload to Supabase Storage
+    let storage_url = state.supabase_storage.upload_photo(
+        couple_id,
+        photo_id,
+        file_data.clone(),
+        &unique_filename,
+        &mime_type,
+    ).await.map_err(|e| {
+        tracing::error!("Failed to upload photo to Supabase: {}", e);
+        AppError::Internal(anyhow::anyhow!("Failed to upload photo: {}", e))
     })?;
 
     // Save photo metadata to database
     let now = Utc::now();
     sqlx::query!(
-        "INSERT INTO photos (id, couple_id, file_path, file_name, caption, upload_date, memory_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        "INSERT INTO photos (id, couple_id, file_path, file_name, caption, upload_date, memory_date, storage_url, file_size, mime_type)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
         photo_id,
         couple_id,
+        format!("supabase://{}/{}", couple_id, photo_id),
         unique_filename,
-        file_name,
         caption,
         now,
-        memory_date
+        memory_date,
+        storage_url,
+        file_data.len() as i32,
+        mime_type
     )
     .execute(&state.db.pool)
     .await?;
 
-    // Generate photo URL
-    let photo_url = format!("/api/photos/{}/file", photo_id);
+    tracing::info!("Photo uploaded successfully to Supabase: {} ({}KB)", photo_id, file_data.len() / 1024);
+
+    // Use the Supabase URL directly
+    let photo_url = storage_url.clone();
 
     Ok(Json(PhotoResponse {
         id: photo_id,
-        file_name,
+        file_name: unique_filename,
         caption,
         upload_date: now,
         memory_date,
@@ -186,7 +190,7 @@ async fn get_photos(
     .ok_or_else(|| AppError::NotFound("您還沒有配對".to_string()))?;
 
     let photos = sqlx::query!(
-        "SELECT id, file_name, caption, upload_date, memory_date
+        "SELECT id, file_name, caption, upload_date, memory_date, storage_url
          FROM photos 
          WHERE couple_id = $1 
          ORDER BY memory_date DESC",
@@ -196,13 +200,18 @@ async fn get_photos(
     .await?;
 
     let photo_responses: Vec<PhotoResponse> = photos.into_iter().map(|photo| {
+        let url = photo.storage_url.unwrap_or_else(|| {
+            // Fallback for old photos without storage_url
+            state.supabase_storage.get_photo_url(couple.id, photo.id)
+        });
+        
         PhotoResponse {
             id: photo.id,
             file_name: photo.file_name,
             caption: photo.caption,
             upload_date: photo.upload_date.unwrap_or_else(|| Utc::now()),
             memory_date: photo.memory_date,
-            url: format!("/api/photos/{}/file", photo.id),
+            url,
         }
     }).collect();
 
@@ -220,7 +229,7 @@ async fn get_photo(
         .map_err(|_| AppError::Auth("無效的用戶ID".to_string()))?;
 
     let photo = sqlx::query!(
-        "SELECT p.id, p.file_name, p.caption, p.upload_date, p.memory_date
+        "SELECT p.id, p.file_name, p.caption, p.upload_date, p.memory_date, p.storage_url, c.id as couple_id
          FROM photos p
          JOIN couples c ON p.couple_id = c.id
          WHERE p.id = $1 AND (c.user1_id = $2 OR c.user2_id = $2)",
@@ -231,17 +240,22 @@ async fn get_photo(
     .await?
     .ok_or_else(|| AppError::NotFound("照片不存在".to_string()))?;
 
+    let url = photo.storage_url.unwrap_or_else(|| {
+        // Fallback for old photos without storage_url
+        state.supabase_storage.get_photo_url(photo.couple_id, photo.id)
+    });
+
     Ok(Json(PhotoResponse {
         id: photo.id,
         file_name: photo.file_name,
         caption: photo.caption,
         upload_date: photo.upload_date.unwrap_or_else(|| Utc::now()),
         memory_date: photo.memory_date,
-        url: format!("/api/photos/{}/file", photo.id),
+        url,
     }))
 }
 
-/// Serve photo file
+/// Serve photo file (redirect to Supabase URL)
 /// GET /api/photos/:id/file
 async fn serve_photo_file(
     State(state): State<AppState>,
@@ -251,9 +265,9 @@ async fn serve_photo_file(
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| AppError::Auth("無效的用戶ID".to_string()))?;
 
-    // Verify user has access to this photo
+    // Verify user has access to this photo and get storage URL
     let photo = sqlx::query!(
-        "SELECT p.file_path, p.file_name
+        "SELECT p.storage_url, c.id as couple_id
          FROM photos p
          JOIN couples c ON p.couple_id = c.id
          WHERE p.id = $1 AND (c.user1_id = $2 OR c.user2_id = $2)",
@@ -264,30 +278,16 @@ async fn serve_photo_file(
     .await?
     .ok_or_else(|| AppError::NotFound("照片不存在或無權限訪問".to_string()))?;
 
-    // Read file from disk
-    let file_path = PathBuf::from(&state.config.upload_path).join(&photo.file_path);
-    let file_data = fs::read(&file_path).await.map_err(|e| {
-        AppError::Internal(anyhow!("讀取照片文件失敗: {}", e))
-    })?;
+    let storage_url = photo.storage_url.unwrap_or_else(|| {
+        // Fallback for old photos without storage_url
+        state.supabase_storage.get_photo_url(photo.couple_id, photo_id)
+    });
 
-    // Determine content type from file extension
-    let content_type = match std::path::Path::new(&photo.file_name)
-        .extension()
-        .and_then(|ext| ext.to_str())
-        .unwrap_or("")
-        .to_lowercase()
-        .as_str()
-    {
-        "jpg" | "jpeg" => "image/jpeg",
-        "png" => "image/png",
-        "gif" => "image/gif",
-        "webp" => "image/webp",
-        _ => "application/octet-stream",
-    };
+    tracing::debug!("Redirecting to Supabase URL for photo {}: {}", photo_id, storage_url);
 
+    // Redirect to the Supabase storage URL
     Ok((
-        StatusCode::OK,
-        [(header::CONTENT_TYPE, content_type)],
-        file_data,
+        StatusCode::FOUND,
+        [(header::LOCATION, storage_url.as_str())],
     ).into_response())
 } 

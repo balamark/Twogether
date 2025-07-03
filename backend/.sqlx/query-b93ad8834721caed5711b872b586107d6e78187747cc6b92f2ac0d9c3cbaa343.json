@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT p.storage_url, c.id as couple_id\n         FROM photos p\n         JOIN couples c ON p.couple_id = c.id\n         WHERE p.id = $1 AND (c.user1_id = $2 OR c.user2_id = $2)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "storage_url",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "couple_id",
+        "type_info": "Uuid"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "b93ad8834721caed5711b872b586107d6e78187747cc6b92f2ac0d9c3cbaa343"
+}

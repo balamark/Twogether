@@ -222,11 +222,15 @@ pub struct CoinSpendRequest {
 pub struct Photo {
     pub id: Uuid,
     pub couple_id: Uuid,
-    pub file_path: String,
+    pub file_path: String, // Kept for backward compatibility
     pub file_name: String,
     pub caption: Option<String>,
     pub upload_date: DateTime<Utc>,
     pub memory_date: DateTime<Utc>,
+    // New fields for database storage
+    pub photo_data: Vec<u8>,
+    pub file_size: i32,
+    pub mime_type: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Validate)]
