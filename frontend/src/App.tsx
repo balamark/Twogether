@@ -173,7 +173,22 @@ const defaultRoleplayScripts = [
   }
 ];
 
+// Add interfaces for the data structures
+interface ForeplayActivity {
+  title: string;
+  description: string;
+  duration: string;
+  coins: number;
+  tips: string[];
+}
 
+interface PositionSuggestion {
+  name: string;
+  difficulty: string;
+  description: string;
+  coins: number;
+  benefits: string[];
+}
 
 const LoveTimeApp = () => {
   const [currentView, setCurrentView] = useState('record');
@@ -353,17 +368,9 @@ const LoveTimeApp = () => {
     }
   };
 
-  const handlePartnerConnect = (_partnerCode: string) => {
-    // In a real app, this would verify the code with the server
-    setAuthState(prev => ({ ...prev, partnerConnected: true }));
-    localStorage.setItem('authState', JSON.stringify({ ...authState, partnerConnected: true }));
-    
-    showNotification({
-      type: 'success',
-      title: '配對成功！',
-      message: '你們現在可以分享愛的時光了！',
-      duration: 5000
-    });
+  const handlePartnerConnect = (partnerCode: string) => {
+    // Implementation here
+    console.log('Connecting with partner code:', partnerCode);
   };
 
   const handleLogout = async () => {
@@ -1285,33 +1292,19 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
 
     const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
-      if (file) {
-        // Show compression notification
+      if (!file) return;
+
+      try {
+        const compressedImage = await compressImage(file);
+        setRecordForm({...recordForm, photo: compressedImage});
+      } catch (err) {
+        console.error('Failed to upload photo:', err);
         showNotification({
-          type: 'info',
-          title: '正在處理照片...',
-          message: '為了節省儲存空間，正在壓縮照片',
+          type: 'error',
+          title: '照片上傳失敗',
+          message: '請稍後再試',
           duration: 3000
         });
-        
-        try {
-          const compressedImage = await compressImage(file);
-          setRecordForm({...recordForm, photo: compressedImage});
-          
-          showNotification({
-            type: 'success',
-            title: '照片處理完成！',
-            message: '照片已壓縮至適合大小，節省儲存成本',
-            duration: 3000
-          });
-        } catch (error) {
-          showNotification({
-            type: 'warning',
-            title: '照片處理失敗',
-            message: '請重新選擇照片',
-            duration: 3000
-          });
-        }
       }
     };
 
@@ -2304,10 +2297,10 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
 
   // Foreplay View Component
   const ForeplayView = () => {
-    const [selectedActivity, setSelectedActivity] = useState<any>(null);
-    const [selectedPosition, setSelectedPosition] = useState<any>(null);
+    const [selectedActivity, setSelectedActivity] = useState<ForeplayActivity | null>(null);
+    const [selectedPosition, setSelectedPosition] = useState<PositionSuggestion | null>(null);
 
-    const handleTryActivity = (activity: any) => {
+    const handleTryActivity = (activity: ForeplayActivity) => {
       const coinsEarned = activity.coins;
       setTotalCoins(prev => prev + coinsEarned);
       
@@ -2320,7 +2313,7 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
       });
     };
 
-    const handleTryPosition = (position: any) => {
+    const handleTryPosition = (position: PositionSuggestion) => {
       const coinsEarned = position.coins;
       setTotalCoins(prev => prev + coinsEarned);
       
