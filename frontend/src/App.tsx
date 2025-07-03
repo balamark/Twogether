@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Heart, Calendar, BarChart3, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Upload, Play, Coins, Plus, X, User, ShoppingBag } from 'lucide-react';
+import { Heart, Calendar, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Upload, Play, Coins, Plus, X, User, ShoppingBag } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import RoleplayView from './components/RoleplayView';
 import { AchievementsView } from './components/AchievementsView';
@@ -514,80 +514,70 @@ const LoveTimeApp = () => {
   // Load authenticated data when user logs in
   useEffect(() => {
     const loadAuthenticatedData = async () => {
-      if (!authState.isAuthenticated) return;
-      
-      // Check if we have valid token before making API calls
-      if (!apiService.hasValidToken()) {
-        // No valid token, clear auth state
-        setAuthState({
-          user: null,
-          isAuthenticated: false,
-          partnerConnected: false
-        });
-        localStorage.removeItem('authState');
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('authUser');
-        return;
-      }
-      
       try {
-        // Load data using API service (requires authentication)
-        const [
-          savedRecords,
-          savedNicknames,
-          savedCoins
-        ] = await Promise.all([
-          apiService.getIntimateRecords().catch(() => []), // Fallback to empty array
-          apiService.getNicknames().catch(() => ({ partner1: '親愛的', partner2: '寶貝' })), // Fallback to defaults
-          apiService.getTotalCoins().catch(() => 0) // Fallback to 0
-        ]);
+        // Load nicknames
+        const storedNicknames = await apiService.getNicknames();
+        setNicknames(storedNicknames);
         
-        setIntimateRecords(savedRecords);
-        if (savedNicknames.partner1) setNicknames(savedNicknames);
-        setTotalCoins(savedCoins);
+        // Load intimacy records from backend
+        try {
+          const records = await apiService.getIntimateRecords();
+          setIntimateRecords(records);
+        } catch (error) {
+          console.error('Failed to load intimate records:', error);
+          // Keep empty array if API fails
+        }
+
+        // Load couple information to get partner details
+        try {
+          const coupleInfo = await apiService.getCouple();
+          if (coupleInfo && authState.user) {
+            const partnerNickname = coupleInfo.user1Nickname !== authState.user.nickname 
+              ? coupleInfo.user1Nickname 
+              : coupleInfo.user2Nickname;
+            
+            const updatedAuthState = {
+              ...authState,
+              partnerConnected: !!coupleInfo.user2Nickname,
+              user: {
+                ...authState.user,
+                partnerId: coupleInfo.id,
+                partnerNickname: partnerNickname || undefined
+              }
+            };
+            
+            setAuthState(updatedAuthState);
+            localStorage.setItem('authState', JSON.stringify(updatedAuthState));
+            
+            // Update nicknames if both partners exist
+            if (coupleInfo.user1Nickname && coupleInfo.user2Nickname) {
+              const coupleNicknames = {
+                partner1: coupleInfo.user1Nickname,
+                partner2: coupleInfo.user2Nickname
+              };
+              setNicknames(coupleNicknames);
+              await apiService.updateNicknames(coupleNicknames);
+            }
+          }
+        } catch (coupleError) {
+          console.log('No couple found or error fetching couple info:', coupleError);
+          // This is okay - user might not be paired yet
+        }
+        
+        // Load scripts
+        const storedScripts = localStorage.getItem('customScripts');
+        if (storedScripts) {
+          setCustomScripts(JSON.parse(storedScripts));
+        }
       } catch (error) {
         console.error('Error loading authenticated data:', error);
-        
-        // If it's an authentication error, clear auth state
-        if (error instanceof Error && (error.message.includes('登錄已過期') || error.message.includes('401'))) {
-          setAuthState({
-            user: null,
-            isAuthenticated: false,
-            partnerConnected: false
-          });
-          localStorage.removeItem('authState');
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('authUser');
-          showNotification({
-            type: 'warning',
-            title: '登錄已過期',
-            message: '請重新登錄以繼續使用',
-            duration: 5000
-          });
-        }
-        
-        // Fallback to localStorage if API fails
-        try {
-          const savedRecords = JSON.parse(localStorage.getItem('intimateRecords') || '[]');
-          const savedNicknames = JSON.parse(localStorage.getItem('nicknames') || '{}');
-          const savedCoins = parseInt(localStorage.getItem('totalCoins') || '0');
-          
-          setIntimateRecords(savedRecords);
-          if (savedNicknames.partner1) setNicknames(savedNicknames);
-          setTotalCoins(savedCoins);
-        } catch (fallbackError) {
-          console.error('Error loading fallback data:', fallbackError);
-        }
       }
     };
 
     loadAuthenticatedData();
   }, [authState.isAuthenticated]);
 
-  // Save data whenever records, nicknames, milestones, or coins change
-  useEffect(() => {
-    localStorage.setItem('intimateRecords', JSON.stringify(intimateRecords));
-  }, [intimateRecords]);
+  // Note: Intimate records are now persisted in the backend, no localStorage needed
 
   useEffect(() => {
     const saveNicknames = async () => {
@@ -911,28 +901,7 @@ const LoveTimeApp = () => {
     return thisWeek.length;
   };
 
-  const getMonthlyStats = () => {
-    const now = new Date();
-    const oneMonthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
-    return intimateRecords.filter(record => 
-      new Date(record.date) >= oneMonthAgo && new Date(record.date) <= now
-    ).length;
-  };
 
-  const getBadges = () => {
-    const weeklyCount = getWeeklyStats();
-    const badges = [];
-    
-    if (weeklyCount >= 1) badges.push({ name: '週間戀人', icon: '💕', desc: '本週至少一次親密時光' });
-    if (weeklyCount >= 2) badges.push({ name: '熱戀情侶', icon: '🔥', desc: '本週至少兩次親密時光' });
-    if (weeklyCount >= 3) badges.push({ name: '甜蜜無敵', icon: '🌟', desc: '本週三次以上親密時光' });
-    
-    const totalCount = intimateRecords.length;
-    if (totalCount >= 10) badges.push({ name: '愛情老手', icon: '🏆', desc: '累計十次親密記錄' });
-    if (totalCount >= 50) badges.push({ name: '愛情大師', icon: '👑', desc: '累計五十次親密記錄' });
-    
-    return badges;
-  };
 
   const romanticGames = [
     { 
@@ -1439,15 +1408,21 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
 
                 <div className="space-y-4">
                   {/* Basic Info */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">日期</label>
-                      <input
-                        type="date"
-                        value={recordForm.date}
-                        onChange={(e) => setRecordForm({...recordForm, date: e.target.value})}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                      />
+                      <label className="block text-sm font-medium text-gray-700 mb-2">日期選擇</label>
+                      <div className="space-y-3">
+                        <input
+                          type="date"
+                          value={recordForm.date}
+                          onChange={(e) => setRecordForm({...recordForm, date: e.target.value})}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                        />
+                        <CalendarDatePicker 
+                          selectedDate={recordForm.date}
+                          onDateSelect={(date) => setRecordForm({...recordForm, date})}
+                        />
+                      </div>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">時間</label>
@@ -1612,9 +1587,11 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
         )}
 
         <div className="bg-white rounded-2xl shadow-lg p-6">
-          <h3 className="text-xl font-bold text-gray-800 mb-4">最近的親密記錄</h3>
-          <div className="space-y-3">
-            {intimateRecords.slice(-5).reverse().map((record) => (
+          <h3 className="text-xl font-bold text-gray-800 mb-4">
+            親密記錄 ({intimateRecords.length} 次)
+          </h3>
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {intimateRecords.slice().reverse().map((record) => (
               <div 
                 key={record.id} 
                 className="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow cursor-pointer"
@@ -1682,61 +1659,7 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
     );
   };
 
-  const StatsView = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-gradient-to-br from-pink-500 to-rose-600 text-white p-6 rounded-2xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-pink-100">本週次數</p>
-              <p className="text-3xl font-bold">{getWeeklyStats()}</p>
-            </div>
-            <Heart className="w-12 h-12 text-pink-200" />
-          </div>
-        </div>
-        
-        <div className="bg-gradient-to-br from-purple-500 to-indigo-600 text-white p-6 rounded-2xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-purple-100">本月次數</p>
-              <p className="text-3xl font-bold">{getMonthlyStats()}</p>
-            </div>
-            <BarChart3 className="w-12 h-12 text-purple-200" />
-          </div>
-        </div>
-        
-        <div className="bg-gradient-to-br from-orange-500 to-red-600 text-white p-6 rounded-2xl">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-orange-100">總計次數</p>
-              <p className="text-3xl font-bold">{intimateRecords.length}</p>
-            </div>
-            <Trophy className="w-12 h-12 text-orange-200" />
-          </div>
-        </div>
-      </div>
 
-      <div className="bg-white rounded-2xl shadow-lg p-6">
-        <h3 className="text-xl font-bold text-gray-800 mb-4">愛情成就徽章</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {getBadges().map((badge, index) => (
-            <div key={index} className="flex items-center space-x-4 p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border-2 border-yellow-200">
-              <div className="text-3xl">{badge.icon}</div>
-              <div>
-                <div className="font-bold text-gray-800">{badge.name}</div>
-                <div className="text-sm text-gray-600">{badge.desc}</div>
-              </div>
-            </div>
-          ))}
-          {getBadges().length === 0 && (
-            <div className="col-span-2 text-center py-8 text-gray-500">
-              開始記錄你們的愛情，解鎖更多成就徽章！
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
 
   const GamesView = () => (
     <div className="space-y-6">
@@ -2714,8 +2637,7 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
   const navItems = [
     { id: 'foreplay', label: '前戲探索', icon: Sparkles },
     { id: 'record', label: '記錄時光', icon: Calendar },
-    { id: 'achievements', label: '成就統計', icon: Trophy },
-    { id: 'stats', label: '親密統計', icon: BarChart3 },
+    { id: 'achievements', label: '親密統計', icon: Trophy },
     { id: 'shop', label: '金幣商店', icon: ShoppingBag },
     { id: 'games', label: '情趣遊戲', icon: Gamepad2 },
     { id: 'conflict', label: '和諧相處', icon: MessageCircle },
@@ -2725,11 +2647,40 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
   ];
 
   const renderView = () => {
+    // Show login prompt for private content when not authenticated
+    if (!authState.isAuthenticated) {
+      switch (currentView) {
+        case 'settings': return <SettingsView 
+          nicknames={nicknames}
+          handleNicknameChange={handleNicknameChange}
+          journeyMilestones={journeyMilestones}
+          setJourneyMilestones={setJourneyMilestones}
+          authState={authState}
+          setShowAuthModal={setShowAuthModal}
+          onAuthStateUpdate={setAuthState}
+        />;
+        default: return (
+          <div className="flex items-center justify-center min-h-64">
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">歡迎使用 Twogether</h2>
+              <p className="text-gray-600 mb-6">登入以開始記錄你們的愛情時光</p>
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-6 py-3 rounded-lg hover:shadow-lg transition-colors"
+              >
+                立即登入
+              </button>
+            </div>
+          </div>
+        );
+      }
+    }
+
+    // Show authenticated content
     switch (currentView) {
       case 'foreplay': return <ForeplayView />;
       case 'record': return <CalendarView />;
       case 'achievements': return <AchievementsView />;
-      case 'stats': return <StatsView />;
       case 'shop': return <CoinShopView />;
       case 'games': return <GamesView />;
       case 'conflict': return <ConflictView />;
@@ -2758,6 +2709,113 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
 
   const closeNotification = (id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
+  // Calendar component for date picking
+  const CalendarDatePicker = ({ selectedDate, onDateSelect }: { selectedDate: string, onDateSelect: (date: string) => void }) => {
+    const [currentMonth, setCurrentMonth] = useState(() => {
+      const date = selectedDate ? new Date(selectedDate) : new Date();
+      return new Date(date.getFullYear(), date.getMonth(), 1);
+    });
+
+    const getDaysInMonth = (date: Date) => {
+      const year = date.getFullYear();
+      const month = date.getMonth();
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const daysInMonth = lastDay.getDate();
+      const startingDayOfWeek = firstDay.getDay();
+
+      const days = [];
+      
+      // Previous month's trailing days
+      for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+        const day = new Date(year, month, -i);
+        days.push({ date: day, isCurrentMonth: false });
+      }
+      
+      // Current month's days
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(year, month, day);
+        days.push({ date, isCurrentMonth: true });
+      }
+      
+      // Next month's leading days
+      const remainingDays = 42 - days.length; // 6 rows × 7 days
+      for (let day = 1; day <= remainingDays; day++) {
+        const date = new Date(year, month + 1, day);
+        days.push({ date, isCurrentMonth: false });
+      }
+      
+      return days;
+    };
+
+    const formatDate = (date: Date) => {
+      return date.toISOString().split('T')[0];
+    };
+
+    const isSelected = (date: Date) => {
+      return formatDate(date) === selectedDate;
+    };
+
+    const isToday = (date: Date) => {
+      const today = new Date();
+      return date.toDateString() === today.toDateString();
+    };
+
+    const days = getDaysInMonth(currentMonth);
+    const monthYear = currentMonth.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long' });
+
+    return (
+      <div className="bg-white rounded-lg p-4 border">
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
+            className="p-2 hover:bg-gray-100 rounded"
+          >
+            ‹
+          </button>
+          <h3 className="font-semibold text-gray-800">{monthYear}</h3>
+          <button
+            onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
+            className="p-2 hover:bg-gray-100 rounded"
+          >
+            ›
+          </button>
+        </div>
+        
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {['日', '一', '二', '三', '四', '五', '六'].map(day => (
+            <div key={day} className="p-2 text-center text-sm font-medium text-gray-500">
+              {day}
+            </div>
+          ))}
+        </div>
+        
+        <div className="grid grid-cols-7 gap-1">
+          {days.map((dayInfo, index) => {
+            const { date, isCurrentMonth } = dayInfo;
+            const selected = isSelected(date);
+            const today = isToday(date);
+            
+            return (
+              <button
+                key={index}
+                onClick={() => onDateSelect(formatDate(date))}
+                className={`
+                  p-2 text-sm rounded hover:bg-gray-100 transition-colors
+                  ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}
+                  ${selected ? 'bg-pink-500 text-white hover:bg-pink-600' : ''}
+                  ${today && !selected ? 'bg-blue-100 text-blue-600' : ''}
+                `}
+              >
+                {date.getDate()}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   return (

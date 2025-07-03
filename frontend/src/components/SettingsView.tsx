@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { User, Users, CheckCircle } from 'lucide-react';
 import { apiService } from '../services/api';
-import ErrorNotification from './ErrorNotification';
 
 interface Nicknames {
   partner1: string;
@@ -25,6 +24,7 @@ interface User {
   nickname: string;
   partnerId?: string;
   partnerCode?: string;
+  partnerNickname?: string;
   createdAt: string;
 }
 
@@ -98,12 +98,25 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       
       // Update authentication state to reflect pairing
       if (authState.user && onAuthStateUpdate) {
+        // Update nicknames based on couple information
+        if (coupleResult.user1Nickname && coupleResult.user2Nickname) {
+          const updatedNicknames = {
+            partner1: coupleResult.user1Nickname,
+            partner2: coupleResult.user2Nickname
+          };
+          handleNicknameChange('partner1', updatedNicknames.partner1);
+          handleNicknameChange('partner2', updatedNicknames.partner2);
+        }
+
         const updatedAuthState = {
           ...authState,
           partnerConnected: true,
           user: {
             ...authState.user,
-            partnerId: coupleResult.id
+            partnerId: coupleResult.id,
+            partnerNickname: coupleResult.user1Nickname !== authState.user.nickname 
+              ? coupleResult.user1Nickname 
+              : coupleResult.user2Nickname
           }
         };
         
@@ -114,7 +127,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         onAuthStateUpdate(updatedAuthState);
       }
       
-      setSuccess('配對成功！您現在已經與伴侶連結');
+      setSuccess(`配對成功！您現在已經與 ${authState.user?.partnerNickname || '伴侶'} 連結`);
       setPairingCode('');
       
     } catch (err: any) {
@@ -279,7 +292,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             {authState.partnerConnected ? (
               <div className="p-4 bg-green-50 rounded-lg">
                 <p className="font-medium text-green-800">✓ 已與伴侶連接</p>
-                <p className="text-sm text-green-600">你們可以分享愛的時光了！</p>
+                <p className="text-sm text-green-600">
+                  與 {authState.user?.partnerNickname || '伴侶'} 連結中 - 你們可以分享愛的時光了！
+                </p>
               </div>
             ) : (
               <div className="p-4 bg-yellow-50 rounded-lg">

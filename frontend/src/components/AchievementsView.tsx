@@ -1,5 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import apiService from '../services/api';
+
+interface IntimateRecord {
+  id: number;
+  date: string;
+  time: string;
+  mood: string;
+  notes?: string;
+  timestamp: string;
+  photo?: string;
+  description?: string;
+  duration?: string;
+  location?: string;
+  roleplayScript?: string;
+  coinsEarned?: number;
+  activityType?: string;
+}
 
 interface Achievement {
   id: string;
@@ -45,7 +61,17 @@ export function AchievementsView() {
   const [stats, setStats] = useState<IntimacyStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'achievements' | 'stats'>('achievements');
+
+  // Fetch all records for badge logic
+  const [records, setRecords] = useState<IntimateRecord[]>([]);
+  useEffect(() => {
+    (async () => {
+      try {
+        const recs = await apiService.getIntimateRecords();
+        setRecords(recs);
+      } catch {}
+    })();
+  }, []);
 
   useEffect(() => {
     loadData();
@@ -55,12 +81,10 @@ export function AchievementsView() {
     try {
       setLoading(true);
       setError(null);
-
       const [achievementsData, statsData] = await Promise.all([
         apiService.getAchievements(),
         apiService.getStats(),
       ]);
-
       setAchievements(achievementsData);
       setStats(statsData);
     } catch (err: any) {
@@ -70,6 +94,28 @@ export function AchievementsView() {
       setLoading(false);
     }
   };
+
+  // Badge logic
+  const badges = useMemo(() => {
+    if (!stats) return [];
+    const b = [];
+    // Weekly/Monthly/Total badges
+    if (stats.average_per_week >= 1) b.push({ name: '週間戀人', icon: '💕', desc: '本週至少一次親密時光' });
+    if (stats.average_per_week >= 2) b.push({ name: '熱戀情侶', icon: '🔥', desc: '本週至少兩次親密時光' });
+    if (stats.average_per_week >= 3) b.push({ name: '甜蜜無敵', icon: '🌟', desc: '本週三次以上親密時光' });
+    if (stats.total_moments >= 10) b.push({ name: '愛情老手', icon: '🏆', desc: '累計十次親密記錄' });
+    if (stats.total_moments >= 50) b.push({ name: '愛情大師', icon: '👑', desc: '累計五十次親密記錄' });
+    // Unique poses badge
+    const uniquePoses = new Set(records.map(r => r.activityType).filter(Boolean));
+    if (uniquePoses.size >= 3) b.push({ name: '多樣體驗', icon: '🧘', desc: `已嘗試 ${uniquePoses.size} 種不同體位/活動` });
+    // Unique locations badge
+    const uniqueLocs = new Set(records.map(r => r.location).filter(Boolean));
+    if (uniqueLocs.size >= 3) b.push({ name: '冒險地點', icon: '🗺️', desc: `已在 ${uniqueLocs.size} 個不同地點親密` });
+    // Longest duration badge
+    const maxDuration = Math.max(...records.map(r => parseInt(r.duration ?? '0') || 0));
+    if (maxDuration >= 60) b.push({ name: '最長紀錄', icon: '⏱️', desc: `單次親密時長達 ${maxDuration} 分鐘` });
+    return b;
+  }, [stats, records]);
 
   if (loading) {
     return (
@@ -96,38 +142,87 @@ export function AchievementsView() {
   return (
     <div className="max-w-4xl mx-auto p-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">成就與統計</h1>
-        <p className="text-gray-600">查看您的愛情成就和詳細統計</p>
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">親密統計</h1>
+        <p className="text-gray-600">查看你們的親密統計與成就徽章</p>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex border-b border-gray-200 mb-6">
-        <button
-          onClick={() => setActiveTab('achievements')}
-          className={`px-6 py-3 font-medium transition-colors ${
-            activeTab === 'achievements'
-              ? 'text-pink-600 border-b-2 border-pink-600'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          🏆 成就 ({achievements?.unlocked_achievements || 0}/{achievements?.total_achievements || 0})
-        </button>
-        <button
-          onClick={() => setActiveTab('stats')}
-          className={`px-6 py-3 font-medium transition-colors ${
-            activeTab === 'stats'
-              ? 'text-pink-600 border-b-2 border-pink-600'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          📊 統計
-        </button>
-      </div>
+      {/* Intimacy Stats Section */}
+      {stats && (
+        <div className="space-y-6 mb-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+              <div className="flex items-center">
+                <span className="text-2xl mr-3">💗</span>
+                <div>
+                  <p className="text-sm text-gray-600">總記錄</p>
+                  <p className="text-2xl font-bold text-gray-800">{stats.total_moments}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+              <div className="flex items-center">
+                <span className="text-2xl mr-3">📅</span>
+                <div>
+                  <p className="text-sm text-gray-600">記錄天數</p>
+                  <p className="text-2xl font-bold text-gray-800">{stats.total_days}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+              <div className="flex items-center">
+                <span className="text-2xl mr-3">💰</span>
+                <div>
+                  <p className="text-sm text-gray-600">金幣餘額</p>
+                  <p className="text-2xl font-bold text-gray-800">{stats.current_balance}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
+              <div className="flex items-center">
+                <span className="text-2xl mr-3">📈</span>
+                <div>
+                  <p className="text-sm text-gray-600">月平均</p>
+                  <p className="text-2xl font-bold text-gray-800">{stats.average_per_month.toFixed(1)}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Weekly/Monthly Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-pink-50 rounded-lg p-4 border border-pink-200 text-center">
+              <div className="text-lg font-bold text-pink-600">本週次數</div>
+              <div className="text-2xl font-bold">{stats.average_per_week.toFixed(1)}</div>
+            </div>
+            <div className="bg-purple-50 rounded-lg p-4 border border-purple-200 text-center">
+              <div className="text-lg font-bold text-purple-600">本月次數</div>
+              <div className="text-2xl font-bold">{stats.average_per_month.toFixed(1)}</div>
+            </div>
+          </div>
+          {/* Badges */}
+          <div className="bg-white rounded-2xl shadow-lg p-6">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">愛情成就徽章</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {badges.length > 0 ? badges.map((badge, index) => (
+                <div key={index} className="flex items-center space-x-4 p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border-2 border-yellow-200">
+                  <div className="text-3xl">{badge.icon}</div>
+                  <div>
+                    <div className="font-bold text-gray-800">{badge.name}</div>
+                    <div className="text-sm text-gray-600">{badge.desc}</div>
+                  </div>
+                </div>
+              )) : (
+                <div className="col-span-2 text-center py-8 text-gray-500">
+                  開始記錄你們的愛情，解鎖更多成就徽章！
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
-      {/* Achievements Tab */}
-      {activeTab === 'achievements' && achievements && (
+      {/* Achievements Section */}
+      {achievements && stats && (
         <div className="space-y-6">
-          {/* Progress Overview */}
           <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-800">成就進度</h2>
@@ -298,144 +393,6 @@ export function AchievementsView() {
                   )}
                 </div>
               ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Stats Tab */}
-      {activeTab === 'stats' && stats && (
-        <div className="space-y-6">
-          {/* Overview Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-              <div className="flex items-center">
-                <span className="text-2xl mr-3">💕</span>
-                <div>
-                  <p className="text-sm text-gray-600">總記錄</p>
-                  <p className="text-2xl font-bold text-gray-800">{stats.total_moments}</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-              <div className="flex items-center">
-                <span className="text-2xl mr-3">📅</span>
-                <div>
-                  <p className="text-sm text-gray-600">記錄天數</p>
-                  <p className="text-2xl font-bold text-gray-800">{stats.total_days}</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-              <div className="flex items-center">
-                <span className="text-2xl mr-3">💰</span>
-                <div>
-                  <p className="text-sm text-gray-600">金幣餘額</p>
-                  <p className="text-2xl font-bold text-gray-800">{stats.current_balance}</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-              <div className="flex items-center">
-                <span className="text-2xl mr-3">📊</span>
-                <div>
-                  <p className="text-sm text-gray-600">月平均</p>
-                  <p className="text-2xl font-bold text-gray-800">
-                    {stats.average_per_month.toFixed(1)}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Detailed Stats */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">時間統計</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">總時長</span>
-                  <span className="font-medium">{stats.total_duration_hours.toFixed(1)} 小時</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">平均時長</span>
-                  <span className="font-medium">{stats.average_duration_minutes.toFixed(0)} 分鐘</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">記錄月數</span>
-                  <span className="font-medium">{stats.total_months} 個月</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">週平均</span>
-                  <span className="font-medium">{stats.average_per_week.toFixed(1)} 次</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">金幣統計</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">總賺取</span>
-                  <span className="font-medium text-green-600">+{stats.total_coins_earned}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">總花費</span>
-                  <span className="font-medium text-red-600">-{stats.total_coins_spent}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">當前餘額</span>
-                  <span className="font-medium text-blue-600">{stats.current_balance}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Activity Insights */}
-          <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">活動洞察</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {stats.favorite_activity && (
-                <div>
-                  <p className="text-sm text-gray-600">最喜歡的活動</p>
-                  <p className="font-medium">{stats.favorite_activity}</p>
-                </div>
-              )}
-              {stats.most_active_month && (
-                <div>
-                  <p className="text-sm text-gray-600">最活躍月份</p>
-                  <p className="font-medium">{stats.most_active_month}</p>
-                </div>
-              )}
-              {stats.most_active_day && (
-                <div>
-                  <p className="text-sm text-gray-600">最活躍星期</p>
-                  <p className="font-medium">{stats.most_active_day}</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Date Range */}
-          <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">記錄時間範圍</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {stats.first_record_date && (
-                <div>
-                  <p className="text-sm text-gray-600">首次記錄</p>
-                  <p className="font-medium">
-                    {new Date(stats.first_record_date).toLocaleDateString('zh-TW')}
-                  </p>
-                </div>
-              )}
-              {stats.last_record_date && (
-                <div>
-                  <p className="text-sm text-gray-600">最近記錄</p>
-                  <p className="font-medium">
-                    {new Date(stats.last_record_date).toLocaleDateString('zh-TW')}
-                  </p>
-                </div>
-              )}
             </div>
           </div>
         </div>

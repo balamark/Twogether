@@ -422,7 +422,7 @@ class ApiService {
       const response = await apiClient.get('/couples');
       return this.transformCoupleResponse(response.data);
     } catch (error: any) {
-      console.error('Failed to fetch couple:', error);
+      console.error('Failed to get couple:', error);
       throw new Error(error.message || '無法獲取情侶檔案');
     }
   }
