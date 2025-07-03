@@ -318,12 +318,12 @@ const LoveTimeApp = () => {
         message: `歡迎回來 ${nickname}！`,
         duration: 5000
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Login error:', error);
       showNotification({
         type: 'error',
         title: '登入失敗',
-        message: error.message || '登入過程中發生錯誤，請檢查帳號密碼',
+        message: (error as Error)?.message || '登入過程中發生錯誤，請檢查帳號密碼',
         duration: 5000
       });
     }
@@ -357,12 +357,12 @@ const LoveTimeApp = () => {
         message: `歡迎 ${nickname}！已為你創建新帳號`,
         duration: 5000
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Registration error:', error);
       showNotification({
         type: 'error',
         title: '註冊失敗',
-        message: error.message || '註冊過程中發生錯誤，請檢查輸入資料',
+        message: (error as Error)?.message || '註冊過程中發生錯誤，請檢查輸入資料',
         duration: 5000
       });
     }
@@ -386,11 +386,11 @@ const LoveTimeApp = () => {
         title: '已登出',
         message: '感謝使用 Twogether'
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       showNotification({
         type: 'error',
         title: '登出失敗',
-        message: error.message || '登出過程中發生錯誤'
+        message: (error as Error)?.message || '登出過程中發生錯誤'
       });
     }
   };
@@ -582,7 +582,7 @@ const LoveTimeApp = () => {
     };
 
     loadAuthenticatedData();
-  }, [authState.isAuthenticated]);
+  }, [authState.isAuthenticated, authState]);
 
   // Note: Intimate records are now persisted in the backend, no localStorage needed
 
@@ -766,17 +766,17 @@ const LoveTimeApp = () => {
       const { badgeProgress } = checkBadgeProgress();
       showNotification({
         type: 'success',
-        title: '親密時光已記錄！',
+        title: '記錄成功！',
         message: badgeProgress,
         coins: coinsEarned,
         duration: 6000
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error adding intimate record:', error);
       showNotification({
         type: 'error',
         title: '記錄失敗',
-        message: error.message || '無法保存記錄，請檢查網絡連接',
+        message: (error as Error)?.message || '無法保存記錄，請檢查網絡連接',
         duration: 5000
       });
     }

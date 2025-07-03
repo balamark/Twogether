@@ -45,10 +45,10 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   parseScriptContent,
   addIntimateRecord
 }) => {
-  const [selectedScript, setSelectedScript] = useState<any>(null);
+  const [selectedScript, setSelectedScript] = useState<RoleplayScript | null>(null);
   const [showScriptModal, setShowScriptModal] = useState(false);
 
-  const handlePlayScript = useCallback((script: any) => {
+  const handlePlayScript = useCallback((script: RoleplayScript) => {
     // Parse the script content with proper nickname replacement
     const parsedScript = parseScriptContent(script.script);
     

@@ -69,7 +69,10 @@ export function AchievementsView() {
       try {
         const recs = await apiService.getIntimateRecords();
         setRecords(recs);
-      } catch {}
+      } catch (error) {
+        console.error('Failed to load intimate records:', error);
+        // Keep empty array if API fails
+      }
     })();
   }, []);
 
@@ -87,9 +90,9 @@ export function AchievementsView() {
       ]);
       setAchievements(achievementsData);
       setStats(statsData);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to load achievements and stats:', err);
-      setError(err.message || '載入數據失敗');
+      setError((err as Error)?.message || '載入數據失敗');
     } finally {
       setLoading(false);
     }

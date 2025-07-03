@@ -57,6 +57,19 @@ interface PairingCodeResponse {
   expiresAt: string;
 }
 
+interface ApiError {
+  message?: string;
+  error?: string;
+  status?: number;
+}
+
+interface ApiErrorResponse {
+  response?: {
+    data?: ApiError;
+  };
+  message?: string;
+}
+
 // Enhanced API Client with error handling
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -140,9 +153,9 @@ class ApiService {
         throw new Error('獲取記錄數據格式錯誤');
       }
       return response.data.map(this.transformApiRecord);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to fetch intimate records:', error);
-      throw new Error(error.message || '無法獲取愛的時光記錄');
+      throw new Error((error as ApiErrorResponse)?.message || '無法獲取愛的時光記錄');
     }
   }
 
@@ -153,9 +166,9 @@ class ApiService {
       }
       const response = await apiClient.get(`/love-moments/${id}`);
       return this.transformApiRecord(response.data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to fetch intimate record:', error);
-      throw new Error(error.message || '無法獲取記錄詳情');
+      throw new Error((error as ApiErrorResponse)?.message || '無法獲取記錄詳情');
     }
   }
 
@@ -179,9 +192,9 @@ class ApiService {
 
       const response = await apiClient.post('/love-moments', apiPayload);
       return this.transformApiRecord(response.data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to create intimate record:', error);
-      throw new Error(error.message || '無法創建愛的時光記錄');
+      throw new Error((error as ApiErrorResponse)?.message || '無法創建愛的時光記錄');
     }
   }
 
@@ -224,9 +237,9 @@ class ApiService {
       }
 
       return response.data;
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to upload photo:', error);
-      throw new Error(error.message || '照片上傳失敗');
+      throw new Error((error as ApiErrorResponse)?.message || '照片上傳失敗');
     }
   }
 
@@ -266,7 +279,7 @@ class ApiService {
     }
   }
 
-  async getCoinTransactions(): Promise<any[]> {
+  async getCoinTransactions(): Promise<unknown[]> {
     try {
       const response = await apiClient.get('/coins/transactions');
       return response.data || [];
@@ -290,7 +303,7 @@ class ApiService {
   }
 
   // Achievements
-  async getAchievements(): Promise<any> {
+  async getAchievements(): Promise<unknown> {
     try {
       const response = await apiClient.get('/achievements');
       return response.data;
@@ -301,7 +314,7 @@ class ApiService {
   }
 
   // Statistics
-  async getStats(): Promise<any> {
+  async getStats(): Promise<unknown> {
     try {
       const response = await apiClient.get('/stats');
       return response.data;
@@ -311,7 +324,7 @@ class ApiService {
     }
   }
 
-  async getMonthlyStats(): Promise<any[]> {
+  async getMonthlyStats(): Promise<unknown[]> {
     try {
       const response = await apiClient.get('/stats/monthly');
       return response.data || [];
@@ -321,7 +334,7 @@ class ApiService {
     }
   }
 
-  async getWeeklyStats(): Promise<any[]> {
+  async getWeeklyStats(): Promise<unknown[]> {
     try {
       const response = await apiClient.get('/stats/weekly');
       return response.data || [];
@@ -332,7 +345,7 @@ class ApiService {
   }
 
   // Authentication
-  async login(email: string, password: string): Promise<{ token: string; user: any }> {
+  async login(email: string, password: string): Promise<{ token: string; user: unknown }> {
     const response = await apiClient.post('/auth/login', { email, password });
     const { token, user } = response.data;
     
@@ -342,7 +355,7 @@ class ApiService {
     return { token, user };
   }
 
-  async register(email: string, nickname: string, password: string): Promise<{ token: string; user: any }> {
+  async register(email: string, nickname: string, password: string): Promise<{ token: string; user: unknown }> {
     const response = await apiClient.post('/auth/register', { email, nickname, password });
     const { token, user } = response.data;
     
@@ -396,7 +409,7 @@ class ApiService {
     try {
       const response = await apiClient.get('/health');
       return response.status === 200;
-    } catch (error) {
+    } catch {
       return false;
     }
   }
@@ -404,16 +417,11 @@ class ApiService {
   // Couples
   async createCouple(data: CreateCoupleRequest): Promise<CoupleResponse> {
     try {
-      const response = await apiClient.post('/couples', {
-        couple_name: data.coupleName,
-        anniversary_date: data.anniversaryDate,
-        partner_email: data.partnerEmail,
-        pairing_code: data.pairingCode,
-      });
+      const response = await apiClient.post('/couples', data);
       return this.transformCoupleResponse(response.data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to create couple:', error);
-      throw new Error(error.message || '無法創建情侶檔案');
+      throw new Error((error as ApiErrorResponse)?.message || '無法創建情侶關係');
     }
   }
 
@@ -421,34 +429,41 @@ class ApiService {
     try {
       const response = await apiClient.get('/couples');
       return this.transformCoupleResponse(response.data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Failed to get couple:', error);
-      throw new Error(error.message || '無法獲取情侶檔案');
+      throw new Error((error as ApiErrorResponse)?.message || '無法獲取情侶信息');
     }
   }
 
   async generatePairingCode(): Promise<PairingCodeResponse> {
     try {
       const response = await apiClient.post('/couples/pairing-code');
-      return {
-        code: response.data.code,
-        expiresAt: response.data.expires_at,
-      };
-    } catch (error: any) {
+      return response.data;
+    } catch (error: unknown) {
       console.error('Failed to generate pairing code:', error);
-      throw new Error(error.message || '無法生成配對碼');
+      throw new Error((error as ApiErrorResponse)?.message || '無法生成配對碼');
     }
   }
 
-  private transformCoupleResponse(data: any): CoupleResponse {
+  private transformCoupleResponse(data: unknown): CoupleResponse {
+    const typedData = data as {
+      id?: string;
+      couple_name?: string;
+      anniversary_date?: string;
+      user1_nickname?: string;
+      user2_nickname?: string;
+      created_at?: string;
+      pairing_code?: string;
+    };
+    
     return {
-      id: data.id,
-      coupleName: data.couple_name,
-      anniversaryDate: data.anniversary_date,
-      user1Nickname: data.user1_nickname,
-      user2Nickname: data.user2_nickname,
-      createdAt: data.created_at,
-      pairingCode: data.pairing_code,
+      id: typedData?.id || '',
+      coupleName: typedData?.couple_name,
+      anniversaryDate: typedData?.anniversary_date,
+      user1Nickname: typedData?.user1_nickname || '',
+      user2Nickname: typedData?.user2_nickname,
+      createdAt: typedData?.created_at || new Date().toISOString(),
+      pairingCode: typedData?.pairing_code,
     };
   }
 }

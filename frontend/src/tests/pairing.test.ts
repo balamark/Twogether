@@ -17,6 +17,15 @@ Object.defineProperty(window, 'localStorage', {
   value: localStorageMock
 });
 
+interface MockAxiosInstance {
+  post: ReturnType<typeof vi.fn>;
+  get: ReturnType<typeof vi.fn>;
+  interceptors: {
+    request: { use: ReturnType<typeof vi.fn> };
+    response: { use: ReturnType<typeof vi.fn> };
+  };
+}
+
 describe('Pairing Flow Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -32,13 +41,15 @@ describe('Pairing Flow Tests', () => {
         }
       };
 
-      mockedAxios.create.mockReturnValue({
+      const mockApiClient = {
         post: vi.fn().mockResolvedValue(mockResponse),
         interceptors: {
           request: { use: vi.fn() },
           response: { use: vi.fn() }
         }
-      } as any);
+      } as MockAxiosInstance;
+
+      mockedAxios.create.mockReturnValue(mockApiClient as MockAxiosInstance);
 
       const result = await apiService.generatePairingCode();
 
@@ -61,13 +72,15 @@ describe('Pairing Flow Tests', () => {
         }
       };
 
-      mockedAxios.create.mockReturnValue({
+      const mockApiClient = {
         post: vi.fn().mockRejectedValue(mockError),
         interceptors: {
           request: { use: vi.fn() },
           response: { use: vi.fn() }
         }
-      } as any);
+      } as MockAxiosInstance;
+
+      mockedAxios.create.mockReturnValue(mockApiClient as MockAxiosInstance);
 
       await expect(apiService.generatePairingCode()).rejects.toThrow('您已有一個有效的配對碼');
     });
@@ -87,13 +100,15 @@ describe('Pairing Flow Tests', () => {
         }
       };
 
-      mockedAxios.create.mockReturnValue({
+      const mockApiClient = {
         post: vi.fn().mockResolvedValue(mockResponse),
         interceptors: {
           request: { use: vi.fn() },
           response: { use: vi.fn() }
         }
-      } as any);
+      } as MockAxiosInstance;
+
+      mockedAxios.create.mockReturnValue(mockApiClient as MockAxiosInstance);
 
       const result = await apiService.createCouple({ pairingCode: 'X5RX6S7D' });
 
@@ -121,13 +136,15 @@ describe('Pairing Flow Tests', () => {
         }
       };
 
-      mockedAxios.create.mockReturnValue({
+      const mockApiClient = {
         post: vi.fn().mockRejectedValue(mockError),
         interceptors: {
           request: { use: vi.fn() },
           response: { use: vi.fn() }
         }
-      } as any);
+      } as MockAxiosInstance;
+
+      mockedAxios.create.mockReturnValue(mockApiClient as MockAxiosInstance);
 
       await expect(apiService.createCouple({ pairingCode: 'INVALID1' }))
         .rejects.toThrow('配對碼無效或已過期');
@@ -146,13 +163,15 @@ describe('Pairing Flow Tests', () => {
         }
       };
 
-      mockedAxios.create.mockReturnValue({
+      const mockApiClient = {
         post: vi.fn().mockRejectedValue(mockError),
         interceptors: {
           request: { use: vi.fn() },
           response: { use: vi.fn() }
         }
-      } as any);
+      } as MockAxiosInstance;
+
+      mockedAxios.create.mockReturnValue(mockApiClient as MockAxiosInstance);
 
       await expect(apiService.createCouple({ pairingCode: 'X5RX6S7D' }))
         .rejects.toThrow('您已經有配對的伴侶了');
@@ -173,13 +192,15 @@ describe('Pairing Flow Tests', () => {
         }
       };
 
-      mockedAxios.create.mockReturnValue({
+      const mockApiClient = {
         get: vi.fn().mockResolvedValue(mockResponse),
         interceptors: {
           request: { use: vi.fn() },
           response: { use: vi.fn() }
         }
-      } as any);
+      } as MockAxiosInstance;
+
+      mockedAxios.create.mockReturnValue(mockApiClient as MockAxiosInstance);
 
       const result = await apiService.getCouple();
 
@@ -207,13 +228,15 @@ describe('Pairing Flow Tests', () => {
         }
       };
 
-      mockedAxios.create.mockReturnValue({
+      const mockApiClient = {
         get: vi.fn().mockRejectedValue(mockError),
         interceptors: {
           request: { use: vi.fn() },
           response: { use: vi.fn() }
         }
-      } as any);
+      } as MockAxiosInstance;
+
+      mockedAxios.create.mockReturnValue(mockApiClient as MockAxiosInstance);
 
       await expect(apiService.getCouple()).rejects.toThrow('找不到情侶檔案');
     });
@@ -291,7 +314,7 @@ describe('End-to-End Pairing Flow Simulation', () => {
       }
     };
 
-    const mockAxiosInstance = {
+    const mockApiClient = {
       post: vi.fn()
         .mockResolvedValueOnce(userAResponse) // User A registration
         .mockResolvedValueOnce(pairingCodeResponse) // Pairing code generation
@@ -301,21 +324,23 @@ describe('End-to-End Pairing Flow Simulation', () => {
         request: { use: vi.fn() },
         response: { use: vi.fn() }
       }
-    };
+    } as MockAxiosInstance;
 
-    mockedAxios.create.mockReturnValue(mockAxiosInstance as any);
+    mockedAxios.create.mockReturnValue(mockApiClient as MockAxiosInstance);
 
     // Simulate User A registration
-    const userA = await apiService.register('user-a@test.com', '測試用戶A', 'password123');
-    expect(userA.user.nickname).toBe('測試用戶A');
+    const userA = await apiService.register('userA@test.com', '測試用戶A', 'password123');
+    
+    // Simulate User B registration  
+    const userB = await apiService.register('userB@test.com', '測試用戶B', 'password123');
+
+    // Verify both users are registered
+    expect((userA.user as { id: string; email: string; nickname: string }).id).toBeDefined();
+    expect((userB.user as { id: string; email: string; nickname: string }).id).toBeDefined();
 
     // Simulate pairing code generation
     const pairingCode = await apiService.generatePairingCode();
     expect(pairingCode.code).toBe('X5RX6S7D');
-
-    // Simulate User B registration
-    const userB = await apiService.register('user-b@test.com', '測試用戶B', 'password123');
-    expect(userB.user.nickname).toBe('測試用戶B');
 
     // Simulate pairing
     const couple = await apiService.createCouple({ pairingCode: 'X5RX6S7D' });

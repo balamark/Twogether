@@ -41,6 +41,13 @@ interface ApiError {
   timestamp: string;
 }
 
+interface ApiErrorResponse {
+  response?: {
+    data?: ApiError;
+  };
+  message?: string;
+}
+
 interface SettingsViewProps {
   nicknames: Nicknames;
   handleNicknameChange: (partner: 'partner1' | 'partner2', value: string) => void;
@@ -72,15 +79,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       const response = await apiService.generatePairingCode();
       setGeneratedCode(response.code);
       setSuccess('配對碼已生成，請分享給您的伴侶');
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Generate pairing code error:', err);
-      const apiError = err.response?.data as ApiError;
+      const apiError = (err as ApiErrorResponse)?.response?.data;
       if (apiError?.error_code === 'ALREADY_PAIRED') {
         setError('您已經有配對的伴侶了，無法生成新的配對碼');
       } else if (apiError?.error_code === 'CODE_EXISTS') {
         setError('您已有一個有效的配對碼，請等待其過期後再生成新的配對碼');
       } else {
-        setError(err.message || '生成配對碼失敗，請稍後再試');
+        setError((err as Error)?.message || '生成配對碼失敗，請稍後再試');
       }
     }
   };
@@ -130,9 +137,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       setSuccess(`配對成功！您現在已經與 ${authState.user?.partnerNickname || '伴侶'} 連結`);
       setPairingCode('');
       
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Pair with code error:', err);
-      const apiError = err.response?.data as ApiError;
+      const apiError = (err as ApiErrorResponse)?.response?.data;
       
       // Handle specific error cases
       if (apiError?.error_code === 'NOT_FOUND') {
@@ -144,7 +151,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       } else if (apiError?.error_code === 'SELF_PAIRING') {
         setError('無法使用自己生成的配對碼進行配對');
       } else {
-        setError(err.message || '配對失敗，請稍後再試');
+        setError((err as Error)?.message || '配對失敗，請稍後再試');
       }
     }
   };
