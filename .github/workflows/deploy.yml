@@ -103,33 +103,6 @@ jobs:
           sed -i "s|http://localhost:8080|$SERVICE_URL|g" /tmp/index.html
           gsutil cp /tmp/index.html gs://${{ env.FRONTEND_BUCKET }}/index.html
 
-  # Database migrations (if needed)
-  run-migrations:
-    runs-on: ubuntu-latest
-    needs: deploy-backend
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Google Auth
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Setup Google Cloud CLI
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ env.PROJECT_ID }}
-
-      - name: Run database migrations
-        run: |
-          # Get the Cloud Run service URL
-          SERVICE_URL=$(gcloud run services describe ${{ env.BACKEND_SERVICE }} --region=${{ env.REGION }} --format="value(status.url)")
-          
-          # Run migrations via API call (if you have a migration endpoint)
-          curl -X POST "$SERVICE_URL/api/migrate" || echo "Migration endpoint not available"
-
   # Health check
   health-check:
     runs-on: ubuntu-latest
