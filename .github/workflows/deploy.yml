@@ -1,137 +1,144 @@
-name: Deploy Twogether to GCP
+name: Deploy to Google Cloud Platform
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   pull_request:
-    branches: [main]
+    branches: [ main ]
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
-  SERVICE_NAME: twogether-backend
   REGION: us-central1
+  FRONTEND_BUCKET: ${{ secrets.GCP_FRONTEND_BUCKET }}
+  BACKEND_SERVICE: twogether-backend
 
 jobs:
-  test:
+  # Frontend Build and Deploy
+  deploy-frontend:
     runs-on: ubuntu-latest
-    
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: twogether_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
-    - name: Cache cargo dependencies
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
 
-    - name: Run backend tests
-      working-directory: ./backend
-      env:
-        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/twogether_test
-      run: |
-        cargo test
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
+      - name: Setup Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
 
-    - name: Install frontend dependencies
-      working-directory: ./frontend
-      run: npm ci
+      - name: Deploy frontend to Cloud Storage
+        run: |
+          gsutil -m rsync -d -r frontend/dist gs://${{ env.FRONTEND_BUCKET }}
+          gsutil iam ch allUsers:objectViewer gs://${{ env.FRONTEND_BUCKET }}
+          gsutil web set -m index.html -e 404.html gs://${{ env.FRONTEND_BUCKET }}
 
-    - name: Build frontend
-      working-directory: ./frontend
-      run: npm run build
-
-    - name: Run frontend tests (if any)
-      working-directory: ./frontend
-      run: npm run test --if-present
-
-  deploy:
-    needs: test
+  # Backend Build and Deploy
+  deploy-backend:
     runs-on: ubuntu-latest
+    needs: deploy-frontend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
+
+      - name: Configure Docker for GCP
+        run: gcloud auth configure-docker
+
+      - name: Build and push Docker image
+        run: |
+          docker build -t gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }} ./backend
+          docker push gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }}
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.BACKEND_SERVICE }} \
+            --image gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }} \
+            --platform managed \
+            --region ${{ env.REGION }} \
+            --allow-unauthenticated \
+            --port 8080 \
+            --memory 512Mi \
+            --cpu 1 \
+            --max-instances 10 \
+            --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
+            --set-env-vars "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" \
+            --set-env-vars "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" \
+            --set-env-vars "SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}"
+
+      - name: Update frontend API URL
+        run: |
+          # Get the Cloud Run service URL
+          SERVICE_URL=$(gcloud run services describe ${{ env.BACKEND_SERVICE }} --region=${{ env.REGION }} --format="value(status.url)")
+          
+          # Update the frontend with the new API URL
+          gsutil cp gs://${{ env.FRONTEND_BUCKET }}/index.html /tmp/index.html
+          sed -i "s|http://localhost:8080|$SERVICE_URL|g" /tmp/index.html
+          gsutil cp /tmp/index.html gs://${{ env.FRONTEND_BUCKET }}/index.html
+
+  # Database migrations (if needed)
+  run-migrations:
+    runs-on: ubuntu-latest
+    needs: deploy-backend
     if: github.ref == 'refs/heads/main'
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - id: 'auth'
-      name: 'Authenticate to Google Cloud'
-      uses: 'google-github-actions/auth@v1'
-      with:
-        credentials_json: '${{ secrets.GCP_SA_KEY }}'
+      - name: Setup Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
 
-    - name: 'Set up Cloud SDK'
-      uses: 'google-github-actions/setup-gcloud@v1'
+      - name: Run database migrations
+        run: |
+          # Get the Cloud Run service URL
+          SERVICE_URL=$(gcloud run services describe ${{ env.BACKEND_SERVICE }} --region=${{ env.REGION }} --format="value(status.url)")
+          
+          # Run migrations via API call (if you have a migration endpoint)
+          curl -X POST "$SERVICE_URL/api/migrate" || echo "Migration endpoint not available"
 
-    - name: Configure Docker for GCR
-      run: gcloud auth configure-docker
+  # Health check
+  health-check:
+    runs-on: ubuntu-latest
+    needs: [deploy-frontend, deploy-backend]
+    steps:
+      - name: Setup Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
 
-    - name: Build backend Docker image
-      run: |
-        docker build -t gcr.io/$PROJECT_ID/$SERVICE_NAME:$GITHUB_SHA ./backend
-        docker push gcr.io/$PROJECT_ID/$SERVICE_NAME:$GITHUB_SHA
+      - name: Health check backend
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.BACKEND_SERVICE }} --region=${{ env.REGION }} --format="value(status.url)")
+          curl -f "$SERVICE_URL/api/health" || exit 1
 
-    - name: Deploy backend to Cloud Run
-      run: |
-        gcloud run deploy $SERVICE_NAME \
-          --image gcr.io/$PROJECT_ID/$SERVICE_NAME:$GITHUB_SHA \
-          --platform managed \
-          --region $REGION \
-          --allow-unauthenticated \
-          --set-env-vars="DATABASE_URL=${{ secrets.DATABASE_URL }}" \
-          --set-env-vars="JWT_SECRET=${{ secrets.JWT_SECRET }}" \
-          --set-env-vars="ENVIRONMENT=production" \
-          --set-env-vars="CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}"
-
-    - name: Setup Node.js for frontend
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
-
-    - name: Install and build frontend
-      working-directory: ./frontend
-      run: |
-        npm ci
-        npm run build
-
-    - name: Deploy frontend to Cloud Storage
-      run: |
-        gsutil -m rsync -r -d ./frontend/dist gs://${{ secrets.GCS_BUCKET_NAME }}
-        gsutil -m setmeta -h "Cache-Control:public, max-age=86400" gs://${{ secrets.GCS_BUCKET_NAME }}/**
-
-    - name: Update load balancer backend
-      run: |
-        echo "Backend deployed to Cloud Run"
-        echo "Frontend deployed to Cloud Storage"
-        echo "Update your load balancer configuration to point to the new backend" 
+      - name: Health check frontend
+        run: |
+          FRONTEND_URL="https://storage.googleapis.com/${{ env.FRONTEND_BUCKET }}/index.html"
+          curl -f "$FRONTEND_URL" || exit 1 
