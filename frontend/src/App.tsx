@@ -294,12 +294,19 @@ const LoveTimeApp = () => {
     try {
       const authResult = await apiService.login(email, password);
       
+      const userData = authResult.user as {
+        id?: string;
+        email: string;
+        nickname: string;
+        created_at?: string;
+      };
+      
       const user: User = {
-        id: authResult.user.id || Date.now().toString(),
-        email: authResult.user.email,
-        nickname: authResult.user.nickname,
+        id: userData.id || Date.now().toString(),
+        email: userData.email,
+        nickname: userData.nickname,
         partnerCode: generatePartnerCode(),
-        createdAt: authResult.user.created_at || new Date().toISOString()
+        createdAt: userData.created_at || new Date().toISOString()
       };
       
       setAuthState({
@@ -333,12 +340,19 @@ const LoveTimeApp = () => {
     try {
       const authResult = await apiService.register(email, nickname, password);
       
+      const userData = authResult.user as {
+        id?: string;
+        email: string;
+        nickname: string;
+        created_at?: string;
+      };
+      
       const user: User = {
-        id: authResult.user.id || Date.now().toString(),
-        email: authResult.user.email,
-        nickname: authResult.user.nickname,
+        id: userData.id || Date.now().toString(),
+        email: userData.email,
+        nickname: userData.nickname,
         partnerCode: generatePartnerCode(),
-        createdAt: authResult.user.created_at || new Date().toISOString()
+        createdAt: userData.created_at || new Date().toISOString()
       };
       
       setAuthState({

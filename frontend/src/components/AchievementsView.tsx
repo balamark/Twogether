@@ -88,8 +88,8 @@ export function AchievementsView() {
         apiService.getAchievements(),
         apiService.getStats(),
       ]);
-      setAchievements(achievementsData);
-      setStats(statsData);
+      setAchievements(achievementsData as AchievementStats);
+      setStats(statsData as IntimacyStats);
     } catch (err: unknown) {
       console.error('Failed to load achievements and stats:', err);
       setError((err as Error)?.message || '載入數據失敗');
