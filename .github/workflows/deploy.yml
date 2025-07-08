@@ -80,11 +80,8 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          # Create .sqlx directory if it doesn't exist
           mkdir -p .sqlx
-          # Generate SQLx metadata
-          cargo sqlx prepare --workspace
-          # List contents to verify
+          cargo sqlx prepare
           ls -la .sqlx/
 
       - name: Configure Docker for GCP

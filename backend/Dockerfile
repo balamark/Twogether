@@ -21,10 +21,7 @@ COPY backend/Cargo.toml ./backend/Cargo.toml
 # Copy source code and SQLx metadata
 COPY backend/src ./backend/src
 COPY backend/migrations ./backend/migrations
-
-# IMPORTANT CHANGE HERE: Copy .sqlx from the workspace root (where prepare created it)
-# to the backend directory inside the container.
-COPY .sqlx/ ./backend/.sqlx/
+COPY ./backend/.sqlx/ ./backend/.sqlx/
 
 # Build the application (will use SQLx offline mode)
 RUN cd backend && cargo build --release
