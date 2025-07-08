@@ -49,9 +49,6 @@ COPY --from=builder /app/target/release/twogether-backend /app/twogether-backend
 # Copy migrations
 COPY --from=builder /app/backend/migrations /app/migrations
 
-# Create uploads directory
-RUN mkdir -p /app/uploads && chown -R appuser:appuser /app
-
 # Switch to app user
 USER appuser
 

@@ -86,7 +86,6 @@ export JWT_SECRET="$JWT_SECRET"
 export CORS_ORIGIN="$CORS_ORIGIN"
 export PORT=8080
 export ENVIRONMENT=development
-export UPLOAD_PATH="./uploads"
 export MAX_FILE_SIZE=10485760
 
 # Export Supabase configuration from .env

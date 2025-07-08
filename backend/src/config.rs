@@ -4,7 +4,6 @@ use std::env;
 pub struct Config {
     pub database_url: String,
     pub jwt_secret: String,
-    pub upload_path: String,
     pub cors_origin: String,
     pub port: u16,
     pub max_file_size: usize,
@@ -35,8 +34,6 @@ impl Config {
                         "twogether-dev-secret-key-change-in-production".to_string()
                     }
                 }),
-            upload_path: env::var("UPLOAD_PATH")
-                .unwrap_or_else(|_| "./uploads".to_string()),
             cors_origin: env::var("CORS_ORIGIN")
                 .unwrap_or_else(|_| "http://localhost:5174".to_string()),
             port: env::var("PORT")
