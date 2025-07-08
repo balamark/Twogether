@@ -24,7 +24,14 @@ if [ ! -f .env ]; then
     echo "📄 Creating .env file..."
     cp env.example .env
     echo "✅ .env file created. Please edit it with your configuration."
+    echo "❗ IMPORTANT: Update your Supabase credentials in .env before proceeding!"
+    echo "   You can run this script again after updating .env"
+    exit 0
 fi
+
+# Load environment variables from .env
+echo "📋 Loading environment variables from .env..."
+export $(grep -v '^#' .env | xargs)
 
 # Create uploads directory
 echo "📁 Creating uploads directory..."
@@ -56,7 +63,7 @@ fi
 # Run database migrations
 echo "🗄️  Running database migrations..."
 cd backend
-DATABASE_URL="postgresql://twogether:twogether_dev_password@localhost:5432/twogether_dev" sqlx migrate run
+DATABASE_URL="$DATABASE_URL" sqlx migrate run
 cd ..
 
 # Install frontend dependencies
@@ -75,25 +82,24 @@ echo "🎉 Development environment setup complete!"
 echo ""
 echo "🚀 To start the development servers:"
 echo ""
-echo "  Terminal 1 - Backend:"
-echo "    cd backend"
-echo "    DATABASE_URL=\"postgresql://twogether:twogether_dev_password@localhost:5432/twogether_dev\" cargo run"
+echo "  Option 1 - Use start-dev.sh (recommended):"
+echo "    ./start-dev.sh"
 echo ""
-echo "  Terminal 2 - Frontend:"
-echo "    cd frontend"
-echo "    npm run dev"
+echo "  Option 2 - Manual startup:"
+echo "    Terminal 1 - Backend:"
+echo "      cd backend"
+echo "      DATABASE_URL=\"$DATABASE_URL\" cargo run"
+echo ""
+echo "    Terminal 2 - Frontend:"
+echo "      cd frontend"
+echo "      npm run dev"
 echo ""
 echo "📊 Access points:"
 echo "  • Frontend:     http://localhost:5174"
 echo "  • Backend API:  http://localhost:8080"
-echo "  • Database Admin: http://localhost:8081 (pgAdmin)"
 echo ""
-echo "🗄️  Database connection details:"
-echo "  • Host: localhost"
-echo "  • Port: 5432"
-echo "  • Database: twogether_dev"
-echo "  • Username: twogether"
-echo "  • Password: twogether_dev_password"
+echo "🗄️  Database connection details (loaded from .env):"
+echo "  • Database URL: $DATABASE_URL"
 echo ""
 echo "📋 View logs:"
 echo "  • Backend logs: Check terminal where 'cargo run' is running"
@@ -109,4 +115,4 @@ echo ""
 echo "📁 File locations:"
 echo "  • Uploaded photos: ./uploads/"
 echo "  • Database data: Docker volume 'twogether_postgres_data'"
-echo "  • Logs: Check respective terminals" 
+echo "  • Configuration: .env file" 

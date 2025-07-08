@@ -1,93 +1,78 @@
 #!/bin/bash
 
-# Development startup script for Twogether
-# This script starts the database in Docker and runs the applications locally
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
 
-echo "🚀 Starting Twogether Development Environment..."
+echo -e "${GREEN}🚀 Starting Twogether Development Environment${NC}"
 
-# Start PostgreSQL in Docker
-echo "📊 Starting PostgreSQL database..."
-docker compose up postgres -d
-
-# Wait for PostgreSQL to be ready
-echo "⏳ Waiting for database to be ready..."
-sleep 5
-
-# Run database migrations
-echo "🗄️ Running database migrations..."
-cd backend
-DATABASE_URL="postgresql://twogether:twogether_dev_password@localhost:5432/twogether_dev" sqlx migrate run --source migrations
-cd ..
-
-# Set environment variables for development
-export DATABASE_URL="postgresql://twogether:twogether_dev_password@localhost:5432/twogether_dev"
-export JWT_SECRET="twogether-dev-secret-key-change-in-production"
-export CORS_ORIGIN="http://localhost:5174"
-export PORT="8080"
-export ENVIRONMENT="development"
-
-# Note: Replace these with your actual Supabase credentials
-export SUPABASE_URL="https://gqhoebnveeaishflmkqv.supabase.co"
-export SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxaG9lYm52ZWVhaXNoZmxta3F2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE0Mjg5NTcsImV4cCI6MjA2NzAwNDk1N30.kw7lXqkbXiD9lKX6bSUxq_zWIPBDUB-xZ1PAy-AUG-E"
-export SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxaG9lYm52ZWVhaXNoZmxta3F2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTQyODk1NywiZXhwIjoyMDY3MDA0OTU3fQ.MVaYbfHe_wI2xMpmMnEuugM5MM37sgM8LU9diltU2q0"
-
-echo "🔧 Environment variables set."
-
-# Create logs directory
-mkdir -p logs
-
-# Start backend in background with logging
-echo "🦀 Starting Rust backend..."
-cd backend
-
-# Source Cargo environment if it exists
-if [ -f "$HOME/.cargo/env" ]; then
-    source "$HOME/.cargo/env"
-fi
-
-# Check if cargo is available
-if ! command -v cargo &> /dev/null; then
-    echo "❌ Cargo not found. Please install Rust and Cargo first:"
-    echo "   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
-    echo "   source ~/.cargo/env"
-    echo "   Then run this script again."
+# Check if .env file exists
+if [ ! -f .env ]; then
+    echo -e "${YELLOW}⚠️  .env file not found. Creating from env.example...${NC}"
+    cp env.example .env
+    echo -e "${RED}❗ Please edit .env with your actual configuration before continuing.${NC}"
+    echo -e "${BLUE}📝 You need to set your Supabase credentials in .env${NC}"
     exit 1
 fi
 
-RUST_LOG=debug SQLX_OFFLINE=true cargo run --release > ../logs/backend.log 2>&1 &
-BACKEND_PID=$!
-cd ..
+# Load environment variables from .env
+export $(grep -v '^#' .env | xargs)
 
-# Wait a moment for backend to start
-sleep 3
+# Run database migrations
+echo -e "${BLUE}📊 Running database migrations...${NC}"
+DATABASE_URL="$DATABASE_URL" sqlx migrate run --source migrations
 
-# Start frontend with logging
-echo "⚛️ Starting React frontend..."
-cd frontend
-npm run dev > ../logs/frontend.log 2>&1 &
-FRONTEND_PID=$!
-cd ..
+# Start backend
+echo -e "${BLUE}🔧 Starting backend server...${NC}"
+export DATABASE_URL="$DATABASE_URL"
+export JWT_SECRET="$JWT_SECRET"
+export CORS_ORIGIN="$CORS_ORIGIN"
+export PORT=8080
+export ENVIRONMENT=development
+export UPLOAD_PATH="./uploads"
+export MAX_FILE_SIZE=10485760
 
-echo "✅ Development environment started!"
-echo "🌐 Frontend: http://localhost:5174"
-echo "🔗 Backend API: http://localhost:8080"
-echo "📝 Backend logs: tail -f logs/backend.log"
-echo "📝 Frontend logs: tail -f logs/frontend.log"
+# Export Supabase configuration from .env
+export SUPABASE_URL="$SUPABASE_URL"
+export SUPABASE_ANON_KEY="$SUPABASE_ANON_KEY"
+export SUPABASE_SERVICE_ROLE_KEY="$SUPABASE_SERVICE_ROLE_KEY"
+
+# Ensure uploads directory exists
+mkdir -p uploads
+
+# Navigate to backend directory and start
+cd backend
+
+echo -e "${GREEN}✅ Environment loaded from .env file${NC}"
+echo -e "${BLUE}🚀 Starting Rust backend...${NC}"
+echo -e "${YELLOW}📝 Backend will be available at http://localhost:8080${NC}"
+echo -e "${YELLOW}📚 API documentation at http://localhost:8080/api/docs${NC}"
+
+# Start the backend
+cargo run
+
+echo -e "${GREEN}🛑 Backend stopped${NC}"
+
+# Instructions for next steps
 echo ""
-echo "Press Ctrl+C to stop all services"
+echo -e "${BLUE}📋 Next steps:${NC}"
+echo -e "${YELLOW}  1. Open another terminal${NC}"
+echo -e "${YELLOW}  2. Navigate to frontend directory: cd frontend${NC}"
+echo -e "${YELLOW}  3. Install dependencies: npm install${NC}"
+echo -e "${YELLOW}  4. Start frontend: npm run dev${NC}"
+echo ""
+echo -e "${GREEN}🌐 Then visit: http://localhost:5174${NC}"
 
-# Function to cleanup on exit
-cleanup() {
-    echo ""
-    echo "🛑 Stopping services..."
-    kill $BACKEND_PID $FRONTEND_PID 2>/dev/null
-    docker compose down
-    echo "👋 Goodbye!"
-    exit 0
-}
+# Development database info
+echo ""
+echo -e "${BLUE}📊 Database Info:${NC}"
+echo -e "${YELLOW}  • Host: localhost:5432${NC}"
+echo -e "${YELLOW}  • Database: twogether_dev${NC}"
+echo -e "${YELLOW}  • Username: twogether${NC}"
+echo -e "${YELLOW}  • Connection URL loaded from .env${NC}"
 
-# Set up signal handlers
-trap cleanup SIGINT SIGTERM
-
-# Wait for user to stop
-wait 
+echo ""
+echo -e "${GREEN}✨ Happy coding!${NC}" 

@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: twogether_dev
       POSTGRES_USER: twogether
-      POSTGRES_PASSWORD: twogether_dev_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-twogether_dev_password}
     ports:
       - "5432:5432"
     volumes:
@@ -26,15 +26,15 @@ services:
       dockerfile: backend/Dockerfile
     container_name: twogether_backend
     environment:
-      DATABASE_URL: postgresql://twogether:twogether_dev_password@postgres:5432/twogether_dev
-      JWT_SECRET: twogether-dev-secret-key-change-in-production
-      CORS_ORIGIN: http://localhost:5174
+      DATABASE_URL: ${DATABASE_URL:-postgresql://twogether:${POSTGRES_PASSWORD:-twogether_dev_password}@postgres:5432/twogether_dev}
+      JWT_SECRET: ${JWT_SECRET:-twogether-dev-secret-key-change-in-production}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5174}
       PORT: 8080
-      ENVIRONMENT: development
-      # Supabase configuration - replace with your actual values
-      SUPABASE_URL: https://gqhoebnveeaishflmkqv.supabase.co
-      SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxaG9lYm52ZWVhaXNoZmxta3F2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE0Mjg5NTcsImV4cCI6MjA2NzAwNDk1N30.kw7lXqkbXiD9lKX6bSUxq_zWIPBDUB-xZ1PAy-AUG-E
-      SUPABASE_SERVICE_ROLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdxaG9lYm52ZWVhaXNoZmxta3F2Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1MTQyODk1NywiZXhwIjoyMDY3MDA0OTU3fQ.MVaYbfHe_wI2xMpmMnEuugM5MM37sgM8LU9diltU2q0
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      # Supabase configuration - these MUST be set via environment variables
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
     ports:
       - "8080:8080"
     depends_on:
@@ -51,7 +51,7 @@ services:
       dockerfile: Dockerfile.dev
     container_name: twogether_frontend
     environment:
-      VITE_API_BASE_URL: http://localhost:8080/api
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080/api}
     ports:
       - "5173:5173"
     volumes:

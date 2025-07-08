@@ -7,6 +7,17 @@ set -e
 
 echo "🚀 Starting Twogether development servers..."
 
+# Check if .env file exists
+if [ ! -f .env ]; then
+    echo "⚠️  .env file not found. Creating from env.example..."
+    cp env.example .env
+    echo "❗ Please edit .env with your actual configuration before continuing."
+    exit 1
+fi
+
+# Load environment variables from .env
+export $(grep -v '^#' .env | xargs)
+
 # Check if PostgreSQL is running
 if ! docker ps | grep -q twogether-postgres; then
     echo "🐘 Starting PostgreSQL database..."
@@ -26,7 +37,7 @@ fi
 start_backend() {
     echo "🦀 Starting Rust backend..."
     cd backend
-    DATABASE_URL="postgresql://twogether:twogether_dev_password@localhost:5432/twogether_dev" cargo run
+    DATABASE_URL="$DATABASE_URL" cargo run
 }
 
 # Function to start frontend  

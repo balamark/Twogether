@@ -11,6 +11,8 @@ dist/
 *.db
 *.sqlite
 *.sqlite3
+love_time.db
+twogether.db
 
 # Environment files
 .env
@@ -38,4 +40,12 @@ sqlx-tmp/
 
 # Rust specific
 Cargo.lock
-*.pdb 
+*.pdb
+
+# SQLX query cache (contains database schema info)
+**/.sqlx/
+
+# Additional sensitive files
+*.key
+*.pem
+*.p12 
