@@ -75,7 +75,9 @@ done < .env
 
 # Run database migrations
 echo -e "${BLUE}📊 Running database migrations...${NC}"
+cd backend
 DATABASE_URL="$DATABASE_URL" sqlx migrate run --source migrations
+cd ..
 
 # Start backend
 echo -e "${BLUE}🔧 Starting backend server...${NC}"

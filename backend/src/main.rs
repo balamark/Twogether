@@ -63,10 +63,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let env_filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new(&format!("twogether_backend={},tower_http=debug", cli.log_level)));
 
-    if let Some(log_file_path) = cli.log_file {
+    // Keep the guard alive for the duration of the program
+    let _log_guard = if let Some(log_file_path) = cli.log_file {
         // File logging
         let file_appender = tracing_appender::rolling::never("", &log_file_path);
-        let (non_blocking_file, _guard) = tracing_appender::non_blocking(file_appender);
+        let (non_blocking_file, guard) = tracing_appender::non_blocking(file_appender);
         
         tracing_subscriber::registry()
             .with(fmt::layer()
@@ -82,6 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .init();
         
         tracing::info!("Logging to file: {}", log_file_path);
+        Some(guard)
     } else {
         // Console logging (default)
         tracing_subscriber::registry()
@@ -96,7 +98,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .pretty())
             .with(env_filter)
             .init();
-    }
+        None
+    };
 
     tracing::info!("Starting Twogether backend server...");
 
@@ -180,8 +183,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Server listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app).await?;
-
+    
+    // Keep the log guard alive until the server shuts down
+    let result = axum::serve(listener, app).await;
+    
+    // Explicitly drop the guard to ensure logs are flushed
+    drop(_log_guard);
+    
+    result?;
     Ok(())
 }
 
