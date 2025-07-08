@@ -42,8 +42,7 @@ sqlx-tmp/
 Cargo.lock
 *.pdb
 
-# SQLX query cache (contains database schema info)
-**/.sqlx/
+
 
 # Additional sensitive files
 *.key

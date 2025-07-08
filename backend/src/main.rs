@@ -19,6 +19,7 @@ use std::path::Path;
 use std::sync::OnceLock;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{fmt, EnvFilter, prelude::*};
+use std::sync::Arc;
 
 use crate::{
     config::Config,
@@ -46,9 +47,9 @@ struct Cli {
 
 #[derive(Clone)]
 pub struct AppState {
-    pub db: Database,
-    pub config: Config,
-    pub supabase_storage: SupabaseStorage,
+    pub db: Arc<Database>,
+    pub config: Arc<Config>,
+    pub supabase_storage: Arc<SupabaseStorage>,
 }
 
 #[tokio::main]
@@ -146,9 +147,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create app state
     let state = AppState {
-        config: config.clone(),
-        db,
-        supabase_storage,
+        config: Arc::new(config.clone()),
+        db: Arc::new(db),
+        supabase_storage: Arc::new(supabase_storage),
     };
 
     // Configure CORS

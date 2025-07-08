@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO achievements (id, couple_id, badge_type, earned_date, milestone_value)\n             VALUES ($1, $2, $3, $4, $5)\n             ON CONFLICT (couple_id, badge_type) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Timestamptz",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "fdd929f0a308000989dbda5dced698ad7779cd1a94370c5a6c19f6bffc811b89"
+}

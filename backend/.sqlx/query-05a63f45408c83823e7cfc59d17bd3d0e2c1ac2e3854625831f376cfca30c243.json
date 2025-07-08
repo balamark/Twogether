@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT \n            TO_CHAR(moment_date, 'YYYY-MM') as month,\n            COUNT(*) as count\n         FROM love_moments \n         WHERE couple_id = $1 \n           AND moment_date >= NOW() - INTERVAL '12 months'\n         GROUP BY TO_CHAR(moment_date, 'YYYY-MM')\n         ORDER BY month",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "month",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "05a63f45408c83823e7cfc59d17bd3d0e2c1ac2e3854625831f376cfca30c243"
+}

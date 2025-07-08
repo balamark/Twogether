@@ -1,55 +1,177 @@
 use axum::{
-    body::Body,
+    body::{Body, to_bytes},
     http::{Request, StatusCode},
+    Json,
 };
 use serde_json::{json, Value};
 use sqlx::PgPool;
-use tower::util::ServiceExt;
+use tower::ServiceExt;
 use uuid::Uuid;
 
 mod common;
-use common::{setup_test_app, TestApp};
+use common::{create_test_app, TestApp};
+
+#[derive(Debug)]
+struct UserWithToken {
+    id: String,
+    token: String,
+}
+
+// Helper function to create a user and get their token
+async fn create_user(app: &TestApp, email: &str, nickname: &str) -> UserWithToken {
+    let response = app.router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/auth/register")
+                .header("Content-Type", "application/json")
+                .body(
+                    Body::from(
+                        json!({
+                            "email": email,
+                            "nickname": nickname,
+                            "password": "password123"
+                        })
+                        .to_string()
+                    )
+                )
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = to_bytes(response.into_body()).await.unwrap();
+    let response: serde_json::Value = serde_json::from_slice(&body).unwrap();
+
+    UserWithToken {
+        id: response["user"]["id"].as_str().unwrap().to_string(),
+        token: response["token"].as_str().unwrap().to_string(),
+    }
+}
+
+// Helper function to create a couple
+async fn create_couple(app: &TestApp, token: &str, partner_email: &str) -> serde_json::Value {
+    let response = app.router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/couples")
+                .header("Content-Type", "application/json")
+                .header("Authorization", format!("Bearer {}", token))
+                .body(
+                    Body::from(
+                        json!({
+                            "couple_name": "Test Couple",
+                            "partner_email": partner_email
+                        })
+                        .to_string()
+                    )
+                )
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+// Helper function to get pairing code
+async fn get_pairing_code(app: &TestApp, token: &str) -> serde_json::Value {
+    let response = app.router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/api/couples/pairing-code")
+                .header("Authorization", format!("Bearer {}", token))
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
+
+// Helper function to pair with code
+async fn pair_with_code(app: &TestApp, token: &str, code: &str) -> serde_json::Value {
+    let response = app.router
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/couples/pair")
+                .header("Content-Type", "application/json")
+                .header("Authorization", format!("Bearer {}", token))
+                .body(
+                    Body::from(
+                        json!({
+                            "code": code
+                        })
+                        .to_string()
+                    )
+                )
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let body = to_bytes(response.into_body()).await.unwrap();
+    serde_json::from_slice(&body).unwrap()
+}
 
 #[tokio::test]
 #[ignore] // Skip in CI since no database is available
 async fn test_pairing_code_flow_complete() {
-    let app = setup_test_app().await;
+    let app = create_test_app().await;
     
     // 1. Register User A
-    let user_a = register_test_user(&app, "user-a@test.com", "測試用戶A", "password123").await;
+    let user_a = create_user(&app, "user-a@test.com", "測試用戶A").await;
     
     // 2. User A generates pairing code
-    let pairing_response = generate_pairing_code(&app, &user_a.token).await;
-    assert!(pairing_response.code.len() == 8);
-    assert!(pairing_response.expires_at > chrono::Utc::now());
+    let pairing_response = get_pairing_code(&app, &user_a.token).await;
+    assert!(pairing_response["code"].as_str().unwrap().len() == 8);
+    assert!(pairing_response["expires_at"] > chrono::Utc::now().to_string());
     
     // 3. Register User B
-    let user_b = register_test_user(&app, "user-b@test.com", "測試用戶B", "password123").await;
+    let user_b = create_user(&app, "user-b@test.com", "測試用戶B").await;
     
     // 4. User B uses pairing code
-    let couple_response = pair_with_code(&app, &user_b.token, &pairing_response.code).await;
-    assert_eq!(couple_response.user1_nickname, "測試用戶A");
-    assert_eq!(couple_response.user2_nickname.unwrap(), "測試用戶B");
+    let used_code_result = pair_with_code(&app, &user_b.token, pairing_response["code"].as_str().unwrap()).await;
+    assert_eq!(used_code_result["user1_nickname"].as_str().unwrap(), "測試用戶A");
+    assert_eq!(used_code_result["user2_nickname"].as_str().unwrap(), "測試用戶B");
     
     // 5. Verify both users can get couple info
     let user_a_couple = get_couple(&app, &user_a.token).await;
     let user_b_couple = get_couple(&app, &user_b.token).await;
-    assert_eq!(user_a_couple.id, user_b_couple.id);
-    assert_eq!(user_a_couple.user2_nickname.unwrap(), "測試用戶B");
-    assert_eq!(user_b_couple.user1_nickname, "測試用戶A");
+    assert_eq!(user_a_couple["id"], user_b_couple["id"]);
+    assert_eq!(user_a_couple["user2_nickname"].as_str().unwrap(), "測試用戶B");
+    assert_eq!(user_b_couple["user1_nickname"].as_str().unwrap(), "測試用戶A");
     
     // 6. Verify pairing code is marked as used
-    let used_code_result = pair_with_code(&app, &user_b.token, &pairing_response.code).await;
+    let used_code_result = pair_with_code(&app, &user_b.token, pairing_response["code"].as_str().unwrap()).await;
     // Should fail because code is already used or user already paired
 }
 
 #[tokio::test]
 #[ignore] // Skip in CI since no database is available
 async fn test_pairing_code_validation_errors() {
-    let app = setup_test_app().await;
+    let app = create_test_app().await;
     
     // Register a user
-    let user = register_test_user(&app, "test@test.com", "Test User", "password123").await;
+    let user = create_user(&app, "test@test.com", "Test User").await;
     
     // Test invalid pairing code
     let response = app.router
@@ -76,19 +198,19 @@ async fn test_pairing_code_validation_errors() {
 #[tokio::test]
 #[ignore] // Skip in CI since no database is available
 async fn test_generate_pairing_code_restrictions() {
-    let app = setup_test_app().await;
+    let app = create_test_app().await;
     
     // Register User A
-    let user_a = register_test_user(&app, "user-a@test.com", "User A", "password123").await;
+    let user_a = create_user(&app, "user-a@test.com", "User A").await;
     
     // Generate first pairing code
-    let _pairing_code = generate_pairing_code(&app, &user_a.token).await;
+    let _pairing_code = get_pairing_code(&app, &user_a.token).await;
     
     // Try to generate another code (should fail)
     let response = app.router
         .oneshot(
             Request::builder()
-                .method("POST")
+                .method("GET")
                 .uri("/api/couples/pairing-code")
                 .header("authorization", format!("Bearer {}", user_a.token))
                 .body(Body::empty())
@@ -103,19 +225,19 @@ async fn test_generate_pairing_code_restrictions() {
 #[tokio::test]
 #[ignore] // Skip in CI since no database is available
 async fn test_already_paired_user_restrictions() {
-    let app = setup_test_app().await;
+    let app = create_test_app().await;
     
     // Complete pairing flow
-    let user_a = register_test_user(&app, "user-a@test.com", "User A", "password123").await;
-    let pairing_code = generate_pairing_code(&app, &user_a.token).await;
-    let user_b = register_test_user(&app, "user-b@test.com", "User B", "password123").await;
-    let _couple = pair_with_code(&app, &user_b.token, &pairing_code.code).await;
+    let user_a = create_user(&app, "user-a@test.com", "User A").await;
+    let pairing_code = get_pairing_code(&app, &user_a.token).await;
+    let user_b = create_user(&app, "user-b@test.com", "User B").await;
+    let _couple = pair_with_code(&app, &user_b.token, pairing_code["code"].as_str().unwrap()).await;
     
     // Try to generate new pairing code (should fail - already paired)
     let response = app.router
         .oneshot(
             Request::builder()
-                .method("POST")
+                .method("GET")
                 .uri("/api/couples/pairing-code")
                 .header("authorization", format!("Bearer {}", user_a.token))
                 .body(Body::empty())
@@ -127,8 +249,8 @@ async fn test_already_paired_user_restrictions() {
     assert_eq!(response.status(), StatusCode::CONFLICT);
     
     // Try to use another pairing code (should fail - already paired)
-    let user_c = register_test_user(&app, "user-c@test.com", "User C", "password123").await;
-    let another_code = generate_pairing_code(&app, &user_c.token).await;
+    let user_c = create_user(&app, "user-c@test.com", "User C").await;
+    let another_code = get_pairing_code(&app, &user_c.token).await;
     
     let response = app.router
         .oneshot(
@@ -138,7 +260,7 @@ async fn test_already_paired_user_restrictions() {
                 .header("content-type", "application/json")
                 .header("authorization", format!("Bearer {}", user_a.token))
                 .body(Body::from(json!({
-                    "pairing_code": another_code.code
+                    "pairing_code": another_code["code"].as_str().unwrap()
                 }).to_string()))
                 .unwrap(),
         )
@@ -148,109 +270,15 @@ async fn test_already_paired_user_restrictions() {
     assert_eq!(response.status(), StatusCode::CONFLICT);
 }
 
-// Helper structs
-#[derive(serde::Deserialize)]
-struct AuthResponse {
-    token: String,
-    user: UserData,
-}
-
-#[derive(serde::Deserialize)]
-struct UserData {
-    id: String,
-    email: String,
-    nickname: String,
-}
-
-#[derive(serde::Deserialize)]
-struct PairingCodeResponse {
-    code: String,
-    expires_at: chrono::DateTime<chrono::Utc>,
-}
-
-#[derive(serde::Deserialize)]
-struct CoupleResponse {
-    id: Uuid,
-    couple_name: Option<String>,
-    anniversary_date: Option<chrono::NaiveDate>,
-    user1_nickname: String,
-    user2_nickname: Option<String>,
-    created_at: chrono::DateTime<chrono::Utc>,
-    pairing_code: Option<String>,
-}
-
-// Helper functions
-async fn register_test_user(app: &TestApp, email: &str, nickname: &str, password: &str) -> AuthResponse {
+// Helper function to get couple info
+async fn get_couple(app: &TestApp, token: &str) -> serde_json::Value {
     let response = app.router
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/auth/register")
-                .header("content-type", "application/json")
-                .body(Body::from(json!({
-                    "email": email,
-                    "nickname": nickname,
-                    "password": password
-                }).to_string()))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    
-    assert_eq!(response.status(), StatusCode::OK);
-    
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-    serde_json::from_slice(&body).unwrap()
-}
-
-async fn generate_pairing_code(app: &TestApp, token: &str) -> PairingCodeResponse {
-    let response = app.router
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/couples/pairing-code")
-                .header("authorization", format!("Bearer {}", token))
-                .body(Body::empty())
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    
-    assert_eq!(response.status(), StatusCode::OK);
-    
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-    serde_json::from_slice(&body).unwrap()
-}
-
-async fn pair_with_code(app: &TestApp, token: &str, pairing_code: &str) -> CoupleResponse {
-    let response = app.router
-        .oneshot(
-            Request::builder()
-                .method("POST")
-                .uri("/api/couples")
-                .header("content-type", "application/json")
-                .header("authorization", format!("Bearer {}", token))
-                .body(Body::from(json!({
-                    "pairing_code": pairing_code
-                }).to_string()))
-                .unwrap(),
-        )
-        .await
-        .unwrap();
-    
-    assert_eq!(response.status(), StatusCode::OK);
-    
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-    serde_json::from_slice(&body).unwrap()
-}
-
-async fn get_couple(app: &TestApp, token: &str) -> CoupleResponse {
-    let response = app.router
+        .clone()
         .oneshot(
             Request::builder()
                 .method("GET")
-                .uri("/api/couples")
-                .header("authorization", format!("Bearer {}", token))
+                .uri("/api/couples/current")
+                .header("Authorization", format!("Bearer {}", token))
                 .body(Body::empty())
                 .unwrap(),
         )
@@ -259,6 +287,6 @@ async fn get_couple(app: &TestApp, token: &str) -> CoupleResponse {
     
     assert_eq!(response.status(), StatusCode::OK);
     
-    let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let body = to_bytes(response.into_body()).await.unwrap();
     serde_json::from_slice(&body).unwrap()
 } 

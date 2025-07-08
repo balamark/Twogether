@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO couples (id, user1_id, user2_id, couple_name, anniversary_date, created_at) \n                 VALUES ($1, $2, NULL, NULL, NULL, $3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9d04a98d74af86220023ea040db0189af44c575493b4ad5f21bda0035f04a2c3"
+}

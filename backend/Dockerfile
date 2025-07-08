@@ -15,11 +15,12 @@ WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY backend/Cargo.toml ./backend/Cargo.toml
 
-# Copy source code
+# Copy source code and SQLx metadata
 COPY backend/src ./backend/src
 COPY backend/migrations ./backend/migrations
+COPY backend/.sqlx ./backend/.sqlx
 
-# Build the application (will connect to database at runtime)
+# Build the application (will use SQLx offline mode)
 RUN cd backend && cargo build --release
 
 # Runtime stage

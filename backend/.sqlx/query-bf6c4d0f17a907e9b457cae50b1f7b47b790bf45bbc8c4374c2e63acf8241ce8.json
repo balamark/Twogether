@@ -1,0 +1,82 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT lm.id, lm.moment_date, lm.notes, lm.description, lm.duration, lm.location, lm.roleplay_script, lm.photo_id, lm.created_at, u.nickname as recorded_by_nickname, p.storage_url\n         FROM love_moments lm\n         JOIN users u ON lm.recorded_by = u.id\n         LEFT JOIN photos p ON lm.photo_id = p.id\n         WHERE lm.couple_id = $1\n         ORDER BY lm.moment_date DESC\n         LIMIT 100",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "moment_date",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 2,
+        "name": "notes",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "duration",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "location",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "roleplay_script",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "photo_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 8,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 9,
+        "name": "recorded_by_nickname",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "storage_url",
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true
+    ]
+  },
+  "hash": "bf6c4d0f17a907e9b457cae50b1f7b47b790bf45bbc8c4374c2e63acf8241ce8"
+}

@@ -6,9 +6,9 @@ edition = "2021"
 [dependencies]
 # Web framework
 axum = { version = "0.7", features = ["macros", "multipart"] }
-tower = "0.4"
+tower = { version = "0.4", features = ["util"] }
 tower-http = { version = "0.5", features = ["cors", "fs", "trace"] }
-hyper = "1.0"
+hyper = { version = "1.0", features = ["full"] }
 
 # Async runtime
 tokio = { version = "1.0", features = ["full"] }
@@ -57,6 +57,10 @@ futures = "0.3.31"
 
 # Command line argument parsing
 clap = { version = "4.0", features = ["derive"] }
+
+[dev-dependencies]
+axum-test = "14.3"
+tokio = { version = "1.0", features = ["full", "test-util"] }
 
 [[bin]]
 name = "twogether-backend"

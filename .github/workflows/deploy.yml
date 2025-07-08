@@ -75,6 +75,19 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install SQLx CLI
+        run: cargo install sqlx-cli --no-default-features --features postgres
+
+      - name: Generate SQLx metadata
+        working-directory: ./backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          # Create .sqlx directory if it doesn't exist
+          mkdir -p .sqlx
+          # Generate SQLx query metadata
+          cargo sqlx prepare --workspace
+
       - name: Build and push Docker image
         run: |
           docker build -t gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }} -f ./backend/Dockerfile .
