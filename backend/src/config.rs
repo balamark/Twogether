@@ -19,18 +19,12 @@ impl Config {
         let environment = env::var("ENVIRONMENT")
             .unwrap_or_else(|_| "development".to_string());
             
-        // Default to PostgreSQL for development, fallback to SQLite
+        // DATABASE_URL must be set (Supabase PostgreSQL)
         let database_url = env::var("DATABASE_URL")
             .unwrap_or_else(|_| {
-                if environment == "production" {
-                    // This should be set via environment in production
-                    panic!("DATABASE_URL must be set in production")
-                } else {
-                    // Local development - try PostgreSQL first, fallback to SQLite
-                    "postgresql://twogether:twogether_dev_password@localhost:5432/twogether_dev".to_string()
-                }
+                panic!("DATABASE_URL must be set. Please configure your Supabase PostgreSQL connection string.")
             });
-            
+        
         Ok(Config {
             database_url,
             jwt_secret: env::var("JWT_SECRET")

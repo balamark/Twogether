@@ -27,20 +27,22 @@ while IFS= read -r line; do
     fi
 done < .env
 
-# Check if PostgreSQL is running
-if ! docker ps | grep -q twogether-postgres; then
-    echo "🐘 Starting PostgreSQL database..."
-    docker-compose up -d postgres
-    
-    # Wait for PostgreSQL to be ready
-    echo "⏳ Waiting for PostgreSQL to be ready..."
-    sleep 5
-    while ! docker-compose exec -T postgres pg_isready -U twogether; do
-        echo "⏳ Still waiting for PostgreSQL..."
-        sleep 2
-    done
-    echo "✅ PostgreSQL is ready!"
+# Check if required environment variables are set
+if [ -z "$DATABASE_URL" ]; then
+    echo "❌ DATABASE_URL is not set in .env file"
+    echo "   Please set it to your Supabase PostgreSQL connection string"
+    exit 1
 fi
+
+if [ -z "$SUPABASE_URL" ]; then
+    echo "❌ SUPABASE_URL is not set in .env file"
+    echo "   Please set it to your Supabase project URL"
+    exit 1
+fi
+
+echo "✅ Environment variables loaded successfully"
+echo "   Database: Supabase PostgreSQL"
+echo "   Storage: Supabase Storage"
 
 # Function to start backend
 start_backend() {

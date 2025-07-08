@@ -7,18 +7,6 @@ set -e
 
 echo "🚀 Setting up Twogether development environment..."
 
-# Check if Docker is installed
-if ! command -v docker &> /dev/null; then
-    echo "❌ Docker is not installed. Please install Docker first."
-    exit 1
-fi
-
-# Check if Docker Compose is installed
-if ! command -v docker-compose &> /dev/null; then
-    echo "❌ Docker Compose is not installed. Please install Docker Compose first."
-    exit 1
-fi
-
 # Create .env file if it doesn't exist
 if [ ! -f .env ]; then
     echo "📄 Creating .env file..."
@@ -41,36 +29,41 @@ while IFS= read -r line; do
     fi
 done < .env
 
+# Check if required environment variables are set
+if [ -z "$DATABASE_URL" ]; then
+    echo "❌ DATABASE_URL is not set in .env file"
+    echo "   Please set it to your Supabase PostgreSQL connection string"
+    exit 1
+fi
+
+if [ -z "$SUPABASE_URL" ]; then
+    echo "❌ SUPABASE_URL is not set in .env file"
+    echo "   Please set it to your Supabase project URL"
+    exit 1
+fi
+
 # Create uploads directory
 echo "📁 Creating uploads directory..."
 mkdir -p uploads
 chmod 755 uploads
 
-# Start PostgreSQL with Docker Compose
-echo "🐘 Starting PostgreSQL database..."
-docker-compose up -d postgres
-
-# Wait for PostgreSQL to be ready
-echo "⏳ Waiting for PostgreSQL to be ready..."
-sleep 5
-
-# Check if PostgreSQL is ready
-while ! docker-compose exec -T postgres pg_isready -U twogether; do
-    echo "⏳ Still waiting for PostgreSQL..."
-    sleep 2
-done
-
-echo "✅ PostgreSQL is ready!"
-
 # Install SQLx CLI if not installed
 if ! command -v sqlx &> /dev/null; then
     echo "🔧 Installing SQLx CLI..."
-    cargo install sqlx-cli --no-default-features --features native-tls,postgres
+    cargo install sqlx-cli --no-default-features --features postgres
+fi
+
+# Test database connection
+echo "🔍 Testing database connection..."
+cd backend
+if ! DATABASE_URL="$DATABASE_URL" sqlx migrate info; then
+    echo "❌ Failed to connect to database. Please check your DATABASE_URL."
+    echo "   Make sure your Supabase database is accessible."
+    exit 1
 fi
 
 # Run database migrations
 echo "🗄️  Running database migrations..."
-cd backend
 DATABASE_URL="$DATABASE_URL" sqlx migrate run
 cd ..
 
@@ -108,19 +101,18 @@ echo "  • Backend API:  http://localhost:8080"
 echo ""
 echo "🗄️  Database connection details (loaded from .env):"
 echo "  • Database URL: $DATABASE_URL"
+echo "  • Supabase URL: $SUPABASE_URL"
 echo ""
 echo "📋 View logs:"
 echo "  • Backend logs: Check terminal where 'cargo run' is running"
 echo "  • Frontend logs: Check terminal where 'npm run dev' is running"
-echo "  • Database logs: docker-compose logs postgres"
-echo "  • All container logs: docker-compose logs -f"
 echo ""
 echo "🛠️  Useful commands:"
-echo "  • Stop database: docker-compose down"
-echo "  • Reset database: docker-compose down -v && docker-compose up -d postgres"
-echo "  • View database: docker-compose exec postgres psql -U twogether -d twogether_dev"
+echo "  • Test database: cd backend && DATABASE_URL=\"$DATABASE_URL\" sqlx migrate info"
+echo "  • Run migrations: cd backend && DATABASE_URL=\"$DATABASE_URL\" sqlx migrate run"
+echo "  • Generate SQLx data: cd backend && DATABASE_URL=\"$DATABASE_URL\" cargo sqlx prepare"
 echo ""
 echo "📁 File locations:"
 echo "  • Uploaded photos: ./uploads/"
-echo "  • Database data: Docker volume 'twogether_postgres_data'"
-echo "  • Configuration: .env file" 
+echo "  • Configuration: .env file"
+echo "  • Database: Supabase PostgreSQL (managed)" 

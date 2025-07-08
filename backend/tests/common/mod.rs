@@ -30,9 +30,11 @@ pub async fn setup_test_app() -> TestApp {
         tracing_subscriber::fmt::init();
     });
 
-    // Use test database
+    // Use test database (should be a separate Supabase database for testing)
     let database_url = std::env::var("TEST_DATABASE_URL")
-        .unwrap_or_else(|_| "postgresql://twogether:twogether_dev_password@localhost:5432/twogether_test".to_string());
+        .unwrap_or_else(|_| {
+            panic!("TEST_DATABASE_URL must be set for testing. Use a separate Supabase database for tests.")
+        });
     
     let db = PgPoolOptions::new()
         .max_connections(5)

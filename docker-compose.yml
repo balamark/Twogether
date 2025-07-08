@@ -1,24 +1,4 @@
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:15-alpine
-    container_name: twogether_postgres
-    environment:
-      POSTGRES_DB: twogether_dev
-      POSTGRES_USER: twogether
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-twogether_dev_password}
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./backend/migrations:/docker-entrypoint-initdb.d
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U twogether -d twogether_dev"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
   # Backend API
   backend:
     build:
@@ -26,7 +6,7 @@ services:
       dockerfile: backend/Dockerfile
     container_name: twogether_backend
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://twogether:${POSTGRES_PASSWORD:-twogether_dev_password}@postgres:5432/twogether_dev}
+      DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET:-twogether-dev-secret-key-change-in-production}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5174}
       PORT: 8080
@@ -37,9 +17,6 @@ services:
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
     ports:
       - "8080:8080"
-    depends_on:
-      postgres:
-        condition: service_healthy
     restart: unless-stopped
     volumes:
       - ./uploads:/app/uploads
@@ -58,7 +35,3 @@ services:
       - ./frontend:/app
       - /app/node_modules
     restart: unless-stopped
-
-volumes:
-  postgres_data:
-    driver: local
