@@ -29,9 +29,17 @@ if [ ! -f .env ]; then
     exit 0
 fi
 
-# Load environment variables from .env
+# Load environment variables from .env (only valid assignments, skip comments)
 echo "📋 Loading environment variables from .env..."
-export $(grep -v '^#' .env | xargs)
+while IFS= read -r line; do
+    # Skip empty lines and comments
+    if [[ -n "$line" && ! "$line" =~ ^[[:space:]]*# ]]; then
+        # Only export lines that contain = (valid variable assignments)
+        if [[ "$line" =~ = ]]; then
+            export "$line"
+        fi
+    fi
+done < .env
 
 # Create uploads directory
 echo "📁 Creating uploads directory..."

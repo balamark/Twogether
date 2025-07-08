@@ -18,8 +18,17 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
-# Load environment variables from .env
-export $(grep -v '^#' .env | xargs)
+# Load environment variables from .env (only valid assignments, skip comments)
+echo -e "${BLUE}📋 Loading environment variables from .env...${NC}"
+while IFS= read -r line; do
+    # Skip empty lines and comments
+    if [[ -n "$line" && ! "$line" =~ ^[[:space:]]*# ]]; then
+        # Only export lines that contain = (valid variable assignments)
+        if [[ "$line" =~ = ]]; then
+            export "$line"
+        fi
+    fi
+done < .env
 
 # Run database migrations
 echo -e "${BLUE}📊 Running database migrations...${NC}"
