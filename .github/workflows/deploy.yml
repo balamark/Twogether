@@ -69,9 +69,6 @@ jobs:
         with:
           project_id: ${{ env.PROJECT_ID }}
 
-      - name: Configure Docker for GCP
-        run: gcloud auth configure-docker
-
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -85,8 +82,13 @@ jobs:
         run: |
           # Create .sqlx directory if it doesn't exist
           mkdir -p .sqlx
-          # Generate SQLx query metadata
+          # Generate SQLx metadata
           cargo sqlx prepare --workspace
+          # List contents to verify
+          ls -la .sqlx/
+
+      - name: Configure Docker for GCP
+        run: gcloud auth configure-docker
 
       - name: Build and push Docker image
         run: |
