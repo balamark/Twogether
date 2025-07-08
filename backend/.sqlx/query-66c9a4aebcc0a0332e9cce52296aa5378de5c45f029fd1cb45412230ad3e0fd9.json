@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT \n            COALESCE(SUM(CASE WHEN transaction_type = 'earn' THEN amount ELSE 0 END), 0) as total_earned,\n            COALESCE(SUM(CASE WHEN transaction_type = 'spend' THEN amount ELSE 0 END), 0) as total_spent\n         FROM coin_transactions \n         WHERE couple_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "total_earned",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "total_spent",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "66c9a4aebcc0a0332e9cce52296aa5378de5c45f029fd1cb45412230ad3e0fd9"
+}

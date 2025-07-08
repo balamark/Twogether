@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT balance, last_updated FROM coin_balances WHERE couple_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "balance",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "last_updated",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "4bd62d60f04eb90e63ea0eb7f6c4e00ced78820bee8291c1d6aa4e593f114503"
+}

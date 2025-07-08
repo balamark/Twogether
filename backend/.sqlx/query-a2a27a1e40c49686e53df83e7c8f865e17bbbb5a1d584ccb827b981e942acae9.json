@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT activity_type, COUNT(*) as count\n         FROM love_moments \n         WHERE couple_id = $1 AND activity_type IS NOT NULL\n         GROUP BY activity_type\n         ORDER BY count DESC\n         LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "activity_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      null
+    ]
+  },
+  "hash": "a2a27a1e40c49686e53df83e7c8f865e17bbbb5a1d584ccb827b981e942acae9"
+}

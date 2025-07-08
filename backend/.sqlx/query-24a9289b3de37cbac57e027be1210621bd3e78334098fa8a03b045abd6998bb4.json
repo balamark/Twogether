@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT \n            COUNT(*) as total_moments,\n            COUNT(DISTINCT DATE(moment_date)) as total_days,\n            COUNT(DISTINCT EXTRACT(YEAR FROM moment_date) || '-' || EXTRACT(MONTH FROM moment_date)) as total_months,\n            COALESCE(SUM(coins_earned), 0) as total_coins_earned,\n            MIN(moment_date) as first_record_date,\n            MAX(moment_date) as last_record_date\n         FROM love_moments \n         WHERE couple_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "total_moments",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "total_days",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "total_months",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "total_coins_earned",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "first_record_date",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 5,
+        "name": "last_record_date",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "24a9289b3de37cbac57e027be1210621bd3e78334098fa8a03b045abd6998bb4"
+}

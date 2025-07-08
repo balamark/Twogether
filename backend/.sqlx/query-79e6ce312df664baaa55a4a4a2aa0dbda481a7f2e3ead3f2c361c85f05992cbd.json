@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT \n            CASE EXTRACT(DOW FROM moment_date)\n                WHEN 0 THEN 'Sunday'\n                WHEN 1 THEN 'Monday'\n                WHEN 2 THEN 'Tuesday'\n                WHEN 3 THEN 'Wednesday'\n                WHEN 4 THEN 'Thursday'\n                WHEN 5 THEN 'Friday'\n                WHEN 6 THEN 'Saturday'\n            END as day_name,\n            COUNT(*) as count\n         FROM love_moments \n         WHERE couple_id = $1\n         GROUP BY EXTRACT(DOW FROM moment_date)\n         ORDER BY count DESC\n         LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "day_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "79e6ce312df664baaa55a4a4a2aa0dbda481a7f2e3ead3f2c361c85f05992cbd"
+}
