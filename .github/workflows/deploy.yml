@@ -73,10 +73,7 @@ jobs:
         run: gcloud auth configure-docker
 
       - name: Setup Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Install SQLx CLI
         run: cargo install sqlx-cli --no-default-features --features postgres
@@ -84,7 +81,7 @@ jobs:
       - name: Generate SQLx offline data
         run: |
           cd backend
-          cargo sqlx prepare -- --lib
+          cargo sqlx prepare
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 

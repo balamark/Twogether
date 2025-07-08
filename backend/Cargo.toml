@@ -57,3 +57,7 @@ futures = "0.3.31"
 
 # Command line argument parsing
 clap = { version = "4.0", features = ["derive"] }
+
+[[bin]]
+name = "twogether-backend"
+path = "src/main.rs"
