@@ -75,16 +75,6 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install SQLx CLI
-        run: cargo install sqlx-cli --no-default-features --features postgres
-
-      - name: Generate SQLx offline data
-        run: |
-          cd backend
-          cargo sqlx prepare
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
       - name: Build and push Docker image
         run: |
           docker build -t gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }} -f ./backend/Dockerfile .
@@ -104,7 +94,8 @@ jobs:
             --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
             --set-env-vars "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" \
             --set-env-vars "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" \
-            --set-env-vars "SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}"
+            --set-env-vars "SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            --set-env-vars "ENVIRONMENT=production"
 
       - name: Update frontend API URL
         run: |
