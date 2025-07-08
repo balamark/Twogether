@@ -12,7 +12,10 @@ use axum::{
     routing::get,
     Router,
 };
+use clap::Parser;
 use std::net::SocketAddr;
+use std::fs;
+use std::path::Path;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{fmt, EnvFilter, prelude::*};
 
@@ -24,6 +27,19 @@ use crate::{
     services::supabase::SupabaseStorage,
 };
 
+#[derive(Parser)]
+#[command(name = "twogether-backend")]
+#[command(about = "Twogether backend server for couples relationship tracking")]
+struct Cli {
+    /// Enable file logging and specify the log file path
+    #[arg(long, value_name = "FILE")]
+    log_file: Option<String>,
+    
+    /// Set the log level (trace, debug, info, warn, error)
+    #[arg(long, default_value = "info")]
+    log_level: String,
+}
+
 #[derive(Clone)]
 pub struct AppState {
     pub db: Database,
@@ -33,22 +49,54 @@ pub struct AppState {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize logging with pretty format and colors
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("twogether_backend=debug,tower_http=debug"));
+    // Parse command line arguments
+    let cli = Cli::parse();
+    
+    // Create logs directory if logging to file and directory doesn't exist
+    if let Some(ref log_file_path) = cli.log_file {
+        if let Some(parent_dir) = Path::new(log_file_path).parent() {
+            fs::create_dir_all(parent_dir)?;
+        }
+    }
 
-    tracing_subscriber::registry()
-        .with(fmt::layer()
-            .with_target(true)
-            .with_thread_ids(true)
-            .with_line_number(true)
-            .with_file(true)
-            .with_level(true)
-            .with_ansi(true)
-            .with_thread_names(true)
-            .pretty())
-        .with(env_filter)
-        .init();
+    // Configure logging based on CLI arguments
+    let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new(&format!("twogether_backend={},tower_http=debug", cli.log_level)));
+
+    if let Some(log_file_path) = cli.log_file {
+        // File logging
+        let file_appender = tracing_appender::rolling::never("", &log_file_path);
+        let (non_blocking_file, _guard) = tracing_appender::non_blocking(file_appender);
+        
+        tracing_subscriber::registry()
+            .with(fmt::layer()
+                .with_target(true)
+                .with_thread_ids(true)
+                .with_line_number(true)
+                .with_file(true)
+                .with_level(true)
+                .with_ansi(false) // No ANSI colors in file
+                .with_thread_names(true)
+                .with_writer(non_blocking_file))
+            .with(env_filter)
+            .init();
+        
+        tracing::info!("Logging to file: {}", log_file_path);
+    } else {
+        // Console logging (default)
+        tracing_subscriber::registry()
+            .with(fmt::layer()
+                .with_target(true)
+                .with_thread_ids(true)
+                .with_line_number(true)
+                .with_file(true)
+                .with_level(true)
+                .with_ansi(true)
+                .with_thread_names(true)
+                .pretty())
+            .with(env_filter)
+            .init();
+    }
 
     tracing::info!("Starting Twogether backend server...");
 

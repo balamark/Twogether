@@ -7,7 +7,50 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Parse command line arguments
+LOG_TO_FILE=false
+LOG_FILE_PATH=""
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --log-file)
+            LOG_TO_FILE=true
+            LOG_FILE_PATH="${2:-logs/backend.log}"
+            shift 2
+            ;;
+        --log-file=*)
+            LOG_TO_FILE=true
+            LOG_FILE_PATH="${1#*=}"
+            shift
+            ;;
+        -h|--help)
+            echo "Usage: $0 [--log-file [path]]"
+            echo ""
+            echo "Options:"
+            echo "  --log-file [path]    Enable file logging (default: logs/backend.log)"
+            echo "  -h, --help          Show this help message"
+            echo ""
+            echo "Examples:"
+            echo "  $0                          # Console logging (default)"
+            echo "  $0 --log-file               # File logging to logs/backend.log"
+            echo "  $0 --log-file=/tmp/app.log  # File logging to custom path"
+            exit 0
+            ;;
+        *)
+            echo -e "${RED}❌ Unknown option: $1${NC}"
+            echo "Use -h or --help for usage information."
+            exit 1
+            ;;
+    esac
+done
+
 echo -e "${GREEN}🚀 Starting Twogether Development Environment${NC}"
+
+if [ "$LOG_TO_FILE" = true ]; then
+    echo -e "${BLUE}📝 Backend logs will be written to: $LOG_FILE_PATH${NC}"
+    # Ensure log directory exists
+    mkdir -p "$(dirname "$LOG_FILE_PATH")"
+fi
 
 # Check if .env file exists
 if [ ! -f .env ]; then
@@ -61,7 +104,13 @@ echo -e "${YELLOW}📝 Backend will be available at http://localhost:8080${NC}"
 echo -e "${YELLOW}📚 API documentation at http://localhost:8080/api/docs${NC}"
 
 # Start the backend
-cargo run
+if [ "$LOG_TO_FILE" = true ]; then
+    echo -e "${GREEN}📝 Starting backend with file logging enabled...${NC}"
+    cargo run -- --log-file "$LOG_FILE_PATH"
+else
+    echo -e "${GREEN}📺 Starting backend with console logging...${NC}"
+    cargo run
+fi
 
 echo -e "${GREEN}🛑 Backend stopped${NC}"
 

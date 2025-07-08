@@ -38,6 +38,7 @@ dotenvy = "0.15"
 # Logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
 
 # Validation
 validator = { version = "0.18", features = ["derive"] }
@@ -53,3 +54,6 @@ bytes = "1.5"
 # Configuration
 config = "0.14" 
 futures = "0.3.31"
+
+# Command line argument parsing
+clap = { version = "4.0", features = ["derive"] }

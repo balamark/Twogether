@@ -534,6 +534,11 @@ const LoveTimeApp = () => {
 
   // Load authenticated data when user logs in
   useEffect(() => {
+    // Only run if user is authenticated
+    if (!authState.isAuthenticated || !authState.user) {
+      return;
+    }
+
     const loadAuthenticatedData = async () => {
       try {
         // Load nicknames
@@ -596,11 +601,17 @@ const LoveTimeApp = () => {
     };
 
     loadAuthenticatedData();
-  }, [authState.isAuthenticated, authState]);
+  }, [authState.isAuthenticated]); // Only depend on isAuthenticated, not the entire authState object
 
   // Note: Intimate records are now persisted in the backend, no localStorage needed
 
   useEffect(() => {
+    // Only save nicknames if user is authenticated and nicknames are not default values
+    if (!authState.isAuthenticated || 
+        (nicknames.partner1 === '親愛的' && nicknames.partner2 === '寶貝')) {
+      return;
+    }
+
     const saveNicknames = async () => {
       try {
         await apiService.updateNicknames(nicknames);
@@ -610,7 +621,7 @@ const LoveTimeApp = () => {
     };
     
     saveNicknames();
-  }, [nicknames]);
+  }, [nicknames, authState.isAuthenticated]);
 
   useEffect(() => {
     localStorage.setItem('journeyMilestones', JSON.stringify(journeyMilestones));
@@ -735,10 +746,17 @@ const LoveTimeApp = () => {
       // Upload photo if provided
       if (photo) {
         try {
-          // Convert base64 to File object
-          const response = await fetch(photo);
-          const blob = await response.blob();
-          const file = new File([blob], 'photo.jpg', { type: 'image/jpeg' });
+          // Convert base64 data URL to File object directly (avoid CSP violation)
+          const base64Data = photo.split(',')[1]; // Remove "data:image/jpeg;base64," prefix
+          const mimeType = photo.split(';')[0].split(':')[1]; // Extract MIME type
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: mimeType });
+          const file = new File([blob], 'photo.jpg', { type: mimeType });
           
           const photoResponse = await apiService.uploadPhoto(file, description);
           photoId = photoResponse.id;
