@@ -72,6 +72,22 @@ jobs:
       - name: Configure Docker for GCP
         run: gcloud auth configure-docker
 
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install SQLx CLI
+        run: cargo install sqlx-cli --no-default-features --features postgres
+
+      - name: Generate SQLx offline data
+        run: |
+          cd backend
+          cargo sqlx prepare -- --lib
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Build and push Docker image
         run: |
           docker build -t gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }} -f ./backend/Dockerfile .

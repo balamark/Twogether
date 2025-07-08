@@ -18,10 +18,8 @@ COPY backend/Cargo.toml ./backend/Cargo.toml
 # Copy source code
 COPY backend/src ./backend/src
 COPY backend/migrations ./backend/migrations
-COPY backend/.sqlx ./backend/.sqlx
 
-# Build the application with SQLx offline mode
-ENV SQLX_OFFLINE=true
+# Build the application (will connect to database at runtime)
 RUN cd backend && cargo build --release
 
 # Runtime stage
