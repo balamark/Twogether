@@ -1,6 +1,7 @@
 use anyhow::Result;
 use reqwest::Client;
 use uuid::Uuid;
+use serde_json;
 
 #[derive(Clone)]
 pub struct SupabaseStorage {
@@ -40,13 +41,43 @@ impl SupabaseStorage {
             .header("Authorization", format!("Bearer {}", self.service_role_key))
             .header("Content-Type", content_type)
             .header("x-upsert", "true") // Allow overwriting
-            .body(data)
+            .body(data.clone()) // Clone data so it's available for retry
             .send()
             .await?;
 
         if !response.status().is_success() {
             let error_text = response.text().await?;
-            anyhow::bail!("Failed to upload photo: {}", error_text);
+            
+            // If bucket not found, try to create it automatically
+            if error_text.contains("Bucket not found") {
+                tracing::warn!("Photos bucket not found, attempting to create it automatically...");
+                match self.create_bucket_if_not_exists(bucket_name).await {
+                    Ok(_) => {
+                        tracing::info!("Photos bucket created successfully, retrying upload...");
+                        // Retry the upload after creating bucket
+                        let retry_response = self
+                            .client
+                            .post(&url)
+                            .header("Authorization", format!("Bearer {}", self.service_role_key))
+                            .header("Content-Type", content_type)
+                            .header("x-upsert", "true")
+                            .body(data)
+                            .send()
+                            .await?;
+                        
+                        if !retry_response.status().is_success() {
+                            let retry_error = retry_response.text().await?;
+                            anyhow::bail!("Failed to upload photo after creating bucket: {}", retry_error);
+                        }
+                    }
+                    Err(create_error) => {
+                        tracing::error!("Failed to create photos bucket: {}", create_error);
+                        anyhow::bail!("Failed to upload photo (bucket creation failed): {}", error_text);
+                    }
+                }
+            } else {
+                anyhow::bail!("Failed to upload photo: {}", error_text);
+            }
         }
 
         let public_url = format!(
@@ -54,6 +85,34 @@ impl SupabaseStorage {
             self.base_url, bucket_name, file_path
         );
         Ok(public_url)
+    }
+
+    /// Create a bucket if it doesn't exist
+    async fn create_bucket_if_not_exists(&self, bucket_name: &str) -> Result<()> {
+        let url = format!("{}/storage/v1/bucket", self.base_url);
+        
+        let payload = serde_json::json!({
+            "id": bucket_name,
+            "name": bucket_name,
+            "public": true,
+            "allowed_mime_types": ["image/jpeg", "image/png", "image/gif", "image/webp"]
+        });
+
+        let response = self
+            .client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.service_role_key))
+            .header("Content-Type", "application/json")
+            .json(&payload)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            anyhow::bail!("Failed to create bucket: {}", error_text);
+        }
+
+        Ok(())
     }
 
     pub async fn delete_photo(&self, couple_id: Uuid, photo_id: Uuid) -> Result<()> {

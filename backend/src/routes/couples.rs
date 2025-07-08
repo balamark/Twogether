@@ -19,6 +19,7 @@ pub struct CreateCoupleRequest {
     #[validate(length(min = 1, max = 100))]
     pub couple_name: Option<String>,
     pub anniversary_date: Option<chrono::NaiveDate>,
+    #[allow(dead_code)] // Keep for future use
     pub partner_email: Option<String>,
     pub pairing_code: Option<String>,
 }

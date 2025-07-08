@@ -16,6 +16,7 @@ use clap::Parser;
 use std::net::SocketAddr;
 use std::fs;
 use std::path::Path;
+use std::sync::OnceLock;
 use tower_http::cors::CorsLayer;
 use tracing_subscriber::{fmt, EnvFilter, prelude::*};
 
@@ -26,6 +27,9 @@ use crate::{
     routes::{auth_routes, couple_routes, love_moment_routes, achievement_routes, photo_routes, coin_routes, stats_routes},
     services::supabase::SupabaseStorage,
 };
+
+// Global guard to keep the file logging alive
+static LOG_GUARD: OnceLock<Option<tracing_appender::non_blocking::WorkerGuard>> = OnceLock::new();
 
 #[derive(Parser)]
 #[command(name = "twogether-backend")]
@@ -63,10 +67,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let env_filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new(&format!("twogether_backend={},tower_http=debug", cli.log_level)));
 
-    // Keep the guard alive for the duration of the program
-    let _log_guard = if let Some(log_file_path) = cli.log_file {
-        // File logging
-        let file_appender = tracing_appender::rolling::never("", &log_file_path);
+    if let Some(log_file_path) = cli.log_file {
+        // Dual logging: both console and file
+        // Resolve path relative to project root (one level up from backend)
+        let project_root = std::env::current_dir()
+            .expect("Failed to get current directory")
+            .parent()
+            .expect("Failed to get parent directory")
+            .to_path_buf();
+        let full_log_path = project_root.join(&log_file_path);
+        let log_dir = full_log_path.parent().expect("Log file must have a parent directory");
+        let log_filename = full_log_path.file_name().expect("Log file must have a filename");
+        
+        let file_appender = tracing_appender::rolling::never(log_dir, log_filename);
         let (non_blocking_file, guard) = tracing_appender::non_blocking(file_appender);
         
         tracing_subscriber::registry()
@@ -76,16 +89,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .with_line_number(true)
                 .with_file(true)
                 .with_level(true)
-                .with_ansi(false) // No ANSI colors in file
+                .with_ansi(true) // Colors for console
+                .with_thread_names(true)
+                .pretty())
+            .with(fmt::layer()
+                .with_target(true)
+                .with_thread_ids(true)
+                .with_line_number(true)
+                .with_file(true)
+                .with_level(true)
+                .with_ansi(false) // No colors for file
                 .with_thread_names(true)
                 .with_writer(non_blocking_file))
             .with(env_filter)
             .init();
         
-        tracing::info!("Logging to file: {}", log_file_path);
-        Some(guard)
+        tracing::info!("Dual logging enabled - Console + File: {}", full_log_path.display());
+        // Store the guard globally to keep it alive
+        LOG_GUARD.set(Some(guard)).expect("Failed to set log guard");
     } else {
-        // Console logging (default)
+        // Console logging only (default)
         tracing_subscriber::registry()
             .with(fmt::layer()
                 .with_target(true)
@@ -98,7 +121,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .pretty())
             .with(env_filter)
             .init();
-        None
+        // Set empty guard for console logging
+        LOG_GUARD.set(None).expect("Failed to set log guard");
     };
 
     tracing::info!("Starting Twogether backend server...");
@@ -187,8 +211,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Keep the log guard alive until the server shuts down
     let result = axum::serve(listener, app).await;
     
-    // Explicitly drop the guard to ensure logs are flushed
-    drop(_log_guard);
+    // Properly handle log guard cleanup
+    let _ = LOG_GUARD.get().expect("Log guard not set");
     
     result?;
     Ok(())
