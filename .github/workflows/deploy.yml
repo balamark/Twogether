@@ -72,7 +72,7 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           mkdir -p .sqlx
-          cargo sqlx prepare --workspace
+          cargo sqlx prepare
           ls -la .sqlx/
 
       - name: Upload SQLx metadata
