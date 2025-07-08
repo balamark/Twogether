@@ -11,6 +11,9 @@ RUN apt-get update && apt-get install -y \
 # Create app directory
 WORKDIR /app
 
+# Set SQLx to use offline mode
+ENV SQLX_OFFLINE=true
+
 # Copy workspace cargo files
 COPY Cargo.toml Cargo.lock ./
 COPY backend/Cargo.toml ./backend/Cargo.toml

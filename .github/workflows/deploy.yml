@@ -92,7 +92,8 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          docker build -t gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }} -f ./backend/Dockerfile .
+          docker build -t gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }} -f ./backend/Dockerfile . \
+            --build-arg SQLX_OFFLINE=true
           docker push gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }}
 
       - name: Deploy to Cloud Run
