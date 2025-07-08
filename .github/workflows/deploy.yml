@@ -75,27 +75,6 @@ jobs:
           cargo sqlx prepare
           ls -la .sqlx/
 
-      - name: Upload SQLx metadata
-        uses: actions/upload-artifact@v4
-        with:
-          name: sqlx-metadata
-          path: backend/.sqlx/
-          retention-days: 1
-
-  # Backend Build
-  build-backend:
-    needs: prepare-backend
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download SQLx metadata
-        uses: actions/download-artifact@v4
-        with:
-          name: sqlx-metadata
-          path: backend/.sqlx/
-
       - name: Google Auth
         uses: google-github-actions/auth@v2
         with:
@@ -111,13 +90,13 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          docker build -t gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ needs.prepare-backend.outputs.image_tag }} -f ./backend/Dockerfile . \
+          docker build -t gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }} -f ./backend/Dockerfile . \
             --build-arg SQLX_OFFLINE=true
-          docker push gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ needs.prepare-backend.outputs.image_tag }}
+            docker push gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }}
 
   # Backend Deploy
   deploy-backend:
-    needs: [build-backend, prepare-backend]
+    needs: [prepare-backend]
     runs-on: ubuntu-latest
     steps:
       - name: Google Auth
@@ -129,7 +108,6 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
-
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy ${{ env.BACKEND_SERVICE }} \
