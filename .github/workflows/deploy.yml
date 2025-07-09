@@ -130,9 +130,9 @@ jobs:
       - name: Build frontend with API URL
         working-directory: ./frontend
         run: |
-          echo "Building frontend with VITE_API_BASE_URL=${{ steps.get_service_url.outputs.backend_url }}"
-          VITE_API_BASE_URL=${{ steps.get_service_url.outputs.backend_url }} npm run build
-          echo "Frontend built successfully"
+          FULL_API_BASE_URL="${{ steps.get_service_url.outputs.backend_url }}/api"
+          echo "Building frontend with VITE_API_BASE_URL=$FULL_API_BASE_URL"
+          VITE_API_BASE_URL="$FULL_API_BASE_URL" npm run build
 
       - name: Deploy frontend to Cloud Storage
         run: |
