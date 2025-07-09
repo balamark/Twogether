@@ -13,44 +13,6 @@ env:
   BACKEND_SERVICE: twogether-backend
 
 jobs:
-  # Frontend Build and Deploy
-  deploy-frontend:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: ./frontend
-        run: npm ci
-
-      - name: Build frontend
-        working-directory: ./frontend
-        run: npm run build
-
-      - name: Google Auth
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GCP_SA_KEY }}
-
-      - name: Setup Google Cloud CLI
-        uses: google-github-actions/setup-gcloud@v2
-        with:
-          project_id: ${{ env.PROJECT_ID }}
-
-      - name: Deploy frontend to Cloud Storage
-        run: |
-          gsutil -m rsync -d -r frontend/dist gs://${{ env.FRONTEND_BUCKET }}
-          gsutil iam ch allUsers:objectViewer gs://${{ env.FRONTEND_BUCKET }}
-          gsutil web set -m index.html -e 404.html gs://${{ env.FRONTEND_BUCKET }}
-
   # Backend Preparation
   prepare-backend:
     runs-on: ubuntu-latest
@@ -129,11 +91,25 @@ jobs:
             --set-env-vars "HOST=0.0.0.0" \
             --set-env-vars "ENVIRONMENT=production"
 
-  # Update Frontend API URL
-  update-frontend:
-    needs: deploy-backend
+  # Frontend Build and Deploy
+  deploy-frontend:
     runs-on: ubuntu-latest
+    needs: [deploy-backend]
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
       - name: Google Auth
         uses: google-github-actions/auth@v2
         with:
@@ -144,20 +120,30 @@ jobs:
         with:
           project_id: ${{ env.PROJECT_ID }}
 
-      - name: Update frontend API URL
+      - name: Get Backend Service URL
+        id: get_service_url # Give this step an ID to reference its outputs
         run: |
-          # Get the Cloud Run service URL
           SERVICE_URL=$(gcloud run services describe ${{ env.BACKEND_SERVICE }} --region=${{ env.REGION }} --format="value(status.url)")
-          
-          # Update the frontend with the new API URL
-          gsutil cp gs://${{ env.FRONTEND_BUCKET }}/index.html /tmp/index.html
-          sed -i "s|http://localhost:8080|$SERVICE_URL|g" /tmp/index.html
-          gsutil cp /tmp/index.html gs://${{ env.FRONTEND_BUCKET }}/index.html
+          echo "::set-output name=backend_url::$SERVICE_URL"
+          echo "Fetched Backend URL: $SERVICE_URL"
+
+      - name: Build frontend with API URL
+        working-directory: ./frontend
+        run: |
+          echo "Building frontend with VITE_API_BASE_URL=${{ steps.get_service_url.outputs.backend_url }}"
+          VITE_API_BASE_URL=${{ steps.get_service_url.outputs.backend_url }} npm run build
+          echo "Frontend built successfully"
+
+      - name: Deploy frontend to Cloud Storage
+        run: |
+          gsutil -m rsync -d -r frontend/dist gs://${{ env.FRONTEND_BUCKET }}
+          gsutil iam ch allUsers:objectViewer gs://${{ env.FRONTEND_BUCKET }}
+          gsutil web set -m index.html -e 404.html gs://${{ env.FRONTEND_BUCKET }}
 
   # Health check
   health-check:
     runs-on: ubuntu-latest
-    needs: [update-frontend, deploy-backend]
+    needs: [deploy-frontend, deploy-backend]
     steps:
       - name: Google Auth
         uses: google-github-actions/auth@v2
