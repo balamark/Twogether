@@ -85,7 +85,7 @@ Add these secrets to your GitHub repository:
 - `DATABASE_URL`: PostgreSQL connection string
 - `SUPABASE_URL`: Supabase project URL
 - `SUPABASE_ANON_KEY`: Supabase anonymous key
-- `SUPABASE_SERVICE_KEY`: Supabase service role key
+- `SUPABASE_SERVICE_ROLE_KEY`: Supabase service role key
 
 #### Deployment Steps
 1. Push to `main` branch triggers automatic deployment
@@ -129,7 +129,7 @@ gcloud run deploy twogether-backend \
 DATABASE_URL=postgresql://user:password@localhost/twogether
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_KEY=your-service-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-key
 JWT_SECRET=your-jwt-secret
 ```
 
