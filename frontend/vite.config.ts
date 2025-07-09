@@ -29,6 +29,9 @@ export default defineConfig(({ mode }) => {
 
   return {
   plugins: [react()],
+  // Add the base path here for production builds
+  // This tells Vite to generate asset paths relative to the HTML file's location
+  base: './', // <--- ADD THIS LINE FOR STATIC HOSTING
   server: {
     port: 5174,
     host: true,
