@@ -172,7 +172,7 @@ jobs:
       - name: Health check backend
         run: |
           SERVICE_URL=$(gcloud run services describe ${{ env.BACKEND_SERVICE }} --region=${{ env.REGION }} --format="value(status.url)")
-          curl -f "$SERVICE_URL/api/health" || exit 1
+          curl -f "$SERVICE_URL/health" || exit 1
 
       - name: Health check frontend
         run: |
