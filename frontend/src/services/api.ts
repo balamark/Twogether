@@ -107,7 +107,8 @@ apiClient.interceptors.response.use(
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;
-      const errorMessage = data?.error || data?.message || '未知錯誤';
+      // Extract error message from nested structure
+      const errorMessage = data?.error?.message || data?.message || data?.error || '未知錯誤';
       const requestUrl = error.config?.url || '';
       
       // Handle specific error cases
@@ -127,7 +128,8 @@ apiClient.interceptors.response.use(
       } else if (status === 404) {
         throw new Error('請求的資源不存在');
       } else if (status === 422) {
-        throw new Error(`輸入驗證失敗：${errorMessage}`);
+        // For validation errors, show the detailed error message
+        throw new Error(errorMessage);
       } else if (status >= 500) {
         throw new Error('服務器內部錯誤，請稍後再試');
       }

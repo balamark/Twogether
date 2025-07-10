@@ -48,6 +48,16 @@ interface ApiErrorResponse {
   message?: string;
 }
 
+interface Notification {
+  id: string;
+  type: 'success' | 'error' | 'info' | 'warning';
+  title: string;
+  message: string;
+  coins?: number;
+  badge?: string;
+  duration?: number;
+}
+
 interface SettingsViewProps {
   nicknames: Nicknames;
   handleNicknameChange: (partner: 'partner1' | 'partner2', value: string) => void;
@@ -56,6 +66,7 @@ interface SettingsViewProps {
   authState: AuthState;
   setShowAuthModal: React.Dispatch<React.SetStateAction<boolean>>;
   onAuthStateUpdate?: (authState: AuthState) => void;
+  showNotification: (notification: Omit<Notification, 'id'>) => void;
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({
@@ -65,39 +76,59 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   setJourneyMilestones,
   authState,
   setShowAuthModal,
-  onAuthStateUpdate
+  onAuthStateUpdate,
+  showNotification
 }) => {
   const [pairingCode, setPairingCode] = useState('');
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   const handleGenerateCode = async () => {
     try {
-      setError(null);
-      setSuccess(null);
       const response = await apiService.generatePairingCode();
       setGeneratedCode(response.code);
-      setSuccess('配對碼已生成，請分享給您的伴侶');
+      showNotification({
+        type: 'success',
+        title: '配對碼已生成',
+        message: '請分享給您的伴侶',
+        duration: 6000
+      });
     } catch (err: unknown) {
       console.error('Generate pairing code error:', err);
       const apiError = (err as ApiErrorResponse)?.response?.data;
       if (apiError?.error_code === 'ALREADY_PAIRED') {
-        setError('您已經有配對的伴侶了，無法生成新的配對碼');
+        showNotification({
+          type: 'error',
+          title: '無法生成配對碼',
+          message: '您已經有配對的伴侶了，無法生成新的配對碼',
+          duration: 8000
+        });
       } else if (apiError?.error_code === 'CODE_EXISTS') {
-        setError('您已有一個有效的配對碼，請等待其過期後再生成新的配對碼');
+        showNotification({
+          type: 'error',
+          title: '配對碼已存在',
+          message: '您已有一個有效的配對碼，請等待其過期後再生成新的配對碼',
+          duration: 8000
+        });
       } else {
-        setError((err as Error)?.message || '生成配對碼失敗，請稍後再試');
+        showNotification({
+          type: 'error',
+          title: '生成失敗',
+          message: (err as Error)?.message || '生成配對碼失敗，請稍後再試',
+          duration: 8000
+        });
       }
     }
   };
 
   const handlePairWithCode = async () => {
     try {
-      setError(null);
-      setSuccess(null);
       if (!pairingCode.trim()) {
-        setError('請輸入配對碼');
+        showNotification({
+          type: 'error',
+          title: '驗證錯誤',
+          message: '請輸入配對碼',
+          duration: 6000
+        });
         return;
       }
       
@@ -134,7 +165,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         onAuthStateUpdate(updatedAuthState);
       }
       
-      setSuccess(`配對成功！您現在已經與 ${authState.user?.partnerNickname || '伴侶'} 連結`);
+      showNotification({
+        type: 'success',
+        title: '配對成功！',
+        message: `您現在已經與 ${authState.user?.partnerNickname || '伴侶'} 連結`,
+        duration: 8000
+      });
       setPairingCode('');
       
     } catch (err: unknown) {
@@ -143,15 +179,40 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       
       // Handle specific error cases
       if (apiError?.error_code === 'NOT_FOUND') {
-        setError('配對碼無效或已過期，請確認配對碼是否正確或請您的伴侶重新生成');
+        showNotification({
+          type: 'error',
+          title: '配對碼無效',
+          message: '配對碼無效或已過期，請確認配對碼是否正確或請您的伴侶重新生成',
+          duration: 8000
+        });
       } else if (apiError?.error_code === 'ALREADY_PAIRED') {
-        setError('您已經有配對的伴侶了，無法使用配對碼');
+        showNotification({
+          type: 'error',
+          title: '無法配對',
+          message: '您已經有配對的伴侶了，無法使用配對碼',
+          duration: 8000
+        });
       } else if (apiError?.error_code === 'CODE_EXPIRED') {
-        setError('此配對碼已過期，請您的伴侶重新生成');
+        showNotification({
+          type: 'error',
+          title: '配對碼已過期',
+          message: '此配對碼已過期，請您的伴侶重新生成',
+          duration: 8000
+        });
       } else if (apiError?.error_code === 'SELF_PAIRING') {
-        setError('無法使用自己生成的配對碼進行配對');
+        showNotification({
+          type: 'error',
+          title: '無法自配對',
+          message: '無法使用自己生成的配對碼進行配對',
+          duration: 8000
+        });
       } else {
-        setError((err as Error)?.message || '配對失敗，請稍後再試');
+        showNotification({
+          type: 'error',
+          title: '配對失敗',
+          message: (err as Error)?.message || '配對失敗，請稍後再試',
+          duration: 8000
+        });
       }
     }
   };
@@ -375,31 +436,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       )}
 
-      {/* Error/Success Messages */}
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mt-4">
-          <span className="block sm:inline">{error}</span>
-          <button
-            className="absolute top-0 bottom-0 right-0 px-4 py-3"
-            onClick={() => setError(null)}
-          >
-            <span className="sr-only">關閉</span>
-            <span className="text-2xl">&times;</span>
-          </button>
-        </div>
-      )}
-      {success && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative mt-4">
-          <span className="block sm:inline">{success}</span>
-          <button
-            className="absolute top-0 bottom-0 right-0 px-4 py-3"
-            onClick={() => setSuccess(null)}
-          >
-            <span className="sr-only">關閉</span>
-            <span className="text-2xl">&times;</span>
-          </button>
-        </div>
-      )}
+
     </div>
   );
 };

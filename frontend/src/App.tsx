@@ -331,7 +331,7 @@ const LoveTimeApp = () => {
         type: 'error',
         title: '登入失敗',
         message: (error as Error)?.message || '登入過程中發生錯誤，請檢查帳號密碼',
-        duration: 5000
+        duration: 8000
       });
     }
   };
@@ -377,7 +377,7 @@ const LoveTimeApp = () => {
         type: 'error',
         title: '註冊失敗',
         message: (error as Error)?.message || '註冊過程中發生錯誤，請檢查輸入資料',
-        duration: 5000
+        duration: 8000
       });
     }
   };
@@ -766,7 +766,7 @@ const LoveTimeApp = () => {
             type: 'warning',
             title: '照片上傳失敗',
             message: '記錄已保存，但照片上傳失敗',
-            duration: 5000
+            duration: 7000
           });
         }
       }
@@ -809,7 +809,7 @@ const LoveTimeApp = () => {
         type: 'error',
         title: '記錄失敗',
         message: (error as Error)?.message || '無法保存記錄，請檢查網絡連接',
-        duration: 5000
+        duration: 8000
       });
     }
   };
@@ -1347,7 +1347,7 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
           type: 'error',
           title: '驗證錯誤',
           message: '請選擇日期',
-          duration: 5000
+          duration: 6000
         });
         return;
       }
@@ -1357,7 +1357,7 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
           type: 'error',
           title: '驗證錯誤',
           message: '請選擇時間',
-          duration: 5000
+          duration: 6000
         });
         return;
       }
@@ -1777,19 +1777,118 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
       e.preventDefault();
       
       if (authMode === 'login') {
+        // Validate login form
+        if (!email.trim()) {
+          showNotification({
+            type: 'error',
+            title: '驗證錯誤',
+            message: '請輸入電子郵件地址',
+            duration: 6000
+          });
+          return;
+        }
+        if (!password.trim()) {
+          showNotification({
+            type: 'error',
+            title: '驗證錯誤',
+            message: '請輸入密碼',
+            duration: 6000
+          });
+          return;
+        }
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          showNotification({
+            type: 'error',
+            title: '驗證錯誤',
+            message: '請輸入有效的電子郵件地址',
+            duration: 6000
+          });
+          return;
+        }
         handleLogin(email, password, nickname);
       } else if (authMode === 'register') {
+        // Validate registration form
+        if (!email.trim()) {
+          showNotification({
+            type: 'error',
+            title: '驗證錯誤',
+            message: '請輸入電子郵件地址',
+            duration: 6000
+          });
+          return;
+        }
+        if (!nickname.trim()) {
+          showNotification({
+            type: 'error',
+            title: '驗證錯誤',
+            message: '請輸入暱稱',
+            duration: 6000
+          });
+          return;
+        }
+        if (!password.trim()) {
+          showNotification({
+            type: 'error',
+            title: '驗證錯誤',
+            message: '請輸入密碼',
+            duration: 6000
+          });
+          return;
+        }
+        // Basic email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+          showNotification({
+            type: 'error',
+            title: '驗證錯誤',
+            message: '請輸入有效的電子郵件地址',
+            duration: 6000
+          });
+          return;
+        }
+        // Nickname length validation
+        if (nickname.length < 2 || nickname.length > 50) {
+          showNotification({
+            type: 'error',
+            title: '驗證錯誤',
+            message: '暱稱必須在2-50個字符之間',
+            duration: 6000
+          });
+          return;
+        }
+        // Password length validation
+        if (password.length < 6) {
+          showNotification({
+            type: 'error',
+            title: '驗證錯誤',
+            message: '密碼至少需要6個字符',
+            duration: 6000
+          });
+          return;
+        }
         if (password !== confirmPassword) {
           showNotification({
             type: 'error',
             title: '密碼不匹配',
             message: '請確認兩次輸入的密碼相同',
-            duration: 3000
+            duration: 6000
           });
           return;
         }
         handleRegister(email, nickname, password);
       } else {
+        // Validate partner code
+        if (!partnerCode.trim()) {
+          showNotification({
+            type: 'error',
+            title: '驗證錯誤',
+            message: '請輸入配對碼',
+            duration: 6000
+          });
+          return;
+        }
         handlePartnerConnect(partnerCode);
       }
     };
@@ -2683,6 +2782,7 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
           authState={authState}
           setShowAuthModal={setShowAuthModal}
           onAuthStateUpdate={setAuthState}
+          showNotification={showNotification}
         />;
         default: return (
           <div className="flex items-center justify-center min-h-64">
@@ -2727,6 +2827,7 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
         authState={authState}
         setShowAuthModal={setShowAuthModal}
         onAuthStateUpdate={setAuthState}
+        showNotification={showNotification}
       />;
       default: return <ForeplayView />;
     }
