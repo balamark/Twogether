@@ -13,6 +13,7 @@ use chrono::Utc;
 use crate::{
     error::{AppError, Result},
     models::{Claims, PhotoResponse},
+    routes::couples::get_user_couple_id,
     AppState,
 };
 
@@ -34,16 +35,9 @@ async fn upload_photo(
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| AppError::Auth("無效的用戶ID".to_string()))?;
 
-    // Find the user's couple
-    let couple = sqlx::query!(
-        "SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1",
-        user_id
-    )
-    .fetch_optional(&state.db.pool)
-    .await?
-    .ok_or_else(|| AppError::NotFound("您還沒有配對。請先創建情侶檔案。".to_string()))?;
-
-    let couple_id = couple.id;
+    // Get the user's couple ID
+    let couple_id = get_user_couple_id(&state, user_id).await?
+        .ok_or_else(|| AppError::NotFound("您還沒有配對。請先創建情侶檔案。".to_string()))?;
 
     let mut file_name = String::new();
     let mut file_data: Vec<u8> = Vec::new();

@@ -12,6 +12,7 @@ use validator::Validate;
 use crate::{
     error::{AppError, Result},
     models::{Claims, CreateLoveMomentRequest, IntimacyStats, LoveMomentResponse, MonthlyData},
+    routes::couples::get_user_couple_id,
     AppState,
 };
 
@@ -49,20 +50,10 @@ async fn create_love_moment(
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| AppError::Auth("無效的用戶ID".to_string()))?;
 
-    // Find the user's couple
-    let couple = sqlx::query!(
-        "SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1",
-        user_id
-    )
-    .fetch_optional(&state.db.pool)
-    .await?;
+    // Get the user's couple ID
+    let couple_id = get_user_couple_id(&state, user_id).await?
+        .ok_or_else(|| AppError::NotFound("您還沒有配對。請先創建情侶檔案。".to_string()))?;
 
-    if couple.is_none() {
-        tracing::warn!("User {} attempted to create love moment but has no couple", user_id);
-        return Err(AppError::NotFound("您還沒有配對。請先創建情侶檔案。".to_string()));
-    }
-
-    let couple_id = couple.unwrap().id;
     tracing::debug!("Found couple {} for user {}", couple_id, user_id);
 
     // Create love moment
@@ -148,20 +139,10 @@ async fn get_love_moments(
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| AppError::Auth("無效的用戶ID".to_string()))?;
 
-    // Find the user's couple
-    let couple = sqlx::query!(
-        "SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1",
-        user_id
-    )
-    .fetch_optional(&state.db.pool)
-    .await?;
+    // Get the user's couple ID
+    let couple_id = get_user_couple_id(&state, user_id).await?
+        .ok_or_else(|| AppError::NotFound("您還沒有配對".to_string()))?;
 
-    if couple.is_none() {
-        tracing::warn!("User {} attempted to fetch love moments but has no couple", user_id);
-        return Err(AppError::NotFound("您還沒有配對".to_string()));
-    }
-
-    let couple_id = couple.unwrap().id;
     tracing::debug!("Found couple {} for user {}", couple_id, user_id);
 
     // Query with photo information including storage URLs
@@ -330,12 +311,13 @@ async fn get_intimacy_stats(
         this_month: this_month.unwrap_or(0),
         current_streak,
         longest_streak,
-        weekly_average,
-        monthly_data,
+        average_per_week: weekly_average,
+        average_per_month: weekly_average * 4.0, // Approximate monthly average based on weekly
+        monthly_data: monthly_data,
     }))
 }
 
-async fn calculate_current_streak(state: &AppState, couple_id: Uuid) -> Result<i64> {
+pub async fn calculate_current_streak(state: &AppState, couple_id: Uuid) -> Result<i64> {
     let moments = sqlx::query!(
         "SELECT DATE(moment_date) as moment_date 
          FROM love_moments 
@@ -370,7 +352,7 @@ async fn calculate_current_streak(state: &AppState, couple_id: Uuid) -> Result<i
     Ok(streak)
 }
 
-async fn calculate_longest_streak(state: &AppState, couple_id: Uuid) -> Result<i64> {
+pub async fn calculate_longest_streak(state: &AppState, couple_id: Uuid) -> Result<i64> {
     let moments = sqlx::query!(
         "SELECT DISTINCT DATE(moment_date) as moment_date 
          FROM love_moments 

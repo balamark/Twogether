@@ -185,7 +185,7 @@ export function AchievementsView() {
                 <span className="text-2xl mr-3">📈</span>
                 <div>
                   <p className="text-sm text-gray-600">月平均</p>
-                  <p className="text-2xl font-bold text-gray-800">{stats.average_per_month.toFixed(1)}</p>
+                  <p className="text-2xl font-bold text-gray-800">{(stats.average_per_month || 0).toFixed(1)}</p>
                 </div>
               </div>
             </div>
@@ -194,11 +194,11 @@ export function AchievementsView() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="bg-pink-50 rounded-lg p-4 border border-pink-200 text-center">
               <div className="text-lg font-bold text-pink-600">本週次數</div>
-              <div className="text-2xl font-bold">{stats.average_per_week.toFixed(1)}</div>
+              <div className="text-2xl font-bold">{(stats.average_per_week || 0).toFixed(1)}</div>
             </div>
             <div className="bg-purple-50 rounded-lg p-4 border border-purple-200 text-center">
               <div className="text-lg font-bold text-purple-600">本月次數</div>
-              <div className="text-2xl font-bold">{stats.average_per_month.toFixed(1)}</div>
+              <div className="text-2xl font-bold">{(stats.average_per_month || 0).toFixed(1)}</div>
             </div>
           </div>
           {/* Badges */}

@@ -11,6 +11,7 @@ use uuid::Uuid;
 use crate::{
     error::{AppError, Result},
     models::Claims,
+    routes::couples::get_user_couple_id,
     AppState,
 };
 
@@ -49,14 +50,9 @@ async fn get_achievements(
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| AppError::Auth("無效的用戶ID".to_string()))?;
 
-    // Find the user's couple
-    let couple = sqlx::query!(
-        "SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1",
-        user_id
-    )
-    .fetch_optional(&state.db.pool)
-    .await?
-    .ok_or_else(|| AppError::NotFound("您還沒有配對。請先創建情侶檔案。".to_string()))?;
+    // Get the user's couple ID
+    let couple_id = get_user_couple_id(&state, user_id).await?
+        .ok_or_else(|| AppError::NotFound("您還沒有配對。請先創建情侶檔案。".to_string()))?;
 
     // Get couple statistics
     let stats = sqlx::query!(
@@ -67,7 +63,7 @@ async fn get_achievements(
             COALESCE(SUM(coins_earned), 0) as total_coins_earned
          FROM love_moments 
          WHERE couple_id = $1",
-        couple.id
+        couple_id
     )
     .fetch_one(&state.db.pool)
     .await?;

@@ -14,6 +14,7 @@ use crate::{
     error::{AppError, Result},
     models::{AuthResponse, Claims, CreateUserRequest, LoginRequest, User, UserResponse},
     services::auth::{hash_password, verify_password},
+    routes::couples::create_single_user_couple,
     AppState,
 };
 
@@ -71,6 +72,10 @@ async fn register(
     .await?;
 
     tracing::info!("New user created successfully with ID: {}", user_id);
+
+    // Create a single-user couple for the new user
+    let (couple_id, _) = create_single_user_couple(&state, user_id, None, None, false).await?;
+    tracing::info!("Created initial couple {} for new user {}", couple_id, user_id);
 
     // Create JWT token
     let token = create_token(&state, user_id, &payload.nickname)?;

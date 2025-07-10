@@ -12,6 +12,7 @@ use validator::Validate;
 use crate::{
     error::{AppError, Result},
     models::Claims,
+    routes::couples::get_user_couple_id,
     AppState,
 };
 
@@ -60,20 +61,10 @@ async fn get_balance(
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| AppError::Auth("無效的用戶ID".to_string()))?;
 
-    // Find the user's couple
-    let couple = sqlx::query!(
-        "SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1",
-        user_id
-    )
-    .fetch_optional(&state.db.pool)
-    .await?;
+    // Get the user's couple ID
+    let couple_id = get_user_couple_id(&state, user_id).await?
+        .ok_or_else(|| AppError::NotFound("您還沒有配對。請先創建情侶檔案。".to_string()))?;
 
-    if couple.is_none() {
-        tracing::warn!("User {} attempted to fetch coin balance but has no couple", user_id);
-        return Err(AppError::NotFound("您還沒有配對。請先創建情侶檔案。".to_string()));
-    }
-
-    let couple_id = couple.unwrap().id;
     tracing::debug!("Found couple {} for user {}", couple_id, user_id);
 
     // Get balance from the view
@@ -101,14 +92,6 @@ async fn get_balance(
     .fetch_one(&state.db.pool)
     .await?;
 
-    tracing::debug!(
-        "Coin stats for couple {}: balance={}, earned={}, spent={}", 
-        couple_id, 
-        balance,
-        totals.total_earned.unwrap_or(0),
-        totals.total_spent.unwrap_or(0)
-    );
-
     Ok(Json(CoinBalance {
         balance,
         total_earned: totals.total_earned.unwrap_or(0),
@@ -117,7 +100,7 @@ async fn get_balance(
     }))
 }
 
-/// Get coin transaction history
+/// Get coin transactions for the couple
 /// GET /api/coins/transactions
 async fn get_coin_transactions(
     State(state): State<AppState>,
@@ -128,35 +111,22 @@ async fn get_coin_transactions(
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| AppError::Auth("無效的用戶ID".to_string()))?;
 
-    // Find the user's couple
-    let couple = sqlx::query!(
-        "SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1",
-        user_id
-    )
-    .fetch_optional(&state.db.pool)
-    .await?;
+    // Get the user's couple ID
+    let couple_id = get_user_couple_id(&state, user_id).await?
+        .ok_or_else(|| AppError::NotFound("您還沒有配對。請先創建情侶檔案。".to_string()))?;
 
-    if couple.is_none() {
-        tracing::warn!("User {} attempted to fetch coin transactions but has no couple", user_id);
-        return Err(AppError::NotFound("您還沒有配對。請先創建情侶檔案。".to_string()));
-    }
-
-    let couple_id = couple.unwrap().id;
     tracing::debug!("Found couple {} for user {}", couple_id, user_id);
 
-    // Get transaction history
     let transactions = sqlx::query!(
         "SELECT id, amount, transaction_type, description, transaction_date
          FROM coin_transactions 
          WHERE couple_id = $1
          ORDER BY transaction_date DESC
-         LIMIT 50",
+         LIMIT 100",
         couple_id
     )
     .fetch_all(&state.db.pool)
     .await?;
-
-    tracing::debug!("Found {} transactions for couple {}", transactions.len(), couple_id);
 
     let response_transactions: Vec<CoinTransaction> = transactions.into_iter().map(|tx| {
         CoinTransaction {
@@ -186,14 +156,9 @@ async fn create_transaction(
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| AppError::Auth("無效的用戶ID".to_string()))?;
 
-    // Find the user's couple
-    let couple = sqlx::query!(
-        "SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1",
-        user_id
-    )
-    .fetch_optional(&state.db.pool)
-    .await?
-    .ok_or_else(|| AppError::NotFound("您還沒有配對。請先創建情侶檔案。".to_string()))?;
+    // Get the user's couple ID
+    let couple_id = get_user_couple_id(&state, user_id).await?
+        .ok_or_else(|| AppError::NotFound("您還沒有配對。請先創建情侶檔案。".to_string()))?;
 
     // Validate transaction type
     if payload.transaction_type != "earn" && payload.transaction_type != "spend" {
@@ -204,7 +169,7 @@ async fn create_transaction(
     if payload.transaction_type == "spend" {
         let current_balance = sqlx::query!(
             "SELECT COALESCE(balance, 0) as balance FROM coin_balances WHERE couple_id = $1",
-            couple.id
+            couple_id
         )
         .fetch_optional(&state.db.pool)
         .await?
@@ -224,7 +189,7 @@ async fn create_transaction(
         "INSERT INTO coin_transactions (id, couple_id, amount, transaction_type, description, transaction_date)
          VALUES ($1, $2, $3, $4, $5, $6)",
         transaction_id,
-        couple.id,
+        couple_id,
         payload.amount,
         payload.transaction_type,
         payload.description,
@@ -232,6 +197,8 @@ async fn create_transaction(
     )
     .execute(&state.db.pool)
     .await?;
+
+    tracing::info!("Created coin transaction {} for couple {}", transaction_id, couple_id);
 
     Ok(Json(CoinTransaction {
         id: transaction_id,

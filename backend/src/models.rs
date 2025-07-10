@@ -259,7 +259,8 @@ pub struct IntimacyStats {
     pub this_month: i64,
     pub current_streak: i64,
     pub longest_streak: i64,
-    pub weekly_average: f64,
+    pub average_per_week: f64,
+    pub average_per_month: f64,
     pub monthly_data: Vec<MonthlyData>,
 }
 

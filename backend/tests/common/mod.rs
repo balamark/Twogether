@@ -5,7 +5,7 @@ use axum::{
     Router,
 };
 use sqlx::{PgPool, postgres::PgPoolOptions};
-use std::net::SocketAddr;
+use std::sync::Arc;
 use std::sync::Once;
 use tower_http::cors::CorsLayer;
 use twogether_backend::{
@@ -43,7 +43,7 @@ pub async fn setup_test_app() -> TestApp {
         .expect("Failed to connect to test database");
     
     // Run migrations
-    sqlx::migrate!("../migrations")
+    sqlx::migrate!("migrations")
         .run(&db)
         .await
         .expect("Failed to run migrations");
@@ -60,9 +60,9 @@ pub async fn setup_test_app() -> TestApp {
     );
     
     let state = AppState {
-        config: config.clone(),
-        db: database,
-        supabase_storage,
+        config: Arc::new(config.clone()),
+        db: Arc::new(database),
+        supabase_storage: Arc::new(supabase_storage),
     };
     
     // Configure CORS
@@ -148,4 +148,4 @@ async fn clear_test_data(db: &PgPool) {
         .execute(db)
         .await
         .expect("Failed to clear users");
-} 
+}

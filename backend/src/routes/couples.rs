@@ -48,6 +48,72 @@ pub fn routes() -> Router<AppState> {
         .route("/pairing-code", post(generate_pairing_code))
 }
 
+/// Helper function to get a user's couple ID
+/// Returns None if user has no couple
+pub async fn get_user_couple_id(
+    state: &AppState,
+    user_id: Uuid,
+) -> Result<Option<Uuid>> {
+    let couple = sqlx::query!(
+        "SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1",
+        user_id
+    )
+    .fetch_optional(&state.db.pool)
+    .await?;
+
+    Ok(couple.map(|c| c.id))
+}
+
+/// Helper function to create a single-user couple
+/// Returns the couple ID and optional pairing code
+pub async fn create_single_user_couple(
+    state: &AppState,
+    user_id: Uuid,
+    couple_name: Option<String>,
+    anniversary_date: Option<chrono::NaiveDate>,
+    generate_pairing: bool,
+) -> Result<(Uuid, Option<String>)> {
+    let couple_id = Uuid::new_v4();
+    let now = Utc::now();
+
+    // Create the couple
+    sqlx::query!(
+        "INSERT INTO couples (id, user1_id, user2_id, couple_name, anniversary_date, created_at) 
+         VALUES ($1, $2, NULL, $3, $4, $5)",
+        couple_id,
+        user_id,
+        couple_name,
+        anniversary_date,
+        now
+    )
+    .execute(&state.db.pool)
+    .await?;
+
+    tracing::debug!("Created new couple {} for user {}", couple_id, user_id);
+
+    // Generate pairing code if requested
+    let pairing_code = if generate_pairing {
+        let expires_at = now + Duration::hours(24);
+        let code = sqlx::query_scalar!(
+            "INSERT INTO pairing_codes (code, couple_id, created_by, expires_at)
+             VALUES (generate_pairing_code(), $1, $2, $3)
+             RETURNING code",
+            couple_id,
+            user_id,
+            expires_at
+        )
+        .fetch_one(&state.db.pool)
+        .await?;
+
+        tracing::info!("Generated initial pairing code for couple {}", couple_id);
+        Some(code)
+    } else {
+        None
+    };
+
+    Ok((couple_id, pairing_code))
+}
+
 /// Generate a new pairing code
 /// POST /api/couples/pairing-code
 #[axum::debug_handler]
@@ -108,27 +174,7 @@ async fn generate_pairing_code(
             c.id
         },
         None => {
-            tracing::info!(
-                user_id = %user_id,
-                "User has no couple, creating new single-user couple for pairing code generation"
-            );
-            
-            // Create a new single-user couple
-            let new_couple_id = Uuid::new_v4();
-            let now = Utc::now();
-
-            sqlx::query!(
-                "INSERT INTO couples (id, user1_id, user2_id, couple_name, anniversary_date, created_at) 
-                 VALUES ($1, $2, NULL, NULL, NULL, $3)",
-                new_couple_id,
-                user_id,
-                now
-            )
-            .execute(&state.db.pool)
-            .await?;
-
-            tracing::info!("Created new couple {} for user {} to generate pairing code", new_couple_id, user_id);
-
+            let (new_couple_id, _) = create_single_user_couple(&state, user_id, None, None, false).await?;
             new_couple_id
         }
     };
@@ -178,17 +224,20 @@ async fn create_couple(
     let user_id = Uuid::parse_str(&claims.sub)
         .map_err(|_| AppError::Auth("無效的用戶ID".to_string()))?;
 
-    // Check if user is already in a couple
+    // Check if user is already in a complete couple (with two users)
     let existing_couple = sqlx::query!(
-        "SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1",
+        "SELECT id, user2_id FROM couples WHERE user1_id = $1 OR user2_id = $1",
         user_id
     )
     .fetch_optional(&state.db.pool)
     .await?;
 
-    if existing_couple.is_some() {
-        tracing::warn!("User {} attempted to create/join couple but already has one", user_id);
-        return Err(AppError::Conflict("您已經有情侶檔案了".to_string()));
+    // Only block if the user is in a complete couple (has both users)
+    if let Some(couple) = &existing_couple {
+        if couple.user2_id.is_some() {
+            tracing::warn!("User {} attempted to create/join couple but already has a complete couple", user_id);
+            return Err(AppError::Conflict("您已經有完整的情侶檔案了，無法再次配對。如果您需要重新配對，請先解除當前配對。".to_string()));
+        }
     }
 
     // Handle pairing code if provided
@@ -232,16 +281,76 @@ async fn create_couple(
             return Err(AppError::Conflict("此情侶檔案已經有兩個用戶了".to_string()));
         }
 
-        // Update the couple with the new partner
+        // Get the joining user's existing couple (should be single-user)
+        let joining_user_couple = sqlx::query!(
+            "SELECT id FROM couples WHERE user1_id = $1 AND user2_id IS NULL",
+            user_id
+        )
+        .fetch_optional(&state.db.pool)
+        .await?;
+
+        // Start a transaction to merge the couples
+        let mut tx = state.db.pool.begin().await?;
+
+        // Update the target couple with the new partner
         sqlx::query!(
             "UPDATE couples SET user2_id = $1 WHERE id = $2",
             user_id,
             pairing_code.couple_id
         )
-        .execute(&state.db.pool)
+        .execute(&mut *tx)
         .await?;
 
-        tracing::info!("Successfully added user {} as partner to couple {}", user_id, pairing_code.couple_id);
+        // If the joining user has their own couple, merge their data
+        if let Some(joining_couple) = joining_user_couple {
+            tracing::info!("Merging couple {} into couple {}", joining_couple.id, pairing_code.couple_id);
+            
+            // Move love moments from joining user's couple to target couple
+            sqlx::query!(
+                "UPDATE love_moments SET couple_id = $1 WHERE couple_id = $2",
+                pairing_code.couple_id,
+                joining_couple.id
+            )
+            .execute(&mut *tx)
+            .await?;
+
+            // Move photos from joining user's couple to target couple
+            sqlx::query!(
+                "UPDATE photos SET couple_id = $1 WHERE couple_id = $2",
+                pairing_code.couple_id,
+                joining_couple.id
+            )
+            .execute(&mut *tx)
+            .await?;
+
+            // Move coin transactions from joining user's couple to target couple
+            sqlx::query!(
+                "UPDATE coin_transactions SET couple_id = $1 WHERE couple_id = $2",
+                pairing_code.couple_id,
+                joining_couple.id
+            )
+            .execute(&mut *tx)
+            .await?;
+
+            // Move achievements from joining user's couple to target couple
+            sqlx::query!(
+                "UPDATE achievements SET couple_id = $1 WHERE couple_id = $2",
+                pairing_code.couple_id,
+                joining_couple.id
+            )
+            .execute(&mut *tx)
+            .await?;
+
+            // Delete the joining user's empty couple
+            sqlx::query!(
+                "DELETE FROM couples WHERE id = $1",
+                joining_couple.id
+            )
+            .execute(&mut *tx)
+            .await?;
+
+            tracing::info!("Successfully merged couple {} into couple {}", joining_couple.id, pairing_code.couple_id);
+        }
 
         // Mark pairing code as used
         sqlx::query!(
@@ -249,56 +358,46 @@ async fn create_couple(
             user_id,
             pairing_code.id
         )
-        .execute(&state.db.pool)
+        .execute(&mut *tx)
         .await?;
 
-        tracing::debug!("Marked pairing code {} as used", pairing_code.id);
+        // Commit the transaction
+        tx.commit().await?;
+
+        tracing::info!("Successfully paired user {} with couple {}", user_id, pairing_code.couple_id);
+
+        // Get updated couple information including both nicknames
+        let updated_couple = sqlx::query!(
+            "SELECT c.id, c.couple_name, c.anniversary_date, c.created_at,
+                    u1.nickname as user1_nickname, u2.nickname as user2_nickname
+             FROM couples c
+             JOIN users u1 ON c.user1_id = u1.id
+             JOIN users u2 ON c.user2_id = u2.id
+             WHERE c.id = $1",
+            pairing_code.couple_id
+        )
+        .fetch_one(&state.db.pool)
+        .await?;
 
         return Ok(Json(CoupleResponse {
-            id: pairing_code.couple_id,
-            couple_name: pairing_code.couple_name,
-            anniversary_date: pairing_code.anniversary_date,
-            user1_nickname: pairing_code.user1_nickname,
-            user2_nickname: Some(claims.nickname),
-            created_at: pairing_code.created_at.unwrap_or_else(|| Utc::now()),
+            id: updated_couple.id,
+            couple_name: updated_couple.couple_name,
+            anniversary_date: updated_couple.anniversary_date,
+            user1_nickname: updated_couple.user1_nickname,
+            user2_nickname: Some(updated_couple.user2_nickname),
+            created_at: updated_couple.created_at.unwrap_or_else(|| Utc::now()),
             pairing_code: None,
         }));
     }
 
-    tracing::info!("Creating new couple for user {}", user_id);
-
-    // Create a new single-user couple
-    let couple_id = Uuid::new_v4();
-    let now = Utc::now();
-
-    sqlx::query!(
-        "INSERT INTO couples (id, user1_id, user2_id, couple_name, anniversary_date, created_at) 
-         VALUES ($1, $2, NULL, $3, $4, $5)",
-        couple_id,
+    // Create a new single-user couple with pairing code
+    let (couple_id, pairing_code) = create_single_user_couple(
+        &state,
         user_id,
-        payload.couple_name,
+        payload.couple_name.clone(),
         payload.anniversary_date,
-        now
-    )
-    .execute(&state.db.pool)
-    .await?;
-
-    tracing::debug!("Created new couple {} for user {}", couple_id, user_id);
-
-    // Generate initial pairing code
-    let expires_at = now + Duration::hours(24);
-    let pairing_code = sqlx::query_scalar!(
-        "INSERT INTO pairing_codes (code, couple_id, created_by, expires_at)
-         VALUES (generate_pairing_code(), $1, $2, $3)
-         RETURNING code",
-        couple_id,
-        user_id,
-        expires_at
-    )
-    .fetch_one(&state.db.pool)
-    .await?;
-
-    tracing::info!("Generated initial pairing code for couple {}", couple_id);
+        true
+    ).await?;
 
     Ok(Json(CoupleResponse {
         id: couple_id,
@@ -306,8 +405,8 @@ async fn create_couple(
         anniversary_date: payload.anniversary_date,
         user1_nickname: claims.nickname,
         user2_nickname: None,
-        created_at: now,
-        pairing_code: Some(pairing_code),
+        created_at: Utc::now(),
+        pairing_code,
     }))
 }
 
@@ -327,7 +426,7 @@ async fn get_couple(
                 pc.code as \"pairing_code?\"
          FROM couples c
          JOIN users u1 ON c.user1_id = u1.id
-         LEFT JOIN users u2 ON c.user2_id = u2.id AND c.user1_id != c.user2_id
+         LEFT JOIN users u2 ON c.user2_id = u2.id
          LEFT JOIN pairing_codes pc ON c.id = pc.couple_id 
             AND pc.used_at IS NULL 
             AND pc.expires_at > NOW()
