@@ -38,31 +38,97 @@ A modern couples app for recording intimate moments, achievements, and relations
 
 ### Local Development
 
-1. **Clone the repository**
+#### Option 1: Using Development Script (Recommended)
+```bash
+git clone https://github.com/balamark/Twogether.git
+cd Twogether
+./start-dev.sh
+```
+
+#### Option 2: Manual Setup (Plain Commands)
+
+1. **Clone and Setup Environment**
    ```bash
    git clone https://github.com/balamark/Twogether.git
    cd Twogether
+   
+   # Copy environment template and configure
+   cp env.example .env
+   # Edit .env with your database credentials and Supabase settings
    ```
 
-2. **Backend Setup**
+2. **Database Setup (Required)**
    ```bash
-   cd backend
+   # Install SQLx CLI for database migrations
    cargo install sqlx-cli
-   cargo run
+   
+   # Run database migrations
+   cd backend
+   sqlx migrate run --database-url "your-database-url-here"
+   cd ..
    ```
 
-3. **Frontend Setup**
+3. **Backend Server (Rust/Axum)**
    ```bash
+   # Terminal 1: Start backend server
+   cd backend
+   cargo run
+   # Server runs on http://localhost:8080
+   ```
+
+4. **Frontend Server (React/Vite)**
+   ```bash
+   # Terminal 2: Start frontend server
    cd frontend
    npm install
    npm run dev
+   # Frontend runs on http://localhost:5173
    ```
 
-4. **Database Setup**
-   ```bash
-   # Run migrations
-   sqlx migrate run
+5. **Environment Variables**
+   
+   Make sure your `.env` file contains:
+   ```env
+   # Database (Supabase PostgreSQL)
+   DATABASE_URL=postgresql://postgres:password@localhost:5432/twogether
+   
+   # JWT Secret
+   JWT_SECRET=your-secret-key-change-in-production
+   
+   # Supabase Configuration
+   SUPABASE_URL=https://your-project.supabase.co
+   SUPABASE_ANON_KEY=your-anon-key
+   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+   
+   # CORS
+   CORS_ORIGIN=http://localhost:5173
+   
+   # Frontend API URL
+   VITE_API_BASE_URL=http://localhost:8080/api
    ```
+
+#### Option 3: Docker Development
+```bash
+# Start both services with Docker Compose
+docker-compose up --build
+
+# Frontend: http://localhost:5173
+# Backend API: http://localhost:8080
+```
+
+#### Testing
+```bash
+# Backend tests
+cd backend
+cargo test
+
+# Frontend E2E tests with Playwright
+cd frontend
+npm run test:e2e          # Run tests headless
+npm run test:e2e:ui       # Run with interactive UI
+npm run test:e2e:headed   # Run with browser visible
+npm run test:e2e:debug    # Debug mode with step-by-step
+```
 
 ## Deployment
 
