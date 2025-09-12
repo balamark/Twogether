@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { User, LogOut, Coins, Heart } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, LogOut, Coins, Heart, Bell, Send } from 'lucide-react';
+import { apiService } from '../services/api';
 
 interface User {
   id: string;
@@ -21,19 +22,48 @@ interface HeaderProps {
   totalCoins: number;
   onShowAuthModal: () => void;
   onLogout: () => void;
+  onShowIntimacyRequest: () => void;
+  onShowNotifications: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
   authState, 
   totalCoins, 
   onShowAuthModal, 
-  onLogout 
+  onLogout,
+  onShowIntimacyRequest,
+  onShowNotifications,
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+
+  // Fetch unread notification count
+  useEffect(() => {
+    if (authState.isAuthenticated) {
+      fetchUnreadCount();
+      // Set up periodic refresh
+      const interval = setInterval(fetchUnreadCount, 30000); // Every 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [authState.isAuthenticated]);
+
+  const fetchUnreadCount = async function() {
+    try {
+      const count = await apiService.getUnreadNotificationCount();
+      setUnreadNotificationCount(count);
+    } catch (error) {
+      console.error('Failed to fetch unread notification count:', error);
+    }
+  };
 
   const handleLogout = () => {
     onLogout();
     setShowUserMenu(false);
+  };
+
+  const handleNotificationClick = () => {
+    onShowNotifications();
+    setUnreadNotificationCount(0); // Reset count when opening notifications
   };
 
   return (
@@ -50,8 +80,36 @@ const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Right Side - Coins and User */}
+          {/* Right Side - Actions, Coins and User */}
           <div className="flex items-center space-x-4">
+            {/* Intimacy Request Button */}
+            {authState.isAuthenticated && authState.partnerConnected && (
+              <button
+                onClick={onShowIntimacyRequest}
+                className="flex items-center space-x-2 bg-gradient-to-r from-pink-500 to-red-500 text-white px-4 py-2 rounded-full hover:from-pink-600 hover:to-red-600 transition-colors"
+                title="發送親密邀請"
+              >
+                <Send className="w-4 h-4" />
+                <span className="hidden sm:inline text-sm font-medium">親密邀請</span>
+              </button>
+            )}
+
+            {/* Notifications */}
+            {authState.isAuthenticated && (
+              <button
+                onClick={handleNotificationClick}
+                className="relative p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors"
+                title="通知中心"
+              >
+                <Bell className="w-5 h-5" />
+                {unreadNotificationCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                    {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+                  </span>
+                )}
+              </button>
+            )}
+
             {/* Coins Display */}
             {authState.isAuthenticated && (
               <div className="flex items-center space-x-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-3 py-2 rounded-full">

@@ -270,6 +270,155 @@ pub struct MonthlyData {
     pub count: i64,
 }
 
+// Intimacy Request Models
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct IntimacyRequest {
+    pub id: Uuid,
+    pub couple_id: Uuid,
+    pub sender_id: Uuid,
+    pub receiver_id: Uuid,
+    pub message_content: String,
+    pub request_type: String,
+    pub roleplay_category: Option<String>,
+    pub scheduled_time: Option<DateTime<Utc>>,
+    pub status: String,
+    pub responded_at: Option<DateTime<Utc>>,
+    pub response_message: Option<String>,
+    pub alternative_type: Option<String>,
+    pub alternative_content: Option<String>,
+    pub alternative_scheduled_time: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Validate)]
+pub struct CreateIntimacyRequestRequest {
+    #[validate(length(min = 1, max = 1000, message = "請求內容不能為空且不超過1000個字符"))]
+    pub message_content: String,
+    
+    pub request_type: String, // "intimate" or "scheduled"
+    pub roleplay_category: Option<String>,
+    pub scheduled_time: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Validate)]
+pub struct RespondToIntimacyRequestRequest {
+    pub accept: bool,
+    
+    #[validate(length(max = 500, message = "回應訊息不能超過500個字符"))]
+    pub response_message: Option<String>,
+    
+    // For rejection with alternative
+    pub alternative_type: Option<String>,
+    pub alternative_content: Option<String>,
+    pub alternative_scheduled_time: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct IntimacyRequestResponse {
+    pub id: Uuid,
+    pub sender_nickname: String,
+    pub receiver_nickname: String,
+    pub message_content: String,
+    pub request_type: String,
+    pub roleplay_category: Option<String>,
+    pub scheduled_time: Option<DateTime<Utc>>,
+    pub status: String,
+    pub responded_at: Option<DateTime<Utc>>,
+    pub response_message: Option<String>,
+    pub alternative_type: Option<String>,
+    pub alternative_content: Option<String>,
+    pub alternative_scheduled_time: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub expires_at: DateTime<Utc>,
+}
+
+// Notification Models
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct Notification {
+    pub id: Uuid,
+    pub user_id: Uuid,
+    pub notification_type: String,
+    pub title: String,
+    pub content: String,
+    pub intimacy_request_id: Option<Uuid>,
+    pub related_user_id: Option<Uuid>,
+    pub is_read: bool,
+    pub read_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub priority: i32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct NotificationResponse {
+    pub id: Uuid,
+    pub notification_type: String,
+    pub title: String,
+    pub content: String,
+    pub intimacy_request_id: Option<Uuid>,
+    pub related_user_nickname: Option<String>,
+    pub is_read: bool,
+    pub read_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+    pub priority: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MarkNotificationReadRequest {
+    pub notification_ids: Vec<Uuid>,
+}
+
+// Intimacy Template Models
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct IntimacyTemplate {
+    pub id: Uuid,
+    pub category: String,
+    pub time_hint: String,
+    pub roleplay_setup: String,
+    pub suggestion_level: String,
+    pub is_active: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct IntimacyTemplateResponse {
+    pub id: Uuid,
+    pub category: String,
+    pub time_hint: String,
+    pub roleplay_setup: String,
+    pub suggestion_level: String,
+}
+
+// Alternative Intimacy Options Models
+#[derive(Debug, Serialize, Deserialize, FromRow)]
+pub struct AlternativeIntimacyOption {
+    pub id: Uuid,
+    pub category: String,
+    pub title: String,
+    pub description: String,
+    pub estimated_duration: Option<String>,
+    pub is_default: bool,
+    pub sort_order: i32,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AlternativeIntimacyOptionResponse {
+    pub id: Uuid,
+    pub category: String,
+    pub title: String,
+    pub description: String,
+    pub estimated_duration: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AlternativeIntimacyOptionsGrouped {
+    pub physical: Vec<AlternativeIntimacyOptionResponse>,
+    pub emotional: Vec<AlternativeIntimacyOptionResponse>,
+    pub playful: Vec<AlternativeIntimacyOptionResponse>,
+    pub companionship: Vec<AlternativeIntimacyOptionResponse>,
+}
+
 // JWT Claims
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {

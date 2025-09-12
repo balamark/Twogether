@@ -70,6 +70,76 @@ interface ApiErrorResponse {
   message?: string;
 }
 
+// Intimacy Request Types
+interface IntimacyRequest {
+  id: string;
+  senderNickname: string;
+  receiverNickname: string;
+  messageContent: string;
+  requestType: string;
+  roleplayCategory?: string;
+  scheduledTime?: string;
+  status: string;
+  respondedAt?: string;
+  responseMessage?: string;
+  alternativeType?: string;
+  alternativeContent?: string;
+  alternativeScheduledTime?: string;
+  createdAt: string;
+  expiresAt: string;
+}
+
+interface CreateIntimacyRequestRequest {
+  messageContent: string;
+  requestType: string;
+  roleplayCategory?: string;
+  scheduledTime?: string;
+}
+
+interface RespondToIntimacyRequestRequest {
+  accept: boolean;
+  responseMessage?: string;
+  alternativeType?: string;
+  alternativeContent?: string;
+  alternativeScheduledTime?: string;
+}
+
+interface IntimacyTemplate {
+  id: string;
+  category: string;
+  timeHint: string;
+  roleplaySetup: string;
+  suggestionLevel: string;
+}
+
+interface AlternativeIntimacyOption {
+  id: string;
+  category: string;
+  title: string;
+  description: string;
+  estimatedDuration?: string;
+}
+
+interface AlternativeIntimacyOptionsGrouped {
+  physical: AlternativeIntimacyOption[];
+  emotional: AlternativeIntimacyOption[];
+  playful: AlternativeIntimacyOption[];
+  companionship: AlternativeIntimacyOption[];
+}
+
+interface Notification {
+  id: string;
+  notificationType: string;
+  title: string;
+  content: string;
+  intimacyRequestId?: string;
+  relatedUserNickname?: string;
+  isRead: boolean;
+  readAt?: string;
+  createdAt: string;
+  priority: number;
+}
+
 // Enhanced API Client with error handling
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -468,7 +538,238 @@ class ApiService {
       pairingCode: typedData?.pairing_code,
     };
   }
+
+  // Intimacy Requests
+  async createIntimacyRequest(request: CreateIntimacyRequestRequest): Promise<IntimacyRequest> {
+    try {
+      const response = await apiClient.post('/intimacy/intimacy-requests', {
+        message_content: request.messageContent,
+        request_type: request.requestType,
+        roleplay_category: request.roleplayCategory,
+        scheduled_time: request.scheduledTime,
+      });
+      return this.transformIntimacyRequest(response.data);
+    } catch (error: unknown) {
+      console.error('Failed to create intimacy request:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '無法發送親密邀請');
+    }
+  }
+
+  async getIntimacyRequests(status?: string): Promise<IntimacyRequest[]> {
+    try {
+      const params = status ? { status } : {};
+      const response = await apiClient.get('/intimacy/intimacy-requests', { params });
+      return response.data.map((item: unknown) => this.transformIntimacyRequest(item));
+    } catch (error: unknown) {
+      console.error('Failed to fetch intimacy requests:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '無法獲取親密邀請記錄');
+    }
+  }
+
+  async respondToIntimacyRequest(
+    requestId: string, 
+    response: RespondToIntimacyRequestRequest
+  ): Promise<IntimacyRequest> {
+    try {
+      const result = await apiClient.put(`/intimacy/intimacy-requests/${requestId}/respond`, {
+        accept: response.accept,
+        response_message: response.responseMessage,
+        alternative_type: response.alternativeType,
+        alternative_content: response.alternativeContent,
+        alternative_scheduled_time: response.alternativeScheduledTime,
+      });
+      return this.transformIntimacyRequest(result.data);
+    } catch (error: unknown) {
+      console.error('Failed to respond to intimacy request:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '無法回應親密邀請');
+    }
+  }
+
+  async getIntimacyTemplates(): Promise<IntimacyTemplate[]> {
+    try {
+      const response = await apiClient.get('/intimacy/intimacy-templates');
+      return response.data.map((item: unknown) => this.transformIntimacyTemplate(item));
+    } catch (error: unknown) {
+      console.error('Failed to fetch intimacy templates:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '無法獲取親密邀請模板');
+    }
+  }
+
+  async getIntimacyTemplatesByCategory(category: string): Promise<IntimacyTemplate[]> {
+    try {
+      const response = await apiClient.get(`/intimacy/intimacy-templates/${category}`);
+      return response.data.map((item: unknown) => this.transformIntimacyTemplate(item));
+    } catch (error: unknown) {
+      console.error('Failed to fetch intimacy templates by category:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '無法獲取分類模板');
+    }
+  }
+
+  async getAlternativeIntimacyOptions(): Promise<AlternativeIntimacyOptionsGrouped> {
+    try {
+      const response = await apiClient.get('/intimacy/alternative-intimacy-options');
+      return {
+        physical: response.data.physical?.map((item: unknown) => this.transformAlternativeOption(item)) || [],
+        emotional: response.data.emotional?.map((item: unknown) => this.transformAlternativeOption(item)) || [],
+        playful: response.data.playful?.map((item: unknown) => this.transformAlternativeOption(item)) || [],
+        companionship: response.data.companionship?.map((item: unknown) => this.transformAlternativeOption(item)) || [],
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch alternative intimacy options:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '無法獲取替代親密選項');
+    }
+  }
+
+  // Notifications
+  async getNotifications(params?: { notificationType?: string; isRead?: boolean }): Promise<Notification[]> {
+    try {
+      const queryParams = {
+        notification_type: params?.notificationType,
+        is_read: params?.isRead,
+      };
+      const response = await apiClient.get('/intimacy/notifications', { params: queryParams });
+      return response.data.map((item: unknown) => this.transformNotification(item));
+    } catch (error: unknown) {
+      console.error('Failed to fetch notifications:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '無法獲取通知');
+    }
+  }
+
+  async markNotificationsRead(notificationIds: string[]): Promise<void> {
+    try {
+      await apiClient.put('/intimacy/notifications/mark-read', {
+        notification_ids: notificationIds,
+      });
+    } catch (error: unknown) {
+      console.error('Failed to mark notifications as read:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '無法標記通知為已讀');
+    }
+  }
+
+  async getUnreadNotificationCount(): Promise<number> {
+    try {
+      const response = await apiClient.get('/intimacy/notifications/unread-count');
+      return response.data.unread_count || 0;
+    } catch (error: unknown) {
+      console.error('Failed to fetch unread notification count:', error);
+      return 0;
+    }
+  }
+
+  // Transform methods for intimacy features
+  private transformIntimacyRequest(data: unknown): IntimacyRequest {
+    const typedData = data as {
+      id?: string;
+      sender_nickname?: string;
+      receiver_nickname?: string;
+      message_content?: string;
+      request_type?: string;
+      roleplay_category?: string;
+      scheduled_time?: string;
+      status?: string;
+      responded_at?: string;
+      response_message?: string;
+      alternative_type?: string;
+      alternative_content?: string;
+      alternative_scheduled_time?: string;
+      created_at?: string;
+      expires_at?: string;
+    };
+
+    return {
+      id: typedData?.id || '',
+      senderNickname: typedData?.sender_nickname || '',
+      receiverNickname: typedData?.receiver_nickname || '',
+      messageContent: typedData?.message_content || '',
+      requestType: typedData?.request_type || '',
+      roleplayCategory: typedData?.roleplay_category,
+      scheduledTime: typedData?.scheduled_time,
+      status: typedData?.status || '',
+      respondedAt: typedData?.responded_at,
+      responseMessage: typedData?.response_message,
+      alternativeType: typedData?.alternative_type,
+      alternativeContent: typedData?.alternative_content,
+      alternativeScheduledTime: typedData?.alternative_scheduled_time,
+      createdAt: typedData?.created_at || '',
+      expiresAt: typedData?.expires_at || '',
+    };
+  }
+
+  private transformIntimacyTemplate(data: unknown): IntimacyTemplate {
+    const typedData = data as {
+      id?: string;
+      category?: string;
+      time_hint?: string;
+      roleplay_setup?: string;
+      suggestion_level?: string;
+    };
+
+    return {
+      id: typedData?.id || '',
+      category: typedData?.category || '',
+      timeHint: typedData?.time_hint || '',
+      roleplaySetup: typedData?.roleplay_setup || '',
+      suggestionLevel: typedData?.suggestion_level || '',
+    };
+  }
+
+  private transformAlternativeOption(data: unknown): AlternativeIntimacyOption {
+    const typedData = data as {
+      id?: string;
+      category?: string;
+      title?: string;
+      description?: string;
+      estimated_duration?: string;
+    };
+
+    return {
+      id: typedData?.id || '',
+      category: typedData?.category || '',
+      title: typedData?.title || '',
+      description: typedData?.description || '',
+      estimatedDuration: typedData?.estimated_duration,
+    };
+  }
+
+  private transformNotification(data: unknown): Notification {
+    const typedData = data as {
+      id?: string;
+      notification_type?: string;
+      title?: string;
+      content?: string;
+      intimacy_request_id?: string;
+      related_user_nickname?: string;
+      is_read?: boolean;
+      read_at?: string;
+      created_at?: string;
+      priority?: number;
+    };
+
+    return {
+      id: typedData?.id || '',
+      notificationType: typedData?.notification_type || '',
+      title: typedData?.title || '',
+      content: typedData?.content || '',
+      intimacyRequestId: typedData?.intimacy_request_id,
+      relatedUserNickname: typedData?.related_user_nickname,
+      isRead: typedData?.is_read || false,
+      readAt: typedData?.read_at,
+      createdAt: typedData?.created_at || '',
+      priority: typedData?.priority || 1,
+    };
+  }
 }
 
 export const apiService = new ApiService();
-export default apiService; 
+export default apiService;
+
+// Export types for external use
+export type {
+  IntimacyRequest,
+  CreateIntimacyRequestRequest,
+  RespondToIntimacyRequestRequest,
+  IntimacyTemplate,
+  AlternativeIntimacyOption,
+  AlternativeIntimacyOptionsGrouped,
+  Notification,
+}

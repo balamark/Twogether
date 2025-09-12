@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT c.id, c.couple_name, c.anniversary_date, c.created_at, \n                u1.nickname as user1_nickname, u2.nickname as \"user2_nickname?\",\n                pc.code as \"pairing_code?\"\n         FROM couples c\n         JOIN users u1 ON c.user1_id = u1.id\n         LEFT JOIN users u2 ON c.user2_id = u2.id AND c.user1_id != c.user2_id\n         LEFT JOIN pairing_codes pc ON c.id = pc.couple_id \n            AND pc.used_at IS NULL \n            AND pc.expires_at > NOW()\n         WHERE c.user1_id = $1 OR c.user2_id = $1",
+  "query": "SELECT c.id, c.couple_name, c.anniversary_date, c.created_at,\n                    u1.nickname as user1_nickname, u2.nickname as user2_nickname\n             FROM couples c\n             JOIN users u1 ON c.user1_id = u1.id\n             JOIN users u2 ON c.user2_id = u2.id\n             WHERE c.id = $1",
   "describe": {
     "columns": [
       {
@@ -30,12 +30,7 @@
       },
       {
         "ordinal": 5,
-        "name": "user2_nickname?",
-        "type_info": "Varchar"
-      },
-      {
-        "ordinal": 6,
-        "name": "pairing_code?",
+        "name": "user2_nickname",
         "type_info": "Varchar"
       }
     ],
@@ -50,9 +45,8 @@
       true,
       true,
       false,
-      false,
       false
     ]
   },
-  "hash": "3576ad9230e84ac117510ce0bb5795ea278236221c1864a559b6c57107d9df7b"
+  "hash": "ba7e216471a7527ca55fe58d9299696ab85456f3b673250fd9ba86fbb4e9d7f1"
 }

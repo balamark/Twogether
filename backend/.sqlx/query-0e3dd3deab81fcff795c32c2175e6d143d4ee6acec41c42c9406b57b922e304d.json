@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT \n            TO_CHAR(moment_date, 'YYYY-MM') as month,\n            COUNT(*) as count\n         FROM love_moments \n         WHERE couple_id = $1\n         GROUP BY TO_CHAR(moment_date, 'YYYY-MM')\n         ORDER BY count DESC\n         LIMIT 1",
+  "query": "SELECT \n            TO_CHAR(moment_date, 'YYYY-MM') as month,\n            COUNT(*) as count\n         FROM love_moments \n         WHERE couple_id = $1\n         GROUP BY TO_CHAR(moment_date, 'YYYY-MM')\n         ORDER BY month DESC\n         LIMIT 12",
   "describe": {
     "columns": [
       {
@@ -24,5 +24,5 @@
       null
     ]
   },
-  "hash": "914649b6e74a71e08a861ea7363488a21bf67187d58bba2f131e8d0e0c5b251d"
+  "hash": "0e3dd3deab81fcff795c32c2175e6d143d4ee6acec41c42c9406b57b922e304d"
 }

@@ -82,7 +82,7 @@ cd Twogether
    cd frontend
    npm install
    npm run dev
-   # Frontend runs on http://localhost:5173
+   # Frontend runs on http://localhost:5174
    ```
 
 5. **Environment Variables**
@@ -101,7 +101,7 @@ cd Twogether
    SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
    
    # CORS
-   CORS_ORIGIN=http://localhost:5173
+   CORS_ORIGIN=http://localhost:5174
    
    # Frontend API URL
    VITE_API_BASE_URL=http://localhost:8080/api
@@ -112,7 +112,7 @@ cd Twogether
 # Start both services with Docker Compose
 docker-compose up --build
 
-# Frontend: http://localhost:5173
+# Frontend: http://localhost:5174
 # Backend API: http://localhost:8080
 ```
 

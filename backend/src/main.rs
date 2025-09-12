@@ -25,7 +25,7 @@ use crate::{
     config::Config,
     database::Database,
     middleware::{auth, logging},
-    routes::{auth_routes, couple_routes, love_moment_routes, achievement_routes, photo_routes, coin_routes, stats_routes},
+    routes::{auth_routes, couple_routes, love_moment_routes, achievement_routes, photo_routes, coin_routes, stats_routes, intimacy_request_routes},
     services::supabase::SupabaseStorage,
 };
 
@@ -197,6 +197,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nest(
             "/api/stats", 
             stats_routes().layer(from_fn_with_state(state.clone(), auth::require_auth))
+        )
+        .nest(
+            "/api/intimacy", 
+            intimacy_request_routes().layer(from_fn_with_state(state.clone(), auth::require_auth))
         )
         .layer(cors)
         .layer(logging::create_trace_layer())

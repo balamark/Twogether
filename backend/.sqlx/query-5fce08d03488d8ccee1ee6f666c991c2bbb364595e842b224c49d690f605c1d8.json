@@ -1,0 +1,56 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM intimacy_templates WHERE is_active = true ORDER BY category, created_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "category",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "time_hint",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "roleplay_setup",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "suggestion_level",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "is_active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "5fce08d03488d8ccee1ee6f666c991c2bbb364595e842b224c49d690f605c1d8"
+}

@@ -1,0 +1,118 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE intimacy_requests \n        SET \n            status = $1,\n            responded_at = $2,\n            response_message = $3,\n            alternative_type = $4,\n            alternative_content = $5,\n            alternative_scheduled_time = $6\n        WHERE id = $7\n        RETURNING *\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "couple_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "sender_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "receiver_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "message_content",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "request_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "roleplay_category",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "scheduled_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "responded_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "response_message",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 11,
+        "name": "alternative_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 12,
+        "name": "alternative_content",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 13,
+        "name": "alternative_scheduled_time",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 15,
+        "name": "expires_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Varchar",
+        "Timestamptz",
+        "Text",
+        "Varchar",
+        "Text",
+        "Timestamptz",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "6c8c97133800b77b7f8d44f7c988a685c689015229cd8f7c202d36b64fed547c"
+}

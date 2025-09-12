@@ -5,6 +5,7 @@ pub mod achievements;
 pub mod photos;
 pub mod coins;
 pub mod stats;
+pub mod intimacy_requests;
 
 use axum::Router;
 use crate::AppState;
@@ -35,4 +36,8 @@ pub fn coin_routes() -> Router<AppState> {
 
 pub fn stats_routes() -> Router<AppState> {
     stats::routes()
+}
+
+pub fn intimacy_request_routes() -> Router<AppState> {
+    intimacy_requests::routes()
 } 

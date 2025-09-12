@@ -5,6 +5,8 @@ import RoleplayView from './components/RoleplayView';
 import { AchievementsView } from './components/AchievementsView';
 import Header from './components/Header';
 import { NotificationContainer } from './components/ErrorNotification';
+import IntimacyRequestForm from './components/IntimacyRequestForm';
+import NotificationInbox from './components/NotificationInbox';
 import { apiService } from './services/api';
 
 interface IntimateRecord {
@@ -213,6 +215,9 @@ const LoveTimeApp = () => {
 
   const [customScripts, setCustomScripts] = useState<RoleplayScript[]>([]);
   const [showScriptUploadModal, setShowScriptUploadModal] = useState(false);
+  const [showIntimacyRequestForm, setShowIntimacyRequestForm] = useState(false);
+  const [showNotificationInbox, setShowNotificationInbox] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [journeyMilestones, setJourneyMilestones] = useState<JourneyMilestone[]>([
     {
       id: 'meeting',
@@ -2988,6 +2993,8 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
         totalCoins={totalCoins}
         onShowAuthModal={() => setShowAuthModal(true)}
         onLogout={handleLogout}
+        onShowIntimacyRequest={() => setShowIntimacyRequestForm(true)}
+        onShowNotifications={() => setShowNotificationInbox(true)}
       />
       
       {/* Notification Container */}
@@ -3032,6 +3039,23 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
       {/* Modals */}
       {showAuthModal && <AuthModal />}
       {showScriptUploadModal && <ScriptUploadModal />}
+      
+      {/* Intimacy Request Form */}
+      <IntimacyRequestForm
+        isOpen={showIntimacyRequestForm}
+        onClose={() => setShowIntimacyRequestForm(false)}
+        onSuccess={() => {
+          showNotification('success', '親密邀請已發送', '你的邀請已經發送給伴侶', 0, '', 3000);
+        }}
+      />
+      
+      {/* Notification Inbox */}
+      <NotificationInbox
+        isOpen={showNotificationInbox}
+        onClose={() => setShowNotificationInbox(false)}
+        unreadCount={unreadNotificationCount}
+        onUnreadCountChange={setUnreadNotificationCount}
+      />
 
       {/* Record Detail Modal */}
       {showRecordDetail && selectedRecord && (

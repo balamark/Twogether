@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH weekly_counts AS (\n            SELECT DATE_TRUNC('week', moment_date) as week, COUNT(*) as count\n            FROM love_moments\n            WHERE couple_id = $1\n            GROUP BY DATE_TRUNC('week', moment_date)\n        )\n        SELECT COALESCE(AVG(count::float8), 0) as average\n        FROM weekly_counts",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "average",
+        "type_info": "Float8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "040e19ef0371dd81b30f92b1ecfcb974b9b856fe4e314efa2459a3ab1544df52"
+}

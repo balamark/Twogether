@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, amount, transaction_type, description, transaction_date\n         FROM coin_transactions \n         WHERE couple_id = $1\n         ORDER BY transaction_date DESC\n         LIMIT 50",
+  "query": "SELECT id, amount, transaction_type, description, transaction_date\n         FROM coin_transactions \n         WHERE couple_id = $1\n         ORDER BY transaction_date DESC\n         LIMIT 100",
   "describe": {
     "columns": [
       {
@@ -42,5 +42,5 @@
       true
     ]
   },
-  "hash": "00f49a7600e2744b3a86ba2017f15d0a5bff42c252c728954e77bb3b3426c4d3"
+  "hash": "281014fe881712c9774eca1525cd64b847cb6ec11d92d9dd4780f03be4956ff1"
 }

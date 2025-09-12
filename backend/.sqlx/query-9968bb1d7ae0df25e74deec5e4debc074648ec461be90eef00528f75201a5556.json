@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE coin_transactions SET couple_id = $1 WHERE couple_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9968bb1d7ae0df25e74deec5e4debc074648ec461be90eef00528f75201a5556"
+}

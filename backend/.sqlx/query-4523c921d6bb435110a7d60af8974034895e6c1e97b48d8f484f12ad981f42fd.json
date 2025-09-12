@@ -1,0 +1,80 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT \n            n.id, n.notification_type, n.title, n.content,\n            n.intimacy_request_id, n.is_read, n.read_at,\n            n.created_at, n.priority,\n            related_user.nickname as \"related_user_nickname?\"\n        FROM notifications n\n        LEFT JOIN users related_user ON n.related_user_id = related_user.id\n        WHERE n.user_id = $1\n          AND ($2::text IS NULL OR n.notification_type = $2)\n          AND ($3::boolean IS NULL OR n.is_read = $3)\n        ORDER BY n.created_at DESC\n        LIMIT $4 OFFSET $5\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "notification_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "title",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "content",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "intimacy_request_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "is_read",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 6,
+        "name": "read_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "priority",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 9,
+        "name": "related_user_nickname?",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bool",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4523c921d6bb435110a7d60af8974034895e6c1e97b48d8f484f12ad981f42fd"
+}
