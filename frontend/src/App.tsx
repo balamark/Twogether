@@ -290,7 +290,7 @@ const LoveTimeApp = () => {
     return Math.random().toString(36).substr(2, 8).toUpperCase();
   };
 
-  const handleLogin = async (email: string, password: string, nickname: string) => {
+  const handleLogin = async (email: string, password: string, _unused?: string) => {
     try {
       const authResult = await apiService.login(email, password);
       
@@ -315,14 +315,14 @@ const LoveTimeApp = () => {
         partnerConnected: false
       });
       
-      setNicknames(prev => ({ ...prev, partner1: nickname }));
+      setNicknames(prev => ({ ...prev, partner1: userData.nickname }));
       localStorage.setItem('authState', JSON.stringify({ user, isAuthenticated: true, partnerConnected: false }));
       setShowAuthModal(false);
       
       showNotification({
         type: 'success',
         title: '登入成功！',
-        message: `歡迎回來 ${nickname}！`,
+        message: `歡迎回來 ${userData.nickname}！`,
         duration: 5000
       });
     } catch (error: unknown) {
@@ -1772,11 +1772,17 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [partnerCode, setPartnerCode] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
       
-      if (authMode === 'login') {
+      if (isLoading) return; // Prevent double-clicking
+      
+      setIsLoading(true);
+      
+      try {
+        if (authMode === 'login') {
         // Validate login form
         if (!email.trim()) {
           showNotification({
@@ -1807,7 +1813,17 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
           });
           return;
         }
-        handleLogin(email, password, nickname);
+        // Password length validation
+        if (password.length < 6) {
+          showNotification({
+            type: 'error',
+            title: '驗證錯誤',
+            message: '密碼至少需要6個字符',
+            duration: 6000
+          });
+          return;
+        }
+        await handleLogin(email, password, '');
       } else if (authMode === 'register') {
         // Validate registration form
         if (!email.trim()) {
@@ -1877,25 +1893,32 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
           });
           return;
         }
-        handleRegister(email, nickname, password);
-      } else {
-        // Validate partner code
-        if (!partnerCode.trim()) {
-          showNotification({
-            type: 'error',
-            title: '驗證錯誤',
-            message: '請輸入配對碼',
-            duration: 6000
-          });
-          return;
+        await handleRegister(email, nickname, password);
+        } else {
+          // Validate partner code
+          if (!partnerCode.trim()) {
+            showNotification({
+              type: 'error',
+              title: '驗證錯誤',
+              message: '請輸入配對碼',
+              duration: 6000
+            });
+            setIsLoading(false);
+            return;
+          }
+          await handlePartnerConnect(partnerCode);
         }
-        handlePartnerConnect(partnerCode);
+      } catch (error) {
+        // Error handling is done in individual functions
+        console.error('Form submission error:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg p-6 max-w-md w-full">
+        <div className="bg-white rounded-lg p-6 max-w-md w-full" data-testid="auth-modal">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-xl font-bold text-pink-700">
               {authMode === 'login' ? '登入愛的時光' : 
@@ -1924,7 +1947,7 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                     placeholder="輸入你的電子郵件"
-                    required
+                    disabled={isLoading}
                   />
                 </div>
                 <div>
@@ -1939,25 +1962,10 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                     placeholder="輸入你的密碼"
-                    required
-                    minLength={6}
+                    disabled={isLoading}
                   />
                 </div>
-                <div>
-                  <label htmlFor="auth-nickname" className="block text-sm font-medium text-gray-700 mb-2">
-                    暱稱
-                  </label>
-                  <input
-                    id="auth-nickname"
-                    name="auth-nickname"
-                    type="text"
-                    value={nickname}
-                    onChange={(e) => setNickname(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    placeholder="輸入你的暱稱"
-                    required
-                  />
-                </div>
+                {/* Nickname field removed for login - it's retrieved from the database */}
               </>
             ) : authMode === 'register' ? (
               <>
@@ -1973,7 +1981,6 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                     placeholder="輸入你的電子郵件"
-                    required
                   />
                 </div>
                 <div>
@@ -1988,7 +1995,6 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
                     onChange={(e) => setNickname(e.target.value)}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                     placeholder="輸入你的暱稱"
-                    required
                   />
                 </div>
                 <div>
@@ -2003,8 +2009,6 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                     placeholder="輸入你的密碼"
-                    required
-                    minLength={6}
                   />
                 </div>
                 <div>
@@ -2019,8 +2023,6 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                     placeholder="再次輸入密碼"
-                    required
-                    minLength={6}
                   />
                 </div>
               </>
@@ -2037,17 +2039,38 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
                   onChange={(e) => setPartnerCode(e.target.value.toUpperCase())}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                   placeholder="輸入伴侶的配對碼"
-                  required
                 />
               </div>
             )}
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-pink-500 to-rose-600 text-white py-3 rounded-lg hover:from-pink-600 hover:to-rose-700 transition-colors"
+              disabled={isLoading}
+              className={`w-full py-3 rounded-lg font-medium transition-all duration-200 transform ${
+                isLoading
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed scale-95'
+                  : 'bg-gradient-to-r from-pink-500 to-rose-600 text-white hover:from-pink-600 hover:to-rose-700 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl'
+              }`}
             >
-              {authMode === 'login' ? '開始愛的旅程' : 
-               authMode === 'register' ? '註冊帳號' : '連接伴侶'}
+              {isLoading ? (
+                <div className="flex items-center justify-center space-x-3">
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span className="font-medium">
+                    {authMode === 'login' ? '登入中...' : 
+                     authMode === 'register' ? '註冊中...' : '連接中...'}
+                  </span>
+                  <div className="flex space-x-1">
+                    <div className="w-1 h-1 bg-white rounded-full animate-pulse" style={{animationDelay: '0ms'}}></div>
+                    <div className="w-1 h-1 bg-white rounded-full animate-pulse" style={{animationDelay: '150ms'}}></div>
+                    <div className="w-1 h-1 bg-white rounded-full animate-pulse" style={{animationDelay: '300ms'}}></div>
+                  </div>
+                </div>
+              ) : (
+                <span className="font-medium">
+                  {authMode === 'login' ? '開始愛的旅程' : 
+                   authMode === 'register' ? '註冊帳號' : '連接伴侶'}
+                </span>
+              )}
             </button>
           </form>
 
@@ -2056,13 +2079,19 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
               <>
                 <button
                   onClick={() => setAuthMode('register')}
-                  className="text-pink-600 hover:text-pink-700 text-sm block w-full"
+                  disabled={isLoading}
+                  className={`text-pink-600 hover:text-pink-700 text-sm block w-full ${
+                    isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 >
                   還沒帳號？立即註冊
                 </button>
                 <button
                   onClick={() => setAuthMode('partner')}
-                  className="text-pink-600 hover:text-pink-700 text-sm block w-full"
+                  disabled={isLoading}
+                  className={`text-pink-600 hover:text-pink-700 text-sm block w-full ${
+                    isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 >
                   已有帳號？連接伴侶
                 </button>
@@ -2071,7 +2100,10 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
             {authMode === 'register' && (
               <button
                 onClick={() => setAuthMode('login')}
-                className="text-pink-600 hover:text-pink-700 text-sm block w-full"
+                disabled={isLoading}
+                className={`text-pink-600 hover:text-pink-700 text-sm block w-full ${
+                  isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               >
                 已有帳號？立即登入
               </button>
@@ -2079,7 +2111,10 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
             {authMode === 'partner' && (
               <button
                 onClick={() => setAuthMode('login')}
-                className="text-pink-600 hover:text-pink-700 text-sm block w-full"
+                disabled={isLoading}
+                className={`text-pink-600 hover:text-pink-700 text-sm block w-full ${
+                  isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               >
                 還沒帳號？立即註冊
               </button>
@@ -2792,6 +2827,7 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
               <button
                 onClick={() => setShowAuthModal(true)}
                 className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-6 py-3 rounded-lg hover:shadow-lg transition-colors"
+                data-testid="login-button"
               >
                 立即登入
               </button>
