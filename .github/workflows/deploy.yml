@@ -149,6 +149,8 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
+      - name: Configure Docker auth for GCR
+        run: gcloud auth configure-docker gcr.io --quiet
       - name: Build and push Docker image (cached)
         uses: docker/build-push-action@v5
         with:
