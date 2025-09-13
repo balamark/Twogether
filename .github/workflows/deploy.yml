@@ -146,7 +146,7 @@ jobs:
         run: |
           docker build -t gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }} -f ./backend/Dockerfile . \
             --build-arg SQLX_OFFLINE=true
-            docker push gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }}
+          docker push gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }}
 
   # Backend Deploy
   deploy-backend:
@@ -216,7 +216,7 @@ jobs:
         id: get_service_url # Give this step an ID to reference its outputs
         run: |
           SERVICE_URL=$(gcloud run services describe ${{ env.BACKEND_SERVICE }} --region=${{ env.REGION }} --format="value(status.url)")
-          echo "::set-output name=backend_url::$SERVICE_URL"
+          echo "backend_url=$SERVICE_URL" >> $GITHUB_OUTPUT
           echo "Fetched Backend URL: $SERVICE_URL"
 
       - name: Build frontend with API URL
