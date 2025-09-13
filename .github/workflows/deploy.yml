@@ -82,14 +82,6 @@ jobs:
         working-directory: ./frontend
         run: npx playwright install --with-deps
 
-      - name: Start frontend dev server
-        working-directory: ./frontend
-        run: npm run dev &
-        
-      - name: Wait for frontend server
-        run: |
-          timeout 60 bash -c 'until curl -f http://localhost:5174; do sleep 1; done'
-
       - name: Run Playwright tests
         working-directory: ./frontend
         env:
