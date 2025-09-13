@@ -26,7 +26,7 @@ if ! gcloud auth list --filter=status:ACTIVE --format="value(account)" | grep -q
 fi
 
 # Check required environment variables
-required_vars=("GCP_PROJECT_ID" "DATABASE_URL" "JWT_SECRET" "CORS_ORIGIN" "GCS_BUCKET_NAME")
+required_vars=("GCP_PROJECT_ID" "DATABASE_URL" "JWT_SECRET" "CORS_ORIGIN" "GCS_BUCKET_NAME" "SUPABASE_URL" "SUPABASE_ANON_KEY" "SUPABASE_SERVICE_ROLE_KEY")
 for var in "${required_vars[@]}"; do
     if [ -z "${!var}" ]; then
         echo -e "${RED}❌ Environment variable $var is not set.${NC}"
@@ -57,13 +57,20 @@ gcloud run deploy twogether-backend \
     --platform managed \
     --region us-central1 \
     --allow-unauthenticated \
-    --set-env-vars="DATABASE_URL=$DATABASE_URL" \
-    --set-env-vars="JWT_SECRET=$JWT_SECRET" \
-    --set-env-vars="ENVIRONMENT=production" \
-    --set-env-vars="CORS_ORIGIN=$CORS_ORIGIN" \
+    --port 8080 \
     --memory=512Mi \
     --cpu=1 \
-    --max-instances=10
+    --min-instances=1 \
+    --max-instances=5 \
+    --timeout=300 \
+    --set-annotations "run.googleapis.com/startup-cpu-boost=true" \
+    --set-env-vars="DATABASE_URL=$DATABASE_URL" \
+    --set-env-vars="SUPABASE_URL=$SUPABASE_URL" \
+    --set-env-vars="SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" \
+    --set-env-vars="SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY" \
+    --set-env-vars="JWT_SECRET=$JWT_SECRET" \
+    --set-env-vars="ENVIRONMENT=production" \
+    --set-env-vars="CORS_ORIGIN=$CORS_ORIGIN" 
 
 # Build frontend
 echo -e "${GREEN}📦 Building frontend...${NC}"

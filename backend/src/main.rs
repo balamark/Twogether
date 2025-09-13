@@ -170,21 +170,30 @@ async fn main() -> Result<(), AppError> {
     };
 
     // Configure CORS
-    let cors = CorsLayer::new()
-        .allow_origin(config.cors_origin.parse::<HeaderValue>()?)
-        .allow_methods([
-            Method::GET,
-            Method::POST,
-            Method::PUT,
-            Method::DELETE,
-            Method::OPTIONS,
-        ])
-        .allow_headers([
-            CONTENT_TYPE,
-            "authorization".parse::<axum::http::HeaderName>()?,
-            "x-requested-with".parse::<axum::http::HeaderName>()?,
-        ])
-        .allow_credentials(true);
+    // Note: `Access-Control-Allow-Credentials: true` cannot be combined with `Access-Control-Allow-Origin: *`
+    // so we only enable credentials when the configured origin is not "*".
+    let cors = {
+        let origin_str = config.cors_origin.clone();
+        let base = CorsLayer::new()
+            .allow_origin(origin_str.parse::<HeaderValue>()?)
+            .allow_methods([
+                Method::GET,
+                Method::POST,
+                Method::PUT,
+                Method::DELETE,
+                Method::OPTIONS,
+            ])
+            .allow_headers([
+                CONTENT_TYPE,
+                "authorization".parse::<axum::http::HeaderName>()?,
+                "x-requested-with".parse::<axum::http::HeaderName>()?,
+            ]);
+        if origin_str == "*" {
+            base
+        } else {
+            base.allow_credentials(true)
+        }
+    };
 
     // Build application router
     let app = Router::new()
