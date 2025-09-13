@@ -46,6 +46,34 @@ impl From<MigrateError> for AppError {
     }
 }
 
+// Implement From<std::io::Error> for AppError
+impl From<std::io::Error> for AppError {
+    fn from(error: std::io::Error) -> Self {
+        AppError::Internal(anyhow::anyhow!("IO錯誤: {}", error))
+    }
+}
+
+// Implement From<Box<dyn std::error::Error>> for AppError
+impl From<Box<dyn std::error::Error>> for AppError {
+    fn from(error: Box<dyn std::error::Error>) -> Self {
+        AppError::Internal(anyhow::anyhow!("配置錯誤: {}", error))
+    }
+}
+
+// Implement From<axum::http::header::InvalidHeaderValue> for AppError
+impl From<axum::http::header::InvalidHeaderValue> for AppError {
+    fn from(error: axum::http::header::InvalidHeaderValue) -> Self {
+        AppError::Internal(anyhow::anyhow!("無效的Header值: {}", error))
+    }
+}
+
+// Implement From<axum::http::header::InvalidHeaderName> for AppError
+impl From<axum::http::header::InvalidHeaderName> for AppError {
+    fn from(error: axum::http::header::InvalidHeaderName) -> Self {
+        AppError::Internal(anyhow::anyhow!("無效的Header名稱: {}", error))
+    }
+}
+
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, error_code, error_message) = match self {

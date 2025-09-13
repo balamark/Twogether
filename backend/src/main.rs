@@ -12,6 +12,7 @@ use axum::{
     routing::get,
     Router,
 };
+use error::AppError;
 use clap::Parser;
 use std::net::SocketAddr;
 use std::fs;
@@ -53,7 +54,7 @@ pub struct AppState {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<(), AppError> {
     // Parse command line arguments
     let cli = Cli::parse();
     
