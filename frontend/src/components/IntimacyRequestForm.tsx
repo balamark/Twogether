@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Heart, Clock, Send, Sparkles, X } from 'lucide-react';
 import { apiService } from '../services/api';
-import type { IntimacyTemplate, AlternativeIntimacyOptionsGrouped } from '../services/api';
+import type { IntimacyTemplate } from '../services/api';
 
 interface IntimacyRequestFormProps {
   isOpen: boolean;
@@ -16,7 +16,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState<'category' | 'template' | 'customize' | 'confirm'>('category');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedTemplate, setSelectedTemplate] = useState<IntimacyTemplate | null>(null);
+  const [_selectedTemplate, setSelectedTemplate] = useState<IntimacyTemplate | null>(null);
   const [customMessage, setCustomMessage] = useState('');
   const [requestType, setRequestType] = useState<'intimate' | 'scheduled'>('intimate');
   const [scheduledTime, setScheduledTime] = useState('');

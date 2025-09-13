@@ -5,11 +5,8 @@ import {
   Heart, 
   Check, 
   Clock, 
-  Calendar,
-  MessageCircle,
   Smile,
   Coffee,
-  Music,
   HandHeart
 } from 'lucide-react';
 import { apiService } from '../services/api';
@@ -17,6 +14,7 @@ import type {
   Notification, 
   IntimacyRequest, 
   AlternativeIntimacyOptionsGrouped,
+  AlternativeIntimacyOption,
   RespondToIntimacyRequestRequest 
 } from '../services/api';
 
@@ -123,7 +121,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
     setShowAlternatives(true);
   };
 
-  const handleAlternativeSelect = function(category: string, option: any) {
+  const handleAlternativeSelect = function(category: string, option: AlternativeIntimacyOption) {
     setSelectedAlternative({
       type: category,
       content: option.title,
@@ -295,7 +293,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
                       </h5>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {options.map((option) => (
+                      {(options as AlternativeIntimacyOption[]).map((option: AlternativeIntimacyOption) => (
                         <button
                           key={option.id}
                           onClick={() => handleAlternativeSelect(category, option)}

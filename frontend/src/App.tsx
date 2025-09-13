@@ -3045,7 +3045,12 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
         isOpen={showIntimacyRequestForm}
         onClose={() => setShowIntimacyRequestForm(false)}
         onSuccess={() => {
-          showNotification('success', '親密邀請已發送', '你的邀請已經發送給伴侶', 0, '', 3000);
+          showNotification({
+            type: 'success',
+            title: '親密邀請已發送',
+            message: '你的邀請已經發送給伴侶',
+            duration: 3000,
+          });
         }}
       />
       
