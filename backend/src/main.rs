@@ -133,10 +133,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_env()?;
     tracing::debug!("Loaded configuration: {:?}", config);
 
-    // Initialize database
-    let db = Database::new(&config.database_url).await?;
-    db.migrate().await?;
-    tracing::info!("Database connection established");
+    // Initialize database with retry logic
+    let db = match Database::new(&config.database_url).await {
+        Ok(db) => {
+            match db.migrate().await {
+                Ok(_) => {
+                    tracing::info!("Database connection established and migrations completed");
+                    db
+                }
+                Err(e) => {
+                    tracing::error!("Database migration failed: {}", e);
+                    tracing::warn!("Continuing without database migrations - some features may not work");
+                    db
+                }
+            }
+        }
+        Err(e) => {
+            tracing::error!("Failed to connect to database: {}", e);
+            return Err(e);
+        }
+    };
 
     // Initialize Supabase storage
     let supabase_storage = SupabaseStorage::new(

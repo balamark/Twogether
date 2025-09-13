@@ -170,16 +170,18 @@ jobs:
             --region ${{ env.REGION }} \
             --allow-unauthenticated \
             --port 8080 \
-            --memory 512Mi \
-            --cpu 1 \
+            --memory 1Gi \
+            --cpu 2 \
             --max-instances 10 \
+            --timeout 300 \
             --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
             --set-env-vars "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" \
             --set-env-vars "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" \
             --set-env-vars "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             --set-env-vars "JWT_SECRET=${{ secrets.JWT_SECRET }}" \
+            --set-env-vars "PORT=8080" \
             --set-env-vars "MAX_FILE_SIZE=10485760" \
-            --set-env-vars "CORS_ORIGIN=https://storage.googleapis.com" \
+            --set-env-vars "CORS_ORIGIN=*" \
             --set-env-vars "HOST=0.0.0.0" \
             --set-env-vars "ENVIRONMENT=production"
 
