@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, nickname FROM users WHERE id = $1 OR id = $2",
+  "query": "SELECT id, nickname, email FROM users WHERE id = $1 OR id = $2",
   "describe": {
     "columns": [
       {
@@ -12,6 +12,11 @@
         "ordinal": 1,
         "name": "nickname",
         "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "email",
+        "type_info": "Varchar"
       }
     ],
     "parameters": {
@@ -22,8 +27,9 @@
     },
     "nullable": [
       false,
+      false,
       false
     ]
   },
-  "hash": "d60d019809fb7f2f1cbc6bc602bf8412cafb7901301c55e98d278952810c0dcc"
+  "hash": "a3c778e9922475772f1116aa7a62a8997036a4d996fc827dd268fd98927c0231"
 }

@@ -8,11 +8,12 @@ pub mod services;
 
 use std::sync::Arc;
 
-use crate::{config::Config, database::Database, services::supabase::SupabaseStorage};
+use crate::{config::Config, database::Database, services::supabase::SupabaseStorage, services::email::EmailClient};
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: Arc<Database>,
     pub config: Arc<Config>,
     pub supabase_storage: Arc<SupabaseStorage>,
+    pub email_client: Arc<EmailClient>,
 } 

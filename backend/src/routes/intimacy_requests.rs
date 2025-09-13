@@ -63,7 +63,7 @@ pub async fn create_intimacy_request(
     // Get the user's couple information
     let couple_query = sqlx::query!(
         "SELECT id, user1_id, user2_id FROM couples WHERE user1_id = $1 OR user2_id = $1",
-user_id
+        user_id
     )
     .fetch_optional(&state.db.pool)
     .await?;
@@ -89,7 +89,7 @@ user_id
         RETURNING *
         "#,
         couple.id,
-user_id,
+        user_id,
         receiver_id,
         request.message_content,
         request.request_type,
@@ -99,10 +99,10 @@ user_id,
     .fetch_one(&state.db.pool)
     .await?;
 
-    // Get sender and receiver nicknames for response
+    // Get sender and receiver info for response and email
     let users = sqlx::query!(
-        "SELECT id, nickname FROM users WHERE id = $1 OR id = $2",
-user_id,
+        "SELECT id, nickname, email FROM users WHERE id = $1 OR id = $2",
+        user_id,
         receiver_id
     )
     .fetch_all(&state.db.pool)
@@ -119,6 +119,36 @@ user_id,
         .find(|u| u.id == receiver_id)
         .map(|u| u.nickname.clone())
         .unwrap_or_default();
+
+    // Email the partner about the new request (best-effort)
+    if let Some(receiver_email) = users
+        .iter()
+        .find(|u| u.id == receiver_id)
+        .map(|u| u.email.clone())
+    {
+        let subject = format!("{} 給你發送了親密邀請 💌", sender_nickname);
+        let mut extra = String::new();
+        if let Some(category) = &request.roleplay_category {
+            extra.push_str(&format!("<p>類別：<strong>{}</strong></p>", category));
+        }
+        if let Some(scheduled) = &request.scheduled_time {
+            extra.push_str(&format!("<p>時間：<strong>{}</strong></p>", scheduled));
+        }
+        let html = format!(
+            "<div><p>嗨 {}，</p><p><strong>{}</strong> 給你發送了一個親密邀請：</p><blockquote>{}</blockquote>{}<p>請打開 Twogether 查看並回應 💖</p></div>",
+            receiver_nickname,
+            sender_nickname,
+            request.message_content,
+            extra
+        );
+        if let Err(err) = state
+            .email_client
+            .send_email(&receiver_email, &subject, &html, None)
+            .await
+        {
+            tracing::warn!("Failed to send intimacy request email: {}", err);
+        }
+    }
 
     let response = IntimacyRequestResponse {
         id: intimacy_request.id,
@@ -227,7 +257,7 @@ pub async fn respond_to_intimacy_request(
         IntimacyRequest,
         "SELECT * FROM intimacy_requests WHERE id = $1 AND receiver_id = $2 AND status = 'pending'",
         request_id,
-user_id
+        user_id
     )
     .fetch_optional(&state.db.pool)
     .await?
@@ -239,6 +269,16 @@ user_id
     }
 
     let new_status = if response.accept { "accepted" } else { "rejected" };
+
+    // Default acceptance message when none provided
+    let response_message_to_use = if response.accept {
+        response
+            .response_message
+            .clone()
+            .or_else(|| Some("我接受你的邀請，讓我們延續這個情境吧 💕".to_string()))
+    } else {
+        response.response_message.clone()
+    };
 
     // Update the request
     let updated_request = sqlx::query_as!(
@@ -257,7 +297,7 @@ user_id
         "#,
         new_status,
         Utc::now(),
-        response.response_message,
+        response_message_to_use,
         response.alternative_type,
         response.alternative_content,
         response.alternative_scheduled_time,
@@ -266,9 +306,9 @@ user_id
     .fetch_one(&state.db.pool)
     .await?;
 
-    // Get user nicknames
+    // Get user info (nicknames + emails)
     let users = sqlx::query!(
-        "SELECT id, nickname FROM users WHERE id = $1 OR id = $2",
+        "SELECT id, nickname, email FROM users WHERE id = $1 OR id = $2",
         updated_request.sender_id,
         updated_request.receiver_id
     )
@@ -286,6 +326,39 @@ user_id
         .find(|u| u.id == updated_request.receiver_id)
         .map(|u| u.nickname.clone())
         .unwrap_or_default();
+
+    // Email the original sender about the response (best-effort)
+    if let Some(sender_email) = users
+        .iter()
+        .find(|u| u.id == updated_request.sender_id)
+        .map(|u| u.email.clone())
+    {
+        let subject = if new_status == "accepted" {
+            format!("你的親密邀請被接受了 💖 - 來自 {}", receiver_nickname)
+        } else {
+            format!("你的親密邀請被婉拒 - 來自 {}", receiver_nickname)
+        };
+        let mut html = String::new();
+        if new_status == "accepted" {
+            html.push_str(&format!("<p>太好了！<strong>{}</strong> 接受了你的邀請。</p>", receiver_nickname));
+        } else {
+            html.push_str(&format!("<p>抱歉，<strong>{}</strong> 這次沒有答應。</p>", receiver_nickname));
+        }
+        if let Some(msg) = &updated_request.response_message {
+            html.push_str(&format!("<p>對方的回覆：</p><blockquote>{}</blockquote>", msg));
+        }
+        if let Some(alt) = &updated_request.alternative_content {
+            html.push_str(&format!("<p>建議的替代方案：<em>{}</em></p>", alt));
+        }
+        html.push_str("<p>打開 Twogether 查看詳情並繼續你們的甜蜜計劃。</p>");
+        if let Err(err) = state
+            .email_client
+            .send_email(&sender_email, &subject, &html, None)
+            .await
+        {
+            tracing::warn!("Failed to send response email: {}", err);
+        }
+    }
 
     let response_data = IntimacyRequestResponse {
         id: updated_request.id,
@@ -479,7 +552,7 @@ pub async fn mark_notifications_read(
             WHERE user_id = $2 AND id = $3 AND is_read = false
             "#,
             Utc::now(),
-    user_id,
+            user_id,
             notification_id
         )
         .execute(&state.db.pool)

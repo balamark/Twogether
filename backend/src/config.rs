@@ -11,6 +11,13 @@ pub struct Config {
     pub supabase_url: String,
     pub supabase_anon_key: String,
     pub supabase_service_role_key: String,
+    pub resend_api_key: String,
+    pub email_from: String,
+    pub smtp_host: Option<String>,
+    pub smtp_port: Option<u16>,
+    pub smtp_user: Option<String>,
+    pub smtp_pass: Option<String>,
+    pub smtp_secure: Option<String>,
 }
 
 impl Config {
@@ -24,6 +31,26 @@ impl Config {
                 panic!("DATABASE_URL must be set. Please configure your Supabase PostgreSQL connection string.")
             });
         
+        // Optional SMTP settings (read early to validate email provider requirements)
+        let smtp_host = env::var("SMTP_HOST").ok();
+        let smtp_port = env::var("SMTP_PORT").ok().and_then(|v| v.parse::<u16>().ok());
+        let smtp_user = env::var("SMTP_USER").ok();
+        let smtp_pass = env::var("SMTP_PASS").ok();
+        let smtp_secure = env::var("SMTP_SECURE").ok();
+
+        // Determine Resend key requirement: allow missing if SMTP creds are present in production
+        let resend_api_key = match env::var("RESEND_API_KEY") {
+            Ok(v) => v,
+            Err(_) => {
+                let has_smtp = smtp_host.is_some() && smtp_user.is_some() && smtp_pass.is_some();
+                if environment == "production" && !has_smtp {
+                    panic!("RESEND_API_KEY or SMTP credentials (SMTP_HOST, SMTP_USER, SMTP_PASS) must be set in production");
+                }
+                // Dev default or SMTP-driven production; allow placeholder
+                "dev-resend-api-key".to_string()
+            }
+        };
+
         Ok(Config {
             database_url,
             jwt_secret: env::var("JWT_SECRET")
@@ -69,6 +96,19 @@ impl Config {
                         "your-service-role-key".to_string()
                     }
                 }),
+            resend_api_key,
+            email_from: env::var("EMAIL_FROM").unwrap_or_else(|_| {
+                if environment == "production" {
+                    panic!("EMAIL_FROM must be set in production")
+                } else {
+                    "Twogether <no-reply@example.com>".to_string()
+                }
+            }),
+            smtp_host,
+            smtp_port,
+            smtp_user,
+            smtp_pass,
+            smtp_secure,
         })
     }
     

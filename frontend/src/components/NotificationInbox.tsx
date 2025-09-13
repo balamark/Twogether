@@ -42,6 +42,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
   } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [acceptMessage, setAcceptMessage] = useState<string>('接受你的邀請 💕');
 
   useEffect(() => {
     if (isOpen) {
@@ -102,10 +103,11 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       setLoading(true);
       await apiService.respondToIntimacyRequest(activeRequest.id, {
         accept: true,
-        responseMessage: '接受你的邀請 💕',
+        responseMessage: acceptMessage.trim() || undefined,
       });
       
       setActiveRequest(null);
+      setAcceptMessage('接受你的邀請 💕');
       fetchNotifications(); // Refresh notifications
     } catch (err) {
       setError(err instanceof Error ? err.message : '回應失敗');
@@ -194,7 +196,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg max-w-2xl w/full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div className="flex items-center space-x-3">
@@ -245,22 +247,34 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
                   )}
 
                   {activeRequest.status === 'pending' && (
-                    <div className="flex space-x-3">
-                      <button
-                        onClick={handleAcceptRequest}
-                        disabled={loading}
-                        className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:bg-pink-300 transition-colors flex items-center space-x-2"
-                      >
-                        <Check className="w-4 h-4" />
-                        <span>接受邀請</span>
-                      </button>
-                      <button
-                        onClick={handleRejectRequest}
-                        disabled={loading}
-                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        改個時間
-                      </button>
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm text-gray-700 mb-1">給對方的回覆（可自訂）</label>
+                        <input
+                          type="text"
+                          value={acceptMessage}
+                          onChange={(e) => setAcceptMessage(e.target.value)}
+                          placeholder="例如：我好期待，今晚就從你的劇本開始吧"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-200"
+                        />
+                      </div>
+                      <div className="flex space-x-3">
+                        <button
+                          onClick={handleAcceptRequest}
+                          disabled={loading}
+                          className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:bg-pink-300 transition-colors flex items-center space-x-2"
+                        >
+                          <Check className="w-4 h-4" />
+                          <span>接受邀請</span>
+                        </button>
+                        <button
+                          onClick={handleRejectRequest}
+                          disabled={loading}
+                          className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                        >
+                          改個時間
+                        </button>
+                      </div>
                     </div>
                   )}
 

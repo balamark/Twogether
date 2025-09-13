@@ -34,100 +34,140 @@ A modern couples app for recording intimate moments, achievements, and relations
 - Node.js 18+
 - Rust 1.70+
 - PostgreSQL
-- Docker (for deployment)
+- SQLx CLI (`cargo install sqlx-cli`)
+- Docker (optional for deployment)
 
-### Local Development
+### End-to-End Local Run (Plain Commands)
 
-#### Option 1: Using Development Script (Recommended)
+1) Environment
 ```bash
-git clone https://github.com/balamark/Twogether.git
-cd Twogether
-./start-dev.sh
+# From repo root
+cp env.example .env
+# Edit .env with your DATABASE_URL, SUPABASE_*, and email settings (optional)
 ```
 
-#### Option 2: Manual Setup (Plain Commands)
-
-1. **Clone and Setup Environment**
-   ```bash
-   git clone https://github.com/balamark/Twogether.git
-   cd Twogether
-   
-   # Copy environment template and configure
-   cp env.example .env
-   # Edit .env with your database credentials and Supabase settings
-   ```
-
-2. **Database Setup (Required)**
-   ```bash
-   # Install SQLx CLI for database migrations
-   cargo install sqlx-cli
-   
-   # Run database migrations
-   cd backend
-   sqlx migrate run --database-url "your-database-url-here"
-   cd ..
-   ```
-
-3. **Backend Server (Rust/Axum)**
-   ```bash
-   # Terminal 1: Start backend server
-   cd backend
-   cargo run
-   # Server runs on http://localhost:8080
-   ```
-
-4. **Frontend Server (React/Vite)**
-   ```bash
-   # Terminal 2: Start frontend server
-   cd frontend
-   npm install
-   npm run dev
-   # Frontend runs on http://localhost:5174
-   ```
-
-5. **Environment Variables**
-   
-   Make sure your `.env` file contains:
-   ```env
-   # Database (Supabase PostgreSQL)
-   DATABASE_URL=postgresql://postgres:password@localhost:5432/twogether
-   
-   # JWT Secret
-   JWT_SECRET=your-secret-key-change-in-production
-   
-   # Supabase Configuration
-   SUPABASE_URL=https://your-project.supabase.co
-   SUPABASE_ANON_KEY=your-anon-key
-   SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-   
-   # CORS
-   CORS_ORIGIN=http://localhost:5174
-   
-   # Frontend API URL
-   VITE_API_BASE_URL=http://localhost:8080/api
-   ```
-
-#### Option 3: Docker Development
+2) Database migrations
 ```bash
-# Start both services with Docker Compose
-docker-compose up --build
+cd backend
+# Ensure DATABASE_URL is set; either export or rely on .env
+export DATABASE_URL='postgresql://user:password@localhost:5432/twogether'   # if not set in .env
+sqlx migrate run
+```
 
-# Frontend: http://localhost:5174
+3) SQLx offline metadata (required when queries change)
+```bash
+# With DATABASE_URL set, generate/refresh .sqlx metadata for offline compile-time checks
+cargo sqlx prepare
+```
+
+4) Start backend (Terminal 1)
+```bash
+cd backend
+cargo run
 # Backend API: http://localhost:8080
 ```
 
-#### Testing
+5) Start frontend (Terminal 2)
 ```bash
-# Backend tests
-cd backend
-cargo test
-
-# Frontend E2E tests with Playwright
 cd frontend
-npm run test:e2e          # Run tests headless
-npm run test:e2e:ui       # Run with interactive UI
-npm run test:e2e:headed   # Run with browser visible
-npm run test:e2e:debug    # Debug mode with step-by-step
+npm install
+npm run dev
+# Frontend: http://localhost:5174
+```
+
+6) Health check
+```bash
+curl http://localhost:8080/health
+```
+
+### Manual Setup (Alternative)
+
+1. **Clone and Setup Environment**
+```bash
+git clone https://github.com/balamark/Twogether.git
+cd Twogether
+cp env.example .env
+```
+
+2. **Database Setup**
+```bash
+cargo install sqlx-cli
+cd backend
+sqlx migrate run
+cargo sqlx prepare
+cd ..
+```
+
+3. **Backend Server (Rust/Axum)**
+```bash
+cd backend
+cargo run
+```
+
+4. **Frontend Server (React/Vite)**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### E2E Smoke Test Checklist
+- 註冊兩個帳號 → 登入 A
+- 透過 `配對碼` 或 email 完成配對 → 登入 B 確認
+- 在 A 端發送「親密邀請」→ B 端通知中心可看到
+- B 端輸入自訂回覆並「接受」→ A 端收到通知、可見回覆文字
+
+## Docker Compose (Optional)
+
+A simple `docker-compose.yml` is provided to run backend and the Vite dev server in containers.
+
+```bash
+# From repo root
+export DATABASE_URL='postgresql://user:password@host:5432/db'
+export SUPABASE_URL=... SUPABASE_ANON_KEY=... SUPABASE_SERVICE_ROLE_KEY=...
+export VITE_API_BASE_URL='http://localhost:8080/api'
+export CORS_ORIGIN='http://localhost:5174'
+docker compose up --build
+```
+
+- Backend: `http://localhost:8080`
+- Frontend: `http://localhost:5174`
+
+Notes:
+- Backend Dockerfile uses SQLx offline mode (`SQLX_OFFLINE=true`). If you change queries, re-run `cargo sqlx prepare` locally and commit the updated `.sqlx` directory so compose builds keep working.
+- Ensure volumes and ports in compose suit your environment.
+
+## Dev Scripts (Optional)
+
+- `./start-dev.sh`
+  - Loads `.env`, runs migrations, and starts backend.
+  - Flags: `--log-file [path]` to enable file logging via backend CLI.
+
+- `./scripts/dev-start.sh`
+  - Starts backend and/or frontend.
+  - Usage:
+    ```bash
+    ./scripts/dev-start.sh backend   # start backend only
+    ./scripts/dev-start.sh frontend  # start frontend only
+    ./scripts/dev-start.sh           # start both (runs concurrently)
+    ```
+
+These scripts are optional sugar; plain commands above are sufficient.
+
+## CORS Configuration
+
+- Backend reads `CORS_ORIGIN` from environment (defaults to `http://localhost:5174`).
+- We do not load a separate `.env.cors` file; put your CORS settings in `.env` (or export in your shell) under `CORS_ORIGIN`.
+- Common local error (5173 vs 5174): if your frontend runs on 5174 but backend allows 5173, update backend env and restart:
+```bash
+# In repo root or before starting backend
+export CORS_ORIGIN=http://localhost:5174
+cd backend && cargo run
+```
+- For Docker Compose:
+```bash
+export CORS_ORIGIN=http://localhost:5174
+docker compose up --build
 ```
 
 ## Deployment
@@ -192,19 +232,48 @@ gcloud run deploy twogether-backend \
 
 ### Backend (.env)
 ```env
+# Database (required)
 DATABASE_URL=postgresql://user:password@localhost/twogether
+
+# Supabase (required for storage features)
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
 SUPABASE_SERVICE_ROLE_KEY=your-service-key
+
+# JWT
 JWT_SECRET=your-jwt-secret
+
+# CORS / Server
+CORS_ORIGIN=http://localhost:5174
+PORT=8080
+
+# Email (optional, for request/response notifications)
+RESEND_API_KEY=your-resend-api-key
+EMAIL_FROM=Twogether <no-reply@example.com>
+
+# SMTP (optional alternative to Resend)
+# Use your mailbox via SMTP (e.g., Gmail with App Password)
+# SMTP_HOST=smtp.gmail.com
+# SMTP_PORT=587
+# SMTP_USER=your.email@gmail.com
+# SMTP_PASS=your-app-password
 ```
 
-### Frontend (.env)
+### Frontend (Vite)
 ```env
-VITE_API_URL=http://localhost:8080
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key
+# Defaults to http://localhost:8080/api if not set
+VITE_API_BASE_URL=http://localhost:8080/api
 ```
+
+## SQLx Offline Mode (Rust)
+- 本專案啟用 SQLx 編譯期驗證（`sqlx-macros`）並使用離線模式（`.sqlx` 目錄）。
+- 當你「新增/修改」查詢或資料庫結構後，請執行：
+```bash
+cd backend
+export DATABASE_URL='postgresql://user:password@localhost:5432/twogether'  # 若 .env 未提供
+cargo sqlx prepare
+```
+- `cargo build` 之後即會使用離線元資料進行型別與語法驗證，無需連線資料庫。
 
 ## API Endpoints
 

@@ -28,6 +28,7 @@ use crate::{
     middleware::{auth, logging},
     routes::{auth_routes, couple_routes, love_moment_routes, achievement_routes, photo_routes, coin_routes, stats_routes, intimacy_request_routes},
     services::supabase::SupabaseStorage,
+    services::email::EmailClient,
 };
 
 // Global guard to keep the file logging alive
@@ -51,6 +52,7 @@ pub struct AppState {
     pub db: Arc<Database>,
     pub config: Arc<Config>,
     pub supabase_storage: Arc<SupabaseStorage>,
+    pub email_client: Arc<EmailClient>,
 }
 
 #[tokio::main]
@@ -131,8 +133,11 @@ async fn main() -> Result<(), AppError> {
 
     // Load configuration
     dotenvy::dotenv().ok();
+    // Fallback: also try loading ../.env (repo root) when running from backend/
+    let _ = dotenvy::from_path("../.env");
     let config = Config::from_env()?;
-    tracing::debug!("Loaded configuration: {:?}", config);
+    // Pretty-print the full configuration at debug level
+    tracing::debug!("Loaded configuration (full): {:#?}", config);
 
     // Initialize database with retry logic
     let db = match Database::new(&config.database_url).await {
@@ -162,11 +167,27 @@ async fn main() -> Result<(), AppError> {
     );
     tracing::info!("Supabase storage initialized");
 
+    // Initialize Email client (SMTP first, fallback to Resend)
+    let email_client = if let (Some(host), Some(user), Some(pass)) = (
+        config.smtp_host.clone(),
+        config.smtp_user.clone(),
+        config.smtp_pass.clone(),
+    ) {
+        let port = config.smtp_port.unwrap_or(587);
+        let secure = crate::services::email::SmtpSecurity::from_env(config.smtp_secure.clone());
+        tracing::info!("Email client: using SMTP transport ({}:{})", host, port);
+        EmailClient::new_smtp(host, port, user, pass, secure, config.email_from.clone())
+    } else {
+        tracing::info!("Email client: using Resend API");
+        EmailClient::new_resend(config.resend_api_key.clone(), config.email_from.clone())
+    };
+
     // Create app state
     let state = AppState {
         config: Arc::new(config.clone()),
         db: Arc::new(db),
         supabase_storage: Arc::new(supabase_storage),
+        email_client: Arc::new(email_client),
     };
 
     // Configure CORS

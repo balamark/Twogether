@@ -198,7 +198,13 @@ jobs:
             --set-env-vars "MAX_FILE_SIZE=10485760" \
             --set-env-vars "CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}" \
             --set-env-vars "HOST=0.0.0.0" \
-            --set-env-vars "ENVIRONMENT=production"
+            --set-env-vars "ENVIRONMENT=production" \
+            --set-env-vars "SMTP_HOST=${{ secrets.SMTP_HOST }}" \
+            --set-env-vars "SMTP_PORT=${{ secrets.SMTP_PORT }}" \
+            --set-env-vars "SMTP_USER=${{ secrets.SMTP_USER }}" \
+            --set-env-vars "SMTP_PASS=${{ secrets.SMTP_PASS }}" \
+            --set-env-vars "EMAIL_FROM=${{ secrets.EMAIL_FROM }}" \
+            --set-env-vars "SMTP_SECURE=starttls|tls|none"
 
       - name: Apply startup CPU boost annotation
         run: |
