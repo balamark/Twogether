@@ -167,7 +167,6 @@ jobs:
             --min-instances 1 \
             --max-instances 5 \
             --timeout 300 \
-            --set-annotations "run.googleapis.com/startup-cpu-boost=true" \
             --set-env-vars "DATABASE_URL=${{ secrets.DATABASE_URL }}" \
             --set-env-vars "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" \
             --set-env-vars "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" \
@@ -177,6 +176,12 @@ jobs:
             --set-env-vars "CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}" \
             --set-env-vars "HOST=0.0.0.0" \
             --set-env-vars "ENVIRONMENT=production"
+
+      - name: Apply startup CPU boost annotation
+        run: |
+          gcloud run services update ${{ env.BACKEND_SERVICE }} \
+            --region ${{ env.REGION }} \
+            --update-annotations run.googleapis.com/startup-cpu-boost=true
 
   # Frontend Build and Deploy
   deploy-frontend:

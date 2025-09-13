@@ -63,7 +63,6 @@ gcloud run deploy twogether-backend \
     --min-instances=1 \
     --max-instances=5 \
     --timeout=300 \
-    --set-annotations "run.googleapis.com/startup-cpu-boost=true" \
     --set-env-vars="DATABASE_URL=$DATABASE_URL" \
     --set-env-vars="SUPABASE_URL=$SUPABASE_URL" \
     --set-env-vars="SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" \
@@ -71,6 +70,10 @@ gcloud run deploy twogether-backend \
     --set-env-vars="JWT_SECRET=$JWT_SECRET" \
     --set-env-vars="ENVIRONMENT=production" \
     --set-env-vars="CORS_ORIGIN=$CORS_ORIGIN" 
+
+gcloud run services update twogether-backend \
+    --region us-central1 \
+    --update-annotations run.googleapis.com/startup-cpu-boost=true
 
 # Build frontend
 echo -e "${GREEN}📦 Building frontend...${NC}"
