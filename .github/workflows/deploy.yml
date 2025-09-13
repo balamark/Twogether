@@ -12,9 +12,32 @@ env:
   FRONTEND_BUCKET: ${{ secrets.GCP_FRONTEND_BUCKET }}
   BACKEND_SERVICE: twogether-backend
 
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  # Test Job - Run both backend and frontend tests
-  test:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/deploy.yml'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/deploy.yml'
+
+  test-backend:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -30,32 +53,27 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # Backend Tests
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - name: Restore SQLx metadata cache
+        uses: actions/cache@v4
+        with:
+          path: backend/.sqlx
+          key: sqlx-${{ hashFiles('backend/migrations/**/*.sql', 'backend/Cargo.lock') }}
       - name: Install SQLx CLI
         run: cargo install sqlx-cli --no-default-features --features postgres
-
-      - name: Setup test database
+      - name: Setup test database (only if .sqlx missing)
+        if: ${{ !hashFiles('backend/.sqlx/*') }}
         working-directory: ./backend
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/twogether_test
         run: |
           sqlx database create
           sqlx migrate run
-
-      - name: Generate SQLx metadata
-        working-directory: ./backend
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/twogether_test
-        run: |
-          mkdir -p .sqlx
           cargo sqlx prepare
-
       - name: Run backend tests
         working-directory: ./backend
         env:
@@ -66,31 +84,26 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: test-service-key
         run: cargo test
 
-      # Frontend Tests
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
+  test-frontend:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.47.0-jammy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node from container
+        run: node -v && npm -v
       - name: Install frontend dependencies
         working-directory: ./frontend
         run: npm ci
-
-      - name: Install Playwright Browsers
-        working-directory: ./frontend
-        run: npx playwright install --with-deps
-
       - name: Run Playwright tests
         working-directory: ./frontend
         env:
           CI: true
         run: npm run test:e2e
-
       - name: Upload Playwright Report
-        uses: actions/upload-artifact@v4
         if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: frontend/playwright-report/
@@ -98,47 +111,50 @@ jobs:
 
   # Backend Preparation
   prepare-backend:
-    needs: [test]
+    needs: [test-backend, test-frontend]
     runs-on: ubuntu-latest
     outputs:
       image_tag: ${{ github.sha }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install SQLx CLI
-        run: cargo install sqlx-cli --no-default-features --features postgres
-
-      - name: Generate SQLx metadata
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - name: Restore SQLx metadata cache
+        uses: actions/cache@v4
+        with:
+          path: backend/.sqlx
+          key: sqlx-${{ hashFiles('backend/migrations/**/*.sql', 'backend/Cargo.lock') }}
+      - name: Generate SQLx metadata (only if cache miss)
+        if: ${{ !hashFiles('backend/.sqlx/*') }}
         working-directory: ./backend
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
           mkdir -p .sqlx
+          cargo install sqlx-cli --no-default-features --features postgres
           cargo sqlx prepare
-          ls -la .sqlx/
-
+      - uses: docker/setup-buildx-action@v3
       - name: Google Auth
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
-
       - name: Setup Google Cloud CLI
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
-
-      - name: Configure Docker for GCP
-        run: gcloud auth configure-docker
-
-      - name: Build and push Docker image
-        run: |
-          docker build -t gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }} -f ./backend/Dockerfile . \
-            --build-arg SQLX_OFFLINE=true
-          docker push gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }}
+      - name: Build and push Docker image (cached)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./backend/Dockerfile
+          build-args: |
+            SQLX_OFFLINE=true
+          push: true
+          tags: gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   # Backend Deploy
   deploy-backend:
@@ -184,48 +200,59 @@ jobs:
             --update-annotations run.googleapis.com/startup-cpu-boost=true
 
   # Frontend Build and Deploy
-  deploy-frontend:
+  build-frontend:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
-    needs: [deploy-backend]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
-
-      - name: Install frontend dependencies
-        working-directory: ./frontend
-        run: npm ci
-
       - name: Google Auth
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
-
       - name: Setup Google Cloud CLI
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
-
       - name: Get Backend Service URL
-        id: get_service_url # Give this step an ID to reference its outputs
+        id: get_service_url
         run: |
           SERVICE_URL=$(gcloud run services describe ${{ env.BACKEND_SERVICE }} --region=${{ env.REGION }} --format="value(status.url)")
           echo "backend_url=$SERVICE_URL" >> $GITHUB_OUTPUT
-          echo "Fetched Backend URL: $SERVICE_URL"
-
       - name: Build frontend with API URL
         working-directory: ./frontend
         run: |
           FULL_API_BASE_URL="${{ steps.get_service_url.outputs.backend_url }}/api"
-          echo "Building frontend with VITE_API_BASE_URL=$FULL_API_BASE_URL"
           VITE_API_BASE_URL="$FULL_API_BASE_URL" npm run build
+      - name: Upload built frontend
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
 
+  deploy-frontend:
+    needs: [deploy-backend, build-frontend]
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Google Auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+      - name: Setup Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+      - name: Download built frontend
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
       - name: Deploy frontend to Cloud Storage
         run: |
           gsutil -m rsync -d -r frontend/dist gs://${{ env.FRONTEND_BUCKET }}
