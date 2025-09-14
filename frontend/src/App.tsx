@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Heart, Calendar, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Upload, Play, Coins, Plus, X, User, ShoppingBag } from 'lucide-react';
+import { Heart, Calendar, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Upload, Play, Coins, Plus, X, User, ShoppingBag, Inbox } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import RoleplayView from './components/RoleplayView';
 import { AchievementsView } from './components/AchievementsView';
 import Header from './components/Header';
 import { NotificationContainer } from './components/ErrorNotification';
+import IntimacyRequestsHistory from './components/IntimacyRequestsHistory';
 import IntimacyRequestForm from './components/IntimacyRequestForm';
 import NotificationInbox from './components/NotificationInbox';
 import { apiService } from './services/api';
@@ -36,6 +37,7 @@ interface JourneyMilestone {
   date: string;
   title: string;
   description: string;
+  place?: string;
   count?: number;
   recordId?: number;
   isCustom?: boolean;
@@ -104,7 +106,7 @@ const defaultRoleplayScripts = [
     title: '初次相遇',
     category: 'romantic' as const,
     scenario: '在咖啡廳偶然相遇的陌生人',
-    image: '/images/roleplay/first-meeting.jpg',
+    image: '/images/roleplay/coffee shop.png',
     script: `[partner1]: 不好意思，這個位子有人坐嗎？
 [partner2]: 沒有，請坐。你看起來很面熟，我們是不是在哪裡見過？
 [partner1]: 我也有這種感覺，也許是命運的安排。我叫[partner1]，你呢？
@@ -118,7 +120,7 @@ const defaultRoleplayScripts = [
     title: '辦公室秘密',
     category: 'adventurous' as const,
     scenario: '下班後的辦公室，只剩下你們兩個',
-    image: '/images/roleplay/office-romance.jpg',
+    image: '/images/roleplay/office.png',
     script: `[partner1]: 終於只剩我們兩個了，今天加班真累。
 [partner2]: 是啊，不過和你一起加班感覺還不錯。
 [partner1]: 我一直想找機會和你單獨聊聊...關於我們。
@@ -133,7 +135,7 @@ const defaultRoleplayScripts = [
     title: '禁忌誘惑',
     category: 'adventurous' as const,
     scenario: '朋友的聚會上，兩個不該在一起的人',
-    image: '/images/roleplay/forbidden-temptation.jpg',
+    image: '/images/roleplay/party.png',
     script: `[partner1]: 我們不應該在這裡...
 [partner2]: 我知道，但我忍不住。每次看到你，我就...
 [partner1]: 別人會看到的。我們是朋友的...
@@ -230,7 +232,7 @@ const LoveTimeApp = () => {
       id: 'first_date',
       type: 'first_date', 
       date: '2024-01-15',
-      title: '第一次約會',
+      title: '開始交往',
       description: '緊張又興奮的第一次約會，從此心中只有彼此'
     },
     {
@@ -238,14 +240,16 @@ const LoveTimeApp = () => {
       type: 'first_kiss',
       date: '2024-01-20',
       title: '初吻',
-      description: '那個讓時間停止的美好瞬間'
+      description: '那個讓時間停止的美好瞬間',
+      place: ''
     },
     {
       id: 'first_sex',
       type: 'first_sex',
-      date: '2024-02-14',
-      title: '第一次親密',
-      description: '愛情昇華的神聖時刻'
+      date: '',
+      title: '第一次親密場所',
+      description: '愛情昇華的神聖時刻',
+      place: ''
     }
   ]);
 
@@ -512,13 +516,11 @@ const LoveTimeApp = () => {
   // Load saved data on component mount - only once
   useEffect(() => {
     const loadInitialData = () => {
-      // Load localStorage data first (doesn't require authentication)
-      const savedMilestones = JSON.parse(localStorage.getItem('journeyMilestones') || '[]');
+      // Load localStorage for non-critical UI only
       const savedAuth = JSON.parse(localStorage.getItem('authState') || '{}');
       const savedCustomGifts = JSON.parse(localStorage.getItem('customGifts') || '[]');
       const savedCustomScripts = JSON.parse(localStorage.getItem('customScripts') || '[]');
       
-      setJourneyMilestones(savedMilestones);
       setCustomGifts(savedCustomGifts);
       setCustomScripts(savedCustomScripts);
       
@@ -559,13 +561,20 @@ const LoveTimeApp = () => {
           // Keep empty array if API fails
         }
 
-        // Load couple information to get partner details
+        // Load couple information to get partner details and journey fields
         try {
           const coupleInfo = await apiService.getCouple();
           if (coupleInfo && authState.user) {
             const partnerNickname = coupleInfo.user1Nickname !== authState.user.nickname 
               ? coupleInfo.user1Nickname 
               : coupleInfo.user2Nickname;
+
+            // Ensure partner1 is the logged-in user's nickname
+            if (coupleInfo.user2Nickname === authState.user.nickname && coupleInfo.user1Nickname) {
+              setNicknames({ partner1: coupleInfo.user2Nickname, partner2: coupleInfo.user1Nickname });
+            } else if (coupleInfo.user1Nickname && coupleInfo.user2Nickname) {
+              setNicknames({ partner1: coupleInfo.user1Nickname, partner2: coupleInfo.user2Nickname });
+            }
             
             const updatedAuthState = {
               ...authState,
@@ -580,15 +589,17 @@ const LoveTimeApp = () => {
             setAuthState(updatedAuthState);
             localStorage.setItem('authState', JSON.stringify(updatedAuthState));
             
-            // Update nicknames if both partners exist
-            if (coupleInfo.user1Nickname && coupleInfo.user2Nickname) {
-              const coupleNicknames = {
-                partner1: coupleInfo.user1Nickname,
-                partner2: coupleInfo.user2Nickname
+            // Persist nickname alignment to backend
+            try {
+              const current = {
+                partner1: authState.user.nickname,
+                partner2: partnerNickname || '',
               };
-              setNicknames(coupleNicknames);
-              await apiService.updateNicknames(coupleNicknames);
-            }
+              await apiService.updateNicknames(current);
+            } catch {}
+
+            // Merge journey fields from backend where available
+            // Note: backend CoupleResponse currently includes only basic fields; journey is saved via dedicated endpoint
           }
         } catch (coupleError) {
           console.log('No couple found or error fetching couple info:', coupleError);
@@ -636,9 +647,7 @@ const LoveTimeApp = () => {
     localStorage.setItem('nicknames', JSON.stringify(nicknames));
   }, [nicknames, authState.isAuthenticated]);
 
-  useEffect(() => {
-    localStorage.setItem('journeyMilestones', JSON.stringify(journeyMilestones));
-  }, [journeyMilestones]);
+  // Stop persisting milestones to localStorage; backend is source of truth
 
   useEffect(() => {
     localStorage.setItem('totalCoins', totalCoins.toString());
@@ -1143,7 +1152,7 @@ const LoveTimeApp = () => {
       title: '初次相遇',
       category: 'romantic',
       scenario: '重現你們第一次見面的場景，但這次更加大膽',
-      image: '/images/roleplay/first-meeting.jpg', // Add instruction in README for updating images
+      image: '/images/roleplay/coffee shop.png', // Updated asset
       script: `${nicknames.partner1}: "不好意思，請問這個位置有人坐嗎？"
 
 ${nicknames.partner2}: "沒有，請坐。你看起來很面熟呢..."
@@ -1176,7 +1185,7 @@ ${nicknames.partner2}: "我已經迫不及待想要感受你的溫度了..."`
       title: '辦公室秘密',
       category: 'adventurous',
       scenario: '同事間的禁忌戀情，充滿刺激與激情',
-      image: '/images/roleplay/office-romance.jpg',
+      image: '/images/roleplay/office.png',
       script: `${nicknames.partner1}: "會議結束後，到我辦公室來一下，我們需要討論那個... 特殊項目。"
 
 ${nicknames.partner2}: "又是那個項目？我們已經討論過很多次了... 難道還有什麼需要深入探討的？"
@@ -1209,7 +1218,7 @@ ${nicknames.partner2}: "那我們最好準備一個很好的藉口，因為我�
       title: '禁忌誘惑',
       category: 'adventurous',
       scenario: '陌生人間的危險吸引力，充滿神秘與慾望',
-      image: '/images/roleplay/forbidden-temptation.jpg',
+      image: '/images/roleplay/party.png',
       script: `${nicknames.partner1}: "我注意你很久了。你知道自己有多吸引人嗎？"
 
 ${nicknames.partner2}: "我們甚至不認識彼此... 這樣不太合適吧？"
@@ -2690,9 +2699,13 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
 
   // Our Journey View
   const OurJourneyView = () => {
-    const sortedMilestones = [...journeyMilestones].sort((a, b) => 
-      new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
+    const sortedMilestones = [...journeyMilestones]
+      .filter(m => m.date || m.place)
+      .sort((a, b) => {
+        const da = a.date ? new Date(a.date).getTime() : 0;
+        const db = b.date ? new Date(b.date).getTime() : 0;
+        return da - db;
+      });
 
     const handleMilestoneClick = (milestone: JourneyMilestone) => {
       if (milestone.recordId) {
@@ -2744,7 +2757,12 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
                     <div className="flex items-start justify-between mb-2">
                       <div>
                         <h3 className="text-lg font-bold text-gray-800">{milestone.title}</h3>
-                        <p className="text-sm text-gray-500">{milestone.date}</p>
+                        <p className="text-sm text-gray-500">
+                          {milestone.date || (milestone.place ? '—' : '')}
+                        </p>
+                        {milestone.place && (
+                          <p className="text-sm text-gray-500">地點：{milestone.place}</p>
+                        )}
                       </div>
                       {milestone.count && (
                         <span className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium">
@@ -2815,6 +2833,7 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
     { id: 'conflict', label: '和諧相處', icon: MessageCircle },
     { id: 'roleplay', label: '角色扮演', icon: Play },
     { id: 'journey', label: '愛情旅程', icon: Trophy },
+    { id: 'intimacy-history', label: '邀請紀錄', icon: Inbox },
     { id: 'settings', label: '設定', icon: Heart }
   ];
 
@@ -2878,6 +2897,7 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
         onAuthStateUpdate={setAuthState}
         showNotification={showNotification}
       />;
+      case 'intimacy-history': return <IntimacyRequestsHistory authState={authState} />;
       default: return <ForeplayView />;
     }
   };

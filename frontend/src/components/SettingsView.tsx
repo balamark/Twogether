@@ -13,6 +13,7 @@ interface JourneyMilestone {
   date: string;
   title: string;
   description: string;
+  place?: string;
   count?: number;
   recordId?: number;
   isCustom?: boolean;
@@ -81,6 +82,59 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const [pairingCode, setPairingCode] = useState('');
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  const handleSaveSettings = async () => {
+    try {
+      setIsSavingSettings(true);
+      await apiService.updateNicknames({
+        partner1: nicknames.partner1,
+        partner2: nicknames.partner2,
+      });
+      // Persist couple journey to backend
+      const meeting = journeyMilestones.find(m => m.type === 'meeting');
+      const firstDate = journeyMilestones.find(m => m.type === 'first_date');
+      const firstKiss = journeyMilestones.find(m => m.type === 'first_kiss');
+      const firstSex = journeyMilestones.find(m => m.type === 'first_sex');
+      await apiService.updateCoupleJourney({
+        anniversary_date: meeting?.date || undefined,
+        first_date: firstDate?.date || undefined,
+        first_kiss_date: firstKiss?.date || undefined,
+        first_kiss_place: (firstKiss as any)?.place || undefined,
+        first_intimacy_place: (firstSex as any)?.place || undefined,
+      });
+      // Update auth state and local storage so Header/profile and couple status reflect immediately
+      if (authState.user && onAuthStateUpdate) {
+        const updatedAuthState = {
+          ...authState,
+          user: {
+            ...authState.user,
+            nickname: nicknames.partner1,
+            partnerNickname: nicknames.partner2,
+          },
+        };
+        onAuthStateUpdate(updatedAuthState);
+        localStorage.setItem('authState', JSON.stringify(updatedAuthState));
+        localStorage.setItem('authUser', JSON.stringify(updatedAuthState.user));
+      }
+      // No longer rely on localStorage for milestones
+      showNotification({
+        type: 'success',
+        title: '已保存設定',
+        message: '暱稱與愛情里程碑已更新',
+        duration: 5000,
+      });
+    } catch (err) {
+      showNotification({
+        type: 'error',
+        title: '保存失敗',
+        message: (err as Error)?.message || '無法保存暱稱，請稍後重試',
+        duration: 6000,
+      });
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   const handleGenerateCode = async () => {
     try {
@@ -220,15 +274,28 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   return (
     <div className="space-y-6">
       <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-6 rounded-2xl">
-        <h2 className="text-2xl font-bold mb-2">設定</h2>
-        <p className="text-indigo-100">個人化你們的愛情應用</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold mb-1">設定</h2>
+            <p className="text-indigo-100">個人化你們的愛情應用</p>
+          </div>
+          <button
+            onClick={handleSaveSettings}
+            disabled={isSavingSettings}
+            className={`inline-flex items-center px-4 py-2 rounded-lg text-white transition-colors ${
+              isSavingSettings ? 'bg-white/30 cursor-not-allowed' : 'bg-white/20 hover:bg-white/30'
+            }`}
+          >
+            {isSavingSettings ? '保存中…' : '保存設定'}
+          </button>
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl shadow-lg p-6">
         <h3 className="text-lg font-bold text-gray-800 mb-4">暱稱設定</h3>
         <div className="space-y-4">
           <div>
-            <label htmlFor="partner1-name" className="block text-sm font-medium text-gray-700 mb-2">伴侶一的暱稱</label>
+            <label htmlFor="partner1-name" className="block text-sm font-medium text-gray-700 mb-2">你的暱稱</label>
             <input
               id="partner1-name"
               name="partner1-name"
@@ -242,7 +309,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             />
           </div>
           <div>
-            <label htmlFor="partner2-name" className="block text-sm font-medium text-gray-700 mb-2">伴侶二的暱稱</label>
+            <label htmlFor="partner2-name" className="block text-sm font-medium text-gray-700 mb-2">伴侶的暱稱</label>
             <input
               id="partner2-name"
               name="partner2-name"
@@ -255,6 +322,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
             />
           </div>
+          {/* Global save button moved to header */}
         </div>
       </div>
 
@@ -278,7 +346,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             />
           </div>
           <div>
-            <label htmlFor="first-date" className="block text-sm font-medium text-gray-700 mb-2">第一次約會日期</label>
+            <label htmlFor="first-date" className="block text-sm font-medium text-gray-700 mb-2">開始交往的日期</label>
             <input
               id="first-date"
               name="first-date"
@@ -306,17 +374,34 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               }}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
             />
+            <div className="mt-3">
+              <label htmlFor="first-kiss-place" className="block text-sm font-medium text-gray-700 mb-2">印象深刻的親吻事件地點</label>
+              <input
+                id="first-kiss-place"
+                name="first-kiss-place"
+                type="text"
+                placeholder="例如：象山步道、校園操場…"
+                value={journeyMilestones.find(m => m.type === 'first_kiss')?.place || ''}
+                onChange={(e) => {
+                  setJourneyMilestones(prev => prev.map(m => 
+                    m.type === 'first_kiss' ? {...m, place: e.target.value} : m
+                  ));
+                }}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+              />
+            </div>
           </div>
           <div>
-            <label htmlFor="first-intimacy" className="block text-sm font-medium text-gray-700 mb-2">第一次親密日期</label>
+            <label htmlFor="first-intimacy-place" className="block text-sm font-medium text-gray-700 mb-2">第一次親密場所</label>
             <input
-              id="first-intimacy"
-              name="first-intimacy"
-              type="date"
-              value={journeyMilestones.find(m => m.type === 'first_sex')?.date || ''}
+              id="first-intimacy-place"
+              name="first-intimacy-place"
+              type="text"
+              placeholder="例如：某飯店、家裡、露營車…"
+              value={journeyMilestones.find(m => m.type === 'first_sex')?.place || ''}
               onChange={(e) => {
                 setJourneyMilestones(prev => prev.map(m => 
-                  m.type === 'first_sex' ? {...m, date: e.target.value} : m
+                  m.type === 'first_sex' ? {...m, place: e.target.value} : m
                 ));
               }}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"

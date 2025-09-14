@@ -38,22 +38,24 @@ interface AchievementStats {
 
 interface IntimacyStats {
   total_moments: number;
-  total_days: number;
-  total_months: number;
   average_per_month: number;
   average_per_week: number;
-  longest_streak: number;
-  current_streak: number;
-  total_coins_earned: number;
-  total_coins_spent: number;
-  current_balance: number;
+  current_streak?: number;
+  longest_streak?: number;
+  monthly_data?: { month: string; count: number }[];
+  // Legacy/extra fields (optional)
+  total_days?: number;
+  total_months?: number;
+  total_coins_earned?: number;
+  total_coins_spent?: number;
+  current_balance?: number;
   favorite_activity?: string;
   most_active_month?: string;
   most_active_day?: string;
   first_record_date?: string;
   last_record_date?: string;
-  total_duration_hours: number;
-  average_duration_minutes: number;
+  total_duration_hours?: number;
+  average_duration_minutes?: number;
 }
 
 export function AchievementsView() {
@@ -97,6 +99,43 @@ export function AchievementsView() {
       setLoading(false);
     }
   };
+
+  // Build monthly series from records for a small bar chart (12 months)
+  const monthlySeries = useMemo(() => {
+    const counts = new Array(12).fill(0);
+    if (stats?.monthly_data && stats.monthly_data.length > 0) {
+      stats.monthly_data.forEach((m) => {
+        const normalized = m.month.replace('/', '-');
+        const parts = normalized.split('-');
+        const mm = parts.length === 2 ? parts[1] : parts[parts.length - 1];
+        const monthIdx = Number(mm) - 1;
+        if (!Number.isNaN(monthIdx) && monthIdx >= 0 && monthIdx < 12) {
+          counts[monthIdx] = m.count;
+        }
+      });
+    }
+    return counts;
+  }, [stats]);
+
+  // Daily distributions for current and previous month
+  const { currentMonthSeries, previousMonthSeries, currentMonthDays, previousMonthDays } = useMemo(() => {
+    const now = new Date();
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const daysInCurrent = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const daysInPrev = new Date(prev.getFullYear(), prev.getMonth() + 1, 0).getDate();
+    const cur = new Array(daysInCurrent).fill(0);
+    const pre = new Array(daysInPrev).fill(0);
+    records.forEach((r) => {
+      const d = new Date(r.date);
+      if (Number.isNaN(d.getTime())) return;
+      if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) {
+        cur[(d.getDate() - 1)] += 1;
+      } else if (d.getFullYear() === prev.getFullYear() && d.getMonth() === prev.getMonth()) {
+        pre[(d.getDate() - 1)] += 1;
+      }
+    });
+    return { currentMonthSeries: cur, previousMonthSeries: pre, currentMonthDays: daysInCurrent, previousMonthDays: daysInPrev };
+  }, [records]);
 
   // Badge logic
   const badges = useMemo(() => {
@@ -143,7 +182,7 @@ export function AchievementsView() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-6xl mx-auto p-4 sm:p-6">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-800 mb-2">親密統計</h1>
         <p className="text-gray-600">查看你們的親密統計與成就徽章</p>
@@ -152,31 +191,13 @@ export function AchievementsView() {
       {/* Intimacy Stats Section */}
       {stats && (
         <div className="space-y-6 mb-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
             <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
               <div className="flex items-center">
                 <span className="text-2xl mr-3">💗</span>
                 <div>
                   <p className="text-sm text-gray-600">總記錄</p>
                   <p className="text-2xl font-bold text-gray-800">{stats.total_moments}</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-              <div className="flex items-center">
-                <span className="text-2xl mr-3">📅</span>
-                <div>
-                  <p className="text-sm text-gray-600">記錄天數</p>
-                  <p className="text-2xl font-bold text-gray-800">{stats.total_days}</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-              <div className="flex items-center">
-                <span className="text-2xl mr-3">💰</span>
-                <div>
-                  <p className="text-sm text-gray-600">金幣餘額</p>
-                  <p className="text-2xl font-bold text-gray-800">{stats.current_balance}</p>
                 </div>
               </div>
             </div>
@@ -191,15 +212,31 @@ export function AchievementsView() {
             </div>
           </div>
           {/* Weekly/Monthly Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <div className="bg-pink-50 rounded-lg p-4 border border-pink-200 text-center">
               <div className="text-lg font-bold text-pink-600">本週次數</div>
-              <div className="text-2xl font-bold">{(stats.average_per_week || 0).toFixed(1)}</div>
+              <div className="text-2xl font-bold">{(stats as any).this_week ?? 0}</div>
             </div>
             <div className="bg-purple-50 rounded-lg p-4 border border-purple-200 text-center">
               <div className="text-lg font-bold text-purple-600">本月次數</div>
-              <div className="text-2xl font-bold">{(stats.average_per_month || 0).toFixed(1)}</div>
+              <div className="text-2xl font-bold">{(stats as any).this_month ?? 0}</div>
             </div>
+          </div>
+
+          {/* Bar Chart: Monthly distribution */}
+          <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">每月記錄分佈</h3>
+            <MonthlyBarChart data={monthlySeries} />
+          </div>
+          {/* Current Month Distribution */}
+          <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">本月記錄分佈</h3>
+            <DailyBarChart data={currentMonthSeries} days={currentMonthDays} />
+          </div>
+          {/* Previous Month Distribution */}
+          <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
+            <h3 className="text-xl font-bold text-gray-800 mb-4">上月記錄分佈</h3>
+            <DailyBarChart data={previousMonthSeries} days={previousMonthDays} />
           </div>
           {/* Badges */}
           <div className="bg-white rounded-2xl shadow-lg p-6">
@@ -403,3 +440,107 @@ export function AchievementsView() {
     </div>
   );
 } 
+
+// Simple responsive bar chart without external deps
+function MonthlyBarChart({ data }: { data: number[] }) {
+  const labels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const max = Math.max(1, ...data);
+  const ticks = 4;
+  const tickValues = Array.from({ length: ticks + 1 }, (_, i) => Math.round((max * i) / ticks));
+
+  return (
+    <div className="w-full">
+      <div className="flex gap-3 h-40 sm:h-48">
+        {/* Y Axis */}
+        <div className="w-8 sm:w-10 flex flex-col justify-between text-[10px] text-gray-400">
+          {tickValues.slice().reverse().map((v, i) => (
+            <div key={i} className="-translate-y-1">{v}</div>
+          ))}
+        </div>
+        {/* Chart Area */}
+        <div className="relative flex-1">
+          {/* Horizontal grid lines */}
+          {tickValues.map((v, i) => (
+            <div
+              key={i}
+              className={`absolute left-0 right-0 border-t ${i === 0 ? 'border-gray-300' : 'border-gray-200/60'}`}
+              style={{ bottom: `${(v / max) * 100}%` }}
+            />
+          ))}
+          <div className="grid grid-cols-12 gap-2 items-end h-full relative">
+            {data.map((value, idx) => {
+              const height = (value / max) * 100;
+              return (
+                <div key={idx} className="group flex flex-col items-center h-full relative">
+                  <div
+                    className="w-full rounded-t bg-gradient-to-t from-pink-500 to-purple-500 transition-transform duration-200 group-hover:scale-y-105"
+                    style={{ height: `${height}%`, minHeight: value > 0 ? '2px' : '0' }}
+                  />
+                  {/* Tooltip */}
+                  <div
+                    className="absolute left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-gray-800 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ bottom: `calc(${height}% + 8px)` }}
+                  >
+                    {labels[idx]}月：{value}
+                  </div>
+                  <div className="mt-2 text-xs text-gray-600">{labels[idx]}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      <div className="mt-2 text-right text-xs text-gray-500">最高 {Math.max(...data)} 次</div>
+    </div>
+  );
+}
+
+function DailyBarChart({ data, days }: { data: number[]; days: number }) {
+  const labels = Array.from({ length: days }, (_, i) => String(i + 1));
+  const max = Math.max(1, ...data);
+  const ticks = 4;
+  const tickValues = Array.from({ length: ticks + 1 }, (_, i) => Math.round((max * i) / ticks));
+  return (
+    <div className="w-full overflow-hidden">
+      <div className="flex gap-3 h-32 sm:h-40">
+        {/* Y Axis */}
+        <div className="w-8 sm:w-10 flex flex-col justify-between text-[10px] text-gray-400">
+          {tickValues.slice().reverse().map((v, i) => (
+            <div key={i} className="-translate-y-1">{v}</div>
+          ))}
+        </div>
+        {/* Chart Area */}
+        <div className="relative flex-1">
+          {tickValues.map((v, i) => (
+            <div
+              key={i}
+              className={`absolute left-0 right-0 border-t ${i === 0 ? 'border-gray-300' : 'border-gray-200/60'}`}
+              style={{ bottom: `${(v / max) * 100}%` }}
+            />
+          ))}
+          <div className="grid items-end h-full" style={{ gridTemplateColumns: `repeat(${days}, minmax(8px, 1fr))` }}>
+            {data.map((value, idx) => {
+              const height = (value / max) * 100;
+              return (
+                <div key={idx} className="group flex flex-col items-center h-full relative">
+                  <div
+                    className="w-full rounded-t bg-gradient-to-t from-indigo-500 to-pink-500 transition-transform duration-200 group-hover:scale-y-105"
+                    style={{ height: `${height}%`, minHeight: value > 0 ? '2px' : '0' }}
+                  />
+                  <div
+                    className="absolute left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-gray-800 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ bottom: `calc(${height}% + 6px)` }}
+                  >
+                    第{labels[idx]}天：{value}
+                  </div>
+                  <div className="mt-1 text-[10px] text-gray-500">{labels[idx]}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      <div className="mt-2 text-right text-xs text-gray-500">最高 {Math.max(...data)} 次</div>
+    </div>
+  );
+}

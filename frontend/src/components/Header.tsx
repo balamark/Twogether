@@ -42,7 +42,7 @@ const Header: React.FC<HeaderProps> = ({
     if (authState.isAuthenticated) {
       fetchUnreadCount();
       // Set up periodic refresh
-      const interval = setInterval(fetchUnreadCount, 30000); // Every 30 seconds
+      const interval = setInterval(fetchUnreadCount, 90000); // Every 90 seconds
       return () => clearInterval(interval);
     }
   }, [authState.isAuthenticated]);

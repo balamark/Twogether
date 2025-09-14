@@ -297,6 +297,50 @@ cargo sqlx prepare
 - `GET /api/stats` - Get user statistics
 - `GET /api/achievements` - Get achievements
 
+
+Rust backend dev cycle for this repo
+Start both services
+Backend: cd backend && cargo run (or ./scripts/dev-start.sh backend)
+Frontend: cd frontend && npm run dev (or ./scripts/dev-start.sh frontend)
+
+When you change backend Rust code
+Yes, the binary must rebuild. If you are running cargo run, it auto-rebuilds on restart. Use a watcher to rebuild on file change so you don’t have to restart manually:
+
+Install cargo-watch: cargo install cargo-watch
+
+Run: cd backend && DATABASE_URL=... cargo watch -x 'run'
+This re-compiles and restarts the server whenever you edit files.
+
+When you change SQL (queries or schema) with SQLx
+Run migrations if schema changed:
+cd backend && sqlx migrate run
+
+Regenerate SQLx offline metadata so compile-time checks pass:
+cd backend && cargo sqlx prepare
+
+Then build/run: cargo run (or your cargo watch session will recompile automatically).
+
+Note: this repo uses SQLx offline mode; remember to commit the updated .sqlx directory after changing queries.
+
+Environment
+Copy .env: cp env.example .env and fill values.
+Backend reads env at startup; if you change env vars, restart the backend process.
+
+Common local vars:
+DATABASE_URL (required)
+CORS_ORIGIN=http://localhost:5174
+Supabase keys if you use storage.
+Typical workflow
+1) Terminal A: cd backend && cargo watch -x 'run'
+2) Terminal B: cd frontend && npm run dev
+3) If you edit queries or run new migrations:
+cd backend && sqlx migrate run && cargo sqlx prepare
+cargo-watch will rebuild and restart the server.
+
+Quick script in repo
+./scripts/dev-start.sh both starts backend and frontend (no watch). Use the cargo-watch approach above for true live-reload on backend code.
+
+
 ## Contributing
 
 1. Fork the repository

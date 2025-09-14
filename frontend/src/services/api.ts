@@ -320,8 +320,25 @@ class ApiService {
     try {
       // Prefer backend couple info for authoritative nicknames
       const couple = await this.getCouple();
-      const partner1 = couple.user1Nickname || '親愛的';
-      const partner2 = couple.user2Nickname || '寶貝';
+      let partner1 = couple.user1Nickname || '親愛的';
+      let partner2 = couple.user2Nickname || '寶貝';
+
+      // Ensure partner1 represents the current user's nickname
+      try {
+        const authUserRaw = localStorage.getItem('authUser');
+        if (authUserRaw) {
+          const authUser = JSON.parse(authUserRaw) as { nickname?: string };
+          const currentUserNickname = authUser?.nickname;
+          if (currentUserNickname) {
+            if (partner2 && partner2 === currentUserNickname) {
+              [partner1, partner2] = [partner2, partner1];
+            }
+          }
+        }
+      } catch {
+        // Ignore parsing errors and use default ordering
+      }
+
       return { partner1, partner2 };
     } catch {
       // Fallback to local if not paired yet or error
@@ -332,11 +349,25 @@ class ApiService {
 
   async updateNicknames(nicknames: { partner1: string; partner2: string }): Promise<void> {
     try {
+      // Only send non-empty, valid fields to satisfy backend validation
+      const payload: { partner1?: string; partner2?: string } = {};
+      const partner1 = nicknames.partner1?.trim();
+      const partner2 = nicknames.partner2?.trim();
+
+      if (partner1 && partner1.length >= 2) {
+        payload.partner1 = partner1;
+      }
+      if (partner2 && partner2.length >= 2) {
+        payload.partner2 = partner2;
+      }
+
+      // If nothing valid to update, skip the request
+      if (Object.keys(payload).length === 0) {
+        return;
+      }
+
       // Send to backend; it will update the caller's own nickname based on couple role
-      await apiClient.put('/couples/nicknames', {
-        partner1: nicknames.partner1,
-        partner2: nicknames.partner2,
-      });
+      await apiClient.put('/couples/nicknames', payload);
     } catch (error) {
       // Persist locally as a fallback so UI reflects change even if offline/unpaired
       console.warn('Backend nickname update failed, falling back to localStorage:', error);
@@ -571,6 +602,17 @@ class ApiService {
       console.error('Failed to create intimacy request:', error);
       throw new Error((error as ApiErrorResponse)?.message || '無法發送親密邀請');
     }
+  }
+
+  // Journey / Couple details
+  async updateCoupleJourney(payload: {
+    anniversary_date?: string;
+    first_date?: string;
+    first_kiss_date?: string;
+    first_kiss_place?: string;
+    first_intimacy_place?: string;
+  }): Promise<void> {
+    await apiClient.put('/couples/journey', payload);
   }
 
   async getIntimacyRequests(status?: string): Promise<IntimacyRequest[]> {

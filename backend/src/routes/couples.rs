@@ -41,12 +41,22 @@ pub struct PairingCodeResponse {
     pub expires_at: chrono::DateTime<Utc>,
 }
 
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateCoupleJourneyRequest {
+    pub anniversary_date: Option<chrono::NaiveDate>,
+    pub first_date: Option<chrono::NaiveDate>,
+    pub first_kiss_date: Option<chrono::NaiveDate>,
+    pub first_kiss_place: Option<String>,
+    pub first_intimacy_place: Option<String>,
+}
+
 pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/", post(create_couple))
         .route("/", get(get_couple))
         .route("/pairing-code", post(generate_pairing_code))
         .route("/nicknames", put(update_nicknames))
+        .route("/journey", put(update_couple_journey))
 }
 
 /// Helper function to get a user's couple ID
@@ -555,5 +565,75 @@ async fn update_nicknames(
         user2_nickname: None,
         created_at: user.created_at.unwrap_or_else(|| Utc::now()),
         pairing_code: None,
+    }))
+}
+
+/// Update couple journey fields (anniversary and milestone places)
+/// PUT /api/couples/journey
+#[axum::debug_handler]
+async fn update_couple_journey(
+    State(state): State<AppState>,
+    claims: Claims,
+    Json(payload): Json<UpdateCoupleJourneyRequest>,
+) -> Result<Json<CoupleResponse>> {
+    let user_id = Uuid::parse_str(&claims.sub)
+        .map_err(|_| AppError::Auth("無效的用戶ID".to_string()))?;
+
+    // Find couple id
+    let couple = sqlx::query!(
+        "SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1",
+        user_id
+    )
+    .fetch_optional(&state.db.pool)
+    .await?;
+
+    let couple_id = match couple { Some(c) => c.id, None => {
+        return Err(AppError::NotFound("找不到情侶檔案".to_string()));
+    } };
+
+    // Update provided fields only
+    sqlx::query!(
+        "UPDATE couples SET 
+            anniversary_date = COALESCE($2, anniversary_date),
+            first_date = COALESCE($3, first_date),
+            first_kiss_date = COALESCE($4, first_kiss_date),
+            first_kiss_place = COALESCE($5, first_kiss_place),
+            first_intimacy_place = COALESCE($6, first_intimacy_place)
+         WHERE id = $1",
+        couple_id,
+        payload.anniversary_date,
+        payload.first_date,
+        payload.first_kiss_date,
+        payload.first_kiss_place,
+        payload.first_intimacy_place
+    )
+    .execute(&state.db.pool)
+    .await?;
+
+    // Return updated couple
+    let couple = sqlx::query!(
+        "SELECT c.id, c.couple_name, c.anniversary_date, c.created_at, \
+                u1.nickname as user1_nickname, u2.nickname as \"user2_nickname?\", \
+                pc.code as \"pairing_code?\" \
+         FROM couples c \
+         JOIN users u1 ON c.user1_id = u1.id \
+         LEFT JOIN users u2 ON c.user2_id = u2.id \
+         LEFT JOIN pairing_codes pc ON c.id = pc.couple_id  \
+            AND pc.used_at IS NULL  \
+            AND pc.expires_at > NOW() \
+         WHERE c.id = $1",
+        couple_id
+    )
+    .fetch_one(&state.db.pool)
+    .await?;
+
+    Ok(Json(CoupleResponse {
+        id: couple.id,
+        couple_name: couple.couple_name,
+        anniversary_date: couple.anniversary_date,
+        user1_nickname: couple.user1_nickname,
+        user2_nickname: couple.user2_nickname,
+        created_at: couple.created_at.unwrap_or_else(|| Utc::now()),
+        pairing_code: couple.pairing_code,
     }))
 }

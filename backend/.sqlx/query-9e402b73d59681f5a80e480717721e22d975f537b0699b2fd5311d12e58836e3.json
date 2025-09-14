@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE couples SET \n            anniversary_date = COALESCE($2, anniversary_date),\n            first_date = COALESCE($3, first_date),\n            first_kiss_date = COALESCE($4, first_kiss_date),\n            first_kiss_place = COALESCE($5, first_kiss_place),\n            first_intimacy_place = COALESCE($6, first_intimacy_place)\n         WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Date",
+        "Date",
+        "Date",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9e402b73d59681f5a80e480717721e22d975f537b0699b2fd5311d12e58836e3"
+}
