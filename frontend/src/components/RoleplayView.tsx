@@ -4,7 +4,7 @@ import { Heart, Sparkles, FileText, Plus, Filter, Play, Camera } from 'lucide-re
 interface RoleplayScript {
   id: string;
   title: string;
-  category: 'romantic' | 'adventurous';
+  category: 'romantic' | 'adventurous' | 'school';
   scenario: string;
   image?: string;
   script: string;
@@ -95,7 +95,8 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           {[
             { id: 'all', label: '全部', icon: '🌟' },
             { id: 'romantic', label: '浪漫', icon: '💕' },
-            { id: 'adventurous', label: '冒險', icon: '🔥' }
+            { id: 'adventurous', label: '冒險', icon: '🔥' },
+            { id: 'school', label: '校園', icon: '🏫' }
           ].map(category => (
             <button
               key={category.id}

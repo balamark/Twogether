@@ -62,7 +62,7 @@ interface CoinActivity {
 interface RoleplayScript {
   id: string;
   title: string;
-  category: 'romantic' | 'adventurous';
+  category: 'romantic' | 'adventurous' | 'school';
   scenario: string;
   image?: string;
   script: string;
@@ -102,11 +102,38 @@ interface AuthState {
 // Default roleplay scripts
 const defaultRoleplayScripts = [
   {
+    id: 'fan-idol-backstage',
+    title: '粉絲與偶像：後台限定應援會',
+    category: 'adventurous' as const,
+    scenario: '演唱會結束後的後台更衣室，粉絲闖入的禁忌應援',
+    image: 'images/roleplay/fan.png',
+    script: `[partner2]（滿臉興奮）：「天啊！是真的你……我居然能進來！」\n[partner1]（輕笑，擦汗）：「你怎麼拿到 backstage pass 的？這裡不是一般人可以來的地方。」\n[partner2]（低頭輕聲）：「我排了一整晚的隊，還偷偷賄賂了工作人員……因為我想告訴你一件事。」\n[partner1]（挑眉）：「你想告白？我每天收幾百封信，什麼都看過。」\n[partner2]（靠近一步）：「可你沒看過，我願意為你做的事。哪怕只是幫你擦汗，幫你按摩腳。」（此時可幫對方擦臉，脫掉外套）\n[partner1]（嘴角上揚）：「你是來當助理的？還是……想當更特別的粉絲？」\n（進入試探與誘惑階段，可選「說出你的幻想」「模仿偶像舞步」等）\n\n後續互動建議：\n- 偶像提出「粉絲任務」：念出應援口號＋親吻手背\n- 以身應援：跪下綁鞋帶，唱出最愛歌詞並用身體表現\n- 播放演唱會音效創造臨場感`,
+    duration: '20-30分鐘'
+  },
+  {
+    id: 'wife-oldclassmate',
+    title: '人妻與老同學：重逢的夜晚',
+    category: 'romantic' as const,
+    scenario: '咖啡廳續攤到飯店房間，氣氛曖昧的重逢',
+    image: 'images/roleplay/coffee shop.png',
+    script: `[partner1]（輕鬆）：「沒想到妳變這麼漂亮。當年還是那個綁馬尾的書呆子。」\n[partner2]（微笑）：「你變得更……自信了。我還記得你以前坐我後面，總是借筆。」\n[partner1]（湊近些）：「我記得的不是筆，是妳背後的香味。」\n[partner2]（低頭）：「別鬧了……我現在可是人妻。」\n[partner1]（低語）：「但我不是你的丈夫。我是那個你當年錯過的人。」（可加入對視與肢體觸碰）\n\n後續引導：\n- 回憶遊戲：輪流說出大學時代對彼此的回憶\n- 「如果當年我有勇氣⋯⋯」接龍句，引導壓抑情感\n- 最終選擇：「今晚，就當回大學生，好嗎？」`,
+    duration: '25-35分鐘'
+  },
+  {
+    id: 'photographer-model',
+    title: '攝影師與模特兒：寫真誘惑',
+    category: 'adventurous' as const,
+    scenario: '柔光攝影棚裡的寫真指導與凝視',
+    image: 'images/roleplay/model_cameramen.png',
+    script: `[partner1]（專業）：「今天的主題是『慾望中的自己』，妳準備好了嗎？」\n[partner2]（緊張）：「這是我第一次拍這種風格……但我想試試看。」\n[partner1]（輕笑）：「放心，我會引導妳。先站到鏡子前，看著妳自己。」（慢慢脫去外衣，觀察肢體）\n[partner1]（低語）：「妳現在看到的，不是誰的老婆、誰的媽媽，只是妳自己——一個渴望被凝視的女人。」\n[partner2]（喘息）：「我從沒這樣看過我自己……好像，我突然開始喜歡這樣的我了。」\n\n後續互動建議：\n- 指導語：「轉身、抬頭、手放這裡……」\n- 「我看見了妳眼裡的慾望，現在妳也看看我。」\n- 最後拍下一張象徵性的照片（自拍或合影）作為紀念`,
+    duration: '20-30分鐘'
+  },
+  {
     id: 'first-meeting',
     title: '初次相遇',
     category: 'romantic' as const,
     scenario: '在咖啡廳偶然相遇的陌生人',
-    image: '/images/roleplay/coffee shop.png',
+    image: 'images/roleplay/coffee shop.png',
     script: `[partner1]: 不好意思，這個位子有人坐嗎？
 [partner2]: 沒有，請坐。你看起來很面熟，我們是不是在哪裡見過？
 [partner1]: 我也有這種感覺，也許是命運的安排。我叫[partner1]，你呢？
@@ -120,7 +147,7 @@ const defaultRoleplayScripts = [
     title: '辦公室秘密',
     category: 'adventurous' as const,
     scenario: '下班後的辦公室，只剩下你們兩個',
-    image: '/images/roleplay/office.png',
+    image: 'images/roleplay/office.png',
     script: `[partner1]: 終於只剩我們兩個了，今天加班真累。
 [partner2]: 是啊，不過和你一起加班感覺還不錯。
 [partner1]: 我一直想找機會和你單獨聊聊...關於我們。
@@ -135,7 +162,7 @@ const defaultRoleplayScripts = [
     title: '禁忌誘惑',
     category: 'adventurous' as const,
     scenario: '朋友的聚會上，兩個不該在一起的人',
-    image: '/images/roleplay/party.png',
+    image: 'images/roleplay/party.png',
     script: `[partner1]: 我們不應該在這裡...
 [partner2]: 我知道，但我忍不住。每次看到你，我就...
 [partner1]: 別人會看到的。我們是朋友的...
@@ -149,7 +176,7 @@ const defaultRoleplayScripts = [
     title: '舊情復燃',
     category: 'romantic' as const,
     scenario: '多年後的同學會，重遇初戀',
-    image: '/images/roleplay/reunion-love.jpg',
+    image: 'images/roleplay/reunion-love.png',
     script: `[partner1]: [partner2]？真的是你嗎？這麼多年了...
 [partner2]: [partner1]！我沒想到會在這裡見到你。你一點都沒變。
 [partner1]: 你還是那麼美。這些年過得怎麼樣？
@@ -164,7 +191,7 @@ const defaultRoleplayScripts = [
     title: '度假誘惑',
     category: 'romantic' as const,
     scenario: '海邊度假村的浪漫邂逅',
-    image: '/images/roleplay/vacation-romance.jpg',
+    image: 'images/roleplay/vacation-romance.png',
     script: `[partner1]: 這個海灘真美，尤其是夕陽西下的時候。
 [partner2]: 是啊，但最美的風景是你。
 [partner1]: 你真會說話。這次度假真是來對了。
@@ -174,6 +201,32 @@ const defaultRoleplayScripts = [
 [partner1]: 然後呢？
 [partner2]: 然後讓這個夜晚變得難忘。`,
     duration: '15-25分鐘'
+  },
+  {
+    id: 'campus-discipline',
+    title: '校園群體幻想：明星校花的秘密懲罰',
+    category: 'school' as const,
+    scenario: '學校地下社辦的臨時懲戒會議',
+    image: 'images/roleplay/discipline.png',
+    script: `（可多人參與或一對一扮演多角）
+[partner2]（校花，冷哼）：「你有證據嗎？還是你只是想抓我來羞辱我？」
+[partner1]（風紀會長，嚴肅）：「學生會長室今晚只處理一件事——妳在教官室的『不當行為』。」
+（會長慢慢走近，從信封中拿出照片）
+[partner1]：「這些，是昨天從監控截下來的。妳自己看看。」
+[partner1]（冷聲）：「身為校花，妳應該成為榜樣。但妳……選擇成為慾望的教材。」
+
+——第二階段：壓力審問——
+[partner1]（拍桌）：「懲戒委員，開始審問她。先檢查她今天穿的是不是校服規定。」
+（此時可安排：解開領口、量裙長、故意拖延動作）
+配角A（由伴侶扮演）：「看來裙子長度也不合規定……不如我們量一量？」
+[partner2]（顫聲）：「你們這樣是……濫用職權……我會告你們！」
+[partner1]（笑）：「妳可以告我。但妳內心真的想逃嗎？還是……想被更多人看到妳的另一面？」
+
+——第三階段：羞辱與釋放——
+配角B：「我們應該幫她重修『服從訓練』。」
+[partner2]（呼吸急促）：「你們想怎樣……要我做什麼？」
+[partner1]（靠近耳邊低語）：「現在，把手放到背後，跪坐下來。妳要自願接受處罰，才能證明妳願意悔改。」`,
+    duration: '20-30分鐘'
   }
 ];
 
@@ -1152,7 +1205,7 @@ const LoveTimeApp = () => {
       title: '初次相遇',
       category: 'romantic',
       scenario: '重現你們第一次見面的場景，但這次更加大膽',
-      image: '/images/roleplay/coffee shop.png', // Updated asset
+      image: 'images/roleplay/coffee shop.png', // Updated asset
       script: `${nicknames.partner1}: "不好意思，請問這個位置有人坐嗎？"
 
 ${nicknames.partner2}: "沒有，請坐。你看起來很面熟呢..."
@@ -1185,7 +1238,7 @@ ${nicknames.partner2}: "我已經迫不及待想要感受你的溫度了..."`
       title: '辦公室秘密',
       category: 'adventurous',
       scenario: '同事間的禁忌戀情，充滿刺激與激情',
-      image: '/images/roleplay/office.png',
+      image: 'images/roleplay/office.png',
       script: `${nicknames.partner1}: "會議結束後，到我辦公室來一下，我們需要討論那個... 特殊項目。"
 
 ${nicknames.partner2}: "又是那個項目？我們已經討論過很多次了... 難道還有什麼需要深入探討的？"
@@ -1218,7 +1271,7 @@ ${nicknames.partner2}: "那我們最好準備一個很好的藉口，因為我�
       title: '禁忌誘惑',
       category: 'adventurous',
       scenario: '陌生人間的危險吸引力，充滿神秘與慾望',
-      image: '/images/roleplay/party.png',
+      image: 'images/roleplay/party.png',
       script: `${nicknames.partner1}: "我注意你很久了。你知道自己有多吸引人嗎？"
 
 ${nicknames.partner2}: "我們甚至不認識彼此... 這樣不太合適吧？"
@@ -1255,7 +1308,7 @@ ${nicknames.partner2}: "帶我走吧，但我警告你，一旦開始，我會�
       title: '舊情復燃',
       category: 'romantic',
       scenario: '多年後重逢的戀人，重新點燃昔日激情',
-      image: '/images/roleplay/reunion-love.jpg',
+      image: 'images/roleplay/reunion-love.png',
       script: `${nicknames.partner1}: "這麼多年了，你還是那麼美... 時間似乎對你特別仁慈。"
 
 ${nicknames.partner2}: "你也是... 但你的眼神比以前更加深邃，更加... 誘人。"
@@ -1290,7 +1343,7 @@ ${nicknames.partner1}: "跟我來，今晚我要讓你知道，有些愛情只�
       title: '度假誘惑',
       category: 'romantic',
       scenario: '在異國他鄉的浪漫度假，遠離世俗束縛',
-      image: '/images/roleplay/vacation-romance.jpg',
+      image: 'images/roleplay/vacation-romance.png',
       script: `${nicknames.partner1}: "看這片海灘，只有我們兩個人... 你不覺得這是完美的時機嗎？"
 
 ${nicknames.partner2}: "什麼的完美時機？"
@@ -2420,6 +2473,7 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
                 >
                   <option value="romantic">浪漫</option>
                   <option value="adventurous">冒險</option>
+                  <option value="school">校園</option>
                 </select>
               </div>
             </div>
