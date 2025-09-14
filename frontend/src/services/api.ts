@@ -317,13 +317,31 @@ class ApiService {
 
   // Nicknames
   async getNicknames(): Promise<{ partner1: string; partner2: string }> {
-    const saved = localStorage.getItem('nicknames');
-    return saved ? JSON.parse(saved) : { partner1: '親愛的', partner2: '寶貝' };
+    try {
+      // Prefer backend couple info for authoritative nicknames
+      const couple = await this.getCouple();
+      const partner1 = couple.user1Nickname || '親愛的';
+      const partner2 = couple.user2Nickname || '寶貝';
+      return { partner1, partner2 };
+    } catch {
+      // Fallback to local if not paired yet or error
+      const saved = localStorage.getItem('nicknames');
+      return saved ? JSON.parse(saved) : { partner1: '親愛的', partner2: '寶貝' };
+    }
   }
 
   async updateNicknames(nicknames: { partner1: string; partner2: string }): Promise<void> {
-    localStorage.setItem('nicknames', JSON.stringify(nicknames));
-    // TODO: Update backend when implemented
+    try {
+      // Send to backend; it will update the caller's own nickname based on couple role
+      await apiClient.put('/couples/nicknames', {
+        partner1: nicknames.partner1,
+        partner2: nicknames.partner2,
+      });
+    } catch (error) {
+      // Persist locally as a fallback so UI reflects change even if offline/unpaired
+      console.warn('Backend nickname update failed, falling back to localStorage:', error);
+      localStorage.setItem('nicknames', JSON.stringify(nicknames));
+    }
   }
 
   // Coins

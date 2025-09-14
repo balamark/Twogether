@@ -628,6 +628,14 @@ const LoveTimeApp = () => {
     saveNicknames();
   }, [nicknames, authState.isAuthenticated]);
 
+  // Persist nicknames locally when not authenticated
+  useEffect(() => {
+    if (authState.isAuthenticated) {
+      return;
+    }
+    localStorage.setItem('nicknames', JSON.stringify(nicknames));
+  }, [nicknames, authState.isAuthenticated]);
+
   useEffect(() => {
     localStorage.setItem('journeyMilestones', JSON.stringify(journeyMilestones));
   }, [journeyMilestones]);

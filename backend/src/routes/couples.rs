@@ -1,6 +1,6 @@
 use axum::{
     extract::{Json, State},
-    routing::{get, post},
+    routing::{get, post, put},
     Router,
 };
 use chrono::{Duration, Utc};
@@ -46,6 +46,7 @@ pub fn routes() -> Router<AppState> {
         .route("/", post(create_couple))
         .route("/", get(get_couple))
         .route("/pairing-code", post(generate_pairing_code))
+        .route("/nicknames", put(update_nicknames))
 }
 
 /// Helper function to get a user's couple ID
@@ -447,3 +448,112 @@ async fn get_couple(
         pairing_code: couple.pairing_code,
     }))
 } 
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct UpdateNicknamesRequest {
+    #[validate(length(min = 2, max = 50))]
+    pub partner1: Option<String>,
+    #[validate(length(min = 2, max = 50))]
+    pub partner2: Option<String>,
+}
+
+/// Update the authenticated user's nickname within the couple context
+/// PUT /api/couples/nicknames
+#[axum::debug_handler]
+async fn update_nicknames(
+    State(state): State<AppState>,
+    claims: Claims,
+    Json(payload): Json<UpdateNicknamesRequest>,
+) -> Result<Json<CoupleResponse>> {
+    // Validate lengths if provided
+    payload.validate().map_err(|e| {
+        AppError::Validation(format!("驗證失敗: {}", e))
+    })?;
+
+    let user_id = Uuid::parse_str(&claims.sub)
+        .map_err(|_| AppError::Auth("無效的用戶ID".to_string()))?;
+
+    // Find the couple and determine whether the caller is user1 or user2
+    let couple = sqlx::query!(
+        "SELECT id, user1_id, user2_id FROM couples WHERE user1_id = $1 OR user2_id = $1",
+        user_id
+    )
+    .fetch_optional(&state.db.pool)
+    .await?;
+
+    // Determine which field to take based on position; if no couple yet, allow updating self directly using partner1 if provided, otherwise partner2
+    let (nickname_to_set, target_user_id) = match couple {
+        Some(c) => {
+            if c.user1_id == user_id {
+                let new_name = payload.partner1.clone().ok_or_else(|| AppError::Validation("請提供要更新的暱稱 (partner1)".to_string()))?;
+                (new_name, c.user1_id)
+            } else {
+                // Caller is user2
+                let new_name = payload.partner2.clone().ok_or_else(|| AppError::Validation("請提供要更新的暱稱 (partner2)".to_string()))?;
+                (new_name, c.user2_id.expect("user2_id must be Some for user2"))
+            }
+        }
+        None => {
+            // No couple found; update own nickname using the first provided value
+            let provided = payload.partner1.or(payload.partner2).ok_or_else(|| AppError::Validation("請提供要更新的暱稱".to_string()))?;
+            (provided, user_id)
+        }
+    };
+
+    // Update the user's nickname
+    sqlx::query!(
+        "UPDATE users SET nickname = $1 WHERE id = $2",
+        nickname_to_set,
+        target_user_id
+    )
+    .execute(&state.db.pool)
+    .await?;
+
+    // Return updated couple info
+    let couple = sqlx::query!(
+        "SELECT c.id, c.couple_name, c.anniversary_date, c.created_at, \
+                u1.nickname as user1_nickname, u2.nickname as \"user2_nickname?\", \
+                pc.code as \"pairing_code?\" \
+         FROM couples c \
+         JOIN users u1 ON c.user1_id = u1.id \
+         LEFT JOIN users u2 ON c.user2_id = u2.id \
+         LEFT JOIN pairing_codes pc ON c.id = pc.couple_id  \
+            AND pc.used_at IS NULL  \
+            AND pc.expires_at > NOW() \
+         WHERE c.user1_id = $1 OR c.user2_id = $1",
+        user_id
+    )
+    .fetch_optional(&state.db.pool)
+    .await?;
+
+    // If the couple isn't found (single-user or not created), synthesize a minimal response
+    if let Some(couple) = couple {
+        return Ok(Json(CoupleResponse {
+            id: couple.id,
+            couple_name: couple.couple_name,
+            anniversary_date: couple.anniversary_date,
+            user1_nickname: couple.user1_nickname,
+            user2_nickname: couple.user2_nickname,
+            created_at: couple.created_at.unwrap_or_else(|| Utc::now()),
+            pairing_code: couple.pairing_code,
+        }));
+    }
+
+    // No couple row: return user's own nickname with placeholders
+    let user = sqlx::query!(
+        "SELECT id, nickname, created_at FROM users WHERE id = $1",
+        user_id
+    )
+    .fetch_one(&state.db.pool)
+    .await?;
+
+    Ok(Json(CoupleResponse {
+        id: Uuid::new_v4(),
+        couple_name: None,
+        anniversary_date: None,
+        user1_nickname: user.nickname,
+        user2_nickname: None,
+        created_at: user.created_at.unwrap_or_else(|| Utc::now()),
+        pairing_code: None,
+    }))
+}
