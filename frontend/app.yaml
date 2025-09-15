@@ -1,0 +1,13 @@
+runtime: python311
+service: frontend
+
+handlers:
+  - url: /(.*\.(css|js|png|jpg|jpeg|svg|webp|ico|txt|json|woff|woff2))$
+    static_files: dist/\1
+    upload: dist/.*\.(css|js|png|jpg|jpeg|svg|webp|ico|txt|json|woff|woff2)$
+    http_headers:
+      Cache-Control: "public, max-age=31536000, immutable"
+
+  - url: /.*
+    static_files: dist/index.html
+    upload: dist/index.html
