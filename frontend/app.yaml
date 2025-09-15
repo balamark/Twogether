@@ -1,5 +1,5 @@
 runtime: python311
-service: frontend
+service: default
 
 automatic_scaling:
   min_num_instances: 1
