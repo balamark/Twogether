@@ -24,5 +24,3 @@ liveness_check:
 
 env_variables:
   RUST_LOG: info
-  PORT: "8080"
-  CORS_ORIGIN: "https://<your-frontend-domain>"
