@@ -14,7 +14,104 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+              - '.github/workflows/deploy.yml'
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/deploy.yml'
+
+  test-backend:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.backend == 'true' }}
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: twogether_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - name: Restore SQLx metadata cache
+        uses: actions/cache@v4
+        with:
+          path: backend/.sqlx
+          key: sqlx-${{ hashFiles('backend/migrations/**/*.sql', 'backend/Cargo.lock') }}
+      - name: Install SQLx CLI
+        run: cargo install sqlx-cli --no-default-features --features postgres
+      - name: Setup test database
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/twogether_test
+        run: |
+          sqlx database create
+          sqlx migrate run
+      - name: Generate SQLx metadata (only if cache miss)
+        if: ${{ hashFiles('backend/.sqlx/**') == '' }}
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/twogether_test
+        run: cargo sqlx prepare
+      - name: Run backend tests
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/twogether_test
+          JWT_SECRET: test-secret-key
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_ANON_KEY: test-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: test-service-key
+        run: cargo test
+
+  test-frontend:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    container: mcr.microsoft.com/playwright:v1.55.0-jammy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use Node from container
+        run: node -v && npm -v
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+      - name: Run Playwright tests
+        working-directory: ./frontend
+        env:
+          CI: true
+        run: npm run test:e2e
+      - name: Upload Playwright Report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 30
+
   build-and-deploy:
+    needs: [test-backend, test-frontend]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,5 +145,4 @@ jobs:
           gcloud app deploy backend/app.yaml frontend/app.yaml dispatch.yaml --quiet --project=${{ env.PROJECT_ID }}
 
       - name: Post-deploy info
-        run: |
-          gcloud app services list --project=${{ env.PROJECT_ID }} 
+        run: gcloud app services list --project=${{ env.PROJECT_ID }}

@@ -1,6 +1,10 @@
 runtime: python311
 service: frontend
 
+automatic_scaling:
+  min_num_instances: 1
+  max_num_instances: 2
+  
 handlers:
   - url: /(.*\.(css|js|png|jpg|jpeg|svg|webp|ico|txt|json|woff|woff2))$
     static_files: dist/\1
