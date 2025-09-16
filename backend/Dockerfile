@@ -14,17 +14,16 @@ WORKDIR /app
 # Set SQLx to use offline mode
 ENV SQLX_OFFLINE=true
 
-# Copy workspace cargo files
-COPY Cargo.toml Cargo.lock ./
-COPY backend/Cargo.toml ./backend/Cargo.toml
+# Copy backend cargo files (build context is backend/ directory)
+COPY Cargo.toml ./
 
 # Copy source code and SQLx metadata
-COPY backend/src ./backend/src
-COPY backend/migrations ./backend/migrations
-COPY ./backend/.sqlx/ ./backend/.sqlx/
+COPY src ./src
+COPY migrations ./migrations
+COPY .sqlx/ ./.sqlx/
 
 # Build the application (will use SQLx offline mode)
-RUN cd backend && cargo build --release
+RUN cargo build --release
 
 # Runtime stage
 FROM debian:bookworm-slim
@@ -47,7 +46,7 @@ WORKDIR /app
 COPY --from=builder /app/target/release/twogether-backend /app/twogether-backend
 
 # Copy migrations
-COPY --from=builder /app/backend/migrations /app/migrations
+COPY --from=builder /app/migrations /app/migrations
 
 # Switch to app user
 USER appuser
