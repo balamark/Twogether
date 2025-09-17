@@ -140,6 +140,12 @@ jobs:
         with:
           project_id: ${{ env.PROJECT_ID }}
 
+      - name: Configure Docker for BuildKit
+        run: |
+          echo '{"features": {"buildkit": true}}' | sudo tee /etc/docker/daemon.json
+          sudo systemctl restart docker
+          docker buildx create --use --name builder --driver docker-container
+
       - name: Deploy to App Engine (backend, frontend, dispatch)
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
