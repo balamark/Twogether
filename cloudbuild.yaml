@@ -83,7 +83,6 @@ steps:
 timeout: '2700s'
 
 options:
-  machineType: 'E2_STANDARD_4'  # More powerful machine for faster builds
   logging: CLOUD_LOGGING_ONLY
 
 substitutions:
