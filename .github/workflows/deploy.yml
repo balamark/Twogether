@@ -152,6 +152,47 @@ jobs:
           CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
         run: |
           echo "🚀 Deploying to App Engine..."
+
+          # Update backend app.yaml with secrets
+          python3 << EOF
+          import os
+
+          # Read the current app.yaml
+          with open('backend/app.yaml', 'r') as f:
+              content = f.read()
+
+          # Replace env_variables section
+          lines = content.split('\n')
+          new_lines = []
+          skip_env_vars = False
+
+          for line in lines:
+              if line.strip().startswith('env_variables:'):
+                  # Add our env_variables section
+                  new_lines.append('env_variables:')
+                  new_lines.append('  RUST_LOG: info')
+                  new_lines.append('  ENVIRONMENT: production')
+                  new_lines.append(f'  DATABASE_URL: "{os.environ["DATABASE_URL"]}"')
+                  new_lines.append(f'  JWT_SECRET: "{os.environ["JWT_SECRET"]}"')
+                  new_lines.append(f'  SUPABASE_URL: "{os.environ["SUPABASE_URL"]}"')
+                  new_lines.append(f'  SUPABASE_ANON_KEY: "{os.environ["SUPABASE_ANON_KEY"]}"')
+                  new_lines.append(f'  SUPABASE_SERVICE_ROLE_KEY: "{os.environ["SUPABASE_SERVICE_ROLE_KEY"]}"')
+                  new_lines.append(f'  EMAIL_FROM: "{os.environ["EMAIL_FROM"]}"')
+                  new_lines.append(f'  RESEND_API_KEY: "{os.environ["RESEND_API_KEY"]}"')
+                  new_lines.append(f'  CORS_ORIGIN: "{os.environ["CORS_ORIGIN"]}"')
+                  skip_env_vars = True
+              elif skip_env_vars and line.strip() and not line.startswith('  '):
+                  # End of env_variables section
+                  skip_env_vars = False
+                  new_lines.append(line)
+              elif not skip_env_vars:
+                  new_lines.append(line)
+
+          # Write back to file
+          with open('backend/app.yaml', 'w') as f:
+              f.write('\n'.join(new_lines))
+          EOF
+
           gcloud app deploy backend/app.yaml frontend/app.yaml dispatch.yaml --quiet --project=${{ env.PROJECT_ID }}
 
       - name: Post-deploy info
