@@ -14,8 +14,9 @@ WORKDIR /app
 # Set SQLx to use offline mode
 ENV SQLX_OFFLINE=true
 
-# Copy backend cargo files (build context is backend/ directory)
+# Copy and cache dependencies first
 COPY Cargo.toml ./
+RUN cargo fetch
 
 # Copy source code and SQLx metadata
 COPY src ./src
