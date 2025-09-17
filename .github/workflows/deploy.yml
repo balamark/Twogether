@@ -148,6 +148,7 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
         run: |
@@ -178,6 +179,7 @@ jobs:
                   new_lines.append(f'  SUPABASE_ANON_KEY: "{os.environ["SUPABASE_ANON_KEY"]}"')
                   new_lines.append(f'  SUPABASE_SERVICE_ROLE_KEY: "{os.environ["SUPABASE_SERVICE_ROLE_KEY"]}"')
                   new_lines.append(f'  EMAIL_FROM: "{os.environ["EMAIL_FROM"]}"')
+                  new_lines.append(f'  EMAIL_PASS: "{os.environ["EMAIL_PASS"]}"')
                   new_lines.append(f'  RESEND_API_KEY: "{os.environ["RESEND_API_KEY"]}"')
                   new_lines.append(f'  CORS_ORIGIN: "{os.environ["CORS_ORIGIN"]}"')
                   skip_env_vars = True
