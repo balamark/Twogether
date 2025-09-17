@@ -28,6 +28,7 @@ jobs:
             backend:
               - 'backend/**'
               - '.github/workflows/deploy.yml'
+              - 'cloudbuild.yaml'
             frontend:
               - 'frontend/**'
               - '.github/workflows/deploy.yml'
