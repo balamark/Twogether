@@ -148,5 +148,23 @@ jobs:
           gcloud builds submit --config=cloudbuild.yaml --project=${{ env.PROJECT_ID }} \
             --substitutions=_DATABASE_URL="${{ secrets.DATABASE_URL }}",_JWT_SECRET="${{ secrets.JWT_SECRET }}",_SUPABASE_URL="${{ secrets.SUPABASE_URL }}",_SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}",_SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}",_EMAIL_FROM="${{ secrets.EMAIL_FROM }}",_EMAIL_PASS="${{ secrets.EMAIL_PASS }}",_RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}",_CORS_ORIGIN="${{ secrets.CORS_ORIGIN }}"
 
-      - name: Post-deploy info
-        run: gcloud app services list --project=${{ env.PROJECT_ID }}
+      - name: Check deployment status
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "📊 Deployment Status Check"
+
+          # Check GitHub Actions run status
+          gh run list --limit 1 --json status,conclusion,headSha,workflowName
+
+          # Check App Engine services
+          echo "🚀 App Engine Services:"
+          gcloud app services list --project=${{ env.PROJECT_ID }}
+
+          # Check if deployment was successful
+          if [ ${{ job.status }} == "success" ]; then
+            echo "✅ Deployment completed successfully!"
+          else
+            echo "❌ Deployment failed or had issues"
+          fi
