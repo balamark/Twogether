@@ -17,12 +17,10 @@ steps:
       - '-c'
       - |
         # Update backend app.yaml to use pre-built image
-        python3 << 'EOF'
-        import os
-
-        # Create new app.yaml content for pre-built image
-        image_url = f"gcr.io/{os.environ['PROJECT_ID']}/twogether-backend:{os.environ['_IMAGE_TAG']}"
-        content = f"""env: flex
+        python3 -c "
+import os
+image_url = f'gcr.io/{os.environ[\"PROJECT_ID\"]}/twogether-backend:{os.environ[\"_IMAGE_TAG\"]}'
+content = f'''env: flex
 service: backend
 runtime: custom
 runtime_config:
@@ -51,21 +49,19 @@ liveness_check:
 env_variables:
   RUST_LOG: info
   ENVIRONMENT: production
-  DATABASE_URL: "{os.environ['DATABASE_URL']}"
-  JWT_SECRET: "{os.environ['JWT_SECRET']}"
-  SUPABASE_URL: "{os.environ['SUPABASE_URL']}"
-  SUPABASE_ANON_KEY: "{os.environ['SUPABASE_ANON_KEY']}"
-  SUPABASE_SERVICE_ROLE_KEY: "{os.environ['SUPABASE_SERVICE_ROLE_KEY']}"
-  EMAIL_FROM: "{os.environ['EMAIL_FROM']}"
-  EMAIL_PASS: "{os.environ['EMAIL_PASS']}"
-  RESEND_API_KEY: "{os.environ['RESEND_API_KEY']}"
-  CORS_ORIGIN: "{os.environ['CORS_ORIGIN']}"
-"""
-
-        # Write to file
-        with open('backend/app.yaml', 'w') as f:
-            f.write(content)
-        EOF
+  DATABASE_URL: \"{os.environ['DATABASE_URL']}\"
+  JWT_SECRET: \"{os.environ['JWT_SECRET']}\"
+  SUPABASE_URL: \"{os.environ['SUPABASE_URL']}\"
+  SUPABASE_ANON_KEY: \"{os.environ['SUPABASE_ANON_KEY']}\"
+  SUPABASE_SERVICE_ROLE_KEY: \"{os.environ['SUPABASE_SERVICE_ROLE_KEY']}\"
+  EMAIL_FROM: \"{os.environ['EMAIL_FROM']}\"
+  EMAIL_PASS: \"{os.environ['EMAIL_PASS']}\"
+  RESEND_API_KEY: \"{os.environ['RESEND_API_KEY']}\"
+  CORS_ORIGIN: \"{os.environ['CORS_ORIGIN']}\"
+'''
+with open('backend/app.yaml', 'w') as f:
+    f.write(content)
+"
 
         # Deploy to App Engine
         gcloud app deploy backend/app.yaml frontend/app.yaml dispatch.yaml --quiet --project=$PROJECT_ID
