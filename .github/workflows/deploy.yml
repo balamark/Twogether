@@ -142,6 +142,7 @@ jobs:
 
 
       - name: Deploy to App Engine (backend, frontend, dispatch)
+        timeout-minutes: 30
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
