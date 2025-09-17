@@ -4,8 +4,8 @@ RUN cargo install cargo-chef --locked
 WORKDIR /app
 
 FROM chef AS planner
-# Copy only the files needed for dependency analysis
-COPY Cargo.toml Cargo.lock ./
+# Copy all files needed for dependency analysis
+COPY . .
 RUN cargo chef prepare --recipe-path recipe.json
 
 FROM chef AS builder
@@ -30,7 +30,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
 COPY src ./src
 COPY migrations ./migrations
 COPY .sqlx/ ./.sqlx/
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 
 # Build the application with cache mounts (dependencies already cached)
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
