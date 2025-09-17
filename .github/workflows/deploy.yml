@@ -140,13 +140,24 @@ jobs:
         with:
           project_id: ${{ env.PROJECT_ID }}
 
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker
 
-      - name: Deploy with Cloud Build (extended timeout)
-        timeout-minutes: 50
+      - name: Build and push backend Docker image
+        working-directory: ./backend
         run: |
-          echo "🚀 Deploying with Cloud Build (45min timeout)..."
+          echo "🔨 Building backend Docker image..."
+          docker build -t gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }} .
+          echo "📤 Pushing to Google Container Registry..."
+          docker push gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }}
+
+
+      - name: Deploy with Cloud Build (lightweight deployment)
+        timeout-minutes: 15
+        run: |
+          echo "🚀 Deploying pre-built image with Cloud Build..."
           gcloud builds submit --config=cloudbuild.yaml --project=${{ env.PROJECT_ID }} \
-            --substitutions=_DATABASE_URL="${{ secrets.DATABASE_URL }}",_JWT_SECRET="${{ secrets.JWT_SECRET }}",_SUPABASE_URL="${{ secrets.SUPABASE_URL }}",_SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}",_SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}",_EMAIL_FROM="${{ secrets.EMAIL_FROM }}",_EMAIL_PASS="${{ secrets.EMAIL_PASS }}",_RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}",_CORS_ORIGIN="${{ secrets.CORS_ORIGIN }}"
+            --substitutions=_IMAGE_TAG="${{ github.sha }}",_DATABASE_URL="${{ secrets.DATABASE_URL }}",_JWT_SECRET="${{ secrets.JWT_SECRET }}",_SUPABASE_URL="${{ secrets.SUPABASE_URL }}",_SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}",_SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}",_EMAIL_FROM="${{ secrets.EMAIL_FROM }}",_EMAIL_PASS="${{ secrets.EMAIL_PASS }}",_RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}",_CORS_ORIGIN="${{ secrets.CORS_ORIGIN }}"
 
       - name: Check deployment status
         if: always()

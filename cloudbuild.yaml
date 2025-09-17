@@ -10,70 +10,68 @@ steps:
     entrypoint: 'npm'
     args: ['run', 'build']
 
-  # Build and push backend Docker image (separate steps for better error handling)
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'build'
-      - '-t'
-      - 'gcr.io/$PROJECT_ID/twogether-backend:$BUILD_ID'
-      - 'backend'
-    timeout: '1800s'  # 30 minutes for Rust build
-
-  # Push with explicit timeout
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/twogether-backend:$BUILD_ID']
-    timeout: '900s'  # 15 minutes for push
-
   # Deploy backend to App Engine
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        # Update backend app.yaml with environment variables
+        # Update backend app.yaml to use pre-built image
         python3 << 'EOF'
         import os
 
-        # Read the current app.yaml
-        with open('backend/app.yaml', 'r') as f:
-            content = f.read()
+        # Create new app.yaml content for pre-built image
+        image_url = f"gcr.io/{os.environ['PROJECT_ID']}/twogether-backend:{os.environ['_IMAGE_TAG']}"
+        content = f"""env: flex
+service: backend
+runtime: custom
+runtime_config:
+  container_image: {image_url}
 
-        # Replace env_variables section
-        lines = content.split('\n')
-        new_lines = []
-        skip_env_vars = False
+automatic_scaling:
+  min_num_instances: 1
+  max_num_instances: 2
+  cpu_utilization:
+    target_utilization: 0.6
 
-        for line in lines:
-            if line.strip().startswith('env_variables:'):
-                # Add our env_variables section
-                new_lines.append('env_variables:')
-                new_lines.append('  RUST_LOG: info')
-                new_lines.append('  ENVIRONMENT: production')
-                new_lines.append(f'  DATABASE_URL: "{os.environ["DATABASE_URL"]}"')
-                new_lines.append(f'  JWT_SECRET: "{os.environ["JWT_SECRET"]}"')
-                new_lines.append(f'  SUPABASE_URL: "{os.environ["SUPABASE_URL"]}"')
-                new_lines.append(f'  SUPABASE_ANON_KEY: "{os.environ["SUPABASE_ANON_KEY"]}"')
-                new_lines.append(f'  SUPABASE_SERVICE_ROLE_KEY: "{os.environ["SUPABASE_SERVICE_ROLE_KEY"]}"')
-                new_lines.append(f'  EMAIL_FROM: "{os.environ["EMAIL_FROM"]}"')
-                new_lines.append(f'  EMAIL_PASS: "{os.environ["EMAIL_PASS"]}"')
-                new_lines.append(f'  RESEND_API_KEY: "{os.environ["RESEND_API_KEY"]}"')
-                new_lines.append(f'  CORS_ORIGIN: "{os.environ["CORS_ORIGIN"]}"')
-                skip_env_vars = True
-            elif skip_env_vars and line.strip() and not line.startswith('  '):
-                # End of env_variables section
-                skip_env_vars = False
-                new_lines.append(line)
-            elif not skip_env_vars:
-                new_lines.append(line)
+readiness_check:
+  path: /health
+  check_interval_sec: 10
+  timeout_sec: 4
+  failure_threshold: 2
+  success_threshold: 2
 
-        # Write back to file
+liveness_check:
+  path: /health
+  check_interval_sec: 30
+  timeout_sec: 4
+  failure_threshold: 2
+  success_threshold: 2
+
+env_variables:
+  RUST_LOG: info
+  ENVIRONMENT: production
+  DATABASE_URL: "{os.environ['DATABASE_URL']}"
+  JWT_SECRET: "{os.environ['JWT_SECRET']}"
+  SUPABASE_URL: "{os.environ['SUPABASE_URL']}"
+  SUPABASE_ANON_KEY: "{os.environ['SUPABASE_ANON_KEY']}"
+  SUPABASE_SERVICE_ROLE_KEY: "{os.environ['SUPABASE_SERVICE_ROLE_KEY']}"
+  EMAIL_FROM: "{os.environ['EMAIL_FROM']}"
+  EMAIL_PASS: "{os.environ['EMAIL_PASS']}"
+  RESEND_API_KEY: "{os.environ['RESEND_API_KEY']}"
+  CORS_ORIGIN: "{os.environ['CORS_ORIGIN']}"
+"""
+
+        # Write to file
         with open('backend/app.yaml', 'w') as f:
-            f.write('\n'.join(new_lines))
+            f.write(content)
         EOF
 
         # Deploy to App Engine
         gcloud app deploy backend/app.yaml frontend/app.yaml dispatch.yaml --quiet --project=$PROJECT_ID
     env:
+      - 'PROJECT_ID=$PROJECT_ID'
+      - '_IMAGE_TAG=$_IMAGE_TAG'
       - 'DATABASE_URL=$_DATABASE_URL'
       - 'JWT_SECRET=$_JWT_SECRET'
       - 'SUPABASE_URL=$_SUPABASE_URL'
@@ -84,13 +82,14 @@ steps:
       - 'RESEND_API_KEY=$_RESEND_API_KEY'
       - 'CORS_ORIGIN=$_CORS_ORIGIN'
 
-# Overall build timeout - 45 minutes
-timeout: '2700s'
+# Overall build timeout - 10 minutes (deployment only)
+timeout: '600s'
 
 options:
   logging: CLOUD_LOGGING_ONLY
 
 substitutions:
+  _IMAGE_TAG: ''
   _DATABASE_URL: ''
   _JWT_SECRET: ''
   _SUPABASE_URL: ''
