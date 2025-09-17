@@ -1,5 +1,15 @@
-# Multi-stage build for Rust backend
-FROM rust:latest AS builder
+# Multi-stage build for Rust backend with cargo-chef
+FROM rust:latest AS chef
+RUN cargo install cargo-chef --locked
+WORKDIR /app
+
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS builder
+# Set SQLx to use offline mode
+ENV SQLX_OFFLINE=true
 
 # Install required dependencies
 RUN apt-get update && apt-get install -y \
@@ -8,22 +18,17 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Create app directory
-WORKDIR /app
-
-# Set SQLx to use offline mode
-ENV SQLX_OFFLINE=true
-
-# Copy and cache dependencies first
-COPY Cargo.toml ./
-RUN cargo fetch
+# Copy the recipe and build dependencies
+COPY --from=planner /app/recipe.json recipe.json
+RUN cargo chef cook --release --recipe-path recipe.json
 
 # Copy source code and SQLx metadata
 COPY src ./src
 COPY migrations ./migrations
 COPY .sqlx/ ./.sqlx/
+COPY Cargo.toml ./
 
-# Build the application (will use SQLx offline mode)
+# Build the application (dependencies already cached)
 RUN cargo build --release
 
 # Runtime stage
