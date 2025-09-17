@@ -10,7 +10,7 @@ steps:
     entrypoint: 'npm'
     args: ['run', 'build']
 
-  # Build backend Docker image
+  # Build and push backend Docker image (separate steps for better error handling)
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
@@ -18,6 +18,11 @@ steps:
       - 'gcr.io/$PROJECT_ID/twogether-backend:$BUILD_ID'
       - 'backend'
     timeout: '1800s'  # 30 minutes for Rust build
+
+  # Push with explicit timeout
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/twogether-backend:$BUILD_ID']
+    timeout: '900s'  # 15 minutes for push
 
   # Deploy backend to App Engine
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'

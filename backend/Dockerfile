@@ -1,5 +1,5 @@
-# Multi-stage build for Rust backend - simple and fast
-FROM rust:latest AS builder
+# Multi-stage build for Rust backend - optimized for size
+FROM rust:slim-bullseye AS builder
 
 # Set SQLx to use offline mode
 ENV SQLX_OFFLINE=true
@@ -23,8 +23,9 @@ COPY src ./src
 COPY migrations ./migrations
 COPY .sqlx/ ./.sqlx/
 
-# Build the application
-RUN cargo build --release
+# Build the application with size optimizations
+RUN cargo build --release \
+    && strip target/release/twogether-backend
 
 # Runtime stage
 FROM debian:bookworm-slim
