@@ -152,8 +152,7 @@ jobs:
           CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
         run: |
           echo "🚀 Deploying to App Engine..."
-          gcloud app deploy backend/app.yaml frontend/app.yaml dispatch.yaml --quiet --project=${{ env.PROJECT_ID }} \
-            --set-env-vars="DATABASE_URL=${DATABASE_URL},JWT_SECRET=${JWT_SECRET},SUPABASE_URL=${SUPABASE_URL},SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY},SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY},EMAIL_FROM=${EMAIL_FROM},RESEND_API_KEY=${RESEND_API_KEY},CORS_ORIGIN=${CORS_ORIGIN},ENVIRONMENT=production"
+          gcloud app deploy backend/app.yaml frontend/app.yaml dispatch.yaml --quiet --project=${{ env.PROJECT_ID }}
 
       - name: Post-deploy info
         run: gcloud app services list --project=${{ env.PROJECT_ID }}
