@@ -111,7 +111,8 @@ jobs:
           retention-days: 30
 
   build-and-deploy:
-    needs: [test-backend, test-frontend]
+    needs: [changes, test-backend, test-frontend]
+    if: always() && (needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true') && !cancelled() && !failure()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
