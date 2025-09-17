@@ -141,63 +141,12 @@ jobs:
           project_id: ${{ env.PROJECT_ID }}
 
 
-      - name: Deploy to App Engine (backend, frontend, dispatch)
-        timeout-minutes: 30
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
+      - name: Deploy with Cloud Build (extended timeout)
+        timeout-minutes: 50
         run: |
-          echo "🚀 Deploying to App Engine..."
-
-          # Update backend app.yaml with secrets
-          python3 << EOF
-          import os
-
-          # Read the current app.yaml
-          with open('backend/app.yaml', 'r') as f:
-              content = f.read()
-
-          # Replace env_variables section
-          lines = content.split('\n')
-          new_lines = []
-          skip_env_vars = False
-
-          for line in lines:
-              if line.strip().startswith('env_variables:'):
-                  # Add our env_variables section
-                  new_lines.append('env_variables:')
-                  new_lines.append('  RUST_LOG: info')
-                  new_lines.append('  ENVIRONMENT: production')
-                  new_lines.append(f'  DATABASE_URL: "{os.environ["DATABASE_URL"]}"')
-                  new_lines.append(f'  JWT_SECRET: "{os.environ["JWT_SECRET"]}"')
-                  new_lines.append(f'  SUPABASE_URL: "{os.environ["SUPABASE_URL"]}"')
-                  new_lines.append(f'  SUPABASE_ANON_KEY: "{os.environ["SUPABASE_ANON_KEY"]}"')
-                  new_lines.append(f'  SUPABASE_SERVICE_ROLE_KEY: "{os.environ["SUPABASE_SERVICE_ROLE_KEY"]}"')
-                  new_lines.append(f'  EMAIL_FROM: "{os.environ["EMAIL_FROM"]}"')
-                  new_lines.append(f'  EMAIL_PASS: "{os.environ["EMAIL_PASS"]}"')
-                  new_lines.append(f'  RESEND_API_KEY: "{os.environ["RESEND_API_KEY"]}"')
-                  new_lines.append(f'  CORS_ORIGIN: "{os.environ["CORS_ORIGIN"]}"')
-                  skip_env_vars = True
-              elif skip_env_vars and line.strip() and not line.startswith('  '):
-                  # End of env_variables section
-                  skip_env_vars = False
-                  new_lines.append(line)
-              elif not skip_env_vars:
-                  new_lines.append(line)
-
-          # Write back to file
-          with open('backend/app.yaml', 'w') as f:
-              f.write('\n'.join(new_lines))
-          EOF
-
-          gcloud app deploy backend/app.yaml frontend/app.yaml dispatch.yaml --quiet --project=${{ env.PROJECT_ID }}
+          echo "🚀 Deploying with Cloud Build (45min timeout)..."
+          gcloud builds submit --config=cloudbuild.yaml --project=${{ env.PROJECT_ID }} \
+            --substitutions=_DATABASE_URL="${{ secrets.DATABASE_URL }}",_JWT_SECRET="${{ secrets.JWT_SECRET }}",_SUPABASE_URL="${{ secrets.SUPABASE_URL }}",_SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}",_SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}",_EMAIL_FROM="${{ secrets.EMAIL_FROM }}",_EMAIL_PASS="${{ secrets.EMAIL_PASS }}",_RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}",_CORS_ORIGIN="${{ secrets.CORS_ORIGIN }}"
 
       - name: Post-deploy info
         run: gcloud app services list --project=${{ env.PROJECT_ID }}
