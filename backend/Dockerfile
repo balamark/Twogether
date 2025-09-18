@@ -1,13 +1,6 @@
-# Multi-stage build for Rust backend - optimized with cargo-chef
-FROM rust:slim-bullseye AS chef
-RUN cargo install cargo-chef
-WORKDIR /app
+# Simple Rust build - prioritize speed over optimization
+FROM rust:slim-bullseye AS builder
 
-FROM chef AS planner
-COPY . .
-RUN cargo chef prepare --recipe-path recipe.json
-
-FROM chef AS builder
 # Set SQLx to use offline mode
 ENV SQLX_OFFLINE=true
 
@@ -18,14 +11,12 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Build dependencies (cached layer)
-COPY --from=planner /app/recipe.json recipe.json
-RUN cargo chef cook --release --recipe-path recipe.json
+# Create app directory
+WORKDIR /app
 
-# Build application
+# Copy everything and build
 COPY . .
-RUN cargo build --release \
-    && strip target/release/twogether-backend
+RUN cargo build --release
 
 # Runtime stage
 FROM debian:bookworm-slim
