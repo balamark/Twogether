@@ -18,8 +18,8 @@ WORKDIR /app
 COPY . .
 RUN cargo build --release
 
-# Runtime stage
-FROM debian:bookworm-slim
+# Runtime stage - match build environment
+FROM debian:bullseye-slim
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
