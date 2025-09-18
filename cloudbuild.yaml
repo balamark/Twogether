@@ -16,8 +16,11 @@ steps:
     args:
       - '-c'
       - |
+        # Create clean backend directory without Dockerfile
+        mkdir -p clean-backend
+
         # Create backend app.yaml with pre-built image
-        cat > backend/app.yaml << 'APPYAML'
+        cat > clean-backend/app.yaml << 'APPYAML'
         env: flex
         service: backend
         runtime: custom
@@ -58,8 +61,8 @@ steps:
           CORS_ORIGIN: "$_CORS_ORIGIN"
         APPYAML
 
-        # Deploy to App Engine
-        gcloud app deploy backend/app.yaml frontend/app.yaml dispatch.yaml --quiet --project=$PROJECT_ID
+        # Deploy to App Engine using clean directory
+        gcloud app deploy clean-backend/app.yaml frontend/app.yaml dispatch.yaml --quiet --project=$PROJECT_ID
     env:
       - 'PROJECT_ID=$PROJECT_ID'
       - '_IMAGE_TAG=$_IMAGE_TAG'
