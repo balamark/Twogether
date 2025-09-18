@@ -16,52 +16,47 @@ steps:
     args:
       - '-c'
       - |
-        # Update backend app.yaml to use pre-built image
-        python3 -c "
-import os
-image_url = f'gcr.io/{os.environ[\"PROJECT_ID\"]}/twogether-backend:{os.environ[\"_IMAGE_TAG\"]}'
-content = f'''env: flex
-service: backend
-runtime: custom
-runtime_config:
-  container_image: {image_url}
+        # Create backend app.yaml with pre-built image
+        cat > backend/app.yaml << 'APPYAML'
+        env: flex
+        service: backend
+        runtime: custom
+        runtime_config:
+          container_image: gcr.io/$PROJECT_ID/twogether-backend:$_IMAGE_TAG
 
-automatic_scaling:
-  min_num_instances: 1
-  max_num_instances: 2
-  cpu_utilization:
-    target_utilization: 0.6
+        automatic_scaling:
+          min_num_instances: 1
+          max_num_instances: 2
+          cpu_utilization:
+            target_utilization: 0.6
 
-readiness_check:
-  path: /health
-  check_interval_sec: 10
-  timeout_sec: 4
-  failure_threshold: 2
-  success_threshold: 2
+        readiness_check:
+          path: /health
+          check_interval_sec: 10
+          timeout_sec: 4
+          failure_threshold: 2
+          success_threshold: 2
 
-liveness_check:
-  path: /health
-  check_interval_sec: 30
-  timeout_sec: 4
-  failure_threshold: 2
-  success_threshold: 2
+        liveness_check:
+          path: /health
+          check_interval_sec: 30
+          timeout_sec: 4
+          failure_threshold: 2
+          success_threshold: 2
 
-env_variables:
-  RUST_LOG: info
-  ENVIRONMENT: production
-  DATABASE_URL: \"{os.environ['DATABASE_URL']}\"
-  JWT_SECRET: \"{os.environ['JWT_SECRET']}\"
-  SUPABASE_URL: \"{os.environ['SUPABASE_URL']}\"
-  SUPABASE_ANON_KEY: \"{os.environ['SUPABASE_ANON_KEY']}\"
-  SUPABASE_SERVICE_ROLE_KEY: \"{os.environ['SUPABASE_SERVICE_ROLE_KEY']}\"
-  EMAIL_FROM: \"{os.environ['EMAIL_FROM']}\"
-  EMAIL_PASS: \"{os.environ['EMAIL_PASS']}\"
-  RESEND_API_KEY: \"{os.environ['RESEND_API_KEY']}\"
-  CORS_ORIGIN: \"{os.environ['CORS_ORIGIN']}\"
-'''
-with open('backend/app.yaml', 'w') as f:
-    f.write(content)
-"
+        env_variables:
+          RUST_LOG: info
+          ENVIRONMENT: production
+          DATABASE_URL: "$DATABASE_URL"
+          JWT_SECRET: "$JWT_SECRET"
+          SUPABASE_URL: "$SUPABASE_URL"
+          SUPABASE_ANON_KEY: "$SUPABASE_ANON_KEY"
+          SUPABASE_SERVICE_ROLE_KEY: "$SUPABASE_SERVICE_ROLE_KEY"
+          EMAIL_FROM: "$EMAIL_FROM"
+          EMAIL_PASS: "$EMAIL_PASS"
+          RESEND_API_KEY: "$RESEND_API_KEY"
+          CORS_ORIGIN: "$CORS_ORIGIN"
+        APPYAML
 
         # Deploy to App Engine
         gcloud app deploy backend/app.yaml frontend/app.yaml dispatch.yaml --quiet --project=$PROJECT_ID
