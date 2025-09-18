@@ -1,0 +1,87 @@
+steps:
+  # Deploy backend to App Engine
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # Create clean backend directory with minimal Dockerfile
+        mkdir -p clean-backend
+
+        # Create minimal Dockerfile that references pre-built image
+        cat > clean-backend/Dockerfile << 'DOCKERFILE'
+        FROM gcr.io/$PROJECT_ID/twogether-backend:$_IMAGE_TAG
+        DOCKERFILE
+
+        # Create backend app.yaml for custom runtime
+        cat > clean-backend/app.yaml << 'APPYAML'
+        env: flex
+        service: backend
+        runtime: custom
+
+        automatic_scaling:
+          min_num_instances: 1
+          max_num_instances: 2
+          cpu_utilization:
+            target_utilization: 0.6
+
+        readiness_check:
+          path: /health
+          check_interval_sec: 10
+          timeout_sec: 4
+          failure_threshold: 2
+          success_threshold: 2
+
+        liveness_check:
+          path: /health
+          check_interval_sec: 30
+          timeout_sec: 4
+          failure_threshold: 2
+          success_threshold: 2
+
+        env_variables:
+          RUST_LOG: info
+          ENVIRONMENT: production
+          DATABASE_URL: "$_DATABASE_URL"
+          JWT_SECRET: "$_JWT_SECRET"
+          SUPABASE_URL: "$_SUPABASE_URL"
+          SUPABASE_ANON_KEY: "$_SUPABASE_ANON_KEY"
+          SUPABASE_SERVICE_ROLE_KEY: "$_SUPABASE_SERVICE_ROLE_KEY"
+          EMAIL_FROM: "$_EMAIL_FROM"
+          EMAIL_PASS: "$_EMAIL_PASS"
+          RESEND_API_KEY: "$_RESEND_API_KEY"
+          CORS_ORIGIN: "$_CORS_ORIGIN"
+        APPYAML
+
+        # Deploy backend service only
+        gcloud app deploy clean-backend/app.yaml --quiet --project=$PROJECT_ID
+    env:
+      - 'PROJECT_ID=$PROJECT_ID'
+      - '_IMAGE_TAG=$_IMAGE_TAG'
+      - 'DATABASE_URL=$_DATABASE_URL'
+      - 'JWT_SECRET=$_JWT_SECRET'
+      - 'SUPABASE_URL=$_SUPABASE_URL'
+      - 'SUPABASE_ANON_KEY=$_SUPABASE_ANON_KEY'
+      - 'SUPABASE_SERVICE_ROLE_KEY=$_SUPABASE_SERVICE_ROLE_KEY'
+      - 'EMAIL_FROM=$_EMAIL_FROM'
+      - 'EMAIL_PASS=$_EMAIL_PASS'
+      - 'RESEND_API_KEY=$_RESEND_API_KEY'
+      - 'CORS_ORIGIN=$_CORS_ORIGIN'
+
+# Backend deployment timeout - 10 minutes
+timeout: '600s'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _IMAGE_TAG: ''
+  _DATABASE_URL: ''
+  _JWT_SECRET: ''
+  _SUPABASE_URL: ''
+  _SUPABASE_ANON_KEY: ''
+  _SUPABASE_SERVICE_ROLE_KEY: ''
+  _EMAIL_FROM: ''
+  _EMAIL_PASS: ''
+  _RESEND_API_KEY: ''
+  _CORS_ORIGIN: ''
