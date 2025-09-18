@@ -163,7 +163,7 @@ jobs:
           gcloud container images describe gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }}
 
       - name: Deploy backend with Cloud Build
-        timeout-minutes: 10
+        timeout-minutes: 15
         run: |
           echo "🚀 Deploying backend with pre-built image..."
           gcloud builds submit --config=cloudbuild-backend.yaml --project=${{ env.PROJECT_ID }} \
