@@ -151,7 +151,13 @@ jobs:
           docker build -t gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }} .
           echo "📤 Pushing to Google Container Registry..."
           docker push gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }}
+          echo "✅ Image pushed successfully: gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }}"
 
+
+      - name: Verify Docker image exists
+        run: |
+          echo "🔍 Verifying image exists in GCR..."
+          gcloud container images describe gcr.io/${{ env.PROJECT_ID }}/twogether-backend:${{ github.sha }}
 
       - name: Deploy with Cloud Build (lightweight deployment)
         timeout-minutes: 15
