@@ -16,16 +16,19 @@ steps:
     args:
       - '-c'
       - |
-        # Create clean backend directory without Dockerfile
+        # Create clean backend directory with minimal Dockerfile
         mkdir -p clean-backend
 
-        # Create backend app.yaml with pre-built image
+        # Create minimal Dockerfile that references pre-built image
+        cat > clean-backend/Dockerfile << 'DOCKERFILE'
+        FROM gcr.io/$PROJECT_ID/twogether-backend:$_IMAGE_TAG
+        DOCKERFILE
+
+        # Create backend app.yaml for custom runtime
         cat > clean-backend/app.yaml << 'APPYAML'
         env: flex
         service: backend
         runtime: custom
-        runtime_config:
-          container_image: gcr.io/$PROJECT_ID/twogether-backend:$_IMAGE_TAG
 
         automatic_scaling:
           min_num_instances: 1
