@@ -25,7 +25,7 @@ FROM debian:bullseye-slim
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     libpq5 \
-    libssl3 \
+    libssl1.1 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
