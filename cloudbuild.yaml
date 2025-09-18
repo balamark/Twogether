@@ -47,15 +47,15 @@ steps:
         env_variables:
           RUST_LOG: info
           ENVIRONMENT: production
-          DATABASE_URL: "$DATABASE_URL"
-          JWT_SECRET: "$JWT_SECRET"
-          SUPABASE_URL: "$SUPABASE_URL"
-          SUPABASE_ANON_KEY: "$SUPABASE_ANON_KEY"
-          SUPABASE_SERVICE_ROLE_KEY: "$SUPABASE_SERVICE_ROLE_KEY"
-          EMAIL_FROM: "$EMAIL_FROM"
-          EMAIL_PASS: "$EMAIL_PASS"
-          RESEND_API_KEY: "$RESEND_API_KEY"
-          CORS_ORIGIN: "$CORS_ORIGIN"
+          DATABASE_URL: "$_DATABASE_URL"
+          JWT_SECRET: "$_JWT_SECRET"
+          SUPABASE_URL: "$_SUPABASE_URL"
+          SUPABASE_ANON_KEY: "$_SUPABASE_ANON_KEY"
+          SUPABASE_SERVICE_ROLE_KEY: "$_SUPABASE_SERVICE_ROLE_KEY"
+          EMAIL_FROM: "$_EMAIL_FROM"
+          EMAIL_PASS: "$_EMAIL_PASS"
+          RESEND_API_KEY: "$_RESEND_API_KEY"
+          CORS_ORIGIN: "$_CORS_ORIGIN"
         APPYAML
 
         # Deploy to App Engine
