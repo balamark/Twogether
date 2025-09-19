@@ -1,92 +1,132 @@
 steps:
-  # Build frontend
+  # Install dependencies and build frontend
   - name: 'node:20'
-    dir: 'frontend'
-    entrypoint: 'npm'
-    args: ['ci']
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        echo "📦 Installing dependencies..."
+        npm ci --production
+        
+        echo "🎨 Building React frontend..."
+        npm run build
+        
+        echo "✅ Frontend build complete"
 
-  - name: 'node:20'
-    dir: 'frontend'
-    entrypoint: 'npm'
-    args: ['run', 'build']
-
-  # Deploy backend to App Engine
+  # Deploy combined app to App Engine Standard
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'bash'
     args:
       - '-c'
       - |
-        # Create clean backend directory with minimal Dockerfile
-        mkdir -p clean-backend
-
-        # Create minimal Dockerfile that references pre-built image
-        cat > clean-backend/Dockerfile << 'DOCKERFILE'
-        FROM gcr.io/$PROJECT_ID/twogether-backend:$_IMAGE_TAG
-        DOCKERFILE
-
-        # Create backend app.yaml for custom runtime
-        cat > clean-backend/app.yaml << 'APPYAML'
-        env: flex
-        service: backend
-        runtime: custom
-
+        # Create app.yaml with substituted environment variables
+        cat > app.yaml << 'APPYAML'
+        runtime: nodejs20
+        
+        # Environment variables (secure method)
+        env_variables:
+          NODE_ENV: "production"
+          PORT: "8080"
+          # Database connection
+          DATABASE_URL: "$_DATABASE_URL"
+          # JWT Secret
+          JWT_SECRET: "$_JWT_SECRET"
+          # Supabase configuration
+          SUPABASE_URL: "$_SUPABASE_URL"
+          SUPABASE_ANON_KEY: "$_SUPABASE_ANON_KEY"
+          SUPABASE_SERVICE_ROLE_KEY: "$_SUPABASE_SERVICE_ROLE_KEY"
+          # Email configuration
+          EMAIL_FROM: "$_EMAIL_FROM"
+          EMAIL_PASS: "$_EMAIL_PASS"
+          RESEND_API_KEY: "$_RESEND_API_KEY"
+          # CORS origin (not needed for combined app)
+          CORS_ORIGIN: "$_CORS_ORIGIN"
+        
+        # Automatic scaling (free tier compatible)
         automatic_scaling:
-          min_num_instances: 1
-          max_num_instances: 2
-          cpu_utilization:
-            target_utilization: 0.6
-
+          min_instances: 0
+          max_instances: 2
+          target_cpu_utilization: 0.6
+        
+        # Instance class (free tier)
+        instance_class: F1
+        
+        # Static file handling for React assets
+        handlers:
+          # Static assets with cache headers
+          - url: /assets/.*
+            static_files: dist/assets/\1
+            upload: dist/assets/.*
+            secure: always
+            expiration: "1d"
+            
+          # Images with cache headers
+          - url: /images/.*
+            static_files: dist/images/\1
+            upload: dist/images/.*
+            secure: always
+            expiration: "1h"
+            
+          # Favicon and other root assets
+          - url: /(.*\.(ico|png|svg))$
+            static_files: dist/\1
+            upload: dist/.*\.(ico|png|svg)$
+            secure: always
+            expiration: "1d"
+            
+          # API routes go to the server
+          - url: /api/.*
+            script: auto
+            secure: always
+            
+          # Health check
+          - url: /health
+            script: auto
+            secure: always
+            
+          # All other routes serve the React app (for client-side routing)
+          - url: /.*
+            script: auto
+            secure: always
+        
+        # Health check
         readiness_check:
-          path: /health
+          path: "/health"
           check_interval_sec: 10
           timeout_sec: 4
           failure_threshold: 2
           success_threshold: 2
-
+          app_start_timeout_sec: 300
+        
         liveness_check:
-          path: /health
+          path: "/health"
           check_interval_sec: 30
           timeout_sec: 4
           failure_threshold: 2
           success_threshold: 2
-
-        env_variables:
-          RUST_LOG: info
-          ENVIRONMENT: production
-          DATABASE_URL: "$_DATABASE_URL"
-          JWT_SECRET: "$_JWT_SECRET"
-          SUPABASE_URL: "$_SUPABASE_URL"
-          SUPABASE_ANON_KEY: "$_SUPABASE_ANON_KEY"
-          SUPABASE_SERVICE_ROLE_KEY: "$_SUPABASE_SERVICE_ROLE_KEY"
-          EMAIL_FROM: "$_EMAIL_FROM"
-          EMAIL_PASS: "$_EMAIL_PASS"
-          RESEND_API_KEY: "$_RESEND_API_KEY"
-          CORS_ORIGIN: "$_CORS_ORIGIN"
         APPYAML
-
-        # Deploy to App Engine using clean directory
-        gcloud app deploy clean-backend/app.yaml frontend/app.yaml dispatch.yaml --quiet --project=$PROJECT_ID
+        
+        # Deploy combined application
+        gcloud app deploy app.yaml --quiet --project=$PROJECT_ID --version=combined-$(date +%Y%m%dt%H%M%S) --promote
     env:
       - 'PROJECT_ID=$PROJECT_ID'
-      - '_IMAGE_TAG=$_IMAGE_TAG'
-      - 'DATABASE_URL=$_DATABASE_URL'
-      - 'JWT_SECRET=$_JWT_SECRET'
-      - 'SUPABASE_URL=$_SUPABASE_URL'
-      - 'SUPABASE_ANON_KEY=$_SUPABASE_ANON_KEY'
-      - 'SUPABASE_SERVICE_ROLE_KEY=$_SUPABASE_SERVICE_ROLE_KEY'
-      - 'EMAIL_FROM=$_EMAIL_FROM'
-      - 'EMAIL_PASS=$_EMAIL_PASS'
-      - 'RESEND_API_KEY=$_RESEND_API_KEY'
-      - 'CORS_ORIGIN=$_CORS_ORIGIN'
+      - '_DATABASE_URL=$_DATABASE_URL'
+      - '_JWT_SECRET=$_JWT_SECRET'
+      - '_SUPABASE_URL=$_SUPABASE_URL'
+      - '_SUPABASE_ANON_KEY=$_SUPABASE_ANON_KEY'
+      - '_SUPABASE_SERVICE_ROLE_KEY=$_SUPABASE_SERVICE_ROLE_KEY'
+      - '_EMAIL_FROM=$_EMAIL_FROM'
+      - '_EMAIL_PASS=$_EMAIL_PASS'
+      - '_RESEND_API_KEY=$_RESEND_API_KEY'
+      - '_CORS_ORIGIN=$_CORS_ORIGIN'
 
-# Overall build timeout - 10 minutes (deployment only)
-timeout: '600s'
+# Combined app deployment timeout - 15 minutes
+timeout: '900s'
 
 options:
   logging: CLOUD_LOGGING_ONLY
 
 substitutions:
-  _IMAGE_TAG: ''
   _DATABASE_URL: ''
   _JWT_SECRET: ''
   _SUPABASE_URL: ''

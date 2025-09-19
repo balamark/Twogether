@@ -1,0 +1,83 @@
+runtime: nodejs20
+
+# Environment variables (secure method)
+env_variables:
+  NODE_ENV: "production"
+  PORT: "8080"
+  # Database connection
+  DATABASE_URL: "$_DATABASE_URL"
+  # JWT Secret
+  JWT_SECRET: "$_JWT_SECRET"
+  # Supabase configuration
+  SUPABASE_URL: "$_SUPABASE_URL"
+  SUPABASE_ANON_KEY: "$_SUPABASE_ANON_KEY"
+  SUPABASE_SERVICE_ROLE_KEY: "$_SUPABASE_SERVICE_ROLE_KEY"
+  # Email configuration
+  EMAIL_FROM: "$_EMAIL_FROM"
+  EMAIL_PASS: "$_EMAIL_PASS"
+  RESEND_API_KEY: "$_RESEND_API_KEY"
+  # CORS origin (not needed for combined app)
+  CORS_ORIGIN: "$_CORS_ORIGIN"
+
+# Automatic scaling (free tier compatible)
+automatic_scaling:
+  min_instances: 0
+  max_instances: 2
+  target_cpu_utilization: 0.6
+
+# Instance class (free tier)
+instance_class: F1
+
+# Static file handling for React assets
+handlers:
+  # Static assets with cache headers
+  - url: /assets/.*
+    static_files: dist/assets/\1
+    upload: dist/assets/.*
+    secure: always
+    expiration: "1d"
+    
+  # Images with cache headers
+  - url: /images/.*
+    static_files: dist/images/\1
+    upload: dist/images/.*
+    secure: always
+    expiration: "1h"
+    
+  # Favicon and other root assets
+  - url: /(.*\.(ico|png|svg))$
+    static_files: dist/\1
+    upload: dist/.*\.(ico|png|svg)$
+    secure: always
+    expiration: "1d"
+    
+  # API routes go to the server
+  - url: /api/.*
+    script: auto
+    secure: always
+    
+  # Health check
+  - url: /health
+    script: auto
+    secure: always
+    
+  # All other routes serve the React app (for client-side routing)
+  - url: /.*
+    script: auto
+    secure: always
+
+# Health check
+readiness_check:
+  path: "/health"
+  check_interval_sec: 10
+  timeout_sec: 4
+  failure_threshold: 2
+  success_threshold: 2
+  app_start_timeout_sec: 300
+
+liveness_check:
+  path: "/health"
+  check_interval_sec: 30
+  timeout_sec: 4
+  failure_threshold: 2
+  success_threshold: 2

@@ -69,7 +69,7 @@ steps:
       - 'CORS_ORIGIN=$_CORS_ORIGIN'
 
 # Backend deployment timeout - 10 minutes
-timeout: '600s'
+timeout: '1200s'
 
 options:
   logging: CLOUD_LOGGING_ONLY
