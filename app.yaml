@@ -22,8 +22,8 @@ env_variables:
 # Automatic scaling (free tier compatible)
 automatic_scaling:
   min_instances: 0
-  max_instances: 2
-  target_cpu_utilization: 0.6
+  max_instances: 1
+  target_cpu_utilization: 0.8
 
 # Instance class (free tier)
 instance_class: F1

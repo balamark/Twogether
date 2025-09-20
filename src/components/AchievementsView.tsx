@@ -90,7 +90,7 @@ export function AchievementsView() {
         apiService.getAchievements(),
         apiService.getStats(),
       ]);
-      setAchievements(achievementsData as AchievementStats);
+      setAchievements((achievementsData as any).stats as AchievementStats);
       setStats(statsData as IntimacyStats);
     } catch (err: unknown) {
       console.error('Failed to load achievements and stats:', err);
@@ -282,7 +282,7 @@ export function AchievementsView() {
           </div>
 
           {/* Recent Achievements */}
-          {achievements.recent_achievements.length > 0 && (
+          {achievements.recent_achievements && achievements.recent_achievements.length > 0 && (
             <div>
               <h3 className="text-lg font-semibold text-gray-800 mb-4">最近解鎖</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

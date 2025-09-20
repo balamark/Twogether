@@ -540,7 +540,7 @@ class ApiService {
   async createCouple(data: CreateCoupleRequest): Promise<CoupleResponse> {
     try {
       const response = await apiClient.post('/couples', data);
-      return this.transformCoupleResponse(response.data);
+      return this.transformCoupleResponse(response.data.couple);
     } catch (error: unknown) {
       console.error('Failed to create couple:', error);
       throw new Error((error as ApiErrorResponse)?.message || '無法創建情侶關係');
@@ -550,7 +550,7 @@ class ApiService {
   async getCouple(): Promise<CoupleResponse> {
     try {
       const response = await apiClient.get('/couples');
-      return this.transformCoupleResponse(response.data);
+      return this.transformCoupleResponse(response.data.couple);
     } catch (error: unknown) {
       console.error('Failed to get couple:', error);
       throw new Error((error as ApiErrorResponse)?.message || '無法獲取情侶信息');

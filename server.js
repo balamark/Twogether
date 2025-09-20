@@ -17,8 +17,9 @@ const coinRoutes = require('./routes/coins');
 const statsRoutes = require('./routes/stats');
 const intimacyRequestRoutes = require('./routes/intimacy-requests');
 
-// Import database
+// Import database and middleware
 const db = require('./database/db');
+const { requestLogger, errorHandler, asyncHandler } = require('./middleware/logging');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -69,6 +70,9 @@ app.use(limiter);
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
+// Add comprehensive request/response logging
+app.use(requestLogger);
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({
@@ -107,32 +111,8 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  
-  if (err.name === 'ValidationError') {
-    return res.status(400).json({
-      success: false,
-      message: 'Validation error',
-      errors: err.errors
-    });
-  }
-  
-  if (err.name === 'UnauthorizedError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Unauthorized access'
-    });
-  }
-  
-  res.status(500).json({
-    success: false,
-    message: process.env.NODE_ENV === 'production' 
-      ? 'Internal server error' 
-      : err.message
-  });
-});
+// Error handling middleware (comprehensive logging)
+app.use(errorHandler);
 
 // Start server
 app.listen(PORT, async () => {

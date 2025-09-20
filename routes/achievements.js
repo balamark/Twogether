@@ -123,6 +123,12 @@ router.get('/', async (req, res) => {
 
     const unlockedCount = achievements.filter(a => a.unlocked).length;
 
+    // Get recent achievements (last 5 unlocked, sorted by unlock date)
+    const recentAchievements = achievements
+      .filter(a => a.unlocked)
+      .sort((a, b) => new Date(b.unlocked_at) - new Date(a.unlocked_at))
+      .slice(0, 5);
+
     res.json({
       success: true,
       achievements: groupedAchievements,
@@ -130,7 +136,8 @@ router.get('/', async (req, res) => {
         total_achievements: achievements.length,
         unlocked_achievements: unlockedCount,
         total_points: totalPoints,
-        completion_rate: Math.round((unlockedCount / achievements.length) * 100)
+        completion_rate: Math.round((unlockedCount / achievements.length) * 100),
+        recent_achievements: recentAchievements
       }
     });
 

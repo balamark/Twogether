@@ -117,7 +117,7 @@ router.get('/', async (req, res) => {
         total_coins: parseInt(stats.total_coins) || 0,
         anniversary_date: couple.anniversary_date
       },
-      monthly_breakdown: monthlyResult.rows.map(row => ({
+      monthly_data: monthlyResult.rows.map(row => ({
         month: row.month,
         count: parseInt(row.count)
       })),

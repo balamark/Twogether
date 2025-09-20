@@ -147,6 +147,62 @@ router.post('/', [
   }
 });
 
+// Generate pairing code (alternative endpoint for frontend compatibility)
+router.post('/pairing-code', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    console.info(`🔗 User ${userId} requesting pairing code generation`);
+
+    // Check if user has a couple
+    const coupleResult = await db.query(
+      'SELECT id FROM couples WHERE user1_id = $1 AND user2_id IS NULL',
+      [userId]
+    );
+
+    if (coupleResult.rows.length === 0) {
+      console.warn(`⚠️ User ${userId} tried to generate pairing code but has no incomplete couple`);
+      return res.status(404).json({
+        success: false,
+        message: '找不到可配對的情侶關係',
+        error_code: 'NO_INCOMPLETE_COUPLE'
+      });
+    }
+
+    const coupleId = coupleResult.rows[0].id;
+
+    // Generate 6-digit code
+    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // Delete existing codes for this couple
+    await db.query(
+      'DELETE FROM pairing_codes WHERE couple_id = $1',
+      [coupleId]
+    );
+
+    // Insert new pairing code
+    await db.query(
+      'INSERT INTO pairing_codes (code, couple_id, created_by, expires_at) VALUES ($1, $2, $3, $4)',
+      [code, coupleId, userId, expiresAt]
+    );
+
+    console.log(`✅ Pairing code generated for couple ${coupleId}: ${code}`);
+
+    res.json({
+      success: true,
+      code,
+      expires_at: expiresAt
+    });
+
+  } catch (error) {
+    console.error('Generate pairing code error:', error);
+    res.status(500).json({
+      success: false,
+      message: '生成配對碼失敗'
+    });
+  }
+});
+
 // Generate pairing code
 router.post('/generate-pairing-code', async (req, res) => {
   try {
@@ -393,8 +449,12 @@ router.put('/nicknames', [
 
     const userId = req.user.id;
     const { partner1, partner2 } = req.body;
-    
-    console.info(`💑 Updating nicknames for user ${userId}: partner1=${partner1}, partner2=${partner2}`);
+
+    // Validate and sanitize input
+    const validPartner1 = partner1 && typeof partner1 === 'string' && partner1.trim() && partner1 !== 'undefined' ? partner1.trim() : null;
+    const validPartner2 = partner2 && typeof partner2 === 'string' && partner2.trim() && partner2 !== 'undefined' ? partner2.trim() : null;
+
+    console.info(`💑 Updating nicknames for user ${userId}: partner1=${validPartner1}, partner2=${validPartner2}`);
 
     // Find user's couple
     const coupleResult = await db.query(`
@@ -422,23 +482,25 @@ router.put('/nicknames', [
     
     console.info(`💑 User ${userId} is ${isUser1 ? 'user1' : 'user2'} in couple ${couple.id}`);
 
-    // Update the calling user's nickname if partner1 is provided
-    if (partner1) {
+    // Update the calling user's nickname if validPartner1 is provided
+    if (validPartner1) {
       await db.query(
         'UPDATE users SET nickname = $1 WHERE id = $2',
-        [partner1, userId]
+        [validPartner1, userId]
       );
-      console.info(`✅ Updated user ${userId} nickname to: ${partner1}`);
+      console.info(`✅ Updated user ${userId} nickname to: ${validPartner1}`);
     }
 
-    // Update partner's nickname if partner2 is provided and couple is complete
-    if (partner2 && couple.user2_id) {
+    // Update partner's nickname if validPartner2 is provided and couple is complete
+    if (validPartner2 && couple.user2_id) {
       const partnerId = isUser1 ? couple.user2_id : couple.user1_id;
       await db.query(
         'UPDATE users SET nickname = $1 WHERE id = $2',
-        [partner2, partnerId]
+        [validPartner2, partnerId]
       );
-      console.info(`✅ Updated partner ${partnerId} nickname to: ${partner2}`);
+      console.info(`✅ Updated partner ${partnerId} nickname to: ${validPartner2}`);
+    } else if (validPartner2 && !couple.user2_id) {
+      console.warn(`⚠️ Cannot update partner2 nickname: couple ${couple.id} is incomplete (no user2)`);
     }
 
     res.json({
