@@ -116,7 +116,17 @@ app.use('/api/pairing-requests', pairingRequestRoutes);
 app.use('/api/intimacy', intimacyRequestRoutes);
 
 // Serve static files from the frontend build
-app.use(express.static(path.join(__dirname, 'dist')));
+app.use(express.static(path.join(__dirname, 'dist'), {
+  setHeaders: (res, path) => {
+    // Cache assets with hash for a year
+    if (path.includes('/assets/')) {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    } else {
+      // Don't cache HTML files
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  }
+}));
 
 // Handle React Router - serve index.html for all non-API routes
 app.get('*', (req, res) => {
@@ -125,6 +135,14 @@ app.get('*', (req, res) => {
     return res.status(404).json({
       success: false,
       message: 'API route not found'
+    });
+  }
+  
+  // Don't serve index.html for static asset requests
+  if (req.path.startsWith('/assets/')) {
+    return res.status(404).json({
+      success: false,
+      message: 'Asset not found'
     });
   }
   
