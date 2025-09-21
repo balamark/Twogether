@@ -155,9 +155,9 @@ class TestRunner {
     // Test duplicate registration
     await this.test('Duplicate Registration Prevention', async () => {
       const response = await this.makeRequest('POST', '/auth/register', {
-        email: 'test@example.com',
-        nickname: 'TestUser',
-        password: 'password123'
+        email: this.testUser.email,
+        nickname: this.testUser.nickname,
+        password: this.testUser.password
       });
       this.assertStatus(response, 409, 'Duplicate registration should return 409 Conflict');
     });
