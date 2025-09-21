@@ -1,23 +1,25 @@
 runtime: nodejs20
 
+runtime: nodejs20
+
 # Environment variables (secure method)
 env_variables:
   NODE_ENV: "production"
   PORT: "8080"
   # Database connection
-  DATABASE_URL: "$_DATABASE_URL"
+  DATABASE_URL: $_DATABASE_URL
   # JWT Secret
-  JWT_SECRET: "$_JWT_SECRET"
+  JWT_SECRET: $_JWT_SECRET
   # Supabase configuration
-  SUPABASE_URL: "$_SUPABASE_URL"
-  SUPABASE_ANON_KEY: "$_SUPABASE_ANON_KEY"
-  SUPABASE_SERVICE_ROLE_KEY: "$_SUPABASE_SERVICE_ROLE_KEY"
+  SUPABASE_URL: $_SUPABASE_URL
+  SUPABASE_ANON_KEY: $_SUPABASE_ANON_KEY
+  SUPABASE_SERVICE_ROLE_KEY: $_SUPABASE_SERVICE_ROLE_KEY
   # Email configuration
-  EMAIL_FROM: "$_EMAIL_FROM"
-  EMAIL_PASS: "$_EMAIL_PASS"
-  RESEND_API_KEY: "$_RESEND_API_KEY"
+  EMAIL_FROM: $_EMAIL_FROM
+  EMAIL_PASS: $_EMAIL_PASS
+  RESEND_API_KEY: $_RESEND_API_KEY
   # CORS origin (not needed for combined app)
-  CORS_ORIGIN: "$_CORS_ORIGIN"
+  CORS_ORIGIN: $_CORS_ORIGIN
 
 # Automatic scaling (free tier compatible)
 automatic_scaling:

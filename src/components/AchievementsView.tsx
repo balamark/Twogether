@@ -450,9 +450,9 @@ function MonthlyBarChart({ data }: { data: number[] }) {
 
   return (
     <div className="w-full">
-      <div className="flex gap-3 h-40 sm:h-48">
+      <div className="flex gap-2 sm:gap-3 h-40 sm:h-48">
         {/* Y Axis */}
-        <div className="w-8 sm:w-10 flex flex-col justify-between text-[10px] text-gray-400">
+        <div className="w-6 sm:w-10 flex flex-col justify-between text-[8px] sm:text-[10px] text-gray-400 flex-shrink-0">
           {tickValues.slice().reverse().map((v, i) => (
             <div key={i} className="-translate-y-1">{v}</div>
           ))}
@@ -467,7 +467,7 @@ function MonthlyBarChart({ data }: { data: number[] }) {
               style={{ bottom: `${(v / max) * 100}%` }}
             />
           ))}
-          <div className="grid grid-cols-12 gap-2 items-end h-full relative">
+          <div className="grid grid-cols-12 gap-1 sm:gap-2 items-end h-full relative">
             {data.map((value, idx) => {
               const height = (value / max) * 100;
               return (
@@ -478,12 +478,12 @@ function MonthlyBarChart({ data }: { data: number[] }) {
                   />
                   {/* Tooltip */}
                   <div
-                    className="absolute left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-gray-800 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-gray-800 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap"
                     style={{ bottom: `calc(${height}% + 8px)` }}
                   >
                     {labels[idx]}月：{value}
                   </div>
-                  <div className="mt-2 text-xs text-gray-600">{labels[idx]}</div>
+                  <div className="mt-1 sm:mt-2 text-[8px] sm:text-xs text-gray-600 text-center">{labels[idx]}</div>
                 </div>
               );
             })}
@@ -500,17 +500,18 @@ function DailyBarChart({ data, days }: { data: number[]; days: number }) {
   const max = Math.max(1, ...data);
   const ticks = 4;
   const tickValues = Array.from({ length: ticks + 1 }, (_, i) => Math.round((max * i) / ticks));
+  
   return (
-    <div className="w-full overflow-hidden">
+    <div className="w-full">
       <div className="flex gap-3 h-32 sm:h-40">
         {/* Y Axis */}
-        <div className="w-8 sm:w-10 flex flex-col justify-between text-[10px] text-gray-400">
+        <div className="w-8 sm:w-10 flex flex-col justify-between text-[10px] text-gray-400 flex-shrink-0">
           {tickValues.slice().reverse().map((v, i) => (
             <div key={i} className="-translate-y-1">{v}</div>
           ))}
         </div>
-        {/* Chart Area */}
-        <div className="relative flex-1">
+        {/* Chart Area - Make it scrollable horizontally on mobile */}
+        <div className="relative flex-1 overflow-hidden">
           {tickValues.map((v, i) => (
             <div
               key={i}
@@ -518,29 +519,41 @@ function DailyBarChart({ data, days }: { data: number[]; days: number }) {
               style={{ bottom: `${(v / max) * 100}%` }}
             />
           ))}
-          <div className="grid items-end h-full" style={{ gridTemplateColumns: `repeat(${days}, minmax(8px, 1fr))` }}>
-            {data.map((value, idx) => {
-              const height = (value / max) * 100;
-              return (
-                <div key={idx} className="group flex flex-col items-center h-full relative">
-                  <div
-                    className="w-full rounded-t bg-gradient-to-t from-indigo-500 to-pink-500 transition-transform duration-200 group-hover:scale-y-105"
-                    style={{ height: `${height}%`, minHeight: value > 0 ? '2px' : '0' }}
-                  />
-                  <div
-                    className="absolute left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-gray-800 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{ bottom: `calc(${height}% + 6px)` }}
-                  >
-                    第{labels[idx]}天：{value}
+          {/* Scrollable container for mobile */}
+          <div className="overflow-x-auto">
+            <div 
+              className="grid items-end h-full gap-1 sm:gap-2" 
+              style={{ 
+                gridTemplateColumns: `repeat(${days}, minmax(${days > 20 ? '16px' : '20px'}, 1fr))`,
+                minWidth: days > 20 ? `${days * 18}px` : 'auto' // Ensure minimum width for scrolling
+              }}
+            >
+              {data.map((value, idx) => {
+                const height = (value / max) * 100;
+                return (
+                  <div key={idx} className="group flex flex-col items-center h-full relative">
+                    <div
+                      className="w-full rounded-t bg-gradient-to-t from-indigo-500 to-pink-500 transition-transform duration-200 group-hover:scale-y-105"
+                      style={{ height: `${height}%`, minHeight: value > 0 ? '2px' : '0' }}
+                    />
+                    <div
+                      className="absolute left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-gray-800 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap"
+                      style={{ bottom: `calc(${height}% + 6px)` }}
+                    >
+                      第{labels[idx]}天：{value}
+                    </div>
+                    <div className="mt-1 text-[8px] sm:text-[10px] text-gray-500 text-center">{labels[idx]}</div>
                   </div>
-                  <div className="mt-1 text-[10px] text-gray-500">{labels[idx]}</div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
-      <div className="mt-2 text-right text-xs text-gray-500">最高 {Math.max(...data)} 次</div>
+      <div className="mt-2 flex justify-between text-xs text-gray-500">
+        <span>左右滑動查看所有天數</span>
+        <span>最高 {Math.max(...data)} 次</span>
+      </div>
     </div>
   );
 }

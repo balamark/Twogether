@@ -25,7 +25,7 @@ jobs:
         with:
           filters: |
             app:
-              - 'frontend/**'
+              - 'src/**'
               - 'routes/**'
               - 'database/**'
               - 'middleware/**'
@@ -33,9 +33,8 @@ jobs:
               - 'package.json'
               - 'app.yaml'
               - '.github/workflows/deploy.yml'
-              - 'cloudbuild.yaml'
 
-  test-app:
+  test-and-deploy:
     needs: [changes]
     if: ${{ needs.changes.outputs.app == 'true' }}
     runs-on: ubuntu-latest
@@ -54,13 +53,19 @@ jobs:
           - 5432:5432
     steps:
       - uses: actions/checkout@v4
+      
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      - name: Install backend dependencies
+      
+      - name: Install dependencies
         run: npm ci
+      
+      - name: Build frontend
+        run: npm run build
+      
       - name: Test backend
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/twogether_test
@@ -70,60 +75,43 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: test-service-key
         run: npm run test:backend
 
-      - name: Install frontend dependencies and test
-        working-directory: ./frontend
-        run: |
-          npm ci
-          npm run build
-      - name: Run frontend E2E tests
-        working-directory: ./frontend
-        env:
-          CI: true
-        run: |
-          # Skip E2E tests in CI for now (can be added later)
-          echo "Frontend build successful"
-
-  deploy:
-    needs: [changes, test-app]
-    if: always() && needs.changes.outputs.app == 'true' && !cancelled() && !failure()
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
       - name: Google Auth
+        if: github.ref == 'refs/heads/main'
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Setup Google Cloud CLI
+        if: github.ref == 'refs/heads/main'
         uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ env.PROJECT_ID }}
 
-      - name: Deploy combined app with Cloud Build
+      - name: Deploy to App Engine
+        if: github.ref == 'refs/heads/main'
         timeout-minutes: 15
-        run: |
-          echo "🚀 Deploying combined Twogether app to App Engine Standard..."
-          gcloud builds submit --config=cloudbuild.yaml --project=${{ env.PROJECT_ID }} \
-            --substitutions=_DATABASE_URL="${{ secrets.DATABASE_URL }}",_JWT_SECRET="${{ secrets.JWT_SECRET }}",_SUPABASE_URL="${{ secrets.SUPABASE_URL }}",_SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}",_SUPABASE_SERVICE_ROLE_KEY="${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}",_EMAIL_FROM="${{ secrets.EMAIL_FROM }}",_EMAIL_PASS="${{ secrets.EMAIL_PASS }}",_RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}",_CORS_ORIGIN="${{ secrets.CORS_ORIGIN }}"
-
-      - name: Check deployment status
-        if: always()
         env:
-          GH_TOKEN: ${{ github.token }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
         run: |
-          echo "📊 Deployment Status Check"
+          echo "🚀 Deploying Twogether app directly to App Engine..."
+          # Create app.yaml with actual environment variables
+          envsubst < app.yaml > app.yaml.tmp && mv app.yaml.tmp app.yaml
+          gcloud app deploy --quiet --project=${{ env.PROJECT_ID }}
 
-          # Check GitHub Actions run status
-          gh run list --limit 1 --json status,conclusion,headSha,workflowName
-
-          # Check App Engine services
-          echo "🚀 App Engine Services:"
-          gcloud app services list --project=${{ env.PROJECT_ID }}
-
-          # Check if deployment was successful
+      - name: Deployment Summary
+        if: always() && github.ref == 'refs/heads/main'
+        run: |
+          echo "📊 Deployment completed!"
           if [ ${{ job.status }} == "success" ]; then
-            echo "✅ Deployment completed successfully!"
+            echo "✅ Deployment successful!"
           else
-            echo "❌ Deployment failed or had issues"
+            echo "❌ Deployment failed"
           fi

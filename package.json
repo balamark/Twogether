@@ -10,7 +10,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --port 5174",
     "test": "npm run test:backend && npm run test:e2e",
-    "test:backend": "mocha test/**/*.test.js --recursive",
+    "test:backend": "node test-integration.js",
     "test:e2e": "npx playwright test",
     "test:e2e:ui": "npx playwright test --ui",
     "test:e2e:headed": "npx playwright test --headed",
