@@ -89,6 +89,7 @@ class TestRunner {
 
   async runAllTests() {
     console.log('🚀 Starting Twogether API Integration Tests\n');
+    // Updated: This test suite now triggers CI/CD pipeline on any changes
 
     // Health Check
     await this.test('Health Check', async () => {
