@@ -1,7 +1,15 @@
 #!/usr/bin/env node
 
-// Load environment variables
-require('dotenv').config();
+// Load environment variables based on NODE_ENV
+const path = require('path');
+
+if (process.env.NODE_ENV === 'test') {
+  require('dotenv').config({ path: path.join(__dirname, '..', '.env.test') });
+} else if (process.env.NODE_ENV === 'development') {
+  require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
+} else {
+  require('dotenv').config();
+}
 
 const migrator = require('../database/migrator');
 

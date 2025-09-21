@@ -25,7 +25,7 @@ class Migrator {
     const result = await db.query(
       'SELECT version FROM _sqlx_migrations WHERE success = true ORDER BY version'
     );
-    return result.rows.map(row => row.version);
+    return result.rows.map(row => parseInt(row.version));
   }
 
   async getMigrationFiles() {

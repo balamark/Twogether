@@ -1,4 +1,14 @@
 const { Pool } = require('pg');
+const path = require('path');
+
+// Load environment variables based on NODE_ENV
+if (process.env.NODE_ENV === 'test') {
+  require('dotenv').config({ path: path.join(__dirname, '..', '.env.test') });
+} else if (process.env.NODE_ENV === 'development') {
+  require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
+} else {
+  require('dotenv').config();
+}
 
 // Database connection configuration
 const isSupabase = process.env.DATABASE_URL?.includes('supabase.com');
