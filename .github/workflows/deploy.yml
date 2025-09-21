@@ -60,20 +60,39 @@ jobs:
           node-version: '20'
           cache: 'npm'
       
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+      
       - name: Install dependencies
         run: npm ci
       
       - name: Build frontend
         run: npm run build
       
-      - name: Test backend
+      - name: Set up test database and run tests
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/twogether_test
-          JWT_SECRET: test-secret-key
+          JWT_SECRET: test-secret-key-for-ci
           SUPABASE_URL: https://test.supabase.co
           SUPABASE_ANON_KEY: test-anon-key
           SUPABASE_SERVICE_ROLE_KEY: test-service-key
-        run: npm run test:backend
+          PORT: 8080
+          NODE_ENV: test
+        run: |
+          echo "�️ Setting up test database..."
+          # Wait for PostgreSQL to be ready
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+          
+          # Run database migrations
+          npm run migrate
+          
+          echo "🧪 Running integration tests with server..."
+          npm run test:ci
 
       - name: Google Auth
         if: github.ref == 'refs/heads/main'
@@ -91,15 +110,15 @@ jobs:
         if: github.ref == 'refs/heads/main'
         timeout-minutes: 15
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
-          CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
+          _DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          _JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          _SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          _SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          _SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          _EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          _EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          _RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          _CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
         run: |
           echo "🚀 Deploying Twogether app directly to App Engine..."
           # Create app.yaml with actual environment variables
