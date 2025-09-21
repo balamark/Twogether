@@ -13,10 +13,10 @@ router.use(authenticateToken);
 router.post('/', [
   body('message')
     .optional()
-    .isLength({ max: 500 })
-    .withMessage('訊息不能超過500個字符'),
+    .isLength({ max: 1000 })
+    .withMessage('訊息不能超過1000個字符'),
   body('request_type')
-    .isIn(['general', 'romantic', 'playful', 'surprise', 'compliment'])
+    .isIn(['general', 'romantic', 'playful', 'surprise', 'compliment', 'intimate'])
     .withMessage('請求類型無效')
 ], async (req, res) => {
   try {
@@ -61,11 +61,11 @@ router.post('/', [
 
     const result = await db.query(`
       INSERT INTO intimacy_requests (
-        id, couple_id, requester_id, recipient_id, message, request_type, 
+        id, couple_id, sender_id, receiver_id, message_content, request_type,
         status, created_at
       )
       VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
-      RETURNING id, message, request_type, status, created_at
+      RETURNING id, message_content, request_type, status, created_at
     `, [requestId, coupleId, userId, partnerId, message || null, request_type, now]);
 
     const request = result.rows[0];
@@ -81,7 +81,7 @@ router.post('/', [
         partnerId,
         'intimacy_request',
         '親密邀請',
-        request.message || '您收到了一個新的親密邀請',
+        request.message_content || '您收到了一個新的親密邀請',
         requestId,
         userId,
         2
@@ -126,16 +126,16 @@ router.get('/', async (req, res) => {
     const offset = (page - 1) * limit;
 
     // Build where conditions
-    let whereConditions = ['(ir.requester_id = $1 OR ir.recipient_id = $1)'];
+    let whereConditions = ['(ir.sender_id = $1 OR ir.receiver_id = $1)'];
     let params = [userId];
     let paramIndex = 2;
 
     if (type === 'sent') {
-      whereConditions.push(`ir.requester_id = $1`);
-      whereConditions = [`ir.requester_id = $1`]; // Override previous condition
+      whereConditions.push(`ir.sender_id = $1`);
+      whereConditions = [`ir.sender_id = $1`]; // Override previous condition
     } else if (type === 'received') {
-      whereConditions.push(`ir.recipient_id = $1`);
-      whereConditions = [`ir.recipient_id = $1`]; // Override previous condition
+      whereConditions.push(`ir.receiver_id = $1`);
+      whereConditions = [`ir.receiver_id = $1`]; // Override previous condition
     }
 
     if (status !== 'all') {
@@ -158,13 +158,13 @@ router.get('/', async (req, res) => {
     
     const result = await db.query(`
       SELECT 
-        ir.id, ir.message, ir.request_type, ir.status, ir.created_at, ir.responded_at,
-        requester.id as requester_id, requester.nickname as requester_nickname,
-        recipient.id as recipient_id, recipient.nickname as recipient_nickname,
-        CASE WHEN ir.requester_id = $1 THEN 'sent' ELSE 'received' END as direction
+        ir.id, ir.message_content, ir.request_type, ir.status, ir.created_at, ir.responded_at,
+        sender.id as sender_id, sender.nickname as sender_nickname,
+        receiver.id as receiver_id, receiver.nickname as receiver_nickname,
+        CASE WHEN ir.sender_id = $1 THEN 'sent' ELSE 'received' END as direction
       FROM intimacy_requests ir
-      JOIN users requester ON ir.requester_id = requester.id
-      JOIN users recipient ON ir.recipient_id = recipient.id
+      JOIN users sender ON ir.sender_id = sender.id
+      JOIN users receiver ON ir.receiver_id = receiver.id
       WHERE ${whereClause}
       ORDER BY ir.created_at DESC
       LIMIT $${paramIndex++} OFFSET $${paramIndex++}
@@ -172,19 +172,21 @@ router.get('/', async (req, res) => {
 
     const requests = result.rows.map(row => ({
       id: row.id,
-      message: row.message,
+      message_content: row.message_content,
       request_type: row.request_type,
       status: row.status,
       direction: row.direction,
       created_at: row.created_at,
       responded_at: row.responded_at,
+      sender_nickname: row.sender_nickname,
+      receiver_nickname: row.receiver_nickname,
       requester: {
-        id: row.requester_id,
-        nickname: row.requester_nickname
+        id: row.sender_id,
+        nickname: row.sender_nickname
       },
       recipient: {
-        id: row.recipient_id,
-        nickname: row.recipient_nickname
+        id: row.receiver_id,
+        nickname: row.receiver_nickname
       }
     }));
 
@@ -231,7 +233,7 @@ router.put('/:id/respond', [
 
     // Check if user is the recipient of this request
     const requestResult = await db.query(
-      'SELECT id, status, requester_id FROM intimacy_requests WHERE id = $1 AND recipient_id = $2',
+      'SELECT id, status, sender_id FROM intimacy_requests WHERE id = $1 AND receiver_id = $2',
       [requestId, userId]
     );
 
@@ -266,7 +268,7 @@ router.put('/:id/respond', [
         // Award coins to requester
         await client.query(
           'UPDATE users SET coins = COALESCE(coins, 0) + $1 WHERE id = $2',
-          [coinAmount, request.requester_id]
+          [coinAmount, request.sender_id]
         );
         
         // Award coins to recipient
@@ -282,7 +284,7 @@ router.put('/:id/respond', [
         await client.query(`
           INSERT INTO coin_transactions (id, user_id, amount, transaction_type, description, created_at)
           VALUES ($1, $2, $3, 'bonus', '親密請求被接受獎勵', $4)
-        `, [transactionId1, request.requester_id, coinAmount, now]);
+        `, [transactionId1, request.sender_id, coinAmount, now]);
         
         await client.query(`
           INSERT INTO coin_transactions (id, user_id, amount, transaction_type, description, created_at)
@@ -304,7 +306,7 @@ router.put('/:id/respond', [
           intimacy_request_id, related_user_id, priority
         ) VALUES ($1, $2, $3, $4, $5, $6, $7)
       `, [
-        request.requester_id,
+        request.sender_id,
         'request_response',
         notificationTitle,
         notificationContent,
@@ -343,7 +345,7 @@ router.delete('/:id', async (req, res) => {
 
     // Delete request (only if user is the requester)
     const result = await db.query(
-      'DELETE FROM intimacy_requests WHERE id = $1 AND requester_id = $2 RETURNING id',
+      'DELETE FROM intimacy_requests WHERE id = $1 AND sender_id = $2 RETURNING id',
       [requestId, userId]
     );
 
@@ -388,7 +390,7 @@ router.get('/notifications/unread-count', async (req, res) => {
         return await db.query(`
           SELECT COUNT(*) as unread_count
           FROM intimacy_requests 
-          WHERE recipient_id = $1 AND status = 'pending'
+          WHERE receiver_id = $1 AND status = 'pending'
         `, [userId]);
       }
       throw error;

@@ -25,6 +25,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const categories = [
+    { id: 'compliment', name: '甜蜜讚美', emoji: '💕', description: '發送溫馨的讚美和愛意給伴侶' },
     { id: 'idol_photographer', name: '偶像/攝影師', emoji: '📸', description: '角色扮演：偶像與攝影師的私密互動' },
     { id: 'teacher_student', name: '老師/學生', emoji: '📚', description: '角色扮演：師生間的特別課程' },
     { id: 'foreign_student', name: '留學生邂逅', emoji: '✈️', description: '角色扮演：異國戀情的浪漫約會' },
@@ -80,9 +81,9 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
 
       await apiService.createIntimacyRequest({
         messageContent,
-        requestType,
-        roleplayCategory: selectedCategory !== 'custom' ? selectedCategory : undefined,
-        scheduledTime: requestType === 'scheduled' && scheduledTime ? 
+        requestType: selectedCategory === 'compliment' ? 'compliment' : requestType,
+        roleplayCategory: selectedCategory !== 'custom' && selectedCategory !== 'compliment' ? selectedCategory : undefined,
+        scheduledTime: requestType === 'scheduled' && scheduledTime ?
           new Date(scheduledTime).toISOString() : undefined,
       });
 
@@ -202,7 +203,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-lg font-medium text-gray-900">
-                  選擇訊息模板
+                  {selectedCategory === 'compliment' ? '選擇讚美訊息' : '選擇訊息模板'}
                 </h4>
                 <button
                   onClick={() => setCurrentStep('category')}
@@ -219,37 +220,81 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {templates.map((template) => (
-                    <button
-                      key={template.id}
-                      onClick={() => handleTemplateSelect(template)}
-                      className="w-full p-4 border border-gray-200 rounded-lg hover:border-pink-300 hover:bg-pink-50 transition-colors text-left"
-                    >
-                      <div className="flex items-start space-x-3">
-                        <div className={`w-3 h-3 rounded-full mt-2 ${
-                          template.suggestionLevel === 'subtle' ? 'bg-green-400' :
-                          template.suggestionLevel === 'moderate' ? 'bg-yellow-400' :
-                          'bg-red-400'
-                        }`}></div>
-                        <div className="flex-1">
-                          <p className="text-gray-900 font-medium mb-1">
-                            {template.timeHint}
-                          </p>
-                          <p className="text-gray-600 text-sm">
-                            {template.roleplaySetup}
-                          </p>
+                  {/* Show templates or default compliment options */}
+                  {templates.length > 0 ? (
+                    templates.map((template) => (
+                      <button
+                        key={template.id}
+                        onClick={() => handleTemplateSelect(template)}
+                        className="w-full p-4 border border-gray-200 rounded-lg hover:border-pink-300 hover:bg-pink-50 transition-colors text-left"
+                      >
+                        <div className="flex items-start space-x-3">
+                          <div className={`w-3 h-3 rounded-full mt-2 ${
+                            template.suggestionLevel === 'subtle' ? 'bg-green-400' :
+                            template.suggestionLevel === 'moderate' ? 'bg-yellow-400' :
+                            'bg-red-400'
+                          }`}></div>
+                          <div className="flex-1">
+                            <p className="text-gray-900 font-medium mb-1">
+                              {template.timeHint}
+                            </p>
+                            <p className="text-gray-600 text-sm">
+                              {template.roleplaySetup}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    </button>
-                  ))}
-                  
+                      </button>
+                    ))
+                  ) : selectedCategory === 'compliment' ? (
+                    // Default compliment options if templates aren't loaded
+                    [
+                      { timeHint: '甜蜜時光', roleplaySetup: '你好溫柔，你是我的女神 💕' },
+                      { timeHint: '愛的告白', roleplaySetup: '你是我見過最美麗的人，每天和你在一起都是幸福 ✨' },
+                      { timeHint: '溫馨時刻', roleplaySetup: '你的笑容是我最愛的風景，能讓我的心瞬間溫暖 😊' },
+                      { timeHint: '深情表達', roleplaySetup: '謝謝你一直在我身邊，你是我生命中最珍貴的禮物 🎁' },
+                      { timeHint: '浪漫情話', roleplaySetup: '和你在一起的每一天，都比昨天更愛你一點 💖' },
+                      { timeHint: '貼心話語', roleplaySetup: '你總是這麼體貼，讓我覺得自己是世界上最幸運的人 🍀' },
+                      { timeHint: '愛意滿滿', roleplaySetup: '你的溫柔像春風，你的愛像暖陽，照亮了我的整個世界 🌞' },
+                      { timeHint: '真心話', roleplaySetup: '遇見你是我這輩子最美好的事，願意和你走過每個春夏秋冬 🌸' },
+                      { timeHint: '甜蜜宣言', roleplaySetup: '你不只是我的戀人，更是我的最佳朋友和靈魂伴侶 👫' },
+                      { timeHint: '愛的承諾', roleplaySetup: '無論什麼時候，你都是我心中最特別的那個人 💝' }
+                    ].map((template, index) => (
+                      <button
+                        key={index}
+                        onClick={() => {
+                          setCustomMessage(template.roleplaySetup);
+                          setCurrentStep('customize');
+                        }}
+                        className="w-full p-4 border border-gray-200 rounded-lg hover:border-pink-300 hover:bg-pink-50 transition-colors text-left"
+                      >
+                        <div className="flex items-start space-x-3">
+                          <div className="w-3 h-3 rounded-full mt-2 bg-pink-400"></div>
+                          <div className="flex-1">
+                            <p className="text-gray-900 font-medium mb-1">
+                              {template.timeHint}
+                            </p>
+                            <p className="text-gray-600 text-sm">
+                              {template.roleplaySetup}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>無可用模板</p>
+                    </div>
+                  )}
+
                   <button
                     onClick={() => setCurrentStep('customize')}
                     className="w-full p-4 border border-gray-200 rounded-lg hover:border-pink-300 hover:bg-pink-50 transition-colors text-left"
                   >
                     <div className="flex items-center space-x-3">
                       <Sparkles className="w-5 h-5 text-pink-500" />
-                      <span className="text-gray-900 font-medium">自訂訊息內容</span>
+                      <span className="text-gray-900 font-medium">
+                        {selectedCategory === 'compliment' ? '自訂讚美訊息' : '自訂訊息內容'}
+                      </span>
                     </div>
                   </button>
                 </div>
@@ -262,7 +307,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-lg font-medium text-gray-900">
-                  自訂邀請內容
+                  {selectedCategory === 'compliment' ? '自訂讚美內容' : '自訂邀請內容'}
                 </h4>
                 <button
                   onClick={() => selectedCategory === 'custom' ? setCurrentStep('category') : setCurrentStep('template')}
@@ -317,12 +362,14 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    邀請內容 *
+                    {selectedCategory === 'compliment' ? '讚美內容 *' : '邀請內容 *'}
                   </label>
                   <textarea
                     value={customMessage}
                     onChange={(e) => setCustomMessage(e.target.value)}
-                    placeholder="輸入你的親密邀請內容..."
+                    placeholder={selectedCategory === 'compliment' ?
+                      "輸入你想對伴侶說的甜蜜讚美..." :
+                      "輸入你的親密邀請內容..."}
                     rows={4}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"
                   />
@@ -349,7 +396,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-lg font-medium text-gray-900">
-                  確認邀請內容
+                  {selectedCategory === 'compliment' ? '確認讚美內容' : '確認邀請內容'}
                 </h4>
                 <button
                   onClick={() => setCurrentStep('customize')}
@@ -363,7 +410,9 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                 <div className="flex items-start space-x-3">
                   <Heart className="w-6 h-6 text-pink-500 mt-1" />
                   <div className="flex-1">
-                    <h5 className="font-medium text-gray-900 mb-2">你的親密邀請</h5>
+                    <h5 className="font-medium text-gray-900 mb-2">
+                      {selectedCategory === 'compliment' ? '你的甜蜜讚美' : '你的親密邀請'}
+                    </h5>
                     <p className="text-gray-700 whitespace-pre-wrap">{customMessage}</p>
                     {requestType === 'scheduled' && scheduledTime && (
                       <div className="mt-3 flex items-center space-x-2 text-sm text-gray-600">
@@ -392,7 +441,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                   ) : (
                     <Send className="w-4 h-4" />
                   )}
-                  <span>{loading ? '發送中...' : '發送邀請'}</span>
+                  <span>{loading ? '發送中...' : (selectedCategory === 'compliment' ? '發送讚美' : '發送邀請')}</span>
                 </button>
               </div>
             </div>

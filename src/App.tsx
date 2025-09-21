@@ -8,6 +8,7 @@ import { NotificationContainer } from './components/ErrorNotification';
 import IntimacyRequestsHistory from './components/IntimacyRequestsHistory';
 import IntimacyRequestForm from './components/IntimacyRequestForm';
 import NotificationInbox from './components/NotificationInbox';
+import PairingInvitationHandler from './components/PairingInvitationHandler';
 import { apiService } from './services/api';
 
 interface IntimateRecord {
@@ -317,6 +318,22 @@ const LoveTimeApp = () => {
   useEffect(() => {
     localStorage.setItem('nicknames', JSON.stringify(nicknames));
   }, [nicknames]);
+
+  // Check for pairing invitation token in URL params
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+
+    if (token) {
+      setPairingInvitationToken(token);
+      setShowPairingInvitation(true);
+
+      // Clean up URL to remove token after processing
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, []);
+
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [roleplayFilter, setRoleplayFilter] = useState('all');
@@ -335,6 +352,10 @@ const LoveTimeApp = () => {
   const [showIntimacyRequestForm, setShowIntimacyRequestForm] = useState(false);
   const [showNotificationInbox, setShowNotificationInbox] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+
+  // Pairing invitation states
+  const [pairingInvitationToken, setPairingInvitationToken] = useState<string | null>(null);
+  const [showPairingInvitation, setShowPairingInvitation] = useState(false);
   const [journeyMilestones, setJourneyMilestones] = useState<JourneyMilestone[]>([
     {
       id: 'meeting',
@@ -533,7 +554,27 @@ const LoveTimeApp = () => {
     }
   };
 
+  // Pairing invitation handlers
+  const handlePairingInvitationAccepted = () => {
+    setShowPairingInvitation(false);
+    setPairingInvitationToken(null);
 
+    // Refresh auth state to get updated couple information
+    if (authState.isAuthenticated) {
+      // Trigger a reload of user data to get the new couple relationship
+      window.location.reload();
+    }
+  };
+
+  const handlePairingInvitationRejected = () => {
+    setShowPairingInvitation(false);
+    setPairingInvitationToken(null);
+  };
+
+  const handlePairingInvitationClosed = () => {
+    setShowPairingInvitation(false);
+    setPairingInvitationToken(null);
+  };
 
   // Coin activities configuration
   const coinActivities: { [key: string]: CoinActivity } = {
@@ -3146,11 +3187,24 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
       />
       
       {/* Notification Container */}
-      <NotificationContainer 
+      <NotificationContainer
         notifications={notifications}
         onClose={closeNotification}
       />
-      
+
+      {/* Pairing Invitation Handler */}
+      {showPairingInvitation && pairingInvitationToken && (
+        <PairingInvitationHandler
+          token={pairingInvitationToken}
+          onAccepted={handlePairingInvitationAccepted}
+          onRejected={handlePairingInvitationRejected}
+          onClose={handlePairingInvitationClosed}
+          authState={authState}
+          setShowAuthModal={setShowAuthModal}
+          showNotification={showNotification}
+        />
+      )}
+
       <div className="container mx-auto px-4 py-8">
         {/* Tagline */}
         <div className="text-center mb-8">

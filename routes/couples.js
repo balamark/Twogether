@@ -154,21 +154,41 @@ router.post('/pairing-code', async (req, res) => {
     console.info(`🔗 User ${userId} requesting pairing code generation`);
 
     // Check if user has a couple
-    const coupleResult = await db.query(
+    let coupleResult = await db.query(
       'SELECT id FROM couples WHERE user1_id = $1 AND user2_id IS NULL',
       [userId]
     );
 
+    let coupleId;
     if (coupleResult.rows.length === 0) {
-      console.warn(`⚠️ User ${userId} tried to generate pairing code but has no incomplete couple`);
-      return res.status(404).json({
-        success: false,
-        message: '找不到可配對的情侶關係',
-        error_code: 'NO_INCOMPLETE_COUPLE'
-      });
-    }
+      // Check if user is already in a complete couple
+      const existingCouple = await db.query(
+        'SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1',
+        [userId]
+      );
 
-    const coupleId = coupleResult.rows[0].id;
+      if (existingCouple.rows.length > 0) {
+        console.warn(`⚠️ User ${userId} already has a complete couple relationship`);
+        return res.status(409).json({
+          success: false,
+          message: '您已經在一個完整的情侶關係中',
+          error_code: 'ALREADY_IN_COUPLE'
+        });
+      }
+
+      // Create a new incomplete couple for this user
+      coupleId = uuidv4();
+      const now = new Date().toISOString();
+
+      await db.query(`
+        INSERT INTO couples (id, user1_id, created_at)
+        VALUES ($1, $2, $3)
+      `, [coupleId, userId, now]);
+
+      console.log(`✅ Created new incomplete couple ${coupleId} for user ${userId}`);
+    } else {
+      coupleId = coupleResult.rows[0].id;
+    }
 
     // Generate 6-digit code
     const code = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -278,12 +298,13 @@ router.get('/', async (req, res) => {
     `, [userId]);
 
     if (result.rows.length === 0) {
-      console.warn(`⚠️ User ${userId} has no couple relationship`);
-      return res.status(404).json({
-        success: false,
+      console.info(`📝 User ${userId} has no couple relationship yet`);
+      return res.status(200).json({
+        success: true,
         message: '您還沒有情侶關係',
         error_code: 'NO_COUPLE_RELATIONSHIP',
-        user_has_relationship: false
+        user_has_relationship: false,
+        couple: null
       });
     }
 

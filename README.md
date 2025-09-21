@@ -71,13 +71,32 @@ npm install
 
 ### 3. Development Mode
 
-#### Single Server (Recommended)
+#### Option A: With Cloud Database (Supabase)
 ```bash
 # Build frontend first
 npm run build
 
-# Start combined server
+# Start combined server (uses cloud database)
 npm run dev:backend
+
+# Visit: http://localhost:8080
+```
+
+#### Option B: With Local PostgreSQL Database
+```bash
+# 1. Set up local PostgreSQL database
+./scripts/setup-local-db.sh
+
+# 2. Copy your .env to .env.local and update DATABASE_URL
+cp .env .env.local
+# Edit .env.local to use: DATABASE_URL=postgresql://twogether:twogether123@localhost:5432/twogether_dev
+
+# 3. Run migrations to create tables
+NODE_ENV=development npm run migrate
+
+# 4. Build and start server
+npm run build
+NODE_ENV=development npm run dev:backend
 
 # Visit: http://localhost:8080
 ```
@@ -113,6 +132,70 @@ gcloud app deploy
 
 # Check deployment
 gcloud app browse
+```
+
+## 🗄️ Local PostgreSQL Setup
+
+For local development, you can use a local PostgreSQL database instead of the cloud database:
+
+### Installation
+
+**macOS (with Homebrew):**
+```bash
+brew install postgresql
+brew services start postgresql
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get update
+sudo apt-get install postgresql postgresql-contrib
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+```
+
+### Quick Setup
+```bash
+# Run the automated setup script
+./scripts/setup-local-db.sh
+
+# This creates:
+# - Database: twogether_dev
+# - User: twogether
+# - Password: twogether123
+# - Connection: postgresql://twogether:twogether123@localhost:5432/twogether_dev
+```
+
+### Manual Setup
+```bash
+# 1. Create database user
+psql postgres -c "CREATE USER twogether WITH PASSWORD 'twogether123';"
+psql postgres -c "ALTER USER twogether CREATEDB;"
+
+# 2. Create database
+createdb -O twogether twogether_dev
+
+# 3. Update .env.local
+echo "DATABASE_URL=postgresql://twogether:twogether123@localhost:5432/twogether_dev" >> .env.local
+
+# 4. Run migrations
+NODE_ENV=development npm run migrate
+```
+
+### Database Management
+```bash
+# Connect to local database
+psql postgresql://twogether:twogether123@localhost:5432/twogether_dev
+
+# Run migrations
+npm run migrate
+
+# Check migration status
+npm run migrate:status
+
+# Reset database (drops all tables)
+psql twogether_dev -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+NODE_ENV=development npm run migrate
 ```
 
 ## 📋 Development Commands

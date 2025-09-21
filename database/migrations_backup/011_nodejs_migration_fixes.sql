@@ -18,7 +18,7 @@ CREATE INDEX IF NOT EXISTS idx_love_moments_date ON love_moments(moment_date);
 CREATE INDEX IF NOT EXISTS idx_photos_couple ON photos(couple_id);
 CREATE INDEX IF NOT EXISTS idx_photos_memory_date ON photos(memory_date);
 CREATE INDEX IF NOT EXISTS idx_intimacy_requests_couple ON intimacy_requests(couple_id);
-CREATE INDEX IF NOT EXISTS idx_intimacy_requests_receiver ON intimacy_requests(receiver_id);
+CREATE INDEX IF NOT EXISTS idx_intimacy_requests_recipient ON intimacy_requests(recipient_id);
 CREATE INDEX IF NOT EXISTS idx_intimacy_requests_status ON intimacy_requests(status);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, is_read);

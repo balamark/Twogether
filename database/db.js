@@ -1,9 +1,21 @@
 const { Pool } = require('pg');
 
-// Database connection
+// Database connection configuration
+const isSupabase = process.env.DATABASE_URL?.includes('supabase.com');
+const isLocal = process.env.DATABASE_URL?.includes('localhost') || process.env.DATABASE_URL?.includes('127.0.0.1');
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : { rejectUnauthorized: false }
+  ssl: isSupabase ? {
+    rejectUnauthorized: false,
+    require: true
+  } : isLocal ? false : {
+    rejectUnauthorized: false
+  },
+  // Add additional SSL options for Supabase
+  ...(isSupabase && {
+    sslmode: 'require'
+  })
 });
 
 // Test the connection

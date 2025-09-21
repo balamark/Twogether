@@ -7,6 +7,9 @@ const session = require('express-session');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 
+// PostgreSQL session store for production
+const pgSession = require('connect-pg-simple')(session);
+
 // Import routes
 const authRoutes = require('./routes/auth');
 const coupleRoutes = require('./routes/couples');
@@ -16,6 +19,7 @@ const achievementRoutes = require('./routes/achievements');
 const coinRoutes = require('./routes/coins');
 const statsRoutes = require('./routes/stats');
 const intimacyRequestRoutes = require('./routes/intimacy-requests');
+const pairingRequestRoutes = require('./routes/pairing-requests');
 
 // Import database and middleware
 const db = require('./database/db');
@@ -23,6 +27,11 @@ const { requestLogger, errorHandler, asyncHandler } = require('./middleware/logg
 
 const app = express();
 const PORT = process.env.PORT || 8080;
+
+// Trust proxy for Google Cloud (fixes rate limiting X-Forwarded-For header issue)
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', true);
+}
 
 // Rate limiting
 const limiter = rateLimit({
@@ -32,7 +41,7 @@ const limiter = rateLimit({
 });
 
 // Session configuration
-app.use(session({
+const sessionConfig = {
   secret: process.env.SESSION_SECRET || 'twogether-session-secret-2024',
   resave: false,
   saveUninitialized: false,
@@ -43,7 +52,17 @@ app.use(session({
     sameSite: 'lax'
   },
   name: 'twogether.session'
-}));
+};
+
+// Use PostgreSQL session store in production to avoid memory leaks
+if (process.env.NODE_ENV === 'production') {
+  sessionConfig.store = new pgSession({
+    pool: db.pool,
+    tableName: 'user_sessions'
+  });
+}
+
+app.use(session(sessionConfig));
 
 // Middleware
 app.use(helmet({
@@ -92,6 +111,7 @@ app.use('/api/achievements', achievementRoutes);
 app.use('/api/coins', coinRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/intimacy-requests', intimacyRequestRoutes);
+app.use('/api/pairing-requests', pairingRequestRoutes);
 // Additional mount for intimacy endpoints (frontend compatibility)
 app.use('/api/intimacy', intimacyRequestRoutes);
 

@@ -37,11 +37,50 @@ interface CoupleResponse {
   user2Nickname?: string;
   createdAt: string;
   pairingCode?: string;
+  user1Id?: string;
+  user2Id?: string;
+  isComplete?: boolean;
+  waitingForPartner?: boolean;
+  error_code?: string;
 }
 
 interface PairingCodeResponse {
   code: string;
   expiresAt: string;
+}
+
+interface SendPairingInvitationRequest {
+  recipientEmail: string;
+  message?: string;
+}
+
+interface PairingInvitationResponse {
+  success: boolean;
+  message: string;
+  invitation: {
+    id: string;
+    recipientEmail: string;
+    createdAt: string;
+    expiresAt: string;
+    emailSent: boolean;
+  };
+}
+
+interface AcceptPairingInvitationResponse {
+  success: boolean;
+  message: string;
+  requiresAuth?: boolean;
+  invitation?: {
+    senderNickname: string;
+    recipientEmail: string;
+    message: string;
+    token: string;
+  };
+  couple?: {
+    id: string;
+    partnerNickname: string;
+    createdAt: string;
+  };
 }
 
 interface ApiError {
@@ -349,6 +388,13 @@ class ApiService {
 
   async updateNicknames(nicknames: { partner1: string; partner2: string }): Promise<void> {
     try {
+      // Check if user has a couple relationship first
+      const coupleResponse = await this.getCouple();
+      if (!coupleResponse || coupleResponse.error_code === 'NO_COUPLE_RELATIONSHIP') {
+        // User doesn't have a couple yet, skip saving
+        return;
+      }
+
       // Only send non-empty, valid fields to satisfy backend validation
       const payload: { partner1?: string; partner2?: string } = {};
       const partner1 = nicknames.partner1?.trim();
@@ -369,9 +415,8 @@ class ApiService {
       // Send to backend; it will update the caller's own nickname based on couple role
       await apiClient.put('/couples/nicknames', payload);
     } catch (error) {
-      // Persist locally as a fallback so UI reflects change even if offline/unpaired
-      console.warn('Backend nickname update failed, falling back to localStorage:', error);
-      localStorage.setItem('nicknames', JSON.stringify(nicknames));
+      console.warn('Failed to update nicknames:', error);
+      throw error;
     }
   }
 
@@ -550,6 +595,22 @@ class ApiService {
   async getCouple(): Promise<CoupleResponse> {
     try {
       const response = await apiClient.get('/couples');
+      // Handle case where user has no couple relationship
+      if (response.data.error_code === 'NO_COUPLE_RELATIONSHIP' || !response.data.couple) {
+        return {
+          id: '',
+          coupleName: '',
+          anniversaryDate: '',
+          user1Id: '',
+          user1Nickname: '',
+          user2Id: '',
+          user2Nickname: '',
+          createdAt: '',
+          isComplete: false,
+          waitingForPartner: false,
+          error_code: 'NO_COUPLE_RELATIONSHIP'
+        };
+      }
       return this.transformCoupleResponse(response.data.couple);
     } catch (error: unknown) {
       console.error('Failed to get couple:', error);
@@ -564,6 +625,58 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to generate pairing code:', error);
       throw new Error((error as ApiErrorResponse)?.message || '無法生成配對碼');
+    }
+  }
+
+  // Email-based pairing invitation methods
+  async sendPairingInvitation(data: SendPairingInvitationRequest): Promise<PairingInvitationResponse> {
+    try {
+      const response = await apiClient.post('/pairing-requests/send-invitation', data);
+      return response.data;
+    } catch (error: unknown) {
+      console.error('Failed to send pairing invitation:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '無法發送配對邀請');
+    }
+  }
+
+  async acceptPairingInvitation(token: string): Promise<AcceptPairingInvitationResponse> {
+    try {
+      const response = await apiClient.post(`/pairing-requests/accept/${token}`);
+      return response.data;
+    } catch (error: unknown) {
+      console.error('Failed to accept pairing invitation:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '無法接受配對邀請');
+    }
+  }
+
+  async rejectPairingInvitation(token: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await apiClient.post(`/pairing-requests/reject/${token}`);
+      return response.data;
+    } catch (error: unknown) {
+      console.error('Failed to reject pairing invitation:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '無法拒絕配對邀請');
+    }
+  }
+
+  async getPairingInvitation(token: string): Promise<{
+    success: boolean;
+    invitation: {
+      senderNickname: string;
+      recipientEmail: string;
+      message: string;
+      createdAt: string;
+      expiresAt: string;
+      status: string;
+      isExpired: boolean;
+    };
+  }> {
+    try {
+      const response = await apiClient.get(`/pairing-requests/invitation/${token}`);
+      return response.data;
+    } catch (error: unknown) {
+      console.error('Failed to get pairing invitation:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '無法獲取配對邀請詳情');
     }
   }
 
@@ -592,13 +705,13 @@ class ApiService {
   // Intimacy Requests
   async createIntimacyRequest(request: CreateIntimacyRequestRequest): Promise<IntimacyRequest> {
     try {
-      const response = await apiClient.post('/intimacy/intimacy-requests', {
-        message_content: request.messageContent,
-        request_type: request.requestType,
+      const response = await apiClient.post('/intimacy-requests', {
+        message: request.messageContent,
+        request_type: request.requestType === 'compliment' ? 'compliment' : request.requestType,
         roleplay_category: request.roleplayCategory,
         scheduled_time: request.scheduledTime,
       });
-      return this.transformIntimacyRequest(response.data);
+      return this.transformIntimacyRequest(response.data.intimacy_request || response.data);
     } catch (error: unknown) {
       console.error('Failed to create intimacy request:', error);
       throw new Error((error as ApiErrorResponse)?.message || '無法發送親密邀請');
@@ -619,8 +732,8 @@ class ApiService {
   async getIntimacyRequests(status?: string): Promise<IntimacyRequest[]> {
     try {
       const params = status ? { status } : {};
-      const response = await apiClient.get('/intimacy/intimacy-requests', { params });
-      return response.data.map((item: unknown) => this.transformIntimacyRequest(item));
+      const response = await apiClient.get('/intimacy-requests', { params });
+      return response.data.intimacy_requests?.map((item: unknown) => this.transformIntimacyRequest(item)) || [];
     } catch (error: unknown) {
       console.error('Failed to fetch intimacy requests:', error);
       throw new Error((error as ApiErrorResponse)?.message || '無法獲取親密邀請記錄');
@@ -628,12 +741,12 @@ class ApiService {
   }
 
   async respondToIntimacyRequest(
-    requestId: string, 
+    requestId: string,
     response: RespondToIntimacyRequestRequest
   ): Promise<IntimacyRequest> {
     try {
-      const result = await apiClient.put(`/intimacy/intimacy-requests/${requestId}/respond`, {
-        accept: response.accept,
+      const result = await apiClient.put(`/intimacy-requests/${requestId}/respond`, {
+        response: response.accept ? 'accepted' : 'declined',
         response_message: response.responseMessage,
         alternative_type: response.alternativeType,
         alternative_content: response.alternativeContent,
@@ -648,8 +761,8 @@ class ApiService {
 
   async getIntimacyTemplates(): Promise<IntimacyTemplate[]> {
     try {
-      const response = await apiClient.get('/intimacy/intimacy-templates');
-      return response.data.map((item: unknown) => this.transformIntimacyTemplate(item));
+      const response = await apiClient.get('/intimacy-requests/intimacy-templates');
+      return response.data.templates?.map((item: unknown) => this.transformIntimacyTemplate(item)) || [];
     } catch (error: unknown) {
       console.error('Failed to fetch intimacy templates:', error);
       throw new Error((error as ApiErrorResponse)?.message || '無法獲取親密邀請模板');
@@ -658,8 +771,8 @@ class ApiService {
 
   async getIntimacyTemplatesByCategory(category: string): Promise<IntimacyTemplate[]> {
     try {
-      const response = await apiClient.get(`/intimacy/intimacy-templates/${category}`);
-      return response.data.map((item: unknown) => this.transformIntimacyTemplate(item));
+      const response = await apiClient.get(`/intimacy-requests/intimacy-templates/${category}`);
+      return response.data.templates?.map((item: unknown) => this.transformIntimacyTemplate(item)) || [];
     } catch (error: unknown) {
       console.error('Failed to fetch intimacy templates by category:', error);
       throw new Error((error as ApiErrorResponse)?.message || '無法獲取分類模板');
@@ -668,7 +781,7 @@ class ApiService {
 
   async getAlternativeIntimacyOptions(): Promise<AlternativeIntimacyOptionsGrouped> {
     try {
-      const response = await apiClient.get('/intimacy/alternative-intimacy-options');
+      const response = await apiClient.get('/intimacy-requests/alternative-intimacy-options');
       return {
         physical: response.data.physical?.map((item: unknown) => this.transformAlternativeOption(item)) || [],
         emotional: response.data.emotional?.map((item: unknown) => this.transformAlternativeOption(item)) || [],
@@ -688,8 +801,8 @@ class ApiService {
         notification_type: params?.notificationType,
         is_read: params?.isRead,
       };
-      const response = await apiClient.get('/intimacy/notifications', { params: queryParams });
-      return response.data.map((item: unknown) => this.transformNotification(item));
+      const response = await apiClient.get('/intimacy-requests/notifications', { params: queryParams });
+      return response.data.notifications?.map((item: unknown) => this.transformNotification(item)) || [];
     } catch (error: unknown) {
       console.error('Failed to fetch notifications:', error);
       throw new Error((error as ApiErrorResponse)?.message || '無法獲取通知');
@@ -698,7 +811,7 @@ class ApiService {
 
   async markNotificationsRead(notificationIds: string[]): Promise<void> {
     try {
-      await apiClient.put('/intimacy/notifications/mark-read', {
+      await apiClient.put('/intimacy-requests/notifications/mark-read', {
         notification_ids: notificationIds,
       });
     } catch (error: unknown) {
@@ -709,7 +822,7 @@ class ApiService {
 
   async getUnreadNotificationCount(): Promise<number> {
     try {
-      const response = await apiClient.get('/intimacy/notifications/unread-count');
+      const response = await apiClient.get('/intimacy-requests/notifications/unread-count');
       return response.data.unread_count || 0;
     } catch (error: unknown) {
       console.error('Failed to fetch unread notification count:', error);

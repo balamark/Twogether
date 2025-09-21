@@ -84,6 +84,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
+  // Email invitation states
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [invitationMessage, setInvitationMessage] = useState('');
+  const [isSendingInvitation, setIsSendingInvitation] = useState(false);
+
   const handleSaveSettings = async () => {
     try {
       setIsSavingSettings(true);
@@ -268,6 +273,65 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           duration: 8000
         });
       }
+    }
+  };
+
+  const handleSendEmailInvitation = async () => {
+    try {
+      if (!recipientEmail.trim()) {
+        showNotification({
+          type: 'error',
+          title: '驗證錯誤',
+          message: '請輸入對方的電子郵件地址',
+          duration: 6000
+        });
+        return;
+      }
+
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(recipientEmail.trim())) {
+        showNotification({
+          type: 'error',
+          title: '電子郵件格式錯誤',
+          message: '請輸入有效的電子郵件地址',
+          duration: 6000
+        });
+        return;
+      }
+
+      setIsSendingInvitation(true);
+
+      const invitationData = {
+        recipientEmail: recipientEmail.trim(),
+        message: invitationMessage.trim() || undefined
+      };
+
+      await apiService.sendPairingInvitation(invitationData);
+
+      showNotification({
+        type: 'success',
+        title: '邀請已發送！',
+        message: `已向 ${recipientEmail} 發送配對邀請，請等待對方接受`,
+        duration: 8000
+      });
+
+      // Clear the form
+      setRecipientEmail('');
+      setInvitationMessage('');
+
+    } catch (err: unknown) {
+      console.error('Send email invitation error:', err);
+      const errorMessage = (err as Error)?.message || '發送邀請失敗，請稍後再試';
+
+      showNotification({
+        type: 'error',
+        title: '發送失敗',
+        message: errorMessage,
+        duration: 8000
+      });
+    } finally {
+      setIsSendingInvitation(false);
     }
   };
 
@@ -491,6 +555,61 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                     </p>
                   </div>
                 )}
+              </div>
+
+              {/* Email Invitation Section */}
+              <div className="border-t pt-6">
+                <h4 className="text-lg font-medium mb-2">📧 透過電子郵件邀請</h4>
+                <p className="text-gray-600 mb-4">
+                  直接透過電子郵件向您的伴侶發送配對邀請，對方只需點擊郵件中的連結即可接受配對。
+                </p>
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="recipient-email" className="block text-sm font-medium text-gray-700 mb-2">
+                      伴侶的電子郵件地址
+                    </label>
+                    <input
+                      id="recipient-email"
+                      type="email"
+                      value={recipientEmail}
+                      onChange={(e) => setRecipientEmail(e.target.value)}
+                      placeholder="例如：partner@example.com"
+                      className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                      disabled={isSendingInvitation}
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="invitation-message" className="block text-sm font-medium text-gray-700 mb-2">
+                      個人訊息 (選填)
+                    </label>
+                    <textarea
+                      id="invitation-message"
+                      value={invitationMessage}
+                      onChange={(e) => setInvitationMessage(e.target.value)}
+                      placeholder="想對伴侶說的話..."
+                      rows={3}
+                      maxLength={500}
+                      className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"
+                      disabled={isSendingInvitation}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      {invitationMessage.length}/500 字符
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={handleSendEmailInvitation}
+                    disabled={isSendingInvitation || !recipientEmail.trim()}
+                    className={`w-full py-3 rounded-lg font-medium transition-colors ${
+                      isSendingInvitation || !recipientEmail.trim()
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:from-pink-600 hover:to-rose-600'
+                    }`}
+                  >
+                    {isSendingInvitation ? '發送中...' : '💌 發送邀請'}
+                  </button>
+                </div>
               </div>
 
               {/* Enter Code Section */}
