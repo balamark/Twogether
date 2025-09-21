@@ -31,16 +31,16 @@ instance_class: F1
 # Static file handling for React assets
 handlers:
   # Static assets with cache headers
-  - url: /assets/.*
+  - url: /assets/(.*)
     static_files: dist/assets/\1
-    upload: dist/assets/.*
+    upload: dist/assets/(.*)
     secure: always
     expiration: "1d"
     
   # Images with cache headers
-  - url: /images/.*
+  - url: /images/(.*)
     static_files: dist/images/\1
-    upload: dist/images/.*
+    upload: dist/images/(.*)
     secure: always
     expiration: "1h"
     
