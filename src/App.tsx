@@ -312,7 +312,52 @@ interface PositionSuggestion {
 
 const LoveTimeApp = () => {
   const [currentView, setCurrentView] = useState('record');
-  const [intimateRecords, setIntimateRecords] = useState<IntimateRecord[]>([]);
+  const [intimateRecords, setIntimateRecords] = useState<IntimateRecord[]>(() => {
+    // Demo data for testing calendar redesign
+    if (typeof window !== 'undefined' && !localStorage.getItem('authState')) {
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const weekAgo = new Date(today);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      
+      return [
+        {
+          id: 1,
+          date: today.toISOString().split('T')[0],
+          time: '20:30',
+          mood: '💕',
+          notes: '今晚特別浪漫',
+          timestamp: today.toISOString(),
+          description: '燭光晚餐後的溫馨時光',
+          location: '家中',
+          coinsEarned: 10
+        },
+        {
+          id: 2,
+          date: yesterday.toISOString().split('T')[0],
+          time: '22:15',
+          mood: '🔥',
+          notes: '激情四射的夜晚',
+          timestamp: yesterday.toISOString(),
+          description: '充滿愛意的親密時刻',
+          coinsEarned: 15
+        },
+        {
+          id: 3,
+          date: weekAgo.toISOString().split('T')[0],
+          time: '19:00',
+          mood: '😍',
+          notes: '輕柔的愛撫',
+          timestamp: weekAgo.toISOString(),
+          description: '溫柔的相擁',
+          location: '臥室',
+          coinsEarned: 8
+        }
+      ];
+    }
+    return [];
+  });
   const [nicknames, setNicknames] = useState<Nicknames>({ partner1: '親愛的', partner2: '寶貝' });
   
   useEffect(() => {
@@ -1566,29 +1611,34 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
     };
 
     return (
-      <div className="space-y-6">
-        <div className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-6 rounded-2xl">
-          <h2 className="text-2xl font-bold mb-4">愛的日曆</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">選擇日期</label>
+      <div className="space-y-8">
+        {/* Romantic Header Section */}
+        <div className="bg-gradient-to-br from-romantic-400 via-romantic-500 to-romantic-600 text-white p-8 rounded-3xl shadow-romantic">
+          <div className="text-center mb-6">
+            <h2 className="font-romantic text-4xl mb-2 tracking-wide">記錄時光</h2>
+            <p className="text-romantic-100 opacity-90">珍藏每一個愛的瞬間</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-romantic-100 mb-2">選擇特別的日子</label>
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full p-3 rounded-lg text-gray-800"
+                className="w-full p-4 rounded-2xl text-romantic-800 bg-white/95 border-0 focus:ring-2 focus:ring-white/50 transition-all duration-300 shadow-soft"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">親密時刻</label>
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-romantic-100 mb-2">記錄親密時刻</label>
               <button
                 onClick={() => {
                   setRecordForm({...recordForm, date: selectedDate});
                   setShowRecordModal(true);
                 }}
-                className="w-full bg-white text-pink-600 p-3 rounded-lg font-medium hover:bg-pink-50 transition-colors"
+                className="w-full bg-white/90 text-romantic-600 p-4 rounded-2xl font-medium hover:bg-white hover:scale-105 transition-all duration-300 shadow-soft flex items-center justify-center space-x-2"
               >
-                記錄今天的愛 ❤️
+                <Heart className="w-5 h-5 fill-current" />
+                <span>記錄今天的愛</span>
               </button>
             </div>
           </div>
@@ -2848,6 +2898,60 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
             </div>
           </div>
         )}
+
+        {/* Monthly Overview Calendar */}
+        <div className="bg-gradient-to-br from-white to-romantic-50 rounded-3xl p-8 shadow-romantic border border-romantic-100">
+          <div className="text-center mb-8">
+            <h3 className="font-romantic text-3xl text-romantic-800 mb-2">愛的時光</h3>
+            <p className="text-romantic-600">記錄每一個特別的日子</p>
+          </div>
+          
+          <CalendarDatePicker 
+            selectedDate={selectedDate}
+            onDateSelect={setSelectedDate}
+          />
+          
+          {/* Records for selected date */}
+          {selectedDate && intimateRecords.filter(record => record.date === selectedDate).length > 0 && (
+            <div className="mt-8 p-6 bg-gradient-to-br from-romantic-100 to-lavender-100 rounded-2xl border border-romantic-200">
+              <h4 className="font-medium text-romantic-800 mb-4 flex items-center">
+                <Heart className="w-5 h-5 mr-2 text-romantic-500 fill-current" />
+                {new Date(selectedDate).toLocaleDateString('zh-TW', { month: 'long', day: 'numeric' })} 的美好時光
+              </h4>
+              <div className="space-y-3">
+                {intimateRecords
+                  .filter(record => record.date === selectedDate)
+                  .map((record) => (
+                    <div key={record.id} className="bg-white/80 rounded-xl p-4 backdrop-blur-sm">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center space-x-2">
+                          <span className="text-2xl">{record.mood}</span>
+                          <span className="text-sm text-romantic-600">{record.time}</span>
+                        </div>
+                        {record.coinsEarned && (
+                          <span className="bg-gradient-to-r from-amber-400 to-yellow-500 text-white px-2 py-1 rounded-full text-xs font-medium">
+                            +{record.coinsEarned} 金幣
+                          </span>
+                        )}
+                      </div>
+                      {record.description && (
+                        <p className="text-romantic-700 text-sm mb-2">{record.description}</p>
+                      )}
+                      {record.notes && (
+                        <p className="text-romantic-600 text-xs italic">{record.notes}</p>
+                      )}
+                      {record.location && (
+                        <p className="text-romantic-500 text-xs mt-2 flex items-center">
+                          <MapPin className="w-3 h-3 mr-1" />
+                          {record.location}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     );
   };
@@ -2999,8 +3103,8 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
   ];
 
   const renderView = () => {
-    // Show login prompt for private content when not authenticated
-    if (!authState.isAuthenticated) {
+    // Show login prompt for private content when not authenticated (except for calendar demo)
+    if (!authState.isAuthenticated && currentView !== 'record') {
       switch (currentView) {
         case 'settings': return <SettingsView 
           nicknames={nicknames}
@@ -3067,7 +3171,7 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
-  // Calendar component for date picking
+  // Redesigned calendar component for romantic date picking
   const CalendarDatePicker = ({ selectedDate, onDateSelect }: { selectedDate: string, onDateSelect: (date: string) => void }) => {
     const [currentMonth, setCurrentMonth] = useState(() => {
       const date = selectedDate ? new Date(selectedDate) : new Date();
@@ -3119,53 +3223,72 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
       return date.toDateString() === today.toDateString();
     };
 
+    // Check if a date has intimate records
+    const hasIntimateRecord = (date: Date) => {
+      const dateStr = formatDate(date);
+      return intimateRecords.some(record => record.date === dateStr);
+    };
+
     const days = getDaysInMonth(currentMonth);
     const monthYear = currentMonth.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long' });
 
     return (
-      <div className="bg-white rounded-lg p-4 border">
-        <div className="flex items-center justify-between mb-4">
+      <div className="bg-gradient-to-br from-romantic-50 to-lavender-50 rounded-2xl p-6 shadow-romantic border border-romantic-100">
+        {/* Header with month navigation */}
+        <div className="flex items-center justify-between mb-6">
           <button
             onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
-            className="p-2 hover:bg-gray-100 rounded"
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/70 hover:bg-white shadow-soft transition-all duration-300 hover:scale-110 text-romantic-600 hover:text-romantic-700"
           >
-            ‹
+            <span className="text-lg font-medium">‹</span>
           </button>
-          <h3 className="font-semibold text-gray-800">{monthYear}</h3>
+          <h3 className="font-romantic text-2xl text-romantic-800 tracking-wide">{monthYear}</h3>
           <button
             onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
-            className="p-2 hover:bg-gray-100 rounded"
+            className="w-10 h-10 flex items-center justify-center rounded-full bg-white/70 hover:bg-white shadow-soft transition-all duration-300 hover:scale-110 text-romantic-600 hover:text-romantic-700"
           >
-            ›
+            <span className="text-lg font-medium">›</span>
           </button>
         </div>
         
-        <div className="grid grid-cols-7 gap-1 mb-2">
+        {/* Day labels */}
+        <div className="grid grid-cols-7 gap-2 mb-4">
           {['日', '一', '二', '三', '四', '五', '六'].map(day => (
-            <div key={day} className="p-2 text-center text-sm font-medium text-gray-500">
+            <div key={day} className="h-10 flex items-center justify-center text-sm font-medium text-romantic-500">
               {day}
             </div>
           ))}
         </div>
         
-        <div className="grid grid-cols-7 gap-1">
+        {/* Calendar grid */}
+        <div className="grid grid-cols-7 gap-2">
           {days.map((dayInfo, index) => {
             const { date, isCurrentMonth } = dayInfo;
             const selected = isSelected(date);
             const today = isToday(date);
+            const hasRecord = hasIntimateRecord(date);
             
             return (
               <button
                 key={index}
                 onClick={() => onDateSelect(formatDate(date))}
                 className={`
-                  p-2 text-sm rounded hover:bg-gray-100 transition-colors
-                  ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}
-                  ${selected ? 'bg-pink-500 text-white hover:bg-pink-600' : ''}
-                  ${today && !selected ? 'bg-blue-100 text-blue-600' : ''}
+                  relative h-12 w-full rounded-xl text-sm font-medium transition-all duration-300 transform hover:scale-105
+                  ${isCurrentMonth 
+                    ? selected 
+                      ? 'bg-gradient-to-br from-romantic-400 to-romantic-600 text-white shadow-romantic' 
+                      : today 
+                        ? 'bg-gradient-to-br from-lavender-200 to-romantic-200 text-romantic-800 shadow-soft' 
+                        : 'bg-white/70 hover:bg-white text-romantic-700 hover:shadow-soft' 
+                    : 'text-romantic-300 hover:text-romantic-400'
+                  }
+                  ${hasRecord && !selected ? 'ring-2 ring-romantic-300 ring-opacity-50' : ''}
                 `}
               >
-                {date.getDate()}
+                <span className="relative z-10">{date.getDate()}</span>
+                {hasRecord && (
+                  <Heart className="absolute top-1 right-1 w-3 h-3 text-romantic-500 fill-current z-20" />
+                )}
               </button>
             );
           })}
