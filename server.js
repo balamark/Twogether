@@ -158,7 +158,7 @@ app.listen(PORT, async () => {
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`📧 Email configured: ${!!process.env.RESEND_API_KEY}`);
   console.log(`🗄️  Database: ${process.env.DATABASE_URL ? 'Connected' : 'Not configured'}`);
-  console.log(`🎨 Frontend: Serving from /public (React build)`);
+  console.log(`🎨 Frontend: Serving from /dist (Vite build output)`);
   
   // Test database connection
   try {

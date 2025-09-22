@@ -135,6 +135,29 @@ jobs:
           envsubst < app.yaml > app.yaml.tmp && mv app.yaml.tmp app.yaml
           gcloud app deploy --quiet --project=${{ env.PROJECT_ID }}
 
+      - name: Clean up old container images
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "🧹 Cleaning up old container images..."
+          # Delete untagged images older than 7 days from all repositories
+          for repo in gae-standard gae-flexible gcr.io; do
+            echo "Cleaning repository: $repo"
+            # Get images older than 7 days and untagged
+            IMAGES_TO_DELETE=$(gcloud artifacts docker images list asia-east1-docker.pkg.dev/${{ env.PROJECT_ID }}/$repo \
+              --filter="createTime<-P7D AND tags=''" \
+              --format="value(IMAGE)" \
+              --limit=10 2>/dev/null || echo "")
+
+            if [ ! -z "$IMAGES_TO_DELETE" ]; then
+              echo "$IMAGES_TO_DELETE" | while read -r image; do
+                echo "Deleting old image: $image"
+                gcloud artifacts docker images delete "$image" --quiet --project=${{ env.PROJECT_ID }} || echo "Failed to delete $image"
+              done
+            else
+              echo "No old images found in $repo"
+            fi
+          done
+
       - name: Deployment Summary
         if: always() && github.ref == 'refs/heads/main'
         run: |
