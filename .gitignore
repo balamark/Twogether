@@ -47,4 +47,10 @@ Cargo.lock
 # Additional sensitive files
 *.key
 *.pem
-*.p12 
+*.p12
+
+# Test artifacts
+test-results/
+playwright-report/
+debug-*.png
+*-debug.png
