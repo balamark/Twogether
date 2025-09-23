@@ -21,14 +21,24 @@ test.describe('Intimacy Record Flow', () => {
     // Navigate to the app
     await page.goto('/');
 
+    // Wait for page to fully load
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(3000);
+
     // Handle login if required
     const loginButton = page.locator('button:has-text("登入 / 註冊")');
-    if (await loginButton.isVisible({ timeout: 3000 })) {
+    const recordButton = page.locator('button:has-text("記錄今天的愛 ❤️")');
+
+    // Check if we're already logged in by looking for the record button
+    if (await recordButton.isVisible({ timeout: 2000 })) {
+      console.log('User already logged in, proceeding to record');
+    } else if (await loginButton.isVisible({ timeout: 3000 })) {
+      console.log('Login required, proceeding with authentication');
       await loginButton.click();
       await page.waitForTimeout(1000);
 
       // Ensure we're in login mode
-      await expect(page.locator('h3:has-text("登入愛的時光")')).toBeVisible({ timeout: 3000 });
+      await expect(page.locator('h3:has-text("登入愛的時光")')).toBeVisible({ timeout: 5000 });
 
       const emailInput = page.locator('input[type="email"]').first();
       const passwordInput = page.locator('input[type="password"]').first();
@@ -45,17 +55,19 @@ test.describe('Intimacy Record Flow', () => {
       await expect(submitButton).toBeVisible({ timeout: 3000 });
       await submitButton.click();
 
-      // Wait for login response
+      // Wait for login response and success indicators
       await Promise.race([
-        page.waitForResponse(response => response.url().includes('/auth/login'), { timeout: 10000 }),
-        page.waitForSelector('text=登入成功', { timeout: 5000 }),
-        page.waitForSelector('text=歡迎', { timeout: 5000 }),
+        page.waitForResponse(response => response.url().includes('/auth/login'), { timeout: 15000 }),
+        page.waitForSelector('text=登入成功', { timeout: 10000 }),
+        page.waitForSelector('text=歡迎', { timeout: 10000 }),
+        recordButton.waitFor({ timeout: 15000 }), // Wait for the record button to appear
       ]).catch(() => {});
 
       // Close modal if still open
       try {
         await page.waitForSelector('[class*="fixed inset-0"]', { state: 'hidden', timeout: 5000 });
       } catch {
+        // Try multiple ways to close the modal
         const modalCloseSelectors = [
           '.modal-close',
           'button:has-text("×")',
@@ -65,27 +77,33 @@ test.describe('Intimacy Record Flow', () => {
           'button:has-text("關閉")'
         ];
 
+        let modalClosed = false;
         for (const selector of modalCloseSelectors) {
           const closeBtn = page.locator(selector);
           if (await closeBtn.isVisible()) {
             await closeBtn.click();
             await page.waitForTimeout(1000);
+            modalClosed = true;
             break;
           }
         }
 
-        // Fallback: use Escape key
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(1000);
+        if (!modalClosed) {
+          // Fallback: use Escape key
+          await page.keyboard.press('Escape');
+          await page.waitForTimeout(1000);
+        }
       }
+
+      // Additional wait for app to fully initialize after login
+      await page.waitForLoadState('networkidle');
+      await page.waitForTimeout(2000);
+    } else {
+      throw new Error('Neither login button nor record button found - app may not have loaded correctly');
     }
 
-    // Wait for app to load
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(2000);
-
-    // Click the record button (using the correct text from source code)
-    const addRecordButton = page.locator('button:has-text("記錄今天的愛")');
+    // Click the record button (using the correct text from source code including emoji)
+    const addRecordButton = page.locator('button:has-text("記錄今天的愛 ❤️")');
     await expect(addRecordButton).toBeVisible({ timeout: 5000 });
     await addRecordButton.click({ force: true });
     await page.waitForTimeout(2000);
