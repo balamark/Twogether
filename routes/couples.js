@@ -376,20 +376,27 @@ router.put('/journey', [
       first_intimacy_place
     } = req.body;
 
-    // Find user's couple
-    const coupleResult = await db.query(
+    // Find user's couple or create one if it doesn't exist
+    let coupleResult = await db.query(
       'SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1',
       [userId]
     );
 
+    let coupleId;
     if (coupleResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: '找不到情侶關係'
-      });
-    }
+      // Create a new couple for this user
+      coupleId = uuidv4();
+      const now = new Date().toISOString();
 
-    const coupleId = coupleResult.rows[0].id;
+      await db.query(`
+        INSERT INTO couples (id, user1_id, created_at)
+        VALUES ($1, $2, $3)
+      `, [coupleId, userId, now]);
+
+      console.log(`✅ Created new couple ${coupleId} for user ${userId} during journey update`);
+    } else {
+      coupleId = coupleResult.rows[0].id;
+    }
 
     // Update couple journey information
     const updateFields = [];

@@ -107,20 +107,32 @@ router.get('/', async (req, res) => {
       LIMIT 10
     `, [coupleId]);
 
+    // Calculate average per month based on data
+    const totalMoments = parseInt(stats.love_moments_count) || 0;
+    const monthsActive = monthlyResult.rows.length || 1; // At least 1 to avoid division by zero
+    const averagePerMonth = totalMoments / monthsActive;
+
     res.json({
       success: true,
+      // Frontend-compatible format
+      total_moments: totalMoments,
+      average_per_month: averagePerMonth,
+      average_per_week: averagePerMonth / 4.33, // Approximate weeks per month
+      current_streak: 0, // Could be calculated from recent consecutive days
+      longest_streak: 0, // Could be calculated from historical data
+      monthly_data: monthlyResult.rows.map(row => ({
+        month: row.month,
+        count: parseInt(row.count)
+      })),
+      // Legacy stats format for compatibility
       stats: {
         days_together: daysTogether,
-        love_moments: parseInt(stats.love_moments_count) || 0,
+        love_moments: totalMoments,
         photos: parseInt(stats.photos_count) || 0,
         achievements: parseInt(stats.achievements_count) || 0,
         total_coins: parseInt(stats.total_coins) || 0,
         anniversary_date: couple.anniversary_date
       },
-      monthly_data: monthlyResult.rows.map(row => ({
-        month: row.month,
-        count: parseInt(row.count)
-      })),
       recent_activity: recentActivityResult.rows.map(row => ({
         type: row.type,
         date: row.date,

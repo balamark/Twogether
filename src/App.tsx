@@ -748,7 +748,30 @@ const LoveTimeApp = () => {
             // Note: Nickname updates will be handled by the useEffect hook for nicknames state changes
 
             // Merge journey fields from backend where available
-            // Note: backend CoupleResponse currently includes only basic fields; journey is saved via dedicated endpoint
+            if (coupleInfo.anniversaryDate || coupleInfo.firstDate || coupleInfo.firstKissDate || (coupleInfo as any).first_kiss_place || (coupleInfo as any).first_intimacy_place) {
+              setJourneyMilestones(prev => prev.map(milestone => {
+                if (milestone.type === 'meeting' && coupleInfo.anniversaryDate) {
+                  return { ...milestone, date: coupleInfo.anniversaryDate };
+                }
+                if (milestone.type === 'first_date' && (coupleInfo as any).first_date) {
+                  return { ...milestone, date: (coupleInfo as any).first_date };
+                }
+                if (milestone.type === 'first_kiss') {
+                  const updated = { ...milestone };
+                  if ((coupleInfo as any).first_kiss_date) {
+                    updated.date = (coupleInfo as any).first_kiss_date;
+                  }
+                  if ((coupleInfo as any).first_kiss_place) {
+                    updated.place = (coupleInfo as any).first_kiss_place;
+                  }
+                  return updated;
+                }
+                if (milestone.type === 'first_sex' && (coupleInfo as any).first_intimacy_place) {
+                  return { ...milestone, place: (coupleInfo as any).first_intimacy_place };
+                }
+                return milestone;
+              }));
+            }
           }
         } catch (coupleError) {
           console.log('No couple found or error fetching couple info:', coupleError);
@@ -760,11 +783,40 @@ const LoveTimeApp = () => {
             console.error('Failed to load nicknames:', nicknameError);
           }
         }
-        
-        // Load scripts
-        const storedScripts = localStorage.getItem('customScripts');
-        if (storedScripts) {
-          setCustomScripts(JSON.parse(storedScripts));
+
+        // Load coin balance from backend
+        try {
+          const coinBalance = await apiService.getCoinBalance();
+          setTotalCoins(coinBalance.balance);
+        } catch (coinError) {
+          console.error('Failed to load coin balance:', coinError);
+          // Keep local value if API fails
+        }
+
+        // Load custom scripts from backend
+        try {
+          const scripts = await apiService.getCustomScripts();
+          setCustomScripts(scripts as any[]); // Type assertion for now
+        } catch (scriptError) {
+          console.error('Failed to load custom scripts:', scriptError);
+          // Fallback to localStorage
+          const storedScripts = localStorage.getItem('customScripts');
+          if (storedScripts) {
+            setCustomScripts(JSON.parse(storedScripts));
+          }
+        }
+
+        // Load custom gifts from backend
+        try {
+          const gifts = await apiService.getCustomGifts();
+          setCustomGifts(gifts as any[]); // Type assertion for now
+        } catch (giftError) {
+          console.error('Failed to load custom gifts:', giftError);
+          // Fallback to localStorage
+          const storedGifts = localStorage.getItem('customGifts');
+          if (storedGifts) {
+            setCustomGifts(JSON.parse(storedGifts));
+          }
         }
       } catch (error) {
         console.error('Error loading authenticated data:', error);
@@ -1057,67 +1109,108 @@ const LoveTimeApp = () => {
     return formattedLines.join('\n\n');
   };
 
-  const addCustomScript = (title: string, category: 'romantic' | 'adventurous', scenario: string, content: string, tags: string[] = []) => {
-    const newScript: RoleplayScript = {
-      id: Date.now().toString(),
-      title,
-      category,
-      scenario,
-      script: parseScriptContent(content),
-      isCustom: true,
-      createdBy: authState.user?.id,
-      createdAt: new Date().toISOString(),
-      tags,
-      duration: '15-30分鐘'
-    };
-    
-    setCustomScripts(prev => [...prev, newScript]);
-    setShowScriptUploadModal(false);
-    
-    showNotification({
-      type: 'success',
-      title: '劇本上傳成功！',
-      message: `${title} 已加入你的劇本庫`,
-      coins: 200,
-      duration: 5000
-    });
-    
-    setTotalCoins(prev => prev + 200); // Reward for creating content
+  const addCustomScript = async (title: string, category: 'romantic' | 'adventurous', scenario: string, content: string, tags: string[] = []) => {
+    try {
+      // Create script via backend API
+      const newScript = await apiService.createCustomScript({
+        title,
+        category,
+        scenario,
+        content: parseScriptContent(content),
+        tags,
+        duration: '15-30分鐘'
+      }) as RoleplayScript;
+
+      // Update local state
+      setCustomScripts(prev => [...prev, newScript]);
+      setShowScriptUploadModal(false);
+
+      // Reward for creating content
+      try {
+        await apiService.updateCoins(200);
+        setTotalCoins(prev => prev + 200);
+      } catch (error) {
+        console.warn('Failed to update coins via API, using local update only:', error);
+        setTotalCoins(prev => prev + 200);
+      }
+
+      showNotification({
+        type: 'success',
+        title: '劇本上傳成功！',
+        message: `${title} 已加入你的劇本庫`,
+        coins: 200,
+        duration: 5000
+      });
+
+    } catch (error) {
+      console.error('Failed to create custom script:', error);
+      showNotification({
+        type: 'error',
+        title: '劇本上傳失敗',
+        message: '無法保存劇本到服務器，請稍後再試',
+        duration: 5000
+      });
+    }
   };
 
   // Gift management functions
-  const addCustomGift = (title: string, description: string, cost: number, category: CoinGift['category'], icon: string) => {
-    const newGift: CoinGift = {
-      id: Date.now().toString(),
-      title,
-      description,
-      cost,
-      category,
-      icon,
-      isCustom: true,
-      createdBy: authState.user?.id
-    };
-    
-    setCustomGifts(prev => [...prev, newGift]);
-    
-    showNotification({
-      type: 'success',
-      title: '禮品已添加！',
-      message: `${title} 已加入禮品商店`,
-      duration: 3000
-    });
-  };
+  const addCustomGift = async (title: string, description: string, cost: number, category: CoinGift['category'], icon: string) => {
+    try {
+      // Create gift via backend API
+      const newGift = await apiService.createCustomGift({
+        title,
+        description,
+        cost,
+        category,
+        icon
+      }) as CoinGift;
 
-  const purchaseGift = (gift: CoinGift) => {
-    if (totalCoins >= gift.cost) {
-      setTotalCoins(prev => prev - gift.cost);
-      
+      // Update local state
+      setCustomGifts(prev => [...prev, newGift]);
+
       showNotification({
         type: 'success',
-        title: '購買成功！',
-        message: `你獲得了 ${gift.title}！記得兌現承諾哦～`,
+        title: '禮品已添加！',
+        message: `${title} 已加入禮品商店`,
+        duration: 3000
+      });
+
+    } catch (error) {
+      console.error('Failed to create custom gift:', error);
+      showNotification({
+        type: 'error',
+        title: '禮品添加失敗',
+        message: '無法保存禮品到服務器，請稍後再試',
         duration: 5000
       });
+    }
+  };
+
+  const purchaseGift = async (gift: CoinGift) => {
+    if (totalCoins >= gift.cost) {
+      try {
+        // Update coins via backend API
+        await apiService.updateCoins(-gift.cost); // Negative amount for spending
+        setTotalCoins(prev => prev - gift.cost);
+
+        showNotification({
+          type: 'success',
+          title: '購買成功！',
+          message: `你獲得了 ${gift.title}！記得兌現承諾哦～`,
+          duration: 5000
+        });
+      } catch (error) {
+        console.error('Failed to update coins via API:', error);
+        // Still update locally for immediate UI feedback
+        setTotalCoins(prev => prev - gift.cost);
+
+        showNotification({
+          type: 'success',
+          title: '購買成功！',
+          message: `你獲得了 ${gift.title}！記得兌現承諾哦～`,
+          duration: 5000
+        });
+      }
     } else {
       showNotification({
         type: 'warning',
@@ -2498,10 +2591,18 @@ const LoveTimeApp = () => {
     const [selectedActivity, setSelectedActivity] = useState<ForeplayActivity | null>(null);
     const [selectedPosition, setSelectedPosition] = useState<PositionSuggestion | null>(null);
 
-    const handleTryActivity = (activity: ForeplayActivity) => {
+    const handleTryActivity = async (activity: ForeplayActivity) => {
       const coinsEarned = activity.coins;
-      setTotalCoins(prev => prev + coinsEarned);
-      
+
+      // Update coins via backend API
+      try {
+        await apiService.updateCoins(coinsEarned);
+        setTotalCoins(prev => prev + coinsEarned);
+      } catch (error) {
+        console.warn('Failed to update coins via API, using local update only:', error);
+        setTotalCoins(prev => prev + coinsEarned);
+      }
+
       showNotification({
         type: 'success',
         title: `已嘗試 ${activity.title}！`,
@@ -2511,10 +2612,18 @@ const LoveTimeApp = () => {
       });
     };
 
-    const handleTryPosition = (position: PositionSuggestion) => {
+    const handleTryPosition = async (position: PositionSuggestion) => {
       const coinsEarned = position.coins;
-      setTotalCoins(prev => prev + coinsEarned);
-      
+
+      // Update coins via backend API
+      try {
+        await apiService.updateCoins(coinsEarned);
+        setTotalCoins(prev => prev + coinsEarned);
+      } catch (error) {
+        console.warn('Failed to update coins via API, using local update only:', error);
+        setTotalCoins(prev => prev + coinsEarned);
+      }
+
       showNotification({
         type: 'success',
         title: `已嘗試 ${position.name}！`,

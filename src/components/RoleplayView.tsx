@@ -214,7 +214,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             {filteredScripts.map((script, index) => (
               <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-all">
                 <div className="flex items-start space-x-4">
-                  <div className="w-20 h-20 bg-gray-200 rounded-lg flex-shrink-0 flex items-center justify-center">
+                  <div className="w-32 h-32 bg-gray-200 rounded-lg flex-shrink-0 flex items-center justify-center">
                     <img 
                       src={script.image} 
                       alt={script.title}

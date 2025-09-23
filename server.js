@@ -20,6 +20,8 @@ const coinRoutes = require('./routes/coins');
 const statsRoutes = require('./routes/stats');
 const intimacyRequestRoutes = require('./routes/intimacy-requests');
 const pairingRequestRoutes = require('./routes/pairing-requests');
+const customScriptsRoutes = require('./routes/custom-scripts');
+const customGiftsRoutes = require('./routes/custom-gifts');
 
 // Import database and middleware
 const db = require('./database/db');
@@ -112,6 +114,8 @@ app.use('/api/coins', coinRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/intimacy-requests', intimacyRequestRoutes);
 app.use('/api/pairing-requests', pairingRequestRoutes);
+app.use('/api/custom-scripts', customScriptsRoutes);
+app.use('/api/custom-gifts', customGiftsRoutes);
 // Additional mount for intimacy endpoints (frontend compatibility)
 app.use('/api/intimacy', intimacyRequestRoutes);
 

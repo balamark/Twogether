@@ -33,6 +33,8 @@ interface CoupleResponse {
   id: string;
   coupleName?: string;
   anniversaryDate?: string;
+  firstDate?: string;
+  firstKissDate?: string;
   user1Nickname: string;
   user2Nickname?: string;
   createdAt: string;
@@ -876,6 +878,112 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to fetch unread notification count:', error);
       return 0;
+    }
+  }
+
+  // Custom Scripts API
+  async getCustomScripts(): Promise<unknown[]> {
+    try {
+      const response = await apiClient.get('/custom-scripts');
+      return response.data.custom_scripts || [];
+    } catch (error) {
+      console.error('Failed to fetch custom scripts:', error);
+      throw error;
+    }
+  }
+
+  async createCustomScript(script: {
+    title: string;
+    category: 'romantic' | 'adventurous' | 'school' | 'bold';
+    scenario: string;
+    content: string;
+    tags?: string[];
+    duration?: string;
+  }): Promise<unknown> {
+    try {
+      const response = await apiClient.post('/custom-scripts', script);
+      return response.data.custom_script;
+    } catch (error) {
+      console.error('Failed to create custom script:', error);
+      throw error;
+    }
+  }
+
+  async updateCustomScript(id: string, updates: {
+    title?: string;
+    category?: 'romantic' | 'adventurous' | 'school' | 'bold';
+    scenario?: string;
+    content?: string;
+    tags?: string[];
+    duration?: string;
+  }): Promise<unknown> {
+    try {
+      const response = await apiClient.put(`/custom-scripts/${id}`, updates);
+      return response.data.custom_script;
+    } catch (error) {
+      console.error('Failed to update custom script:', error);
+      throw error;
+    }
+  }
+
+  async deleteCustomScript(id: string): Promise<void> {
+    try {
+      await apiClient.delete(`/custom-scripts/${id}`);
+    } catch (error) {
+      console.error('Failed to delete custom script:', error);
+      throw error;
+    }
+  }
+
+  // Custom Gifts API
+  async getCustomGifts(): Promise<unknown[]> {
+    try {
+      const response = await apiClient.get('/custom-gifts');
+      return response.data.custom_gifts || [];
+    } catch (error) {
+      console.error('Failed to fetch custom gifts:', error);
+      throw error;
+    }
+  }
+
+  async createCustomGift(gift: {
+    title: string;
+    description: string;
+    cost: number;
+    category: 'service' | 'experience' | 'physical' | 'intimate';
+    icon?: string;
+  }): Promise<unknown> {
+    try {
+      const response = await apiClient.post('/custom-gifts', gift);
+      return response.data.custom_gift;
+    } catch (error) {
+      console.error('Failed to create custom gift:', error);
+      throw error;
+    }
+  }
+
+  async updateCustomGift(id: string, updates: {
+    title?: string;
+    description?: string;
+    cost?: number;
+    category?: 'service' | 'experience' | 'physical' | 'intimate';
+    icon?: string;
+  }): Promise<unknown> {
+    try {
+      const response = await apiClient.put(`/custom-gifts/${id}`, updates);
+      return response.data.custom_gift;
+    } catch (error) {
+      console.error('Failed to update custom gift:', error);
+      throw error;
+    }
+  }
+
+  async deleteCustomGift(id: string): Promise<void> {
+    try {
+      await apiClient.delete(`/custom-gifts/${id}`);
+    } catch (error) {
+      console.error('Failed to delete custom gift:', error);
+      throw error;
     }
   }
 
