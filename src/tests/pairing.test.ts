@@ -347,4 +347,294 @@ describe('End-to-End Pairing Flow Simulation', () => {
     expect(couple.user1Nickname).toBe('測試用戶A');
     expect(couple.user2Nickname).toBe('測試用戶B');
   });
-}); 
+});
+
+describe('Intimacy Records API Tests', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorageMock.getItem.mockReturnValue('mock-jwt-token');
+  });
+
+  describe('createIntimateRecord', () => {
+    it('should create intimate record successfully', async () => {
+      const mockResponse = {
+        data: {
+          success: true,
+          message: '愛情時刻記錄成功',
+          love_moment: {
+            id: 'test-record-id',
+            moment_date: '2023-09-23T14:30:00.000Z',
+            description: 'Test romantic moment',
+            duration: '30',
+            location: 'Test Location',
+            notes: 'Test notes',
+            created_at: '2023-09-23T14:30:00.000Z'
+          }
+        }
+      };
+
+      const mockApiClient = {
+        post: vi.fn().mockResolvedValue(mockResponse),
+        interceptors: {
+          request: { use: vi.fn() },
+          response: { use: vi.fn() }
+        }
+      } as MockAxiosInstance;
+
+      mockedAxios.create.mockReturnValue(mockApiClient as MockAxiosInstance);
+
+      const testRecord = {
+        date: '2023-09-23',
+        time: '14:30',
+        mood: '💕',
+        description: 'Test romantic moment',
+        duration: '30',
+        location: 'Test Location',
+        notes: 'Test notes',
+        photo: '',
+        roleplayScript: '初次相遇',
+        activityType: 'intimate'
+      };
+
+      const result = await apiService.createIntimateRecord(testRecord);
+
+      expect(result).toEqual(expect.objectContaining({
+        id: expect.any(Number),
+        date: '2023-09-23',
+        time: expect.any(String),
+        description: 'Test romantic moment',
+        duration: '30',
+        location: 'Test Location',
+        notes: 'Test notes'
+      }));
+
+      expect(mockApiClient.post).toHaveBeenCalledWith('/love-moments', {
+        moment_date: expect.any(String),
+        notes: 'Test notes',
+        description: 'Test romantic moment',
+        duration: '30',
+        location: 'Test Location',
+        roleplay_script: '初次相遇',
+        activity_type: 'intimate',
+        photo_id: null
+      });
+    });
+
+    it('should handle API error response structure', async () => {
+      // Test the new API response structure handling
+      const mockResponse = {
+        data: {
+          success: true,
+          message: '愛情時刻記錄成功',
+          love_moment: {
+            id: 'cf06ec8b-7c1c-4d77-9f2c-659ce993b1f0',
+            moment_date: '2023-09-23T14:30:00.000Z',
+            description: null,
+            duration: null,
+            location: null,
+            notes: null,
+            created_at: '2023-09-23T14:30:00.000Z'
+          }
+        }
+      };
+
+      const mockApiClient = {
+        post: vi.fn().mockResolvedValue(mockResponse),
+        interceptors: {
+          request: { use: vi.fn() },
+          response: { use: vi.fn() }
+        }
+      } as MockAxiosInstance;
+
+      mockedAxios.create.mockReturnValue(mockApiClient as MockAxiosInstance);
+
+      const testRecord = {
+        date: '2023-09-23',
+        time: '14:30',
+        mood: '💕',
+        notes: '',
+        description: '',
+        duration: '',
+        location: '',
+        photo: '',
+        roleplayScript: '',
+        activityType: 'intimate'
+      };
+
+      const result = await apiService.createIntimateRecord(testRecord);
+
+      // Should successfully transform the record even with null values
+      expect(result).toEqual(expect.objectContaining({
+        id: expect.any(Number),
+        date: '2023-09-23',
+        time: expect.any(String),
+        notes: '',
+        description: '',
+        duration: '',
+        location: '',
+        roleplayScript: ''
+      }));
+    });
+
+    it('should handle invalid date gracefully', async () => {
+      // Test handling of invalid moment_date
+      const mockResponse = {
+        data: {
+          success: true,
+          love_moment: {
+            id: 'test-id',
+            moment_date: 'invalid-date-string',
+            created_at: new Date().toISOString()
+          }
+        }
+      };
+
+      const mockApiClient = {
+        post: vi.fn().mockResolvedValue(mockResponse),
+        interceptors: {
+          request: { use: vi.fn() },
+          response: { use: vi.fn() }
+        }
+      } as MockAxiosInstance;
+
+      mockedAxios.create.mockReturnValue(mockApiClient as MockAxiosInstance);
+
+      const testRecord = {
+        date: '2023-09-23',
+        time: '14:30',
+        mood: '💕',
+        notes: 'test',
+        description: '',
+        duration: '',
+        location: '',
+        photo: '',
+        roleplayScript: '',
+        activityType: 'intimate'
+      };
+
+      // Should not throw error even with invalid date
+      const result = await apiService.createIntimateRecord(testRecord);
+
+      expect(result).toEqual(expect.objectContaining({
+        id: expect.any(Number),
+        date: expect.any(String), // Should fallback to current date
+        time: expect.any(String)  // Should fallback to current time
+      }));
+    });
+
+    it('should validate required fields', async () => {
+      const testRecord = {
+        date: '',  // Missing required date
+        time: '14:30',
+        mood: '💕',
+        notes: 'test',
+        description: '',
+        duration: '',
+        location: '',
+        photo: '',
+        roleplayScript: '',
+        activityType: 'intimate'
+      };
+
+      await expect(apiService.createIntimateRecord(testRecord))
+        .rejects.toThrow('請填寫必要的記錄信息（日期、時間）');
+    });
+  });
+
+  describe('transformApiRecord', () => {
+    it('should handle missing ID gracefully', async () => {
+      // Create a record without ID to test the new safe ID generation
+      const mockResponse = {
+        data: {
+          success: true,
+          love_moment: {
+            // No id field
+            moment_date: '2023-09-23T14:30:00.000Z',
+            description: 'test',
+            created_at: '2023-09-23T14:30:00.000Z'
+          }
+        }
+      };
+
+      const mockApiClient = {
+        post: vi.fn().mockResolvedValue(mockResponse),
+        interceptors: {
+          request: { use: vi.fn() },
+          response: { use: vi.fn() }
+        }
+      } as MockAxiosInstance;
+
+      mockedAxios.create.mockReturnValue(mockApiClient as MockAxiosInstance);
+
+      const testRecord = {
+        date: '2023-09-23',
+        time: '14:30',
+        mood: '💕',
+        notes: 'test',
+        description: '',
+        duration: '',
+        location: '',
+        photo: '',
+        roleplayScript: '',
+        activityType: 'intimate'
+      };
+
+      // Should generate a timestamp-based ID when no ID is provided
+      const result = await apiService.createIntimateRecord(testRecord);
+      expect(result.id).toBeTypeOf('number');
+      expect(result.id).toBeGreaterThan(0);
+    });
+  });
+
+  describe('getIntimateRecords', () => {
+    it('should fetch records successfully with proper structure', async () => {
+      const mockResponse = {
+        data: {
+          success: true,
+          love_moments: [
+            {
+              id: 'record-1',
+              moment_date: '2023-09-23T14:30:00.000Z',
+              description: 'First moment',
+              notes: 'Test note 1',
+              created_at: '2023-09-23T14:30:00.000Z'
+            },
+            {
+              id: 'record-2',
+              moment_date: '2023-09-22T16:00:00.000Z',
+              description: 'Second moment',
+              notes: 'Test note 2',
+              created_at: '2023-09-22T16:00:00.000Z'
+            }
+          ]
+        }
+      };
+
+      const mockApiClient = {
+        get: vi.fn().mockResolvedValue(mockResponse),
+        interceptors: {
+          request: { use: vi.fn() },
+          response: { use: vi.fn() }
+        }
+      } as MockAxiosInstance;
+
+      mockedAxios.create.mockReturnValue(mockApiClient as MockAxiosInstance);
+
+      const result = await apiService.getIntimateRecords();
+
+      expect(result).toHaveLength(2);
+      expect(result[0]).toEqual(expect.objectContaining({
+        id: expect.any(Number),
+        date: '2023-09-23',
+        description: 'First moment',
+        notes: 'Test note 1'
+      }));
+      expect(result[1]).toEqual(expect.objectContaining({
+        id: expect.any(Number),
+        date: '2023-09-22',
+        description: 'Second moment',
+        notes: 'Test note 2'
+      }));
+    });
+  });
+});
