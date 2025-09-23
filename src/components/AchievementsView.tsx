@@ -63,6 +63,8 @@ export function AchievementsView() {
   const [stats, setStats] = useState<IntimacyStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
   // Fetch all records for badge logic
   const [records, setRecords] = useState<IntimateRecord[]>([]);
@@ -100,41 +102,29 @@ export function AchievementsView() {
     }
   };
 
-  // Build monthly series from records for a small bar chart (12 months)
-  const monthlySeries = useMemo(() => {
-    const counts = new Array(12).fill(0);
-    if (stats?.monthly_data && stats.monthly_data.length > 0) {
-      stats.monthly_data.forEach((m) => {
-        const normalized = m.month.replace('/', '-');
-        const parts = normalized.split('-');
-        const mm = parts.length === 2 ? parts[1] : parts[parts.length - 1];
-        const monthIdx = Number(mm) - 1;
-        if (!Number.isNaN(monthIdx) && monthIdx >= 0 && monthIdx < 12) {
-          counts[monthIdx] = m.count;
-        }
-      });
-    }
-    return counts;
-  }, [stats]);
 
-  // Daily distributions for current and previous month
-  const { currentMonthSeries, previousMonthSeries, currentMonthDays, previousMonthDays } = useMemo(() => {
+  // Calculate current week/month statistics
+  const currentStats = useMemo(() => {
+    if (!records || records.length === 0) return { thisWeek: 0, thisMonth: 0 };
+
     const now = new Date();
-    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const daysInCurrent = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const daysInPrev = new Date(prev.getFullYear(), prev.getMonth() + 1, 0).getDate();
-    const cur = new Array(daysInCurrent).fill(0);
-    const pre = new Array(daysInPrev).fill(0);
-    records.forEach((r) => {
-      const d = new Date(r.date);
-      if (Number.isNaN(d.getTime())) return;
-      if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()) {
-        cur[(d.getDate() - 1)] += 1;
-      } else if (d.getFullYear() === prev.getFullYear() && d.getMonth() === prev.getMonth()) {
-        pre[(d.getDate() - 1)] += 1;
-      }
-    });
-    return { currentMonthSeries: cur, previousMonthSeries: pre, currentMonthDays: daysInCurrent, previousMonthDays: daysInPrev };
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const thisWeek = records.filter(record => {
+      const recordDate = new Date(record.date);
+      return recordDate >= startOfWeek;
+    }).length;
+
+    const thisMonth = records.filter(record => {
+      const recordDate = new Date(record.date);
+      return recordDate >= startOfMonth;
+    }).length;
+
+    return { thisWeek, thisMonth };
   }, [records]);
 
   // Badge logic
@@ -142,9 +132,9 @@ export function AchievementsView() {
     if (!stats) return [];
     const b = [];
     // Weekly/Monthly/Total badges
-    if (stats.average_per_week >= 1) b.push({ name: '週間戀人', icon: '💕', desc: '本週至少一次親密時光' });
-    if (stats.average_per_week >= 2) b.push({ name: '熱戀情侶', icon: '🔥', desc: '本週至少兩次親密時光' });
-    if (stats.average_per_week >= 3) b.push({ name: '甜蜜無敵', icon: '🌟', desc: '本週三次以上親密時光' });
+    if (currentStats.thisWeek >= 1) b.push({ name: '週間戀人', icon: '💕', desc: '本週至少一次親密時光' });
+    if (currentStats.thisWeek >= 2) b.push({ name: '熱戀情侶', icon: '🔥', desc: '本週至少兩次親密時光' });
+    if (currentStats.thisWeek >= 3) b.push({ name: '甜蜜無敵', icon: '🌟', desc: '本週三次以上親密時光' });
     if (stats.total_moments >= 10) b.push({ name: '愛情老手', icon: '🏆', desc: '累計十次親密記錄' });
     if (stats.total_moments >= 50) b.push({ name: '愛情大師', icon: '👑', desc: '累計五十次親密記錄' });
     // Unique poses badge
@@ -157,7 +147,7 @@ export function AchievementsView() {
     const maxDuration = Math.max(...records.map(r => parseInt(r.duration ?? '0') || 0));
     if (maxDuration >= 60) b.push({ name: '最長紀錄', icon: '⏱️', desc: `單次親密時長達 ${maxDuration} 分鐘` });
     return b;
-  }, [stats, records]);
+  }, [stats, records, currentStats]);
 
   if (loading) {
     return (
@@ -215,28 +205,27 @@ export function AchievementsView() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
             <div className="bg-pink-50 rounded-lg p-4 border border-pink-200 text-center">
               <div className="text-lg font-bold text-pink-600">本週次數</div>
-              <div className="text-2xl font-bold">{(stats as any).this_week ?? 0}</div>
+              <div className="text-2xl font-bold">{currentStats.thisWeek}</div>
             </div>
             <div className="bg-purple-50 rounded-lg p-4 border border-purple-200 text-center">
               <div className="text-lg font-bold text-purple-600">本月次數</div>
-              <div className="text-2xl font-bold">{(stats as any).this_month ?? 0}</div>
+              <div className="text-2xl font-bold">{currentStats.thisMonth}</div>
             </div>
           </div>
 
-          {/* Bar Chart: Monthly distribution */}
+          {/* Interactive Month Heatmap */}
           <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">每月記錄分佈</h3>
-            <MonthlyBarChart data={monthlySeries} />
-          </div>
-          {/* Current Month Distribution */}
-          <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">本月記錄分佈</h3>
-            <DailyBarChart data={currentMonthSeries} days={currentMonthDays} />
-          </div>
-          {/* Previous Month Distribution */}
-          <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">上月記錄分佈</h3>
-            <DailyBarChart data={previousMonthSeries} days={previousMonthDays} />
+            <CalendarHeatmap
+              data={records}
+              year={currentYear}
+              month={currentMonth}
+              title="月度記錄分佈"
+              showMonthLabels={true}
+              onNavigate={(year, month) => {
+                setCurrentYear(year);
+                setCurrentMonth(month);
+              }}
+            />
           </div>
           {/* Badges */}
           <div className="bg-white rounded-2xl shadow-lg p-6">
@@ -267,13 +256,13 @@ export function AchievementsView() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-800">成就進度</h2>
               <span className="text-2xl font-bold text-pink-600">
-                {Math.round(achievements.completion_percentage)}%
+                {Math.round(achievements.completion_percentage || 0)}%
               </span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-3">
               <div
                 className="bg-gradient-to-r from-pink-500 to-purple-500 h-3 rounded-full transition-all duration-500"
-                style={{ width: `${achievements.completion_percentage}%` }}
+                style={{ width: `${achievements.completion_percentage || 0}%` }}
               ></div>
             </div>
             <p className="text-sm text-gray-600 mt-2">
@@ -441,118 +430,182 @@ export function AchievementsView() {
   );
 } 
 
-// Simple responsive bar chart without external deps
-function MonthlyBarChart({ data }: { data: number[] }) {
-  const labels = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const max = Math.max(1, ...data);
-  const ticks = 4;
-  const tickValues = Array.from({ length: ticks + 1 }, (_, i) => Math.round((max * i) / ticks));
-
-  return (
-    <div className="w-full">
-      <div className="flex gap-2 sm:gap-3 h-40 sm:h-48">
-        {/* Y Axis */}
-        <div className="w-6 sm:w-10 flex flex-col justify-between text-[8px] sm:text-[10px] text-gray-400 flex-shrink-0">
-          {tickValues.slice().reverse().map((v, i) => (
-            <div key={i} className="-translate-y-1">{v}</div>
-          ))}
-        </div>
-        {/* Chart Area */}
-        <div className="relative flex-1">
-          {/* Horizontal grid lines */}
-          {tickValues.map((v, i) => (
-            <div
-              key={i}
-              className={`absolute left-0 right-0 border-t ${i === 0 ? 'border-gray-300' : 'border-gray-200/60'}`}
-              style={{ bottom: `${(v / max) * 100}%` }}
-            />
-          ))}
-          <div className="grid grid-cols-12 gap-1 sm:gap-2 items-end h-full relative">
-            {data.map((value, idx) => {
-              const height = (value / max) * 100;
-              return (
-                <div key={idx} className="group flex flex-col items-center h-full relative">
-                  <div
-                    className="w-full rounded-t bg-gradient-to-t from-pink-500 to-purple-500 transition-transform duration-200 group-hover:scale-y-105"
-                    style={{ height: `${height}%`, minHeight: value > 0 ? '2px' : '0' }}
-                  />
-                  {/* Tooltip */}
-                  <div
-                    className="absolute left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-gray-800 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap"
-                    style={{ bottom: `calc(${height}% + 8px)` }}
-                  >
-                    {labels[idx]}月：{value}
-                  </div>
-                  <div className="mt-1 sm:mt-2 text-[8px] sm:text-xs text-gray-600 text-center">{labels[idx]}</div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-      <div className="mt-2 text-right text-xs text-gray-500">最高 {Math.max(...data)} 次</div>
-    </div>
-  );
+// Calendar Heatmap Component - GitHub style for better mobile experience
+interface CalendarHeatmapProps {
+  data: IntimateRecord[];
+  year?: number;
+  month?: number;
+  title: string;
+  showMonthLabels?: boolean;
+  onNavigate?: (year: number, month: number) => void;
 }
 
-function DailyBarChart({ data, days }: { data: number[]; days: number }) {
-  const labels = Array.from({ length: days }, (_, i) => String(i + 1));
-  const max = Math.max(1, ...data);
-  const ticks = 4;
-  const tickValues = Array.from({ length: ticks + 1 }, (_, i) => Math.round((max * i) / ticks));
-  
+function CalendarHeatmap({ data, year, month, title, showMonthLabels = true, onNavigate }: CalendarHeatmapProps) {
+  const now = new Date();
+  const targetYear = year ?? now.getFullYear();
+  const targetMonth = month ?? now.getMonth();
+
+  // Generate calendar data
+  const calendarData = useMemo(() => {
+    const firstDay = new Date(targetYear, targetMonth, 1);
+    const lastDay = new Date(targetYear, targetMonth + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startDayOfWeek = firstDay.getDay();
+
+    // Create array of days with counts
+    const days = [];
+
+    // Add empty cells for days before the month starts
+    for (let i = 0; i < startDayOfWeek; i++) {
+      days.push({ date: null, count: 0, isEmpty: true });
+    }
+
+    // Add all days of the month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDate = new Date(targetYear, targetMonth, day);
+      const dateStr = currentDate.toISOString().split('T')[0];
+
+      // Count records for this day
+      const count = data.filter(record => {
+        const recordDate = new Date(record.date);
+        return recordDate.toISOString().split('T')[0] === dateStr;
+      }).length;
+
+      days.push({
+        date: currentDate,
+        count,
+        isEmpty: false,
+        dateStr
+      });
+    }
+
+    return days;
+  }, [data, targetYear, targetMonth]);
+
+  // Color intensity based on count
+  const getIntensityClass = (count: number) => {
+    if (count === 0) return 'bg-gray-100 border-gray-200';
+    if (count === 1) return 'bg-pink-100 border-pink-200';
+    if (count === 2) return 'bg-pink-200 border-pink-300';
+    if (count === 3) return 'bg-pink-300 border-pink-400';
+    if (count >= 4) return 'bg-pink-500 border-pink-600';
+    return 'bg-gray-100 border-gray-200';
+  };
+
+  const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+  const monthNames = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
+
+  const maxCount = Math.max(...calendarData.map(d => d.count));
+
+  const navigateMonth = (direction: number) => {
+    if (!onNavigate) return;
+
+    let newMonth = targetMonth + direction;
+    let newYear = targetYear;
+
+    if (newMonth < 0) {
+      newMonth = 11;
+      newYear -= 1;
+    } else if (newMonth > 11) {
+      newMonth = 0;
+      newYear += 1;
+    }
+
+    onNavigate(newYear, newMonth);
+  };
+
   return (
     <div className="w-full">
-      <div className="flex gap-3 h-32 sm:h-40">
-        {/* Y Axis */}
-        <div className="w-8 sm:w-10 flex flex-col justify-between text-[10px] text-gray-400 flex-shrink-0">
-          {tickValues.slice().reverse().map((v, i) => (
-            <div key={i} className="-translate-y-1">{v}</div>
-          ))}
-        </div>
-        {/* Chart Area - Make it scrollable horizontally on mobile */}
-        <div className="relative flex-1 overflow-hidden">
-          {tickValues.map((v, i) => (
-            <div
-              key={i}
-              className={`absolute left-0 right-0 border-t ${i === 0 ? 'border-gray-300' : 'border-gray-200/60'}`}
-              style={{ bottom: `${(v / max) * 100}%` }}
-            />
-          ))}
-          {/* Scrollable container for mobile */}
-          <div className="overflow-x-auto">
-            <div 
-              className="grid items-end h-full gap-1 sm:gap-2" 
-              style={{ 
-                gridTemplateColumns: `repeat(${days}, minmax(${days > 20 ? '16px' : '20px'}, 1fr))`,
-                minWidth: days > 20 ? `${days * 18}px` : 'auto' // Ensure minimum width for scrolling
-              }}
-            >
-              {data.map((value, idx) => {
-                const height = (value / max) * 100;
-                return (
-                  <div key={idx} className="group flex flex-col items-center h-full relative">
-                    <div
-                      className="w-full rounded-t bg-gradient-to-t from-indigo-500 to-pink-500 transition-transform duration-200 group-hover:scale-y-105"
-                      style={{ height: `${height}%`, minHeight: value > 0 ? '2px' : '0' }}
-                    />
-                    <div
-                      className="absolute left-1/2 -translate-x-1/2 px-2 py-1 rounded bg-gray-800 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap"
-                      style={{ bottom: `calc(${height}% + 6px)` }}
-                    >
-                      第{labels[idx]}天：{value}
-                    </div>
-                    <div className="mt-1 text-[8px] sm:text-[10px] text-gray-500 text-center">{labels[idx]}</div>
-                  </div>
-                );
-              })}
-            </div>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-gray-800">{title}</h3>
+        {showMonthLabels && (
+          <div className="flex items-center space-x-2">
+            {onNavigate && (
+              <button
+                onClick={() => navigateMonth(-1)}
+                className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                title="上一個月"
+              >
+                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+            )}
+            <span className="text-sm text-gray-500 min-w-[80px] text-center">
+              {targetYear}年 {monthNames[targetMonth]}
+            </span>
+            {onNavigate && (
+              <button
+                onClick={() => navigateMonth(1)}
+                className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                title="下一個月"
+              >
+                <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            )}
           </div>
-        </div>
+        )}
       </div>
-      <div className="mt-2 flex justify-between text-xs text-gray-500">
-        <span>左右滑動查看所有天數</span>
-        <span>最高 {Math.max(...data)} 次</span>
+
+      {/* Weekday headers */}
+      <div className="grid grid-cols-7 gap-1 mb-2">
+        {weekDays.map((day) => (
+          <div key={day} className="text-xs text-gray-500 text-center py-1 font-medium">
+            {day}
+          </div>
+        ))}
+      </div>
+
+      {/* Calendar grid */}
+      <div className="grid grid-cols-7 gap-1 mb-4">
+        {calendarData.map((day, index) => (
+          <div
+            key={index}
+            className={`
+              aspect-square rounded-sm border transition-all duration-200 hover:scale-110 hover:z-10 relative group
+              ${day.isEmpty ? 'invisible' : getIntensityClass(day.count)}
+              ${!day.isEmpty && day.count > 0 ? 'cursor-pointer' : ''}
+            `}
+          >
+            {!day.isEmpty && day.date && (
+              <>
+                {/* Day number for mobile */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className={`text-xs font-medium ${
+                    day.count >= 3 ? 'text-white' : 'text-gray-600'
+                  }`}>
+                    {day.date.getDate()}
+                  </span>
+                </div>
+
+                {/* Tooltip */}
+                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-20 whitespace-nowrap pointer-events-none">
+                  {day.date.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })}
+                  <br />
+                  {day.count} 次記錄
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Legend and stats */}
+      <div className="flex items-center justify-between text-xs text-gray-500">
+        <div className="flex items-center space-x-2">
+          <span>較少</span>
+          <div className="flex space-x-1">
+            <div className="w-3 h-3 bg-gray-100 border border-gray-200 rounded-sm"></div>
+            <div className="w-3 h-3 bg-pink-100 border border-pink-200 rounded-sm"></div>
+            <div className="w-3 h-3 bg-pink-200 border border-pink-300 rounded-sm"></div>
+            <div className="w-3 h-3 bg-pink-300 border border-pink-400 rounded-sm"></div>
+            <div className="w-3 h-3 bg-pink-500 border border-pink-600 rounded-sm"></div>
+          </div>
+          <span>較多</span>
+        </div>
+        <span>最高 {maxCount} 次</span>
       </div>
     </div>
   );
