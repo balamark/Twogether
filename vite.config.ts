@@ -54,6 +54,17 @@ export default defineConfig(({ mode }) => {
       sourcemap: false,
       outDir: 'dist',
       emptyOutDir: true,
+      chunkSizeWarningLimit: 600,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            react: ['react', 'react-dom'],
+            vendor: ['lucide-react', '@headlessui/react', '@heroicons/react'],
+            router: ['react-router-dom'],
+            utils: ['date-fns', 'axios']
+          }
+        }
+      }
     },
     esbuild: {
       legalComments: 'none',
