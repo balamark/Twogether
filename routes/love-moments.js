@@ -56,20 +56,14 @@ router.post('/', [
       photo_id
     } = req.body;
 
-    // Find user's couple
+    // Find user's couple (optional - users can record even when unpaired)
     const coupleResult = await db.query(
       'SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1',
       [userId]
     );
 
-    if (coupleResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: '您還沒有情侶關係'
-      });
-    }
-
-    const coupleId = coupleResult.rows[0].id;
+    // Allow unpaired users to create records - they can pair later
+    const coupleId = coupleResult.rows.length > 0 ? coupleResult.rows[0].id : null;
 
     // Create love moment
     const momentId = uuidv4();
@@ -120,28 +114,28 @@ router.get('/', async (req, res) => {
     
     const offset = (page - 1) * limit;
 
-    // Find user's couple
+    // Find user's couple (optional for unpaired users)
     const coupleResult = await db.query(
       'SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1',
       [userId]
     );
 
-    if (coupleResult.rows.length === 0) {
-      return res.json({
-        success: true,
-        love_moments: [],
-        total: 0,
-        page: parseInt(page),
-        limit: parseInt(limit)
-      });
-    }
+    const coupleId = coupleResult.rows.length > 0 ? coupleResult.rows[0].id : null;
 
-    const coupleId = coupleResult.rows[0].id;
-
-    // Build query with optional month filter
-    let whereClause = 'WHERE lm.couple_id = $1';
-    let queryParams = [coupleId];
+    // Build query to include both couple records and individual records
+    let whereClause, queryParams;
     let paramIndex = 2;
+
+    if (coupleId) {
+      // User has a couple - show both couple records and their individual records
+      whereClause = 'WHERE (lm.couple_id = $1 OR (lm.couple_id IS NULL AND lm.recorded_by = $2))';
+      queryParams = [coupleId, userId];
+      paramIndex = 3;
+    } else {
+      // User has no couple - only show their individual records
+      whereClause = 'WHERE lm.couple_id IS NULL AND lm.recorded_by = $1';
+      queryParams = [userId];
+    }
 
     if (month) {
       whereClause += ` AND DATE_TRUNC('month', lm.moment_date) = $${paramIndex}::date`;
@@ -211,15 +205,18 @@ router.get('/:id', async (req, res) => {
     const momentId = req.params.id;
 
     const result = await db.query(`
-      SELECT 
+      SELECT
         lm.id, lm.moment_date, lm.notes, lm.description, lm.duration,
         lm.location, lm.roleplay_script, lm.photo_id, lm.created_at,
         u.id as recorded_by_id, u.nickname as recorded_by_nickname,
         c.id as couple_id
       FROM love_moments lm
       JOIN users u ON lm.recorded_by = u.id
-      JOIN couples c ON lm.couple_id = c.id
-      WHERE lm.id = $1 AND (c.user1_id = $2 OR c.user2_id = $2)
+      LEFT JOIN couples c ON lm.couple_id = c.id
+      WHERE lm.id = $1 AND (
+        lm.recorded_by = $2 OR
+        (c.id IS NOT NULL AND (c.user1_id = $2 OR c.user2_id = $2))
+      )
     `, [momentId, userId]);
 
     if (result.rows.length === 0) {
@@ -302,8 +299,11 @@ router.put('/:id', [
     // Check if user owns this love moment
     const ownershipResult = await db.query(`
       SELECT lm.id FROM love_moments lm
-      JOIN couples c ON lm.couple_id = c.id
-      WHERE lm.id = $1 AND (c.user1_id = $2 OR c.user2_id = $2)
+      LEFT JOIN couples c ON lm.couple_id = c.id
+      WHERE lm.id = $1 AND (
+        lm.recorded_by = $2 OR
+        (c.id IS NOT NULL AND (c.user1_id = $2 OR c.user2_id = $2))
+      )
     `, [momentId, userId]);
 
     if (ownershipResult.rows.length === 0) {
@@ -368,9 +368,12 @@ router.delete('/:id', async (req, res) => {
 
     // Check ownership and delete
     const result = await db.query(`
-      DELETE FROM love_moments 
-      WHERE id = $1 AND couple_id IN (
-        SELECT id FROM couples WHERE user1_id = $2 OR user2_id = $2
+      DELETE FROM love_moments
+      WHERE id = $1 AND (
+        recorded_by = $2 OR
+        couple_id IN (
+          SELECT id FROM couples WHERE user1_id = $2 OR user2_id = $2
+        )
       )
       RETURNING id
     `, [momentId, userId]);
