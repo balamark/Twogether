@@ -302,7 +302,12 @@ class ApiService {
       };
 
       const response = await apiClient.post('/love-moments', apiPayload);
-      return this.transformApiRecord(response.data);
+      console.log('Create record API response:', response.data); // Debug log
+
+      // The API returns {success: true, message: "...", love_moment: {...}}
+      // We need to extract the love_moment object
+      const recordData = response.data.love_moment || response.data;
+      return this.transformApiRecord(recordData);
     } catch (error: unknown) {
       console.error('Failed to create intimate record:', error);
       throw new Error((error as ApiErrorResponse)?.message || '無法創建愛的時光記錄');
@@ -355,10 +360,10 @@ class ApiService {
   }
 
   // Nicknames
-  async getNicknames(): Promise<{ partner1: string; partner2: string }> {
+  async getNicknames(coupleData?: CoupleResponse): Promise<{ partner1: string; partner2: string }> {
     try {
-      // Prefer backend couple info for authoritative nicknames
-      const couple = await this.getCouple();
+      // Use provided couple data if available, otherwise fetch from backend
+      const couple = coupleData || await this.getCouple();
       let partner1 = couple.user1Nickname || '親愛的';
       let partner2 = couple.user2Nickname || '寶貝';
 
@@ -554,11 +559,55 @@ class ApiService {
 
   private transformApiRecord(apiRecord: any): IntimateRecord {
     // Handle both the expected ApiIntimateRecord and actual backend response
-    const momentDate = new Date(apiRecord.moment_date);
+    console.log('Transforming API record:', apiRecord); // Debug log to see the raw response
+
+    // Safely parse the date with fallback
+    let momentDate: Date;
+    if (apiRecord.moment_date) {
+      momentDate = new Date(apiRecord.moment_date);
+      // Check if date is valid
+      if (isNaN(momentDate.getTime())) {
+        console.warn('Invalid moment_date received:', apiRecord.moment_date);
+        momentDate = new Date(); // Fallback to current date
+      }
+    } else {
+      console.warn('No moment_date in API response, using current date');
+      momentDate = new Date(); // Fallback to current date
+    }
+
+    // Generate a safe ID - handle cases where apiRecord.id might be undefined
+    let safeId: number;
+    if (apiRecord.id && typeof apiRecord.id === 'string') {
+      // Try to convert UUID to number
+      try {
+        safeId = parseInt(apiRecord.id.replace(/-/g, '').substring(0, 8), 16);
+      } catch (e) {
+        safeId = Math.floor(Math.random() * 1000000); // Fallback random ID
+      }
+    } else {
+      // Use timestamp-based ID if no ID provided
+      safeId = Math.floor(momentDate.getTime() / 1000);
+    }
+
+    // Safely format date and time
+    let dateStr: string;
+    let timeStr: string;
+
+    try {
+      dateStr = momentDate.toISOString().split('T')[0];
+      timeStr = momentDate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
+    } catch (e) {
+      console.error('Error formatting date/time:', e);
+      // Fallback to manual formatting
+      const now = new Date();
+      dateStr = now.toISOString().split('T')[0];
+      timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    }
+
     return {
-      id: parseInt(apiRecord.id.replace(/-/g, '').substring(0, 8), 16), // Convert UUID to number
-      date: momentDate.toISOString().split('T')[0],
-      time: momentDate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false }),
+      id: safeId,
+      date: dateStr,
+      time: timeStr,
       mood: '💕', // Default mood
       notes: apiRecord.notes || '',
       timestamp: apiRecord.created_at,
