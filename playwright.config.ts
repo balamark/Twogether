@@ -46,6 +46,13 @@ export default defineConfig({
       url: 'http://localhost:8080',
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
+      env: {
+        ...process.env,
+        NODE_ENV: 'development',
+        DATABASE_URL: 'postgresql://postgres.gqhoebnveeaishflmkqv:ucFCg5Xy22XDyy68@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres',
+        JWT_SECRET: 'CHANGE-THIS-TO-A-SECURE-RANDOM-STRING-IN-PRODUCTION',
+        PORT: '8080'
+      }
     },
     {
       command: 'npm run dev',
