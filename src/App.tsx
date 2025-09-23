@@ -704,10 +704,6 @@ const LoveTimeApp = () => {
 
     const loadAuthenticatedData = async () => {
       try {
-        // Load nicknames
-        const storedNicknames = await apiService.getNicknames();
-        setNicknames(storedNicknames);
-        
         // Load intimacy records from backend
         try {
           const records = await apiService.getIntimateRecords();
@@ -720,6 +716,10 @@ const LoveTimeApp = () => {
         // Load couple information to get partner details and journey fields
         try {
           const coupleInfo = await apiService.getCouple();
+
+          // Load nicknames using the couple data to avoid duplicate API call
+          const storedNicknames = await apiService.getNicknames(coupleInfo);
+          setNicknames(storedNicknames);
           if (coupleInfo && authState.user) {
             const partnerNickname = coupleInfo.user1Nickname !== authState.user.nickname 
               ? coupleInfo.user1Nickname 
@@ -745,21 +745,20 @@ const LoveTimeApp = () => {
             setAuthState(updatedAuthState);
             localStorage.setItem('authState', JSON.stringify(updatedAuthState));
             
-            // Persist nickname alignment to backend
-            try {
-              const current = {
-                partner1: authState.user.nickname,
-                partner2: partnerNickname || '',
-              };
-              await apiService.updateNicknames(current);
-            } catch {}
+            // Note: Nickname updates will be handled by the useEffect hook for nicknames state changes
 
             // Merge journey fields from backend where available
             // Note: backend CoupleResponse currently includes only basic fields; journey is saved via dedicated endpoint
           }
         } catch (coupleError) {
           console.log('No couple found or error fetching couple info:', coupleError);
-          // This is okay - user might not be paired yet
+          // Load nicknames even if no couple info available (will fallback to localStorage)
+          try {
+            const storedNicknames = await apiService.getNicknames();
+            setNicknames(storedNicknames);
+          } catch (nicknameError) {
+            console.error('Failed to load nicknames:', nicknameError);
+          }
         }
         
         // Load scripts
@@ -777,21 +776,35 @@ const LoveTimeApp = () => {
 
   // Note: Intimate records are now persisted in the backend, no localStorage needed
 
+  // Use ref to track previous nicknames to avoid unnecessary API calls
+  const previousNicknames = useRef<{ partner1: string; partner2: string }>({ partner1: '', partner2: '' });
+
   useEffect(() => {
     // Only save nicknames if user is authenticated and nicknames are not default values
-    if (!authState.isAuthenticated || 
+    if (!authState.isAuthenticated ||
         (nicknames.partner1 === '親愛的' && nicknames.partner2 === '寶貝')) {
+      return;
+    }
+
+    // Check if nicknames have actually changed
+    const hasChanged =
+      previousNicknames.current.partner1 !== nicknames.partner1 ||
+      previousNicknames.current.partner2 !== nicknames.partner2;
+
+    if (!hasChanged) {
       return;
     }
 
     const saveNicknames = async () => {
       try {
         await apiService.updateNicknames(nicknames);
+        // Update the ref only after successful save
+        previousNicknames.current = { ...nicknames };
       } catch (error) {
         console.error('Error saving nicknames:', error);
       }
     };
-    
+
     saveNicknames();
   }, [nicknames, authState.isAuthenticated]);
 
@@ -968,9 +981,15 @@ const LoveTimeApp = () => {
       // Update local state
       setIntimateRecords(prev => [...prev, newRecord]);
       
-      // Update coins using API service
-      await apiService.updateCoins(coinsEarned);
-      setTotalCoins(prev => prev + coinsEarned);
+      // Update coins using API service (non-blocking)
+      try {
+        await apiService.updateCoins(coinsEarned);
+        setTotalCoins(prev => prev + coinsEarned);
+      } catch (coinsError) {
+        console.warn('Failed to update coins via API, using local update only:', coinsError);
+        // Still update coins locally even if API fails
+        setTotalCoins(prev => prev + coinsEarned);
+      }
       
       // Show success notification
       const { badgeProgress } = checkBadgeProgress();
@@ -1733,8 +1752,13 @@ ${nicknames.partner1}: "跟我來，今晚海灘將見證我們最狂野的激�
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                     >
                       <option value="">未使用劇本</option>
-                      {roleplayScripts.map((script, index) => (
-                        <option key={index} value={script.title}>{script.title}</option>
+                      {/* Default scripts */}
+                      {defaultRoleplayScripts.map((script, index) => (
+                        <option key={`default-${index}`} value={script.title}>{script.title}</option>
+                      ))}
+                      {/* Custom scripts */}
+                      {customScripts.map((script, index) => (
+                        <option key={`custom-${index}`} value={script.title}>{script.title} (自定義)</option>
                       ))}
                     </select>
                   </div>
