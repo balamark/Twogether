@@ -37,13 +37,11 @@ const Header: React.FC<HeaderProps> = ({
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
 
-  // Fetch unread notification count
+  // Fetch unread notification count only on login/refresh
   useEffect(() => {
     if (authState.isAuthenticated) {
       fetchUnreadCount();
-      // Set up periodic refresh
-      const interval = setInterval(fetchUnreadCount, 90000); // Every 90 seconds
-      return () => clearInterval(interval);
+      // No periodic refresh - only fetch on login/refresh to reduce server load
     }
   }, [authState.isAuthenticated]);
 
@@ -64,6 +62,8 @@ const Header: React.FC<HeaderProps> = ({
   const handleNotificationClick = () => {
     onShowNotifications();
     setUnreadNotificationCount(0); // Reset count when opening notifications
+    // Refresh count after opening notifications
+    setTimeout(() => fetchUnreadCount(), 1000);
   };
 
   return (

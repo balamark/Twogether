@@ -244,6 +244,147 @@ ${acceptUrl}
       throw error;
     }
   }
+
+  async sendIntimacyRequestNotification(senderName, recipientEmail, requestType, message = '') {
+    console.log(`📧 Attempting to send intimacy request email to ${recipientEmail}...`);
+
+    if (!this.isConfigured()) {
+      console.warn('⚠️ Email service not configured, skipping intimacy request email');
+      return;
+    }
+
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
+
+    const typeTranslations = {
+      general: '一般邀請',
+      romantic: '浪漫時光',
+      playful: '玩樂時光',
+      surprise: '驚喜時刻',
+      compliment: '甜蜜讚美',
+      intimate: '親密時光'
+    };
+
+    const requestTypeName = typeTranslations[requestType] || '親密邀請';
+
+    const htmlContent = `
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>親密邀請通知</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5; }
+        .container { max-width: 600px; margin: 0 auto; background-color: white; }
+        .header { background: linear-gradient(135deg, #ff6b6b 0%, #ff8e8e 100%); color: white; padding: 40px 20px; text-align: center; }
+        .header h1 { margin: 0; font-size: 28px; font-weight: 300; }
+        .content { padding: 40px 20px; }
+        .invitation-card { background: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%); padding: 30px; border-radius: 15px; margin: 20px 0; text-align: center; }
+        .invitation-card h2 { margin: 0 0 15px 0; color: #2d3436; font-size: 24px; }
+        .sender-name { color: #e17055; font-weight: bold; font-size: 20px; }
+        .custom-message { background: white; padding: 20px; border-radius: 10px; margin: 20px 0; font-style: italic; color: #636e72; border-left: 4px solid #e17055; }
+        .cta-button { display: inline-block; background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); color: white; text-decoration: none; padding: 15px 30px; border-radius: 25px; font-weight: bold; margin: 20px 0; box-shadow: 0 4px 15px rgba(0, 184, 148, 0.3); transition: transform 0.2s; }
+        .footer { background-color: #2d3436; color: white; padding: 20px; text-align: center; font-size: 14px; }
+        .features { display: flex; justify-content: space-around; margin: 30px 0; flex-wrap: wrap; }
+        .feature { text-align: center; flex: 1; min-width: 150px; margin: 10px; }
+        .feature-icon { font-size: 30px; margin-bottom: 10px; }
+        @media (max-width: 600px) {
+            .features { flex-direction: column; }
+            .content { padding: 20px 15px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💕 親密邀請通知</h1>
+            <p>你的伴侶想要與你分享特別的時光</p>
+        </div>
+
+        <div class="content">
+            <div class="invitation-card">
+                <h2>💫 ${requestTypeName}</h2>
+                <p><span class="sender-name">${senderName}</span> 向你發送了一個親密邀請</p>
+            </div>
+
+            ${message ? `
+            <div class="custom-message">
+                <strong>個人訊息：</strong><br>
+                "${message}"
+            </div>
+            ` : ''}
+
+            <div class="features">
+                <div class="feature">
+                    <div class="feature-icon">💕</div>
+                    <p><strong>增進感情</strong><br>珍貴的親密時光</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🌟</div>
+                    <p><strong>創造回憶</strong><br>美好的共同體驗</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">🎁</div>
+                    <p><strong>獲得獎勵</strong><br>愛情金幣獎勵</p>
+                </div>
+            </div>
+
+            <div style="text-align: center;">
+                <a href="${frontendUrl}" class="cta-button">
+                    💕 打開 Twogether 回應邀請
+                </a>
+            </div>
+
+            <p style="color: #636e72; font-size: 14px; text-align: center; margin-top: 30px;">
+                在 Twogether 應用中查看完整邀請並選擇你的回應。<br>
+                如果無法點擊按鈕，請直接打開 Twogether 應用。
+            </p>
+        </div>
+
+        <div class="footer">
+            <p>© 2024 Twogether - 專為情侶打造的愛情記錄應用</p>
+            <p style="font-size: 12px; opacity: 0.8;">
+                這封郵件是因為你的伴侶發送了親密邀請而寄送。<br>
+                如果你不想收到此類郵件，請在應用內調整通知設定。
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+    `;
+
+    const textContent = `
+Twogether 親密邀請通知
+
+${senderName} 向你發送了一個${requestTypeName}！
+
+${message ? `個人訊息："${message}"` : ''}
+
+在 Twogether 中回應這個邀請，與你的伴侶分享特別的時光。
+打開 Twogether 應用來查看完整邀請並選擇你的回應。
+
+---
+© 2024 Twogether
+如果你不想收到此類郵件，請在應用內調整通知設定。
+    `;
+
+    const mailOptions = {
+      from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+      to: recipientEmail,
+      subject: `💕 ${senderName} 向你發送了${requestTypeName}`,
+      text: textContent,
+      html: htmlContent,
+    };
+
+    try {
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Intimacy request notification sent to ${recipientEmail}`);
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to send intimacy request notification:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new EmailService();

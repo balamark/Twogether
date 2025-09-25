@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
+const emailService = require('../services/emailService');
 
 const router = express.Router();
 
@@ -74,7 +75,7 @@ router.post('/', [
     try {
       await db.query(`
         INSERT INTO notifications (
-          user_id, notification_type, title, content, 
+          user_id, notification_type, title, content,
           intimacy_request_id, related_user_id, priority
         ) VALUES ($1, $2, $3, $4, $5, $6, $7)
       `, [
@@ -90,6 +91,29 @@ router.post('/', [
     } catch (notificationError) {
       console.warn('⚠️ Failed to create notification:', notificationError.message);
       // Don't fail the request if notification creation fails
+    }
+
+    // Send email notification to partner
+    try {
+      // Get partner's email
+      const partnerResult = await db.query('SELECT email FROM users WHERE id = $1', [partnerId]);
+      if (partnerResult.rows.length > 0) {
+        const partnerEmail = partnerResult.rows[0].email;
+        const senderNickname = req.user.nickname || '你的伴侶';
+
+        console.log(`📧 Attempting to send intimacy request email to partner ${partnerEmail}...`);
+        await emailService.sendIntimacyRequestNotification(
+          senderNickname,
+          partnerEmail,
+          request_type,
+          message || ''
+        );
+      } else {
+        console.warn(`⚠️ Partner email not found for user ${partnerId}`);
+      }
+    } catch (emailError) {
+      console.warn('⚠️ Failed to send intimacy request email:', emailError.message);
+      // Don't fail the request if email sending fails
     }
 
     console.log(`✅ Intimacy request created: ${requestId} from ${userId} to ${partnerId}`);
