@@ -94,7 +94,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       setIsSavingSettings(true);
       // Only update current user's nickname
       await apiService.updateNicknames({
-        nickname: nicknames.partner1, // partner1 represents current user's nickname
+        partner1: nicknames.partner1,
+        partner2: nicknames.partner2
       });
       // Persist couple journey to backend
       const meeting = journeyMilestones.find(m => m.type === 'meeting');

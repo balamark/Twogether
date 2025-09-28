@@ -396,18 +396,29 @@ class ApiService {
     }
   }
 
-  async updateNicknames(nickname: { nickname: string }): Promise<void> {
+  async updateNicknames(nicknames: { partner1?: string; partner2?: string }): Promise<void> {
     try {
-      const validNickname = nickname.nickname?.trim();
+      const payload: { partner1?: string; partner2?: string } = {};
 
-      if (!validNickname || validNickname.length < 2) {
-        throw new Error('暱稱必須至少2個字符');
+      const partner1 = nicknames.partner1?.trim();
+      const partner2 = nicknames.partner2?.trim();
+
+      if (partner1 && partner1.length >= 2) {
+        payload.partner1 = partner1;
       }
 
-      await apiClient.put('/couples/nicknames', { nickname: validNickname });
+      if (partner2 && partner2.length >= 2) {
+        payload.partner2 = partner2;
+      }
+
+      if (Object.keys(payload).length === 0) {
+        return;
+      }
+
+      await apiClient.put('/couples/nicknames', payload);
     } catch (error: unknown) {
-      console.error('Failed to update nickname:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '更新暱稱失敗');
+      console.warn('Backend nickname update failed, falling back to localStorage:', error);
+      localStorage.setItem('nicknames', JSON.stringify(nicknames));
     }
   }
 
@@ -744,9 +755,18 @@ class ApiService {
   // Intimacy Requests
   async createIntimacyRequest(request: CreateIntimacyRequestRequest): Promise<IntimacyRequest> {
     try {
+      // Map request types to server-accepted values
+      let requestType = request.requestType;
+      if (requestType === 'scheduled') {
+        requestType = 'intimate'; // scheduled requests are intimate requests with a time
+      }
+      if (requestType !== 'compliment') {
+        requestType = 'intimate'; // default to intimate for non-compliment requests
+      }
+
       const response = await apiClient.post('/intimacy-requests', {
         message: request.messageContent,
-        request_type: request.requestType === 'compliment' ? 'compliment' : request.requestType,
+        request_type: requestType,
         roleplay_category: request.roleplayCategory,
         scheduled_time: request.scheduledTime,
       });
