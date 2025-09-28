@@ -89,6 +89,7 @@ interface User {
   id: string;
   email: string;
   nickname: string;
+  gender?: 'male' | 'female' | 'other';
   partnerId?: string;
   partnerCode?: string;
   createdAt: string;

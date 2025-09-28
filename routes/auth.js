@@ -171,8 +171,8 @@ router.get('/me', authenticateToken, async (req, res) => {
   try {
     // Get user with couple information
     const userResult = await db.query(`
-      SELECT 
-        u.id, u.nickname, u.email, u.created_at, u.last_login,
+      SELECT
+        u.id, u.nickname, u.email, u.gender, u.created_at, u.last_login,
         c.id as couple_id, c.couple_name, c.anniversary_date,
         c.user1_id, c.user2_id
       FROM users u
@@ -210,6 +210,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         id: userData.id,
         nickname: userData.nickname,
         email: userData.email,
+        gender: userData.gender,
         created_at: userData.created_at,
         last_login: userData.last_login,
         couple: userData.couple_id ? {
@@ -226,6 +227,51 @@ router.get('/me', authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: '獲取用戶信息失敗'
+    });
+  }
+});
+
+// Update user gender
+router.put('/user/gender', authenticateToken, [
+  body('gender')
+    .isIn(['male', 'female', 'other'])
+    .withMessage('性別必須是 male、female 或 other')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: '驗證失敗',
+        errors: errors.array()
+      });
+    }
+
+    const userId = req.user.id;
+    const { gender } = req.body;
+
+    console.info(`👤 Updating gender for user ${userId} to: ${gender}`);
+
+    // Update user gender in database
+    await db.query(`
+      UPDATE users
+      SET gender = $1, updated_at = NOW()
+      WHERE id = $2
+    `, [gender, userId]);
+
+    console.info(`✅ Successfully updated gender for user ${userId}`);
+
+    res.json({
+      success: true,
+      message: '性別設定已更新',
+      gender: gender
+    });
+
+  } catch (error) {
+    console.error('Update user gender error:', error);
+    res.status(500).json({
+      success: false,
+      message: '更新性別設定失敗'
     });
   }
 });

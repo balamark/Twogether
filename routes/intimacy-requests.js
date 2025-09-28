@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const emailService = require('../services/emailService');
+const characterMappingService = require('../services/characterMappingService');
 
 const router = express.Router();
 
@@ -483,13 +484,33 @@ router.get('/intimacy-templates/:category', async (req, res) => {
   try {
     const userId = req.user.id;
     const { category } = req.params;
-    
+
     console.info(`🎭 Getting intimacy templates for category ${category} (user ${userId})`);
+
+    // Get user's gender and couple information for character mapping
+    const userResult = await db.query(`
+      SELECT u.gender, u.nickname, c.user1_nickname, c.user2_nickname, c.user1_id
+      FROM users u
+      LEFT JOIN couples c ON (c.user1_id = u.id OR c.user2_id = u.id)
+      WHERE u.id = $1
+    `, [userId]);
+
+    const userGender = userResult.rows[0]?.gender || null;
+    const userNickname = userResult.rows[0]?.nickname || 'You';
+
+    // Determine partner nickname based on couple relationship
+    let partnerNickname = 'Partner';
+    if (userResult.rows[0]?.user1_nickname && userResult.rows[0]?.user2_nickname) {
+      const isUser1 = userResult.rows[0]?.user1_id === userId;
+      partnerNickname = isUser1 ? userResult.rows[0].user2_nickname : userResult.rows[0].user1_nickname;
+    }
+
+    console.info(`👤 User ${userId} - Gender: ${userGender || 'not specified'}, Nickname: ${userNickname}, Partner: ${partnerNickname}`);
 
     const result = await db.query(`
       SELECT id, category, time_hint, roleplay_setup, suggestion_level, created_at
-      FROM intimacy_templates 
-      WHERE category = $1 AND is_active = true 
+      FROM intimacy_templates
+      WHERE category = $1 AND is_active = true
       ORDER BY created_at
     `, [category]);
 
@@ -497,12 +518,18 @@ router.get('/intimacy-templates/:category', async (req, res) => {
       id: row.id,
       category: row.category,
       time_hint: row.time_hint,
-      roleplay_setup: row.roleplay_setup,
+      roleplay_setup: characterMappingService.processTemplate(
+        row.roleplay_setup,
+        category,
+        userGender,
+        userNickname,
+        partnerNickname
+      ),
       suggestion_level: row.suggestion_level,
       created_at: row.created_at
     }));
 
-    console.info(`✅ Retrieved ${templates.length} templates for category ${category}`);
+    console.info(`✅ Retrieved ${templates.length} templates for category ${category} with gender-aware processing`);
 
     res.json({
       success: true,

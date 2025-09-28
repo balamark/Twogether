@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { User, Users, CheckCircle } from 'lucide-react';
 import { apiService } from '../services/api';
 
@@ -23,6 +23,7 @@ interface User {
   id: string;
   email: string;
   nickname: string;
+  gender?: 'male' | 'female' | 'other';
   partnerId?: string;
   partnerCode?: string;
   partnerNickname?: string;
@@ -84,14 +85,28 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
+  // Gender selection state
+  const [userGender, setUserGender] = useState<'male' | 'female' | 'other' | null>(null);
+
   // Email invitation states
   const [recipientEmail, setRecipientEmail] = useState('');
   const [invitationMessage, setInvitationMessage] = useState('');
   const [isSendingInvitation, setIsSendingInvitation] = useState(false);
 
+  // Load user's current gender from auth state when component mounts
+  useEffect(() => {
+    if (authState.user?.gender) {
+      setUserGender(authState.user.gender);
+    }
+  }, [authState.user?.gender]);
+
   const handleSaveSettings = async () => {
     try {
       setIsSavingSettings(true);
+      // Update user gender if specified
+      if (userGender) {
+        await apiService.updateUserGender(userGender);
+      }
       // Only update current user's nickname
       await apiService.updateNicknames({
         partner1: nicknames.partner1,
@@ -389,6 +404,56 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             </p>
           </div>
           {/* Global save button moved to header */}
+        </div>
+      </div>
+
+      {/* Gender Selection */}
+      <div className="bg-white rounded-2xl shadow-lg p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-4">性別設定</h3>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              選擇您的性別 (用於角色扮演劇本的角色分配)
+            </label>
+            <div className="flex space-x-4">
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="gender"
+                  value="female"
+                  checked={userGender === 'female'}
+                  onChange={() => setUserGender('female')}
+                  className="w-4 h-4 text-pink-600 bg-gray-100 border-gray-300 focus:ring-pink-500 focus:ring-2"
+                />
+                <span className="ml-2 text-sm font-medium text-gray-700">女性 👩</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="gender"
+                  value="male"
+                  checked={userGender === 'male'}
+                  onChange={() => setUserGender('male')}
+                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
+                />
+                <span className="ml-2 text-sm font-medium text-gray-700">男性 👨</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="radio"
+                  name="gender"
+                  value="other"
+                  checked={userGender === 'other'}
+                  onChange={() => setUserGender('other')}
+                  className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 focus:ring-purple-500 focus:ring-2"
+                />
+                <span className="ml-2 text-sm font-medium text-gray-700">其他 🌈</span>
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              💡 此設定會影響角色扮演劇本中的角色名稱，例如偶像默認為女性角色
+            </p>
+          </div>
         </div>
       </div>
 

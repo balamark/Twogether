@@ -788,6 +788,16 @@ class ApiService {
     await apiClient.put('/couples/journey', payload);
   }
 
+  // User gender management
+  async updateUserGender(gender: 'male' | 'female' | 'other'): Promise<void> {
+    try {
+      await apiClient.put('/auth/user/gender', { gender });
+    } catch (error: unknown) {
+      console.error('Failed to update user gender:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '更新性別設定失敗');
+    }
+  }
+
   async getIntimacyRequests(status?: string): Promise<IntimacyRequest[]> {
     try {
       const params = status ? { status } : {};
