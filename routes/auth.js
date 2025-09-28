@@ -255,7 +255,7 @@ router.put('/user/gender', authenticateToken, [
     // Update user gender in database
     await db.query(`
       UPDATE users
-      SET gender = $1, updated_at = NOW()
+      SET gender = $1
       WHERE id = $2
     `, [gender, userId]);
 
