@@ -398,24 +398,46 @@ class ApiService {
 
   async updateNicknames(nicknames: { partner1?: string; partner2?: string }): Promise<void> {
     try {
-      const payload: { partner1?: string; partner2?: string } = {};
+      // Get current user info to determine which nickname belongs to them
+      const authUserRaw = localStorage.getItem('authUser');
+      const currentUserId = authUserRaw ? JSON.parse(authUserRaw)?.id : null;
 
-      const partner1 = nicknames.partner1?.trim();
-      const partner2 = nicknames.partner2?.trim();
-
-      if (partner1 && partner1.length >= 2) {
-        payload.partner1 = partner1;
-      }
-
-      if (partner2 && partner2.length >= 2) {
-        payload.partner2 = partner2;
-      }
-
-      if (Object.keys(payload).length === 0) {
+      if (!currentUserId) {
+        // No authenticated user, just save to localStorage
+        localStorage.setItem('nicknames', JSON.stringify(nicknames));
         return;
       }
 
-      await apiClient.put('/couples/nicknames', payload);
+      // Get couple info to determine which partner the current user is
+      const couple = await this.getCouple();
+
+      // Determine the current user's nickname to send to backend
+      let currentUserNickname: string | undefined;
+
+      if (couple && couple.user1Id === currentUserId) {
+        // Current user is user1, so partner1 nickname is theirs
+        currentUserNickname = nicknames.partner1?.trim();
+      } else if (couple && couple.user2Id === currentUserId) {
+        // Current user is user2, so partner2 nickname is theirs
+        currentUserNickname = nicknames.partner2?.trim();
+      } else {
+        // No couple relationship or couldn't determine, save to localStorage
+        localStorage.setItem('nicknames', JSON.stringify(nicknames));
+        return;
+      }
+
+      // Validate the nickname
+      if (!currentUserNickname || currentUserNickname.length < 2) {
+        // Invalid nickname, just save to localStorage
+        localStorage.setItem('nicknames', JSON.stringify(nicknames));
+        return;
+      }
+
+      // Send the correct payload format that backend expects
+      await apiClient.put('/couples/nicknames', { nickname: currentUserNickname });
+
+      // Also save to localStorage for consistency
+      localStorage.setItem('nicknames', JSON.stringify(nicknames));
     } catch (error: unknown) {
       console.warn('Backend nickname update failed, falling back to localStorage:', error);
       localStorage.setItem('nicknames', JSON.stringify(nicknames));
