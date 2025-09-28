@@ -454,14 +454,9 @@ router.put('/journey', [
   }
 });
 
-// Update nicknames for couple
+// Update user's own nickname only
 router.put('/nicknames', [
-  body('partner1')
-    .optional()
-    .isLength({ min: 2, max: 50 })
-    .withMessage('暱稱必須在2-50個字符之間'),
-  body('partner2')
-    .optional()
+  body('nickname')
     .isLength({ min: 2, max: 50 })
     .withMessage('暱稱必須在2-50個字符之間')
 ], async (req, res) => {
@@ -476,60 +471,26 @@ router.put('/nicknames', [
     }
 
     const userId = req.user.id;
-    const { partner1, partner2 } = req.body;
+    const { nickname } = req.body;
 
     // Validate and sanitize input
-    const validPartner1 = partner1 && typeof partner1 === 'string' && partner1.trim() && partner1 !== 'undefined' ? partner1.trim() : null;
-    const validPartner2 = partner2 && typeof partner2 === 'string' && partner2.trim() && partner2 !== 'undefined' ? partner2.trim() : null;
+    const validNickname = nickname && typeof nickname === 'string' && nickname.trim() && nickname !== 'undefined' ? nickname.trim() : null;
 
-    console.info(`💑 Updating nicknames for user ${userId}: partner1=${validPartner1}, partner2=${validPartner2}`);
-
-    // Find user's couple
-    const coupleResult = await db.query(`
-      SELECT 
-        c.id, c.user1_id, c.user2_id,
-        u1.nickname as user1_nickname,
-        u2.nickname as user2_nickname
-      FROM couples c
-      JOIN users u1 ON c.user1_id = u1.id
-      LEFT JOIN users u2 ON c.user2_id = u2.id
-      WHERE c.user1_id = $1 OR c.user2_id = $1
-    `, [userId]);
-
-    if (coupleResult.rows.length === 0) {
-      console.warn(`⚠️ User ${userId} attempted to update nicknames but has no couple relationship`);
-      return res.status(404).json({
+    if (!validNickname) {
+      return res.status(400).json({
         success: false,
-        message: '您還沒有情侶關係',
-        error_code: 'NO_COUPLE_RELATIONSHIP'
+        message: '請提供有效的暱稱'
       });
     }
 
-    const couple = coupleResult.rows[0];
-    const isUser1 = couple.user1_id === userId;
-    
-    console.info(`💑 User ${userId} is ${isUser1 ? 'user1' : 'user2'} in couple ${couple.id}`);
+    console.info(`💑 User ${userId} updating their nickname to: ${validNickname}`);
 
-    // Update the calling user's nickname if validPartner1 is provided
-    if (validPartner1) {
-      await db.query(
-        'UPDATE users SET nickname = $1 WHERE id = $2',
-        [validPartner1, userId]
-      );
-      console.info(`✅ Updated user ${userId} nickname to: ${validPartner1}`);
-    }
-
-    // Update partner's nickname if validPartner2 is provided and couple is complete
-    if (validPartner2 && couple.user2_id) {
-      const partnerId = isUser1 ? couple.user2_id : couple.user1_id;
-      await db.query(
-        'UPDATE users SET nickname = $1 WHERE id = $2',
-        [validPartner2, partnerId]
-      );
-      console.info(`✅ Updated partner ${partnerId} nickname to: ${validPartner2}`);
-    } else if (validPartner2 && !couple.user2_id) {
-      console.warn(`⚠️ Cannot update partner2 nickname: couple ${couple.id} is incomplete (no user2)`);
-    }
+    // Update the calling user's nickname only
+    await db.query(
+      'UPDATE users SET nickname = $1 WHERE id = $2',
+      [validNickname, userId]
+    );
+    console.info(`✅ Updated user ${userId} nickname to: ${validNickname}`);
 
     res.json({
       success: true,
@@ -537,7 +498,7 @@ router.put('/nicknames', [
     });
 
   } catch (error) {
-    console.error('Update nicknames error:', error);
+    console.error('Update nickname error:', error);
     res.status(500).json({
       success: false,
       message: '更新暱稱失敗'

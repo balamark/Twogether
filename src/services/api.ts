@@ -366,26 +366,29 @@ class ApiService {
     try {
       // Use provided couple data if available, otherwise fetch from backend
       const couple = coupleData || await this.getCouple();
-      let partner1 = couple.user1Nickname || '親愛的';
-      let partner2 = couple.user2Nickname || '寶貝';
 
-      // Ensure partner1 represents the current user's nickname
-      try {
-        const authUserRaw = localStorage.getItem('authUser');
-        if (authUserRaw) {
-          const authUser = JSON.parse(authUserRaw) as { nickname?: string };
-          const currentUserNickname = authUser?.nickname;
-          if (currentUserNickname) {
-            if (partner2 && partner2 === currentUserNickname) {
-              [partner1, partner2] = [partner2, partner1];
-            }
-          }
+      // Get current user info from localStorage
+      const authUserRaw = localStorage.getItem('authUser');
+      const currentUserId = authUserRaw ? JSON.parse(authUserRaw)?.id : null;
+
+      let currentUserNickname = '親愛的';
+      let partnerNickname = '寶貝';
+
+      if (currentUserId && couple) {
+        // Determine which user in the couple is the current user
+        if (couple.user1Id === currentUserId) {
+          currentUserNickname = couple.user1Nickname || '親愛的';
+          partnerNickname = couple.user2Nickname || '寶貝';
+        } else if (couple.user2Id === currentUserId) {
+          currentUserNickname = couple.user2Nickname || '親愛的';
+          partnerNickname = couple.user1Nickname || '寶貝';
         }
-      } catch {
-        // Ignore parsing errors and use default ordering
       }
 
-      return { partner1, partner2 };
+      return {
+        partner1: currentUserNickname, // partner1 always represents current user
+        partner2: partnerNickname      // partner2 always represents partner
+      };
     } catch {
       // Fallback to local if not paired yet or error
       const saved = localStorage.getItem('nicknames');
@@ -393,37 +396,18 @@ class ApiService {
     }
   }
 
-  async updateNicknames(nicknames: { partner1: string; partner2: string }): Promise<void> {
+  async updateNicknames(nickname: { nickname: string }): Promise<void> {
     try {
-      // Check if user has a couple relationship first
-      const coupleResponse = await this.getCouple();
-      if (!coupleResponse || coupleResponse.error_code === 'NO_COUPLE_RELATIONSHIP') {
-        // User doesn't have a couple yet, skip saving
-        return;
+      const validNickname = nickname.nickname?.trim();
+
+      if (!validNickname || validNickname.length < 2) {
+        throw new Error('暱稱必須至少2個字符');
       }
 
-      // Only send non-empty, valid fields to satisfy backend validation
-      const payload: { partner1?: string; partner2?: string } = {};
-      const partner1 = nicknames.partner1?.trim();
-      const partner2 = nicknames.partner2?.trim();
-
-      if (partner1 && partner1.length >= 2) {
-        payload.partner1 = partner1;
-      }
-      if (partner2 && partner2.length >= 2) {
-        payload.partner2 = partner2;
-      }
-
-      // If nothing valid to update, skip the request
-      if (Object.keys(payload).length === 0) {
-        return;
-      }
-
-      // Send to backend; it will update the caller's own nickname based on couple role
-      await apiClient.put('/couples/nicknames', payload);
-    } catch (error) {
-      console.warn('Failed to update nicknames:', error);
-      throw error;
+      await apiClient.put('/couples/nicknames', { nickname: validNickname });
+    } catch (error: unknown) {
+      console.error('Failed to update nickname:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '更新暱稱失敗');
     }
   }
 
@@ -736,17 +720,21 @@ class ApiService {
       id?: string;
       couple_name?: string;
       anniversary_date?: string;
+      user1_id?: string;
       user1_nickname?: string;
+      user2_id?: string;
       user2_nickname?: string;
       created_at?: string;
       pairing_code?: string;
     };
-    
+
     return {
       id: typedData?.id || '',
       coupleName: typedData?.couple_name,
       anniversaryDate: typedData?.anniversary_date,
+      user1Id: typedData?.user1_id,
       user1Nickname: typedData?.user1_nickname || '',
+      user2Id: typedData?.user2_id,
       user2Nickname: typedData?.user2_nickname,
       createdAt: typedData?.created_at || new Date().toISOString(),
       pairingCode: typedData?.pairing_code,

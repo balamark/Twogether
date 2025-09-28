@@ -92,9 +92,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const handleSaveSettings = async () => {
     try {
       setIsSavingSettings(true);
+      // Only update current user's nickname
       await apiService.updateNicknames({
-        partner1: nicknames.partner1,
-        partner2: nicknames.partner2,
+        nickname: nicknames.partner1, // partner1 represents current user's nickname
       });
       // Persist couple journey to backend
       const meeting = journeyMilestones.find(m => m.type === 'meeting');
@@ -114,15 +114,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           ...authState,
           user: {
             ...authState.user,
-            nickname: nicknames.partner1,
-            partnerNickname: nicknames.partner2,
+            nickname: nicknames.partner1, // Update with the new nickname
+            partnerNickname: nicknames.partner2, // Keep partner nickname unchanged
           },
         };
         onAuthStateUpdate(updatedAuthState);
         localStorage.setItem('authState', JSON.stringify(updatedAuthState));
         localStorage.setItem('authUser', JSON.stringify(updatedAuthState.user));
       }
-      // No longer rely on localStorage for milestones
       showNotification({
         type: 'success',
         title: '已保存設定',
@@ -379,12 +378,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               name="partner2-name"
               type="text"
               value={nicknames.partner2}
-              onChange={(e) => handleNicknameChange('partner2', e.target.value)}
-              onFocus={(e) => {
-                e.target.select();
-              }}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+              readOnly
+              disabled
+              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
+              title="伴侶的暱稱無法編輯，只能查看"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              ℹ️ 伴侶的暱稱由對方設定，您無法修改
+            </p>
           </div>
           {/* Global save button moved to header */}
         </div>

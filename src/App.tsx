@@ -720,25 +720,15 @@ const LoveTimeApp = () => {
           // Load nicknames using the couple data to avoid duplicate API call
           const storedNicknames = await apiService.getNicknames(coupleInfo);
           setNicknames(storedNicknames);
-          if (coupleInfo && authState.user) {
-            const partnerNickname = coupleInfo.user1Nickname !== authState.user.nickname 
-              ? coupleInfo.user1Nickname 
-              : coupleInfo.user2Nickname;
 
-            // Ensure partner1 is the logged-in user's nickname
-            if (coupleInfo.user2Nickname === authState.user.nickname && coupleInfo.user1Nickname) {
-              setNicknames({ partner1: coupleInfo.user2Nickname, partner2: coupleInfo.user1Nickname });
-            } else if (coupleInfo.user1Nickname && coupleInfo.user2Nickname) {
-              setNicknames({ partner1: coupleInfo.user1Nickname, partner2: coupleInfo.user2Nickname });
-            }
-            
+          if (coupleInfo && authState.user) {
             const updatedAuthState = {
               ...authState,
               partnerConnected: !!coupleInfo.user2Nickname,
               user: {
                 ...authState.user,
                 partnerId: coupleInfo.id,
-                partnerNickname: partnerNickname || undefined
+                partnerNickname: storedNicknames.partner2 || undefined // partner2 is always the partner's nickname
               }
             };
             
