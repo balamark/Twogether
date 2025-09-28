@@ -426,7 +426,7 @@ class TestRunner {
 
       // Partner pairs with the code
       const response = await this.makeRequest('POST', '/couples', {
-        pairingCode: this.pairingCode
+        pairing_code: this.pairingCode
       });
 
       if (response.status === 409) {

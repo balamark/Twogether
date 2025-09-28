@@ -286,7 +286,7 @@ router.get('/', async (req, res) => {
     console.info(`👫 Getting couple info for user ${userId}`);
 
     const result = await db.query(`
-      SELECT 
+      SELECT
         c.id, c.couple_name, c.anniversary_date, c.created_at,
         c.first_date, c.first_kiss_date, c.first_kiss_place, c.first_intimacy_place,
         u1.id as user1_id, u1.nickname as user1_nickname,
