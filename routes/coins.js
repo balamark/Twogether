@@ -336,4 +336,107 @@ router.post('/daily-claim', async (req, res) => {
   }
 });
 
+// Generic transaction endpoint (for frontend compatibility)
+router.post('/transaction', [
+  body('amount')
+    .isInt({ min: 1 })
+    .withMessage('金幣數量必須是正整數'),
+  body('transaction_type')
+    .isIn(['earn', 'spend'])
+    .withMessage('交易類型必須是 earn 或 spend'),
+  body('description')
+    .isLength({ min: 1, max: 200 })
+    .withMessage('描述必須在1-200個字符之間')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: '驗證失敗',
+        errors: errors.array()
+      });
+    }
+
+    const userId = req.user.id;
+    const { amount, transaction_type, description } = req.body;
+
+    // Find user's couple
+    const coupleResult = await db.query(
+      'SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1',
+      [userId]
+    );
+
+    if (coupleResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '您還沒有情侶關係'
+      });
+    }
+
+    const coupleId = coupleResult.rows[0].id;
+
+    // If spending, check balance first
+    if (transaction_type === 'spend') {
+      const balanceResult = await db.query(`
+        SELECT COALESCE(SUM(CASE WHEN transaction_type = 'earn' THEN amount ELSE -amount END), 0) as balance
+        FROM coin_transactions
+        WHERE couple_id = $1
+      `, [coupleId]);
+
+      const currentBalance = parseInt(balanceResult.rows[0].balance) || 0;
+
+      if (currentBalance < amount) {
+        return res.status(400).json({
+          success: false,
+          message: '金幣餘額不足',
+          current_balance: currentBalance,
+          required: amount
+        });
+      }
+    }
+
+    // Record transaction
+    const transactionId = uuidv4();
+    await db.query(`
+      INSERT INTO coin_transactions (id, couple_id, amount, transaction_type, description, transaction_date, earned_from, spent_on)
+      VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)
+    `, [
+      transactionId,
+      coupleId,
+      amount,
+      transaction_type,
+      description,
+      transaction_type === 'earn' ? description : null,
+      transaction_type === 'spend' ? description : null
+    ]);
+
+    // Get updated balance
+    const balanceResult = await db.query(`
+      SELECT COALESCE(SUM(CASE WHEN transaction_type = 'earn' THEN amount ELSE -amount END), 0) as balance
+      FROM coin_transactions
+      WHERE couple_id = $1
+    `, [coupleId]);
+    const newBalance = parseInt(balanceResult.rows[0].balance);
+
+    const action = transaction_type === 'earn' ? '獲得' : '花費';
+    console.log(`✅ Couple ${coupleId} ${action} ${amount} coins: ${description}`);
+
+    res.json({
+      success: true,
+      message: `${action} ${amount} 金幣`,
+      amount,
+      transaction_type,
+      new_balance: newBalance
+    });
+
+  } catch (error) {
+    console.error('Coin transaction error:', error);
+    res.status(500).json({
+      success: false,
+      message: '金幣交易失敗'
+    });
+  }
+});
+
 module.exports = router;

@@ -81,6 +81,16 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   onAuthStateUpdate,
   showNotification
 }) => {
+  // Helper function to format ISO date string to YYYY-MM-DD for HTML date input
+  const formatDateForInput = (isoDateString: string): string => {
+    if (!isoDateString) return '';
+    try {
+      const date = new Date(isoDateString);
+      return date.toISOString().split('T')[0];
+    } catch {
+      return '';
+    }
+  };
   const [pairingCode, setPairingCode] = useState('');
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
@@ -467,7 +477,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               id="meeting-date"
               name="meeting-date"
               type="date"
-              value={journeyMilestones.find(m => m.type === 'meeting')?.date || ''}
+              value={formatDateForInput(journeyMilestones.find(m => m.type === 'meeting')?.date || '')}
               onChange={(e) => {
                 setJourneyMilestones(prev => prev.map(m => 
                   m.type === 'meeting' ? {...m, date: e.target.value} : m
@@ -482,7 +492,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               id="first-date"
               name="first-date"
               type="date"
-              value={journeyMilestones.find(m => m.type === 'first_date')?.date || ''}
+              value={formatDateForInput(journeyMilestones.find(m => m.type === 'first_date')?.date || '')}
               onChange={(e) => {
                 setJourneyMilestones(prev => prev.map(m => 
                   m.type === 'first_date' ? {...m, date: e.target.value} : m
@@ -497,7 +507,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               id="first-kiss"
               name="first-kiss"
               type="date"
-              value={journeyMilestones.find(m => m.type === 'first_kiss')?.date || ''}
+              value={formatDateForInput(journeyMilestones.find(m => m.type === 'first_kiss')?.date || '')}
               onChange={(e) => {
                 setJourneyMilestones(prev => prev.map(m => 
                   m.type === 'first_kiss' ? {...m, date: e.target.value} : m
