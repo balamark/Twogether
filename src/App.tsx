@@ -2454,7 +2454,7 @@ const LoveTimeApp = () => {
   const ScriptUploadModal = () => {
     const [scriptData, setScriptData] = useState({
       title: '',
-      category: 'romantic' as 'romantic' | 'adventurous',
+      category: 'romantic' as 'romantic' | 'adventurous' | 'school' | 'bold',
       scenario: '',
       content: '',
       tags: ''
