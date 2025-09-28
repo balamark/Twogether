@@ -76,9 +76,18 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   }, [parseScriptContent, addIntimateRecord]);
 
   const allScripts = [...defaultRoleplayScripts, ...customScripts];
-  const filteredScripts = roleplayFilter === 'all' 
-    ? allScripts 
+  const filteredScripts = roleplayFilter === 'all'
+    ? allScripts
     : allScripts.filter(script => script.category === roleplayFilter);
+
+  // Debug logging to help identify filtering issues
+  console.log('Filter Debug:', {
+    roleplayFilter,
+    allScriptsCount: allScripts.length,
+    filteredScriptsCount: filteredScripts.length,
+    scriptCategories: allScripts.map(s => s.category),
+    filteredCategories: filteredScripts.map(s => s.category)
+  });
 
   const featuredScripts = defaultRoleplayScripts.slice(0, 3);
 
@@ -208,7 +217,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
         <div>
           <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
             <Filter className="w-5 h-5 mr-2 text-purple-500" />
-            所有劇本 ({filteredScripts.length + customScripts.length})
+            所有劇本 ({filteredScripts.length})
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filteredScripts.map((script, index) => (

@@ -806,6 +806,7 @@ class ApiService {
     first_date?: string;
     first_kiss_date?: string;
     first_kiss_place?: string;
+    first_intimacy_date?: string;
     first_intimacy_place?: string;
   }): Promise<void> {
     await apiClient.put('/couples/journey', payload);

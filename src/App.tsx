@@ -439,18 +439,20 @@ const LoveTimeApp = () => {
   const handleLogin = async (email: string, password: string, _unused?: string) => {
     try {
       const authResult = await apiService.login(email, password);
-      
+
       const userData = authResult.user as {
         id?: string;
         email: string;
         nickname: string;
+        gender?: 'male' | 'female' | 'other';
         created_at?: string;
       };
-      
+
       const user: User = {
         id: userData.id || Date.now().toString(),
         email: userData.email,
         nickname: userData.nickname,
+        gender: userData.gender,
         partnerCode: generatePartnerCode(),
         createdAt: userData.created_at || new Date().toISOString()
       };
@@ -739,7 +741,7 @@ const LoveTimeApp = () => {
             // Note: Nickname updates will be handled by the useEffect hook for nicknames state changes
 
             // Merge journey fields from backend where available
-            if (coupleInfo.anniversaryDate || (coupleInfo as any).first_meet_date || coupleInfo.firstKissDate || (coupleInfo as any).first_kiss_place || (coupleInfo as any).first_intimacy_place) {
+            if (coupleInfo.anniversaryDate || (coupleInfo as any).first_meet_date || coupleInfo.firstKissDate || (coupleInfo as any).first_kiss_place || (coupleInfo as any).first_intimacy_date || (coupleInfo as any).first_intimacy_place) {
               setJourneyMilestones(prev => prev.map(milestone => {
                 if (milestone.type === 'meeting' && (coupleInfo as any).first_meet_date) {
                   return { ...milestone, date: (coupleInfo as any).first_meet_date };
@@ -757,8 +759,15 @@ const LoveTimeApp = () => {
                   }
                   return updated;
                 }
-                if (milestone.type === 'first_sex' && (coupleInfo as any).first_intimacy_place) {
-                  return { ...milestone, place: (coupleInfo as any).first_intimacy_place };
+                if (milestone.type === 'first_sex') {
+                  const updated = { ...milestone };
+                  if ((coupleInfo as any).first_intimacy_date) {
+                    updated.date = (coupleInfo as any).first_intimacy_date;
+                  }
+                  if ((coupleInfo as any).first_intimacy_place) {
+                    updated.place = (coupleInfo as any).first_intimacy_place;
+                  }
+                  return updated;
                 }
                 return milestone;
               }));
@@ -1100,7 +1109,7 @@ const LoveTimeApp = () => {
     return formattedLines.join('\n\n');
   };
 
-  const addCustomScript = async (title: string, category: 'romantic' | 'adventurous', scenario: string, content: string, tags: string[] = []) => {
+  const addCustomScript = async (title: string, category: 'romantic' | 'adventurous' | 'school' | 'bold', scenario: string, content: string, tags: string[] = []) => {
     try {
       // Create script via backend API
       const newScript = await apiService.createCustomScript({
@@ -2506,7 +2515,7 @@ const LoveTimeApp = () => {
                   id="script-category"
                   name="script-category"
                   value={scriptData.category}
-                  onChange={(e) => setScriptData(prev => ({ ...prev, category: e.target.value as 'romantic' | 'adventurous' }))}
+                  onChange={(e) => setScriptData(prev => ({ ...prev, category: e.target.value as 'romantic' | 'adventurous' | 'school' | 'bold' }))}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                   required
                 >

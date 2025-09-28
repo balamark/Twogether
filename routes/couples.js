@@ -288,7 +288,7 @@ router.get('/', async (req, res) => {
     const result = await db.query(`
       SELECT
         c.id, c.couple_name, c.anniversary_date, c.created_at,
-        c.first_meet_date, c.first_date, c.first_kiss_date, c.first_kiss_place, c.first_intimacy_place,
+        c.first_meet_date, c.first_date, c.first_kiss_date, c.first_kiss_place, c.first_intimacy_date, c.first_intimacy_place,
         u1.id as user1_id, u1.nickname as user1_nickname,
         u2.id as user2_id, u2.nickname as user2_nickname
       FROM couples c
@@ -356,6 +356,7 @@ router.put('/journey', [
   body('first_date').optional().isISO8601(),
   body('first_kiss_date').optional().isISO8601(),
   body('first_kiss_place').optional().isLength({ max: 200 }),
+  body('first_intimacy_date').optional().isISO8601(),
   body('first_intimacy_place').optional().isLength({ max: 200 })
 ], async (req, res) => {
   try {
@@ -375,6 +376,7 @@ router.put('/journey', [
       first_date,
       first_kiss_date,
       first_kiss_place,
+      first_intimacy_date,
       first_intimacy_place
     } = req.body;
 
@@ -424,6 +426,10 @@ router.put('/journey', [
     if (first_kiss_place !== undefined) {
       updateFields.push(`first_kiss_place = $${paramIndex++}`);
       updateValues.push(first_kiss_place);
+    }
+    if (first_intimacy_date !== undefined) {
+      updateFields.push(`first_intimacy_date = $${paramIndex++}`);
+      updateValues.push(first_intimacy_date);
     }
     if (first_intimacy_place !== undefined) {
       updateFields.push(`first_intimacy_place = $${paramIndex++}`);

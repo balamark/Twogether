@@ -132,6 +132,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         anniversary_date: firstDate?.date || undefined,
         first_kiss_date: firstKiss?.date || undefined,
         first_kiss_place: (firstKiss as any)?.place || undefined,
+        first_intimacy_date: firstSex?.date || undefined,
         first_intimacy_place: (firstSex as any)?.place || undefined,
       });
       // Update auth state and local storage so Header/profile and couple status reflect immediately
@@ -531,6 +532,21 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
               />
             </div>
+          </div>
+          <div>
+            <label htmlFor="first-intimacy-date" className="block text-sm font-medium text-gray-700 mb-2">第一次親密日期</label>
+            <input
+              id="first-intimacy-date"
+              name="first-intimacy-date"
+              type="date"
+              value={formatDateForInput(journeyMilestones.find(m => m.type === 'first_sex')?.date || '')}
+              onChange={(e) => {
+                setJourneyMilestones(prev => prev.map(m =>
+                  m.type === 'first_sex' ? {...m, date: e.target.value} : m
+                ));
+              }}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+            />
           </div>
           <div>
             <label htmlFor="first-intimacy-place" className="block text-sm font-medium text-gray-700 mb-2">第一次親密場所</label>

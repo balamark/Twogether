@@ -112,7 +112,7 @@ router.post('/login', [
 
     // Find user
     const userResult = await db.query(
-      'SELECT id, nickname, email, password_hash, created_at FROM users WHERE email = $1',
+      'SELECT id, nickname, email, gender, password_hash, created_at FROM users WHERE email = $1',
       [email]
     );
 
@@ -153,6 +153,7 @@ router.post('/login', [
         id: user.id,
         nickname: user.nickname,
         email: user.email,
+        gender: user.gender,
         created_at: user.created_at
       }
     });
