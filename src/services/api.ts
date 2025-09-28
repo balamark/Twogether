@@ -867,7 +867,8 @@ class ApiService {
       return response.data.templates?.map((item: unknown) => this.transformIntimacyTemplate(item)) || [];
     } catch (error: unknown) {
       console.error('Failed to fetch intimacy templates by category:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法獲取分類模板');
+      // Re-throw the error from the interceptor without modification to preserve auth error handling
+      throw error;
     }
   }
 

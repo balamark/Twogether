@@ -44,8 +44,14 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
       const categoryTemplates = await apiService.getIntimacyTemplatesByCategory(selectedCategory);
       setTemplates(categoryTemplates);
     } catch (err) {
-      setError('無法載入模板');
-      console.error(err);
+      const errorMessage = err instanceof Error ? err.message : '無法載入模板';
+      setError(errorMessage);
+      console.error('Failed to fetch intimacy templates by category:', err);
+
+      // If it's an authentication error, close the form so the app can handle login redirect
+      if (errorMessage.includes('登錄已過期') || errorMessage.includes('重新登錄')) {
+        onClose();
+      }
     } finally {
       setLoading(false);
     }
