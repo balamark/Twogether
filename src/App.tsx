@@ -739,13 +739,13 @@ const LoveTimeApp = () => {
             // Note: Nickname updates will be handled by the useEffect hook for nicknames state changes
 
             // Merge journey fields from backend where available
-            if (coupleInfo.anniversaryDate || coupleInfo.firstDate || coupleInfo.firstKissDate || (coupleInfo as any).first_kiss_place || (coupleInfo as any).first_intimacy_place) {
+            if (coupleInfo.anniversaryDate || (coupleInfo as any).first_meet_date || coupleInfo.firstKissDate || (coupleInfo as any).first_kiss_place || (coupleInfo as any).first_intimacy_place) {
               setJourneyMilestones(prev => prev.map(milestone => {
-                if (milestone.type === 'meeting' && coupleInfo.anniversaryDate) {
-                  return { ...milestone, date: coupleInfo.anniversaryDate };
+                if (milestone.type === 'meeting' && (coupleInfo as any).first_meet_date) {
+                  return { ...milestone, date: (coupleInfo as any).first_meet_date };
                 }
-                if (milestone.type === 'first_date' && (coupleInfo as any).first_date) {
-                  return { ...milestone, date: (coupleInfo as any).first_date };
+                if (milestone.type === 'first_date' && coupleInfo.anniversaryDate) {
+                  return { ...milestone, date: coupleInfo.anniversaryDate };
                 }
                 if (milestone.type === 'first_kiss') {
                   const updated = { ...milestone };

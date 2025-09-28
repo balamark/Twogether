@@ -118,8 +118,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       const firstKiss = journeyMilestones.find(m => m.type === 'first_kiss');
       const firstSex = journeyMilestones.find(m => m.type === 'first_sex');
       await apiService.updateCoupleJourney({
-        anniversary_date: meeting?.date || undefined,
-        first_date: firstDate?.date || undefined,
+        first_meet_date: meeting?.date || undefined,
+        anniversary_date: firstDate?.date || undefined,
         first_kiss_date: firstKiss?.date || undefined,
         first_kiss_place: (firstKiss as any)?.place || undefined,
         first_intimacy_place: (firstSex as any)?.place || undefined,
@@ -506,7 +506,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
             />
             <div className="mt-3">
-              <label htmlFor="first-kiss-place" className="block text-sm font-medium text-gray-700 mb-2">印象深刻的親吻事件地點</label>
+              <label htmlFor="first-kiss-place" className="block text-sm font-medium text-gray-700 mb-2">初吻事件地點</label>
               <input
                 id="first-kiss-place"
                 name="first-kiss-place"

@@ -288,7 +288,7 @@ router.get('/', async (req, res) => {
     const result = await db.query(`
       SELECT
         c.id, c.couple_name, c.anniversary_date, c.created_at,
-        c.first_date, c.first_kiss_date, c.first_kiss_place, c.first_intimacy_place,
+        c.first_meet_date, c.first_date, c.first_kiss_date, c.first_kiss_place, c.first_intimacy_place,
         u1.id as user1_id, u1.nickname as user1_nickname,
         u2.id as user2_id, u2.nickname as user2_nickname
       FROM couples c
@@ -352,6 +352,7 @@ router.get('/me', async (req, res) => {
 // Update couple journey information
 router.put('/journey', [
   body('anniversary_date').optional().isISO8601(),
+  body('first_meet_date').optional().isISO8601(),
   body('first_date').optional().isISO8601(),
   body('first_kiss_date').optional().isISO8601(),
   body('first_kiss_place').optional().isLength({ max: 200 }),
@@ -370,6 +371,7 @@ router.put('/journey', [
     const userId = req.user.id;
     const {
       anniversary_date,
+      first_meet_date,
       first_date,
       first_kiss_date,
       first_kiss_place,
@@ -406,6 +408,10 @@ router.put('/journey', [
     if (anniversary_date !== undefined) {
       updateFields.push(`anniversary_date = $${paramIndex++}`);
       updateValues.push(anniversary_date);
+    }
+    if (first_meet_date !== undefined) {
+      updateFields.push(`first_meet_date = $${paramIndex++}`);
+      updateValues.push(first_meet_date);
     }
     if (first_date !== undefined) {
       updateFields.push(`first_date = $${paramIndex++}`);

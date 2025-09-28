@@ -802,6 +802,7 @@ class ApiService {
   // Journey / Couple details
   async updateCoupleJourney(payload: {
     anniversary_date?: string;
+    first_meet_date?: string;
     first_date?: string;
     first_kiss_date?: string;
     first_kiss_place?: string;
