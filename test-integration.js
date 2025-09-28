@@ -92,45 +92,51 @@ class TestRunner {
     console.log('🚀 Starting Twogether API Integration Tests\n');
     // Updated: This test suite now triggers CI/CD pipeline on any changes
 
-    // Health Check
-    await this.test('Health Check', async () => {
-      const url = 'http://localhost:8080/health'; // Direct health endpoint, not under /api
-      const response = await fetch(url);
-      const data = await response.text();
-      
-      if (response.status !== 200) {
-        throw new Error(`Health check should return 200: expected status 200, got ${response.status}. Response: ${data}`);
-      }
-      
-      this.assertTrue(typeof data === 'string', 'Health check should return a string message');
-    });
+    try {
+      // Health Check
+      await this.test('Health Check', async () => {
+        const url = 'http://localhost:8080/health'; // Direct health endpoint, not under /api
+        const response = await fetch(url);
+        const data = await response.text();
 
-    // Authentication Flow Tests
-    await this.testAuthenticationFlow();
+        if (response.status !== 200) {
+          throw new Error(`Health check should return 200: expected status 200, got ${response.status}. Response: ${data}`);
+        }
 
-    // Couples Management Tests
-    await this.testCouplesManagement();
+        this.assertTrue(typeof data === 'string', 'Health check should return a string message');
+      });
 
-    // Pairing Flow Tests (creates complete couple relationship)
-    await this.testPairingFlow();
+      // Authentication Flow Tests
+      await this.testAuthenticationFlow();
 
-    // Love Moments Tests
-    await this.testLoveMoments();
+      // Couples Management Tests
+      await this.testCouplesManagement();
 
-    // Coins System Tests
-    await this.testCoinsSystem();
+      // Pairing Flow Tests (creates complete couple relationship)
+      await this.testPairingFlow();
 
-    // Achievements Tests
-    await this.testAchievements();
+      // Love Moments Tests
+      await this.testLoveMoments();
 
-    // Intimacy Requests Tests (with email verification)
-    await this.testIntimacyRequests();
+      // Coins System Tests
+      await this.testCoinsSystem();
 
-    // Photos Tests
-    await this.testPhotos();
+      // Achievements Tests
+      await this.testAchievements();
 
-    // Error Handling Tests
-    await this.testErrorHandling();
+      // Intimacy Requests Tests (with email verification)
+      await this.testIntimacyRequests();
+
+      // Photos Tests
+      await this.testPhotos();
+
+      // Error Handling Tests
+      await this.testErrorHandling();
+
+    } finally {
+      // Always cleanup test users, even if tests fail
+      await this.cleanupTestUsers();
+    }
 
     this.printSummary();
   }
@@ -593,6 +599,71 @@ class TestRunner {
     });
   }
 
+  async cleanupTestUsers() {
+    console.log('\n🧹 Cleaning up test users...');
+
+    const usersToCleanup = [];
+
+    // Collect all test users created during this test run
+    if (this.testUser) {
+      usersToCleanup.push({
+        email: this.testUser.email,
+        nickname: this.testUser.nickname,
+        token: this.authToken,
+        userId: this.userId
+      });
+    }
+
+    if (this.partnerUser) {
+      usersToCleanup.push({
+        email: this.partnerUser.email,
+        nickname: this.partnerUser.nickname,
+        token: this.partnerToken,
+        userId: null // We don't store partner user ID, but we can delete by email
+      });
+    }
+
+    for (const user of usersToCleanup) {
+      try {
+        // Set the auth token for this user
+        const originalToken = this.authToken;
+        this.authToken = user.token;
+
+        // Try to delete the user account via API
+        const deleteResponse = await this.makeRequest('DELETE', '/auth/user');
+
+        if (deleteResponse.status === 200 || deleteResponse.status === 404) {
+          console.log(`   ✅ Cleaned up user: ${user.nickname} (${user.email})`);
+        } else {
+          console.log(`   ⚠️ Could not clean up user ${user.nickname}: API returned ${deleteResponse.status}`);
+        }
+
+        // Restore original token
+        this.authToken = originalToken;
+
+      } catch (error) {
+        console.log(`   ⚠️ Failed to cleanup user ${user.nickname}: ${error.message}`);
+      }
+    }
+
+    // If we don't have a DELETE endpoint, let's try a different approach
+    // by using the database connection from the setup script
+    try {
+      const { cleanupTestUsers } = require('./scripts/setup-test-db');
+
+      // Try to cleanup any remaining test users from the database
+      const testEmails = usersToCleanup.map(u => u.email);
+      if (testEmails.length > 0) {
+        await cleanupTestUsers(testEmails);
+        console.log('   ✅ Database cleanup completed');
+      }
+    } catch (error) {
+      console.log(`   ⚠️ Database cleanup failed: ${error.message}`);
+    }
+
+    console.log('🧹 Cleanup completed');
+  }
+
   printSummary() {
     console.log('\n📊 Test Summary');
     console.log('='.repeat(50));
@@ -633,8 +704,16 @@ if (typeof fetch === 'undefined') {
 const testRunner = new TestRunner();
 
 // Handle graceful shutdown
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   console.log('\n\n🛑 Test suite interrupted');
+
+  // Cleanup test users even when interrupted
+  try {
+    await testRunner.cleanupTestUsers();
+  } catch (error) {
+    console.log(`⚠️ Cleanup failed during interruption: ${error.message}`);
+  }
+
   testRunner.printSummary();
 });
 

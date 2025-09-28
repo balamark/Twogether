@@ -118,4 +118,43 @@ if (require.main === module) {
     });
 }
 
-module.exports = { setupTestDatabase, cleanTestData };
+// Clean specific test users by email
+async function cleanupTestUsers(emailList) {
+  if (!emailList || emailList.length === 0) {
+    return;
+  }
+
+  console.log(`🧹 Cleaning up ${emailList.length} test users...`);
+
+  for (const email of emailList) {
+    try {
+      // Clean up related data first (foreign key constraints)
+      await runCommand(
+        `psql "${process.env.DATABASE_URL}" -c "DELETE FROM love_moments WHERE couple_id IN (SELECT id FROM couples WHERE user1_id IN (SELECT id FROM users WHERE email = '${email}') OR user2_id IN (SELECT id FROM users WHERE email = '${email}'));"`,
+        `Clean love moments for ${email}`
+      );
+
+      await runCommand(
+        `psql "${process.env.DATABASE_URL}" -c "DELETE FROM pairing_codes WHERE couple_id IN (SELECT id FROM couples WHERE user1_id IN (SELECT id FROM users WHERE email = '${email}') OR user2_id IN (SELECT id FROM users WHERE email = '${email}'));"`,
+        `Clean pairing codes for ${email}`
+      );
+
+      await runCommand(
+        `psql "${process.env.DATABASE_URL}" -c "DELETE FROM couples WHERE user1_id IN (SELECT id FROM users WHERE email = '${email}') OR user2_id IN (SELECT id FROM users WHERE email = '${email}');"`,
+        `Clean couples for ${email}`
+      );
+
+      await runCommand(
+        `psql "${process.env.DATABASE_URL}" -c "DELETE FROM users WHERE email = '${email}';"`,
+        `Clean user ${email}`
+      );
+
+    } catch (error) {
+      console.log(`   ⚠️ Failed to cleanup user ${email}: ${error.message}`);
+    }
+  }
+
+  console.log('✅ Test user cleanup completed');
+}
+
+module.exports = { setupTestDatabase, cleanTestData, cleanupTestUsers };
