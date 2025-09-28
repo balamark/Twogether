@@ -198,6 +198,75 @@ psql twogether_dev -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 NODE_ENV=development npm run migrate
 ```
 
+## 🧪 Database Setup for Different Environments
+
+### Test Environment (Automated)
+The test database is automatically set up when running tests:
+
+```bash
+# Run tests with automatic database setup
+npm run test:backend
+
+# The test script automatically:
+# 1. Creates test database (twogether_test) if it doesn't exist
+# 2. Runs all migrations to ensure schema is up to date
+# 3. Optionally cleans existing data for fresh test runs
+```
+
+**Manual Test Database Setup:**
+```bash
+# Set up test database manually (if needed)
+node scripts/setup-test-db.js
+
+# Or clean and set up test database
+node scripts/setup-test-db.js --clean
+
+# Check test migration status
+NODE_ENV=test npm run migrate:status
+```
+
+### Local Development Environment
+```bash
+# Quick setup (automated)
+./scripts/setup-local-db.sh
+
+# Manual setup
+psql postgres -c "CREATE USER twogether WITH PASSWORD 'twogether123';"
+psql postgres -c "ALTER USER twogether CREATEDB;"
+createdb -O twogether twogether_dev
+
+# Run migrations for local development
+NODE_ENV=development npm run migrate
+
+# Check local development migration status
+NODE_ENV=development npm run migrate:status
+```
+
+### Production Environment
+```bash
+# Production database setup (usually managed by cloud provider)
+# For Supabase: Database is auto-created, just run migrations
+
+# Run production migrations (if using custom PostgreSQL)
+NODE_ENV=production npm run migrate
+
+# Check production migration status
+NODE_ENV=production npm run migrate:status
+```
+
+### Database Environments Summary
+
+| Environment | Database Name | Environment File | Auto-Setup |
+|-------------|---------------|------------------|-----------|
+| **Test** | `twogether_test` | `.env.test` | ✅ Automatic (during tests) |
+| **Local Dev** | `twogether_dev` | `.env.local` | ⚙️ Manual (run script) |
+| **Production** | (Cloud managed) | `.env` | 🌐 Cloud provider |
+
+### Database Configuration Files
+- **Test**: `.env.test` - Contains `DATABASE_URL` for test database
+- **Local Development**: `.env.local` - Contains `DATABASE_URL` for local PostgreSQL
+- **Production**: `.env` - Contains `DATABASE_URL` for cloud database (Supabase)
+
 ## 📋 Development Commands
 
 ### Quick Reference

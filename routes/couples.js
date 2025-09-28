@@ -101,7 +101,7 @@ router.post('/', [
 
       console.log(`✅ User ${userId} joined couple ${coupleId} with pairing code`);
 
-      return res.json({
+      return res.status(201).json({
         success: true,
         message: '成功加入情侶關係',
         couple: coupleResult.rows[0]

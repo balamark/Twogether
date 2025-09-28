@@ -35,12 +35,14 @@ if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', true);
 }
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
-});
+// Rate limiting - disabled for test environment
+const limiter = process.env.NODE_ENV === 'test' || process.env.DISABLE_RATE_LIMIT === 'true'
+  ? (req, res, next) => next() // No-op middleware for tests
+  : rateLimit({
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      max: 100, // limit each IP to 100 requests per windowMs
+      message: 'Too many requests from this IP, please try again later.'
+    });
 
 // Session configuration
 const sessionConfig = {
