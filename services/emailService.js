@@ -40,7 +40,7 @@ class EmailService {
       throw new Error('Email service is not configured');
     }
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://twogether-couples-app.de.r.appspot.com';
     const acceptUrl = `${frontendUrl}/pairing/accept?token=${token}`;
 
     const htmlContent = `
@@ -59,7 +59,9 @@ class EmailService {
         .invitation-card { background: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%); padding: 30px; border-radius: 15px; margin: 20px 0; text-align: center; }
         .invitation-card h2 { margin: 0 0 15px 0; color: #2d3436; font-size: 24px; }
         .sender-name { color: #e17055; font-weight: bold; font-size: 20px; }
-        .custom-message { background: white; padding: 20px; border-radius: 10px; margin: 20px 0; font-style: italic; color: #636e72; border-left: 4px solid #e17055; }
+        .custom-message { background: white; padding: 30px; border-radius: 10px; margin: 20px 0; color: #2d3436; border-left: 4px solid #e17055; }
+        .custom-message-text { font-size: 20px; line-height: 1.6; font-weight: 500; margin-top: 10px; }
+        .custom-message-label { font-size: 14px; color: #636e72; font-weight: normal; }
         .cta-button { display: inline-block; background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); color: white; text-decoration: none; padding: 15px 30px; border-radius: 25px; font-weight: bold; margin: 20px 0; box-shadow: 0 4px 15px rgba(0, 184, 148, 0.3); transition: transform 0.2s; }
         .cta-button:hover { transform: translateY(-2px); }
         .footer { background-color: #2d3436; color: white; padding: 20px; text-align: center; font-size: 14px; }
@@ -88,8 +90,8 @@ class EmailService {
 
             ${customMessage ? `
             <div class="custom-message">
-                <strong>個人訊息：</strong><br>
-                "${customMessage}"
+                <div class="custom-message-label">個人訊息：</div>
+                <div class="custom-message-text">"${customMessage}"</div>
             </div>
             ` : ''}
 
@@ -181,7 +183,7 @@ ${acceptUrl}
       throw new Error('Email service is not configured');
     }
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://twogether-couples-app.de.r.appspot.com';
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -253,7 +255,7 @@ ${acceptUrl}
       return;
     }
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5174';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://twogether-couples-app.de.r.appspot.com';
 
     const typeTranslations = {
       general: '一般邀請',
@@ -282,7 +284,9 @@ ${acceptUrl}
         .invitation-card { background: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%); padding: 30px; border-radius: 15px; margin: 20px 0; text-align: center; }
         .invitation-card h2 { margin: 0 0 15px 0; color: #2d3436; font-size: 24px; }
         .sender-name { color: #e17055; font-weight: bold; font-size: 20px; }
-        .custom-message { background: white; padding: 20px; border-radius: 10px; margin: 20px 0; font-style: italic; color: #636e72; border-left: 4px solid #e17055; }
+        .custom-message { background: white; padding: 30px; border-radius: 10px; margin: 20px 0; color: #2d3436; border-left: 4px solid #e17055; }
+        .custom-message-text { font-size: 20px; line-height: 1.6; font-weight: 500; margin-top: 10px; }
+        .custom-message-label { font-size: 14px; color: #636e72; font-weight: normal; }
         .cta-button { display: inline-block; background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); color: white; text-decoration: none; padding: 15px 30px; border-radius: 25px; font-weight: bold; margin: 20px 0; box-shadow: 0 4px 15px rgba(0, 184, 148, 0.3); transition: transform 0.2s; }
         .footer { background-color: #2d3436; color: white; padding: 20px; text-align: center; font-size: 14px; }
         .features { display: flex; justify-content: space-around; margin: 30px 0; flex-wrap: wrap; }
@@ -309,8 +313,8 @@ ${acceptUrl}
 
             ${message ? `
             <div class="custom-message">
-                <strong>個人訊息：</strong><br>
-                "${message}"
+                <div class="custom-message-label">個人訊息：</div>
+                <div class="custom-message-text">"${message}"</div>
             </div>
             ` : ''}
 
