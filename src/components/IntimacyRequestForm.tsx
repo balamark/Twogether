@@ -26,6 +26,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
 
   const categories = [
     { id: 'compliment', name: '甜蜜讚美', emoji: '💕', description: '發送溫馨的讚美和愛意給伴侶' },
+    { id: 'reconciliation', name: '真心和解', emoji: '🤝', description: '吵架後的真誠道歉和溫柔挽回' },
     { id: 'idol_photographer', name: '偶像/攝影師', emoji: '📸', description: '角色扮演：偶像與攝影師的私密互動' },
     { id: 'teacher_student', name: '老師/學生', emoji: '📚', description: '角色扮演：師生間的特別課程' },
     { id: 'foreign_student', name: '留學生邂逅', emoji: '✈️', description: '角色扮演：異國戀情的浪漫約會' },
@@ -87,8 +88,8 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
 
       await apiService.createIntimacyRequest({
         messageContent,
-        requestType: selectedCategory === 'compliment' ? 'compliment' : requestType,
-        roleplayCategory: selectedCategory !== 'custom' && selectedCategory !== 'compliment' ? selectedCategory : undefined,
+        requestType: selectedCategory === 'compliment' ? 'compliment' : selectedCategory === 'reconciliation' ? 'reconciliation' : requestType,
+        roleplayCategory: selectedCategory !== 'custom' && selectedCategory !== 'compliment' && selectedCategory !== 'reconciliation' ? selectedCategory : undefined,
         scheduledTime: requestType === 'scheduled' && scheduledTime ?
           new Date(scheduledTime).toISOString() : undefined,
       });
@@ -209,7 +210,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-lg font-medium text-gray-900">
-                  {selectedCategory === 'compliment' ? '選擇讚美訊息' : '選擇訊息模板'}
+                  {selectedCategory === 'compliment' ? '選擇讚美訊息' : selectedCategory === 'reconciliation' ? '選擇和解訊息' : '選擇訊息模板'}
                 </h4>
                 <button
                   onClick={() => setCurrentStep('category')}
@@ -251,8 +252,8 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                         </div>
                       </button>
                     ))
-                  ) : selectedCategory === 'compliment' ? (
-                    // Default compliment options if templates aren't loaded
+                  ) : (selectedCategory === 'compliment' || selectedCategory === 'reconciliation') ? (
+                    // Default options if templates aren't loaded
                     [
                       { timeHint: '甜蜜時光', roleplaySetup: '你好溫柔，你是我的女神 💕' },
                       { timeHint: '愛的告白', roleplaySetup: '你是我見過最美麗的人，每天和你在一起都是幸福 ✨' },
@@ -299,7 +300,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                     <div className="flex items-center space-x-3">
                       <Sparkles className="w-5 h-5 text-pink-500" />
                       <span className="text-gray-900 font-medium">
-                        {selectedCategory === 'compliment' ? '自訂讚美訊息' : '自訂訊息內容'}
+                        {selectedCategory === 'compliment' ? '自訂讚美訊息' : selectedCategory === 'reconciliation' ? '自訂和解訊息' : '自訂訊息內容'}
                       </span>
                     </div>
                   </button>
@@ -313,7 +314,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-lg font-medium text-gray-900">
-                  {selectedCategory === 'compliment' ? '自訂讚美內容' : '自訂邀請內容'}
+                  {selectedCategory === 'compliment' ? '自訂讚美內容' : selectedCategory === 'reconciliation' ? '自訂和解內容' : '自訂邀請內容'}
                 </h4>
                 <button
                   onClick={() => selectedCategory === 'custom' ? setCurrentStep('category') : setCurrentStep('template')}
@@ -368,13 +369,15 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {selectedCategory === 'compliment' ? '讚美內容 *' : '邀請內容 *'}
+                    {selectedCategory === 'compliment' ? '讚美內容 *' : selectedCategory === 'reconciliation' ? '和解內容 *' : '邀請內容 *'}
                   </label>
                   <textarea
                     value={customMessage}
                     onChange={(e) => setCustomMessage(e.target.value)}
                     placeholder={selectedCategory === 'compliment' ?
                       "輸入你想對伴侶說的甜蜜讚美..." :
+                      selectedCategory === 'reconciliation' ?
+                      "輸入你的真誠道歉和和解訊息..." :
                       "輸入你的親密邀請內容..."}
                     rows={4}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"
@@ -402,7 +405,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-lg font-medium text-gray-900">
-                  {selectedCategory === 'compliment' ? '確認讚美內容' : '確認邀請內容'}
+                  {selectedCategory === 'compliment' ? '確認讚美內容' : selectedCategory === 'reconciliation' ? '確認和解內容' : '確認邀請內容'}
                 </h4>
                 <button
                   onClick={() => setCurrentStep('customize')}
@@ -417,7 +420,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                   <Heart className="w-6 h-6 text-pink-500 mt-1" />
                   <div className="flex-1">
                     <h5 className="font-medium text-gray-900 mb-2">
-                      {selectedCategory === 'compliment' ? '你的甜蜜讚美' : '你的親密邀請'}
+                      {selectedCategory === 'compliment' ? '你的甜蜜讚美' : selectedCategory === 'reconciliation' ? '你的真心和解' : '你的親密邀請'}
                     </h5>
                     <p className="text-gray-700 whitespace-pre-wrap">{customMessage}</p>
                     {requestType === 'scheduled' && scheduledTime && (
@@ -447,7 +450,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                   ) : (
                     <Send className="w-4 h-4" />
                   )}
-                  <span>{loading ? '發送中...' : (selectedCategory === 'compliment' ? '發送讚美' : '發送邀請')}</span>
+                  <span>{loading ? '發送中...' : (selectedCategory === 'compliment' ? '發送讚美' : selectedCategory === 'reconciliation' ? '發送和解' : '發送邀請')}</span>
                 </button>
               </div>
             </div>

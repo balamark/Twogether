@@ -263,7 +263,8 @@ ${acceptUrl}
       playful: '玩樂時光',
       surprise: '驚喜時刻',
       compliment: '甜蜜讚美',
-      intimate: '親密時光'
+      intimate: '親密時光',
+      reconciliation: '真心和解'
     };
 
     const requestTypeName = typeTranslations[requestType] || '親密邀請';

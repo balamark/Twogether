@@ -18,7 +18,7 @@ router.post('/', [
     .isLength({ max: 1000 })
     .withMessage('訊息不能超過1000個字符'),
   body('request_type')
-    .isIn(['general', 'romantic', 'playful', 'surprise', 'compliment', 'intimate'])
+    .isIn(['general', 'romantic', 'playful', 'surprise', 'compliment', 'intimate', 'reconciliation'])
     .withMessage('請求類型無效')
 ], async (req, res) => {
   try {
