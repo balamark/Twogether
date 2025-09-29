@@ -161,6 +161,11 @@ jobs:
           _EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           _EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
           _RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          _SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          _SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          _SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          _SMTP_USER: ${{ secrets.SMTP_USER }}
+          _SMTP_PASS: ${{ secrets.SMTP_PASS }}
           _CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
         run: |
           echo "🚀 Deploying Twogether app directly to App Engine..."
