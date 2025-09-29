@@ -489,9 +489,17 @@ router.get('/intimacy-templates/:category', async (req, res) => {
 
     // Get user's gender and couple information for character mapping
     const userResult = await db.query(`
-      SELECT u.gender, u.nickname, c.user1_nickname, c.user2_nickname, c.user1_id
+      SELECT
+        u.gender,
+        u.nickname,
+        c.user1_id,
+        c.user2_id,
+        u1.nickname as user1_nickname,
+        u2.nickname as user2_nickname
       FROM users u
       LEFT JOIN couples c ON (c.user1_id = u.id OR c.user2_id = u.id)
+      LEFT JOIN users u1 ON c.user1_id = u1.id
+      LEFT JOIN users u2 ON c.user2_id = u2.id
       WHERE u.id = $1
     `, [userId]);
 
