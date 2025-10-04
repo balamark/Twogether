@@ -115,6 +115,7 @@ interface IntimacyRequest {
   alternativeScheduledTime?: string;
   createdAt: string;
   expiresAt: string;
+  direction?: 'sent' | 'received';  // Added to track if user sent or received this request
 }
 
 interface CreateIntimacyRequestRequest {
@@ -1048,6 +1049,7 @@ class ApiService {
       alternative_scheduled_time?: string;
       created_at?: string;
       expires_at?: string;
+      direction?: 'sent' | 'received';
     };
 
     return {
@@ -1066,6 +1068,7 @@ class ApiService {
       alternativeScheduledTime: typedData?.alternative_scheduled_time,
       createdAt: typedData?.created_at || '',
       expiresAt: typedData?.expires_at || '',
+      direction: typedData?.direction,
     };
   }
 

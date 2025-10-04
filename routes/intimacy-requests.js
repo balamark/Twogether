@@ -353,12 +353,13 @@ router.put('/:id/respond', [
         ir.id, ir.message_content, ir.request_type, ir.status, ir.created_at, ir.responded_at,
         ir.response_message, ir.alternative_type, ir.alternative_content, ir.alternative_scheduled_time,
         sender.id as sender_id, sender.nickname as sender_nickname,
-        receiver.id as receiver_id, receiver.nickname as receiver_nickname
+        receiver.id as receiver_id, receiver.nickname as receiver_nickname,
+        CASE WHEN ir.sender_id = $2 THEN 'sent' ELSE 'received' END as direction
       FROM intimacy_requests ir
       JOIN users sender ON ir.sender_id = sender.id
       JOIN users receiver ON ir.receiver_id = receiver.id
       WHERE ir.id = $1
-    `, [requestId]);
+    `, [requestId, userId]);
 
     const updatedRequest = updatedRequestResult.rows[0];
 
@@ -376,7 +377,8 @@ router.put('/:id/respond', [
       alternative_content: updatedRequest.alternative_content,
       alternative_scheduled_time: updatedRequest.alternative_scheduled_time,
       sender_nickname: updatedRequest.sender_nickname,
-      receiver_nickname: updatedRequest.receiver_nickname
+      receiver_nickname: updatedRequest.receiver_nickname,
+      direction: updatedRequest.direction
     });
 
   } catch (error) {
