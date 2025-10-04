@@ -361,6 +361,14 @@ router.put('/:id/respond', [
       WHERE ir.id = $1
     `, [requestId, userId]);
 
+    if (updatedRequestResult.rows.length === 0) {
+      console.error(`❌ Failed to fetch updated request ${requestId} after respond`);
+      return res.status(500).json({
+        success: false,
+        message: '回應成功但無法獲取更新後的請求信息'
+      });
+    }
+
     const updatedRequest = updatedRequestResult.rows[0];
 
     res.json({
