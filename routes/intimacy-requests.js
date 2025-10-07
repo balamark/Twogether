@@ -347,10 +347,46 @@ router.put('/:id/respond', [
 
     console.log(`✅ Intimacy request ${requestId} ${response} by user ${userId}`);
 
+    // Fetch the updated request with sender and receiver information
+    const updatedRequestResult = await db.query(`
+      SELECT 
+        ir.id, ir.message_content, ir.request_type, ir.status, ir.created_at, ir.responded_at,
+        ir.response_message, ir.alternative_type, ir.alternative_content, ir.alternative_scheduled_time,
+        sender.id as sender_id, sender.nickname as sender_nickname,
+        receiver.id as receiver_id, receiver.nickname as receiver_nickname,
+        CASE WHEN ir.sender_id = $2 THEN 'sent' ELSE 'received' END as direction
+      FROM intimacy_requests ir
+      JOIN users sender ON ir.sender_id = sender.id
+      JOIN users receiver ON ir.receiver_id = receiver.id
+      WHERE ir.id = $1
+    `, [requestId, userId]);
+
+    if (updatedRequestResult.rows.length === 0) {
+      console.error(`❌ Failed to fetch updated request ${requestId} after respond`);
+      return res.status(500).json({
+        success: false,
+        message: '回應成功但無法獲取更新後的請求信息'
+      });
+    }
+
+    const updatedRequest = updatedRequestResult.rows[0];
+
     res.json({
       success: true,
       message: response === 'accepted' ? '請求已接受' : '請求已拒絕',
-      response
+      id: updatedRequest.id,
+      message_content: updatedRequest.message_content,
+      request_type: updatedRequest.request_type,
+      status: updatedRequest.status,
+      created_at: updatedRequest.created_at,
+      responded_at: updatedRequest.responded_at,
+      response_message: updatedRequest.response_message,
+      alternative_type: updatedRequest.alternative_type,
+      alternative_content: updatedRequest.alternative_content,
+      alternative_scheduled_time: updatedRequest.alternative_scheduled_time,
+      sender_nickname: updatedRequest.sender_nickname,
+      receiver_nickname: updatedRequest.receiver_nickname,
+      direction: updatedRequest.direction
     });
 
   } catch (error) {

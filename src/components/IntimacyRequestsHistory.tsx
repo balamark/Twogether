@@ -45,10 +45,18 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
     const s: IntimacyRequest[] = [];
     const r: IntimacyRequest[] = [];
     items.forEach((it) => {
-      if (it.senderNickname === me) {
+      // Use direction field from backend if available, fallback to nickname comparison
+      if (it.direction === 'sent') {
         s.push(it);
-      } else if (it.receiverNickname === me) {
+      } else if (it.direction === 'received') {
         r.push(it);
+      } else {
+        // Fallback: categorize by nickname if direction is not available
+        if (it.senderNickname === me) {
+          s.push(it);
+        } else if (it.receiverNickname === me) {
+          r.push(it);
+        }
       }
     });
     return { sent: s, received: r };
