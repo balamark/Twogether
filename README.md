@@ -567,6 +567,106 @@ npm run dev
 - **Error Tracking**: Automatic error logging
 - **Performance**: Built-in App Engine metrics
 
+## 💰 Cost Breakdown & Optimization
+
+This project uses the following GCP services and their associated costs:
+
+### Service Cost Distribution
+
+**Current Monthly Cost: ~$3-8/month** (varies with usage)
+
+| Service | % of Cost | Monthly Estimate | What It's For |
+|---------|-----------|------------------|---------------|
+| **Artifact Registry** | ~40-50% | $0.30-0.50 | Stores Docker images from deployments |
+| **Cloud Build** | ~30-40% | $0.50-2.00 | Builds and deploys app on each push to main |
+| **App Engine Standard** | ~10-20% | $0-0.50 | Hosts the application (F1 instance) |
+| **Cloud Storage** | ~5-10% | $0.10-0.30 | GitHub Actions artifacts & logs |
+
+**Note**: Supabase (database & file storage) costs are separate and not included above.
+
+### Cost Optimization Tips
+
+#### 1. Reduce Artifact Registry Storage (Save ~60%)
+```bash
+# Set up automatic cleanup policy (keeps last 5 images only)
+gcloud artifacts repositories set-cleanup-policies gae-standard \
+  --location=asia-east1 \
+  --policy=cleanup-policy.json
+
+# Create cleanup-policy.json:
+{
+  "rules": [{
+    "id": "keep-recent-5",
+    "action": "KEEP",
+    "mostRecentVersions": {
+      "keepCount": 5
+    }
+  }, {
+    "id": "delete-old",
+    "action": "DELETE",
+    "olderThan": "7d"
+  }]
+}
+
+# Or manually delete old images
+gcloud artifacts docker images list \
+  asia-east1-docker.pkg.dev/twogether-couples-app/gae-standard \
+  --format="value(IMAGE)" | head -n -5 | xargs -I {} gcloud artifacts docker images delete {} --quiet
+```
+
+#### 2. Reduce Build Frequency (Save ~70%)
+Your GitHub Actions currently triggers on every push to main. Consider:
+- **Batching commits**: Push less frequently, or use feature branches
+- **Skip CI for docs**: Add `[skip ci]` to commit messages for documentation-only changes
+- **Use pull requests**: Test on PRs before merging to main (workflow already has this)
+
+#### 3. Monitor Build Status
+```bash
+# Check recent builds
+gcloud builds list --limit=10
+
+# Check artifact registry usage
+gcloud artifacts repositories describe gae-standard --location=asia-east1
+
+# View current costs
+# Visit: https://console.cloud.google.com/billing/
+```
+
+#### 4. App Engine Optimization
+Your current setup is already optimized:
+- ✅ Using App Engine Standard (not Flex) - saves ~$50/month
+- ✅ `min_instances: 0` - scales to zero when idle
+- ✅ `max_instances: 1` - prevents unexpected scaling
+- ✅ `instance_class: F1` - smallest instance size
+
+### Why Costs Increased Recently
+
+Common causes of cost spikes:
+1. **Multiple failed builds**: Failed builds still consume Cloud Build minutes and create artifacts
+2. **Accumulated Docker images**: Old images not cleaned up (currently 3.26 GB)
+3. **Frequent deployments**: 20 builds in 2 days = excessive Cloud Build usage
+4. **Build timeouts**: Timeout builds (15 min each) consume maximum minutes
+
+### Cost Monitoring Dashboard
+
+Track your costs in real-time:
+1. Go to [GCP Billing Dashboard](https://console.cloud.google.com/billing/)
+2. Set up budget alerts for > $10/month
+3. Enable cost breakdown by service
+
+![Cost Breakdown Graph](https://i.imgur.com/example.png)
+
+### Expected Costs by Usage Level
+
+| Usage Level | Monthly Cost | Details |
+|-------------|--------------|---------|
+| **Development** | $0-2 | Few deployments, free tier covers most |
+| **Light Production** | $2-5 | 1-2 deployments/week, minimal traffic |
+| **Active Production** | $5-15 | Daily deployments, moderate traffic |
+| **Heavy Production** | $15+ | Multiple daily deployments, high traffic |
+
+**Pro Tip**: Most production apps with 100-500 MAU stay under $5/month with proper optimization.
+
 ## 🎛️ Scaling
 
 The app is designed for small to medium couple user bases:
