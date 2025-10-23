@@ -8,7 +8,7 @@ const router = express.Router();
 // All custom script routes require authentication
 router.use(authenticateToken);
 
-// Get custom scripts for user's couple
+// Get custom scripts for user's couple or personal scripts
 router.get('/', async (req, res) => {
   try {
     const userId = req.user.id;
@@ -19,24 +19,17 @@ router.get('/', async (req, res) => {
       [userId]
     );
 
-    if (coupleResult.rows.length === 0) {
-      return res.json({
-        success: true,
-        custom_scripts: []
-      });
-    }
+    const coupleId = coupleResult.rows.length > 0 ? coupleResult.rows[0].id : null;
 
-    const coupleId = coupleResult.rows[0].id;
-
-    // Get custom scripts for the couple
+    // Get custom scripts for the couple OR personal scripts created by this user
     const scriptsResult = await db.query(`
       SELECT
         id, title, category, scenario, content, tags, duration,
         created_by, created_at, updated_at
       FROM custom_scripts
-      WHERE couple_id = $1
+      WHERE couple_id = $1 OR (couple_id IS NULL AND created_by = $2)
       ORDER BY created_at DESC
-    `, [coupleId]);
+    `, [coupleId, userId]);
 
     const scripts = scriptsResult.rows.map(script => ({
       id: script.id,
@@ -101,20 +94,14 @@ router.post('/', [
     const { title, category, scenario, content, tags = [], duration = '15-30分鐘' } = req.body;
     const userId = req.user.id;
 
-    // Find user's couple
+    // Find user's couple (optional - users can create personal scripts)
     const coupleResult = await db.query(
       'SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1',
       [userId]
     );
 
-    if (coupleResult.rows.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: '您還沒有情侶關係，無法創建劇本'
-      });
-    }
-
-    const coupleId = coupleResult.rows[0].id;
+    // Use couple_id if exists, otherwise null for personal scripts
+    const coupleId = coupleResult.rows.length > 0 ? coupleResult.rows[0].id : null;
 
     // Insert custom script
     const scriptResult = await db.query(`
@@ -193,12 +180,16 @@ router.put('/:id', [
     const userId = req.user.id;
     const updates = req.body;
 
-    // Find user's couple and verify script ownership
+    // Verify script ownership - check if user created it or is in the couple
     const scriptResult = await db.query(`
-      SELECT cs.*, c.user1_id, c.user2_id
+      SELECT cs.*
       FROM custom_scripts cs
-      JOIN couples c ON cs.couple_id = c.id
-      WHERE cs.id = $1 AND (c.user1_id = $2 OR c.user2_id = $2)
+      LEFT JOIN couples c ON cs.couple_id = c.id
+      WHERE cs.id = $1 AND (
+        cs.created_by = $2 OR
+        c.user1_id = $2 OR
+        c.user2_id = $2
+      )
     `, [scriptId, userId]);
 
     if (scriptResult.rows.length === 0) {
@@ -277,12 +268,16 @@ router.delete('/:id', async (req, res) => {
     const scriptId = req.params.id;
     const userId = req.user.id;
 
-    // Find user's couple and verify script ownership
+    // Verify script ownership - check if user created it or is in the couple
     const scriptResult = await db.query(`
       SELECT cs.id
       FROM custom_scripts cs
-      JOIN couples c ON cs.couple_id = c.id
-      WHERE cs.id = $1 AND (c.user1_id = $2 OR c.user2_id = $2)
+      LEFT JOIN couples c ON cs.couple_id = c.id
+      WHERE cs.id = $1 AND (
+        cs.created_by = $2 OR
+        c.user1_id = $2 OR
+        c.user2_id = $2
+      )
     `, [scriptId, userId]);
 
     if (scriptResult.rows.length === 0) {

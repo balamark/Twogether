@@ -8,7 +8,7 @@ const router = express.Router();
 // All custom gift routes require authentication
 router.use(authenticateToken);
 
-// Get custom gifts for user's couple
+// Get custom gifts for user's couple or personal gifts
 router.get('/', async (req, res) => {
   try {
     const userId = req.user.id;
@@ -19,24 +19,17 @@ router.get('/', async (req, res) => {
       [userId]
     );
 
-    if (coupleResult.rows.length === 0) {
-      return res.json({
-        success: true,
-        custom_gifts: []
-      });
-    }
+    const coupleId = coupleResult.rows.length > 0 ? coupleResult.rows[0].id : null;
 
-    const coupleId = coupleResult.rows[0].id;
-
-    // Get custom gifts for the couple
+    // Get custom gifts for the couple OR personal gifts created by this user
     const giftsResult = await db.query(`
       SELECT
         id, title, description, cost, category, icon,
         created_by, created_at, updated_at
       FROM custom_gifts
-      WHERE couple_id = $1
+      WHERE couple_id = $1 OR (couple_id IS NULL AND created_by = $2)
       ORDER BY created_at DESC
-    `, [coupleId]);
+    `, [coupleId, userId]);
 
     const gifts = giftsResult.rows.map(gift => ({
       id: gift.id,
@@ -96,20 +89,14 @@ router.post('/', [
     const { title, description, cost, category, icon = '🎁' } = req.body;
     const userId = req.user.id;
 
-    // Find user's couple
+    // Find user's couple (optional - users can create personal gifts)
     const coupleResult = await db.query(
       'SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1',
       [userId]
     );
 
-    if (coupleResult.rows.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: '您還沒有情侶關係，無法創建禮品'
-      });
-    }
-
-    const coupleId = coupleResult.rows[0].id;
+    // Use couple_id if exists, otherwise null for personal gifts
+    const coupleId = coupleResult.rows.length > 0 ? coupleResult.rows[0].id : null;
 
     // Insert custom gift
     const giftResult = await db.query(`
@@ -183,12 +170,16 @@ router.put('/:id', [
     const userId = req.user.id;
     const updates = req.body;
 
-    // Find user's couple and verify gift ownership
+    // Verify gift ownership - check if user created it or is in the couple
     const giftResult = await db.query(`
-      SELECT cg.*, c.user1_id, c.user2_id
+      SELECT cg.*
       FROM custom_gifts cg
-      JOIN couples c ON cg.couple_id = c.id
-      WHERE cg.id = $1 AND (c.user1_id = $2 OR c.user2_id = $2)
+      LEFT JOIN couples c ON cg.couple_id = c.id
+      WHERE cg.id = $1 AND (
+        cg.created_by = $2 OR
+        c.user1_id = $2 OR
+        c.user2_id = $2
+      )
     `, [giftId, userId]);
 
     if (giftResult.rows.length === 0) {
@@ -262,12 +253,16 @@ router.delete('/:id', async (req, res) => {
     const giftId = req.params.id;
     const userId = req.user.id;
 
-    // Find user's couple and verify gift ownership
+    // Verify gift ownership - check if user created it or is in the couple
     const giftResult = await db.query(`
       SELECT cg.id
       FROM custom_gifts cg
-      JOIN couples c ON cg.couple_id = c.id
-      WHERE cg.id = $1 AND (c.user1_id = $2 OR c.user2_id = $2)
+      LEFT JOIN couples c ON cg.couple_id = c.id
+      WHERE cg.id = $1 AND (
+        cg.created_by = $2 OR
+        c.user1_id = $2 OR
+        c.user2_id = $2
+      )
     `, [giftId, userId]);
 
     if (giftResult.rows.length === 0) {
