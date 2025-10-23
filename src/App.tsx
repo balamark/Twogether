@@ -796,7 +796,20 @@ const LoveTimeApp = () => {
         // Load custom scripts from backend
         try {
           const scripts = await apiService.getCustomScripts();
-          setCustomScripts(scripts as any[]); // Type assertion for now
+          // Transform scripts to ensure they have the correct field names
+          const transformedScripts = (scripts as any[]).map((script: any) => ({
+            id: script.id,
+            title: script.title,
+            category: script.category,
+            scenario: script.scenario,
+            script: script.script || script.content, // Backend returns 'script', fallback to 'content' if needed
+            tags: script.tags || [],
+            duration: script.duration,
+            isCustom: script.isCustom ?? true,
+            createdBy: script.createdBy,
+            createdAt: script.createdAt
+          }));
+          setCustomScripts(transformedScripts);
         } catch (scriptError) {
           console.error('Failed to load custom scripts:', scriptError);
           // Fallback to localStorage
@@ -1112,14 +1125,28 @@ const LoveTimeApp = () => {
   const addCustomScript = async (title: string, category: 'romantic' | 'adventurous' | 'school' | 'bold', scenario: string, content: string, tags: string[] = []) => {
     try {
       // Create script via backend API
-      const newScript = await apiService.createCustomScript({
+      const rawScript = await apiService.createCustomScript({
         title,
         category,
         scenario,
         content: parseScriptContent(content),
         tags,
         duration: '15-30分鐘'
-      }) as RoleplayScript;
+      });
+
+      // Transform the response to match RoleplayScript interface
+      const newScript: RoleplayScript = {
+        id: (rawScript as any).id,
+        title: (rawScript as any).title,
+        category: (rawScript as any).category,
+        scenario: (rawScript as any).scenario,
+        script: (rawScript as any).script || (rawScript as any).content,
+        tags: (rawScript as any).tags || [],
+        duration: (rawScript as any).duration,
+        isCustom: true,
+        createdBy: (rawScript as any).createdBy,
+        createdAt: (rawScript as any).createdAt
+      };
 
       // Update local state
       setCustomScripts(prev => [...prev, newScript]);
