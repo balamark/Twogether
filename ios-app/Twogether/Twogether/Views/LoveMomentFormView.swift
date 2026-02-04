@@ -9,6 +9,8 @@ struct LoveMomentFormView: View {
     
     let moment: LocalLoveMoment?
     @Binding var isPresented: Bool
+    let initialDate: Date? = nil
+    let defaultActivity: ActivityType? = .intimate
     let onSave: () -> Void
     
     @State private var date = Date()
@@ -16,7 +18,7 @@ struct LoveMomentFormView: View {
     @State private var location = ""
     @State private var duration = ""
     @State private var selectedMood: MoodType?
-    @State private var selectedActivity: ActivityType?
+    @State private var selectedActivity: ActivityType? = .intimate
     @State private var isLoading = false
     @State private var errorMessage = ""
     @State private var showingPhotoPicker = false
@@ -34,14 +36,45 @@ struct LoveMomentFormView: View {
         users.first { !$0.isDeleted }
     }
     
-    private var isFormValid: Bool {
-        !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    }
+    private var isFormValid: Bool { true }
     
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 24) {
+                    // Hero
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "bolt.heart.fill")
+                                .foregroundColor(.white)
+                                .padding(10)
+                                .background(Color.white.opacity(0.2))
+                                .clipShape(Circle())
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("親密記錄")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                Text("以日曆記下每一次心跳，加深你們的親密節奏。")
+                                    .font(.subheadline)
+                                    .foregroundColor(.white.opacity(0.85))
+                            }
+                            Spacer()
+                        }
+                        
+                        HStack(spacing: 12) {
+                            chip(icon: "calendar", title: date.formatted(.dateTime.month().day()))
+                            chip(icon: "clock", title: date.formatted(.dateTime.hour().minute()))
+                            chip(icon: "heart.fill", title: (selectedActivity ?? .intimate).displayName)
+                        }
+                    }
+                    .padding()
+                    .background(
+                        LinearGradient(colors: [.pink, .purple], startPoint: .topLeading, endPoint: .bottomTrailing)
+                    )
+                    .cornerRadius(18)
+                    .shadow(color: .pink.opacity(0.25), radius: 12, x: 0, y: 6)
+                    
                     // Date Section
                     VStack(alignment: .leading, spacing: 12) {
                         SectionHeader(title: "When", icon: "calendar")
@@ -183,7 +216,7 @@ struct LoveMomentFormView: View {
                 }
                 .padding()
             }
-            .navigationTitle(isEditing ? "Edit Moment" : "New Moment")
+            .navigationTitle(isEditing ? "編輯親密記錄" : "新增親密記錄")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -196,7 +229,7 @@ struct LoveMomentFormView: View {
                     Button(isEditing ? "Update" : "Save") {
                         saveMoment()
                     }
-                    .disabled(!isFormValid || isLoading)
+                    .disabled(isLoading)
                     .fontWeight(.semibold)
                 }
             }
@@ -222,6 +255,14 @@ struct LoveMomentFormView: View {
             )
         }
         .onAppear {
+            if let initialDate, !isEditing {
+                date = initialDate
+            }
+            
+            if !isEditing {
+                selectedActivity = defaultActivity ?? .intimate
+            }
+            
             loadMomentData()
         }
         .photosPicker(
@@ -250,8 +291,7 @@ struct LoveMomentFormView: View {
     }
     
     private func saveMoment() {
-        guard isFormValid,
-              let couple = currentCouple,
+        guard let couple = currentCouple,
               let user = currentUser else { return }
         
         isLoading = true
@@ -260,15 +300,18 @@ struct LoveMomentFormView: View {
         Task {
             do {
                 let durationInt = Int(duration.trimmingCharacters(in: .whitespacesAndNewlines))
+                let trimmedDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
+                let finalDescription = trimmedDescription.isEmpty ? "親密時光" : trimmedDescription
+                let activityValue = selectedActivity?.rawValue ?? ActivityType.intimate.rawValue
                 
                 if let existingMoment = moment {
                     // Update existing moment
                     existingMoment.date = date
-                    existingMoment.desc = description.trimmingCharacters(in: .whitespacesAndNewlines)
+                    existingMoment.desc = finalDescription
                     existingMoment.location = location.isEmpty ? nil : location.trimmingCharacters(in: .whitespacesAndNewlines)
                     existingMoment.duration = durationInt
                     existingMoment.mood = selectedMood?.rawValue
-                    existingMoment.activityType = selectedActivity?.rawValue
+                    existingMoment.activityType = activityValue
                     existingMoment.updatedAt = Date()
                     existingMoment.isSynced = false
                     
@@ -280,11 +323,11 @@ struct LoveMomentFormView: View {
                         coupleId: couple.id,
                         userId: user.id,
                         date: date,
-                        desc: description.trimmingCharacters(in: .whitespacesAndNewlines),
+                        desc: finalDescription,
                         duration: durationInt,
                         mood: selectedMood?.rawValue,
                         location: location.isEmpty ? nil : location.trimmingCharacters(in: .whitespacesAndNewlines),
-                        activityType: selectedActivity?.rawValue
+                        activityType: activityValue
                     )
                     
                     await offlineManager.createLoveMoment(newMoment)
@@ -303,6 +346,21 @@ struct LoveMomentFormView: View {
                 }
             }
         }
+    }
+    
+    private func chip(icon: String, title: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.caption)
+            Text(title)
+                .font(.caption)
+                .fontWeight(.semibold)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.white.opacity(0.16))
+        .foregroundColor(.white)
+        .clipShape(Capsule())
     }
 }
 
