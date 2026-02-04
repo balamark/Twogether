@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
+const pairingService = require('../services/pairingService');
 
 const router = express.Router();
 
@@ -21,8 +22,12 @@ router.post('/', [
     .withMessage('請輸入有效的日期格式'),
   body('pairing_code')
     .optional()
-    .isLength({ min: 6, max: 6 })
-    .withMessage('配對碼必須是6個字符')
+    .isLength({ min: 6, max: 8 })
+    .withMessage('配對碼必須是6-8個字符'),
+  body('pairingCode')
+    .optional()
+    .isLength({ min: 6, max: 8 })
+    .withMessage('配對碼必須是6-8個字符')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -35,7 +40,8 @@ router.post('/', [
       });
     }
 
-    const { couple_name, anniversary_date, pairing_code } = req.body;
+    const { couple_name, anniversary_date } = req.body;
+    const pairing_code = req.body.pairing_code || req.body.pairingCode;
     const userId = req.user.id;
     
     console.info(`💕 User ${userId} attempting to ${pairing_code ? 'join couple with code' : 'create new couple'}`);
@@ -43,71 +49,79 @@ router.post('/', [
       console.info(`🔗 Pairing code: ${pairing_code}`);
     }
 
-    // Check if user is already in a couple
-    const existingCouple = await db.query(
-      'SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1',
-      [userId]
-    );
-
-    if (existingCouple.rows.length > 0) {
-      console.warn(`⚠️ User ${userId} already has a couple relationship: ${existingCouple.rows[0].id}`);
-      return res.status(409).json({
-        success: false,
-        message: '您已經在一個情侶關係中'
-      });
-    }
-
     if (pairing_code) {
-      // Join existing couple using pairing code
-      const pairingResult = await db.query(
-        'SELECT couple_id FROM pairing_codes WHERE code = $1 AND expires_at > NOW() AND used_at IS NULL',
-        [pairing_code]
-      );
+      // Pair using unified invite flow
+      const result = await pairingService.acceptPairingInviteByCode({
+        code: pairing_code,
+        accepter: req.user
+      });
 
-      if (pairingResult.rows.length === 0) {
-        return res.status(404).json({
+      if (result.requiresAuth) {
+        return res.status(401).json({
           success: false,
-          message: '無效或過期的配對碼'
+          message: '請先登入以完成配對',
+          error_code: 'AUTH_REQUIRED'
         });
       }
 
-      const coupleId = pairingResult.rows[0].couple_id;
-
-      // Update couple with second user
-      await db.transaction(async (client) => {
-        await client.query(
-          'UPDATE couples SET user2_id = $1 WHERE id = $2',
-          [userId, coupleId]
-        );
-
-        // Mark pairing code as used
-        await client.query(
-          'UPDATE pairing_codes SET used_at = NOW(), used_by = $2 WHERE code = $1',
-          [pairing_code, userId]
-        );
-      });
-
-      // Get updated couple info
       const coupleResult = await db.query(`
         SELECT 
-          c.id, c.couple_name, c.anniversary_date, c.created_at,
+          c.id, c.couple_name, c.anniversary_date, c.created_at, c.pending_conflicts,
           u1.id as user1_id, u1.nickname as user1_nickname,
           u2.id as user2_id, u2.nickname as user2_nickname
         FROM couples c
         JOIN users u1 ON c.user1_id = u1.id
         LEFT JOIN users u2 ON c.user2_id = u2.id
         WHERE c.id = $1
-      `, [coupleId]);
+      `, [result.coupleId]);
 
-      console.log(`✅ User ${userId} joined couple ${coupleId} with pairing code`);
+      console.log(`✅ User ${userId} joined couple ${result.coupleId} with pairing code`);
 
       return res.status(201).json({
         success: true,
         message: '成功加入情侶關係',
-        couple: coupleResult.rows[0]
+        couple: coupleResult.rows[0],
+        autoResolved: result.autoResolved,
+        pendingConflicts: result.pendingConflicts
       });
 
     } else {
+      // Check for existing couples (complete or draft)
+      const existingCouple = await db.query(
+        'SELECT id, user2_id FROM couples WHERE user1_id = $1 OR user2_id = $1 ORDER BY created_at DESC',
+        [userId]
+      );
+
+      if (existingCouple.rows.length > 0) {
+        const complete = existingCouple.rows.find((row) => row.user2_id);
+        if (complete) {
+          console.warn(`⚠️ User ${userId} already has a complete couple relationship: ${complete.id}`);
+          return res.status(409).json({
+            success: false,
+            message: '您已經在一個情侶關係中',
+            error_code: 'ALREADY_IN_COUPLE'
+          });
+        }
+
+        const draftId = existingCouple.rows[0].id;
+        const draftResult = await db.query(`
+          SELECT 
+            c.id, c.couple_name, c.anniversary_date, c.created_at,
+            u1.id as user1_id, u1.nickname as user1_nickname,
+            u2.id as user2_id, u2.nickname as user2_nickname
+          FROM couples c
+          JOIN users u1 ON c.user1_id = u1.id
+          LEFT JOIN users u2 ON c.user2_id = u2.id
+          WHERE c.id = $1
+        `, [draftId]);
+
+        return res.status(200).json({
+          success: true,
+          message: '已有未完成的情侶關係',
+          couple: draftResult.rows[0]
+        });
+      }
+
       // Create new couple
       const coupleId = uuidv4();
       const now = new Date().toISOString();
@@ -140,9 +154,10 @@ router.post('/', [
 
   } catch (error) {
     console.error('Create couple error:', error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
-      message: '創建情侶關係失敗'
+      message: error.message || '創建情侶關係失敗',
+      error_code: error.error_code
     });
   }
 });
@@ -153,130 +168,32 @@ router.post('/pairing-code', async (req, res) => {
     const userId = req.user.id;
     console.info(`🔗 User ${userId} requesting pairing code generation`);
 
-    // Check if user has a couple
-    let coupleResult = await db.query(
-      'SELECT id FROM couples WHERE user1_id = $1 AND user2_id IS NULL',
-      [userId]
-    );
-
-    let coupleId;
-    if (coupleResult.rows.length === 0) {
-      // Check if user is already in a complete couple
-      const existingCouple = await db.query(
-        'SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1',
-        [userId]
-      );
-
-      if (existingCouple.rows.length > 0) {
-        console.warn(`⚠️ User ${userId} already has a complete couple relationship`);
-        return res.status(409).json({
-          success: false,
-          message: '您已經在一個完整的情侶關係中',
-          error_code: 'ALREADY_IN_COUPLE'
-        });
-      }
-
-      // Create a new incomplete couple for this user
-      coupleId = uuidv4();
-      const now = new Date().toISOString();
-
-      await db.query(`
-        INSERT INTO couples (id, user1_id, created_at)
-        VALUES ($1, $2, $3)
-      `, [coupleId, userId, now]);
-
-      console.log(`✅ Created new incomplete couple ${coupleId} for user ${userId}`);
-    } else {
-      coupleId = coupleResult.rows[0].id;
-    }
-
-    // Generate 6-digit code
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-    // Delete existing codes for this couple
-    await db.query(
-      'DELETE FROM pairing_codes WHERE couple_id = $1',
-      [coupleId]
-    );
-
-    // Insert new pairing code
-    await db.query(
-      'INSERT INTO pairing_codes (code, couple_id, created_by, expires_at) VALUES ($1, $2, $3, $4)',
-      [code, coupleId, userId, expiresAt]
-    );
-
-    console.log(`✅ Pairing code generated for couple ${coupleId}: ${code}`);
+    const invitation = await pairingService.createPairingInvite({
+      senderId: userId,
+      senderEmail: req.user.email,
+      type: 'code'
+    });
 
     res.json({
       success: true,
-      code,
-      expires_at: expiresAt
+      code: invitation.shortCode,
+      token: invitation.token,
+      expires_at: invitation.expiresAt
     });
-
   } catch (error) {
     console.error('Generate pairing code error:', error);
-    res.status(500).json({
+    res.status(error.status || 500).json({
       success: false,
-      message: '生成配對碼失敗'
+      message: error.message || '生成配對碼失敗',
+      error_code: error.error_code
     });
   }
 });
 
 // Generate pairing code
 router.post('/generate-pairing-code', async (req, res) => {
-  try {
-    const userId = req.user.id;
-    console.info(`🔗 User ${userId} requesting pairing code generation`);
-
-    // Check if user has a couple
-    const coupleResult = await db.query(
-      'SELECT id FROM couples WHERE user1_id = $1 AND user2_id IS NULL',
-      [userId]
-    );
-
-    if (coupleResult.rows.length === 0) {
-      console.warn(`⚠️ User ${userId} tried to generate pairing code but has no incomplete couple`);
-      return res.status(404).json({
-        success: false,
-        message: '找不到可配對的情侶關係',
-        error_code: 'NO_INCOMPLETE_COUPLE'
-      });
-    }
-
-    const coupleId = coupleResult.rows[0].id;
-
-    // Generate 6-digit code
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-    // Delete existing codes for this couple
-    await db.query(
-      'DELETE FROM pairing_codes WHERE couple_id = $1',
-      [coupleId]
-    );
-
-    // Insert new pairing code
-    await db.query(
-      'INSERT INTO pairing_codes (code, couple_id, created_by, expires_at) VALUES ($1, $2, $3, $4)',
-      [code, coupleId, userId, expiresAt]
-    );
-
-    console.log(`✅ Pairing code generated for couple ${coupleId}: ${code}`);
-
-    res.json({
-      success: true,
-      code,
-      expires_at: expiresAt
-    });
-
-  } catch (error) {
-    console.error('Generate pairing code error:', error);
-    res.status(500).json({
-      success: false,
-      message: '生成配對碼失敗'
-    });
-  }
+  req.url = '/pairing-code';
+  return router.handle(req, res);
 });
 
 // Get couple info - primary endpoint that frontend calls
@@ -287,7 +204,7 @@ router.get('/', async (req, res) => {
 
     const result = await db.query(`
       SELECT
-        c.id, c.couple_name, c.anniversary_date, c.created_at,
+        c.id, c.couple_name, c.anniversary_date, c.created_at, c.pending_conflicts,
         c.first_meet_date, c.first_date, c.first_kiss_date, c.first_kiss_place, c.first_intimacy_date, c.first_intimacy_place,
         u1.id as user1_id, u1.nickname as user1_nickname,
         u2.id as user2_id, u2.nickname as user2_nickname

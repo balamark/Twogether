@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Heart, CheckCircle, X, AlertCircle, Mail } from 'lucide-react';
 import { apiService } from '../services/api';
 
@@ -9,7 +9,11 @@ interface PairingInvitationHandlerProps {
   onClose: () => void;
   authState: {
     isAuthenticated: boolean;
-    user: any;
+    user: {
+      id?: string;
+      email?: string;
+      nickname?: string;
+    } | null;
   };
   setShowAuthModal: (show: boolean) => void;
   showNotification: (notification: {
@@ -18,6 +22,18 @@ interface PairingInvitationHandlerProps {
     message: string;
     duration?: number;
   }) => void;
+}
+
+interface PairingInvitationDetails {
+  senderNickname: string;
+  recipientEmail?: string;
+  message?: string;
+  createdAt: string;
+  expiresAt: string;
+  status: string;
+  isExpired: boolean;
+  type?: string;
+  shortCode?: string;
 }
 
 const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
@@ -29,16 +45,13 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
   setShowAuthModal,
   showNotification
 }) => {
-  const [invitation, setInvitation] = useState<any>(null);
+  const [invitation, setInvitation] = useState<PairingInvitationDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [autoAccepted, setAutoAccepted] = useState(false);
 
-  useEffect(() => {
-    fetchInvitationDetails();
-  }, [token]);
-
-  const fetchInvitationDetails = async () => {
+  const fetchInvitationDetails = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -55,9 +68,21 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
-  const handleAccept = async () => {
+  useEffect(() => {
+    fetchInvitationDetails();
+    setAutoAccepted(false);
+  }, [fetchInvitationDetails]);
+
+  useEffect(() => {
+    if (authState.isAuthenticated && invitation && !invitation.isExpired && !autoAccepted && !processing) {
+      setAutoAccepted(true);
+      handleAccept();
+    }
+  }, [authState.isAuthenticated, invitation, autoAccepted, processing, handleAccept]);
+
+  const handleAccept = useCallback(async () => {
     if (!authState.isAuthenticated) {
       showNotification({
         type: 'info',
@@ -88,7 +113,9 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
       showNotification({
         type: 'success',
         title: '配對成功！',
-        message: response.message || '您已成功與伴侶配對',
+        message: response.autoResolved
+          ? '配對成功，我們已自動處理重複邀請'
+          : response.message || '您已成功與伴侶配對',
         duration: 8000
       });
 
@@ -105,7 +132,7 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
     } finally {
       setProcessing(false);
     }
-  };
+  }, [authState.isAuthenticated, onAccepted, setShowAuthModal, showNotification, token]);
 
   const handleReject = async () => {
     try {

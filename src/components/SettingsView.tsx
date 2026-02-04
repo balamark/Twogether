@@ -48,6 +48,7 @@ interface ApiErrorResponse {
     data?: ApiError;
   };
   message?: string;
+  error_code?: string;
 }
 
 interface Notification {
@@ -103,6 +104,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [invitationMessage, setInvitationMessage] = useState('');
   const [isSendingInvitation, setIsSendingInvitation] = useState(false);
 
+  const getApiErrorCode = (err: unknown) => {
+    const typed = err as ApiErrorResponse & { data?: ApiError; error_code?: string };
+    return typed?.error_code || typed?.response?.data?.error_code;
+  };
+
   // Load user's current gender from auth state when component mounts
   useEffect(() => {
     if (authState.user?.gender) {
@@ -131,9 +137,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         first_meet_date: meeting?.date || undefined,
         anniversary_date: firstDate?.date || undefined,
         first_kiss_date: firstKiss?.date || undefined,
-        first_kiss_place: (firstKiss as any)?.place || undefined,
+        first_kiss_place: firstKiss?.place || undefined,
         first_intimacy_date: firstSex?.date || undefined,
-        first_intimacy_place: (firstSex as any)?.place || undefined,
+        first_intimacy_place: firstSex?.place || undefined,
       });
       // Update auth state and local storage so Header/profile and couple status reflect immediately
       if (authState.user && onAuthStateUpdate) {
@@ -179,19 +185,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       });
     } catch (err: unknown) {
       console.error('Generate pairing code error:', err);
-      const apiError = (err as ApiErrorResponse)?.response?.data;
-      if (apiError?.error_code === 'ALREADY_PAIRED') {
+      const errorCode = getApiErrorCode(err);
+      if (errorCode === 'ALREADY_IN_COUPLE' || errorCode === 'ALREADY_PAIRED') {
         showNotification({
           type: 'error',
           title: '無法生成配對碼',
           message: '您已經有配對的伴侶了，無法生成新的配對碼',
-          duration: 8000
-        });
-      } else if (apiError?.error_code === 'CODE_EXISTS') {
-        showNotification({
-          type: 'error',
-          title: '配對碼已存在',
-          message: '您已有一個有效的配對碼，請等待其過期後再生成新的配對碼',
           duration: 8000
         });
       } else {
@@ -216,12 +215,23 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         });
         return;
       }
-      
-      const coupleResult = await apiService.createCouple({ pairingCode: pairingCode.trim() });
-      
-      // Update authentication state to reflect pairing
+
+      const acceptResult = await apiService.acceptPairingCode(pairingCode.trim());
+
+      if (acceptResult.requiresAuth) {
+        showNotification({
+          type: 'info',
+          title: '需要登入',
+          message: '請先登入以接受配對邀請',
+          duration: 6000
+        });
+        setShowAuthModal(true);
+        return;
+      }
+
+      const coupleResult = await apiService.getCouple();
+
       if (authState.user && onAuthStateUpdate) {
-        // Update nicknames based on couple information
         if (coupleResult.user1Nickname && coupleResult.user2Nickname) {
           const updatedNicknames = {
             partner1: coupleResult.user1Nickname,
@@ -237,54 +247,53 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           user: {
             ...authState.user,
             partnerId: coupleResult.id,
-            partnerNickname: coupleResult.user1Nickname !== authState.user.nickname 
-              ? coupleResult.user1Nickname 
+            partnerNickname: coupleResult.user1Nickname !== authState.user.nickname
+              ? coupleResult.user1Nickname
               : coupleResult.user2Nickname
           }
         };
-        
-        // Update local state and localStorage
+
         localStorage.setItem('authState', JSON.stringify(updatedAuthState));
-        
-        // Update parent component's auth state
         onAuthStateUpdate(updatedAuthState);
       }
-      
+
       showNotification({
         type: 'success',
         title: '配對成功！',
-        message: `您現在已經與 ${authState.user?.partnerNickname || '伴侶'} 連結`,
+        message: acceptResult.autoResolved
+          ? '配對成功，我們已自動處理重複邀請'
+          : `您現在已經與 ${authState.user?.partnerNickname || '伴侶'} 連結`,
         duration: 8000
       });
       setPairingCode('');
-      
+
     } catch (err: unknown) {
       console.error('Pair with code error:', err);
-      const apiError = (err as ApiErrorResponse)?.response?.data;
+      const errorCode = getApiErrorCode(err);
       
       // Handle specific error cases
-      if (apiError?.error_code === 'NOT_FOUND') {
+      if (errorCode === 'INVITATION_NOT_FOUND') {
         showNotification({
           type: 'error',
           title: '配對碼無效',
           message: '配對碼無效或已過期，請確認配對碼是否正確或請您的伴侶重新生成',
           duration: 8000
         });
-      } else if (apiError?.error_code === 'ALREADY_PAIRED') {
+      } else if (errorCode === 'ALREADY_IN_COUPLE' || errorCode === 'ALREADY_PAIRED') {
         showNotification({
           type: 'error',
           title: '無法配對',
           message: '您已經有配對的伴侶了，無法使用配對碼',
           duration: 8000
         });
-      } else if (apiError?.error_code === 'CODE_EXPIRED') {
+      } else if (errorCode === 'INVITATION_EXPIRED') {
         showNotification({
           type: 'error',
           title: '配對碼已過期',
           message: '此配對碼已過期，請您的伴侶重新生成',
           duration: 8000
         });
-      } else if (apiError?.error_code === 'SELF_PAIRING') {
+      } else if (errorCode === 'SELF_PAIRING') {
         showNotification({
           type: 'error',
           title: '無法自配對',
@@ -348,7 +357,36 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
     } catch (err: unknown) {
       console.error('Send email invitation error:', err);
+      const errorCode = getApiErrorCode(err);
       const errorMessage = (err as Error)?.message || '發送邀請失敗，請稍後再試';
+
+      if (errorCode === 'ALREADY_IN_COUPLE') {
+        showNotification({
+          type: 'error',
+          title: '無法發送邀請',
+          message: '您已經有配對的伴侶了，無法發送新的邀請',
+          duration: 8000
+        });
+        return;
+      }
+      if (errorCode === 'RECIPIENT_ALREADY_IN_COUPLE') {
+        showNotification({
+          type: 'error',
+          title: '對方已配對',
+          message: '這位用戶已經與其他人建立配對',
+          duration: 8000
+        });
+        return;
+      }
+      if (errorCode === 'INVITATION_ALREADY_SENT') {
+        showNotification({
+          type: 'info',
+          title: '已發送邀請',
+          message: '您已經向這個信箱發送過邀請，請等待對方回應',
+          duration: 8000
+        });
+        return;
+      }
 
       showNotification({
         type: 'error',
@@ -617,115 +655,116 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           {/* Generate Code Section */}
           {!authState.partnerConnected && (
             <>
-              <div className="mb-6">
-                <h4 className="text-lg font-medium mb-2">生成配對碼</h4>
-                <p className="text-gray-600 mb-4">
-                  生成一個配對碼並分享給您的伴侶，讓他們可以與您配對。
-                  配對碼有效期為24小時。
-                </p>
-                <button
-                  onClick={handleGenerateCode}
-                  className="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600 transition-colors"
-                >
-                  生成配對碼
-                </button>
-                {generatedCode && (
-                  <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                    <p className="text-gray-700">您的配對碼：</p>
-                    <div className="flex items-center space-x-2 mt-2">
-                      <span className="bg-yellow-200 px-3 py-1 rounded font-mono text-lg">
-                        {generatedCode}
-                      </span>
-                      <button
-                        onClick={() => navigator.clipboard.writeText(generatedCode)}
-                        className="text-yellow-600 hover:text-yellow-700"
-                      >
-                        複製
-                      </button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="border rounded-2xl p-5 bg-pink-50/30">
+                  <h4 className="text-lg font-medium mb-2">📧 透過電子郵件邀請</h4>
+                  <p className="text-gray-600 mb-4">
+                    直接透過電子郵件向您的伴侶發送配對邀請，對方只需點擊郵件中的連結即可接受配對。
+                  </p>
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="recipient-email" className="block text-sm font-medium text-gray-700 mb-2">
+                        伴侶的電子郵件地址
+                      </label>
+                      <input
+                        id="recipient-email"
+                        type="email"
+                        value={recipientEmail}
+                        onChange={(e) => setRecipientEmail(e.target.value)}
+                        placeholder="例如：partner@example.com"
+                        className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                        disabled={isSendingInvitation}
+                      />
                     </div>
-                    <p className="text-sm text-gray-500 mt-2">
-                      此配對碼將在24小時後失效
-                    </p>
-                  </div>
-                )}
-              </div>
 
-              {/* Email Invitation Section */}
-              <div className="border-t pt-6">
-                <h4 className="text-lg font-medium mb-2">📧 透過電子郵件邀請</h4>
-                <p className="text-gray-600 mb-4">
-                  直接透過電子郵件向您的伴侶發送配對邀請，對方只需點擊郵件中的連結即可接受配對。
-                </p>
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="recipient-email" className="block text-sm font-medium text-gray-700 mb-2">
-                      伴侶的電子郵件地址
-                    </label>
-                    <input
-                      id="recipient-email"
-                      type="email"
-                      value={recipientEmail}
-                      onChange={(e) => setRecipientEmail(e.target.value)}
-                      placeholder="例如：partner@example.com"
-                      className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                      disabled={isSendingInvitation}
-                    />
-                  </div>
+                    <div>
+                      <label htmlFor="invitation-message" className="block text-sm font-medium text-gray-700 mb-2">
+                        個人訊息 (選填)
+                      </label>
+                      <textarea
+                        id="invitation-message"
+                        value={invitationMessage}
+                        onChange={(e) => setInvitationMessage(e.target.value)}
+                        placeholder="想對伴侶說的話..."
+                        rows={3}
+                        maxLength={500}
+                        className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"
+                        disabled={isSendingInvitation}
+                      />
+                      <p className="text-xs text-gray-500 mt-1">
+                        {invitationMessage.length}/500 字符
+                      </p>
+                    </div>
 
-                  <div>
-                    <label htmlFor="invitation-message" className="block text-sm font-medium text-gray-700 mb-2">
-                      個人訊息 (選填)
-                    </label>
-                    <textarea
-                      id="invitation-message"
-                      value={invitationMessage}
-                      onChange={(e) => setInvitationMessage(e.target.value)}
-                      placeholder="想對伴侶說的話..."
-                      rows={3}
-                      maxLength={500}
-                      className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"
-                      disabled={isSendingInvitation}
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      {invitationMessage.length}/500 字符
-                    </p>
+                    <button
+                      onClick={handleSendEmailInvitation}
+                      disabled={isSendingInvitation || !recipientEmail.trim()}
+                      className={`w-full py-3 rounded-lg font-medium transition-colors ${
+                        isSendingInvitation || !recipientEmail.trim()
+                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                          : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:from-pink-600 hover:to-rose-600'
+                      }`}
+                    >
+                      {isSendingInvitation ? '發送中...' : '💌 發送邀請'}
+                    </button>
                   </div>
-
-                  <button
-                    onClick={handleSendEmailInvitation}
-                    disabled={isSendingInvitation || !recipientEmail.trim()}
-                    className={`w-full py-3 rounded-lg font-medium transition-colors ${
-                      isSendingInvitation || !recipientEmail.trim()
-                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                        : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:from-pink-600 hover:to-rose-600'
-                    }`}
-                  >
-                    {isSendingInvitation ? '發送中...' : '💌 發送邀請'}
-                  </button>
                 </div>
-              </div>
 
-              {/* Enter Code Section */}
-              <div className="border-t pt-6">
-                <h4 className="text-lg font-medium mb-2">輸入配對碼</h4>
-                <p className="text-gray-600 mb-4">
-                  如果您的伴侶已經生成了配對碼，請在此輸入以完成配對。
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={pairingCode}
-                    onChange={(e) => setPairingCode(e.target.value.toUpperCase())}
-                    placeholder="輸入配對碼"
-                    className="flex-1 border rounded px-3 py-2 font-mono"
-                    maxLength={8}
-                  />
-                  <button
-                    onClick={handlePairWithCode}
-                    className="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600 transition-colors"
-                  >
-                    配對
-                  </button>
+                <div className="border rounded-2xl p-5 bg-yellow-50/40">
+                  <h4 className="text-lg font-medium mb-2">🔑 透過配對碼</h4>
+                  <p className="text-gray-600 mb-4">
+                    生成配對碼並分享給您的伴侶，或輸入伴侶的配對碼完成配對。
+                  </p>
+                  <div className="space-y-4">
+                    <button
+                      onClick={handleGenerateCode}
+                      className="w-full bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600 transition-colors"
+                    >
+                      生成配對碼
+                    </button>
+                    {generatedCode && (
+                      <div className="p-4 bg-white rounded-lg border">
+                        <p className="text-gray-700">您的配對碼：</p>
+                        <div className="flex items-center space-x-2 mt-2">
+                          <span className="bg-yellow-200 px-3 py-1 rounded font-mono text-lg">
+                            {generatedCode}
+                          </span>
+                          <button
+                            onClick={() => navigator.clipboard.writeText(generatedCode)}
+                            className="text-yellow-600 hover:text-yellow-700"
+                          >
+                            複製
+                          </button>
+                        </div>
+                        <p className="text-sm text-gray-500 mt-2">
+                          此配對碼將在24小時後失效
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="border-t pt-4">
+                      <label htmlFor="pairing-code-input" className="block text-sm font-medium text-gray-700 mb-2">
+                        輸入伴侶配對碼
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          id="pairing-code-input"
+                          type="text"
+                          value={pairingCode}
+                          onChange={(e) => setPairingCode(e.target.value.toUpperCase())}
+                          placeholder="輸入配對碼"
+                          className="flex-1 border rounded px-3 py-2 font-mono"
+                          maxLength={8}
+                        />
+                        <button
+                          onClick={handlePairWithCode}
+                          className="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600 transition-colors"
+                        >
+                          配對
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </>

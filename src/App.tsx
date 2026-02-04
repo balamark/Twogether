@@ -320,21 +320,6 @@ const LoveTimeApp = () => {
     localStorage.setItem('nicknames', JSON.stringify(nicknames));
   }, [nicknames]);
 
-  // Check for pairing invitation token in URL params
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get('token');
-
-    if (token) {
-      setPairingInvitationToken(token);
-      setShowPairingInvitation(true);
-
-      // Clean up URL to remove token after processing
-      const newUrl = window.location.pathname;
-      window.history.replaceState({}, document.title, newUrl);
-    }
-  }, []);
-
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [roleplayFilter, setRoleplayFilter] = useState('all');
@@ -347,6 +332,10 @@ const LoveTimeApp = () => {
     partnerConnected: false
   });
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showPairingPrompt, setShowPairingPrompt] = useState(false);
+  const [pairingPromptDismissed, setPairingPromptDismissed] = useState(
+    localStorage.getItem('pairingPromptDismissed') === 'true'
+  );
 
   const [customScripts, setCustomScripts] = useState<RoleplayScript[]>([]);
   const [showScriptUploadModal, setShowScriptUploadModal] = useState(false);
@@ -357,6 +346,31 @@ const LoveTimeApp = () => {
   // Pairing invitation states
   const [pairingInvitationToken, setPairingInvitationToken] = useState<string | null>(null);
   const [showPairingInvitation, setShowPairingInvitation] = useState(false);
+  // Check for pairing invitation token in URL params
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+
+    if (token) {
+      setPairingInvitationToken(token);
+      setShowPairingInvitation(true);
+      localStorage.setItem('pairingInviteToken', token);
+
+      // Clean up URL to remove token after processing
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!pairingInvitationToken) {
+      const storedToken = localStorage.getItem('pairingInviteToken');
+      if (storedToken) {
+        setPairingInvitationToken(storedToken);
+        setShowPairingInvitation(true);
+      }
+    }
+  }, [pairingInvitationToken]);
   const [journeyMilestones, setJourneyMilestones] = useState<JourneyMilestone[]>([
     {
       id: 'meeting',
@@ -530,9 +544,59 @@ const LoveTimeApp = () => {
     }
   };
 
-  const handlePartnerConnect = (partnerCode: string) => {
-    // Implementation here
-    console.log('Connecting with partner code:', partnerCode);
+  useEffect(() => {
+    if (authState.isAuthenticated && !authState.partnerConnected && !pairingPromptDismissed) {
+      setShowPairingPrompt(true);
+    } else {
+      setShowPairingPrompt(false);
+    }
+  }, [authState.isAuthenticated, authState.partnerConnected, pairingPromptDismissed]);
+
+  const handlePartnerConnect = async (partnerCode: string) => {
+    try {
+      const result = await apiService.acceptPairingCode(partnerCode.trim());
+
+      if (result.requiresAuth) {
+        showNotification({
+          type: 'info',
+          title: '需要登入',
+          message: '請先登入以接受配對邀請',
+          duration: 6000
+        });
+        return;
+      }
+
+      showNotification({
+        type: 'success',
+        title: '配對成功！',
+        message: result.autoResolved
+          ? '配對成功，我們已自動處理重複邀請'
+          : '您已成功與伴侶配對',
+        duration: 8000
+      });
+
+      setShowAuthModal(false);
+      window.location.reload();
+    } catch (error: unknown) {
+      const errorCode = (error as { error_code?: string })?.error_code;
+
+      if (errorCode === 'INVITATION_NOT_FOUND') {
+        showNotification({
+          type: 'error',
+          title: '配對碼無效',
+          message: '配對碼無效或已過期，請確認後再試',
+          duration: 8000
+        });
+        return;
+      }
+
+      showNotification({
+        type: 'error',
+        title: '配對失敗',
+        message: (error as Error)?.message || '配對失敗，請稍後再試',
+        duration: 8000
+      });
+    }
   };
 
   const handleLogout = async () => {
@@ -561,6 +625,7 @@ const LoveTimeApp = () => {
   const handlePairingInvitationAccepted = () => {
     setShowPairingInvitation(false);
     setPairingInvitationToken(null);
+    localStorage.removeItem('pairingInviteToken');
 
     // Refresh auth state to get updated couple information
     if (authState.isAuthenticated) {
@@ -572,11 +637,13 @@ const LoveTimeApp = () => {
   const handlePairingInvitationRejected = () => {
     setShowPairingInvitation(false);
     setPairingInvitationToken(null);
+    localStorage.removeItem('pairingInviteToken');
   };
 
   const handlePairingInvitationClosed = () => {
     setShowPairingInvitation(false);
     setPairingInvitationToken(null);
+    localStorage.removeItem('pairingInviteToken');
   };
 
   // Coin activities configuration
@@ -3188,6 +3255,38 @@ const LoveTimeApp = () => {
           setShowAuthModal={setShowAuthModal}
           showNotification={showNotification}
         />
+      )}
+
+      {showPairingPrompt && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-40 p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl">
+            <h2 className="text-xl font-bold text-gray-800 mb-2">先完成配對吧</h2>
+            <p className="text-gray-600 mb-6">
+              邀請伴侶加入後，你們的日曆、回憶與成就就能同步在一起。
+            </p>
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  setCurrentView('settings');
+                  setShowPairingPrompt(false);
+                }}
+                className="w-full bg-gradient-to-r from-pink-500 to-rose-600 text-white py-3 rounded-lg hover:from-pink-600 hover:to-rose-700 transition-colors"
+              >
+                前往配對
+              </button>
+              <button
+                onClick={() => {
+                  setShowPairingPrompt(false);
+                  setPairingPromptDismissed(true);
+                  localStorage.setItem('pairingPromptDismissed', 'true');
+                }}
+                className="w-full text-gray-500 hover:text-gray-700 py-2"
+              >
+                稍後再說
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="container mx-auto px-4 py-8">
