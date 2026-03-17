@@ -1531,26 +1531,32 @@ const LoveTimeApp = () => {
 
     return (
       <div className="space-y-6">
-        <div className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-6 rounded-2xl">
-          <h2 className="text-2xl font-bold mb-4">愛的日曆</h2>
+        <div className="bg-white border border-stone-200 p-6 rounded-2xl">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h2 className="font-display text-2xl font-semibold text-stone-900">愛的日曆</h2>
+              <p className="text-stone-400 text-sm mt-0.5">記錄你們的親密時光</p>
+            </div>
+            <div className="w-1 h-8 bg-rose-500 rounded-full" />
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-2">選擇日期</label>
+              <label className="block text-xs font-medium text-stone-500 uppercase tracking-wider mb-2">選擇日期</label>
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full p-3 rounded-lg text-gray-800"
+                className="w-full p-3 rounded-xl border border-stone-200 text-stone-800 focus:ring-2 focus:ring-rose-500 focus:border-transparent bg-stone-50"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">親密時刻</label>
+              <label className="block text-xs font-medium text-stone-500 uppercase tracking-wider mb-2">親密時刻</label>
               <button
                 onClick={() => {
                   setRecordForm({...recordForm, date: selectedDate});
                   setShowRecordModal(true);
                 }}
-                className="w-full bg-white text-pink-600 p-3 rounded-lg font-medium hover:bg-pink-50 transition-colors"
+                className="w-full bg-rose-500 hover:bg-rose-600 text-white p-3 rounded-xl font-medium transition-colors"
               >
                 記錄今天的愛 ❤️
               </button>
@@ -1835,17 +1841,22 @@ const LoveTimeApp = () => {
 
   const GamesView = () => (
     <div className="space-y-6">
-      <div className="bg-gradient-to-r from-purple-500 to-pink-600 text-white p-6 rounded-2xl">
-        <h2 className="text-2xl font-bold mb-2">情趣遊戲</h2>
-        <p className="text-purple-100">增進彼此感情的有趣活動</p>
+      <div className="bg-white border border-stone-200 p-6 rounded-2xl">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-display text-2xl font-semibold text-stone-900">情趣遊戲</h2>
+            <p className="text-stone-400 text-sm mt-0.5">增進彼此感情的有趣活動</p>
+          </div>
+          <div className="w-1 h-8 bg-rose-500 rounded-full" />
+        </div>
       </div>
 
       <div className="space-y-6">
         {romanticGames.map((game, index) => (
-          <div key={index} className="bg-white rounded-2xl shadow-lg p-6">
+          <div key={index} className="bg-white rounded-2xl border border-stone-200 p-6 hover:border-stone-300 transition-colors">
             <div className="flex items-start space-x-4 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-5 h-5 text-rose-500" />
               </div>
               <div className="flex-1">
                 <h3 className="text-xl font-bold text-gray-800 mb-2">{game.title}</h3>
@@ -1854,16 +1865,16 @@ const LoveTimeApp = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-pink-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-gray-800 mb-3">遊戲步驟：</h4>
+              <div className="bg-stone-50 p-4 rounded-xl border border-stone-100">
+                <h4 className="font-semibold text-stone-700 mb-3 text-sm uppercase tracking-wider">遊戲步驟</h4>
                 <ul className="space-y-2">
                   {game.instructions.map((instruction, i) => (
-                    <li key={i} className="text-sm text-gray-700">{instruction}</li>
+                    <li key={i} className="text-sm text-stone-600 flex gap-2"><span className="text-rose-400 font-medium">{i + 1}.</span>{instruction}</li>
                   ))}
                 </ul>
               </div>
 
-              <div className="bg-purple-50 p-4 rounded-lg">
+              <div className="bg-rose-50 p-4 rounded-xl border border-rose-100">
                 <h4 className="font-semibold text-gray-800 mb-3">
                   {game.questions ? '問題範例：' : 
                    game.tips ? '小貼士：' : 
@@ -1886,17 +1897,22 @@ const LoveTimeApp = () => {
 
   const ConflictView = () => (
     <div className="space-y-6">
-      <div className="bg-gradient-to-r from-green-500 to-teal-600 text-white p-6 rounded-2xl">
-        <h2 className="text-2xl font-bold mb-2">和諧相處</h2>
-        <p className="text-green-100">化解矛盾，增進理解</p>
+      <div className="bg-white border border-stone-200 p-6 rounded-2xl">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-display text-2xl font-semibold text-stone-900">和諧相處</h2>
+            <p className="text-stone-400 text-sm mt-0.5">化解矛盾，增進理解</p>
+          </div>
+          <div className="w-1 h-8 bg-sage-500 rounded-full" />
+        </div>
       </div>
 
       <div className="space-y-4">
         {conflictResolutions.map((solution, index) => (
-          <div key={index} className="bg-white rounded-2xl shadow-lg p-6">
+          <div key={index} className="bg-white rounded-2xl border border-stone-200 p-6 hover:border-stone-300 transition-colors">
             <div className="flex items-start space-x-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-teal-600 rounded-full flex items-center justify-center">
-                <MessageCircle className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 bg-sage-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                <MessageCircle className="w-5 h-5 text-sage-600" />
               </div>
               <div className="flex-1">
                 <h3 className="text-lg font-bold text-gray-800 mb-2">{solution.title}</h3>
@@ -2296,34 +2312,34 @@ const LoveTimeApp = () => {
 
     return (
       <div className="space-y-6">
-        <div className="bg-gradient-to-r from-yellow-500 to-orange-600 text-white p-6 rounded-2xl">
+        <div className="bg-white border border-stone-200 p-6 rounded-2xl">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold mb-2 flex items-center">
-                <ShoppingBag className="mr-2" />
+              <h2 className="font-display text-2xl font-semibold text-stone-900 flex items-center gap-2">
+                <ShoppingBag className="w-6 h-6 text-amber-500" />
                 金幣商店
               </h2>
-              <p className="text-yellow-100">用愛賺來的金幣兌換特別禮品</p>
+              <p className="text-stone-400 text-sm mt-0.5">用愛賺來的金幣兌換特別禮品</p>
             </div>
-            <div className="text-right">
-              <div className="flex items-center space-x-2 bg-white bg-opacity-20 px-4 py-2 rounded-full mb-2">
-                <Coins className="w-5 h-5" />
-                <span className="font-bold text-xl">{totalCoins}</span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 px-3 py-1.5 rounded-full text-sm font-medium">
+                <Coins className="w-4 h-4" />
+                <span className="font-bold">{totalCoins}</span>
               </div>
               <button
                 onClick={() => setShowAddGiftModal(true)}
-                className="bg-white bg-opacity-20 hover:bg-opacity-30 px-3 py-1 rounded-full text-sm flex items-center space-x-1"
+                className="flex items-center gap-1 text-stone-500 hover:text-stone-800 border border-stone-200 hover:border-stone-300 px-3 py-1.5 rounded-full text-sm transition-colors"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5" />
                 <span>自訂禮品</span>
               </button>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {allGifts.map((gift) => (
-            <div key={gift.id} className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+            <div key={gift.id} className="bg-white rounded-2xl border border-stone-200 p-6 hover:border-stone-300 hover:shadow-card-hover transition-all">
               <div className="text-center mb-4">
                 <div className="text-4xl mb-2">{gift.icon}</div>
                 <h3 className="text-lg font-bold text-gray-800">{gift.title}</h3>
@@ -2662,52 +2678,52 @@ const LoveTimeApp = () => {
 
     return (
       <div className="space-y-6">
-        <div className="bg-gradient-to-r from-pink-500 to-rose-600 text-white p-6 rounded-2xl">
+        <div className="bg-white border border-stone-200 p-6 rounded-2xl">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-2xl font-bold mb-2 flex items-center">
-                <Sparkles className="mr-2" />
+              <h2 className="font-display text-2xl font-semibold text-stone-900 flex items-center gap-2">
+                <Sparkles className="w-6 h-6 text-rose-500" />
                 前戲與探索
               </h2>
-              <p className="text-pink-100">增進親密感的活動和建議</p>
+              <p className="text-stone-400 text-sm mt-0.5">增進親密感的活動和建議</p>
             </div>
-            <div className="flex items-center space-x-2 bg-white bg-opacity-20 px-4 py-2 rounded-full">
-              <Coins className="w-5 h-5" />
-              <span className="font-bold">{totalCoins}</span>
+            <div className="flex items-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 px-3 py-1.5 rounded-full text-sm font-medium">
+              <Coins className="w-4 h-4" />
+              <span>{totalCoins}</span>
             </div>
           </div>
         </div>
 
         {/* Foreplay Activities */}
-        <div className="bg-white rounded-2xl shadow-lg p-6">
-          <h3 className="text-xl font-semibold text-gray-800 mb-4">前戲活動</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white rounded-2xl border border-stone-200 p-6">
+          <h3 className="font-display text-lg font-semibold text-stone-800 mb-4 pb-2 border-b border-stone-100">前戲活動</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {foreplayActivities.map((activity, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+              <div key={index} className="border border-stone-200 rounded-xl p-4 hover:border-stone-300 hover:shadow-card transition-all">
                 <div className="flex justify-between items-start mb-3">
-                  <h4 className="text-lg font-semibold text-pink-700">{activity.title}</h4>
-                  <div className="flex items-center space-x-1 text-yellow-600">
-                    <Coins className="w-4 h-4" />
-                    <span className="font-bold">+{activity.coins}</span>
+                  <h4 className="text-base font-semibold text-stone-800">{activity.title}</h4>
+                  <div className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full text-xs font-medium">
+                    <Coins className="w-3 h-3" />
+                    <span>+{activity.coins}</span>
                   </div>
                 </div>
-                <p className="text-gray-600 mb-3">{activity.description}</p>
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-sm text-gray-500 flex items-center">
-                    <Clock className="w-4 h-4 mr-1" />
+                <p className="text-stone-500 text-sm mb-3">{activity.description}</p>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs text-stone-400 flex items-center gap-1">
+                    <Clock className="w-3.5 h-3.5" />
                     {activity.duration}
                   </span>
                   <button
                     onClick={() => handleTryActivity(activity)}
-                    className="bg-gradient-to-r from-pink-500 to-rose-600 text-white px-4 py-2 rounded-full hover:from-pink-600 hover:to-rose-700 transition-colors flex items-center space-x-2"
+                    className="bg-stone-900 hover:bg-stone-700 text-white px-3 py-1.5 rounded-full text-xs font-medium transition-colors flex items-center gap-1.5"
                   >
-                    <Play className="w-4 h-4" />
+                    <Play className="w-3 h-3" />
                     <span>嘗試</span>
                   </button>
                 </div>
                 <button
                   onClick={() => setSelectedActivity(activity)}
-                  className="text-pink-600 text-sm hover:text-pink-700"
+                  className="text-rose-500 text-xs hover:text-rose-600 font-medium"
                 >
                   查看詳細提示 →
                 </button>
@@ -2717,38 +2733,38 @@ const LoveTimeApp = () => {
         </div>
 
         {/* Position Suggestions */}
-        <div className="bg-white rounded-2xl shadow-lg p-6">
-          <h3 className="text-xl font-semibold text-gray-800 mb-4">姿勢建議</h3>
+        <div className="bg-white rounded-2xl border border-stone-200 p-6">
+          <h3 className="font-display text-lg font-semibold text-stone-800 mb-4 pb-2 border-b border-stone-100">姿勢建議</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {positionSuggestions.map((position, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+              <div key={index} className="border border-stone-200 rounded-xl p-4 hover:border-stone-300 transition-all">
                 <div className="flex justify-between items-start mb-2">
-                  <h4 className="text-lg font-semibold text-pink-700">{position.name}</h4>
-                  <div className="flex items-center space-x-1 text-yellow-600">
-                    <Coins className="w-4 h-4" />
-                    <span className="font-bold">+{position.coins}</span>
+                  <h4 className="text-base font-semibold text-stone-800">{position.name}</h4>
+                  <div className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full text-xs font-medium">
+                    <Coins className="w-3 h-3" />
+                    <span>+{position.coins}</span>
                   </div>
                 </div>
                 <div className="mb-3">
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    position.difficulty === '簡單' ? 'bg-green-100 text-green-800' :
-                    position.difficulty === '中等' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    position.difficulty === '簡單' ? 'bg-sage-50 text-sage-700 border border-sage-200' :
+                    position.difficulty === '中等' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                    'bg-rose-50 text-rose-700 border border-rose-200'
                   }`}>
                     {position.difficulty}
                   </span>
                 </div>
-                <p className="text-gray-600 text-sm mb-3">{position.description}</p>
+                <p className="text-stone-500 text-sm mb-3">{position.description}</p>
                 <div className="flex justify-between items-center">
                   <button
                     onClick={() => setSelectedPosition(position)}
-                    className="text-pink-600 text-sm hover:text-pink-700"
+                    className="text-rose-500 text-xs hover:text-rose-600 font-medium"
                   >
                     詳細資訊
                   </button>
                   <button
                     onClick={() => handleTryPosition(position)}
-                    className="bg-gradient-to-r from-pink-500 to-rose-600 text-white px-3 py-1 rounded-full text-sm hover:from-pink-600 hover:to-rose-700 transition-colors"
+                    className="bg-stone-900 hover:bg-stone-700 text-white px-3 py-1 rounded-full text-xs font-medium transition-colors"
                   >
                     嘗試
                   </button>
@@ -2866,29 +2882,26 @@ const LoveTimeApp = () => {
 
     return (
       <div className="space-y-6">
-        <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white p-6 rounded-2xl">
-          <h2 className="text-2xl font-bold mb-2">我們的愛情旅程</h2>
-          <p className="text-emerald-100">記錄每個重要的時刻和里程碑</p>
+        <div className="bg-white border border-stone-200 p-6 rounded-2xl">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-display text-2xl font-semibold text-stone-900">我們的愛情旅程</h2>
+              <p className="text-stone-400 text-sm mt-0.5">記錄每個重要的時刻和里程碑</p>
+            </div>
+            <div className="w-1 h-8 bg-sage-500 rounded-full" />
+          </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-6">
+        <div className="bg-white rounded-2xl border border-stone-200 p-6">
           <div className="relative">
             {/* Timeline Line */}
-            <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gradient-to-b from-pink-500 to-purple-600"></div>
-            
+            <div className="absolute left-8 top-0 bottom-0 w-px bg-stone-200"></div>
+
             <div className="space-y-8">
               {sortedMilestones.map((milestone) => (
                 <div key={milestone.id} className="relative flex items-start space-x-6">
                   {/* Timeline Node */}
-                  <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white font-bold relative z-10 ${
-                    milestone.type === 'meeting' ? 'bg-gradient-to-br from-pink-500 to-rose-600' :
-                    milestone.type === 'first_date' ? 'bg-gradient-to-br from-purple-500 to-indigo-600' :
-                    milestone.type === 'first_kiss' ? 'bg-gradient-to-br from-teal-500 to-cyan-600' :
-                    milestone.type === 'first_sex' ? 'bg-gradient-to-br from-pink-500 to-purple-600' :
-                    milestone.type === 'marriage' ? 'bg-gradient-to-br from-orange-500 to-red-600' :
-                    milestone.type === 'child_born' ? 'bg-gradient-to-br from-green-500 to-teal-600' :
-                    'bg-gradient-to-br from-blue-500 to-indigo-600'
-                  }`}>
+                  <div className="w-16 h-16 rounded-2xl bg-white border-2 border-stone-200 flex items-center justify-center text-2xl relative z-10 flex-shrink-0">
                     {milestone.type === 'meeting' ? '💕' :
                      milestone.type === 'first_date' ? '🌹' :
                      milestone.type === 'first_kiss' ? '💋' :
@@ -2899,31 +2912,31 @@ const LoveTimeApp = () => {
                   </div>
 
                   {/* Content */}
-                  <div className="flex-1 bg-gray-50 rounded-lg p-6">
+                  <div className="flex-1 bg-stone-50 border border-stone-200 rounded-xl p-5">
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <h3 className="text-lg font-bold text-gray-800">{milestone.title}</h3>
-                        <p className="text-sm text-gray-500">
+                        <h3 className="font-semibold text-stone-900">{milestone.title}</h3>
+                        <p className="text-sm text-stone-400 mt-0.5">
                           {milestone.date || (milestone.place ? '—' : '')}
                         </p>
                         {milestone.place && (
-                          <p className="text-sm text-gray-500">地點：{milestone.place}</p>
+                          <p className="text-sm text-stone-400">地點：{milestone.place}</p>
                         )}
                       </div>
                       {milestone.count && (
-                        <span className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium">
+                        <span className="bg-rose-500 text-white px-2.5 py-0.5 rounded-full text-xs font-medium">
                           第 {milestone.count} 次
                         </span>
                       )}
                     </div>
-                    <p className="text-gray-700 mb-4">{milestone.description}</p>
-                    
+                    <p className="text-stone-600 text-sm mb-3">{milestone.description}</p>
+
                     {milestone.recordId && (
                       <button
                         onClick={() => handleMilestoneClick(milestone)}
-                        className="inline-flex items-center text-pink-600 hover:text-pink-700 font-medium text-sm"
+                        className="inline-flex items-center text-rose-500 hover:text-rose-600 font-medium text-sm gap-1"
                       >
-                        <Heart className="w-4 h-4 mr-1" />
+                        <Heart className="w-3.5 h-3.5" />
                         查看詳細記錄
                       </button>
                     )}
@@ -2933,9 +2946,9 @@ const LoveTimeApp = () => {
             </div>
 
             {/* Future Milestones Preview */}
-            <div className="mt-8 p-6 bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg border-2 border-dashed border-pink-200">
-              <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                <Sparkles className="w-5 h-5 mr-2 text-pink-500" />
+            <div className="mt-8 p-6 bg-stone-50 border-2 border-dashed border-stone-300 rounded-xl">
+              <h3 className="font-display text-base font-semibold text-stone-700 mb-4 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-rose-400" />
                 即將到來的里程碑
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2945,17 +2958,17 @@ const LoveTimeApp = () => {
                   { count: 50, achieved: intimateRecords.length >= 50 },
                   { count: 100, achieved: intimateRecords.length >= 100 }
                 ].map(({ count, achieved }) => (
-                  <div key={count} className={`p-4 rounded-lg border-2 ${
-                    achieved 
-                      ? 'border-green-200 bg-green-50' 
-                      : 'border-gray-200 bg-white'
+                  <div key={count} className={`p-4 rounded-xl border ${
+                    achieved
+                      ? 'border-sage-200 bg-sage-50'
+                      : 'border-stone-200 bg-white'
                   }`}>
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-gray-800">第 {count} 次親密時光</span>
+                      <span className="font-medium text-stone-800 text-sm">第 {count} 次親密時光</span>
                       {achieved ? (
-                        <span className="text-green-600 font-bold">✓ 已達成</span>
+                        <span className="text-sage-600 font-semibold text-sm">✓ 已達成</span>
                       ) : (
-                        <span className="text-gray-500">
+                        <span className="text-stone-400 text-sm">
                           還需 {count - intimateRecords.length} 次
                         </span>
                       )}
@@ -2999,12 +3012,15 @@ const LoveTimeApp = () => {
         />;
         default: return (
           <div className="flex items-center justify-center min-h-64">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">歡迎使用 Twogether</h2>
-              <p className="text-gray-600 mb-6">登入以開始記錄你們的愛情時光</p>
+            <div className="text-center max-w-sm">
+              <div className="w-14 h-14 bg-rose-500 rounded-2xl flex items-center justify-center mx-auto mb-5">
+                <Heart className="w-7 h-7 text-white fill-white" />
+              </div>
+              <h2 className="font-display text-2xl font-semibold text-stone-900 mb-3">歡迎使用 Twogether</h2>
+              <p className="text-stone-500 mb-6 text-sm leading-relaxed">登入以開始記錄你們的愛情時光</p>
               <button
                 onClick={() => setShowAuthModal(true)}
-                className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-6 py-3 rounded-lg hover:shadow-lg transition-colors"
+                className="bg-stone-900 hover:bg-stone-700 text-white px-6 py-3 rounded-full font-medium transition-colors text-sm"
                 data-testid="login-button"
               >
                 立即登入
@@ -3144,10 +3160,10 @@ const LoveTimeApp = () => {
                 key={index}
                 onClick={() => onDateSelect(formatDate(date))}
                 className={`
-                  p-2 text-sm rounded hover:bg-gray-100 transition-colors
-                  ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}
-                  ${selected ? 'bg-pink-500 text-white hover:bg-pink-600' : ''}
-                  ${today && !selected ? 'bg-blue-100 text-blue-600' : ''}
+                  p-2 text-sm rounded-lg hover:bg-stone-100 transition-colors
+                  ${isCurrentMonth ? 'text-stone-800' : 'text-stone-300'}
+                  ${selected ? 'bg-rose-500 text-white hover:bg-rose-600' : ''}
+                  ${today && !selected ? 'bg-rose-50 text-rose-600 font-medium' : ''}
                 `}
               >
                 {date.getDate()}
@@ -3160,7 +3176,7 @@ const LoveTimeApp = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-100 via-purple-50 to-indigo-100">
+    <div className="min-h-screen bg-stone-50">
       {/* Header */}
       <Header
         authState={authState}
@@ -3190,28 +3206,25 @@ const LoveTimeApp = () => {
         />
       )}
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-6">
         {/* Tagline */}
-        <div className="text-center mb-8">
-          <p className="text-gray-600">為熱戀中的你們，記錄每一段親密時光</p>
+        <div className="mb-6">
+          <p className="text-stone-400 text-sm">為熱戀中的你們，記錄每一段親密時光</p>
         </div>
 
         {/* Navigation */}
-        <div className="flex flex-wrap justify-center gap-2 mb-8">
+        <div className="flex flex-wrap gap-1.5 mb-8">
           {navItems.map((item) => {
             const Icon = item.icon;
+            const isActive = currentView === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => setCurrentView(item.id)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
-                  currentView === item.id
-                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg'
-                    : 'bg-white text-gray-600 hover:bg-pink-50 hover:text-pink-600'
-                }`}
+                className={`pill-btn ${isActive ? 'active' : ''}`}
               >
-                <Icon className="w-4 h-4" />
-                <span className="text-sm font-medium">{item.label}</span>
+                <Icon className="w-3.5 h-3.5" />
+                <span>{item.label}</span>
               </button>
             );
           })}
@@ -3251,11 +3264,11 @@ const LoveTimeApp = () => {
 
       {/* Record Detail Modal */}
       {showRecordDetail && selectedRecord && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-modal max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-stone-200">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-gray-800">親密時光詳情</h3>
+                <h3 className="font-display text-2xl font-semibold text-stone-900">親密時光詳情</h3>
                 <button
                   onClick={() => setShowRecordDetail(false)}
                   className="text-gray-500 hover:text-gray-700 text-2xl"
