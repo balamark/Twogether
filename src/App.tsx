@@ -74,6 +74,31 @@ interface RoleplayScript {
   duration?: string;
 }
 
+interface ApiCustomScript {
+  id?: string;
+  title?: string;
+  category?: RoleplayScript['category'];
+  scenario?: string;
+  script?: string;
+  content?: string;
+  tags?: string[];
+  duration?: string;
+  isCustom?: boolean;
+  createdBy?: string;
+  createdAt?: string;
+}
+
+interface ApiCustomGift {
+  id: string;
+  title: string;
+  description: string;
+  cost: number;
+  category: CoinGift['category'];
+  icon: string;
+  isCustom?: boolean;
+  createdBy?: string;
+}
+
 interface CoinGift {
   id: string;
   title: string;
@@ -331,11 +356,15 @@ const LoveTimeApp = () => {
     isAuthenticated: false,
     partnerConnected: false
   });
+  const { isAuthenticated, user: authUser, partnerConnected } = authState;
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showPairingPrompt, setShowPairingPrompt] = useState(false);
   const [pairingPromptDismissed, setPairingPromptDismissed] = useState(
     localStorage.getItem('pairingPromptDismissed') === 'true'
   );
+  const [pairingPromptEmail, setPairingPromptEmail] = useState('');
+  const [pairingPromptSending, setPairingPromptSending] = useState(false);
+  const [pairingPromptSent, setPairingPromptSent] = useState(false);
 
   const [customScripts, setCustomScripts] = useState<RoleplayScript[]>([]);
   const [showScriptUploadModal, setShowScriptUploadModal] = useState(false);
@@ -450,7 +479,7 @@ const LoveTimeApp = () => {
     return Math.random().toString(36).substr(2, 8).toUpperCase();
   };
 
-  const handleLogin = async (email: string, password: string, _unused?: string) => {
+  const handleLogin = async (email: string, password: string) => {
     try {
       const authResult = await apiService.login(email, password);
 
@@ -768,7 +797,7 @@ const LoveTimeApp = () => {
   // Load authenticated data when user logs in
   useEffect(() => {
     // Only run if user is authenticated
-    if (!authState.isAuthenticated || !authState.user) {
+    if (!isAuthenticated || !authUser) {
       return;
     }
 
@@ -791,48 +820,65 @@ const LoveTimeApp = () => {
           const storedNicknames = await apiService.getNicknames(coupleInfo);
           setNicknames(storedNicknames);
 
-          if (coupleInfo && authState.user) {
-            const updatedAuthState = {
-              ...authState,
-              partnerConnected: !!coupleInfo.user2Nickname,
-              user: {
-                ...authState.user,
-                partnerId: coupleInfo.id,
-                partnerNickname: storedNicknames.partner2 || undefined // partner2 is always the partner's nickname
-              }
-            };
-            
-            setAuthState(updatedAuthState);
-            localStorage.setItem('authState', JSON.stringify(updatedAuthState));
+          if (coupleInfo && authUser) {
+            const nextPartnerConnected = !!coupleInfo.user2Nickname;
+            const nextPartnerNickname = storedNicknames.partner2 || undefined;
+
+            const needsUpdate =
+              authUser.partnerId !== coupleInfo.id ||
+              authUser.partnerNickname !== nextPartnerNickname ||
+              partnerConnected !== nextPartnerConnected;
+
+            if (needsUpdate) {
+              const updatedAuthState: AuthState = {
+                isAuthenticated: true,
+                partnerConnected: nextPartnerConnected,
+                user: {
+                  ...authUser,
+                  partnerId: coupleInfo.id,
+                  partnerNickname: nextPartnerNickname // partner2 is always the partner's nickname
+                }
+              };
+
+              setAuthState(updatedAuthState);
+              localStorage.setItem('authState', JSON.stringify(updatedAuthState));
+            }
             
             // Note: Nickname updates will be handled by the useEffect hook for nicknames state changes
 
             // Merge journey fields from backend where available
-            if (coupleInfo.anniversaryDate || (coupleInfo as any).first_meet_date || coupleInfo.firstKissDate || (coupleInfo as any).first_kiss_place || (coupleInfo as any).first_intimacy_date || (coupleInfo as any).first_intimacy_place) {
+            if (
+              coupleInfo.anniversaryDate ||
+              coupleInfo.firstMeetDate ||
+              coupleInfo.firstKissDate ||
+              coupleInfo.firstKissPlace ||
+              coupleInfo.firstIntimacyDate ||
+              coupleInfo.firstIntimacyPlace
+            ) {
               setJourneyMilestones(prev => prev.map(milestone => {
-                if (milestone.type === 'meeting' && (coupleInfo as any).first_meet_date) {
-                  return { ...milestone, date: (coupleInfo as any).first_meet_date };
+                if (milestone.type === 'meeting' && coupleInfo.firstMeetDate) {
+                  return { ...milestone, date: coupleInfo.firstMeetDate };
                 }
                 if (milestone.type === 'first_date' && coupleInfo.anniversaryDate) {
                   return { ...milestone, date: coupleInfo.anniversaryDate };
                 }
                 if (milestone.type === 'first_kiss') {
                   const updated = { ...milestone };
-                  if ((coupleInfo as any).first_kiss_date) {
-                    updated.date = (coupleInfo as any).first_kiss_date;
+                  if (coupleInfo.firstKissDate) {
+                    updated.date = coupleInfo.firstKissDate;
                   }
-                  if ((coupleInfo as any).first_kiss_place) {
-                    updated.place = (coupleInfo as any).first_kiss_place;
+                  if (coupleInfo.firstKissPlace) {
+                    updated.place = coupleInfo.firstKissPlace;
                   }
                   return updated;
                 }
                 if (milestone.type === 'first_sex') {
                   const updated = { ...milestone };
-                  if ((coupleInfo as any).first_intimacy_date) {
-                    updated.date = (coupleInfo as any).first_intimacy_date;
+                  if (coupleInfo.firstIntimacyDate) {
+                    updated.date = coupleInfo.firstIntimacyDate;
                   }
-                  if ((coupleInfo as any).first_intimacy_place) {
-                    updated.place = (coupleInfo as any).first_intimacy_place;
+                  if (coupleInfo.firstIntimacyPlace) {
+                    updated.place = coupleInfo.firstIntimacyPlace;
                   }
                   return updated;
                 }
@@ -864,12 +910,12 @@ const LoveTimeApp = () => {
         try {
           const scripts = await apiService.getCustomScripts();
           // Transform scripts to ensure they have the correct field names
-          const transformedScripts = (scripts as any[]).map((script: any) => ({
-            id: script.id,
-            title: script.title,
-            category: script.category,
-            scenario: script.scenario,
-            script: script.script || script.content, // Backend returns 'script', fallback to 'content' if needed
+          const transformedScripts = (scripts as ApiCustomScript[]).map((script) => ({
+            id: script.id || '',
+            title: script.title || '',
+            category: script.category || 'romantic',
+            scenario: script.scenario || '',
+            script: script.script || script.content || '',
             tags: script.tags || [],
             duration: script.duration,
             isCustom: script.isCustom ?? true,
@@ -889,7 +935,7 @@ const LoveTimeApp = () => {
         // Load custom gifts from backend
         try {
           const gifts = await apiService.getCustomGifts();
-          setCustomGifts(gifts as any[]); // Type assertion for now
+          setCustomGifts(gifts as ApiCustomGift[]);
         } catch (giftError) {
           console.error('Failed to load custom gifts:', giftError);
           // Fallback to localStorage
@@ -904,7 +950,7 @@ const LoveTimeApp = () => {
     };
 
     loadAuthenticatedData();
-  }, [authState.isAuthenticated]); // Only depend on isAuthenticated, not the entire authState object
+  }, [isAuthenticated, authUser, partnerConnected]); // Re-run when auth user changes
 
   // Note: Intimate records are now persisted in the backend, no localStorage needed
 
@@ -1202,17 +1248,18 @@ const LoveTimeApp = () => {
       });
 
       // Transform the response to match RoleplayScript interface
+      const typedScript = rawScript as ApiCustomScript;
       const newScript: RoleplayScript = {
-        id: (rawScript as any).id,
-        title: (rawScript as any).title,
-        category: (rawScript as any).category,
-        scenario: (rawScript as any).scenario,
-        script: (rawScript as any).script || (rawScript as any).content,
-        tags: (rawScript as any).tags || [],
-        duration: (rawScript as any).duration,
+        id: typedScript.id || '',
+        title: typedScript.title || title,
+        category: typedScript.category || category,
+        scenario: typedScript.scenario || scenario,
+        script: typedScript.script || typedScript.content || parseScriptContent(content),
+        tags: typedScript.tags || tags,
+        duration: typedScript.duration || '15-30分鐘',
         isCustom: true,
-        createdBy: (rawScript as any).createdBy,
-        createdAt: (rawScript as any).createdAt
+        createdBy: typedScript.createdBy,
+        createdAt: typedScript.createdAt
       };
 
       // Update local state
@@ -2037,7 +2084,7 @@ const LoveTimeApp = () => {
           });
           return;
         }
-        await handleLogin(email, password, '');
+        await handleLogin(email, password);
       } else if (authMode === 'register') {
         // Validate registration form
         if (!email.trim()) {
@@ -3110,7 +3157,12 @@ const LoveTimeApp = () => {
         onAuthStateUpdate={setAuthState}
         showNotification={showNotification}
       />;
-      case 'intimacy-history': return <IntimacyRequestsHistory authState={authState} />;
+      case 'intimacy-history': return (
+        <IntimacyRequestsHistory
+          authState={authState}
+          partnerNickname={nicknames.partner2}
+        />
+      );
       default: return <ForeplayView />;
     }
   };
@@ -3260,31 +3312,102 @@ const LoveTimeApp = () => {
       {showPairingPrompt && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-40 p-4">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl">
-            <h2 className="text-xl font-bold text-gray-800 mb-2">先完成配對吧</h2>
-            <p className="text-gray-600 mb-6">
-              邀請伴侶加入後，你們的日曆、回憶與成就就能同步在一起。
-            </p>
-            <div className="space-y-3">
-              <button
-                onClick={() => {
-                  setCurrentView('settings');
-                  setShowPairingPrompt(false);
-                }}
-                className="w-full bg-gradient-to-r from-pink-500 to-rose-600 text-white py-3 rounded-lg hover:from-pink-600 hover:to-rose-700 transition-colors"
-              >
-                前往配對
-              </button>
-              <button
-                onClick={() => {
-                  setShowPairingPrompt(false);
-                  setPairingPromptDismissed(true);
-                  localStorage.setItem('pairingPromptDismissed', 'true');
-                }}
-                className="w-full text-gray-500 hover:text-gray-700 py-2"
-              >
-                稍後再說
-              </button>
+            <div className="text-center mb-5">
+              <div className="w-14 h-14 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                <span className="text-2xl">💑</span>
+              </div>
+              <h2 className="text-xl font-bold text-gray-800 mb-1">邀請你的伴侶</h2>
+              <p className="text-sm text-gray-500">
+                配對後，日曆、親密紀錄與成就將自動同步。
+              </p>
             </div>
+
+            {pairingPromptSent ? (
+              <div className="text-center py-4">
+                <p className="text-green-600 font-medium mb-1">邀請已寄出！</p>
+                <p className="text-sm text-gray-500 mb-4">請通知伴侶查看信箱，連結 7 天內有效。</p>
+                <button
+                  onClick={() => {
+                    setShowPairingPrompt(false);
+                    setPairingPromptSent(false);
+                    setPairingPromptEmail('');
+                  }}
+                  className="text-gray-500 hover:text-gray-700 text-sm"
+                >
+                  關閉
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">伴侶的 Email</label>
+                  <input
+                    type="email"
+                    value={pairingPromptEmail}
+                    onChange={(e) => setPairingPromptEmail(e.target.value)}
+                    placeholder="partner@example.com"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent text-sm"
+                    disabled={pairingPromptSending}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && pairingPromptEmail.trim()) {
+                        (async () => {
+                          setPairingPromptSending(true);
+                          try {
+                            await apiService.sendPairingInvitation({ recipientEmail: pairingPromptEmail.trim() });
+                            setPairingPromptSent(true);
+                          } catch (err) {
+                            showNotification({ type: 'error', title: '發送失敗', message: (err as Error)?.message || '請稍後再試', duration: 6000 });
+                          } finally {
+                            setPairingPromptSending(false);
+                          }
+                        })();
+                      }
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={async () => {
+                    if (!pairingPromptEmail.trim()) return;
+                    setPairingPromptSending(true);
+                    try {
+                      await apiService.sendPairingInvitation({ recipientEmail: pairingPromptEmail.trim() });
+                      setPairingPromptSent(true);
+                    } catch (err) {
+                      showNotification({ type: 'error', title: '發送失敗', message: (err as Error)?.message || '請稍後再試', duration: 6000 });
+                    } finally {
+                      setPairingPromptSending(false);
+                    }
+                  }}
+                  disabled={pairingPromptSending || !pairingPromptEmail.trim()}
+                  className={`w-full py-2.5 rounded-lg font-medium text-sm transition-colors ${
+                    pairingPromptSending || !pairingPromptEmail.trim()
+                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-pink-500 to-rose-600 text-white hover:from-pink-600 hover:to-rose-700'
+                  }`}
+                >
+                  {pairingPromptSending ? '發送中...' : '💌 發送邀請連結'}
+                </button>
+                <button
+                  onClick={() => {
+                    setCurrentView('settings');
+                    setShowPairingPrompt(false);
+                  }}
+                  className="w-full text-pink-600 hover:text-pink-800 py-1.5 text-sm border border-pink-200 rounded-lg hover:bg-pink-50 transition-colors"
+                >
+                  使用配對碼配對
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPairingPrompt(false);
+                    setPairingPromptDismissed(true);
+                    localStorage.setItem('pairingPromptDismissed', 'true');
+                  }}
+                  className="w-full text-gray-400 hover:text-gray-600 py-1 text-xs"
+                >
+                  稍後再說
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

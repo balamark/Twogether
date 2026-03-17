@@ -20,7 +20,20 @@ interface IntimateRecord {
   activityType?: string;
 }
 
-// Removed ApiIntimateRecord interface - using 'any' type for flexibility with actual backend response
+interface ApiIntimateRecord {
+  id?: string | number;
+  moment_date?: string;
+  notes?: string;
+  created_at?: string;
+  photo_url?: string;
+  photo_id?: string;
+  description?: string;
+  duration?: string;
+  location?: string;
+  roleplay_script?: string;
+  coins_earned?: number;
+  activity_type?: string;
+}
 
 interface CreateCoupleRequest {
   coupleName?: string;
@@ -35,6 +48,10 @@ interface CoupleResponse {
   anniversaryDate?: string;
   firstDate?: string;
   firstKissDate?: string;
+  firstMeetDate?: string;
+  firstKissPlace?: string;
+  firstIntimacyDate?: string;
+  firstIntimacyPlace?: string;
   user1Nickname: string;
   user2Nickname?: string;
   createdAt: string;
@@ -108,6 +125,8 @@ interface ApiErrorResponse {
 // Intimacy Request Types
 interface IntimacyRequest {
   id: string;
+  senderId?: string;
+  receiverId?: string;
   senderNickname: string;
   receiverNickname: string;
   messageContent: string;
@@ -660,7 +679,7 @@ class ApiService {
     return true;
   }
 
-  private transformApiRecord(apiRecord: any): IntimateRecord {
+  private transformApiRecord(apiRecord: ApiIntimateRecord): IntimateRecord {
     // Handle both the expected ApiIntimateRecord and actual backend response
     console.log('Transforming API record:', apiRecord); // Debug log to see the raw response
 
@@ -684,7 +703,8 @@ class ApiService {
       // Try to convert UUID to number
       try {
         safeId = parseInt(apiRecord.id.replace(/-/g, '').substring(0, 8), 16);
-      } catch (e) {
+      } catch (error) {
+        console.warn('Failed to parse record id, generating fallback:', error);
         safeId = Math.floor(Math.random() * 1000000); // Fallback random ID
       }
     } else {
@@ -699,8 +719,8 @@ class ApiService {
     try {
       dateStr = momentDate.toISOString().split('T')[0];
       timeStr = momentDate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
-    } catch (e) {
-      console.error('Error formatting date/time:', e);
+    } catch (error) {
+      console.error('Error formatting date/time:', error);
       // Fallback to manual formatting
       const now = new Date();
       dateStr = now.toISOString().split('T')[0];
@@ -872,6 +892,12 @@ class ApiService {
       id?: string;
       couple_name?: string;
       anniversary_date?: string;
+      first_meet_date?: string;
+      first_date?: string;
+      first_kiss_date?: string;
+      first_kiss_place?: string;
+      first_intimacy_date?: string;
+      first_intimacy_place?: string;
       user1_id?: string;
       user1_nickname?: string;
       user2_id?: string;
@@ -885,10 +911,16 @@ class ApiService {
       id: typedData?.id || '',
       coupleName: typedData?.couple_name,
       anniversaryDate: typedData?.anniversary_date,
+      firstMeetDate: typedData?.first_meet_date,
+      firstDate: typedData?.first_date,
       user1Id: typedData?.user1_id,
       user1Nickname: typedData?.user1_nickname || '',
       user2Id: typedData?.user2_id,
       user2Nickname: typedData?.user2_nickname,
+      firstKissDate: typedData?.first_kiss_date,
+      firstKissPlace: typedData?.first_kiss_place,
+      firstIntimacyDate: typedData?.first_intimacy_date,
+      firstIntimacyPlace: typedData?.first_intimacy_place,
       createdAt: typedData?.created_at || new Date().toISOString(),
       pairingCode: typedData?.pairing_code,
       pendingConflicts: typedData?.pending_conflicts
@@ -1197,6 +1229,8 @@ class ApiService {
   private transformIntimacyRequest(data: unknown): IntimacyRequest {
     const typedData = data as {
       id?: string;
+      sender_id?: string;
+      receiver_id?: string;
       sender_nickname?: string;
       receiver_nickname?: string;
       message_content?: string;
@@ -1212,10 +1246,14 @@ class ApiService {
       created_at?: string;
       expires_at?: string;
       direction?: 'sent' | 'received';
+      requester?: { id?: string; nickname?: string };
+      recipient?: { id?: string; nickname?: string };
     };
 
     return {
       id: typedData?.id || '',
+      senderId: typedData?.sender_id || typedData?.requester?.id,
+      receiverId: typedData?.receiver_id || typedData?.recipient?.id,
       senderNickname: typedData?.sender_nickname || '',
       receiverNickname: typedData?.receiver_nickname || '',
       messageContent: typedData?.message_content || '',

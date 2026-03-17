@@ -188,6 +188,32 @@ router.post('/accept-code', optionalAuth, [
       pendingConflicts: result.pendingConflicts
     });
   } catch (error) {
+    // If the code was already used (race condition: both users submitted simultaneously),
+    // check whether the current user is now in a couple — if so, treat it as success.
+    if (req.user && ['INVITATION_NOT_FOUND', 'ALREADY_IN_COUPLE', 'SENDER_ALREADY_PAIRED'].includes(error.error_code)) {
+      try {
+        const coupleCheck = await db.query(
+          `SELECT c.id, u.nickname as partner_nickname
+           FROM couples c
+           JOIN users u ON (u.id = CASE WHEN c.user1_id = $1 THEN c.user2_id ELSE c.user1_id END)
+           WHERE (c.user1_id = $1 OR c.user2_id = $1) AND c.user2_id IS NOT NULL`,
+          [req.user.id]
+        );
+        if (coupleCheck.rows.length > 0) {
+          return res.json({
+            success: true,
+            alreadyPaired: true,
+            message: '你們已成功配對！',
+            couple: {
+              id: coupleCheck.rows[0].id,
+              partnerNickname: coupleCheck.rows[0].partner_nickname
+            }
+          });
+        }
+      } catch (checkError) {
+        console.error('Already-paired check failed:', checkError);
+      }
+    }
     console.error('Accept pairing code error:', error);
     return handleRouteError(res, error, '接受配對邀請失敗');
   }

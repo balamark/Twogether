@@ -281,9 +281,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         });
       } else if (errorCode === 'ALREADY_IN_COUPLE' || errorCode === 'ALREADY_PAIRED') {
         showNotification({
-          type: 'error',
-          title: '無法配對',
-          message: '您已經有配對的伴侶了，無法使用配對碼',
+          type: 'info',
+          title: '已完成配對',
+          message: '你們已經成功配對了！請重新整理頁面查看最新狀態。',
           duration: 8000
         });
       } else if (errorCode === 'INVITATION_EXPIRED') {
@@ -737,7 +737,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                           </button>
                         </div>
                         <p className="text-sm text-gray-500 mt-2">
-                          此配對碼將在24小時後失效
+                          此配對碼將在7天後失效
                         </p>
                       </div>
                     )}

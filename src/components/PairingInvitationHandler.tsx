@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Heart, CheckCircle, X, AlertCircle, Mail } from 'lucide-react';
 import { apiService } from '../services/api';
 
@@ -49,7 +49,7 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
-  const [autoAccepted, setAutoAccepted] = useState(false);
+  const autoAcceptFired = useRef(false);
 
   const fetchInvitationDetails = useCallback(async () => {
     try {
@@ -71,16 +71,9 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
   }, [token]);
 
   useEffect(() => {
+    autoAcceptFired.current = false;
     fetchInvitationDetails();
-    setAutoAccepted(false);
   }, [fetchInvitationDetails]);
-
-  useEffect(() => {
-    if (authState.isAuthenticated && invitation && !invitation.isExpired && !autoAccepted && !processing) {
-      setAutoAccepted(true);
-      handleAccept();
-    }
-  }, [authState.isAuthenticated, invitation, autoAccepted, processing, handleAccept]);
 
   const handleAccept = useCallback(async () => {
     if (!authState.isAuthenticated) {
@@ -123,6 +116,22 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
 
     } catch (err) {
       console.error('Failed to accept invitation:', err);
+      // Check if user is already paired despite the error (race condition / already-paired case)
+      try {
+        const couple = await apiService.getCouple();
+        if (couple?.id) {
+          showNotification({
+            type: 'success',
+            title: '配對成功！',
+            message: '你們已成功配對！',
+            duration: 8000
+          });
+          onAccepted();
+          return;
+        }
+      } catch {
+        // ignore — show original error below
+      }
       showNotification({
         type: 'error',
         title: '接受邀請失敗',
@@ -133,6 +142,14 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
       setProcessing(false);
     }
   }, [authState.isAuthenticated, onAccepted, setShowAuthModal, showNotification, token]);
+
+  // Auto-accept once the user is authenticated and invitation is loaded
+  useEffect(() => {
+    if (authState.isAuthenticated && invitation && !invitation.isExpired && !autoAcceptFired.current && !processing) {
+      autoAcceptFired.current = true;
+      handleAccept();
+    }
+  }, [authState.isAuthenticated, invitation, processing, handleAccept]);
 
   const handleReject = async () => {
     try {

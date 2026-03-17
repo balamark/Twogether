@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Bell, 
   X, 
@@ -44,13 +44,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [acceptMessage, setAcceptMessage] = useState<string>('接受你的邀請 💕');
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchNotifications();
-    }
-  }, [isOpen]);
-
-  const fetchNotifications = async function() {
+  const fetchNotifications = useCallback(async () => {
     try {
       setLoading(true);
       const data = await apiService.getNotifications();
@@ -63,11 +57,18 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
         onUnreadCountChange(0);
       }
     } catch (err) {
+      console.error('Failed to fetch notifications:', err);
       setError(err instanceof Error ? err.message : '無法載入通知');
     } finally {
       setLoading(false);
     }
-  };
+  }, [onUnreadCountChange]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchNotifications();
+    }
+  }, [isOpen, fetchNotifications]);
 
   const fetchIntimacyRequest = async function(requestId: string) {
     try {
@@ -77,6 +78,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
         setActiveRequest(request);
       }
     } catch (err) {
+      console.error('Failed to fetch intimacy request:', err);
       setError('無法載入邀請詳情');
     }
   };
@@ -86,6 +88,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       const options = await apiService.getAlternativeIntimacyOptions();
       setAlternativeOptions(options);
     } catch (err) {
+      console.error('Failed to fetch alternative options:', err);
       setError('無法載入替代選項');
     }
   };

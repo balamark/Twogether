@@ -6,7 +6,7 @@ const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 8;
 const MAX_CODE_ATTEMPTS = 10;
 const EMAIL_INVITE_TTL_DAYS = 7;
-const CODE_INVITE_TTL_HOURS = 24;
+const CODE_INVITE_TTL_DAYS = 7;
 
 const JOURNEY_FIELDS = [
   'anniversary_date',
@@ -170,9 +170,7 @@ const createPairingInvite = async ({
 
   const token = generateToken();
   const now = Date.now();
-  const expiresAt = inviteType === 'email'
-    ? new Date(now + EMAIL_INVITE_TTL_DAYS * 24 * 60 * 60 * 1000)
-    : new Date(now + CODE_INVITE_TTL_HOURS * 60 * 60 * 1000);
+  const expiresAt = new Date(now + (inviteType === 'email' ? EMAIL_INVITE_TTL_DAYS : CODE_INVITE_TTL_DAYS) * 24 * 60 * 60 * 1000);
 
   const shortCode = inviteType === 'code'
     ? await generateShortCode(db)

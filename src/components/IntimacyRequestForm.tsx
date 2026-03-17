@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Heart, Clock, Send, Sparkles, X } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { IntimacyTemplate } from '../services/api';
@@ -16,7 +16,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState<'category' | 'template' | 'customize' | 'confirm'>('category');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [_selectedTemplate, setSelectedTemplate] = useState<IntimacyTemplate | null>(null);
+  const [selectedTemplate, setSelectedTemplate] = useState<IntimacyTemplate | null>(null);
   const [customMessage, setCustomMessage] = useState('');
   const [requestType, setRequestType] = useState<'intimate' | 'scheduled'>('intimate');
   const [scheduledTime, setScheduledTime] = useState('');
@@ -33,13 +33,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
     { id: 'custom', name: '自訂訊息', emoji: '✨', description: '完全客製化你的親密邀請' },
   ];
 
-  useEffect(() => {
-    if (selectedCategory && selectedCategory !== 'custom') {
-      fetchTemplatesByCategory();
-    }
-  }, [selectedCategory]);
-
-  const fetchTemplatesByCategory = async function() {
+  const fetchTemplatesByCategory = useCallback(async () => {
     try {
       setLoading(true);
       const categoryTemplates = await apiService.getIntimacyTemplatesByCategory(selectedCategory);
@@ -56,7 +50,13 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedCategory, onClose]);
+
+  useEffect(() => {
+    if (selectedCategory && selectedCategory !== 'custom') {
+      fetchTemplatesByCategory();
+    }
+  }, [selectedCategory, fetchTemplatesByCategory]);
 
   const handleCategorySelect = function(categoryId: string) {
     setSelectedCategory(categoryId);
@@ -229,11 +229,17 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                 <div className="space-y-3">
                   {/* Show templates or default compliment options */}
                   {templates.length > 0 ? (
-                    templates.map((template) => (
+                    templates.map((template) => {
+                      const isSelected = selectedTemplate?.id === template.id;
+                      return (
                       <button
                         key={template.id}
                         onClick={() => handleTemplateSelect(template)}
-                        className="w-full p-4 border border-gray-200 rounded-lg hover:border-pink-300 hover:bg-pink-50 transition-colors text-left"
+                        className={`w-full p-4 border rounded-lg transition-colors text-left ${
+                          isSelected
+                            ? 'border-pink-400 bg-pink-50'
+                            : 'border-gray-200 hover:border-pink-300 hover:bg-pink-50'
+                        }`}
                       >
                         <div className="flex items-start space-x-3">
                           <div className={`w-3 h-3 rounded-full mt-2 ${
@@ -251,7 +257,8 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                           </div>
                         </div>
                       </button>
-                    ))
+                    );
+                    })
                   ) : (selectedCategory === 'compliment' || selectedCategory === 'reconciliation') ? (
                     // Default options if templates aren't loaded
                     [
