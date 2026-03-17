@@ -20,7 +20,20 @@ interface IntimateRecord {
   activityType?: string;
 }
 
-// Removed ApiIntimateRecord interface - using 'any' type for flexibility with actual backend response
+interface ApiIntimateRecord {
+  id?: string | number;
+  moment_date?: string;
+  notes?: string;
+  created_at?: string;
+  photo_url?: string;
+  photo_id?: string;
+  description?: string;
+  duration?: string;
+  location?: string;
+  roleplay_script?: string;
+  coins_earned?: number;
+  activity_type?: string;
+}
 
 interface CreateCoupleRequest {
   coupleName?: string;
@@ -35,6 +48,10 @@ interface CoupleResponse {
   anniversaryDate?: string;
   firstDate?: string;
   firstKissDate?: string;
+  firstMeetDate?: string;
+  firstKissPlace?: string;
+  firstIntimacyDate?: string;
+  firstIntimacyPlace?: string;
   user1Nickname: string;
   user2Nickname?: string;
   createdAt: string;
@@ -44,11 +61,13 @@ interface CoupleResponse {
   isComplete?: boolean;
   waitingForPartner?: boolean;
   error_code?: string;
+  pendingConflicts?: Record<string, { inviter: string; accepter: string }>;
 }
 
 interface PairingCodeResponse {
   code: string;
   expiresAt: string;
+  token?: string;
 }
 
 interface SendPairingInvitationRequest {
@@ -62,6 +81,8 @@ interface PairingInvitationResponse {
   invitation: {
     id: string;
     recipientEmail: string;
+    token?: string;
+    shortCode?: string;
     createdAt: string;
     expiresAt: string;
     emailSent: boolean;
@@ -83,11 +104,14 @@ interface AcceptPairingInvitationResponse {
     partnerNickname: string;
     createdAt: string;
   };
+  autoResolved?: boolean;
+  pendingConflicts?: Record<string, { inviter: string; accepter: string }>;
 }
 
 interface ApiError {
   message?: string;
   error?: string;
+  error_code?: string;
   status?: number;
 }
 
@@ -101,6 +125,8 @@ interface ApiErrorResponse {
 // Intimacy Request Types
 interface IntimacyRequest {
   id: string;
+  senderId?: string;
+  receiverId?: string;
   senderNickname: string;
   receiverNickname: string;
   messageContent: string;
@@ -156,6 +182,30 @@ interface AlternativeIntimacyOptionsGrouped {
   companionship: AlternativeIntimacyOption[];
 }
 
+interface IntimacyRequestPeriodStats {
+  accepted: number;
+  rejected: number;
+  unanswered: number;
+}
+
+type IntimacyRequestNudgeReason = 'rejected' | 'unanswered' | 'rejected_and_unanswered' | null;
+
+interface IntimacyRequestNudge {
+  shouldNudge: boolean;
+  reason: IntimacyRequestNudgeReason;
+  message: string | null;
+}
+
+interface IntimacyRequestStats {
+  week: IntimacyRequestPeriodStats;
+  month: IntimacyRequestPeriodStats;
+}
+
+interface IntimacyRequestStatsResponse {
+  statistics: IntimacyRequestStats;
+  nudge: IntimacyRequestNudge;
+}
+
 interface Notification {
   id: string;
   notificationType: string;
@@ -208,44 +258,96 @@ apiClient.interceptors.response.use(
       const { status, data } = error.response;
       // Extract error message from nested structure
       const errorMessage = data?.error?.message || data?.message || data?.error || '未知錯誤';
+      const errorCode = data?.error_code || data?.error?.code || data?.error?.error_code;
       const requestUrl = error.config?.url || '';
       
       // Handle specific error cases
       if (status === 401) {
         // Check if this is a login/register request - don't clear tokens for these
         if (requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register')) {
-          throw new Error('登錄信息錯誤，請檢查郵箱和密碼');
+          const authError = new Error('登錄信息錯誤，請檢查郵箱和密碼') as Error & { error_code?: string; status?: number; data?: unknown };
+          authError.error_code = errorCode;
+          authError.status = status;
+          authError.data = data;
+          throw authError;
         } else {
           // Token expired or invalid for authenticated requests
           localStorage.removeItem('authToken');
           localStorage.removeItem('authUser');
           localStorage.removeItem('authState');
-          throw new Error('登錄已過期，請重新登錄');
+          const authError = new Error('登錄已過期，請重新登錄') as Error & { error_code?: string; status?: number; data?: unknown };
+          authError.error_code = errorCode;
+          authError.status = status;
+          authError.data = data;
+          throw authError;
         }
       } else if (status === 403) {
-        throw new Error('沒有權限執行此操作');
+        const forbiddenError = new Error('沒有權限執行此操作') as Error & { error_code?: string; status?: number; data?: unknown };
+        forbiddenError.error_code = errorCode;
+        forbiddenError.status = status;
+        forbiddenError.data = data;
+        throw forbiddenError;
       } else if (status === 404) {
-        throw new Error('請求的資源不存在');
+        const notFoundError = new Error('請求的資源不存在') as Error & { error_code?: string; status?: number; data?: unknown };
+        notFoundError.error_code = errorCode;
+        notFoundError.status = status;
+        notFoundError.data = data;
+        throw notFoundError;
       } else if (status === 422) {
         // For validation errors, show the detailed error message
-        throw new Error(errorMessage);
+        const validationError = new Error(errorMessage) as Error & { error_code?: string; status?: number; data?: unknown };
+        validationError.error_code = errorCode;
+        validationError.status = status;
+        validationError.data = data;
+        throw validationError;
       } else if (status >= 500) {
-        throw new Error('服務器內部錯誤，請稍後再試');
+        const serverError = new Error('服務器內部錯誤，請稍後再試') as Error & { error_code?: string; status?: number; data?: unknown };
+        serverError.error_code = errorCode;
+        serverError.status = status;
+        serverError.data = data;
+        throw serverError;
       }
       
-      throw new Error(errorMessage);
+      const apiError = new Error(errorMessage) as Error & { error_code?: string; status?: number; data?: unknown };
+      apiError.error_code = errorCode;
+      apiError.status = status;
+      apiError.data = data;
+      throw apiError;
     } else if (error.request) {
       // Network error
-      throw new Error('網絡連接失敗，請檢查網絡連接');
+      const networkError = new Error('網絡連接失敗，請檢查網絡連接') as Error & { error_code?: string };
+      networkError.error_code = 'NETWORK_ERROR';
+      throw networkError;
     } else {
       // Other error
-      throw new Error(`請求失敗：${error.message}`);
+      const requestError = new Error(`請求失敗：${error.message}`) as Error & { error_code?: string };
+      requestError.error_code = 'REQUEST_FAILED';
+      throw requestError;
     }
   }
 );
 
 // API Service Class
 class ApiService {
+  private throwApiError(error: unknown, fallbackMessage: string): never {
+    const typedError = error as Error & { error_code?: string; data?: unknown; response?: { data?: ApiError } };
+    if (typedError?.error_code || typedError?.message) {
+      throw typedError;
+    }
+
+    const responseData = (typedError as { response?: { data?: ApiError } })?.response?.data;
+    const responseMessage = responseData?.message || responseData?.error || responseData?.error?.message;
+    const responseCode = responseData?.error_code || responseData?.error?.code;
+
+    if (responseMessage) {
+      const enrichedError = new Error(responseMessage) as Error & { error_code?: string };
+      enrichedError.error_code = responseCode;
+      throw enrichedError;
+    }
+
+    throw new Error(fallbackMessage);
+  }
+
   // Intimate Records
   async getIntimateRecords(): Promise<IntimateRecord[]> {
     try {
@@ -269,7 +371,7 @@ class ApiService {
       });
     } catch (error: unknown) {
       console.error('Failed to fetch intimate records:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法獲取愛的時光記錄');
+      this.throwApiError(error, '無法獲取愛的時光記錄');
     }
   }
 
@@ -282,7 +384,7 @@ class ApiService {
       return this.transformApiRecord(response.data);
     } catch (error: unknown) {
       console.error('Failed to fetch intimate record:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法獲取記錄詳情');
+      this.throwApiError(error, '無法獲取記錄詳情');
     }
   }
 
@@ -313,7 +415,7 @@ class ApiService {
       return this.transformApiRecord(recordData);
     } catch (error: unknown) {
       console.error('Failed to create intimate record:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法創建愛的時光記錄');
+      this.throwApiError(error, '無法創建愛的時光記錄');
     }
   }
 
@@ -358,7 +460,7 @@ class ApiService {
       return response.data;
     } catch (error: unknown) {
       console.error('Failed to upload photo:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '照片上傳失敗');
+      this.throwApiError(error, '照片上傳失敗');
     }
   }
 
@@ -577,7 +679,7 @@ class ApiService {
     return true;
   }
 
-  private transformApiRecord(apiRecord: any): IntimateRecord {
+  private transformApiRecord(apiRecord: ApiIntimateRecord): IntimateRecord {
     // Handle both the expected ApiIntimateRecord and actual backend response
     console.log('Transforming API record:', apiRecord); // Debug log to see the raw response
 
@@ -601,7 +703,8 @@ class ApiService {
       // Try to convert UUID to number
       try {
         safeId = parseInt(apiRecord.id.replace(/-/g, '').substring(0, 8), 16);
-      } catch (e) {
+      } catch (error) {
+        console.warn('Failed to parse record id, generating fallback:', error);
         safeId = Math.floor(Math.random() * 1000000); // Fallback random ID
       }
     } else {
@@ -616,8 +719,8 @@ class ApiService {
     try {
       dateStr = momentDate.toISOString().split('T')[0];
       timeStr = momentDate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
-    } catch (e) {
-      console.error('Error formatting date/time:', e);
+    } catch (error) {
+      console.error('Error formatting date/time:', error);
       // Fallback to manual formatting
       const now = new Date();
       dateStr = now.toISOString().split('T')[0];
@@ -653,11 +756,17 @@ class ApiService {
   // Couples
   async createCouple(data: CreateCoupleRequest): Promise<CoupleResponse> {
     try {
-      const response = await apiClient.post('/couples', data);
+      const payload: Record<string, unknown> = {};
+      if (data.coupleName) payload.couple_name = data.coupleName;
+      if (data.anniversaryDate) payload.anniversary_date = data.anniversaryDate;
+      if (data.partnerEmail) payload.partnerEmail = data.partnerEmail;
+      if (data.pairingCode) payload.pairing_code = data.pairingCode;
+
+      const response = await apiClient.post('/couples', payload);
       return this.transformCoupleResponse(response.data.couple);
     } catch (error: unknown) {
       console.error('Failed to create couple:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法創建情侶關係');
+      this.throwApiError(error, '無法創建情侶關係');
     }
   }
 
@@ -683,28 +792,45 @@ class ApiService {
       return this.transformCoupleResponse(response.data.couple);
     } catch (error: unknown) {
       console.error('Failed to get couple:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法獲取情侶信息');
+      this.throwApiError(error, '無法獲取情侶信息');
     }
   }
 
   async generatePairingCode(): Promise<PairingCodeResponse> {
     try {
       const response = await apiClient.post('/couples/pairing-code');
-      return response.data;
+      return {
+        code: response.data.code,
+        expiresAt: response.data.expires_at || response.data.expiresAt,
+        token: response.data.token
+      };
     } catch (error: unknown) {
       console.error('Failed to generate pairing code:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法生成配對碼');
+      this.throwApiError(error, '無法生成配對碼');
     }
   }
 
   // Email-based pairing invitation methods
   async sendPairingInvitation(data: SendPairingInvitationRequest): Promise<PairingInvitationResponse> {
     try {
-      const response = await apiClient.post('/pairing-requests/send-invitation', data);
+      const response = await apiClient.post('/pairing-requests', {
+        ...data,
+        type: 'email'
+      });
       return response.data;
     } catch (error: unknown) {
       console.error('Failed to send pairing invitation:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法發送配對邀請');
+      this.throwApiError(error, '無法發送配對邀請');
+    }
+  }
+
+  async createPairingCodeInvite(): Promise<PairingInvitationResponse> {
+    try {
+      const response = await apiClient.post('/pairing-requests', { type: 'code' });
+      return response.data;
+    } catch (error: unknown) {
+      console.error('Failed to create pairing code invite:', error);
+      this.throwApiError(error, '無法生成配對碼');
     }
   }
 
@@ -714,7 +840,17 @@ class ApiService {
       return response.data;
     } catch (error: unknown) {
       console.error('Failed to accept pairing invitation:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法接受配對邀請');
+      this.throwApiError(error, '無法接受配對邀請');
+    }
+  }
+
+  async acceptPairingCode(code: string): Promise<AcceptPairingInvitationResponse> {
+    try {
+      const response = await apiClient.post('/pairing-requests/accept-code', { code });
+      return response.data;
+    } catch (error: unknown) {
+      console.error('Failed to accept pairing code:', error);
+      this.throwApiError(error, '無法接受配對邀請');
     }
   }
 
@@ -724,7 +860,7 @@ class ApiService {
       return response.data;
     } catch (error: unknown) {
       console.error('Failed to reject pairing invitation:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法拒絕配對邀請');
+      this.throwApiError(error, '無法拒絕配對邀請');
     }
   }
 
@@ -738,14 +874,16 @@ class ApiService {
       expiresAt: string;
       status: string;
       isExpired: boolean;
+      type?: string;
+      shortCode?: string;
     };
   }> {
     try {
-      const response = await apiClient.get(`/pairing-requests/invitation/${token}`);
+      const response = await apiClient.get(`/pairing-requests/${token}`);
       return response.data;
     } catch (error: unknown) {
       console.error('Failed to get pairing invitation:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法獲取配對邀請詳情');
+      this.throwApiError(error, '無法獲取配對邀請詳情');
     }
   }
 
@@ -754,24 +892,38 @@ class ApiService {
       id?: string;
       couple_name?: string;
       anniversary_date?: string;
+      first_meet_date?: string;
+      first_date?: string;
+      first_kiss_date?: string;
+      first_kiss_place?: string;
+      first_intimacy_date?: string;
+      first_intimacy_place?: string;
       user1_id?: string;
       user1_nickname?: string;
       user2_id?: string;
       user2_nickname?: string;
       created_at?: string;
       pairing_code?: string;
+      pending_conflicts?: Record<string, { inviter: string; accepter: string }>;
     };
 
     return {
       id: typedData?.id || '',
       coupleName: typedData?.couple_name,
       anniversaryDate: typedData?.anniversary_date,
+      firstMeetDate: typedData?.first_meet_date,
+      firstDate: typedData?.first_date,
       user1Id: typedData?.user1_id,
       user1Nickname: typedData?.user1_nickname || '',
       user2Id: typedData?.user2_id,
       user2Nickname: typedData?.user2_nickname,
+      firstKissDate: typedData?.first_kiss_date,
+      firstKissPlace: typedData?.first_kiss_place,
+      firstIntimacyDate: typedData?.first_intimacy_date,
+      firstIntimacyPlace: typedData?.first_intimacy_place,
       createdAt: typedData?.created_at || new Date().toISOString(),
       pairingCode: typedData?.pairing_code,
+      pendingConflicts: typedData?.pending_conflicts
     };
   }
 
@@ -831,6 +983,48 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to fetch intimacy requests:', error);
       throw new Error((error as ApiErrorResponse)?.message || '無法獲取親密邀請記錄');
+    }
+  }
+
+  async getIntimacyRequestStats(): Promise<IntimacyRequestStatsResponse> {
+    try {
+      const response = await apiClient.get('/intimacy-requests/stats');
+      const statistics = response.data.statistics || {};
+      const nudge = response.data.nudge || {};
+
+      return {
+        statistics: {
+          week: this.normalizePeriodStats(statistics.week),
+          month: this.normalizePeriodStats(statistics.month)
+        },
+        nudge: {
+          shouldNudge: Boolean(nudge.shouldNudge),
+          reason: (nudge.reason ?? null) as IntimacyRequestNudgeReason,
+          message: nudge.message ?? null,
+        }
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch intimacy stats:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '無法獲取親密邀請統計');
+    }
+  }
+
+  async sendIntimacyNudgeEmail(): Promise<string> {
+    try {
+      const response = await apiClient.post('/intimacy-requests/stats/send-nudge');
+
+      if (!response.data?.success) {
+        const message = response.data?.message || '無法寄出貼心提醒';
+        throw new Error(message);
+      }
+
+      return response.data.message || '貼心提醒已寄出';
+    } catch (error: unknown) {
+      console.error('Failed to send intimacy nudge email:', error);
+      if (error instanceof Error && error.message) {
+        throw error;
+      }
+      throw new Error((error as ApiErrorResponse)?.message || '無法寄出貼心提醒');
     }
   }
 
@@ -1035,6 +1229,8 @@ class ApiService {
   private transformIntimacyRequest(data: unknown): IntimacyRequest {
     const typedData = data as {
       id?: string;
+      sender_id?: string;
+      receiver_id?: string;
       sender_nickname?: string;
       receiver_nickname?: string;
       message_content?: string;
@@ -1050,10 +1246,14 @@ class ApiService {
       created_at?: string;
       expires_at?: string;
       direction?: 'sent' | 'received';
+      requester?: { id?: string; nickname?: string };
+      recipient?: { id?: string; nickname?: string };
     };
 
     return {
       id: typedData?.id || '',
+      senderId: typedData?.sender_id || typedData?.requester?.id,
+      receiverId: typedData?.receiver_id || typedData?.recipient?.id,
       senderNickname: typedData?.sender_nickname || '',
       receiverNickname: typedData?.receiver_nickname || '',
       messageContent: typedData?.message_content || '',
@@ -1135,6 +1335,20 @@ class ApiService {
       priority: typedData?.priority || 1,
     };
   }
+
+  private normalizePeriodStats(data: unknown): IntimacyRequestPeriodStats {
+    const typed = data as { accepted?: number; rejected?: number; unanswered?: number } | undefined;
+    const toNumber = (value?: number) => {
+      const num = Number(value);
+      return Number.isFinite(num) ? num : 0;
+    };
+
+    return {
+      accepted: toNumber(typed?.accepted),
+      rejected: toNumber(typed?.rejected),
+      unanswered: toNumber(typed?.unanswered),
+    };
+  }
 }
 
 export const apiService = new ApiService();
@@ -1149,4 +1363,8 @@ export type {
   AlternativeIntimacyOption,
   AlternativeIntimacyOptionsGrouped,
   Notification,
+  IntimacyRequestPeriodStats,
+  IntimacyRequestStats,
+  IntimacyRequestNudge,
+  IntimacyRequestStatsResponse,
 }

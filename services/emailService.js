@@ -390,6 +390,164 @@ ${message ? `個人訊息："${message}"` : ''}
       throw error;
     }
   }
+
+  async sendIntimacyInvitationInsightsEmail({
+    senderNickname,
+    partnerNickname,
+    partnerEmail,
+    stats,
+    nudgeMessage,
+    nudgeReason = null,
+  }) {
+    if (!this.isConfigured()) {
+      throw new Error('Email service is not configured');
+    }
+
+    const safeStats = stats || {};
+    const weekStats = {
+      accepted: safeStats.week?.accepted ?? 0,
+      rejected: safeStats.week?.rejected ?? 0,
+      unanswered: safeStats.week?.unanswered ?? 0,
+    };
+    const monthStats = {
+      accepted: safeStats.month?.accepted ?? 0,
+      rejected: safeStats.month?.rejected ?? 0,
+      unanswered: safeStats.month?.unanswered ?? 0,
+    };
+
+    const totalMonth = monthStats.accepted + monthStats.rejected + monthStats.unanswered;
+    const acceptanceRate = totalMonth > 0 ? Math.round((monthStats.accepted / totalMonth) * 100) : null;
+
+    const reasonLabels = {
+      rejected: '最近婉拒的次數偏高',
+      unanswered: '最近有多次邀請尚未回覆',
+      rejected_and_unanswered: '最近的邀請多次被婉拒或未回覆',
+    };
+
+    const reasonText = reasonLabels[nudgeReason] || '邀請洞察提醒';
+    const safeSender = senderNickname || '你的伴侶';
+    const safePartner = partnerNickname || '親愛的你';
+
+    const htmlContent = `
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>貼心邀請提醒</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f4f5fb; }
+        .container { max-width: 640px; margin: 0 auto; background-color: white; }
+        .header { background: linear-gradient(135deg, #8ec5fc 0%, #e0c3fc 100%); color: #1f2933; padding: 36px 28px; text-align: left; }
+        .header h1 { margin: 0; font-size: 26px; font-weight: 600; }
+        .header p { margin-top: 8px; font-size: 15px; opacity: 0.9; }
+        .content { padding: 32px 28px 40px; color: #1f2933; }
+        .highlight { background: #fff7ed; border-radius: 16px; padding: 20px 24px; border: 1px solid #fcd34d; margin-bottom: 28px; }
+        .highlight h2 { margin: 0 0 8px; font-size: 18px; color: #b45309; }
+        .highlight p { margin: 0; line-height: 1.6; }
+        .stats-table { width: 100%; border-collapse: collapse; margin-bottom: 28px; border-radius: 12px; overflow: hidden; }
+        .stats-table thead { background: #f8fafc; }
+        .stats-table th { text-align: left; padding: 14px 16px; font-size: 14px; color: #475569; }
+        .stats-table td { padding: 14px 16px; border-top: 1px solid #e2e8f0; font-size: 15px; color: #1f2933; }
+        .insight-box { background: linear-gradient(135deg, #eef2ff 0%, #ede9fe 100%); padding: 20px 24px; border-radius: 16px; margin-bottom: 28px; }
+        .insight-box h3 { margin: 0 0 10px; font-size: 17px; color: #4c1d95; }
+        .cta { text-align: center; margin-top: 40px; }
+        .cta a { display: inline-block; background: linear-gradient(135deg, #f472b6 0%, #ec4899 100%); color: white; text-decoration: none; padding: 14px 36px; border-radius: 999px; font-weight: 600; box-shadow: 0 12px 24px rgba(236, 72, 153, 0.25); transition: transform 0.2s ease; }
+        .cta a:hover { transform: translateY(-2px); }
+        .footer { background-color: #0f172a; color: rgba(255,255,255,0.7); padding: 24px 28px; font-size: 12px; text-align: center; }
+        @media (max-width: 640px) {
+            .content, .header { padding: 24px 18px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💌 ${safeSender} 想和你聊聊彼此的感受</h1>
+            <p>${safePartner}，這是一封專為你準備的貼心提醒，一起照顧你們的情感連結。</p>
+        </div>
+        <div class="content">
+            <div class="highlight">
+                <h2>${reasonText}</h2>
+                <p>${nudgeMessage}</p>
+            </div>
+
+            <table class="stats-table">
+                <thead>
+                    <tr>
+                        <th>期間</th>
+                        <th>已接受</th>
+                        <th>已婉拒</th>
+                        <th>待回應</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>過去 7 天</td>
+                        <td>${weekStats.accepted}</td>
+                        <td>${weekStats.rejected}</td>
+                        <td>${weekStats.unanswered}</td>
+                    </tr>
+                    <tr>
+                        <td>過去 30 天</td>
+                        <td>${monthStats.accepted}</td>
+                        <td>${monthStats.rejected}</td>
+                        <td>${monthStats.unanswered}</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="insight-box">
+                <h3>邀請洞察</h3>
+                <p>過去一個月你們回覆了 ${monthStats.accepted + monthStats.rejected + monthStats.unanswered} 次邀請${acceptanceRate !== null ? `，整體回覆率約為 <strong>${acceptanceRate}%</strong>` : ''}。適時分享彼此的狀態與期待，能讓愛更被看見。</p>
+            </div>
+
+            <p style="line-height: 1.7; color: #475569;">試著找個舒服的時刻，與 ${safeSender} 分享你的想法或目前的狀態。坦誠的交流能讓你們的親密關係更穩固，也讓彼此更安心。</p>
+
+            <div class="cta">
+                <a href="${process.env.FRONTEND_URL || 'https://twogether-couples-app.de.r.appspot.com'}">一起展開一次溫柔的對話</a>
+            </div>
+        </div>
+        <div class="footer">
+            <p>© 2024 Twogether - 陪你們把心意說出口</p>
+        </div>
+    </div>
+</body>
+</html>
+    `;
+
+    const textContentLines = [
+      `親愛的 ${safePartner}，`,
+      '',
+      `${safeSender} 想和你一起關心最近的親密邀請：`,
+      `- 過去 7 天：接受 ${weekStats.accepted} 次、婉拒 ${weekStats.rejected} 次、待回應 ${weekStats.unanswered} 次`,
+      `- 過去 30 天：接受 ${monthStats.accepted} 次、婉拒 ${monthStats.rejected} 次、待回應 ${monthStats.unanswered} 次`,
+      '',
+      `貼心提醒：${nudgeMessage}`,
+      '',
+      acceptanceRate !== null ? `過去一個月的整體回覆率約為 ${acceptanceRate}%。` : '過去一個月尚未有太多邀請紀錄。',
+      '找個舒服的時刻聊聊彼此的狀態，能讓你們更了解對方，也讓愛更安心。',
+      '',
+      '— Twogether 愛情助手'
+    ];
+
+    const mailOptions = {
+      from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+      to: partnerEmail,
+      subject: `💞 ${safeSender} 想和你聊聊彼此的親密時光`,
+      text: textContentLines.join('\n'),
+      html: htmlContent,
+    };
+
+    try {
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log(`✅ Intimacy invitation insights email sent to ${partnerEmail}`);
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to send intimacy invitation insights email:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = new EmailService();

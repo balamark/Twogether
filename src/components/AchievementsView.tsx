@@ -92,7 +92,8 @@ export function AchievementsView() {
         apiService.getAchievements(),
         apiService.getStats(),
       ]);
-      setAchievements((achievementsData as any).stats as AchievementStats);
+      const achievementsPayload = achievementsData as { stats?: AchievementStats };
+      setAchievements(achievementsPayload.stats ?? null);
       setStats(statsData as IntimacyStats);
     } catch (err: unknown) {
       console.error('Failed to load achievements and stats:', err);

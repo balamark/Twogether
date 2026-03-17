@@ -11,6 +11,80 @@ const router = express.Router();
 // All intimacy request routes require authentication
 router.use(authenticateToken);
 
+const NUDGE_THRESHOLD = 3;
+
+const normalizeCount = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const determineNudge = (monthStats) => {
+  const shouldNudgeRejected = monthStats.rejected >= NUDGE_THRESHOLD;
+  const shouldNudgeUnanswered = monthStats.unanswered >= NUDGE_THRESHOLD;
+
+  let reason = null;
+  let message = null;
+
+  if (shouldNudgeRejected && shouldNudgeUnanswered) {
+    reason = 'rejected_and_unanswered';
+    message = '最近有幾次親密邀請被婉拒或沒有回應。我很重視我們的連結，也想了解你的感受。也許我們可以找個時間聊聊，看看怎麼讓彼此都感到被愛與被理解？';
+  } else if (shouldNudgeRejected) {
+    reason = 'rejected';
+    message = '最近有幾次親密邀請被你婉拒，我很想知道你的想法，因為我在乎你的舒適與感受。願意找個時刻聊聊，讓我們找到彼此都安心的步調嗎？';
+  } else if (shouldNudgeUnanswered) {
+    reason = 'unanswered';
+    message = '最近有幾次親密邀請一直等不到你的回覆，我會擔心是不是哪裡讓你不舒服。你的想法對我很重要，我們可以聊聊，一起打造舒服的親密氛圍嗎？';
+  }
+
+  return {
+    shouldNudge: Boolean(message),
+    reason,
+    message,
+  };
+};
+
+const computeIntimacyStatsForReceiver = async (userId) => {
+  const now = new Date();
+
+  const weekCutoff = new Date(now);
+  weekCutoff.setDate(weekCutoff.getDate() - 7);
+
+  const monthCutoff = new Date(now);
+  monthCutoff.setDate(monthCutoff.getDate() - 30);
+
+  const statsResult = await db.query(`
+    SELECT
+      SUM(CASE WHEN status = 'accepted' AND responded_at >= $2 THEN 1 ELSE 0 END) AS week_accepted,
+      SUM(CASE WHEN status = 'rejected' AND responded_at >= $2 THEN 1 ELSE 0 END) AS week_rejected,
+      SUM(CASE WHEN status = 'pending' AND created_at >= $2 THEN 1 ELSE 0 END) AS week_unanswered,
+      SUM(CASE WHEN status = 'accepted' AND responded_at >= $3 THEN 1 ELSE 0 END) AS month_accepted,
+      SUM(CASE WHEN status = 'rejected' AND responded_at >= $3 THEN 1 ELSE 0 END) AS month_rejected,
+      SUM(CASE WHEN status = 'pending' AND created_at >= $3 THEN 1 ELSE 0 END) AS month_unanswered
+    FROM intimacy_requests
+    WHERE receiver_id = $1
+      AND (created_at >= $3 OR (responded_at IS NOT NULL AND responded_at >= $3))
+  `, [userId, weekCutoff.toISOString(), monthCutoff.toISOString()]);
+
+  const row = statsResult.rows[0] || {};
+
+  const stats = {
+    week: {
+      accepted: normalizeCount(row.week_accepted),
+      rejected: normalizeCount(row.week_rejected),
+      unanswered: normalizeCount(row.week_unanswered),
+    },
+    month: {
+      accepted: normalizeCount(row.month_accepted),
+      rejected: normalizeCount(row.month_rejected),
+      unanswered: normalizeCount(row.month_unanswered),
+    }
+  };
+
+  const nudge = determineNudge(stats.month);
+
+  return { stats, nudge };
+};
+
 // Create intimacy request
 router.post('/', [
   body('message')
@@ -136,6 +210,98 @@ router.post('/', [
     res.status(500).json({
       success: false,
       message: '發送親密請求失敗'
+    });
+  }
+});
+
+// Get intimacy request statistics for the authenticated user (as receiver)
+router.get('/stats', async (req, res) => {
+  try {
+    const { stats, nudge } = await computeIntimacyStatsForReceiver(req.user.id);
+
+    res.json({
+      success: true,
+      statistics: stats,
+      nudge
+    });
+  } catch (error) {
+    console.error('Get intimacy request stats error:', error);
+    res.status(500).json({
+      success: false,
+      message: '無法獲取邀請統計'
+    });
+  }
+});
+
+router.post('/stats/send-nudge', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { stats, nudge } = await computeIntimacyStatsForReceiver(userId);
+
+    if (!nudge.shouldNudge || !nudge.message) {
+      return res.json({
+        success: false,
+        message: '目前的回應狀況穩定，不需要特別提醒。'
+      });
+    }
+
+    const coupleResult = await db.query(`
+      SELECT 
+        c.id as couple_id,
+        CASE WHEN c.user1_id = $1 THEN c.user2_id ELSE c.user1_id END as partner_id
+      FROM couples c
+      WHERE (c.user1_id = $1 OR c.user2_id = $1) AND c.user2_id IS NOT NULL
+    `, [userId]);
+
+    if (coupleResult.rows.length === 0) {
+      return res.json({
+        success: false,
+        message: '尚未找到完整的情侶關係，請先完成配對。'
+      });
+    }
+
+    const { partner_id: partnerId } = coupleResult.rows[0];
+
+    const partnerResult = await db.query('SELECT email, nickname FROM users WHERE id = $1', [partnerId]);
+    const partnerData = partnerResult.rows[0];
+
+    if (!partnerData?.email) {
+      return res.json({
+        success: false,
+        message: '找不到伴侶的電子郵件地址，請請伴侶更新資訊。'
+      });
+    }
+
+    if (!emailService.isConfigured()) {
+      console.warn('Email service not configured, cannot send intimacy nudge email');
+      return res.json({
+        success: false,
+        message: '信件服務尚未設定，因此暫時無法寄出提醒。'
+      });
+    }
+
+    const senderNickname = req.user.nickname || '你的伴侶';
+    const partnerNickname = partnerData.nickname || '親愛的';
+    const partnerEmail = partnerData.email;
+
+    await emailService.sendIntimacyInvitationInsightsEmail({
+      senderNickname,
+      partnerNickname,
+      partnerEmail,
+      stats,
+      nudgeMessage: nudge.message,
+      nudgeReason: nudge.reason || null,
+    });
+
+    res.json({
+      success: true,
+      message: '已寄出貼心提醒信，祝你們的對話順利💌'
+    });
+  } catch (error) {
+    console.error('Send intimacy nudge email error:', error);
+    res.status(500).json({
+      success: false,
+      message: '寄送提醒信時發生錯誤，請稍後再試。'
     });
   }
 });
