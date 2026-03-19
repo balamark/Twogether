@@ -1,0 +1,89 @@
+service: staging
+runtime: nodejs20
+
+# Environment variables (secure method)
+env_variables:
+  NODE_ENV: "staging"
+  PORT: "8080"
+  # Database connection
+  DATABASE_URL: $_STAGING_DATABASE_URL
+  # JWT Secret
+  JWT_SECRET: $_STAGING_JWT_SECRET
+  # Supabase configuration
+  SUPABASE_URL: $_STAGING_SUPABASE_URL
+  SUPABASE_ANON_KEY: $_STAGING_SUPABASE_ANON_KEY
+  SUPABASE_SERVICE_ROLE_KEY: $_STAGING_SUPABASE_SERVICE_ROLE_KEY
+  # Email configuration (shared with prod)
+  EMAIL_FROM: $_EMAIL_FROM
+  EMAIL_PASS: $_EMAIL_PASS
+  RESEND_API_KEY: $_RESEND_API_KEY
+  SMTP_HOST: $_SMTP_HOST
+  SMTP_PORT: $_SMTP_PORT
+  SMTP_SECURE: $_SMTP_SECURE
+  SMTP_USER: $_SMTP_USER
+  SMTP_PASS: $_SMTP_PASS
+  # CORS origin
+  CORS_ORIGIN: $_STAGING_CORS_ORIGIN
+
+# Automatic scaling (free tier compatible)
+automatic_scaling:
+  min_instances: 0
+  max_instances: 1
+  target_cpu_utilization: 0.8
+
+# Instance class (free tier)
+instance_class: F1
+
+# Static file handling for React assets
+handlers:
+  # Static assets with cache headers
+  - url: /assets/(.*)
+    static_files: dist/assets/\1
+    upload: dist/assets/(.*)
+    secure: always
+    expiration: "1d"
+
+  # Images with cache headers
+  - url: /images/(.*)
+    static_files: dist/images/\1
+    upload: dist/images/(.*)
+    secure: always
+    expiration: "1h"
+
+  # Favicon and other root assets
+  - url: /(.*\.(ico|png|svg))$
+    static_files: dist/\1
+    upload: dist/.*\.(ico|png|svg)$
+    secure: always
+    expiration: "1d"
+
+  # API routes go to the server
+  - url: /api/.*
+    script: auto
+    secure: always
+
+  # Health check
+  - url: /health
+    script: auto
+    secure: always
+
+  # All other routes serve the React app (for client-side routing)
+  - url: /.*
+    script: auto
+    secure: always
+
+# Health check
+readiness_check:
+  path: "/health"
+  check_interval_sec: 10
+  timeout_sec: 4
+  failure_threshold: 2
+  success_threshold: 2
+  app_start_timeout_sec: 300
+
+liveness_check:
+  path: "/health"
+  check_interval_sec: 30
+  timeout_sec: 4
+  failure_threshold: 2
+  success_threshold: 2

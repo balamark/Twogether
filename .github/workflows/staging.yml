@@ -1,0 +1,164 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [ staging ]
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+
+concurrency:
+  group: staging-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            app:
+              - 'src/**'
+              - 'routes/**'
+              - 'database/**'
+              - 'middleware/**'
+              - 'scripts/**'
+              - 'test*.js'
+              - 'test*.sh'
+              - '**/*test*.js'
+              - '**/*test*.ts'
+              - 'server.js'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'app.staging.yaml'
+              - 'vite.config.ts'
+              - 'tsconfig*.json'
+              - 'playwright.config.ts'
+              - 'eslint.config.js'
+              - '.github/workflows/staging.yml'
+
+  test-and-deploy:
+    needs: [changes]
+    if: ${{ needs.changes.outputs.app == 'true' }}
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: twogether_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Set up test database and run tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/twogether_test
+          JWT_SECRET: test-secret-key-for-ci
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_ANON_KEY: test-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: test-service-key
+          PORT: 8080
+          NODE_ENV: test
+        run: |
+          echo "Setting up test database..."
+          until pg_isready -h localhost -p 5432 -U postgres; do
+            echo "Waiting for PostgreSQL..."
+            sleep 2
+          done
+          npm run migrate
+          echo "Running integration tests with server..."
+          npm run test:ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/twogether_test
+          JWT_SECRET: test-secret-key-for-ci
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_ANON_KEY: test-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: test-service-key
+          PORT: 8080
+          NODE_ENV: test
+        run: |
+          echo "Running Playwright E2E tests..."
+          npm run test:e2e
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-staging
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Google Auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Run Staging Database Migrations
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          NODE_ENV: staging
+        run: |
+          echo "Running staging database migrations..."
+          npm run migrate
+
+      - name: Deploy to Staging App Engine
+        timeout-minutes: 15
+        env:
+          _STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          _STAGING_JWT_SECRET: ${{ secrets.STAGING_JWT_SECRET }}
+          _STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          _STAGING_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+          _STAGING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+          _STAGING_CORS_ORIGIN: ${{ secrets.STAGING_CORS_ORIGIN }}
+          _EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          _EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          _RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          _SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          _SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          _SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          _SMTP_USER: ${{ secrets.SMTP_USER }}
+          _SMTP_PASS: ${{ secrets.SMTP_PASS }}
+        run: |
+          echo "Deploying to staging App Engine service..."
+          envsubst < app.staging.yaml > app.staging.yaml.tmp && mv app.staging.yaml.tmp app.staging.yaml
+          gcloud app deploy app.staging.yaml --quiet --project=${{ env.PROJECT_ID }}
+          echo "Staging deployed: https://staging-dot-${{ env.PROJECT_ID }}.appspot.com"
