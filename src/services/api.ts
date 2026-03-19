@@ -336,8 +336,8 @@ class ApiService {
     }
 
     const responseData = (typedError as { response?: { data?: ApiError } })?.response?.data;
-    const responseMessage = responseData?.message || responseData?.error || responseData?.error?.message;
-    const responseCode = responseData?.error_code || responseData?.error?.code;
+    const responseMessage = responseData?.message || (typeof responseData?.error === 'string' ? responseData.error : undefined);
+    const responseCode = responseData?.error_code;
 
     if (responseMessage) {
       const enrichedError = new Error(responseMessage) as Error & { error_code?: string };
@@ -733,7 +733,7 @@ class ApiService {
       time: timeStr,
       mood: '💕', // Default mood
       notes: apiRecord.notes || '',
-      timestamp: apiRecord.created_at,
+      timestamp: apiRecord.created_at ?? '',
       photo: apiRecord.photo_url || apiRecord.photo_id, // Handle both formats
       description: apiRecord.description || '',
       duration: apiRecord.duration || '',

@@ -2,7 +2,15 @@ import Foundation
 
 // MARK: - API Configuration
 struct APIConfig {
-    static let baseURL = "http://localhost:8080/api" // Update for production
+    #if DEBUG
+    // Local development: run `npm run dev:backend` on your machine
+    static let baseURL = "http://localhost:8080/api"
+    #else
+    // Production: update this to your Google Cloud App Engine URL, e.g.:
+    // "https://your-project-id.uc.r.appspot.com/api"
+    // Find your project URL by running: gcloud app browse
+    static let baseURL = "https://your-project-id.uc.r.appspot.com/api"
+    #endif
     static let timeout: TimeInterval = 30.0
 }
 
