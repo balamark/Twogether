@@ -1566,6 +1566,26 @@ const LoveTimeApp = () => {
       return `${hours}:${minutes}`;
     };
 
+    const ACTIVITY_TYPES = [
+      { value: 'romantic',  label: '浪漫',  icon: '🌹' },
+      { value: 'intimate',  label: '親密',  icon: '💑' },
+      { value: 'date',      label: '約會',  icon: '🎬' },
+      { value: 'adventure', label: '冒險',  icon: '🏕️' },
+      { value: 'relaxing',  label: '放鬆',  icon: '🛁' },
+      { value: 'playful',   label: '嬉戲',  icon: '🎮' },
+      { value: 'emotional', label: '情感',  icon: '🤝' },
+      { value: 'other',     label: '其他',  icon: '✨' },
+    ];
+
+    const MOOD_OPTIONS = [
+      { emoji: '💕', label: '愛意' },
+      { emoji: '🔥', label: '激情' },
+      { emoji: '😍', label: '迷戀' },
+      { emoji: '🥰', label: '幸福' },
+      { emoji: '😘', label: '溫柔' },
+      { emoji: '🌟', label: '特別' },
+    ];
+
     const [recordForm, setRecordForm] = useState({
       date: selectedDate,
       time: getCurrentTime(),
@@ -1575,7 +1595,23 @@ const LoveTimeApp = () => {
       duration: '',
       location: '',
       photo: '',
-      roleplayScript: ''
+      roleplayScript: '',
+      activityType: ''
+    });
+
+    const [momentSearch, setMomentSearch] = useState('');
+    const [momentMoodFilter, setMomentMoodFilter] = useState('');
+    const [momentActivityFilter, setMomentActivityFilter] = useState('');
+
+    const filteredMoments = intimateRecords.filter(r => {
+      const q = momentSearch.toLowerCase();
+      const matchSearch = !q ||
+        r.description?.toLowerCase().includes(q) ||
+        r.location?.toLowerCase().includes(q) ||
+        r.notes?.toLowerCase().includes(q);
+      const matchMood = !momentMoodFilter || r.mood === momentMoodFilter;
+      const matchActivity = !momentActivityFilter || r.activityType === momentActivityFilter;
+      return matchSearch && matchMood && matchActivity;
     });
 
     const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1627,7 +1663,8 @@ const LoveTimeApp = () => {
         recordForm.description || undefined, // Convert empty string to undefined
         recordForm.duration || undefined,
         recordForm.location || undefined,
-        recordForm.roleplayScript || undefined
+        recordForm.roleplayScript || undefined,
+        recordForm.activityType || undefined
       );
       setShowRecordModal(false);
       setRecordForm({
@@ -1639,14 +1676,67 @@ const LoveTimeApp = () => {
         duration: '',
         location: '',
         photo: '',
-        roleplayScript: ''
+        roleplayScript: '',
+        activityType: ''
       });
     };
+
+    // Compute calendar statistics
+    const calendarStats = (() => {
+      const now = new Date();
+      const total = intimateRecords.length;
+      const thisMonth = intimateRecords.filter(r => {
+        const d = new Date(r.date);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      }).length;
+
+      const dateSet = new Set(intimateRecords.map(r => r.date.split('T')[0]));
+
+      // Current streak: consecutive days back from today
+      let currentStreak = 0;
+      const cur = new Date(); cur.setHours(0, 0, 0, 0);
+      while (dateSet.has(cur.toISOString().split('T')[0])) {
+        currentStreak++;
+        cur.setDate(cur.getDate() - 1);
+      }
+
+      // Longest streak: scan sorted dates
+      const sorted = [...dateSet].sort();
+      let longestStreak = 0, streak = 0;
+      let prev: Date | null = null;
+      for (const ds of sorted) {
+        const d = new Date(ds);
+        if (prev && (d.getTime() - prev.getTime()) === 86400000) {
+          streak++;
+        } else {
+          streak = 1;
+        }
+        if (streak > longestStreak) longestStreak = streak;
+        prev = d;
+      }
+
+      return { total, thisMonth, currentStreak, longestStreak };
+    })();
 
     return (
       <div className="space-y-6">
         <div className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-6 rounded-2xl">
-          <h2 className="text-2xl font-bold mb-4">愛的日曆</h2>
+          <h2 className="text-2xl font-bold mb-3">愛的日曆</h2>
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            {[
+              { icon: '❤️', label: '總記錄', value: calendarStats.total },
+              { icon: '☀️', label: '本月',   value: calendarStats.thisMonth },
+              { icon: '🔥', label: '連續天', value: calendarStats.currentStreak },
+              { icon: '🏆', label: '最佳連勝', value: calendarStats.longestStreak },
+            ].map(({ icon, label, value }) => (
+              <div key={label} className="bg-white bg-opacity-20 rounded-xl p-3 text-center">
+                <div className="text-xl mb-0.5">{icon}</div>
+                <div className="text-2xl font-bold">{value}</div>
+                <div className="text-xs text-pink-100">{label}</div>
+              </div>
+            ))}
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium mb-2">選擇日期</label>
@@ -1822,21 +1912,43 @@ const LoveTimeApp = () => {
                     </select>
                   </div>
 
+                  {/* Activity Type */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">活動類型</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {ACTIVITY_TYPES.map(({ value, label, icon }) => (
+                        <button
+                          key={value}
+                          onClick={() => setRecordForm({...recordForm, activityType: recordForm.activityType === value ? '' : value})}
+                          className={`flex flex-col items-center p-2 rounded-lg border-2 text-sm transition-colors ${
+                            recordForm.activityType === value
+                              ? 'border-purple-500 bg-purple-50 text-purple-700'
+                              : 'border-gray-200 hover:border-purple-300 text-gray-600'
+                          }`}
+                        >
+                          <span className="text-xl mb-1">{icon}</span>
+                          <span className="text-xs font-medium">{label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Mood and Notes */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">心情</label>
                     <div className="flex space-x-2">
-                      {['💕', '🔥', '😍', '🥰', '😘', '🌟'].map(emoji => (
+                      {MOOD_OPTIONS.map(({ emoji, label }) => (
                         <button
                           key={emoji}
                           onClick={() => setRecordForm({...recordForm, mood: emoji})}
-                          className={`p-2 text-2xl rounded-lg border-2 ${
-                            recordForm.mood === emoji 
-                              ? 'border-pink-500 bg-pink-50' 
+                          className={`flex flex-col items-center p-2 rounded-lg border-2 transition-colors ${
+                            recordForm.mood === emoji
+                              ? 'border-pink-500 bg-pink-50'
                               : 'border-gray-300 hover:border-pink-300'
                           }`}
                         >
-                          {emoji}
+                          <span className="text-2xl">{emoji}</span>
+                          <span className="text-xs text-gray-500 mt-0.5">{label}</span>
                         </button>
                       ))}
                     </div>
@@ -1873,13 +1985,54 @@ const LoveTimeApp = () => {
         )}
 
         <div className="bg-white rounded-2xl shadow-lg p-6">
-          <h3 className="text-xl font-bold text-gray-800 mb-4">
-            親密記錄 ({intimateRecords.length} 次)
-          </h3>
+          {/* Search & Filter Controls */}
+          <div className="mb-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <h3 className="text-xl font-bold text-gray-800 flex-1">
+                親密記錄 ({intimateRecords.length} 次)
+              </h3>
+            </div>
+            <input
+              type="text"
+              placeholder="搜尋記錄 (描述、地點、備註)..."
+              value={momentSearch}
+              onChange={e => setMomentSearch(e.target.value)}
+              className="w-full p-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-pink-500 focus:border-pink-500"
+            />
+            <div className="flex flex-wrap gap-1.5">
+              <span className="text-xs text-gray-500 self-center mr-1">心情：</span>
+              <button
+                onClick={() => setMomentMoodFilter('')}
+                className={`px-2.5 py-1 rounded-full text-xs border ${!momentMoodFilter ? 'bg-pink-500 text-white border-pink-500' : 'border-gray-300 text-gray-600 hover:border-pink-300'}`}
+              >全部</button>
+              {MOOD_OPTIONS.map(({ emoji, label }) => (
+                <button
+                  key={emoji}
+                  onClick={() => setMomentMoodFilter(momentMoodFilter === emoji ? '' : emoji)}
+                  className={`px-2.5 py-1 rounded-full text-xs border ${momentMoodFilter === emoji ? 'bg-pink-500 text-white border-pink-500' : 'border-gray-300 text-gray-600 hover:border-pink-300'}`}
+                >{emoji} {label}</button>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              <span className="text-xs text-gray-500 self-center mr-1">類型：</span>
+              <button
+                onClick={() => setMomentActivityFilter('')}
+                className={`px-2.5 py-1 rounded-full text-xs border ${!momentActivityFilter ? 'bg-purple-500 text-white border-purple-500' : 'border-gray-300 text-gray-600 hover:border-purple-300'}`}
+              >全部</button>
+              {ACTIVITY_TYPES.map(({ value, label, icon }) => (
+                <button
+                  key={value}
+                  onClick={() => setMomentActivityFilter(momentActivityFilter === value ? '' : value)}
+                  className={`px-2.5 py-1 rounded-full text-xs border ${momentActivityFilter === value ? 'bg-purple-500 text-white border-purple-500' : 'border-gray-300 text-gray-600 hover:border-purple-300'}`}
+                >{icon} {label}</button>
+              ))}
+            </div>
+          </div>
+
           <div className="space-y-3 max-h-96 overflow-y-auto">
-            {intimateRecords.slice().reverse().map((record) => (
-              <div 
-                key={record.id} 
+            {filteredMoments.slice().reverse().map((record) => (
+              <div
+                key={record.id}
                 className="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow cursor-pointer"
                 onClick={() => showRecordDetails(record.id)}
               >
@@ -1937,6 +2090,11 @@ const LoveTimeApp = () => {
             {intimateRecords.length === 0 && (
               <div className="text-center py-8 text-gray-500">
                 還沒有記錄，開始你們的愛情之旅吧！
+              </div>
+            )}
+            {intimateRecords.length > 0 && filteredMoments.length === 0 && (
+              <div className="text-center py-8 text-gray-500">
+                沒有符合條件的記錄
               </div>
             )}
           </div>
