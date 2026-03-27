@@ -216,8 +216,10 @@ struct CalendarView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(color)
                 .cornerRadius(14)
+                .accessibilityIdentifier("statCard_\(title)")
             }
         }
+        .accessibilityIdentifier("calendarStatsGrid")
     }
 
     private var calendarCard: some View {
@@ -740,6 +742,7 @@ struct EmptyDayView: View {
                 .clipShape(Capsule())
                 .shadow(color: .pink.opacity(0.25), radius: 8, x: 0, y: 4)
             }
+            .accessibilityIdentifier("addMomentButton")
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)

@@ -157,6 +157,7 @@ struct AuthenticationView: View {
                                     .autocorrectionDisabled()
                                     .padding(.horizontal, 20)
                                     .padding(.vertical, 16)
+                                    .accessibilityIdentifier("emailField")
                                     .background(
                                         RoundedRectangle(cornerRadius: 16)
                                             .fill(Color(.systemBackground))
@@ -179,6 +180,7 @@ struct AuthenticationView: View {
                                     .font(.system(size: 16, weight: .medium))
                                     .padding(.horizontal, 20)
                                     .padding(.vertical, 16)
+                                    .accessibilityIdentifier("passwordField")
                                     .background(
                                         RoundedRectangle(cornerRadius: 16)
                                             .fill(Color(.systemBackground))
@@ -189,7 +191,7 @@ struct AuthenticationView: View {
                                             )
                                     )
                             }
-                            
+
                             // Confirm Password (Registration only) with modern styling
                             if !isLogin {
                                 VStack(alignment: .leading, spacing: 8) {
@@ -266,31 +268,18 @@ struct AuthenticationView: View {
                                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                         .scaleEffect(0.9)
                                 }
-                                
+
                                 Text(isLogin ? "Sign In" : "Create Account")
                                     .font(.system(size: 18, weight: .bold))
                             }
                             .frame(maxWidth: .infinity)
                             .frame(height: 56)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(
-                                        LinearGradient(
-                                            gradient: Gradient(colors: [.pink, .purple]),
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                                    .shadow(color: .pink.opacity(0.4), radius: 12, x: 0, y: 6)
-                            )
-                            .foregroundColor(.white)
-                            .scaleEffect(isFormValid ? 1.0 : 0.95)
-                            .opacity(isFormValid ? 1.0 : 0.6)
                         }
+                        .accessibilityIdentifier(isLogin ? "loginButton" : "registerButton")
                         .disabled(isLoading || !isFormValid)
                         .padding(.horizontal, 24)
                         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isFormValid)
-                        
+
                         // Enhanced Toggle Mode Button
                         Button(action: toggleMode) {
                             HStack(spacing: 6) {
@@ -309,7 +298,8 @@ struct AuthenticationView: View {
                             }
                             .padding(.vertical, 16)
                         }
-                        
+                        .accessibilityIdentifier("switchToSignup")
+
                         Spacer(minLength: 40)
                     }
                 }
@@ -480,7 +470,7 @@ struct PairingView: View {
                                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                                 .scaleEffect(0.9)
                                         }
-                                        
+
                                         Text("Generate Pairing Code")
                                             .font(.system(size: 18, weight: .bold))
                                     }
@@ -500,6 +490,7 @@ struct PairingView: View {
                                     .foregroundColor(.white)
                                     .scaleEffect(isGenerating ? 0.95 : 1.0)
                                 }
+                                .accessibilityIdentifier("generateCodeButton")
                                 .disabled(isGenerating)
                                 .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isGenerating)
                                 
@@ -510,6 +501,7 @@ struct PairingView: View {
                                             .foregroundColor(.secondary)
                                         
                                         Text(generatedCode)
+                                            .accessibilityIdentifier("pairingCodeDisplay")
                                             .font(.system(size: 32, weight: .bold))
                                             .foregroundStyle(
                                                 LinearGradient(
@@ -580,6 +572,7 @@ struct PairingView: View {
                                         .autocapitalization(.allCharacters)
                                         .autocorrectionDisabled()
                                         .frame(minHeight: 50) // Touch-friendly
+                                        .accessibilityIdentifier("partnerCodeField")
                                         .onChange(of: pairingCode) { _, newValue in
                                             // Format as uppercase and limit to 8 chars
                                             let formatted = String(newValue.uppercased().prefix(8))
@@ -607,6 +600,7 @@ struct PairingView: View {
                                     .cornerRadius(16)
                                     .shadow(color: pairingCode.count == 8 ? .pink.opacity(0.3) : .clear, radius: 6, y: 3)
                                 }
+                                .accessibilityIdentifier("pairButton")
                                 .disabled(pairingCode.count != 8 || isPairing)
                             }
                         }

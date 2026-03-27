@@ -104,6 +104,7 @@ struct LoveMomentFormView: View {
                                 RoundedRectangle(cornerRadius: 12)
                                     .stroke(description.isEmpty ? Color.gray.opacity(0.3) : Color.pink.opacity(0.5), lineWidth: 1)
                             )
+                            .accessibilityIdentifier("momentDescriptionField")
                     }
                     
                     // Mood Section
@@ -229,6 +230,7 @@ struct LoveMomentFormView: View {
                     Button(isEditing ? "Update" : "Save") {
                         saveMoment()
                     }
+                    .accessibilityIdentifier("saveMomentButton")
                     .disabled(isLoading)
                     .fontWeight(.semibold)
                 }
