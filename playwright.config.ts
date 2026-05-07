@@ -39,6 +39,8 @@ export default defineConfig({
     },
   ],
 
+  globalSetup: './tests/global-setup.ts',
+
   /* Run your local dev server before starting the tests */
   webServer: [
     {
@@ -48,9 +50,9 @@ export default defineConfig({
       timeout: 120 * 1000,
       env: {
         ...process.env,
-        NODE_ENV: 'development',
-        DATABASE_URL: 'postgresql://postgres.gqhoebnveeaishflmkqv:ucFCg5Xy22XDyy68@aws-0-ap-southeast-1.pooler.supabase.com:5432/postgres',
-        JWT_SECRET: 'CHANGE-THIS-TO-A-SECURE-RANDOM-STRING-IN-PRODUCTION',
+        NODE_ENV: process.env.NODE_ENV || 'development',
+        DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/twogether_test',
+        JWT_SECRET: process.env.JWT_SECRET || 'dev-secret-do-not-use-in-prod',
         PORT: '8080'
       }
     },

@@ -18,6 +18,9 @@ test.describe('Intimacy Record Flow', () => {
   // No mocking - use real backend for true E2E testing
 
   test('should complete full intimacy record creation flow', async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('pairingPromptDismissed', 'true');
+    });
     // Navigate to the app
     await page.goto('/');
 

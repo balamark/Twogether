@@ -20,6 +20,9 @@ const TEST_SCRIPT = {
 
 test.describe('Custom Script Upload and Persistence', () => {
   test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem('pairingPromptDismissed', 'true');
+    });
     // Navigate to the app
     await page.goto('/');
     await page.waitForLoadState('networkidle');
