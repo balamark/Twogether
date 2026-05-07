@@ -110,7 +110,7 @@ interface AcceptPairingInvitationResponse {
 
 interface ApiError {
   message?: string;
-  error?: string;
+  error?: string | { message?: string; code?: string };
   error_code?: string;
   status?: number;
 }
@@ -336,8 +336,10 @@ class ApiService {
     }
 
     const responseData = (typedError as { response?: { data?: ApiError } })?.response?.data;
-    const responseMessage = responseData?.message || responseData?.error || responseData?.error?.message;
-    const responseCode = responseData?.error_code || responseData?.error?.code;
+    const nestedError = responseData?.error && typeof responseData.error === 'object' ? responseData.error : undefined;
+    const stringError = typeof responseData?.error === 'string' ? responseData.error : undefined;
+    const responseMessage = responseData?.message || stringError || nestedError?.message;
+    const responseCode = responseData?.error_code || nestedError?.code;
 
     if (responseMessage) {
       const enrichedError = new Error(responseMessage) as Error & { error_code?: string };
@@ -733,7 +735,7 @@ class ApiService {
       time: timeStr,
       mood: '💕', // Default mood
       notes: apiRecord.notes || '',
-      timestamp: apiRecord.created_at,
+      timestamp: apiRecord.created_at || new Date().toISOString(),
       photo: apiRecord.photo_url || apiRecord.photo_id, // Handle both formats
       description: apiRecord.description || '',
       duration: apiRecord.duration || '',

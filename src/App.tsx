@@ -117,6 +117,7 @@ interface User {
   gender?: 'male' | 'female' | 'other';
   partnerId?: string;
   partnerCode?: string;
+  partnerNickname?: string;
   createdAt: string;
 }
 
