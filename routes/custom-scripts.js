@@ -1,9 +1,41 @@
 const express = require('express');
+const multer = require('multer');
+const sharp = require('sharp');
+const { v4: uuidv4 } = require('uuid');
 const { body, validationResult } = require('express-validator');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
+const { uploadToSupabase } = require('../lib/supabase-storage');
+const { logDbError, errorResponseBody } = require('../lib/db-errors');
 
 const router = express.Router();
+
+const thumbnailUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB
+    files: 1,
+  },
+  fileFilter: (req, file, cb) => {
+    if (!file.originalname.match(/\.(jpg|jpeg|png|webp|gif)$/i)) {
+      return cb(new Error('只允許上傳圖片文件 (jpg, jpeg, png, webp, gif)'), false);
+    }
+    cb(null, true);
+  },
+});
+
+// Parses `tags` form-field (JSON string from multipart) into an array.
+// JSON body requests pass an array directly — return as-is in that case.
+function normalizeTags(input) {
+  if (Array.isArray(input)) return input;
+  if (typeof input !== 'string' || input === '') return [];
+  try {
+    const parsed = JSON.parse(input);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 // All custom script routes require authentication
 router.use(authenticateToken);
@@ -25,7 +57,7 @@ router.get('/', async (req, res) => {
     const scriptsResult = await db.query(`
       SELECT
         id, title, category, scenario, content, tags, duration,
-        created_by, created_at, updated_at
+        thumbnail_url, created_by, created_at, updated_at
       FROM custom_scripts
       WHERE couple_id = $1 OR (couple_id IS NULL AND created_by = $2)
       ORDER BY created_at DESC
@@ -39,6 +71,7 @@ router.get('/', async (req, res) => {
       script: script.content, // Map content to script for frontend compatibility
       tags: script.tags || [],
       duration: script.duration || '15-30分鐘',
+      thumbnailUrl: script.thumbnail_url,
       isCustom: true,
       createdBy: script.created_by,
       createdAt: script.created_at
@@ -50,16 +83,14 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get custom scripts error:', error);
-    res.status(500).json({
-      success: false,
-      message: '無法獲取自訂劇本'
-    });
+    logDbError('Get custom scripts error:', error, { user_id: req.user?.id });
+    res.status(500).json(errorResponseBody('無法獲取自訂劇本', error));
   }
 });
 
-// Create new custom script
-router.post('/', [
+// Create new custom script — accepts multipart (with optional `thumbnail` file)
+// or plain JSON. multer is a no-op when content-type is not multipart.
+router.post('/', thumbnailUpload.single('thumbnail'), [
   body('title')
     .isLength({ min: 1, max: 100 })
     .withMessage('標題必須在1-100個字符之間'),
@@ -72,10 +103,6 @@ router.post('/', [
   body('content')
     .isLength({ min: 1, max: 5000 })
     .withMessage('劇本內容必須在1-5000個字符之間'),
-  body('tags')
-    .optional()
-    .isArray()
-    .withMessage('標籤必須是數組格式'),
   body('duration')
     .optional()
     .isLength({ max: 50 })
@@ -91,7 +118,8 @@ router.post('/', [
       });
     }
 
-    const { title, category, scenario, content, tags = [], duration = '15-30分鐘' } = req.body;
+    const { title, category, scenario, content, duration = '15-30分鐘' } = req.body;
+    const tags = normalizeTags(req.body.tags);
     const userId = req.user.id;
 
     // Find user's couple (optional - users can create personal scripts)
@@ -103,13 +131,23 @@ router.post('/', [
     // Use couple_id if exists, otherwise null for personal scripts
     const coupleId = coupleResult.rows.length > 0 ? coupleResult.rows[0].id : null;
 
+    let thumbnailUrl = null;
+    if (req.file) {
+      const processed = await sharp(req.file.buffer)
+        .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 80, progressive: true })
+        .toBuffer();
+      const fileName = `custom-script-thumbnails/${uuidv4()}-${Date.now()}.jpg`;
+      thumbnailUrl = await uploadToSupabase(processed, fileName, 'image/jpeg');
+    }
+
     // Insert custom script
     const scriptResult = await db.query(`
       INSERT INTO custom_scripts (
-        couple_id, title, category, scenario, content, tags, duration, created_by
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      RETURNING id, title, category, scenario, content, tags, duration, created_by, created_at
-    `, [coupleId, title, category, scenario, content, JSON.stringify(tags), duration, userId]);
+        couple_id, title, category, scenario, content, tags, duration, created_by, thumbnail_url
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING id, title, category, scenario, content, tags, duration, thumbnail_url, created_by, created_at
+    `, [coupleId, title, category, scenario, content, JSON.stringify(tags), duration, userId, thumbnailUrl]);
 
     const script = scriptResult.rows[0];
 
@@ -122,8 +160,9 @@ router.post('/', [
         category: script.category,
         scenario: script.scenario,
         script: script.content,
-        tags: JSON.parse(script.tags || '[]'),
+        tags: Array.isArray(script.tags) ? script.tags : JSON.parse(script.tags || '[]'),
         duration: script.duration,
+        thumbnailUrl: script.thumbnail_url,
         isCustom: true,
         createdBy: script.created_by,
         createdAt: script.created_at
@@ -131,11 +170,8 @@ router.post('/', [
     });
 
   } catch (error) {
-    console.error('Create custom script error:', error);
-    res.status(500).json({
-      success: false,
-      message: '創建劇本失敗'
-    });
+    logDbError('Create custom script error:', error, { user_id: req.user?.id });
+    res.status(500).json(errorResponseBody('創建劇本失敗', error));
   }
 });
 

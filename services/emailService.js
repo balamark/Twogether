@@ -19,15 +19,19 @@ class EmailService {
     };
 
     if (!emailConfig.host || !emailConfig.auth.user || !emailConfig.auth.pass) {
-      console.warn('⚠️ Email service not configured properly. Email features will be disabled.');
+      if (process.env.NODE_ENV !== 'test') {
+        console.warn('Email service not configured properly. Email features will be disabled.');
+      }
       return;
     }
 
     try {
       this.transporter = nodemailer.createTransport(emailConfig);
-      console.log('✅ Email service initialized successfully');
+      if (process.env.NODE_ENV !== 'test') {
+        console.log('Email service initialized successfully');
+      }
     } catch (error) {
-      console.error('❌ Failed to initialize email service:', error);
+      console.error('Failed to initialize email service:', error);
     }
   }
 

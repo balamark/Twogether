@@ -1,6 +1,8 @@
 const { Pool } = require('pg');
 const path = require('path');
 
+const QUIET = process.env.NODE_ENV === 'test' && process.env.LOG_VERBOSE !== '1';
+
 // Load environment variables based on NODE_ENV
 if (process.env.NODE_ENV === 'test') {
   require('dotenv').config({ path: path.join(__dirname, '..', '.env.test') });
@@ -30,11 +32,11 @@ const pool = new Pool({
 
 // Test the connection
 pool.on('connect', () => {
-  console.log('✅ Connected to PostgreSQL database');
+  if (!QUIET) console.log('Connected to PostgreSQL database');
 });
 
 pool.on('error', (err) => {
-  console.error('❌ PostgreSQL connection error:', err);
+  console.error('PostgreSQL connection error:', err);
 });
 
 // Database query helper
@@ -42,11 +44,13 @@ const query = async (text, params) => {
   const start = Date.now();
   try {
     const res = await pool.query(text, params);
-    const duration = Date.now() - start;
-    console.log('📊 Query executed', { text: text.substring(0, 50) + '...', duration, rows: res.rowCount });
+    if (!QUIET) {
+      const duration = Date.now() - start;
+      console.log('Query executed', { text: text.substring(0, 50) + '...', duration, rows: res.rowCount });
+    }
     return res;
   } catch (error) {
-    console.error('❌ Database query error:', { text, error: error.message });
+    console.error('Database query error:', { text, error: error.message });
     throw error;
   }
 };
@@ -69,9 +73,9 @@ const transaction = async (callback) => {
 
 // Close pool gracefully
 const close = async () => {
-  console.log('🔄 Closing database connection pool...');
+  if (!QUIET) console.log('Closing database connection pool...');
   await pool.end();
-  console.log('✅ Database connection pool closed');
+  if (!QUIET) console.log('Database connection pool closed');
 };
 
 module.exports = {

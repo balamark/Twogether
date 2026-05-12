@@ -36,7 +36,6 @@ async function ensureTestUser() {
       data: { email: TEST_USER.email, password: TEST_USER.password },
     });
     if (loginRes.ok()) {
-      console.log(`[global-setup] test user ${TEST_USER.email} already exists`);
       return;
     }
 

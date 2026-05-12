@@ -33,10 +33,8 @@ test.describe('Intimacy Record Flow', () => {
     const recordButton = page.locator('button:has-text("記錄今天的愛 ❤️")');
 
     // Check if we're already logged in by looking for the record button
-    if (await recordButton.isVisible({ timeout: 2000 })) {
-      console.log('User already logged in, proceeding to record');
-    } else if (await loginButton.isVisible({ timeout: 3000 })) {
-      console.log('Login required, proceeding with authentication');
+    const alreadyLoggedIn = await recordButton.isVisible({ timeout: 2000 });
+    if (!alreadyLoggedIn && await loginButton.isVisible({ timeout: 3000 })) {
       await loginButton.click();
       await page.waitForTimeout(1000);
 

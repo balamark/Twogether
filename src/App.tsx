@@ -83,6 +83,7 @@ interface ApiCustomScript {
   content?: string;
   tags?: string[];
   duration?: string;
+  thumbnailUrl?: string;
   isCustom?: boolean;
   createdBy?: string;
   createdAt?: string;
@@ -919,6 +920,7 @@ const LoveTimeApp = () => {
             script: script.script || script.content || '',
             tags: script.tags || [],
             duration: script.duration,
+            image: script.thumbnailUrl,
             isCustom: script.isCustom ?? true,
             createdBy: script.createdBy,
             createdAt: script.createdAt
@@ -1236,7 +1238,7 @@ const LoveTimeApp = () => {
     return formattedLines.join('\n\n');
   };
 
-  const addCustomScript = async (title: string, category: 'romantic' | 'adventurous' | 'school' | 'bold', scenario: string, content: string, tags: string[] = []) => {
+  const addCustomScript = async (title: string, category: 'romantic' | 'adventurous' | 'school' | 'bold', scenario: string, content: string, tags: string[] = [], thumbnail?: File) => {
     try {
       // Create script via backend API
       const rawScript = await apiService.createCustomScript({
@@ -1245,7 +1247,8 @@ const LoveTimeApp = () => {
         scenario,
         content: parseScriptContent(content),
         tags,
-        duration: '15-30分鐘'
+        duration: '15-30分鐘',
+        thumbnail
       });
 
       // Transform the response to match RoleplayScript interface
@@ -1258,6 +1261,7 @@ const LoveTimeApp = () => {
         script: typedScript.script || typedScript.content || parseScriptContent(content),
         tags: typedScript.tags || tags,
         duration: typedScript.duration || '15-30分鐘',
+        image: typedScript.thumbnailUrl,
         isCustom: true,
         createdBy: typedScript.createdBy,
         createdAt: typedScript.createdAt
@@ -2601,11 +2605,33 @@ const LoveTimeApp = () => {
       content: '',
       tags: ''
     });
+    const [thumbnail, setThumbnail] = useState<File | null>(null);
+    const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+
+    useEffect(() => {
+      if (!thumbnail) {
+        setThumbnailPreview(null);
+        return;
+      }
+      const url = URL.createObjectURL(thumbnail);
+      setThumbnailPreview(url);
+      return () => URL.revokeObjectURL(url);
+    }, [thumbnail]);
+
+    const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0] ?? null;
+      if (file && file.size > 5 * 1024 * 1024) {
+        alert('縮圖大小不能超過 5MB');
+        e.target.value = '';
+        return;
+      }
+      setThumbnail(file);
+    };
 
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       const tags = scriptData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
-      addCustomScript(scriptData.title, scriptData.category, scriptData.scenario, scriptData.content, tags);
+      addCustomScript(scriptData.title, scriptData.category, scriptData.scenario, scriptData.content, tags, thumbnail ?? undefined);
     };
 
     return (
@@ -2714,6 +2740,27 @@ const LoveTimeApp = () => {
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                 placeholder="浪漫, 晚餐, 月光"
               />
+            </div>
+
+            <div>
+              <label htmlFor="script-thumbnail" className="block text-sm font-medium text-gray-700 mb-2">
+                縮圖（選填，最大 5MB）
+              </label>
+              <input
+                id="script-thumbnail"
+                name="script-thumbnail"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleThumbnailChange}
+                className="w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100"
+              />
+              {thumbnailPreview && (
+                <img
+                  src={thumbnailPreview}
+                  alt="thumbnail preview"
+                  className="mt-2 w-24 h-24 object-cover rounded-lg border border-gray-200"
+                />
+              )}
             </div>
 
             <button

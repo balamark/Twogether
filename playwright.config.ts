@@ -1,4 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Load .env.test so `npx playwright test` works without manual env exports.
+// We intentionally do NOT load .env or .env.local here — tests must always
+// use the locked-down test config which points at the local test DB.
+dotenv.config({ path: path.resolve(__dirname, '.env.test'), override: true });
 
 /**
  * @see https://playwright.dev/docs/test-configuration
@@ -40,18 +47,19 @@ export default defineConfig({
   ],
 
   globalSetup: './tests/global-setup.ts',
+  globalTeardown: './tests/global-teardown.ts',
 
   /* Run your local dev server before starting the tests */
   webServer: [
     {
-      command: 'npm run dev:backend',
+      command: 'node scripts/setup-test-db.js && node server.js',
       url: 'http://localhost:8080',
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
       env: {
         ...process.env,
-        NODE_ENV: process.env.NODE_ENV || 'development',
-        DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/twogether_test',
+        NODE_ENV: 'test',
+        DATABASE_URL: process.env.DATABASE_URL || 'postgresql://twogether:twogether123@localhost:5432/twogether_test',
         JWT_SECRET: process.env.JWT_SECRET || 'dev-secret-do-not-use-in-prod',
         PORT: '8080'
       }

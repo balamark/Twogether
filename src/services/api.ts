@@ -1139,9 +1139,25 @@ class ApiService {
     content: string;
     tags?: string[];
     duration?: string;
+    thumbnail?: File;
   }): Promise<unknown> {
     try {
-      const response = await apiClient.post('/custom-scripts', script);
+      if (script.thumbnail) {
+        const fd = new FormData();
+        fd.append('title', script.title);
+        fd.append('category', script.category);
+        fd.append('scenario', script.scenario);
+        fd.append('content', script.content);
+        fd.append('duration', script.duration ?? '15-30分鐘');
+        fd.append('tags', JSON.stringify(script.tags ?? []));
+        fd.append('thumbnail', script.thumbnail);
+        const response = await apiClient.post('/custom-scripts', fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data.custom_script;
+      }
+      const { thumbnail: _unused, ...payload } = script;
+      const response = await apiClient.post('/custom-scripts', payload);
       return response.data.custom_script;
     } catch (error) {
       console.error('Failed to create custom script:', error);

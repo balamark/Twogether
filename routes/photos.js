@@ -1,10 +1,10 @@
 const express = require('express');
 const multer = require('multer');
 const sharp = require('sharp');
-const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
+const { uploadToSupabase } = require('../lib/supabase-storage');
 
 const router = express.Router();
 
@@ -25,37 +25,6 @@ const upload = multer({
 
 // All photo routes require authentication
 router.use(authenticateToken);
-
-// Upload photo to Supabase
-async function uploadToSupabase(fileBuffer, fileName, mimeType) {
-  try {
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Supabase configuration missing');
-    }
-
-    const uploadUrl = `${supabaseUrl}/storage/v1/object/photos/${fileName}`;
-    
-    const response = await axios.post(uploadUrl, fileBuffer, {
-      headers: {
-        'Authorization': `Bearer ${supabaseKey}`,
-        'Content-Type': mimeType,
-        'Content-Length': fileBuffer.length
-      }
-    });
-
-    if (response.status !== 200) {
-      throw new Error(`Upload failed with status ${response.status}`);
-    }
-
-    return `${supabaseUrl}/storage/v1/object/public/photos/${fileName}`;
-  } catch (error) {
-    console.error('Supabase upload error:', error);
-    throw new Error('Failed to upload to storage');
-  }
-}
 
 // Upload photo
 router.post('/upload', upload.single('photo'), async (req, res) => {

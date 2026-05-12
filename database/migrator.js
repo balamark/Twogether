@@ -2,6 +2,8 @@ const fs = require('fs').promises;
 const path = require('path');
 const db = require('./db');
 
+const QUIET = process.env.NODE_ENV === 'test' && process.env.LOG_VERBOSE !== '1';
+
 class Migrator {
   constructor() {
     this.migrationsPath = path.join(__dirname, 'migrations');
@@ -47,7 +49,7 @@ class Migrator {
         .sort((a, b) => a.version - b.version);
     } catch (error) {
       if (error.code === 'ENOENT') {
-        console.info('📁 Creating migrations directory...');
+        console.info('Creating migrations directory...');
         await fs.mkdir(this.migrationsPath, { recursive: true });
         return [];
       }
@@ -57,7 +59,7 @@ class Migrator {
 
   async applyMigration(migration) {
     const startTime = Date.now();
-    console.info(`🔄 Applying migration ${migration.version}: ${migration.description}`);
+    console.info(`Applying migration ${migration.version}: ${migration.description}`);
 
     try {
       const sql = await fs.readFile(migration.filepath, 'utf8');
@@ -75,10 +77,10 @@ class Migrator {
         `, [migration.version, migration.description, checksum, executionTime]);
       });
 
-      console.info(`✅ Migration ${migration.version} applied successfully (${Date.now() - startTime}ms)`);
+      console.info(`Migration ${migration.version} applied successfully (${Date.now() - startTime}ms)`);
       return true;
     } catch (error) {
-      console.error(`❌ Migration ${migration.version} failed:`, error.message);
+      console.error(`Migration ${migration.version} failed:`, error.message);
 
       // Record failed migration
       try {
@@ -96,8 +98,6 @@ class Migrator {
   }
 
   async migrate() {
-    console.info('🚀 Starting database migration...');
-
     await this.ensureMigrationsTable();
 
     const appliedMigrations = await this.getAppliedMigrations();
@@ -108,17 +108,15 @@ class Migrator {
     );
 
     if (pendingMigrations.length === 0) {
-      console.info('✅ Database is up to date');
+      if (!QUIET) console.info('Database is up to date');
       return;
     }
 
-    console.info(`📋 Found ${pendingMigrations.length} pending migrations`);
-
+    console.info(`Applying ${pendingMigrations.length} pending migration(s)`);
     for (const migration of pendingMigrations) {
       await this.applyMigration(migration);
     }
-
-    console.info('🎉 All migrations completed successfully');
+    console.info('All migrations completed successfully');
   }
 
   async status() {
@@ -127,7 +125,7 @@ class Migrator {
     const appliedMigrations = await this.getAppliedMigrations();
     const migrationFiles = await this.getMigrationFiles();
 
-    console.info('\n📊 Migration Status:');
+    console.info('\nMigration Status:');
     console.info('==================');
 
     if (migrationFiles.length === 0) {
@@ -136,7 +134,7 @@ class Migrator {
     }
 
     for (const migration of migrationFiles) {
-      const status = appliedMigrations.includes(migration.version) ? '✅ Applied' : '⏳ Pending';
+      const status = appliedMigrations.includes(migration.version) ? 'Applied' : 'Pending';
       console.info(`${status} - ${migration.version}_${migration.description}`);
     }
 

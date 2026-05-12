@@ -81,8 +81,8 @@ app.use(helmet({
   }
 }));
 
-// CORS configuration for development
-if (process.env.NODE_ENV === 'development') {
+// CORS configuration for development and test (frontend on :5174 → backend on :8080)
+if (['development', 'test'].includes(process.env.NODE_ENV)) {
   app.use(cors({
     origin: process.env.CORS_ORIGIN || 'http://localhost:5174',
     credentials: true

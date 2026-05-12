@@ -2,6 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
+const { logDbError, errorResponseBody } = require('../lib/db-errors');
 
 const router = express.Router();
 
@@ -49,11 +50,8 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get custom gifts error:', error);
-    res.status(500).json({
-      success: false,
-      message: '無法獲取自訂禮品'
-    });
+    logDbError('Get custom gifts error:', error, { user_id: req.user?.id });
+    res.status(500).json(errorResponseBody('無法獲取自訂禮品', error));
   }
 });
 
@@ -125,11 +123,8 @@ router.post('/', [
     });
 
   } catch (error) {
-    console.error('Create custom gift error:', error);
-    res.status(500).json({
-      success: false,
-      message: '創建禮品失敗'
-    });
+    logDbError('Create custom gift error:', error, { user_id: req.user?.id });
+    res.status(500).json(errorResponseBody('創建禮品失敗', error));
   }
 });
 

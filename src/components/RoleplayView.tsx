@@ -180,13 +180,25 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {customScripts.map((script) => (
                 <div key={script.id} className="bg-white border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-bold text-gray-800">{script.title}</h4>
-                    <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-600">
-                      自訂
-                    </span>
+                  <div className="flex items-start gap-3 mb-2">
+                    {script.image && (
+                      <img
+                        src={script.image}
+                        alt={script.title}
+                        className="w-16 h-16 object-cover rounded-lg flex-shrink-0 border border-gray-200"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="font-bold text-gray-800 truncate">{script.title}</h4>
+                        <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-600 flex-shrink-0">
+                          自訂
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">{script.scenario}</p>
+                    </div>
                   </div>
-                  <p className="text-sm text-gray-600 mb-3">{script.scenario}</p>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2 text-xs text-gray-500">
                       {script.tags?.map((tag, tagIndex) => (

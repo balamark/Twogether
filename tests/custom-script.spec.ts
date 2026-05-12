@@ -32,10 +32,8 @@ test.describe('Custom Script Upload and Persistence', () => {
     const loginButton = page.locator('button:has-text("登入 / 註冊")');
     const recordButton = page.locator('button:has-text("記錄今天的愛 ❤️")');
 
-    if (await recordButton.isVisible({ timeout: 2000 })) {
-      console.log('User already logged in');
-    } else if (await loginButton.isVisible({ timeout: 3000 })) {
-      console.log('Login required, proceeding with authentication');
+    const alreadyLoggedIn = await recordButton.isVisible({ timeout: 2000 });
+    if (!alreadyLoggedIn && await loginButton.isVisible({ timeout: 3000 })) {
       await loginButton.click();
       await page.waitForTimeout(1000);
 
@@ -147,8 +145,6 @@ test.describe('Custom Script Upload and Persistence', () => {
     // Verify the script has the "自訂" (custom) badge
     const customBadge = page.locator('span:has-text("自訂")');
     await expect(customBadge.first()).toBeVisible({ timeout: 3000 });
-
-    console.log('✓ Custom script uploaded successfully');
   });
 
   test.skip('should persist custom script after page reload', async ({ page }) => {
@@ -186,8 +182,6 @@ test.describe('Custom Script Upload and Persistence', () => {
     const scriptBeforeReload = page.locator(`text=${uniqueTitle}`);
     await expect(scriptBeforeReload.first()).toBeVisible({ timeout: 5000 });
 
-    console.log('✓ Script visible before reload');
-
     // Reload the page
     await page.reload();
     await page.waitForLoadState('networkidle');
@@ -202,8 +196,6 @@ test.describe('Custom Script Upload and Persistence', () => {
     // Verify script is still visible after reload
     const scriptAfterReload = page.locator(`text=${uniqueTitle}`);
     await expect(scriptAfterReload.first()).toBeVisible({ timeout: 5000 });
-
-    console.log('✓ Script persisted after reload');
   });
 
   test('should use custom script and create intimacy record', async ({ page }) => {
@@ -218,7 +210,6 @@ test.describe('Custom Script Upload and Persistence', () => {
 
     // If no custom scripts exist, skip this test
     if (!(await useButton.isVisible({ timeout: 3000 }))) {
-      console.log('No custom scripts available, skipping use test');
       test.skip();
       return;
     }
@@ -239,8 +230,6 @@ test.describe('Custom Script Upload and Persistence', () => {
     const closeButton = page.locator('button:has-text("關閉")');
     await closeButton.click();
     await page.waitForTimeout(1000);
-
-    console.log('✓ Custom script used successfully and intimacy record created');
   });
 
   test('should display custom scripts in filtered view', async ({ page }) => {
@@ -257,8 +246,6 @@ test.describe('Custom Script Upload and Persistence', () => {
     // Verify the count is displayed
     const scriptCount = await customScriptsHeader.textContent();
     expect(scriptCount).toMatch(/自訂劇本 \(\d+\)/);
-
-    console.log(`✓ Custom scripts section visible with count: ${scriptCount}`);
   });
 
   test('should validate custom script form fields', async ({ page }) => {
@@ -287,8 +274,6 @@ test.describe('Custom Script Upload and Persistence', () => {
     const titleInput = page.locator('input#script-title');
     const isRequired = await titleInput.getAttribute('required');
     expect(isRequired).not.toBeNull();
-
-    console.log('✓ Form validation working correctly');
   });
 
   test.skip('should award coins for uploading custom script', async ({ page }) => {
@@ -300,8 +285,6 @@ test.describe('Custom Script Upload and Persistence', () => {
     await expect(coinDisplay).toBeVisible({ timeout: 5000 });
     const initialCoinsText = await coinDisplay.textContent();
     const initialCoins = parseInt(initialCoinsText?.match(/\d+/)?.[0] || '0');
-
-    console.log(`Initial coins: ${initialCoins}`);
 
     // Navigate to roleplay and upload a script
     const roleplayTab = page.locator('button:has-text("角色扮演")');
@@ -335,9 +318,6 @@ test.describe('Custom Script Upload and Persistence', () => {
     const updatedCoinsText = await coinDisplay.textContent();
     const updatedCoins = parseInt(updatedCoinsText?.match(/\d+/)?.[0] || '0');
 
-    console.log(`Updated coins: ${updatedCoins}`);
     expect(updatedCoins).toBe(initialCoins + 200);
-
-    console.log('✓ Coins awarded correctly for custom script upload');
   });
 });

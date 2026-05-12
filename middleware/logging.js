@@ -1,13 +1,17 @@
 const express = require('express');
 
+const QUIET = process.env.NODE_ENV === 'test' && process.env.LOG_VERBOSE !== '1';
+
 // Enhanced request/response logging middleware
 const requestLogger = (req, res, next) => {
+  if (QUIET) return next();
+
   const start = Date.now();
   const originalSend = res.send;
   const originalJson = res.json;
 
   // Log incoming request
-  console.log(`📨 ${req.method} ${req.path}`, {
+  console.log(`${req.method} ${req.path}`, {
     timestamp: new Date().toISOString(),
     ip: req.ip,
     userAgent: req.get('User-Agent'),
@@ -30,7 +34,7 @@ const requestLogger = (req, res, next) => {
         }
       }
 
-      console.log(`📤 ${req.method} ${req.path} - ${res.statusCode}`, {
+      console.log(`${req.method} ${req.path} - ${res.statusCode}`, {
         duration: `${duration}ms`,
         status: res.statusCode,
         responseSize: typeof body === 'string' ? body.length : JSON.stringify(body).length,
@@ -50,7 +54,7 @@ const requestLogger = (req, res, next) => {
 
       // Log errors in detail
       if (res.statusCode >= 400) {
-        console.error(`❌ Error Response ${req.method} ${req.path}:`, {
+        console.error(`Error Response ${req.method} ${req.path}:`, {
           status: res.statusCode,
           error: responseData,
           requestBody: req.body,
@@ -58,7 +62,7 @@ const requestLogger = (req, res, next) => {
         });
       }
     } catch (error) {
-      console.error('❌ Logging middleware error:', error);
+      console.error('Logging middleware error:', error);
     }
 
     return originalSend.call(this, body);
@@ -69,7 +73,7 @@ const requestLogger = (req, res, next) => {
     const duration = Date.now() - start;
 
     try {
-      console.log(`📤 ${req.method} ${req.path} - ${res.statusCode} (JSON)`, {
+      console.log(`${req.method} ${req.path} - ${res.statusCode} (JSON)`, {
         duration: `${duration}ms`,
         status: res.statusCode,
         success: res.statusCode < 400,
@@ -79,7 +83,7 @@ const requestLogger = (req, res, next) => {
 
       // Log detailed error information
       if (res.statusCode >= 400) {
-        console.error(`❌ JSON Error Response ${req.method} ${req.path}:`, {
+        console.error(`JSON Error Response ${req.method} ${req.path}:`, {
           status: res.statusCode,
           error: obj,
           stack: obj && obj.stack ? obj.stack : undefined,
@@ -88,7 +92,7 @@ const requestLogger = (req, res, next) => {
         });
       }
     } catch (error) {
-      console.error('❌ JSON logging middleware error:', error);
+      console.error('JSON logging middleware error:', error);
     }
 
     return originalJson.call(this, obj);
@@ -99,7 +103,7 @@ const requestLogger = (req, res, next) => {
 
 // Global error handler with detailed logging
 const errorHandler = (err, req, res, next) => {
-  console.error(`💥 Unhandled Error in ${req.method} ${req.path}:`, {
+  console.error(`Unhandled Error in ${req.method} ${req.path}:`, {
     error: err.message,
     stack: err.stack,
     timestamp: new Date().toISOString(),
