@@ -342,10 +342,6 @@ const LoveTimeApp = () => {
   const [currentView, setCurrentView] = useState('record');
   const [intimateRecords, setIntimateRecords] = useState<IntimateRecord[]>([]);
   const [nicknames, setNicknames] = useState<Nicknames>({ partner1: '親愛的', partner2: '寶貝' });
-  
-  useEffect(() => {
-    localStorage.setItem('nicknames', JSON.stringify(nicknames));
-  }, [nicknames]);
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [showRecordModal, setShowRecordModal] = useState(false);
@@ -385,7 +381,7 @@ const LoveTimeApp = () => {
     if (token) {
       setPairingInvitationToken(token);
       setShowPairingInvitation(true);
-      localStorage.setItem('pairingInviteToken', token);
+      sessionStorage.setItem('pairingInviteToken', token);
 
       // Clean up URL to remove token after processing
       const newUrl = window.location.pathname;
@@ -395,7 +391,7 @@ const LoveTimeApp = () => {
 
   useEffect(() => {
     if (!pairingInvitationToken) {
-      const storedToken = localStorage.getItem('pairingInviteToken');
+      const storedToken = sessionStorage.getItem('pairingInviteToken');
       if (storedToken) {
         setPairingInvitationToken(storedToken);
         setShowPairingInvitation(true);
@@ -656,7 +652,7 @@ const LoveTimeApp = () => {
   const handlePairingInvitationAccepted = () => {
     setShowPairingInvitation(false);
     setPairingInvitationToken(null);
-    localStorage.removeItem('pairingInviteToken');
+    sessionStorage.removeItem('pairingInviteToken');
 
     // Refresh auth state to get updated couple information
     if (authState.isAuthenticated) {
@@ -668,13 +664,13 @@ const LoveTimeApp = () => {
   const handlePairingInvitationRejected = () => {
     setShowPairingInvitation(false);
     setPairingInvitationToken(null);
-    localStorage.removeItem('pairingInviteToken');
+    sessionStorage.removeItem('pairingInviteToken');
   };
 
   const handlePairingInvitationClosed = () => {
     setShowPairingInvitation(false);
     setPairingInvitationToken(null);
-    localStorage.removeItem('pairingInviteToken');
+    sessionStorage.removeItem('pairingInviteToken');
   };
 
   // Coin activities configuration
@@ -773,15 +769,10 @@ const LoveTimeApp = () => {
   // Load saved data on component mount - only once
   useEffect(() => {
     const loadInitialData = () => {
-      // Load localStorage for non-critical UI only
+      // authState/authToken/authUser are the only allowed localStorage keys.
+      // customGifts/customScripts come from the backend in the authenticated
+      // loader effect; no cache on mount.
       const savedAuth = JSON.parse(localStorage.getItem('authState') || '{}');
-      const savedCustomGifts = JSON.parse(localStorage.getItem('customGifts') || '[]');
-      const savedCustomScripts = JSON.parse(localStorage.getItem('customScripts') || '[]');
-      
-      setCustomGifts(savedCustomGifts);
-      setCustomScripts(savedCustomScripts);
-      
-      // Only set auth state if we have both user and valid token
       const authToken = localStorage.getItem('authToken');
       if (savedAuth.user && authToken) {
         setAuthState(savedAuth);
@@ -928,11 +919,6 @@ const LoveTimeApp = () => {
           setCustomScripts(transformedScripts);
         } catch (scriptError) {
           console.error('Failed to load custom scripts:', scriptError);
-          // Fallback to localStorage
-          const storedScripts = localStorage.getItem('customScripts');
-          if (storedScripts) {
-            setCustomScripts(JSON.parse(storedScripts));
-          }
         }
 
         // Load custom gifts from backend
@@ -941,11 +927,6 @@ const LoveTimeApp = () => {
           setCustomGifts(gifts as ApiCustomGift[]);
         } catch (giftError) {
           console.error('Failed to load custom gifts:', giftError);
-          // Fallback to localStorage
-          const storedGifts = localStorage.getItem('customGifts');
-          if (storedGifts) {
-            setCustomGifts(JSON.parse(storedGifts));
-          }
         }
       } catch (error) {
         console.error('Error loading authenticated data:', error);
@@ -989,27 +970,9 @@ const LoveTimeApp = () => {
     saveNicknames();
   }, [nicknames, authState.isAuthenticated]);
 
-  // Persist nicknames locally when not authenticated
-  useEffect(() => {
-    if (authState.isAuthenticated) {
-      return;
-    }
-    localStorage.setItem('nicknames', JSON.stringify(nicknames));
-  }, [nicknames, authState.isAuthenticated]);
-
-  // Stop persisting milestones to localStorage; backend is source of truth
-
-  useEffect(() => {
-    localStorage.setItem('totalCoins', totalCoins.toString());
-  }, [totalCoins]);
-
-  useEffect(() => {
-    localStorage.setItem('customGifts', JSON.stringify(customGifts));
-  }, [customGifts]);
-
-  useEffect(() => {
-    localStorage.setItem('customScripts', JSON.stringify(customScripts));
-  }, [customScripts]);
+  // Backend is the source of truth for nicknames, customGifts, customScripts,
+  // and totalCoins. They are never cached in localStorage — see /api/* loaders
+  // in the authenticated-data effect below.
 
   // Notification system
   const showNotification = (notification: Omit<Notification, 'id'>) => {

@@ -495,58 +495,40 @@ class ApiService {
         partner2: partnerNickname      // partner2 always represents partner
       };
     } catch {
-      // Fallback to local if not paired yet or error
-      const saved = localStorage.getItem('nicknames');
-      return saved ? JSON.parse(saved) : { partner1: '親愛的', partner2: '寶貝' };
+      // Not paired yet or error — backend is the only source of truth, so
+      // surface the defaults instead of caching client-side.
+      return { partner1: '親愛的', partner2: '寶貝' };
     }
   }
 
   async updateNicknames(nicknames: { partner1?: string; partner2?: string }): Promise<void> {
-    try {
-      // Get current user info to determine which nickname belongs to them
-      const authUserRaw = localStorage.getItem('authUser');
-      const currentUserId = authUserRaw ? JSON.parse(authUserRaw)?.id : null;
+    // Get current user info to determine which nickname belongs to them
+    const authUserRaw = localStorage.getItem('authUser');
+    const currentUserId = authUserRaw ? JSON.parse(authUserRaw)?.id : null;
 
-      if (!currentUserId) {
-        // No authenticated user, just save to localStorage
-        localStorage.setItem('nicknames', JSON.stringify(nicknames));
-        return;
-      }
-
-      // Get couple info to determine which partner the current user is
-      const couple = await this.getCouple();
-
-      // Determine the current user's nickname to send to backend
-      let currentUserNickname: string | undefined;
-
-      if (couple && couple.user1Id === currentUserId) {
-        // Current user is user1, so partner1 nickname is theirs
-        currentUserNickname = nicknames.partner1?.trim();
-      } else if (couple && couple.user2Id === currentUserId) {
-        // Current user is user2, so partner2 nickname is theirs
-        currentUserNickname = nicknames.partner2?.trim();
-      } else {
-        // No couple relationship or couldn't determine, save to localStorage
-        localStorage.setItem('nicknames', JSON.stringify(nicknames));
-        return;
-      }
-
-      // Validate the nickname
-      if (!currentUserNickname || currentUserNickname.length < 2) {
-        // Invalid nickname, just save to localStorage
-        localStorage.setItem('nicknames', JSON.stringify(nicknames));
-        return;
-      }
-
-      // Send the correct payload format that backend expects
-      await apiClient.put('/couples/nicknames', { nickname: currentUserNickname });
-
-      // Also save to localStorage for consistency
-      localStorage.setItem('nicknames', JSON.stringify(nicknames));
-    } catch (error: unknown) {
-      console.warn('Backend nickname update failed, falling back to localStorage:', error);
-      localStorage.setItem('nicknames', JSON.stringify(nicknames));
+    if (!currentUserId) {
+      // Not authenticated — nothing to persist (backend is the only store).
+      return;
     }
+
+    // Get couple info to determine which partner the current user is
+    const couple = await this.getCouple();
+
+    let currentUserNickname: string | undefined;
+    if (couple && couple.user1Id === currentUserId) {
+      currentUserNickname = nicknames.partner1?.trim();
+    } else if (couple && couple.user2Id === currentUserId) {
+      currentUserNickname = nicknames.partner2?.trim();
+    } else {
+      // No couple relationship yet — nothing to persist server-side.
+      return;
+    }
+
+    if (!currentUserNickname || currentUserNickname.length < 2) {
+      return;
+    }
+
+    await apiClient.put('/couples/nicknames', { nickname: currentUserNickname });
   }
 
   // Coins
