@@ -75,7 +75,7 @@ test.describe('Custom Script Upload and Persistence', () => {
     }
   });
 
-  test.skip('should upload a custom script and persist it in the database', async ({ page }) => {
+  test('should upload a custom script and persist it in the database', async ({ page }) => {
     // Navigate to roleplay section
     const roleplayTab = page.locator('button:has-text("角色扮演")').or(
       page.locator('[data-testid="roleplay-tab"]')
@@ -147,7 +147,7 @@ test.describe('Custom Script Upload and Persistence', () => {
     await expect(customBadge.first()).toBeVisible({ timeout: 3000 });
   });
 
-  test.skip('should persist custom script after page reload', async ({ page }) => {
+  test('should persist custom script after page reload', async ({ page }) => {
     // First, upload a script
     const roleplayTab = page.locator('button:has-text("角色扮演")').or(
       page.locator('[data-testid="roleplay-tab"]')
@@ -276,11 +276,10 @@ test.describe('Custom Script Upload and Persistence', () => {
     expect(isRequired).not.toBeNull();
   });
 
-  test.skip('should award coins for uploading custom script', async ({ page }) => {
-    // Get initial coin balance - try multiple selectors
-    const coinDisplay = page.locator('span:has-text("💰")').or(
-      page.locator('text=/💰.*\\d+/')
-    ).first();
+  test('should award coins for uploading custom script', async ({ page }) => {
+    // Header coin display is rendered by src/components/Header.tsx with
+    // data-testid="coin-balance" and shows the running totalCoins value.
+    const coinDisplay = page.locator('[data-testid="coin-balance"]');
 
     await expect(coinDisplay).toBeVisible({ timeout: 5000 });
     const initialCoinsText = await coinDisplay.textContent();
@@ -307,17 +306,21 @@ test.describe('Custom Script Upload and Persistence', () => {
     const successNotification = page.locator('text=劇本上傳成功');
     await expect(successNotification.first()).toBeVisible({ timeout: 10000 });
 
-    // Check for coin reward notification
+    // Check for coin reward notification (ErrorNotification renders "+200" next
+    // to the Coins icon when a notification carries a `coins` field).
     const coinReward = page.locator('text=/\\+\\s*200/');
     await expect(coinReward.first()).toBeVisible({ timeout: 5000 });
 
-    // Wait for coin update
-    await page.waitForTimeout(2000);
-
-    // Verify coins increased
-    const updatedCoinsText = await coinDisplay.textContent();
-    const updatedCoins = parseInt(updatedCoinsText?.match(/\d+/)?.[0] || '0');
-
-    expect(updatedCoins).toBe(initialCoins + 200);
+    // The test user is unpaired, so /coins/transaction returns 404 with
+    // "您還沒有情侶關係". The frontend (src/App.tsx addCustomScript) catches
+    // that and still bumps totalCoins locally by 200, so the header value
+    // increases either way. Coin persistence for paired couples is covered
+    // separately by the coins API tests.
+    await expect
+      .poll(async () => {
+        const text = await coinDisplay.textContent();
+        return parseInt(text?.match(/\d+/)?.[0] || '0');
+      }, { timeout: 5000 })
+      .toBe(initialCoins + 200);
   });
 });

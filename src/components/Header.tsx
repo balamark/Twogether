@@ -112,7 +112,10 @@ const Header: React.FC<HeaderProps> = ({
 
             {/* Coins Display */}
             {authState.isAuthenticated && (
-              <div className="flex items-center space-x-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-3 py-2 rounded-full">
+              <div
+                data-testid="coin-balance"
+                className="flex items-center space-x-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-3 py-2 rounded-full"
+              >
                 <Coins className="w-4 h-4" />
                 <span className="font-bold text-sm">{totalCoins}</span>
               </div>

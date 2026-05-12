@@ -2,11 +2,6 @@ import { test, expect, request } from '@playwright/test';
 
 const API_BASE = 'http://localhost:8080/api';
 const TEST_USER = { email: 'test-e2e@twogether.app', password: 'test123456' };
-// .env.test ships with a placeholder Supabase URL so we don't accidentally
-// upload to a real bucket from CI. Skip the multipart test in that case.
-const HAS_REAL_SUPABASE =
-  !!process.env.SUPABASE_URL &&
-  !process.env.SUPABASE_URL.includes('test.supabase.co');
 
 async function getAuthToken() {
   const ctx = await request.newContext();
@@ -41,7 +36,6 @@ test.describe('Custom scripts API', () => {
   });
 
   test('creates a script via multipart with thumbnail', async () => {
-    test.skip(!HAS_REAL_SUPABASE, 'Skipped: .env.test uses placeholder SUPABASE_URL');
     const token = await getAuthToken();
     const ctx = await request.newContext({
       extraHTTPHeaders: { Authorization: `Bearer ${token}` },
