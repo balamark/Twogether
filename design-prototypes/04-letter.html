@@ -1,0 +1,1442 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Twogether — 04 Letter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700&family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Noto+Serif+TC:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    :root {
+      --ivory: #F8F4ED;
+      --ivory-deep: #EFE9DE;
+      --paper: #FDFBF5;
+      --burgundy: #7A2E3F;
+      --burgundy-soft: #B5707D;
+      --burgundy-deep: #5C1F2D;
+      --gold: #C9A24B;
+      --gold-soft: #E4CE8D;
+      --gold-deep: #95752E;
+      --grey: #E8E3D8;
+      --grey-deep: #BFB5A1;
+      --ink: #2A1F1A;
+      --ink-soft: #5A4838;
+      --muted: #8A7A66;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--ivory);
+      color: var(--ink);
+      font-family: 'EB Garamond', 'Noto Serif TC', serif;
+      font-weight: 400;
+      font-size: 17px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      font-feature-settings: 'liga', 'kern';
+      /* Paper texture */
+      background-image:
+        radial-gradient(circle at 20% 20%, rgba(201, 162, 75, 0.03) 0%, transparent 30%),
+        radial-gradient(circle at 80% 70%, rgba(122, 46, 63, 0.025) 0%, transparent 30%);
+      background-attachment: fixed;
+    }
+    .display { font-family: 'Playfair Display', 'Noto Serif TC', serif; }
+    .smcp {
+      font-variant-caps: all-small-caps;
+      letter-spacing: 0.14em;
+      font-weight: 500;
+    }
+    .ital { font-style: italic; }
+    .num-old { font-feature-settings: 'onum', 'lnum' off; }
+
+    .wrap { max-width: 1140px; margin: 0 auto; padding: 0 56px; }
+    @media (max-width: 760px) { .wrap { padding: 0 24px; } }
+
+    /* Vibe header bar */
+    .vibe-bar {
+      background: var(--burgundy-deep);
+      color: var(--ivory);
+      padding: 12px 56px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: 'EB Garamond', serif;
+      font-size: 13px;
+      font-style: italic;
+    }
+    .vibe-bar a { color: rgba(248, 244, 237, 0.7); text-decoration: none; }
+    .vibe-bar a:hover { color: var(--ivory); }
+    .vibe-bar .palette { display: flex; gap: 6px; }
+    .vibe-bar .swatch { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(248,244,237,0.2); }
+
+    /* App header */
+    header.app {
+      padding: 32px 0 28px;
+      border-bottom: 1px double var(--gold);
+    }
+    .app-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      font-family: 'Playfair Display', serif;
+      font-weight: 700;
+      font-style: italic;
+      font-size: 28px;
+      letter-spacing: -0.01em;
+      color: var(--burgundy);
+    }
+    .logo small {
+      font-family: 'EB Garamond', serif;
+      font-style: normal;
+      font-weight: 400;
+      font-size: 11px;
+      color: var(--gold-deep);
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      display: block;
+      margin-top: -2px;
+    }
+    nav.app-nav { display: flex; gap: 28px; }
+    nav.app-nav a {
+      font-family: 'EB Garamond', serif;
+      font-size: 13px;
+      font-variant-caps: all-small-caps;
+      letter-spacing: 0.16em;
+      font-weight: 500;
+      color: var(--ink-soft);
+      text-decoration: none;
+      padding-bottom: 4px;
+      transition: color 0.2s;
+      position: relative;
+    }
+    nav.app-nav a:hover { color: var(--burgundy); }
+    nav.app-nav a.active { color: var(--burgundy); }
+    nav.app-nav a.active::after {
+      content: '◆';
+      position: absolute;
+      bottom: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: var(--gold);
+      font-size: 8px;
+    }
+    .header-right { display: flex; align-items: center; gap: 22px; }
+    .coin-line {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--gold-deep);
+      font-style: italic;
+    }
+    .coin-line::before {
+      content: '❋';
+      color: var(--gold);
+      font-size: 12px;
+    }
+    .avatar-ring {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--ivory);
+      border: 1px solid var(--gold);
+      padding: 3px;
+    }
+    .avatar-inner {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: var(--burgundy);
+      color: var(--ivory);
+      display: grid;
+      place-items: center;
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-weight: 500;
+    }
+
+    /* Ornamental divider */
+    .ornament {
+      text-align: center;
+      color: var(--gold);
+      font-size: 14px;
+      letter-spacing: 1em;
+      padding: 16px 0;
+    }
+    .ornament::before, .ornament::after {
+      content: '';
+      display: inline-block;
+      width: 80px;
+      height: 1px;
+      background: var(--gold);
+      vertical-align: 5px;
+      margin: 0 16px;
+    }
+
+    /* Section heading */
+    .section { padding: 48px 0 80px; }
+    .section-head {
+      text-align: center;
+      margin-bottom: 56px;
+    }
+    .section-eyebrow {
+      font-family: 'EB Garamond', serif;
+      font-style: italic;
+      color: var(--gold-deep);
+      font-size: 14px;
+      letter-spacing: 0.18em;
+      text-transform: lowercase;
+      margin-bottom: 16px;
+    }
+    .section-eyebrow::before, .section-eyebrow::after {
+      content: ' · ';
+      color: var(--gold);
+      margin: 0 8px;
+    }
+    .section-title {
+      font-family: 'Playfair Display', 'Noto Serif TC', serif;
+      font-weight: 500;
+      font-size: clamp(40px, 5.5vw, 68px);
+      letter-spacing: -0.015em;
+      line-height: 1.05;
+      color: var(--ink);
+    }
+    .section-title em {
+      font-style: italic;
+      font-weight: 400;
+      color: var(--burgundy);
+    }
+    .section-sub {
+      font-family: 'EB Garamond', 'Noto Serif TC', serif;
+      font-size: 17px;
+      font-style: italic;
+      color: var(--ink-soft);
+      margin-top: 14px;
+      max-width: 540px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    /* === SECTION A — Agenda calendar === */
+    .calendar-wrap {
+      background: var(--paper);
+      border: 1px solid var(--grey);
+      border-radius: 2px;
+      padding: 48px 56px;
+      position: relative;
+      box-shadow: 0 24px 60px -32px rgba(122, 46, 63, 0.12);
+    }
+    @media (max-width: 760px) { .calendar-wrap { padding: 32px 24px; } }
+    .calendar-wrap::before,
+    .calendar-wrap::after {
+      content: '';
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border: 1px solid var(--gold);
+      pointer-events: none;
+    }
+    .calendar-wrap::before { top: 14px; left: 14px; border-right: 0; border-bottom: 0; }
+    .calendar-wrap::after { bottom: 14px; right: 14px; border-left: 0; border-top: 0; }
+
+    .cal-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--gold-soft);
+      margin-bottom: 36px;
+    }
+    .cal-month-label {
+      font-family: 'Playfair Display', serif;
+      font-weight: 500;
+    }
+    .cal-month-label .yr {
+      font-style: italic;
+      font-size: 18px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      display: block;
+      margin-bottom: 6px;
+    }
+    .cal-month-label .mo {
+      font-size: 56px;
+      letter-spacing: -0.02em;
+      line-height: 0.9;
+    }
+    .cal-month-label .mo em {
+      font-style: italic;
+      font-weight: 400;
+      color: var(--burgundy);
+    }
+    .cal-meta {
+      text-align: right;
+      font-family: 'EB Garamond', serif;
+      font-style: italic;
+      color: var(--ink-soft);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+    .cal-meta strong {
+      display: block;
+      font-style: normal;
+      font-family: 'Playfair Display', serif;
+      font-weight: 500;
+      font-size: 22px;
+      color: var(--ink);
+      letter-spacing: -0.01em;
+    }
+    .cal-meta strong em { color: var(--gold-deep); font-style: italic; }
+
+    /* Agenda style — vertical list of days */
+    .agenda { display: flex; flex-direction: column; gap: 0; }
+    .day-row {
+      display: grid;
+      grid-template-columns: 100px 1fr 200px;
+      gap: 32px;
+      padding: 24px 0;
+      border-bottom: 1px solid var(--grey);
+      align-items: start;
+    }
+    @media (max-width: 760px) { .day-row { grid-template-columns: 80px 1fr; gap: 16px; } .day-row .day-meta { display: none; } }
+    .day-row:last-child { border-bottom: 0; }
+    .day-row.has { background: linear-gradient(90deg, rgba(122, 46, 63, 0.025) 0%, transparent 60%); margin: 0 -16px; padding: 24px 16px; }
+    .day-row.today {
+      background: linear-gradient(90deg, rgba(201, 162, 75, 0.08) 0%, transparent 70%);
+      margin: 0 -16px;
+      padding: 28px 16px;
+      border-bottom: 1px solid var(--gold);
+      border-top: 1px solid var(--gold);
+    }
+
+    .day-num {
+      text-align: right;
+      padding-right: 24px;
+      border-right: 1px solid var(--grey);
+      position: relative;
+    }
+    .day-row.today .day-num { border-right-color: var(--gold); }
+    .day-num .n {
+      font-family: 'Playfair Display', serif;
+      font-weight: 500;
+      font-size: 48px;
+      letter-spacing: -0.025em;
+      line-height: 0.95;
+      color: var(--ink);
+      font-feature-settings: 'onum';
+    }
+    .day-row.today .day-num .n { color: var(--burgundy); font-style: italic; }
+    .day-row.dim .day-num .n { color: var(--grey-deep); }
+    .day-num .dow {
+      font-size: 12px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 6px;
+      font-style: italic;
+    }
+    .day-row.today .day-num::after {
+      content: '';
+      position: absolute;
+      right: -3px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 5px;
+      height: 5px;
+      background: var(--gold);
+      border-radius: 50%;
+    }
+
+    .day-body { padding-top: 6px; }
+    .day-row.has .day-body, .day-row.today .day-body { padding-top: 0; }
+    .day-mood {
+      display: inline-block;
+      font-size: 22px;
+      margin-right: 12px;
+      vertical-align: -2px;
+    }
+    .day-headline {
+      font-family: 'Playfair Display', 'Noto Serif TC', serif;
+      font-weight: 400;
+      font-size: 22px;
+      letter-spacing: -0.01em;
+      line-height: 1.3;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+    .day-row.today .day-headline em { color: var(--burgundy); font-style: italic; }
+    .day-notes {
+      font-style: italic;
+      color: var(--ink-soft);
+      font-size: 15.5px;
+      line-height: 1.6;
+      padding-left: 16px;
+      border-left: 2px solid var(--gold-soft);
+      margin-top: 8px;
+      font-family: 'EB Garamond', 'Noto Serif TC', serif;
+    }
+    .day-empty {
+      font-style: italic;
+      color: var(--grey-deep);
+      font-size: 14px;
+    }
+
+    .day-meta {
+      text-align: right;
+      font-family: 'EB Garamond', serif;
+      font-size: 13.5px;
+      color: var(--muted);
+      line-height: 1.7;
+      padding-top: 8px;
+    }
+    .day-meta .time {
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-size: 16px;
+      color: var(--ink);
+      display: block;
+      margin-bottom: 2px;
+    }
+    .day-tag {
+      display: inline-block;
+      padding: 2px 10px;
+      border: 1px solid var(--gold-soft);
+      border-radius: 999px;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: var(--gold-deep);
+      text-transform: uppercase;
+      font-family: 'EB Garamond', 'Noto Serif TC', serif;
+      margin-left: 4px;
+    }
+    .day-tag.bg { background: var(--ivory-deep); border-color: transparent; }
+
+    /* === SECTION B — Letter wizard === */
+    .letter {
+      background: var(--paper);
+      border: 1px solid var(--grey);
+      padding: 56px 64px;
+      max-width: 920px;
+      margin: 0 auto;
+      position: relative;
+      box-shadow: 0 24px 60px -32px rgba(122, 46, 63, 0.15);
+    }
+    @media (max-width: 760px) { .letter { padding: 36px 28px; } }
+    .letter::before {
+      content: '';
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      right: 8px;
+      bottom: 8px;
+      border: 1px solid var(--gold-soft);
+      pointer-events: none;
+    }
+    .letter-head {
+      text-align: center;
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--gold-soft);
+      margin-bottom: 36px;
+    }
+    .letter-head .stamp {
+      display: inline-block;
+      padding: 4px 14px;
+      border: 1px solid var(--burgundy);
+      color: var(--burgundy);
+      font-family: 'EB Garamond', serif;
+      font-variant-caps: all-small-caps;
+      font-size: 13px;
+      letter-spacing: 0.16em;
+      margin-bottom: 18px;
+      transform: rotate(-2deg);
+    }
+    .letter-head h3 {
+      font-family: 'Playfair Display', 'Noto Serif TC', serif;
+      font-weight: 500;
+      font-size: 32px;
+      letter-spacing: -0.015em;
+      margin-bottom: 8px;
+    }
+    .letter-head h3 em { font-style: italic; color: var(--burgundy); }
+    .letter-head .sub { font-style: italic; color: var(--muted); font-size: 15px; }
+
+    .step-block {
+      margin-bottom: 40px;
+      padding-bottom: 36px;
+      border-bottom: 1px solid var(--grey);
+    }
+    .step-block:last-child { border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
+
+    .step-marker {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .step-marker .roman {
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-weight: 500;
+      font-size: 28px;
+      color: var(--gold-deep);
+      letter-spacing: 0.04em;
+    }
+    .step-marker .label {
+      font-family: 'Playfair Display', 'Noto Serif TC', serif;
+      font-weight: 500;
+      font-size: 22px;
+      letter-spacing: -0.01em;
+      color: var(--ink);
+    }
+    .step-marker .label em { font-style: italic; color: var(--burgundy); }
+    .step-marker .meta {
+      margin-left: auto;
+      font-size: 12px;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .cat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--grey);
+      border: 1px solid var(--grey);
+    }
+    @media (max-width: 600px) { .cat-grid { grid-template-columns: 1fr 1fr; } }
+    .cat {
+      background: var(--paper);
+      padding: 24px 18px;
+      cursor: pointer;
+      transition: background 0.25s;
+      text-align: center;
+      position: relative;
+    }
+    .cat:hover { background: var(--ivory-deep); }
+    .cat.selected { background: var(--ivory-deep); }
+    .cat.selected::after {
+      content: '◆';
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      color: var(--gold);
+      font-size: 9px;
+    }
+    .cat-emoji { font-size: 28px; display: block; margin-bottom: 12px; line-height: 1; }
+    .cat-name {
+      font-family: 'Playfair Display', 'Noto Serif TC', serif;
+      font-weight: 500;
+      font-size: 17px;
+      letter-spacing: -0.005em;
+      margin-bottom: 4px;
+      color: var(--ink);
+    }
+    .cat-name em { font-style: italic; color: var(--burgundy); }
+    .cat-desc {
+      font-size: 13px;
+      color: var(--muted);
+      font-style: italic;
+      line-height: 1.4;
+    }
+
+    .tmpl {
+      padding: 28px 32px;
+      background: var(--ivory-deep);
+      position: relative;
+      border-left: 3px solid var(--burgundy);
+    }
+    .tmpl-pri {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: 'EB Garamond', serif;
+      font-variant-caps: all-small-caps;
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      color: var(--burgundy);
+      margin-bottom: 14px;
+    }
+    .tmpl-pri::before { content: '✦'; font-size: 11px; color: var(--gold); }
+    .tmpl-hint {
+      font-family: 'Playfair Display', 'Noto Serif TC', serif;
+      font-style: italic;
+      font-weight: 400;
+      font-size: 19px;
+      color: var(--ink-soft);
+      margin-bottom: 12px;
+    }
+    .tmpl-setup {
+      font-family: 'Noto Serif TC', 'EB Garamond', serif;
+      font-size: 17px;
+      line-height: 1.7;
+      color: var(--ink);
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+      font-size: 15px;
+      font-style: italic;
+      color: var(--ink-soft);
+    }
+    .toggle {
+      display: inline-flex;
+      border: 1px solid var(--gold-soft);
+      border-radius: 0;
+    }
+    .toggle button {
+      padding: 8px 18px;
+      background: var(--paper);
+      border: 0;
+      font-family: 'EB Garamond', serif;
+      font-style: italic;
+      font-size: 14px;
+      color: var(--ink-soft);
+      cursor: pointer;
+    }
+    .toggle button + button { border-left: 1px solid var(--gold-soft); }
+    .toggle button.on { background: var(--burgundy); color: var(--ivory); }
+
+    .letter-textarea {
+      width: 100%;
+      padding: 20px 24px;
+      background: var(--paper);
+      border: 1px solid var(--gold-soft);
+      font-family: 'Noto Serif TC', 'EB Garamond', serif;
+      font-size: 17px;
+      line-height: 1.75;
+      color: var(--ink);
+      min-height: 110px;
+      resize: vertical;
+      /* Lined paper effect */
+      background-image: repeating-linear-gradient(
+        transparent 0,
+        transparent 30px,
+        rgba(201, 162, 75, 0.1) 30px,
+        rgba(201, 162, 75, 0.1) 31px
+      );
+      background-position: 0 8px;
+    }
+    .letter-textarea:focus { outline: 0; border-color: var(--burgundy); }
+    .ta-meta {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 8px;
+      font-size: 12.5px;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .when-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-top: 14px;
+      font-style: italic;
+      color: var(--ink-soft);
+      font-size: 15px;
+    }
+    .when-row input {
+      padding: 8px 14px;
+      background: var(--paper);
+      border: 0;
+      border-bottom: 1px solid var(--gold);
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-size: 16px;
+      color: var(--ink);
+    }
+    .when-row input:focus { outline: 0; border-color: var(--burgundy); }
+
+    /* Preview */
+    .preview-letter {
+      padding: 36px 40px;
+      background: var(--paper);
+      border: 1px dashed var(--gold);
+      position: relative;
+      margin-top: 8px;
+    }
+    .preview-letter::before {
+      content: '"';
+      position: absolute;
+      top: 0;
+      left: 16px;
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-size: 96px;
+      color: var(--gold-soft);
+      line-height: 1;
+    }
+    .preview-letter .to {
+      font-family: 'EB Garamond', serif;
+      font-style: italic;
+      color: var(--muted);
+      font-size: 14px;
+      margin-bottom: 18px;
+      padding-left: 56px;
+    }
+    .preview-letter .body {
+      padding-left: 56px;
+      font-family: 'Noto Serif TC', 'EB Garamond', serif;
+      font-size: 19px;
+      line-height: 1.75;
+      color: var(--ink);
+      margin-bottom: 24px;
+    }
+    .preview-letter .sign {
+      text-align: right;
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      color: var(--burgundy);
+      font-size: 22px;
+    }
+
+    .send-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 28px;
+      padding-top: 24px;
+      border-top: 1px solid var(--gold-soft);
+    }
+    .send-meta {
+      font-style: italic;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    .send-meta strong { font-family: 'Playfair Display', serif; color: var(--ink); font-weight: 500; }
+
+    .btn {
+      padding: 12px 32px;
+      background: var(--burgundy);
+      color: var(--ivory);
+      border: 0;
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-size: 17px;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      transition: background 0.2s;
+      border-radius: 2px;
+    }
+    .btn:hover { background: var(--burgundy-deep); }
+    .btn.ghost {
+      background: transparent;
+      color: var(--burgundy);
+      border: 1px solid var(--burgundy);
+    }
+    .btn.ghost:hover { background: var(--burgundy); color: var(--ivory); }
+    .btn.gold { background: var(--gold-deep); }
+    .btn.gold:hover { background: var(--gold-deep); filter: brightness(0.9); }
+
+    /* === SECTION C — Postcards === */
+    .inbox-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+      gap: 48px;
+    }
+    @media (max-width: 920px) { .inbox-layout { grid-template-columns: 1fr; gap: 36px; } }
+
+    .inbox-list { padding: 8px 0; }
+    .notif {
+      display: grid;
+      grid-template-columns: 60px 1fr;
+      gap: 18px;
+      padding: 22px 0;
+      border-bottom: 1px solid var(--grey);
+      cursor: pointer;
+      transition: background 0.18s;
+      align-items: start;
+    }
+    .notif:hover { background: var(--ivory-deep); margin: 0 -16px; padding-left: 16px; padding-right: 16px; }
+    .notif.unread {
+      border-bottom-color: var(--gold-soft);
+    }
+    .notif-stamp {
+      width: 60px;
+      height: 60px;
+      border: 1px solid var(--gold);
+      display: grid;
+      place-items: center;
+      font-family: 'Playfair Display', serif;
+      font-weight: 500;
+      position: relative;
+      background: var(--paper);
+    }
+    .notif-stamp .em { font-size: 22px; }
+    .notif.unread .notif-stamp { background: var(--burgundy); border-color: var(--burgundy); }
+    .notif.unread .notif-stamp .em { filter: drop-shadow(0 0 1px var(--burgundy-deep)); }
+    .notif-stamp::after {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      border: 1px dashed var(--gold-soft);
+      pointer-events: none;
+    }
+    .notif.unread .notif-stamp::after { border-color: rgba(248,244,237,0.4); }
+
+    .notif-content { display: flex; flex-direction: column; }
+    .notif-title {
+      font-family: 'Playfair Display', 'Noto Serif TC', serif;
+      font-weight: 500;
+      font-size: 18px;
+      letter-spacing: -0.005em;
+      margin-bottom: 4px;
+      color: var(--ink);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+    }
+    .notif.unread .notif-title em { color: var(--burgundy); font-style: italic; }
+    .notif-time {
+      font-family: 'EB Garamond', serif;
+      font-style: italic;
+      color: var(--muted);
+      font-size: 13.5px;
+      white-space: nowrap;
+      font-weight: 400;
+    }
+    .notif-snippet {
+      font-family: 'EB Garamond', 'Noto Serif TC', serif;
+      font-size: 15px;
+      line-height: 1.5;
+      color: var(--ink-soft);
+      font-style: italic;
+    }
+
+    /* Active request — full postcard */
+    .postcard {
+      background: var(--paper);
+      border: 1px solid var(--gold);
+      padding: 0;
+      position: relative;
+      box-shadow: 0 24px 60px -32px rgba(122, 46, 63, 0.15);
+    }
+    .postcard::before {
+      content: '';
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      right: 8px;
+      bottom: 8px;
+      border: 1px solid var(--gold-soft);
+      pointer-events: none;
+    }
+    .postcard-head {
+      padding: 28px 36px 24px;
+      border-bottom: 1px solid var(--gold-soft);
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+    .postcard-from { flex: 1; }
+    .postcard-eyebrow {
+      font-family: 'EB Garamond', serif;
+      font-variant-caps: all-small-caps;
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      color: var(--gold-deep);
+      margin-bottom: 10px;
+    }
+    .postcard-eyebrow::before { content: '✉ '; font-size: 14px; color: var(--burgundy); margin-right: 4px; }
+    .postcard-title {
+      font-family: 'Playfair Display', 'Noto Serif TC', serif;
+      font-weight: 500;
+      font-size: 28px;
+      letter-spacing: -0.015em;
+      line-height: 1.15;
+    }
+    .postcard-title em { font-style: italic; color: var(--burgundy); }
+    .postcard-stamp {
+      width: 72px;
+      height: 84px;
+      border: 1px solid var(--gold);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      padding: 8px;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .postcard-stamp .em { font-size: 22px; }
+    .postcard-stamp .yr {
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      font-size: 11px;
+      color: var(--burgundy);
+      letter-spacing: 0.04em;
+    }
+    .postcard-stamp::after {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      border: 1px dashed var(--gold-soft);
+    }
+
+    .postcard-body { padding: 32px 36px; }
+    .postcard-body p {
+      font-family: 'Noto Serif TC', 'EB Garamond', serif;
+      font-size: 18px;
+      line-height: 1.8;
+      color: var(--ink);
+      margin-bottom: 16px;
+    }
+    .postcard-body p:last-of-type { margin-bottom: 24px; }
+
+    .postcard-meta {
+      display: flex;
+      gap: 24px;
+      padding: 14px 0;
+      border-top: 1px solid var(--gold-soft);
+      border-bottom: 1px solid var(--gold-soft);
+      font-family: 'EB Garamond', serif;
+      font-size: 14px;
+      font-style: italic;
+      color: var(--ink-soft);
+    }
+    .postcard-meta b {
+      font-family: 'Playfair Display', serif;
+      font-weight: 500;
+      font-style: normal;
+      color: var(--ink);
+      margin-right: 6px;
+      letter-spacing: -0.005em;
+    }
+    .postcard-meta .v { color: var(--burgundy); font-style: italic; }
+
+    .postcard-respond {
+      padding: 24px 36px;
+      background: var(--ivory-deep);
+    }
+    .postcard-respond-label {
+      font-family: 'EB Garamond', serif;
+      font-variant-caps: all-small-caps;
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      color: var(--gold-deep);
+      margin-bottom: 12px;
+    }
+    .postcard-respond textarea {
+      width: 100%;
+      padding: 14px 18px;
+      background: var(--paper);
+      border: 1px solid var(--gold-soft);
+      font-family: 'Noto Serif TC', 'EB Garamond', serif;
+      font-style: italic;
+      font-size: 16px;
+      color: var(--ink);
+      resize: vertical;
+      min-height: 60px;
+    }
+    .postcard-actions { display: flex; gap: 12px; margin-top: 16px; }
+    .postcard-actions .btn { flex: 1; padding: 14px 20px; }
+
+    .alt-section {
+      padding: 32px 36px;
+      border-top: 1px solid var(--gold-soft);
+    }
+    .alt-h {
+      font-family: 'Playfair Display', 'Noto Serif TC', serif;
+      font-style: italic;
+      font-weight: 400;
+      font-size: 19px;
+      color: var(--ink-soft);
+      margin-bottom: 20px;
+      text-align: center;
+    }
+    .alt-h::before, .alt-h::after { content: ' ◆ '; color: var(--gold); font-style: normal; font-size: 11px; }
+    .alt-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0; border: 1px solid var(--gold-soft); }
+    @media (max-width: 600px) { .alt-grid { grid-template-columns: 1fr; } }
+    .alt-cat {
+      padding: 18px 20px;
+      border-right: 1px solid var(--gold-soft);
+      border-bottom: 1px solid var(--gold-soft);
+    }
+    .alt-cat:nth-child(2n) { border-right: 0; }
+    .alt-cat:nth-last-child(-n+2) { border-bottom: 0; }
+    @media (max-width: 600px) {
+      .alt-cat { border-right: 0; }
+      .alt-cat:not(:last-child) { border-bottom: 1px solid var(--gold-soft); }
+    }
+    .alt-cat-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      font-family: 'Playfair Display', 'Noto Serif TC', serif;
+      font-weight: 500;
+      font-size: 15px;
+    }
+    .alt-cat-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      border: 1px solid var(--gold);
+      background: var(--paper);
+    }
+    .alt-opt {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 6px 0;
+      font-size: 14px;
+    }
+    .alt-opt b { font-weight: 500; font-family: 'Noto Serif TC', serif; color: var(--ink); }
+    .alt-opt span { font-style: italic; color: var(--muted); font-size: 12px; }
+
+    footer.page-end {
+      padding: 56px 0 72px;
+      text-align: center;
+      color: var(--muted);
+      font-style: italic;
+      font-size: 14px;
+    }
+    footer.page-end em {
+      font-family: 'Playfair Display', serif;
+      font-style: italic;
+      color: var(--burgundy);
+      font-size: 17px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="vibe-bar">
+    <a href="./index.html">← retour aux thèmes</a>
+    <span>04 · Letter · Classical correspondence</span>
+    <div class="palette">
+      <span class="swatch" style="background:#F8F4ED"></span>
+      <span class="swatch" style="background:#7A2E3F"></span>
+      <span class="swatch" style="background:#C9A24B"></span>
+      <span class="swatch" style="background:#E8E3D8"></span>
+    </div>
+  </div>
+
+  <header class="app">
+    <div class="wrap app-inner">
+      <div class="logo">Twogether<small>est. 二〇二五</small></div>
+      <nav class="app-nav">
+        <a href="#cal" class="active">記錄</a>
+        <a href="#invite">邀請</a>
+        <a href="#inbox">收件</a>
+        <a href="#">旅程</a>
+        <a href="#">設定</a>
+      </nav>
+      <div class="header-right">
+        <div class="coin-line">248 枚</div>
+        <div class="avatar-ring"><div class="avatar-inner">小</div></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- SECTION A — Agenda Calendar -->
+  <section class="section" id="cal">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="section-eyebrow">i · agenda</div>
+        <h2 class="section-title">記錄<em>時光</em></h2>
+        <p class="section-sub">為每一個值得的夜晚，留下一行字 — 像在一本還沒寫完的日記裡，慢慢地補。</p>
+      </div>
+
+      <div class="calendar-wrap">
+
+        <div class="cal-top">
+          <div class="cal-month-label">
+            <div class="yr">anno 2026 · vol. v</div>
+            <div class="mo">May <em>五月</em></div>
+          </div>
+          <div class="cal-meta">
+            <strong>七個 <em>夜晚</em></strong>
+            本月 · 已陪伴 248 天
+          </div>
+        </div>
+
+        <div class="agenda">
+
+          <div class="day-row has">
+            <div class="day-num">
+              <div class="n">2</div>
+              <div class="dow">星期六</div>
+            </div>
+            <div class="day-body">
+              <div class="day-headline"><span class="day-mood">💕</span>春日的早晨，咖啡與一首老歌。</div>
+              <div class="day-notes">"她說最喜歡這種沒事做的禮拜六。"</div>
+            </div>
+            <div class="day-meta">
+              <span class="time">10:24</span>
+              <span class="day-tag">甜蜜</span>
+            </div>
+          </div>
+
+          <div class="day-row has">
+            <div class="day-num">
+              <div class="n">4</div>
+              <div class="dow">星期一</div>
+            </div>
+            <div class="day-body">
+              <div class="day-headline"><span class="day-mood">🥰</span>提早回家 — 為她煮了一鍋湯。</div>
+            </div>
+            <div class="day-meta">
+              <span class="time">20:08</span>
+              <span class="day-tag bg">廚房</span>
+            </div>
+          </div>
+
+          <div class="day-row has">
+            <div class="day-num">
+              <div class="n">9</div>
+              <div class="dow">星期六</div>
+            </div>
+            <div class="day-body">
+              <div class="day-headline"><span class="day-mood">🔥</span>慶祝她拿到 offer，香檳開了兩瓶。</div>
+              <div class="day-notes">"她笑得停不下來，我也是。最後我們唱歌跳舞跳到天亮。"</div>
+            </div>
+            <div class="day-meta">
+              <span class="time">23:08</span>
+              <span class="day-tag">慶祝</span>
+            </div>
+          </div>
+
+          <div class="day-row has">
+            <div class="day-num">
+              <div class="n">11</div>
+              <div class="dow">星期一</div>
+            </div>
+            <div class="day-body">
+              <div class="day-headline"><span class="day-mood">😘</span>下雨的禮拜一，沒人想起床。</div>
+              <div class="day-notes">"老師說，今天的課暫停⋯⋯"</div>
+            </div>
+            <div class="day-meta">
+              <span class="time">02:15</span>
+              <span class="day-tag">老師／學生</span>
+            </div>
+          </div>
+
+          <div class="day-row today">
+            <div class="day-num">
+              <div class="n">13</div>
+              <div class="dow">星期三 · 今天</div>
+            </div>
+            <div class="day-body">
+              <div class="day-headline"><span class="day-mood">🌟</span>慢慢的、靠近的，<em>像在讀一封寫了很久的信</em>。</div>
+              <div class="day-notes">"她說『不要急』，我就學著不急。我們躺著聽了一整張 Norah Jones，沒說太多話。"</div>
+            </div>
+            <div class="day-meta">
+              <span class="time">22:40</span>
+              <span class="day-tag bg">臥室</span>
+              <span class="day-tag">45 分</span>
+            </div>
+          </div>
+
+          <div class="day-row">
+            <div class="day-num">
+              <div class="n">14</div>
+              <div class="dow">星期四</div>
+            </div>
+            <div class="day-body">
+              <div class="day-empty">— 還沒有記錄，開始你們的愛情之旅吧 —</div>
+            </div>
+            <div class="day-meta"></div>
+          </div>
+
+          <div class="day-row has">
+            <div class="day-num">
+              <div class="n">17</div>
+              <div class="dow">星期日</div>
+            </div>
+            <div class="day-body">
+              <div class="day-headline"><span class="day-mood">😘</span>清晨的賴床比鬧鐘更頑固。</div>
+            </div>
+            <div class="day-meta">
+              <span class="time">07:42</span>
+            </div>
+          </div>
+
+          <div class="day-row dim">
+            <div class="day-num">
+              <div class="n">20</div>
+              <div class="dow">星期三</div>
+            </div>
+            <div class="day-body">
+              <div class="day-empty">— 未來的某一天 —</div>
+            </div>
+            <div class="day-meta"></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="ornament">❦</div>
+
+  <!-- SECTION B — Letter wizard -->
+  <section class="section" id="invite">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="section-eyebrow">ii · correspondence</div>
+        <h2 class="section-title">親愛的<em>小美</em>。</h2>
+        <p class="section-sub">用一封信的時間，把今晚想說的話慢慢寫下來。</p>
+      </div>
+
+      <div class="letter">
+
+        <div class="letter-head">
+          <div class="stamp">親密邀請 · invitation</div>
+          <h3>致 <em>小美</em></h3>
+          <div class="sub">寄件 · 2026 年 五月 十三日 · 星期三</div>
+        </div>
+
+        <!-- Step I — Category -->
+        <div class="step-block">
+          <div class="step-marker">
+            <span class="roman">I.</span>
+            <span class="label">選擇 <em>邀請</em> 類型</span>
+            <span class="meta">— 共六種 —</span>
+          </div>
+          <div class="cat-grid">
+            <div class="cat selected">
+              <span class="cat-emoji">💕</span>
+              <div class="cat-name">甜蜜<em>讚美</em></div>
+              <div class="cat-desc">溫馨的讚美與愛意</div>
+            </div>
+            <div class="cat">
+              <span class="cat-emoji">🤝</span>
+              <div class="cat-name">真心和解</div>
+              <div class="cat-desc">吵架後的溫柔挽回</div>
+            </div>
+            <div class="cat">
+              <span class="cat-emoji">📸</span>
+              <div class="cat-name">偶像／攝影師</div>
+              <div class="cat-desc">私密互動的角色扮演</div>
+            </div>
+            <div class="cat">
+              <span class="cat-emoji">📚</span>
+              <div class="cat-name">老師／學生</div>
+              <div class="cat-desc">師生間的特別課程</div>
+            </div>
+            <div class="cat">
+              <span class="cat-emoji">✈️</span>
+              <div class="cat-name">留學生邂逅</div>
+              <div class="cat-desc">異國戀情的浪漫</div>
+            </div>
+            <div class="cat">
+              <span class="cat-emoji">✨</span>
+              <div class="cat-name">自訂訊息</div>
+              <div class="cat-desc">完全客製的邀請</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step II — Template -->
+        <div class="step-block">
+          <div class="step-marker">
+            <span class="roman">II.</span>
+            <span class="label">挑選 <em>模板</em></span>
+            <span class="meta">— 可重寫 —</span>
+          </div>
+          <div class="tmpl">
+            <div class="tmpl-pri">輕柔 · subtle</div>
+            <div class="tmpl-hint">傍晚六點之後 — 等他回家</div>
+            <p class="tmpl-setup">
+              想用最樸實的方式告訴你：謝謝你一直在我身邊，你是我生命中最珍貴的禮物 🎁
+            </p>
+          </div>
+        </div>
+
+        <!-- Step III — Compose -->
+        <div class="step-block">
+          <div class="step-marker">
+            <span class="roman">III.</span>
+            <span class="label">親手 <em>寫一遍</em></span>
+            <span class="meta">— 78 / 1000 字 —</span>
+          </div>
+          <div class="toggle-row">
+            <span>寄送方式</span>
+            <div class="toggle">
+              <button class="on">立即邀請</button>
+              <button>預約時間</button>
+            </div>
+          </div>
+          <textarea class="letter-textarea">無論什麼時候，你都是我心中最特別的那個人 💝 想念你的整個下午。今晚六點半在家等你 — 為你準備了一些事情，慢慢來。</textarea>
+          <div class="ta-meta">
+            <span>支援表情符號 · 自動儲存</span>
+            <span>78 / 1000 字</span>
+          </div>
+          <div class="when-row">
+            <span>或，安排在</span>
+            <input type="text" value="2026 / 05 / 13" />
+            <span>於</span>
+            <input type="text" value="18:30" />
+            <span>送達</span>
+          </div>
+        </div>
+
+        <!-- Step IV — Confirm -->
+        <div class="step-block">
+          <div class="step-marker">
+            <span class="roman">IV.</span>
+            <span class="label">封 <em>緘</em> 寄出</span>
+            <span class="meta">— 確認後送達 —</span>
+          </div>
+          <div class="preview-letter">
+            <div class="to">致 · 小美</div>
+            <p class="body">無論什麼時候，你都是我心中最特別的那個人 💝 想念你的整個下午。今晚六點半在家等你 — 為你準備了一些事情，慢慢來。</p>
+            <div class="sign">— 你的</div>
+          </div>
+          <div class="send-row">
+            <div class="send-meta">將於 <strong>今晚 18:30</strong> 送達 · 約兩小時後</div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn ghost">回上一步</button>
+              <button class="btn">封緘寄出 →</button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <div class="ornament">❦</div>
+
+  <!-- SECTION C — Inbox postcards -->
+  <section class="section" id="inbox">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="section-eyebrow">iii · letters received</div>
+        <h2 class="section-title">收件<em>匣</em></h2>
+        <p class="section-sub">兩封新的信件 — 一封來自 小美，一封來自時光本身。</p>
+      </div>
+
+      <div class="inbox-layout">
+
+        <div class="inbox-list">
+          <div class="notif unread">
+            <div class="notif-stamp"><span class="em">💌</span></div>
+            <div class="notif-content">
+              <div class="notif-title">
+                <span>來自 <em>小美</em> 的親密邀請</span>
+                <span class="notif-time">剛剛</span>
+              </div>
+              <p class="notif-snippet">"今晚六點半在家等你 — 為你準備了一些事情⋯⋯"</p>
+            </div>
+          </div>
+
+          <div class="notif unread">
+            <div class="notif-stamp"><span class="em">★</span></div>
+            <div class="notif-content">
+              <div class="notif-title">
+                <span>你獲得了一枚新徽章</span>
+                <span class="notif-time">兩小時前</span>
+              </div>
+              <p class="notif-snippet">「連續七日的早安」— 收下 50 枚金幣</p>
+            </div>
+          </div>
+
+          <div class="notif">
+            <div class="notif-stamp"><span class="em">↩</span></div>
+            <div class="notif-content">
+              <div class="notif-title">
+                <span>小美 回覆了你的邀請</span>
+                <span class="notif-time">昨日</span>
+              </div>
+              <p class="notif-snippet">"接受你的邀請 💕 — 我也想你了"</p>
+            </div>
+          </div>
+
+          <div class="notif">
+            <div class="notif-stamp"><span class="em">❦</span></div>
+            <div class="notif-content">
+              <div class="notif-title">
+                <span>本週親密總結已就緒</span>
+                <span class="notif-time">三日前</span>
+              </div>
+              <p class="notif-snippet">這一週你們相遇了 4 次，比上週多 1 次</p>
+            </div>
+          </div>
+        </div>
+
+        <article class="postcard">
+          <div class="postcard-head">
+            <div class="postcard-from">
+              <div class="postcard-eyebrow">親密邀請 · awaiting reply</div>
+              <h3 class="postcard-title">致 你 — 來自 <em>小美</em></h3>
+            </div>
+            <div class="postcard-stamp">
+              <span class="em">💌</span>
+              <span class="yr">v · 13</span>
+            </div>
+          </div>
+
+          <div class="postcard-body">
+            <p>"今晚六點半在家等你 — 為你準備了一些事情，慢慢來。</p>
+            <p>無論你多累，我都想第一個聽你說今天的故事。"</p>
+
+            <div class="postcard-meta">
+              <span><b>送達於</b><span class="v">今晚 18:30</span></span>
+              <span><b>距現在</b><em>約兩小時後</em></span>
+              <span><b>類型</b><em>甜蜜讚美</em></span>
+            </div>
+          </div>
+
+          <div class="postcard-respond">
+            <div class="postcard-respond-label">回信給她 — write back</div>
+            <textarea>接受你的邀請 💕</textarea>
+            <div class="postcard-actions">
+              <button class="btn">接受邀請 ✓</button>
+              <button class="btn ghost">改個時間</button>
+            </div>
+          </div>
+
+          <div class="alt-section">
+            <div class="alt-h">現在不太合適，但我們可以試試這個</div>
+            <div class="alt-grid">
+              <div class="alt-cat">
+                <div class="alt-cat-head"><span class="alt-cat-icon">✋</span>肢體親密</div>
+                <div class="alt-opt"><b>長長的擁抱</b><span>五分鐘</span></div>
+                <div class="alt-opt"><b>幫對方按摩肩頸</b><span>十五分鐘</span></div>
+              </div>
+              <div class="alt-cat">
+                <div class="alt-cat-head"><span class="alt-cat-icon">♥</span>情感親密</div>
+                <div class="alt-opt"><b>分享今天最開心的事</b><span>十分鐘</span></div>
+                <div class="alt-opt"><b>讀一段詩給對方聽</b><span>五分鐘</span></div>
+              </div>
+              <div class="alt-cat">
+                <div class="alt-cat-head"><span class="alt-cat-icon">☺</span>趣味互動</div>
+                <div class="alt-opt"><b>一起看搞笑短片</b><span>二十分鐘</span></div>
+                <div class="alt-opt"><b>玩心電感應遊戲</b><span>十五分鐘</span></div>
+              </div>
+              <div class="alt-cat">
+                <div class="alt-cat-head"><span class="alt-cat-icon">☕</span>日常陪伴</div>
+                <div class="alt-opt"><b>一起喝杯熱茶</b><span>二十分鐘</span></div>
+                <div class="alt-opt"><b>陪她散步回家</b><span>三十分鐘</span></div>
+              </div>
+            </div>
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <footer class="page-end">
+    <p>04 · <em>Letter</em> · 古典書信美學 · Twogether</p>
+  </footer>
+
+</body>
+</html>

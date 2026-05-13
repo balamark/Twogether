@@ -1,0 +1,1311 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Twogether — 02 Modern Mist</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    :root {
+      --bg: #FAFAF7;
+      --bg-2: #F4F3EE;
+      --surface: #FFFFFF;
+      --slate: #3D4A5C;
+      --slate-soft: #6B7689;
+      --slate-faint: #A8B0BD;
+      --line: #E8E6DF;
+      --line-soft: #F1EFE8;
+      --peach: #F4B5A0;
+      --peach-deep: #D87E63;
+      --peach-bg: #FCE9E0;
+      --mint: #C7E0D3;
+      --mint-deep: #6FA088;
+      --mint-bg: #E8F2EC;
+      --lemon: #F2E5A1;
+      --lemon-bg: #FAF4D8;
+      --ink: #1F2733;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Onest', 'Noto Sans TC', system-ui, sans-serif;
+      font-weight: 400;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.005em;
+    }
+    .num-feat { font-feature-settings: 'tnum', 'cv11'; font-variant-numeric: tabular-nums; }
+
+    .wrap { max-width: 1240px; margin: 0 auto; padding: 0 32px; }
+    @media (max-width: 760px) { .wrap { padding: 0 20px; } }
+
+    /* Vibe header bar */
+    .vibe-bar {
+      background: var(--ink);
+      color: #fff;
+      padding: 12px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: -0.005em;
+    }
+    .vibe-bar a { color: rgba(255,255,255,0.7); text-decoration: none; transition: color 0.2s; }
+    .vibe-bar a:hover { color: #fff; }
+    .vibe-bar .palette { display: flex; gap: 4px; }
+    .vibe-bar .swatch { width: 14px; height: 14px; border-radius: 4px; }
+
+    /* App header */
+    header.app {
+      background: var(--surface);
+      border-bottom: 1px solid var(--line);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+    .app-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0;
+    }
+    .logo {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logo::before {
+      content: '';
+      width: 18px;
+      height: 18px;
+      background: linear-gradient(135deg, var(--peach) 0%, var(--mint) 100%);
+      border-radius: 6px;
+    }
+    nav.app-nav { display: flex; gap: 4px; padding: 4px; background: var(--bg-2); border-radius: 10px; }
+    nav.app-nav a {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--slate-soft);
+      text-decoration: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      transition: all 0.18s;
+    }
+    nav.app-nav a:hover { color: var(--ink); }
+    nav.app-nav a.active { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(31, 39, 51, 0.04), 0 0 0 1px rgba(31, 39, 51, 0.04); }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .coin-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--lemon-bg);
+      border: 1px solid #EBDC9A;
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #8A7517;
+    }
+    .coin-pill::before { content: '◉'; color: #C9A91A; }
+    .bell {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: var(--bg-2);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      position: relative;
+      color: var(--slate);
+      transition: background 0.2s;
+    }
+    .bell:hover { background: var(--line); }
+    .bell::after {
+      content: '';
+      position: absolute;
+      top: 7px;
+      right: 7px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--peach-deep);
+      border: 1.5px solid var(--surface);
+    }
+    .avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--peach) 0%, var(--peach-deep) 100%);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    /* Section */
+    .section { padding: 56px 0; }
+    .section + .section { border-top: 1px solid var(--line); }
+    .section-head {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      margin-bottom: 32px;
+    }
+    .section-eyebrow {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--slate-faint);
+      margin-bottom: 8px;
+    }
+    .section-title {
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      line-height: 1.15;
+    }
+    .section-sub {
+      font-size: 13.5px;
+      color: var(--slate-soft);
+      margin-top: 6px;
+    }
+    .section-actions { display: flex; gap: 8px; }
+    .seg-btn {
+      padding: 7px 14px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--slate);
+      cursor: pointer;
+      transition: all 0.18s;
+    }
+    .seg-btn:hover { border-color: var(--slate-faint); }
+    .seg-btn.primary {
+      background: var(--ink);
+      color: #fff;
+      border-color: var(--ink);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .seg-btn.primary:hover { background: #000; }
+
+    /* === SECTION A — Calendar === */
+    .cal-shell {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .cal-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--line);
+    }
+    .cal-month-pick {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .cal-month-pick h3 {
+      font-size: 16.5px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+    }
+    .cal-month-pick .sub {
+      font-size: 12.5px;
+      color: var(--slate-soft);
+      font-weight: 500;
+    }
+    .icon-btn {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--slate);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      transition: all 0.18s;
+    }
+    .icon-btn:hover { background: var(--bg-2); border-color: var(--slate-faint); }
+    .cal-views {
+      display: flex;
+      gap: 2px;
+      padding: 3px;
+      background: var(--bg-2);
+      border-radius: 8px;
+    }
+    .cal-views button {
+      padding: 5px 12px;
+      background: transparent;
+      border: 0;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--slate-soft);
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .cal-views button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+
+    .cal-body {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+    }
+    @media (max-width: 920px) { .cal-body { grid-template-columns: 1fr; } }
+    .cal-grid-wrap { padding: 0; }
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+    }
+    .cal-dow {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--slate-faint);
+      padding: 10px 12px;
+      border-right: 1px solid var(--line);
+      background: var(--bg);
+    }
+    .cal-dow:last-child { border-right: 0; }
+    .cal-cell {
+      min-height: 92px;
+      padding: 8px 10px;
+      border-right: 1px solid var(--line);
+      border-top: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      cursor: pointer;
+      transition: background 0.15s;
+      position: relative;
+    }
+    .cal-cell:hover { background: var(--bg); }
+    .cal-cell:nth-child(7n+7) { border-right: 0; }
+    .cal-cell.dim { color: var(--slate-faint); cursor: default; background: var(--bg); }
+    .cal-cell.dim:hover { background: var(--bg); }
+    .cal-num {
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+    }
+    .cal-cell.today .cal-num {
+      background: var(--ink);
+      color: #fff;
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      font-size: 12px;
+      margin: -2px 0 0 -3px;
+    }
+    .entry-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10.5px;
+      font-weight: 500;
+      padding: 2px 7px;
+      border-radius: 999px;
+      width: fit-content;
+      letter-spacing: -0.005em;
+    }
+    .entry-pill.peach { background: var(--peach-bg); color: var(--peach-deep); }
+    .entry-pill.mint { background: var(--mint-bg); color: var(--mint-deep); }
+    .entry-pill.lemon { background: var(--lemon-bg); color: #8A7517; }
+    .entry-pill .em { font-size: 10px; }
+
+    /* Day detail panel */
+    .day-panel {
+      padding: 20px;
+      border-left: 1px solid var(--line);
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    @media (max-width: 920px) { .day-panel { border-left: 0; border-top: 1px solid var(--line); } }
+    .day-panel-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+    }
+    .day-date {
+      font-size: 22px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    .day-meta {
+      font-size: 11.5px;
+      color: var(--slate-soft);
+      font-weight: 500;
+    }
+    .day-stat {
+      display: flex;
+      gap: 16px;
+      padding: 12px 14px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+    .day-stat .item { display: flex; flex-direction: column; gap: 2px; }
+    .day-stat .label { font-size: 10.5px; font-weight: 500; color: var(--slate-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+    .day-stat .val { font-size: 16px; font-weight: 600; letter-spacing: -0.015em; }
+    .day-stat .val em { color: var(--peach-deep); font-style: normal; }
+
+    .day-entry {
+      padding: 14px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .day-entry-top { display: flex; justify-content: space-between; align-items: center; }
+    .day-entry-mood {
+      font-size: 18px;
+      width: 32px;
+      height: 32px;
+      background: var(--peach-bg);
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+    }
+    .day-entry-time { font-size: 12px; color: var(--slate-soft); font-weight: 500; }
+    .day-entry-desc { font-size: 13.5px; line-height: 1.5; color: var(--ink); }
+    .day-entry-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+    .mini-tag { font-size: 10.5px; padding: 2px 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; color: var(--slate-soft); font-weight: 500; }
+
+    .add-entry-btn {
+      padding: 14px;
+      background: var(--surface);
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--slate-soft);
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.18s;
+    }
+    .add-entry-btn:hover { border-color: var(--slate); color: var(--slate); background: var(--surface); }
+
+    /* === SECTION B — Wizard horizontal === */
+    .wizard-steps {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 28px;
+    }
+    @media (max-width: 760px) { .wizard-steps { grid-template-columns: repeat(2, 1fr); } }
+    .wstep {
+      padding: 12px 14px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      position: relative;
+    }
+    .wstep.done { background: var(--mint-bg); border-color: var(--mint); }
+    .wstep.cur { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .wstep .n {
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      opacity: 0.6;
+    }
+    .wstep .t { font-size: 14px; font-weight: 600; letter-spacing: -0.015em; }
+    .wstep.done .n { color: var(--mint-deep); opacity: 1; }
+
+    .wizard-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+      gap: 20px;
+    }
+    @media (max-width: 920px) { .wizard-grid { grid-template-columns: 1fr; } }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 24px;
+    }
+    .panel-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 18px;
+    }
+    .panel-title { font-size: 15px; font-weight: 600; letter-spacing: -0.015em; }
+    .panel-meta { font-size: 12px; color: var(--slate-soft); }
+
+    .cat-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .cat {
+      padding: 14px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.18s;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+    .cat:hover { border-color: var(--slate-faint); background: var(--surface); }
+    .cat.selected { background: var(--peach-bg); border-color: var(--peach); }
+    .cat-emoji {
+      width: 36px;
+      height: 36px;
+      border-radius: 9px;
+      background: var(--surface);
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .cat.selected .cat-emoji { background: #fff; }
+    .cat-text { display: flex; flex-direction: column; gap: 2px; }
+    .cat-name { font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; }
+    .cat-desc { font-size: 11.5px; color: var(--slate-soft); }
+
+    .tmpl-card {
+      padding: 18px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .tmpl-pri {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      padding: 3px 9px;
+      background: var(--peach-bg);
+      color: var(--peach-deep);
+      border-radius: 999px;
+      width: fit-content;
+    }
+    .tmpl-pri::before { content: '●'; font-size: 8px; }
+    .tmpl-hint {
+      font-size: 12.5px;
+      color: var(--slate-soft);
+      font-weight: 500;
+    }
+    .tmpl-setup {
+      font-size: 14.5px;
+      line-height: 1.55;
+      color: var(--ink);
+      font-family: 'Noto Sans TC', sans-serif;
+    }
+
+    .form-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+    .form-label { font-size: 11.5px; font-weight: 600; color: var(--slate-soft); text-transform: uppercase; letter-spacing: 0.04em; }
+    .seg {
+      display: inline-flex;
+      padding: 3px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      gap: 2px;
+    }
+    .seg button {
+      padding: 6px 14px;
+      background: transparent;
+      border: 0;
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--slate-soft);
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .seg button.on { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+
+    .textarea {
+      width: 100%;
+      padding: 12px 14px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font-family: 'Noto Sans TC', 'Onest', sans-serif;
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--ink);
+      resize: vertical;
+      min-height: 90px;
+      transition: border-color 0.18s;
+    }
+    .textarea:focus { outline: 0; border-color: var(--slate); }
+    .textarea-foot {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11.5px;
+      color: var(--slate-faint);
+      font-weight: 500;
+    }
+    .dt-row { display: flex; gap: 8px; }
+    .dt-row input {
+      flex: 1;
+      padding: 10px 12px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--ink);
+      font-feature-settings: 'tnum';
+    }
+
+    .preview-card {
+      padding: 20px;
+      background: linear-gradient(135deg, var(--peach-bg) 0%, var(--mint-bg) 100%);
+      border-radius: 12px;
+      border: 1px solid rgba(216, 126, 99, 0.15);
+    }
+    .preview-from {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--peach-deep);
+      margin-bottom: 12px;
+    }
+    .preview-msg {
+      font-size: 14.5px;
+      line-height: 1.6;
+      color: var(--ink);
+      font-family: 'Noto Sans TC', sans-serif;
+      margin-bottom: 14px;
+    }
+    .preview-foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 12px;
+      border-top: 1px solid rgba(31, 39, 51, 0.06);
+      font-size: 11.5px;
+      color: var(--slate-soft);
+      font-weight: 500;
+    }
+    .btn {
+      padding: 9px 16px;
+      background: var(--ink);
+      color: #fff;
+      border: 1px solid var(--ink);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.005em;
+      cursor: pointer;
+      transition: all 0.18s;
+    }
+    .btn:hover { background: #000; }
+    .btn.ghost { background: var(--surface); color: var(--ink); }
+    .btn.ghost:hover { background: var(--bg-2); }
+    .btn.accept { background: var(--mint-deep); border-color: var(--mint-deep); }
+    .btn.accept:hover { background: #588471; }
+
+    /* === SECTION C — Inbox === */
+    .inbox-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.3fr);
+      gap: 20px;
+    }
+    @media (max-width: 920px) { .inbox-grid { grid-template-columns: 1fr; } }
+
+    .inbox-list {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .inbox-tabs {
+      display: flex;
+      gap: 0;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      background: var(--bg);
+    }
+    .inbox-tabs button {
+      padding: 5px 12px;
+      background: transparent;
+      border: 0;
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--slate-soft);
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .inbox-tabs button.on { background: var(--surface); color: var(--ink); border: 1px solid var(--line); }
+    .inbox-tabs .count {
+      margin-left: 4px;
+      font-size: 10.5px;
+      padding: 1px 6px;
+      background: var(--peach-bg);
+      color: var(--peach-deep);
+      border-radius: 999px;
+      font-weight: 600;
+    }
+    .notif-row {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line-soft);
+      cursor: pointer;
+      display: grid;
+      grid-template-columns: 32px 1fr auto;
+      gap: 12px;
+      align-items: start;
+      transition: background 0.15s;
+    }
+    .notif-row:hover { background: var(--bg); }
+    .notif-row:last-child { border-bottom: 0; }
+    .notif-row.unread { background: linear-gradient(90deg, var(--peach-bg) 0%, var(--bg) 60%); }
+    .notif-row.unread:hover { background: linear-gradient(90deg, var(--peach-bg) 0%, var(--bg-2) 60%); }
+    .notif-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: grid;
+      place-items: center;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .notif-icon.heart { background: var(--peach-bg); color: var(--peach-deep); }
+    .notif-icon.badge { background: var(--lemon-bg); color: #8A7517; }
+    .notif-icon.reply { background: var(--mint-bg); color: var(--mint-deep); }
+    .notif-icon.stat { background: var(--bg-2); color: var(--slate); }
+    .notif-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin-bottom: 2px;
+      color: var(--ink);
+    }
+    .notif-row:not(.unread) .notif-title { font-weight: 500; color: var(--slate); }
+    .notif-snippet {
+      font-size: 12.5px;
+      color: var(--slate-soft);
+      line-height: 1.45;
+    }
+    .notif-time {
+      font-size: 11px;
+      color: var(--slate-faint);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    /* Active request */
+    .req {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .req-banner {
+      padding: 14px 20px;
+      background: linear-gradient(90deg, var(--peach-bg) 0%, transparent 80%);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11.5px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--peach-deep);
+    }
+    .req-banner::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--peach-deep);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(216, 126, 99, 0.5); }
+      50% { opacity: 0.6; box-shadow: 0 0 0 4px rgba(216, 126, 99, 0); }
+    }
+    .req-head { padding: 20px 24px; }
+    .req-from-line {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .req-from-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--peach) 0%, var(--peach-deep) 100%);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .req-from-text { display: flex; flex-direction: column; }
+    .req-from-name { font-size: 14px; font-weight: 600; }
+    .req-from-meta { font-size: 11.5px; color: var(--slate-soft); }
+    .req-title {
+      font-size: 19px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 14px;
+    }
+    .req-message {
+      padding: 14px 16px;
+      background: var(--bg);
+      border-radius: 10px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--ink);
+      font-family: 'Noto Sans TC', sans-serif;
+    }
+    .req-schedule-row {
+      display: flex;
+      gap: 8px;
+      margin: 14px 0 0;
+      flex-wrap: wrap;
+    }
+    .info-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 11px;
+      background: var(--mint-bg);
+      color: var(--mint-deep);
+      border-radius: 999px;
+    }
+    .info-pill.muted { background: var(--bg-2); color: var(--slate-soft); }
+    .info-pill::before { content: '●'; font-size: 6px; }
+
+    .req-respond {
+      padding: 20px 24px;
+      border-top: 1px solid var(--line);
+      background: var(--bg);
+    }
+    .req-respond textarea {
+      width: 100%;
+      padding: 11px 14px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      font-family: 'Noto Sans TC', 'Onest', sans-serif;
+      font-size: 13.5px;
+      color: var(--ink);
+      resize: vertical;
+      min-height: 56px;
+      margin-bottom: 12px;
+    }
+    .req-actions { display: flex; gap: 8px; }
+    .req-actions .btn { flex: 1; padding: 11px 14px; }
+
+    .alt-block {
+      padding: 20px 24px;
+      border-top: 1px solid var(--line);
+    }
+    .alt-h {
+      font-size: 13px;
+      color: var(--slate-soft);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .alt-h::before { content: '↳'; color: var(--peach-deep); }
+    .alt-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    @media (max-width: 600px) { .alt-grid { grid-template-columns: 1fr; } }
+    .alt-cat {
+      padding: 14px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+    }
+    .alt-cat-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      font-size: 12.5px;
+      font-weight: 600;
+    }
+    .alt-cat-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+    }
+    .alt-cat-icon.body { background: var(--peach-bg); color: var(--peach-deep); }
+    .alt-cat-icon.emo { background: #F4D2D5; color: #B04550; }
+    .alt-cat-icon.play { background: var(--lemon-bg); color: #8A7517; }
+    .alt-cat-icon.daily { background: var(--mint-bg); color: var(--mint-deep); }
+    .alt-opt {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 5px 0;
+      line-height: 1.4;
+    }
+    .alt-opt b { font-weight: 500; color: var(--ink); }
+    .alt-opt span { color: var(--slate-faint); font-feature-settings: 'tnum'; }
+
+    footer.page-end {
+      padding: 32px 0 48px;
+      text-align: center;
+      color: var(--slate-faint);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="vibe-bar">
+    <a href="./index.html">← All themes</a>
+    <span>02 · Modern Mist · Precision</span>
+    <div class="palette">
+      <span class="swatch" style="background:#FAFAF7"></span>
+      <span class="swatch" style="background:#3D4A5C"></span>
+      <span class="swatch" style="background:#F4B5A0"></span>
+      <span class="swatch" style="background:#C7E0D3"></span>
+    </div>
+  </div>
+
+  <header class="app">
+    <div class="wrap app-inner">
+      <div class="logo">Twogether</div>
+      <nav class="app-nav">
+        <a href="#cal" class="active">記錄時光</a>
+        <a href="#invite">親密邀請</a>
+        <a href="#inbox">收件匣</a>
+        <a href="#">愛情旅程</a>
+        <a href="#">設定</a>
+      </nav>
+      <div class="header-right">
+        <div class="coin-pill">248</div>
+        <div class="bell">🔔</div>
+        <div class="avatar">小</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- SECTION A — Calendar -->
+  <section class="section" id="cal">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="section-eyebrow">A · 記錄</div>
+          <h2 class="section-title">記錄時光</h2>
+          <p class="section-sub">本月 <b class="num-feat">7</b> 次相遇 · 已陪伴 <b class="num-feat">248</b> 天</p>
+        </div>
+        <div class="section-actions">
+          <button class="seg-btn">本月</button>
+          <button class="seg-btn primary">+ 新增記錄</button>
+        </div>
+      </div>
+
+      <div class="cal-shell">
+        <div class="cal-toolbar">
+          <div class="cal-month-pick">
+            <button class="icon-btn">‹</button>
+            <button class="icon-btn">›</button>
+            <h3>2026 年 5 月 <span class="sub">· May</span></h3>
+          </div>
+          <div class="cal-views">
+            <button>日</button>
+            <button>週</button>
+            <button class="on">月</button>
+            <button>年</button>
+          </div>
+        </div>
+
+        <div class="cal-body">
+          <div class="cal-grid-wrap">
+            <div class="cal-grid">
+              <div class="cal-dow">星期日</div>
+              <div class="cal-dow">星期一</div>
+              <div class="cal-dow">星期二</div>
+              <div class="cal-dow">星期三</div>
+              <div class="cal-dow">星期四</div>
+              <div class="cal-dow">星期五</div>
+              <div class="cal-dow">星期六</div>
+
+              <div class="cal-cell dim"><span class="cal-num">26</span></div>
+              <div class="cal-cell dim"><span class="cal-num">27</span></div>
+              <div class="cal-cell dim"><span class="cal-num">28</span></div>
+              <div class="cal-cell dim"><span class="cal-num">29</span></div>
+              <div class="cal-cell dim"><span class="cal-num">30</span></div>
+              <div class="cal-cell"><span class="cal-num">1</span></div>
+              <div class="cal-cell"><span class="cal-num">2</span><span class="entry-pill peach"><span class="em">💕</span>甜蜜</span></div>
+
+              <div class="cal-cell"><span class="cal-num">3</span></div>
+              <div class="cal-cell"><span class="cal-num">4</span><span class="entry-pill peach"><span class="em">🥰</span>溫柔</span></div>
+              <div class="cal-cell"><span class="cal-num">5</span></div>
+              <div class="cal-cell"><span class="cal-num">6</span></div>
+              <div class="cal-cell"><span class="cal-num">7</span><span class="entry-pill mint"><span class="em">😍</span>角色扮演</span></div>
+              <div class="cal-cell"><span class="cal-num">8</span></div>
+              <div class="cal-cell"><span class="cal-num">9</span><span class="entry-pill lemon"><span class="em">🔥</span>慶祝</span></div>
+
+              <div class="cal-cell"><span class="cal-num">10</span></div>
+              <div class="cal-cell"><span class="cal-num">11</span><span class="entry-pill mint"><span class="em">😘</span>下雨</span></div>
+              <div class="cal-cell"><span class="cal-num">12</span></div>
+              <div class="cal-cell today"><span class="cal-num">13</span><span class="entry-pill peach"><span class="em">🌟</span>今夜</span></div>
+              <div class="cal-cell"><span class="cal-num">14</span></div>
+              <div class="cal-cell"><span class="cal-num">15</span></div>
+              <div class="cal-cell"><span class="cal-num">16</span></div>
+
+              <div class="cal-cell"><span class="cal-num">17</span><span class="entry-pill peach"><span class="em">😘</span>清晨</span></div>
+              <div class="cal-cell"><span class="cal-num">18</span></div>
+              <div class="cal-cell"><span class="cal-num">19</span></div>
+              <div class="cal-cell"><span class="cal-num">20</span></div>
+              <div class="cal-cell"><span class="cal-num">21</span></div>
+              <div class="cal-cell"><span class="cal-num">22</span></div>
+              <div class="cal-cell"><span class="cal-num">23</span></div>
+
+              <div class="cal-cell"><span class="cal-num">24</span></div>
+              <div class="cal-cell"><span class="cal-num">25</span></div>
+              <div class="cal-cell"><span class="cal-num">26</span></div>
+              <div class="cal-cell"><span class="cal-num">27</span></div>
+              <div class="cal-cell"><span class="cal-num">28</span></div>
+              <div class="cal-cell"><span class="cal-num">29</span></div>
+              <div class="cal-cell"><span class="cal-num">30</span></div>
+
+              <div class="cal-cell"><span class="cal-num">31</span></div>
+              <div class="cal-cell dim"><span class="cal-num">1</span></div>
+              <div class="cal-cell dim"><span class="cal-num">2</span></div>
+              <div class="cal-cell dim"><span class="cal-num">3</span></div>
+              <div class="cal-cell dim"><span class="cal-num">4</span></div>
+              <div class="cal-cell dim"><span class="cal-num">5</span></div>
+              <div class="cal-cell dim"><span class="cal-num">6</span></div>
+            </div>
+          </div>
+
+          <aside class="day-panel">
+            <div class="day-panel-head">
+              <div>
+                <div class="day-date">5 月 13 日</div>
+                <div class="day-meta">星期三 · 今天</div>
+              </div>
+              <button class="icon-btn">⋯</button>
+            </div>
+
+            <div class="day-stat">
+              <div class="item">
+                <span class="label">本月相遇</span>
+                <span class="val num-feat">7 <em>次</em></span>
+              </div>
+              <div class="item">
+                <span class="label">陪伴累積</span>
+                <span class="val num-feat">248 <em>日</em></span>
+              </div>
+            </div>
+
+            <div class="day-entry">
+              <div class="day-entry-top">
+                <div style="display:flex;gap:10px;align-items:center">
+                  <div class="day-entry-mood">🌟</div>
+                  <div class="day-entry-time">22:40 · 45 分鐘</div>
+                </div>
+                <button class="icon-btn">›</button>
+              </div>
+              <p class="day-entry-desc">慢慢的、靠近的、像在讀一封寫了很久的信。她說「不要急」，我就學著不急。</p>
+              <div class="day-entry-tags">
+                <span class="mini-tag">臥室</span>
+                <span class="mini-tag">Norah Jones</span>
+              </div>
+            </div>
+
+            <button class="add-entry-btn">+ 為這一天再添一筆</button>
+
+            <div style="font-size: 11.5px; color: var(--slate-faint); text-align: center; margin-top: -4px;">
+              還沒有記錄，開始你們的愛情之旅吧
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION B — Invite -->
+  <section class="section" id="invite">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="section-eyebrow">B · 邀請</div>
+          <h2 class="section-title">發送親密邀請</h2>
+          <p class="section-sub">選擇 → 模板 → 編輯 → 送出</p>
+        </div>
+      </div>
+
+      <div class="wizard-steps">
+        <div class="wstep done"><span class="n">01 ✓</span><span class="t">選擇類型</span></div>
+        <div class="wstep done"><span class="n">02 ✓</span><span class="t">選擇模板</span></div>
+        <div class="wstep cur"><span class="n">03 · 進行中</span><span class="t">編輯訊息</span></div>
+        <div class="wstep"><span class="n">04</span><span class="t">送出</span></div>
+      </div>
+
+      <div class="wizard-grid">
+
+        <div class="panel">
+          <div class="panel-head">
+            <span class="panel-title">選擇邀請類型</span>
+            <span class="panel-meta">6 個分類</span>
+          </div>
+          <div class="cat-grid">
+            <div class="cat selected">
+              <div class="cat-emoji">💕</div>
+              <div class="cat-text"><span class="cat-name">甜蜜讚美</span><span class="cat-desc">溫馨的讚美與愛意</span></div>
+            </div>
+            <div class="cat">
+              <div class="cat-emoji">🤝</div>
+              <div class="cat-text"><span class="cat-name">真心和解</span><span class="cat-desc">吵架後的溫柔挽回</span></div>
+            </div>
+            <div class="cat">
+              <div class="cat-emoji">📸</div>
+              <div class="cat-text"><span class="cat-name">偶像/攝影師</span><span class="cat-desc">私密角色扮演</span></div>
+            </div>
+            <div class="cat">
+              <div class="cat-emoji">📚</div>
+              <div class="cat-text"><span class="cat-name">老師/學生</span><span class="cat-desc">特別的課程</span></div>
+            </div>
+            <div class="cat">
+              <div class="cat-emoji">✈️</div>
+              <div class="cat-text"><span class="cat-name">留學生邂逅</span><span class="cat-desc">異國的浪漫約會</span></div>
+            </div>
+            <div class="cat">
+              <div class="cat-emoji">✨</div>
+              <div class="cat-text"><span class="cat-name">自訂訊息</span><span class="cat-desc">完全客製化</span></div>
+            </div>
+          </div>
+
+          <div class="panel-head" style="margin-top: 24px;">
+            <span class="panel-title">選擇模板</span>
+            <span class="panel-meta">4 個推薦</span>
+          </div>
+          <div class="tmpl-card">
+            <span class="tmpl-pri">輕柔 · subtle</span>
+            <div class="tmpl-hint">建議時間 · 傍晚六點之後</div>
+            <p class="tmpl-setup">想用最樸實的方式告訴你：謝謝你一直在我身邊，你是我生命中最珍貴的禮物 🎁</p>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <span class="panel-title">編輯訊息</span>
+            <span class="panel-meta">支援表情符號</span>
+          </div>
+
+          <div class="form-group">
+            <span class="form-label">送達時機</span>
+            <div class="seg">
+              <button class="on">立即邀請</button>
+              <button>預約時間</button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <span class="form-label">訊息內容</span>
+            <textarea class="textarea">無論什麼時候，你都是我心中最特別的那個人 💝 想念你的整個下午。今晚六點半在家等你 — 為你準備了一些事情，慢慢來。</textarea>
+            <div class="textarea-foot">
+              <span class="num-feat">78 / 1000</span>
+              <span>已自動儲存草稿</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <span class="form-label">預約時間（選填）</span>
+            <div class="dt-row">
+              <input type="text" value="2026-05-13" />
+              <input type="text" value="18:30" />
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 0;">
+            <span class="form-label">預覽</span>
+            <div class="preview-card">
+              <div class="preview-from">→ 給 小美</div>
+              <p class="preview-msg">無論什麼時候，你都是我心中最特別的那個人 💝 想念你的整個下午。今晚六點半在家等你 — 為你準備了一些事情，慢慢來。</p>
+              <div class="preview-foot">
+                <span>送達於 18:30 · 今天</span>
+                <button class="btn">送出邀請 →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION C — Inbox -->
+  <section class="section" id="inbox">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="section-eyebrow">C · 收件匣</div>
+          <h2 class="section-title">通知收件匣</h2>
+          <p class="section-sub"><b>2</b> 則未讀 · 最新 1 分鐘前</p>
+        </div>
+        <div class="section-actions">
+          <button class="seg-btn">標記已讀</button>
+          <button class="seg-btn">設定</button>
+        </div>
+      </div>
+
+      <div class="inbox-grid">
+
+        <div class="inbox-list">
+          <div class="inbox-tabs">
+            <button class="on">全部 <span class="count">2</span></button>
+            <button>邀請</button>
+            <button>徽章</button>
+            <button>系統</button>
+          </div>
+
+          <div class="notif-row unread">
+            <div class="notif-icon heart">♡</div>
+            <div>
+              <div class="notif-title">來自 小美 的親密邀請</div>
+              <div class="notif-snippet">今晚六點半在家等你 — 為你準備了一些事情⋯⋯</div>
+            </div>
+            <span class="notif-time">剛剛</span>
+          </div>
+
+          <div class="notif-row unread">
+            <div class="notif-icon badge">★</div>
+            <div>
+              <div class="notif-title">你獲得了一枚新徽章</div>
+              <div class="notif-snippet">「連續七日的早安」— 收下 50 枚金幣</div>
+            </div>
+            <span class="notif-time">2 小時前</span>
+          </div>
+
+          <div class="notif-row">
+            <div class="notif-icon reply">↩</div>
+            <div>
+              <div class="notif-title">小美 回覆了你的邀請</div>
+              <div class="notif-snippet">"接受你的邀請 💕 — 我也想你了"</div>
+            </div>
+            <span class="notif-time">昨天</span>
+          </div>
+
+          <div class="notif-row">
+            <div class="notif-icon stat">∼</div>
+            <div>
+              <div class="notif-title">本週親密總結已就緒</div>
+              <div class="notif-snippet">這一週你們相遇了 4 次，比上週多 1 次</div>
+            </div>
+            <span class="notif-time">3 天前</span>
+          </div>
+        </div>
+
+        <div class="req">
+          <div class="req-banner">親密邀請 · 等待你的回覆</div>
+          <div class="req-head">
+            <div class="req-from-line">
+              <div class="req-from-avatar">美</div>
+              <div class="req-from-text">
+                <span class="req-from-name">小美</span>
+                <span class="req-from-meta">1 分鐘前 · 已陪伴 248 天</span>
+              </div>
+            </div>
+            <h3 class="req-title">來自 小美 的親密邀請</h3>
+            <div class="req-message">
+              "今晚六點半在家等你 — 為你準備了一些事情，慢慢來。<br />
+              無論你多累，我都想第一個聽你說今天的故事。"
+            </div>
+            <div class="req-schedule-row">
+              <span class="info-pill">預約時間 · 今晚 18:30</span>
+              <span class="info-pill muted">約 2 小時後</span>
+              <span class="info-pill muted">類型 · 甜蜜讚美</span>
+            </div>
+          </div>
+
+          <div class="req-respond">
+            <textarea>接受你的邀請 💕</textarea>
+            <div class="req-actions">
+              <button class="btn accept">接受邀請 ✓</button>
+              <button class="btn ghost">改個時間</button>
+              <button class="btn ghost">看看別的</button>
+            </div>
+          </div>
+
+          <div class="alt-block">
+            <div class="alt-h">現在不太合適，但我們可以試試這個 💝</div>
+            <div class="alt-grid">
+              <div class="alt-cat">
+                <div class="alt-cat-head"><div class="alt-cat-icon body">✋</div>肢體親密</div>
+                <div class="alt-opt"><b>長長的擁抱</b><span>5 分</span></div>
+                <div class="alt-opt"><b>幫對方按摩肩頸</b><span>15 分</span></div>
+              </div>
+              <div class="alt-cat">
+                <div class="alt-cat-head"><div class="alt-cat-icon emo">♡</div>情感親密</div>
+                <div class="alt-opt"><b>分享今天最開心的事</b><span>10 分</span></div>
+                <div class="alt-opt"><b>讀一段詩給對方聽</b><span>5 分</span></div>
+              </div>
+              <div class="alt-cat">
+                <div class="alt-cat-head"><div class="alt-cat-icon play">☺</div>趣味互動</div>
+                <div class="alt-opt"><b>一起看搞笑短片</b><span>20 分</span></div>
+                <div class="alt-opt"><b>玩心電感應遊戲</b><span>15 分</span></div>
+              </div>
+              <div class="alt-cat">
+                <div class="alt-cat-head"><div class="alt-cat-icon daily">☕</div>日常陪伴</div>
+                <div class="alt-opt"><b>一起喝杯熱茶</b><span>20 分</span></div>
+                <div class="alt-opt"><b>陪她散步回家</b><span>30 分</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <footer class="page-end">
+    02 · Modern Mist · Precision aesthetic · Twogether prototypes
+  </footer>
+
+</body>
+</html>

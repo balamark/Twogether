@@ -1,13 +1,12 @@
-/* Twogether App - Clean Romantic Styles */
+/* Twogether — Soft Petal globals */
 
 #root {
   width: 100%;
   margin: 0;
   padding: 0;
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Manrope', 'Noto Sans TC', system-ui, sans-serif;
 }
 
-/* Remove any default styling that might interfere */
 * {
   box-sizing: border-box;
 }
@@ -15,22 +14,22 @@
 body {
   margin: 0;
   padding: 0;
-  background: linear-gradient(135deg, #F8F0FF 0%, #F3E5F5 100%);
+  background: #FBF7F2;
   min-height: 100vh;
+  color: #2A2520;
 }
 
-/* Ensure smooth transitions for all interactive elements */
 .transition-all {
   transition: all 0.3s ease-in-out;
 }
 
-/* Custom romantic hover effects */
 .hover-lift:hover {
   transform: translateY(-2px);
 }
 
+/* Cream paper card — replaces the previous frosted-white glass. */
 .glass-effect {
-  background: rgba(255, 255, 255, 0.6);
+  background: rgba(253, 251, 245, 0.78);
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 1px solid #E8DFD0;
 }

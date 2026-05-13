@@ -92,67 +92,77 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   const featuredScripts = defaultRoleplayScripts.slice(0, 3);
 
   return (
-    <div className="space-y-6">
-      <div className="bg-gradient-to-r from-red-500 to-pink-600 text-white p-6 rounded-2xl">
-        <h2 className="text-2xl font-bold mb-2">角色扮演劇本</h2>
-        <p className="text-red-100">點燃激情，重溫浪漫</p>
+    <div className="space-y-10">
+      <div className="border-b border-petal-rule pb-7">
+        <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+          — 劇本
+        </div>
+        <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
+          角色<em className="not-italic font-light italic text-pink-600">扮演</em>劇本
+        </h2>
+        <p className="font-display italic font-light text-base text-petal-muted">
+          點燃激情，重溫浪漫 — 慢慢來。
+        </p>
       </div>
 
       {/* Category Filter Tabs */}
-      <div className="bg-white rounded-2xl shadow-lg p-6">
-        <div className="flex flex-wrap gap-2 mb-6">
+      <div>
+        <div className="flex flex-wrap gap-1.5 mb-8">
           {[
             { id: 'all', label: '全部', icon: '🌟' },
             { id: 'romantic', label: '浪漫', icon: '💕' },
             { id: 'adventurous', label: '冒險', icon: '🔥' },
             { id: 'school', label: '校園', icon: '🏫' },
             { id: 'bold', label: '大膽', icon: '🧨' }
-          ].map(category => (
-            <button
-              key={category.id}
-              onClick={() => setRoleplayFilter(category.id)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
-                roleplayFilter === category.id
-                  ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg'
-                  : 'bg-gray-100 text-gray-600 hover:bg-pink-50 hover:text-pink-600'
-              }`}
-            >
-              <span>{category.icon}</span>
-              <span className="font-medium">{category.label}</span>
-            </button>
-          ))}
+          ].map(category => {
+            const isActive = roleplayFilter === category.id;
+            return (
+              <button
+                key={category.id}
+                onClick={() => setRoleplayFilter(category.id)}
+                className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full transition-colors border ${
+                  isActive
+                    ? 'bg-petal-ink text-petal-cream border-petal-ink'
+                    : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
+                }`}
+              >
+                <span className="text-xs opacity-75 saturate-75">{category.icon}</span>
+                <span className="font-body text-[13px] font-medium">{category.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Featured Scripts */}
-        <div className="mb-8">
-          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-            <Sparkles className="w-5 h-5 mr-2 text-pink-500" />
-            精選劇本
+        <div className="mb-10">
+          <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6 flex items-center">
+            <Sparkles className="w-4 h-4 mr-2 text-petal-rose-deep" strokeWidth={1.5} />
+            精選<em className="not-italic font-light italic text-pink-600 ml-1">劇本</em>
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {featuredScripts.map((script, index) => (
-              <div key={index} className="bg-gradient-to-br from-pink-50 to-purple-50 rounded-lg p-4 border-2 border-pink-200">
-                <div className="aspect-video bg-gray-200 rounded-lg mb-3 flex items-center justify-center">
-                  <img 
-                    src={script.image} 
+              <div key={index} className="bg-white rounded-md p-4 border border-petal-rule hover:border-petal-rose transition-colors">
+                <div className="aspect-video bg-petal-cream-2 rounded-md mb-3 flex items-center justify-center overflow-hidden">
+                  <img
+                    src={script.image}
                     alt={script.title}
-                    className="w-full h-full object-cover rounded-lg"
+                    className="w-full h-full object-cover"
                     onError={(e) => {
                       e.currentTarget.style.display = 'none';
                       (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'flex';
                     }}
                   />
-                  <div className="hidden items-center justify-center text-gray-400">
-                    <Camera className="w-8 h-8" />
+                  <div className="hidden items-center justify-center text-petal-muted">
+                    <Camera className="w-7 h-7" strokeWidth={1.5} />
                   </div>
                 </div>
-                <h4 className="font-bold text-gray-800 mb-2">{script.title}</h4>
-                <p className="text-sm text-gray-600 mb-3 line-clamp-2">{script.scenario}</p>
+                <h4 className="font-display text-base font-medium tracking-tight text-petal-ink mb-1.5">{script.title}</h4>
+                <p className="font-body text-sm text-petal-ink-soft mb-3 line-clamp-2 leading-relaxed">{script.scenario}</p>
                 <button
                   onClick={() => handlePlayScript(script)}
-                  className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white py-2 rounded-lg font-medium hover:shadow-lg transition-all"
+                  className="w-full bg-petal-ink text-petal-cream py-2 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors"
                 >
-                  <Play className="w-4 h-4 inline mr-2" />
+                  <Play className="w-3.5 h-3.5 inline mr-1.5" strokeWidth={1.5} />
                   開始扮演
                 </button>
               </div>
@@ -161,57 +171,58 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
         </div>
 
         {/* Custom Scripts Upload */}
-        <div className="mb-8 p-4 bg-blue-50 rounded-lg">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-gray-800 flex items-center">
-              <FileText className="w-5 h-5 mr-2 text-blue-500" />
-              自訂劇本 ({customScripts.length})
+        <div className="mb-10 p-5 bg-petal-cream-2/40 rounded-md border border-petal-rule">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="font-display text-xl font-medium tracking-tight text-petal-ink flex items-center">
+              <FileText className="w-4 h-4 mr-2 text-petal-ink-soft" strokeWidth={1.5} />
+              自訂<em className="not-italic font-light italic text-pink-600 mx-1">劇本</em>
+              <span className="font-display italic font-light text-sm text-petal-muted ml-2">({customScripts.length})</span>
             </h3>
             <button
               onClick={() => setShowScriptUploadModal(true)}
-              className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:shadow-lg transition-all flex items-center space-x-2"
+              className="bg-petal-ink text-petal-cream px-4 py-1.5 rounded-full font-body text-xs hover:bg-pink-700 transition-colors flex items-center space-x-1.5"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
               <span>上傳劇本</span>
             </button>
           </div>
-          
+
           {customScripts.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {customScripts.map((script) => (
-                <div key={script.id} className="bg-white border border-blue-200 rounded-lg p-4">
+                <div key={script.id} className="bg-white border border-petal-rule rounded-md p-4 hover:border-petal-rose transition-colors">
                   <div className="flex items-start gap-3 mb-2">
                     {script.image && (
                       <img
                         src={script.image}
                         alt={script.title}
-                        className="w-16 h-16 object-cover rounded-lg flex-shrink-0 border border-gray-200"
+                        className="w-14 h-14 object-cover rounded-md flex-shrink-0 border border-petal-rule"
                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
                       />
                     )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-bold text-gray-800 truncate">{script.title}</h4>
-                        <span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-600 flex-shrink-0">
+                        <h4 className="font-display text-base font-medium tracking-tight text-petal-ink truncate">{script.title}</h4>
+                        <span className="px-2 py-0.5 font-body text-[10px] uppercase tracking-[0.1em] rounded-full border border-petal-rule text-petal-muted flex-shrink-0">
                           自訂
                         </span>
                       </div>
-                      <p className="text-sm text-gray-600 mt-1">{script.scenario}</p>
+                      <p className="font-body text-sm text-petal-ink-soft mt-1 leading-relaxed">{script.scenario}</p>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2 text-xs text-gray-500">
+                  <div className="flex items-center justify-between mt-3">
+                    <div className="flex items-center gap-1.5 text-xs text-petal-muted flex-wrap">
                       {script.tags?.map((tag, tagIndex) => (
-                        <span key={tagIndex} className="bg-gray-100 px-2 py-1 rounded">
+                        <span key={tagIndex} className="font-body bg-petal-cream-2 px-2 py-0.5 rounded-full">
                           {tag}
                         </span>
                       ))}
                     </div>
                     <button
                       onClick={() => handlePlayScript(script)}
-                      className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-3 py-1 rounded text-sm font-medium hover:shadow-lg transition-all"
+                      className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                     >
-                      <Play className="w-3 h-3 inline mr-1" />
+                      <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
                       使用
                     </button>
                   </div>
@@ -219,53 +230,50 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               ))}
             </div>
           ) : (
-            <p className="text-gray-500 text-center py-4">
-              還沒有自訂劇本，點擊上方按鈕開始創作！
+            <p className="font-display italic font-light text-sm text-petal-muted text-center py-4">
+              還沒有自訂劇本，點擊上方按鈕開始創作。
             </p>
           )}
         </div>
 
         {/* All Scripts */}
         <div>
-          <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-            <Filter className="w-5 h-5 mr-2 text-purple-500" />
-            所有劇本 ({filteredScripts.length})
+          <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6 flex items-center">
+            <Filter className="w-4 h-4 mr-2 text-petal-ink-soft" strokeWidth={1.5} />
+            所有<em className="not-italic font-light italic text-pink-600 mx-1">劇本</em>
+            <span className="font-display italic font-light text-sm text-petal-muted ml-2">({filteredScripts.length})</span>
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {filteredScripts.map((script, index) => (
-              <div key={index} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-lg transition-all">
+              <div key={index} className="bg-white border border-petal-rule rounded-md p-5 hover:border-petal-rose transition-colors">
                 <div className="flex items-start space-x-4">
-                  <div className="w-32 h-32 bg-gray-200 rounded-lg flex-shrink-0 flex items-center justify-center">
-                    <img 
-                      src={script.image} 
+                  <div className="w-28 h-28 bg-petal-cream-2 rounded-md flex-shrink-0 overflow-hidden flex items-center justify-center">
+                    <img
+                      src={script.image}
                       alt={script.title}
-                      className="w-full h-full object-cover rounded-lg"
+                      className="w-full h-full object-cover"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none';
                         (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'flex';
                       }}
                     />
-                    <div className="hidden items-center justify-center text-gray-400">
-                      <Camera className="w-6 h-6" />
+                    <div className="hidden items-center justify-center text-petal-muted">
+                      <Camera className="w-6 h-6" strokeWidth={1.5} />
                     </div>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <h4 className="font-bold text-gray-800">{script.title}</h4>
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        script.category === 'romantic' 
-                          ? 'bg-pink-100 text-pink-600' 
-                          : 'bg-purple-100 text-purple-600'
-                      }`}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h4 className="font-display text-base font-medium tracking-tight text-petal-ink">{script.title}</h4>
+                      <span className="font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rule text-petal-muted">
                         {script.category === 'romantic' ? '浪漫' : '冒險'}
                       </span>
                     </div>
-                    <p className="text-sm text-gray-600 mb-3">{script.scenario}</p>
+                    <p className="font-body text-sm text-petal-ink-soft mb-3 leading-relaxed">{script.scenario}</p>
                     <button
                       onClick={() => handlePlayScript(script)}
-                      className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:shadow-lg transition-all"
+                      className="bg-petal-ink text-petal-cream px-4 py-1.5 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors"
                     >
-                      <Play className="w-4 h-4 inline mr-1" />
+                      <Play className="w-3.5 h-3.5 inline mr-1" strokeWidth={1.5} />
                       開始扮演
                     </button>
                   </div>
@@ -278,43 +286,48 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
 
       {/* Script Modal */}
       {showScriptModal && selectedScript && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex justify-between items-center mb-6">
+        <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-petal-cream rounded-md shadow-petal max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-petal-rule">
+            <div className="p-8">
+              <div className="flex justify-between items-end mb-7 pb-5 border-b border-petal-rule">
                 <div>
-                  <h3 className="text-2xl font-bold text-gray-800">{selectedScript.title}</h3>
-                  <p className="text-gray-600">{selectedScript.scenario}</p>
+                  <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
+                    — 劇本
+                  </div>
+                  <h3 className="font-display text-2xl font-light tracking-tight text-petal-ink mb-1">
+                    {selectedScript.title}
+                  </h3>
+                  <p className="font-display italic font-light text-sm text-petal-muted">{selectedScript.scenario}</p>
                 </div>
                 <button
                   onClick={() => setShowScriptModal(false)}
-                  className="text-gray-500 hover:text-gray-700 text-2xl"
+                  className="text-petal-muted hover:text-petal-ink text-2xl font-light leading-none transition-colors"
                 >
                   ×
                 </button>
               </div>
 
-              <div className="bg-gradient-to-r from-pink-50 to-purple-50 p-6 rounded-lg">
-                <h4 className="font-semibold text-gray-800 mb-4 flex items-center">
-                  <Play className="w-5 h-5 mr-2 text-pink-500" />
-                  劇本對話：
+              <div className="bg-petal-cream-2/40 p-6 rounded-md border border-petal-rule-soft">
+                <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-4 flex items-center">
+                  <Play className="w-3.5 h-3.5 mr-1.5 text-petal-rose-deep" strokeWidth={1.5} />
+                  劇本對話
                 </h4>
-                <div className="whitespace-pre-line text-gray-700 leading-relaxed text-lg">
-                  {selectedScript.script || '劇本內容載入中...'}
+                <div className="whitespace-pre-line font-body text-petal-ink leading-relaxed text-base">
+                  {selectedScript.script || '劇本內容載入中…'}
                 </div>
               </div>
 
-              <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-800 flex items-center">
-                  <Heart className="w-4 h-4 mr-2" />
-                  已自動記錄一次親密時光到你們的愛情日曆中！
+              <div className="mt-5 p-4 bg-petal-sage/10 border border-petal-sage/40 rounded-md">
+                <p className="font-body text-sm text-petal-sage-deep flex items-center">
+                  <Heart className="w-3.5 h-3.5 mr-2" strokeWidth={1.5} />
+                  已自動記錄一次親密時光到你們的愛情日曆中。
                 </p>
               </div>
 
               <div className="flex justify-end mt-6">
                 <button
                   onClick={() => setShowScriptModal(false)}
-                  className="px-6 py-2 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg hover:shadow-lg"
+                  className="px-6 py-2 bg-petal-ink text-petal-cream rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
                 >
                   關閉
                 </button>

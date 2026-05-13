@@ -1,0 +1,1246 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Twogether — 01 Soft Petal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,300;1,9..144,400;1,9..144,500&family=Manrope:wght@300;400;500;600;700&family=Noto+Serif+TC:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    :root {
+      --cream: #FBF7F2;
+      --cream-deep: #F2EBDF;
+      --rose: #D4938A;
+      --rose-soft: #EBCFC8;
+      --rose-deep: #B86E64;
+      --sage: #A8B89E;
+      --sage-deep: #7D8F75;
+      --ink: #2A2520;
+      --ink-soft: #5A4F45;
+      --muted: #8A7E72;
+      --rule: #D9CFC1;
+      --rule-soft: #E8DFD0;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--cream);
+      color: var(--ink);
+      font-family: 'Manrope', 'Noto Serif TC', system-ui, sans-serif;
+      font-weight: 400;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      font-feature-settings: 'ss01', 'ss02';
+    }
+    .serif { font-family: 'Fraunces', 'Noto Serif TC', serif; }
+    .italic-serif { font-family: 'Fraunces', 'Noto Serif TC', serif; font-style: italic; font-weight: 300; }
+    .mono { font-family: 'Manrope', monospace; font-feature-settings: 'tnum'; }
+
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 0 48px; }
+    @media (max-width: 760px) { .wrap { padding: 0 20px; } }
+
+    /* Vibe header */
+    .vibe-bar {
+      background: var(--ink);
+      color: var(--cream);
+      padding: 14px 48px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .vibe-bar a { color: var(--cream); opacity: 0.7; text-decoration: none; transition: opacity 0.2s; }
+    .vibe-bar a:hover { opacity: 1; }
+    .vibe-bar .palette { display: flex; gap: 0; }
+    .vibe-bar .swatch { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(251, 247, 242, 0.2); margin-left: -4px; }
+    .vibe-bar .swatch:first-child { margin-left: 8px; }
+
+    /* App header */
+    header.app {
+      padding: 36px 0;
+      border-bottom: 1px solid var(--rule);
+      margin-bottom: 80px;
+    }
+    .app-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      font-family: 'Fraunces', serif;
+      font-weight: 400;
+      font-size: 24px;
+      letter-spacing: -0.01em;
+    }
+    .logo em { font-style: italic; font-weight: 300; color: var(--rose-deep); }
+    nav.app-nav { display: flex; gap: 36px; }
+    nav.app-nav a {
+      font-size: 14px;
+      color: var(--ink-soft);
+      text-decoration: none;
+      letter-spacing: 0.01em;
+      position: relative;
+      padding-bottom: 4px;
+      transition: color 0.2s;
+    }
+    nav.app-nav a:hover { color: var(--ink); }
+    nav.app-nav a.active { color: var(--ink); font-weight: 500; }
+    nav.app-nav a.active::after {
+      content: '';
+      position: absolute;
+      bottom: -2px;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: var(--rose);
+    }
+    .header-right { display: flex; align-items: center; gap: 24px; }
+    .coin { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-soft); }
+    .coin-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--rose); }
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: var(--rose-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Fraunces', serif;
+      font-style: italic;
+      font-weight: 400;
+      color: var(--rose-deep);
+      font-size: 16px;
+    }
+
+    /* Section header */
+    .section { padding: 0 0 96px; }
+    .section-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: end;
+      margin-bottom: 56px;
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--rule);
+    }
+    .section-num {
+      font-family: 'Fraunces', serif;
+      font-style: italic;
+      font-weight: 300;
+      color: var(--rose-deep);
+      font-size: 14px;
+      letter-spacing: 0.04em;
+      margin-bottom: 12px;
+    }
+    .section-title {
+      font-family: 'Fraunces', 'Noto Serif TC', serif;
+      font-weight: 300;
+      font-size: clamp(40px, 5vw, 64px);
+      line-height: 1;
+      letter-spacing: -0.02em;
+    }
+    .section-title em { font-style: italic; color: var(--rose-deep); }
+    .section-meta {
+      font-size: 13px;
+      color: var(--muted);
+      text-align: right;
+      letter-spacing: 0.04em;
+      line-height: 1.7;
+    }
+    .section-meta strong { color: var(--ink); font-weight: 500; display: block; }
+
+    /* SECTION A — Calendar */
+    .cal-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+      gap: 80px;
+    }
+    @media (max-width: 920px) { .cal-layout { grid-template-columns: 1fr; gap: 64px; } }
+
+    .cal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 32px;
+    }
+    .cal-month {
+      font-family: 'Fraunces', 'Noto Serif TC', serif;
+      font-weight: 400;
+      font-size: 32px;
+      letter-spacing: -0.015em;
+    }
+    .cal-month em { font-style: italic; font-weight: 300; color: var(--rose-deep); margin-left: 8px; }
+    .cal-nav { display: flex; gap: 4px; }
+    .cal-nav button {
+      width: 32px;
+      height: 32px;
+      border: 1px solid var(--rule);
+      background: transparent;
+      color: var(--ink-soft);
+      cursor: pointer;
+      font-size: 14px;
+      border-radius: 50%;
+      transition: all 0.2s;
+    }
+    .cal-nav button:hover { border-color: var(--ink); color: var(--ink); }
+
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 0;
+      border-top: 1px solid var(--rule);
+      border-left: 1px solid var(--rule);
+    }
+    .cal-dow {
+      font-family: 'Manrope', sans-serif;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      padding: 12px 10px;
+      border-right: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+      background: var(--cream-deep);
+    }
+    .cal-cell {
+      aspect-ratio: 1 / 1;
+      padding: 10px;
+      border-right: 1px solid var(--rule);
+      border-bottom: 1px solid var(--rule);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .cal-cell:hover { background: rgba(212, 147, 138, 0.06); }
+    .cal-cell.dim { color: var(--rule); cursor: default; }
+    .cal-cell.dim:hover { background: transparent; }
+    .cal-cell .num {
+      font-family: 'Fraunces', serif;
+      font-weight: 400;
+      font-size: 16px;
+      line-height: 1;
+    }
+    .cal-cell.today .num {
+      color: var(--cream);
+      background: var(--rose-deep);
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-style: italic;
+      margin: -3px 0 0 -3px;
+    }
+    .cal-cell .dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--rose);
+      align-self: flex-end;
+      margin: 0 2px 3px 0;
+      opacity: 0.7;
+    }
+    .cal-cell.today .dot { background: var(--rose-deep); opacity: 1; width: 6px; height: 6px; }
+    .cal-cell .dot.sage { background: var(--sage-deep); }
+
+    /* Recent entries */
+    .entries-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 28px;
+    }
+    .entries-head h3 {
+      font-family: 'Fraunces', 'Noto Serif TC', serif;
+      font-weight: 400;
+      font-size: 24px;
+      letter-spacing: -0.01em;
+    }
+    .entries-count {
+      font-family: 'Fraunces', serif;
+      font-style: italic;
+      font-weight: 300;
+      color: var(--rose-deep);
+      font-size: 14px;
+    }
+    .entries-count b { font-style: normal; font-weight: 400; }
+
+    .entry {
+      padding: 24px 0;
+      border-bottom: 1px solid var(--rule-soft);
+      display: grid;
+      grid-template-columns: 56px 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    .entry:first-child { padding-top: 0; }
+    .entry-mood {
+      font-size: 18px;
+      line-height: 1;
+      margin-top: 4px;
+      opacity: 0.78;
+      filter: saturate(0.85);
+      text-align: center;
+    }
+    .entry-time {
+      font-family: 'Fraunces', serif;
+      font-style: italic;
+      font-size: 13px;
+      color: var(--muted);
+      letter-spacing: 0.02em;
+      margin-bottom: 4px;
+    }
+    .entry-desc {
+      font-family: 'Noto Serif TC', 'Fraunces', serif;
+      font-size: 15.5px;
+      line-height: 1.55;
+      color: var(--ink);
+      margin-bottom: 8px;
+    }
+    .entry-notes {
+      font-size: 13.5px;
+      color: var(--ink-soft);
+      line-height: 1.6;
+      font-style: italic;
+      font-family: 'Fraunces', 'Noto Serif TC', serif;
+      font-weight: 300;
+      margin-top: 6px;
+      padding-left: 12px;
+      border-left: 1px solid var(--rose-soft);
+    }
+    .entry-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .tag {
+      font-size: 11px;
+      padding: 3px 10px;
+      border: 1px solid var(--rule);
+      border-radius: 999px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+    }
+    .tag.sage { color: var(--sage-deep); border-color: var(--sage); background: rgba(168, 184, 158, 0.08); }
+    .entry-photo {
+      margin-top: 12px;
+      width: 88px;
+      height: 88px;
+      border-radius: 4px;
+      background: linear-gradient(135deg, var(--rose-soft), var(--sage));
+      position: relative;
+      overflow: hidden;
+    }
+    .entry-photo::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 30% 40%, rgba(255,255,255,0.4), transparent 50%);
+    }
+
+    .empty-entry {
+      padding: 24px 20px;
+      border: 1px dashed var(--rule);
+      border-radius: 4px;
+      text-align: center;
+      margin-top: 24px;
+    }
+    .empty-entry p {
+      font-family: 'Fraunces', 'Noto Serif TC', serif;
+      font-style: italic;
+      font-weight: 300;
+      font-size: 15px;
+      color: var(--muted);
+    }
+
+    /* SECTION B — Invite wizard */
+    .wizard { display: flex; flex-direction: column; gap: 64px; }
+    .step {
+      display: grid;
+      grid-template-columns: 80px 1fr;
+      gap: 32px;
+      align-items: start;
+    }
+    @media (max-width: 760px) { .step { grid-template-columns: 1fr; gap: 12px; } }
+    .step-label {
+      padding-top: 4px;
+      border-top: 1px solid var(--ink);
+    }
+    .step-label .n {
+      font-family: 'Fraunces', serif;
+      font-style: italic;
+      font-weight: 300;
+      font-size: 32px;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      color: var(--rose-deep);
+    }
+    .step-label .t {
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+    .step-body h4 {
+      font-family: 'Fraunces', 'Noto Serif TC', serif;
+      font-weight: 400;
+      font-size: 22px;
+      letter-spacing: -0.01em;
+      margin-bottom: 20px;
+    }
+
+    .cat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--rule);
+      border: 1px solid var(--rule);
+    }
+    @media (max-width: 760px) { .cat-grid { grid-template-columns: repeat(2, 1fr); } }
+    .cat {
+      background: var(--cream);
+      padding: 28px 20px;
+      cursor: pointer;
+      transition: background 0.25s;
+      position: relative;
+    }
+    .cat:hover { background: #fff; }
+    .cat.selected { background: #fff; }
+    .cat.selected::after {
+      content: '';
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--rose-deep);
+    }
+    .cat-emoji {
+      font-size: 17px;
+      margin-bottom: 14px;
+      display: block;
+      line-height: 1;
+      opacity: 0.7;
+      filter: saturate(0.8);
+    }
+    .cat-name {
+      font-family: 'Fraunces', 'Noto Serif TC', serif;
+      font-weight: 500;
+      font-size: 17px;
+      margin-bottom: 4px;
+      letter-spacing: -0.005em;
+    }
+    .cat-desc {
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .template {
+      background: #fff;
+      border: 1px solid var(--rule);
+      padding: 28px;
+      border-radius: 4px;
+      position: relative;
+    }
+    .template-pri {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--rose-deep);
+      margin-bottom: 18px;
+    }
+    .template-pri .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--rose-deep); }
+    .template-hint {
+      font-family: 'Fraunces', 'Noto Serif TC', serif;
+      font-style: italic;
+      font-weight: 300;
+      font-size: 18px;
+      color: var(--ink-soft);
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
+    .template-setup {
+      font-family: 'Noto Serif TC', serif;
+      font-size: 15px;
+      line-height: 1.7;
+      color: var(--ink);
+    }
+    .template-meta {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid var(--rule-soft);
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .customize {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .toggle {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--rule);
+      border-radius: 999px;
+      width: fit-content;
+      overflow: hidden;
+    }
+    .toggle button {
+      padding: 10px 20px;
+      border: 0;
+      background: transparent;
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--ink-soft);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .toggle button.on {
+      background: var(--ink);
+      color: var(--cream);
+    }
+    .textarea {
+      background: #fff;
+      border: 1px solid var(--rule);
+      padding: 20px 22px;
+      font-family: 'Noto Serif TC', 'Fraunces', serif;
+      font-size: 15.5px;
+      line-height: 1.7;
+      color: var(--ink);
+      border-radius: 4px;
+      min-height: 120px;
+    }
+    .textarea-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: -10px;
+      padding: 0 4px;
+    }
+    .datetime {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      font-size: 13.5px;
+      color: var(--ink-soft);
+    }
+    .datetime input {
+      padding: 10px 16px;
+      border: 1px solid var(--rule);
+      background: #fff;
+      font-family: inherit;
+      font-size: 13.5px;
+      color: var(--ink);
+      border-radius: 4px;
+    }
+
+    .preview {
+      background: var(--cream-deep);
+      padding: 32px;
+      border-radius: 4px;
+      position: relative;
+    }
+    .preview::before {
+      content: '"';
+      font-family: 'Fraunces', serif;
+      font-style: italic;
+      font-size: 80px;
+      color: var(--rose-soft);
+      position: absolute;
+      top: 8px;
+      left: 20px;
+      line-height: 1;
+    }
+    .preview-msg {
+      font-family: 'Fraunces', 'Noto Serif TC', serif;
+      font-weight: 300;
+      font-style: italic;
+      font-size: 19px;
+      line-height: 1.55;
+      color: var(--ink);
+      padding-left: 36px;
+      margin-bottom: 20px;
+    }
+    .preview-foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 18px;
+      border-top: 1px solid var(--rule);
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .btn {
+      padding: 12px 28px;
+      background: var(--ink);
+      color: var(--cream);
+      border: 0;
+      font-family: 'Fraunces', 'Noto Serif TC', serif;
+      font-style: italic;
+      font-weight: 400;
+      font-size: 15px;
+      letter-spacing: 0.01em;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: var(--rose-deep); }
+    .btn.ghost {
+      background: transparent;
+      color: var(--ink);
+      border: 1px solid var(--ink);
+    }
+    .btn.ghost:hover { background: var(--ink); color: var(--cream); }
+
+    /* SECTION C — Inbox */
+    .inbox-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+      gap: 56px;
+    }
+    @media (max-width: 920px) { .inbox-layout { grid-template-columns: 1fr; gap: 48px; } }
+
+    .inbox-list { display: flex; flex-direction: column; }
+    .notif {
+      padding: 22px 0 22px 0;
+      border-bottom: 1px solid var(--rule-soft);
+      cursor: pointer;
+      display: grid;
+      grid-template-columns: 8px 1fr auto;
+      gap: 14px;
+      align-items: start;
+      transition: padding 0.2s;
+    }
+    .notif:hover { padding-left: 4px; }
+    .notif:first-child { padding-top: 0; }
+    .notif-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-top: 8px;
+    }
+    .notif.unread .notif-dot { background: var(--rose-deep); }
+    .notif:not(.unread) .notif-dot { background: transparent; border: 1px solid var(--rule); }
+    .notif.pri-low .notif-dot { background: var(--sage); }
+    .notif-title {
+      font-family: 'Fraunces', 'Noto Serif TC', serif;
+      font-weight: 500;
+      font-size: 15px;
+      letter-spacing: -0.005em;
+      margin-bottom: 4px;
+      color: var(--ink);
+    }
+    .notif:not(.unread) .notif-title { font-weight: 400; color: var(--ink-soft); }
+    .notif-snippet {
+      font-size: 13px;
+      color: var(--muted);
+      line-height: 1.55;
+      font-family: 'Noto Serif TC', serif;
+    }
+    .notif-time {
+      font-family: 'Fraunces', serif;
+      font-style: italic;
+      font-weight: 300;
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    /* Active request card */
+    .req {
+      background: #fff;
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .req-head {
+      padding: 28px 32px 24px;
+      border-bottom: 1px solid var(--rule);
+      background: linear-gradient(180deg, var(--cream-deep) 0%, transparent 100%);
+    }
+    .req-from {
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--rose-deep);
+      margin-bottom: 10px;
+    }
+    .req-title {
+      font-family: 'Fraunces', 'Noto Serif TC', serif;
+      font-weight: 400;
+      font-size: 24px;
+      letter-spacing: -0.01em;
+      line-height: 1.25;
+    }
+    .req-title em { font-style: italic; font-weight: 300; color: var(--rose-deep); }
+    .req-body {
+      padding: 28px 32px;
+    }
+    .req-message {
+      font-family: 'Noto Serif TC', 'Fraunces', serif;
+      font-size: 16.5px;
+      line-height: 1.7;
+      color: var(--ink);
+      padding-left: 16px;
+      border-left: 2px solid var(--rose-soft);
+      margin-bottom: 20px;
+    }
+    .req-schedule {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      font-size: 13px;
+      color: var(--ink-soft);
+      padding: 12px 16px;
+      background: var(--cream);
+      border-radius: 4px;
+      margin-bottom: 24px;
+    }
+    .req-schedule strong { color: var(--ink); font-weight: 500; font-family: 'Fraunces', serif; font-style: italic; }
+
+    .req-respond {
+      border-top: 1px solid var(--rule-soft);
+      padding-top: 20px;
+    }
+    .req-respond-label {
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .req-respond textarea {
+      width: 100%;
+      background: var(--cream);
+      border: 1px solid var(--rule);
+      padding: 14px 16px;
+      font-family: 'Noto Serif TC', 'Fraunces', serif;
+      font-size: 14.5px;
+      line-height: 1.6;
+      color: var(--ink);
+      border-radius: 4px;
+      resize: vertical;
+      min-height: 64px;
+    }
+    .req-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+    }
+    .req-actions .btn { flex: 1; padding: 14px 20px; }
+
+    .alt-section {
+      margin-top: 32px;
+      padding-top: 28px;
+      border-top: 1px solid var(--rule);
+    }
+    .alt-heading {
+      font-family: 'Fraunces', 'Noto Serif TC', serif;
+      font-style: italic;
+      font-weight: 300;
+      font-size: 17px;
+      color: var(--ink-soft);
+      margin-bottom: 20px;
+    }
+    .alt-groups { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    @media (max-width: 600px) { .alt-groups { grid-template-columns: 1fr; } }
+    .alt-group {
+      padding: 18px;
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      background: var(--cream);
+    }
+    .alt-group-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    .alt-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+    .alt-icon.body { background: var(--rose-soft); color: var(--rose-deep); }
+    .alt-icon.emo { background: #F5D9D5; color: #A04438; }
+    .alt-icon.play { background: #F5E8C4; color: #997817; }
+    .alt-icon.daily { background: var(--sage); color: #fff; }
+    .alt-group-name {
+      font-family: 'Fraunces', 'Noto Serif TC', serif;
+      font-size: 14.5px;
+      font-weight: 500;
+    }
+    .alt-options { display: flex; flex-direction: column; gap: 10px; }
+    .alt-option {
+      font-size: 13px;
+      color: var(--ink-soft);
+      line-height: 1.4;
+      padding-left: 14px;
+      position: relative;
+    }
+    .alt-option::before {
+      content: '·';
+      position: absolute;
+      left: 0;
+      color: var(--rose-deep);
+      font-weight: 700;
+    }
+    .alt-option b { color: var(--ink); font-weight: 500; font-family: 'Noto Serif TC', serif; }
+    .alt-option span { color: var(--muted); margin-left: 6px; font-style: italic; font-family: 'Fraunces', serif; font-weight: 300; }
+
+    footer.page-end {
+      padding: 48px;
+      text-align: center;
+      border-top: 1px solid var(--rule);
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-top: 80px;
+      background: var(--cream-deep);
+    }
+    footer.page-end em { font-family: 'Fraunces', serif; font-style: italic; color: var(--rose-deep); text-transform: none; letter-spacing: 0; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+  <!-- Vibe header bar -->
+  <div class="vibe-bar">
+    <a href="./index.html">← All themes</a>
+    <span>01 · Soft Petal · Editorial</span>
+    <div class="palette">
+      <span class="swatch" style="background:#FBF7F2"></span>
+      <span class="swatch" style="background:#D4938A"></span>
+      <span class="swatch" style="background:#A8B89E"></span>
+      <span class="swatch" style="background:#2A2520"></span>
+    </div>
+  </div>
+
+  <!-- App header -->
+  <header class="app">
+    <div class="wrap app-inner">
+      <div class="logo">Two<em>gether</em></div>
+      <nav class="app-nav">
+        <a href="#cal" class="active">記錄時光</a>
+        <a href="#invite">親密邀請</a>
+        <a href="#inbox">收件匣</a>
+        <a href="#">愛情旅程</a>
+        <a href="#">設定</a>
+      </nav>
+      <div class="header-right">
+        <div class="coin"><span class="coin-dot"></span>248 <span style="color:var(--muted)">枚</span></div>
+        <div class="avatar">小</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- SECTION A — Calendar / Record -->
+  <section class="section" id="cal">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="section-num">— A · 記錄</div>
+          <h2 class="section-title">記錄<em>時光</em></h2>
+        </div>
+        <div class="section-meta">
+          <strong>248 days together</strong>
+          自二〇二五年九月七日
+        </div>
+      </div>
+
+      <div class="cal-layout">
+        <div>
+          <div class="cal-head">
+            <div class="cal-month">五月 <em>May 2026</em></div>
+            <div class="cal-nav">
+              <button>‹</button>
+              <button>›</button>
+            </div>
+          </div>
+          <div class="cal-grid">
+            <div class="cal-dow">日</div><div class="cal-dow">一</div><div class="cal-dow">二</div><div class="cal-dow">三</div><div class="cal-dow">四</div><div class="cal-dow">五</div><div class="cal-dow">六</div>
+
+            <!-- May 2026 starts on Friday. Prefix with 5 dim cells (Apr 26-30) -->
+            <div class="cal-cell dim"><span class="num">26</span></div>
+            <div class="cal-cell dim"><span class="num">27</span></div>
+            <div class="cal-cell dim"><span class="num">28</span></div>
+            <div class="cal-cell dim"><span class="num">29</span></div>
+            <div class="cal-cell dim"><span class="num">30</span></div>
+
+            <div class="cal-cell"><span class="num">1</span></div>
+            <div class="cal-cell"><span class="num">2</span><span class="dot"></span></div>
+
+            <div class="cal-cell"><span class="num">3</span></div>
+            <div class="cal-cell"><span class="num">4</span><span class="dot"></span></div>
+            <div class="cal-cell"><span class="num">5</span></div>
+            <div class="cal-cell"><span class="num">6</span></div>
+            <div class="cal-cell"><span class="num">7</span><span class="dot sage"></span></div>
+            <div class="cal-cell"><span class="num">8</span></div>
+            <div class="cal-cell"><span class="num">9</span><span class="dot"></span></div>
+
+            <div class="cal-cell"><span class="num">10</span></div>
+            <div class="cal-cell"><span class="num">11</span><span class="dot"></span></div>
+            <div class="cal-cell"><span class="num">12</span></div>
+            <div class="cal-cell today"><span class="num">13</span><span class="dot"></span></div>
+            <div class="cal-cell"><span class="num">14</span></div>
+            <div class="cal-cell"><span class="num">15</span></div>
+            <div class="cal-cell"><span class="num">16</span></div>
+
+            <div class="cal-cell"><span class="num">17</span><span class="dot"></span></div>
+            <div class="cal-cell"><span class="num">18</span></div>
+            <div class="cal-cell"><span class="num">19</span></div>
+            <div class="cal-cell"><span class="num">20</span></div>
+            <div class="cal-cell"><span class="num">21</span></div>
+            <div class="cal-cell"><span class="num">22</span></div>
+            <div class="cal-cell"><span class="num">23</span></div>
+
+            <div class="cal-cell"><span class="num">24</span></div>
+            <div class="cal-cell"><span class="num">25</span></div>
+            <div class="cal-cell"><span class="num">26</span></div>
+            <div class="cal-cell"><span class="num">27</span></div>
+            <div class="cal-cell"><span class="num">28</span></div>
+            <div class="cal-cell"><span class="num">29</span></div>
+            <div class="cal-cell"><span class="num">30</span></div>
+
+            <div class="cal-cell"><span class="num">31</span></div>
+            <div class="cal-cell dim"><span class="num">1</span></div>
+            <div class="cal-cell dim"><span class="num">2</span></div>
+            <div class="cal-cell dim"><span class="num">3</span></div>
+            <div class="cal-cell dim"><span class="num">4</span></div>
+            <div class="cal-cell dim"><span class="num">5</span></div>
+            <div class="cal-cell dim"><span class="num">6</span></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="entries-head">
+            <h3>親密記錄</h3>
+            <div class="entries-count italic-serif">共 <b>7</b> 次 · 本月</div>
+          </div>
+
+          <article class="entry">
+            <div class="entry-mood">🌟</div>
+            <div>
+              <div class="entry-time">May 13 · 22:40 · 今夜</div>
+              <p class="entry-desc">慢慢的、靠近的、像在讀一封寫了很久的信。</p>
+              <p class="entry-notes">"她說『不要急』，我就學著不急。我們躺著聽了一整張 Norah Jones，沒說太多話。"</p>
+              <div class="entry-tags">
+                <span class="tag">臥室</span>
+                <span class="tag sage">45 分鐘</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="entry">
+            <div class="entry-mood">😘</div>
+            <div>
+              <div class="entry-time">May 11 · 02:15</div>
+              <p class="entry-desc">下雨的禮拜一，沒人想起床。</p>
+              <div class="entry-tags">
+                <span class="tag">老師/學生</span>
+                <span class="tag">客廳沙發</span>
+              </div>
+              <div class="entry-photo"></div>
+            </div>
+          </article>
+
+          <article class="entry">
+            <div class="entry-mood">🔥</div>
+            <div>
+              <div class="entry-time">May 9 · 23:08</div>
+              <p class="entry-desc">慶祝她拿到 offer，香檳開了兩瓶。</p>
+              <p class="entry-notes">"她笑得停不下來，我也是。"</p>
+            </div>
+          </article>
+
+          <div class="empty-entry">
+            <p>還沒有今天的記錄 — 想為這個夜晚留下一筆嗎？</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION B — Invite Wizard -->
+  <section class="section" id="invite">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="section-num">— B · 邀請</div>
+          <h2 class="section-title">發送<em>親密邀請</em></h2>
+        </div>
+        <div class="section-meta">
+          <strong>四個步驟</strong>
+          選擇 · 模板 · 編輯 · 送出
+        </div>
+      </div>
+
+      <div class="wizard">
+
+        <!-- Step 1 -->
+        <div class="step">
+          <div class="step-label">
+            <div class="n">01</div>
+            <div class="t">選擇邀請類型</div>
+          </div>
+          <div class="step-body">
+            <h4>今晚想要什麼樣的相遇？</h4>
+            <div class="cat-grid">
+              <div class="cat selected">
+                <span class="cat-emoji">💕</span>
+                <div class="cat-name">甜蜜讚美</div>
+                <div class="cat-desc">發送溫馨的讚美和愛意</div>
+              </div>
+              <div class="cat">
+                <span class="cat-emoji">🤝</span>
+                <div class="cat-name">真心和解</div>
+                <div class="cat-desc">吵架後的溫柔挽回</div>
+              </div>
+              <div class="cat">
+                <span class="cat-emoji">📸</span>
+                <div class="cat-name">偶像／攝影師</div>
+                <div class="cat-desc">私密互動的角色扮演</div>
+              </div>
+              <div class="cat">
+                <span class="cat-emoji">📚</span>
+                <div class="cat-name">老師／學生</div>
+                <div class="cat-desc">師生間的特別課程</div>
+              </div>
+              <div class="cat">
+                <span class="cat-emoji">✈️</span>
+                <div class="cat-name">留學生邂逅</div>
+                <div class="cat-desc">異國戀情的浪漫約會</div>
+              </div>
+              <div class="cat">
+                <span class="cat-emoji">✨</span>
+                <div class="cat-name">自訂訊息</div>
+                <div class="cat-desc">完全客製化你的邀請</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="step">
+          <div class="step-label">
+            <div class="n">02</div>
+            <div class="t">挑選模板</div>
+          </div>
+          <div class="step-body">
+            <h4>已為你選好一段話 — 也可以重寫</h4>
+            <div class="template">
+              <div class="template-pri"><span class="dot"></span>輕柔 · subtle</div>
+              <div class="template-hint">傍晚六點之後 — 等他回家</div>
+              <div class="template-setup">
+                想用最樸實的方式告訴你：謝謝你一直在我身邊，你是我生命中最珍貴的禮物 🎁
+              </div>
+              <div class="template-meta">
+                <span>類型 · 甜蜜讚美</span>
+                <span>建議時間 · 晚間</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="step">
+          <div class="step-label">
+            <div class="n">03</div>
+            <div class="t">編輯訊息</div>
+          </div>
+          <div class="step-body">
+            <h4>用你的話再說一次</h4>
+            <div class="customize">
+              <div class="toggle">
+                <button class="on">立即邀請</button>
+                <button>預約時間</button>
+              </div>
+              <textarea class="textarea" rows="4">無論什麼時候，你都是我心中最特別的那個人 💝 想念你的整個下午。今晚六點半在家等你 — 為你準備了一些事情，慢慢來。</textarea>
+              <div class="textarea-meta">
+                <span>78 / 1000 字</span>
+                <span class="italic-serif">支援表情符號</span>
+              </div>
+              <div class="datetime">
+                <span>或安排在</span>
+                <input type="text" value="2026-05-13" />
+                <input type="text" value="18:30" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="step">
+          <div class="step-label">
+            <div class="n">04</div>
+            <div class="t">確認送出</div>
+          </div>
+          <div class="step-body">
+            <h4>就要寄出了</h4>
+            <div class="preview">
+              <div class="preview-msg">無論什麼時候，你都是我心中最特別的那個人 💝 想念你的整個下午。今晚六點半在家等你 — 為你準備了一些事情，慢慢來。</div>
+              <div class="preview-foot">
+                <span>給 小美 · 立即送達</span>
+                <button class="btn">送出邀請 →</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION C — Notification Inbox -->
+  <section class="section" id="inbox">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="section-num">— C · 收件匣</div>
+          <h2 class="section-title">通知<em>收件匣</em></h2>
+        </div>
+        <div class="section-meta">
+          <strong>2 則未讀</strong>
+          最新 · 1 分鐘前
+        </div>
+      </div>
+
+      <div class="inbox-layout">
+
+        <div class="inbox-list">
+          <div class="notif unread">
+            <span class="notif-dot"></span>
+            <div>
+              <div class="notif-title">來自 小美 的親密邀請</div>
+              <div class="notif-snippet">今晚六點半在家等你 — 為你準備了一些事情⋯⋯</div>
+            </div>
+            <span class="notif-time">剛剛</span>
+          </div>
+          <div class="notif unread pri-low">
+            <span class="notif-dot"></span>
+            <div>
+              <div class="notif-title">你獲得了一枚新徽章</div>
+              <div class="notif-snippet">「連續七日的早安」— 收下 50 枚金幣</div>
+            </div>
+            <span class="notif-time">2 小時前</span>
+          </div>
+          <div class="notif">
+            <span class="notif-dot"></span>
+            <div>
+              <div class="notif-title">小美 回覆了你的邀請</div>
+              <div class="notif-snippet">"接受你的邀請 💕 — 我也想你了"</div>
+            </div>
+            <span class="notif-time">昨天</span>
+          </div>
+          <div class="notif">
+            <span class="notif-dot"></span>
+            <div>
+              <div class="notif-title">本週親密總結已就緒</div>
+              <div class="notif-snippet">這一週你們相遇了 4 次，比上週多 1 次</div>
+            </div>
+            <span class="notif-time">3 天前</span>
+          </div>
+        </div>
+
+        <div class="req">
+          <div class="req-head">
+            <div class="req-from">— 親密邀請 · ACTIVE</div>
+            <div class="req-title">來自 <em>小美</em> 的親密邀請</div>
+          </div>
+          <div class="req-body">
+            <div class="req-message">
+              "今晚六點半在家等你 — 為你準備了一些事情，慢慢來。<br />
+              無論你多累，我都想第一個聽你說今天的故事。"
+            </div>
+            <div class="req-schedule">
+              <span>預約時間 ·</span>
+              <strong>今晚 18:30</strong>
+              <span style="color:var(--muted)">· 約 2 小時後</span>
+            </div>
+
+            <div class="req-respond">
+              <div class="req-respond-label">— 回覆她</div>
+              <textarea>接受你的邀請 💕</textarea>
+              <div class="req-actions">
+                <button class="btn">接受 ✓</button>
+                <button class="btn ghost">改個時間</button>
+              </div>
+            </div>
+
+            <div class="alt-section">
+              <div class="alt-heading">現在不太合適，但我們可以試試這個 💝</div>
+              <div class="alt-groups">
+                <div class="alt-group">
+                  <div class="alt-group-head">
+                    <div class="alt-icon body">✋</div>
+                    <div class="alt-group-name">肢體親密</div>
+                  </div>
+                  <div class="alt-options">
+                    <div class="alt-option"><b>長長的擁抱</b><span>5 分鐘</span></div>
+                    <div class="alt-option"><b>幫對方按摩肩頸</b><span>15 分鐘</span></div>
+                  </div>
+                </div>
+                <div class="alt-group">
+                  <div class="alt-group-head">
+                    <div class="alt-icon emo">♡</div>
+                    <div class="alt-group-name">情感親密</div>
+                  </div>
+                  <div class="alt-options">
+                    <div class="alt-option"><b>分享今天最開心的事</b><span>10 分鐘</span></div>
+                    <div class="alt-option"><b>讀一段詩給對方聽</b><span>5 分鐘</span></div>
+                  </div>
+                </div>
+                <div class="alt-group">
+                  <div class="alt-group-head">
+                    <div class="alt-icon play">☺</div>
+                    <div class="alt-group-name">趣味互動</div>
+                  </div>
+                  <div class="alt-options">
+                    <div class="alt-option"><b>一起看搞笑短片</b><span>20 分鐘</span></div>
+                    <div class="alt-option"><b>玩心電感應遊戲</b><span>15 分鐘</span></div>
+                  </div>
+                </div>
+                <div class="alt-group">
+                  <div class="alt-group-head">
+                    <div class="alt-icon daily">☕</div>
+                    <div class="alt-group-name">日常陪伴</div>
+                  </div>
+                  <div class="alt-options">
+                    <div class="alt-option"><b>一起喝杯熱茶</b><span>20 分鐘</span></div>
+                    <div class="alt-option"><b>陪她散步回家</b><span>30 分鐘</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <footer class="page-end">
+    <p>— <em>Soft Petal</em> — 編輯式設計樣本 · Twogether ·</p>
+  </footer>
+
+</body>
+</html>

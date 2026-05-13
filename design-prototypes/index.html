@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Twogether — Theme Prototypes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&family=Noto+Serif+TC:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    :root {
+      --bg: #f5f1ea;
+      --ink: #1a1410;
+      --muted: #6b5d52;
+      --rule: #d9cfc1;
+      --accent: #7a2e3f;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Manrope', 'Noto Serif TC', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+    }
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 80px 48px; }
+    header { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 72px; }
+    .brand {
+      font-family: 'Fraunces', 'Noto Serif TC', serif;
+      font-weight: 400;
+      font-size: clamp(40px, 6vw, 72px);
+      letter-spacing: -0.02em;
+      line-height: 0.95;
+    }
+    .brand em { font-style: italic; font-weight: 300; color: var(--accent); }
+    .meta { font-size: 13px; color: var(--muted); text-align: right; letter-spacing: 0.04em; text-transform: uppercase; }
+    .meta strong { display: block; color: var(--ink); font-weight: 600; font-size: 14px; margin-bottom: 4px; letter-spacing: 0.06em; }
+    .intro {
+      max-width: 640px;
+      margin-bottom: 64px;
+      font-size: 17px;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+    .intro span { color: var(--ink); }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 24px;
+    }
+    @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } .wrap { padding: 48px 24px; } header { flex-direction: column; gap: 16px; } .meta { text-align: left; } }
+
+    a.card {
+      display: block;
+      background: #fff;
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      padding: 32px;
+      text-decoration: none;
+      color: inherit;
+      transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.4s, border-color 0.4s;
+      position: relative;
+      overflow: hidden;
+    }
+    a.card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 24px 48px -24px rgba(26, 20, 16, 0.18);
+      border-color: var(--ink);
+    }
+    .num {
+      font-family: 'Fraunces', serif;
+      font-weight: 300;
+      font-size: 14px;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      display: block;
+      margin-bottom: 12px;
+    }
+    .name {
+      font-family: 'Fraunces', 'Noto Serif TC', serif;
+      font-size: 36px;
+      font-weight: 400;
+      letter-spacing: -0.015em;
+      line-height: 1.05;
+      margin-bottom: 4px;
+    }
+    .name em { font-style: italic; font-weight: 300; }
+    .desc {
+      font-size: 14.5px;
+      line-height: 1.55;
+      color: var(--muted);
+      margin: 16px 0 28px;
+      max-width: 36ch;
+    }
+    .chips { display: flex; gap: 0; margin-bottom: 24px; border: 1px solid var(--rule); width: fit-content; }
+    .chip {
+      width: 44px;
+      height: 44px;
+      position: relative;
+    }
+    .chip + .chip { border-left: 1px solid var(--rule); }
+    .chip span {
+      position: absolute;
+      bottom: -22px;
+      left: 0;
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      font-family: 'Manrope', monospace;
+    }
+    .fonts {
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      padding-top: 24px;
+      border-top: 1px solid var(--rule);
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+    .fonts strong { color: var(--ink); font-weight: 500; }
+    .arrow {
+      display: inline-block;
+      margin-left: 6px;
+      transition: transform 0.3s ease;
+    }
+    a.card:hover .arrow { transform: translateX(4px); }
+
+    footer {
+      margin-top: 96px;
+      padding-top: 32px;
+      border-top: 1px solid var(--rule);
+      font-size: 12px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      display: flex;
+      justify-content: space-between;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1 class="brand">Twogether<br /><em>theme studies</em></h1>
+      <p class="meta"><strong>v0.1 · Vibe prototypes</strong>2026.05.13 · 4 directions</p>
+    </header>
+
+    <p class="intro">
+      Four standalone theme directions for the Twogether app, each rendering the three highest-signal surfaces: <span>記錄時光 calendar</span>, <span>發送親密邀請</span>, and <span>通知收件匣</span>. Same content, same layout skeleton — only color, typography, and personality vary. Pick the one that feels right, or borrow the parts you love.
+    </p>
+
+    <div class="grid">
+
+      <a class="card" href="./01-soft-petal.html">
+        <span class="num">01 / Editorial</span>
+        <h2 class="name">Soft Petal</h2>
+        <p class="desc">Cream paper, dusty rose, sage breathing room. A quiet journal you'd want to leave on a bedside table.</p>
+        <div class="chips">
+          <div class="chip" style="background:#FBF7F2"><span>FBF7F2</span></div>
+          <div class="chip" style="background:#D4938A"><span>D4938A</span></div>
+          <div class="chip" style="background:#A8B89E"><span>A8B89E</span></div>
+          <div class="chip" style="background:#2A2520"><span>2A2520</span></div>
+        </div>
+        <div class="fonts"><span><strong>Fraunces</strong> · Manrope</span><span>Open<span class="arrow">→</span></span></div>
+      </a>
+
+      <a class="card" href="./02-modern-mist.html">
+        <span class="num">02 / Precision</span>
+        <h2 class="name">Modern <em>Mist</em></h2>
+        <p class="desc">Off-white canvas, slate ink, warm peach + mint accents. Apple-Calendar discipline with a soft heart.</p>
+        <div class="chips">
+          <div class="chip" style="background:#FAFAF7"><span>FAFAF7</span></div>
+          <div class="chip" style="background:#3D4A5C"><span>3D4A5C</span></div>
+          <div class="chip" style="background:#F4B5A0"><span>F4B5A0</span></div>
+          <div class="chip" style="background:#C7E0D3"><span>C7E0D3</span></div>
+        </div>
+        <div class="fonts"><span><strong>Onest</strong></span><span>Open<span class="arrow">→</span></span></div>
+      </a>
+
+      <a class="card" href="./03-bloom.html">
+        <span class="num">03 / Playful</span>
+        <h2 class="name">Bloom</h2>
+        <p class="desc">Pure white with coral, butter yellow, lilac. Bento blocks, big rounded radii, friendly without being childish.</p>
+        <div class="chips">
+          <div class="chip" style="background:#FFFFFF; border-right: 1px solid var(--rule)"><span>FFFFFF</span></div>
+          <div class="chip" style="background:#FF6B6B"><span>FF6B6B</span></div>
+          <div class="chip" style="background:#FFE5A0"><span>FFE5A0</span></div>
+          <div class="chip" style="background:#E8D5F2"><span>E8D5F2</span></div>
+        </div>
+        <div class="fonts"><span><strong>Bricolage</strong> · Plus Jakarta</span><span>Open<span class="arrow">→</span></span></div>
+      </a>
+
+      <a class="card" href="./04-letter.html">
+        <span class="num">04 / Classical</span>
+        <h2 class="name">Letter</h2>
+        <p class="desc">Ivory stationery, burgundy ink, gold leaf. Postcard notifications, vertical agenda, written by hand.</p>
+        <div class="chips">
+          <div class="chip" style="background:#F8F4ED"><span>F8F4ED</span></div>
+          <div class="chip" style="background:#7A2E3F"><span>7A2E3F</span></div>
+          <div class="chip" style="background:#C9A24B"><span>C9A24B</span></div>
+          <div class="chip" style="background:#E8E3D8"><span>E8E3D8</span></div>
+        </div>
+        <div class="fonts"><span><strong>Playfair</strong> · EB Garamond</span><span>Open<span class="arrow">→</span></span></div>
+      </a>
+
+    </div>
+
+    <footer>
+      <span>Twogether · 情侶親密時光記錄</span>
+      <span>Prototypes are static · No live data</span>
+    </footer>
+  </div>
+</body>
+</html>

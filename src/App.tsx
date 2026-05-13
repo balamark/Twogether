@@ -1496,6 +1496,35 @@ const LoveTimeApp = () => {
   ];
 
 
+  // Chinese-numeral date formatter for editorial meta lines. e.g. 二〇二五年九月七日
+  const toChineseNum = (n: number): string => {
+    const cn = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+    if (n < 10) return cn[n];
+    if (n < 20) return n === 10 ? '十' : `十${cn[n - 10]}`;
+    if (n < 30) return n === 20 ? '二十' : `二十${cn[n - 20]}`;
+    return n === 30 ? '三十' : `三十${cn[n - 30]}`;
+  };
+  const chineseYear = (y: number): string =>
+    y.toString().split('').map(c => '〇一二三四五六七八九'[parseInt(c, 10)]).join('');
+  const formatChineseDate = (d: Date): string =>
+    `${chineseYear(d.getFullYear())}年${toChineseNum(d.getMonth() + 1)}月${toChineseNum(d.getDate())}日`;
+
+  // Earliest meaningful "together since" date — earliest record, else user account.
+  const togetherSince = (() => {
+    if (intimateRecords.length > 0) {
+      const earliest = intimateRecords.reduce(
+        (min, r) => (r.date < min.date ? r : min),
+        intimateRecords[0],
+      );
+      return new Date(earliest.date);
+    }
+    if (authState.user?.createdAt) return new Date(authState.user.createdAt);
+    return null;
+  })();
+  const daysTogether = togetherSince
+    ? Math.max(1, Math.floor((Date.now() - togetherSince.getTime()) / 86400000) + 1)
+    : 0;
+
   const CalendarView = () => {
     // Helper function to get current time in HH:MM format
     const getCurrentTime = () => {
@@ -1583,44 +1612,69 @@ const LoveTimeApp = () => {
     };
 
     return (
-      <div className="space-y-6">
-        <div className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-6 rounded-2xl">
-          <h2 className="text-2xl font-bold mb-4">愛的日曆</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="space-y-10">
+        <div className="border-b border-petal-rule pb-7">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div>
-              <label className="block text-sm font-medium mb-2">選擇日期</label>
+              <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+                — A · 記錄
+              </div>
+              <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05]">
+                記錄<em className="not-italic font-light italic text-pink-600">時光</em>
+              </h2>
+            </div>
+            <div className="text-left md:text-right font-body text-sm text-petal-muted leading-relaxed">
+              {togetherSince ? (
+                <>
+                  <strong className="block text-petal-ink font-display font-semibold text-base tracking-tight mb-0.5">
+                    {daysTogether} days together
+                  </strong>
+                  自{formatChineseDate(togetherSince)}
+                </>
+              ) : (
+                <span className="font-display italic">— 開始你們的旅程 —</span>
+              )}
+            </div>
+          </div>
+          <div className="mt-6 flex flex-col md:flex-row gap-3 md:items-center">
+            <div className="flex items-center gap-3 md:flex-1">
+              <span className="font-body text-xs uppercase tracking-[0.14em] text-petal-muted">日期</span>
               <input
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="w-full p-3 rounded-lg text-gray-800"
+                className="flex-1 max-w-xs px-4 py-2.5 border border-petal-rule rounded-md bg-white font-body text-sm text-petal-ink focus:outline-none focus:border-petal-rose-deep transition-colors"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">親密時刻</label>
-              <button
-                onClick={() => {
-                  setRecordForm({...recordForm, date: selectedDate});
-                  setShowRecordModal(true);
-                }}
-                className="w-full bg-white text-pink-600 p-3 rounded-lg font-medium hover:bg-pink-50 transition-colors"
-              >
-                記錄今天的愛 ❤️
-              </button>
-            </div>
+            <button
+              onClick={() => {
+                setRecordForm({...recordForm, date: selectedDate});
+                setShowRecordModal(true);
+              }}
+              className="px-6 py-2.5 bg-petal-ink text-petal-cream rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
+            >
+              + 為這一天添一筆
+            </button>
           </div>
         </div>
 
         {/* Enhanced Record Modal */}
         {showRecordModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-2xl font-bold text-gray-800">記錄親密時光</h3>
+          <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-petal-cream rounded-md shadow-petal max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-petal-rule">
+              <div className="p-8">
+                <div className="flex justify-between items-end mb-8 pb-5 border-b border-petal-rule">
+                  <div>
+                    <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
+                      — 新的記錄
+                    </div>
+                    <h3 className="font-display text-3xl font-light tracking-tight text-petal-ink">
+                      記錄<em className="not-italic font-light italic text-pink-600">親密時光</em>
+                    </h3>
+                  </div>
                   <button
                     onClick={() => setShowRecordModal(false)}
-                    className="text-gray-500 hover:text-gray-700 text-2xl"
+                    className="text-petal-muted hover:text-petal-ink text-2xl font-light transition-colors leading-none"
                   >
                     ×
                   </button>
@@ -1763,16 +1817,16 @@ const LoveTimeApp = () => {
 
                   {/* Mood and Notes */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">心情</label>
+                    <label className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-3">心情</label>
                     <div className="flex space-x-2">
                       {['💕', '🔥', '😍', '🥰', '😘', '🌟'].map(emoji => (
                         <button
                           key={emoji}
                           onClick={() => setRecordForm({...recordForm, mood: emoji})}
-                          className={`p-2 text-2xl rounded-lg border-2 ${
-                            recordForm.mood === emoji 
-                              ? 'border-pink-500 bg-pink-50' 
-                              : 'border-gray-300 hover:border-pink-300'
+                          className={`w-11 h-11 text-base rounded-full border transition-all ${
+                            recordForm.mood === emoji
+                              ? 'border-petal-rose-deep bg-petal-rose-soft/40 opacity-100 saturate-100'
+                              : 'border-petal-rule hover:border-petal-rose opacity-60 saturate-75 hover:opacity-90 hover:saturate-100'
                           }`}
                         >
                           {emoji}
@@ -1792,16 +1846,16 @@ const LoveTimeApp = () => {
                   </div>
                 </div>
 
-                <div className="flex space-x-4 mt-6">
+                <div className="flex space-x-3 mt-8 pt-6 border-t border-petal-rule">
                   <button
                     onClick={() => setShowRecordModal(false)}
-                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                    className="flex-1 px-4 py-3 border border-petal-rule text-petal-ink rounded-md hover:bg-petal-cream-2 transition-colors font-body text-sm"
                   >
                     取消
                   </button>
                   <button
                     onClick={handleSubmitRecord}
-                    className="flex-1 px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-lg hover:shadow-lg"
+                    className="flex-1 px-4 py-3 bg-petal-ink text-petal-cream rounded-md hover:bg-pink-700 transition-colors font-display italic text-base"
                   >
                     保存記錄
                   </button>
@@ -1811,71 +1865,76 @@ const LoveTimeApp = () => {
           </div>
         )}
 
-        <div className="bg-white rounded-2xl shadow-lg p-6">
-          <h3 className="text-xl font-bold text-gray-800 mb-4">
-            親密記錄 ({intimateRecords.length} 次)
-          </h3>
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {intimateRecords.slice().reverse().map((record) => (
-              <div 
-                key={record.id} 
-                className="bg-white rounded-lg shadow-sm p-4 hover:shadow-md transition-shadow cursor-pointer"
+        <div>
+          <div className="flex items-baseline justify-between mb-6">
+            <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink">
+              親密<em className="not-italic font-light italic text-pink-600">記錄</em>
+            </h3>
+            <span className="font-display italic font-light text-sm text-petal-muted">
+              共 <b className="not-italic font-normal text-petal-ink">{intimateRecords.length}</b> 次
+            </span>
+          </div>
+          <div className="max-h-[36rem] overflow-y-auto">
+            {intimateRecords.slice().reverse().map((record, idx) => (
+              <article
+                key={record.id}
                 onClick={() => showRecordDetails(record.id)}
+                className={`grid grid-cols-[40px_1fr] gap-5 py-5 cursor-pointer hover:bg-petal-cream-2/40 -mx-2 px-2 transition-colors ${
+                  idx === 0 ? '' : 'border-t border-petal-rule-soft'
+                }`}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="text-2xl">{record.mood}</div>
-                    <div>
-                      <div className="font-medium text-gray-800">
-                        {record.date} {record.time}
-                      </div>
-                      {record.description && (
-                        <div className="text-sm text-gray-600 mt-1">
-                          {record.description}
-                        </div>
-                      )}
-                    </div>
+                <div className="text-base opacity-70 saturate-75 mt-1 text-center leading-none">
+                  {record.mood}
+                </div>
+                <div className="min-w-0">
+                  <div className="font-display italic font-light text-sm text-petal-muted mb-1">
+                    {record.date} · {record.time}
                   </div>
+                  {record.description && (
+                    <p className="font-body text-[15px] leading-relaxed text-petal-ink mb-1.5">
+                      {record.description}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2 text-[11px] text-petal-muted mt-1.5">
+                    {record.duration && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 border border-petal-rule rounded-full">
+                        <Clock className="w-3 h-3 mr-1" />
+                        {record.duration}
+                      </span>
+                    )}
+                    {record.location && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 border border-petal-rule rounded-full">
+                        <MapPin className="w-3 h-3 mr-1" />
+                        {record.location}
+                      </span>
+                    )}
+                    {record.roleplayScript && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 border border-petal-sage/60 bg-petal-sage/10 text-petal-sage-deep rounded-full">
+                        <Play className="w-3 h-3 mr-1" />
+                        {record.roleplayScript}
+                      </span>
+                    )}
+                  </div>
+                  {record.notes && (
+                    <p className="font-display italic font-light text-sm text-petal-ink-soft mt-2.5 pl-3 border-l border-petal-rose-soft leading-relaxed">
+                      "{record.notes}"
+                    </p>
+                  )}
                   {record.photo && (
-                    <div className="flex-shrink-0">
-                      <img 
-                        src={record.photo} 
-                        alt="記憶照片" 
-                        className="w-12 h-12 rounded-lg object-cover"
-                      />
-                    </div>
+                    <img
+                      src={record.photo}
+                      alt="記憶照片"
+                      className="mt-3 w-24 h-24 rounded-md object-cover border border-petal-rule"
+                    />
                   )}
                 </div>
-                
-                <div className="flex flex-wrap gap-2 text-xs text-gray-500 mt-2">
-                  {record.duration && (
-                    <span className="flex items-center">
-                      <Clock className="w-3 h-3 mr-1" />
-                      {record.duration}
-                    </span>
-                  )}
-                  {record.location && (
-                    <span className="flex items-center">
-                      <MapPin className="w-3 h-3 mr-1" />
-                      {record.location}
-                    </span>
-                  )}
-                  {record.roleplayScript && (
-                    <span className="flex items-center text-purple-600">
-                      <Play className="w-3 h-3 mr-1" />
-                      {record.roleplayScript}
-                    </span>
-                  )}
-                </div>
-                
-                {record.notes && (
-                  <p className="text-sm text-gray-600 mt-2 italic">"{record.notes}"</p>
-                )}
-              </div>
+              </article>
             ))}
             {intimateRecords.length === 0 && (
-              <div className="text-center py-8 text-gray-500">
-                還沒有記錄，開始你們的愛情之旅吧！
+              <div className="border border-dashed border-petal-rule rounded-md py-10 px-6 text-center">
+                <p className="font-display italic font-light text-base text-petal-muted">
+                  還沒有記錄 — 開始你們的愛情之旅吧
+                </p>
               </div>
             )}
           </div>
@@ -1887,46 +1946,53 @@ const LoveTimeApp = () => {
 
 
   const GamesView = () => (
-    <div className="space-y-6">
-      <div className="bg-gradient-to-r from-purple-500 to-pink-600 text-white p-6 rounded-2xl">
-        <h2 className="text-2xl font-bold mb-2">情趣遊戲</h2>
-        <p className="text-purple-100">增進彼此感情的有趣活動</p>
+    <div className="space-y-10">
+      <div className="border-b border-petal-rule pb-7">
+        <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+          — 情趣
+        </div>
+        <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
+          情趣<em className="not-italic font-light italic text-pink-600">遊戲</em>
+        </h2>
+        <p className="font-display italic font-light text-base text-petal-muted">
+          增進彼此感情的有趣活動 — 一個個慢慢來。
+        </p>
       </div>
 
       <div className="space-y-6">
         {romanticGames.map((game, index) => (
-          <div key={index} className="bg-white rounded-2xl shadow-lg p-6">
-            <div className="flex items-start space-x-4 mb-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-purple-600 rounded-full flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-white" />
+          <div key={index} className="bg-white rounded-md border border-petal-rule p-7">
+            <div className="flex items-start space-x-4 mb-5 pb-5 border-b border-petal-rule-soft">
+              <div className="w-10 h-10 border border-petal-rose-soft bg-petal-rose-soft/40 rounded-full flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-petal-rose-deep" strokeWidth={1.5} />
               </div>
               <div className="flex-1">
-                <h3 className="text-xl font-bold text-gray-800 mb-2">{game.title}</h3>
-                <p className="text-gray-600 mb-4">{game.desc}</p>
+                <h3 className="font-display text-xl font-medium tracking-tight text-petal-ink mb-1">{game.title}</h3>
+                <p className="font-body text-sm text-petal-ink-soft leading-relaxed">{game.desc}</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="bg-pink-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-gray-800 mb-3">遊戲步驟：</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="bg-petal-cream-2/50 p-4 rounded-md">
+                <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-3">遊戲步驟</h4>
                 <ul className="space-y-2">
                   {game.instructions.map((instruction, i) => (
-                    <li key={i} className="text-sm text-gray-700">{instruction}</li>
+                    <li key={i} className="font-body text-sm text-petal-ink-soft leading-relaxed">{instruction}</li>
                   ))}
                 </ul>
               </div>
 
-              <div className="bg-purple-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-gray-800 mb-3">
-                  {game.questions ? '問題範例：' : 
-                   game.tips ? '小貼士：' : 
-                   game.variations ? '變化玩法：' :
-                   game.phrases ? '調情話語：' :
-                   game.scenarios ? '場景建議：' : '願望類別：'}
+              <div className="bg-petal-cream-2/50 p-4 rounded-md">
+                <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-3">
+                  {game.questions ? '問題範例' :
+                   game.tips ? '小貼士' :
+                   game.variations ? '變化玩法' :
+                   game.phrases ? '調情話語' :
+                   game.scenarios ? '場景建議' : '願望類別'}
                 </h4>
                 <ul className="space-y-2">
                   {(game.questions || game.tips || game.variations || game.phrases || game.scenarios || game.categories || []).map((item, i) => (
-                    <li key={i} className="text-sm text-gray-700">{item}</li>
+                    <li key={i} className="font-body text-sm text-petal-ink-soft leading-relaxed">{item}</li>
                   ))}
                 </ul>
               </div>
@@ -1938,22 +2004,29 @@ const LoveTimeApp = () => {
   );
 
   const ConflictView = () => (
-    <div className="space-y-6">
-      <div className="bg-gradient-to-r from-green-500 to-teal-600 text-white p-6 rounded-2xl">
-        <h2 className="text-2xl font-bold mb-2">和諧相處</h2>
-        <p className="text-green-100">化解矛盾，增進理解</p>
+    <div className="space-y-10">
+      <div className="border-b border-petal-rule pb-7">
+        <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+          — 和諧
+        </div>
+        <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
+          和諧<em className="not-italic font-light italic text-pink-600">相處</em>
+        </h2>
+        <p className="font-display italic font-light text-base text-petal-muted">
+          化解矛盾，增進理解 — 把急切的話留到明天再說。
+        </p>
       </div>
 
       <div className="space-y-4">
         {conflictResolutions.map((solution, index) => (
-          <div key={index} className="bg-white rounded-2xl shadow-lg p-6">
+          <div key={index} className="bg-white rounded-md border border-petal-rule p-6">
             <div className="flex items-start space-x-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-teal-600 rounded-full flex items-center justify-center">
-                <MessageCircle className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 border border-petal-sage/60 bg-petal-sage/10 rounded-full flex items-center justify-center">
+                <MessageCircle className="w-4 h-4 text-petal-sage-deep" strokeWidth={1.5} />
               </div>
               <div className="flex-1">
-                <h3 className="text-lg font-bold text-gray-800 mb-2">{solution.title}</h3>
-                <p className="text-gray-600">{solution.desc}</p>
+                <h3 className="font-display text-lg font-medium tracking-tight text-petal-ink mb-1.5">{solution.title}</h3>
+                <p className="font-body text-sm text-petal-ink-soft leading-relaxed">{solution.desc}</p>
               </div>
             </div>
           </div>
@@ -2117,18 +2190,24 @@ const LoveTimeApp = () => {
     };
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg p-6 max-w-md w-full" data-testid="auth-modal">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-bold text-pink-700">
-              {authMode === 'login' ? '登入愛的時光' : 
-               authMode === 'register' ? '註冊新帳號' : '連接伴侶'}
-            </h3>
+      <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-petal-cream rounded-md p-7 max-w-md w-full shadow-petal border border-petal-rule" data-testid="auth-modal">
+          <div className="flex justify-between items-end mb-6 pb-5 border-b border-petal-rule">
+            <div>
+              <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
+                — {authMode === 'login' ? '登入' : authMode === 'register' ? '註冊' : '連接'}
+              </div>
+              <h3 className="font-display text-2xl font-light tracking-tight text-petal-ink">
+                {authMode === 'login' ? <>登入<em className="not-italic font-light italic text-pink-600">愛的時光</em></> :
+                 authMode === 'register' ? <>註冊<em className="not-italic font-light italic text-pink-600">新帳號</em></> :
+                 <>連接<em className="not-italic font-light italic text-pink-600">伴侶</em></>}
+              </h3>
+            </div>
             <button
               onClick={() => setShowAuthModal(false)}
-              className="text-gray-500 hover:text-gray-700"
+              className="text-petal-muted hover:text-petal-ink transition-colors"
             >
-              <X className="w-6 h-6" />
+              <X className="w-5 h-5" strokeWidth={1.5} />
             </button>
           </div>
 
@@ -2249,29 +2328,24 @@ const LoveTimeApp = () => {
             <button
               type="submit"
               disabled={isLoading}
-              className={`w-full py-3 rounded-lg font-medium transition-all duration-200 transform ${
+              className={`w-full py-3 rounded-md font-display italic text-base transition-colors ${
                 isLoading
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed scale-95'
-                  : 'bg-gradient-to-r from-pink-500 to-rose-600 text-white hover:from-pink-600 hover:to-rose-700 hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl'
+                  ? 'bg-petal-cream-2 text-petal-muted cursor-not-allowed'
+                  : 'bg-petal-ink text-petal-cream hover:bg-pink-700'
               }`}
             >
               {isLoading ? (
                 <div className="flex items-center justify-center space-x-3">
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span className="font-medium">
-                    {authMode === 'login' ? '登入中...' : 
-                     authMode === 'register' ? '註冊中...' : '連接中...'}
+                  <div className="w-4 h-4 border-2 border-petal-muted border-t-transparent rounded-full animate-spin"></div>
+                  <span>
+                    {authMode === 'login' ? '登入中…' :
+                     authMode === 'register' ? '註冊中…' : '連接中…'}
                   </span>
-                  <div className="flex space-x-1">
-                    <div className="w-1 h-1 bg-white rounded-full animate-pulse" style={{animationDelay: '0ms'}}></div>
-                    <div className="w-1 h-1 bg-white rounded-full animate-pulse" style={{animationDelay: '150ms'}}></div>
-                    <div className="w-1 h-1 bg-white rounded-full animate-pulse" style={{animationDelay: '300ms'}}></div>
-                  </div>
                 </div>
               ) : (
-                <span className="font-medium">
-                  {authMode === 'login' ? '開始愛的旅程' : 
-                   authMode === 'register' ? '註冊帳號' : '連接伴侶'}
+                <span>
+                  {authMode === 'login' ? '開始愛的旅程 →' :
+                   authMode === 'register' ? '註冊帳號 →' : '連接伴侶 →'}
                 </span>
               )}
             </button>
@@ -2348,68 +2422,67 @@ const LoveTimeApp = () => {
     };
 
     return (
-      <div className="space-y-6">
-        <div className="bg-gradient-to-r from-yellow-500 to-orange-600 text-white p-6 rounded-2xl">
-          <div className="flex items-center justify-between">
+      <div className="space-y-10">
+        <div className="border-b border-petal-rule pb-7">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div>
-              <h2 className="text-2xl font-bold mb-2 flex items-center">
-                <ShoppingBag className="mr-2" />
-                金幣商店
+              <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+                — 商店
+              </div>
+              <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
+                金幣<em className="not-italic font-light italic text-pink-600">商店</em>
               </h2>
-              <p className="text-yellow-100">用愛賺來的金幣兌換特別禮品</p>
+              <p className="font-display italic font-light text-base text-petal-muted">
+                用愛賺來的金幣，兌換特別禮品。
+              </p>
             </div>
-            <div className="text-right">
-              <div className="flex items-center space-x-2 bg-white bg-opacity-20 px-4 py-2 rounded-full mb-2">
-                <Coins className="w-5 h-5" />
-                <span className="font-bold text-xl">{totalCoins}</span>
+            <div className="flex flex-col items-start md:items-end gap-2">
+              <div className="font-display italic font-light text-2xl text-petal-ink">
+                <Coins className="inline w-4 h-4 mr-1.5 text-petal-rose-deep" strokeWidth={1.5} />
+                <b className="not-italic font-medium">{totalCoins}</b> <span className="text-base text-petal-muted">枚</span>
               </div>
               <button
                 onClick={() => setShowAddGiftModal(true)}
-                className="bg-white bg-opacity-20 hover:bg-opacity-30 px-3 py-1 rounded-full text-sm flex items-center space-x-1"
+                className="px-4 py-1.5 border border-petal-rule rounded-full text-xs font-body text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors flex items-center space-x-1.5"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-3.5 h-3.5" />
                 <span>自訂禮品</span>
               </button>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {allGifts.map((gift) => (
-            <div key={gift.id} className="bg-white rounded-2xl shadow-lg p-6 hover:shadow-xl transition-shadow">
-              <div className="text-center mb-4">
-                <div className="text-4xl mb-2">{gift.icon}</div>
-                <h3 className="text-lg font-bold text-gray-800">{gift.title}</h3>
-                <p className="text-gray-600 text-sm">{gift.description}</p>
+            <div key={gift.id} className="bg-white rounded-md border border-petal-rule p-6 hover:border-petal-rose transition-colors">
+              <div className="mb-4 pb-4 border-b border-petal-rule-soft">
+                <div className="text-2xl mb-3 opacity-75 saturate-75">{gift.icon}</div>
+                <h3 className="font-display text-lg font-medium tracking-tight text-petal-ink mb-1">{gift.title}</h3>
+                <p className="font-body text-sm text-petal-ink-soft leading-relaxed">{gift.description}</p>
               </div>
-              
+
               <div className="flex items-center justify-between mb-4">
-                <span className={`px-2 py-1 rounded-full text-xs ${
-                  gift.category === 'service' ? 'bg-blue-100 text-blue-800' :
-                  gift.category === 'experience' ? 'bg-green-100 text-green-800' :
-                  gift.category === 'physical' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-pink-100 text-pink-800'
-                }`}>
+                <span className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted">
                   {gift.category === 'service' ? '服務' :
                    gift.category === 'experience' ? '體驗' :
                    gift.category === 'physical' ? '實物' : '親密'}
                 </span>
-                <div className="flex items-center space-x-1 text-yellow-600">
-                  <Coins className="w-4 h-4" />
-                  <span className="font-bold">{gift.cost}</span>
+                <div className="font-display italic font-light text-base text-petal-ink">
+                  <Coins className="inline w-3.5 h-3.5 mr-1 text-petal-rose-deep" strokeWidth={1.5} />
+                  <b className="not-italic font-normal">{gift.cost}</b>
                 </div>
               </div>
 
               <button
                 onClick={() => purchaseGift(gift)}
                 disabled={totalCoins < gift.cost}
-                className={`w-full py-3 rounded-lg font-medium transition-colors ${
+                className={`w-full py-2.5 rounded-md font-display italic text-base transition-colors ${
                   totalCoins >= gift.cost
-                    ? 'bg-gradient-to-r from-yellow-500 to-orange-600 text-white hover:from-yellow-600 hover:to-orange-700'
-                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                    ? 'bg-petal-ink text-petal-cream hover:bg-pink-700'
+                    : 'bg-petal-cream-2 text-petal-muted cursor-not-allowed'
                 }`}
               >
-                {totalCoins >= gift.cost ? '立即兌換' : '金幣不足'}
+                {totalCoins >= gift.cost ? '立即兌換 →' : '金幣不足'}
               </button>
             </div>
           ))}
@@ -2518,7 +2591,7 @@ const LoveTimeApp = () => {
 
                 <button
                   type="submit"
-                  className="w-full bg-gradient-to-r from-yellow-500 to-orange-600 text-white py-3 rounded-lg hover:from-yellow-600 hover:to-orange-700 transition-colors"
+                  className="w-full bg-petal-ink text-petal-cream py-3 rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
                 >
                   添加禮品
                 </button>
@@ -2699,7 +2772,7 @@ const LoveTimeApp = () => {
 
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-pink-500 to-rose-600 text-white py-3 rounded-lg hover:from-pink-600 hover:to-rose-700 transition-colors"
+              className="w-full bg-petal-ink text-petal-cream py-3 rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
             >
               上傳劇本 (+200 金幣)
             </button>
@@ -2757,53 +2830,59 @@ const LoveTimeApp = () => {
     };
 
     return (
-      <div className="space-y-6">
-        <div className="bg-gradient-to-r from-pink-500 to-rose-600 text-white p-6 rounded-2xl">
-          <div className="flex items-center justify-between">
+      <div className="space-y-10">
+        <div className="border-b border-petal-rule pb-7">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
             <div>
-              <h2 className="text-2xl font-bold mb-2 flex items-center">
-                <Sparkles className="mr-2" />
-                前戲與探索
+              <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+                — 探索
+              </div>
+              <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
+                前戲與<em className="not-italic font-light italic text-pink-600">探索</em>
               </h2>
-              <p className="text-pink-100">增進親密感的活動和建議</p>
+              <p className="font-display italic font-light text-base text-petal-muted">
+                增進親密感的活動和建議 — 慢慢來。
+              </p>
             </div>
-            <div className="flex items-center space-x-2 bg-white bg-opacity-20 px-4 py-2 rounded-full">
-              <Coins className="w-5 h-5" />
-              <span className="font-bold">{totalCoins}</span>
+            <div className="font-display italic font-light text-xl text-petal-ink">
+              <Coins className="inline w-4 h-4 mr-1.5 text-petal-rose-deep" strokeWidth={1.5} />
+              <b className="not-italic font-medium">{totalCoins}</b> <span className="text-sm text-petal-muted">枚</span>
             </div>
           </div>
         </div>
 
         {/* Foreplay Activities */}
-        <div className="bg-white rounded-2xl shadow-lg p-6">
-          <h3 className="text-xl font-semibold text-gray-800 mb-4">前戲活動</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div>
+          <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6">
+            前戲<em className="not-italic font-light italic text-pink-600">活動</em>
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             {foreplayActivities.map((activity, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-3">
-                  <h4 className="text-lg font-semibold text-pink-700">{activity.title}</h4>
-                  <div className="flex items-center space-x-1 text-yellow-600">
-                    <Coins className="w-4 h-4" />
-                    <span className="font-bold">+{activity.coins}</span>
+              <div key={index} className="border border-petal-rule rounded-md p-5 bg-white hover:border-petal-rose transition-colors">
+                <div className="flex justify-between items-start mb-3 pb-3 border-b border-petal-rule-soft">
+                  <h4 className="font-display text-lg font-medium tracking-tight text-petal-ink">{activity.title}</h4>
+                  <div className="font-display italic font-light text-sm text-petal-rose-deep whitespace-nowrap">
+                    <Coins className="inline w-3.5 h-3.5 mr-1" strokeWidth={1.5} />
+                    +{activity.coins}
                   </div>
                 </div>
-                <p className="text-gray-600 mb-3">{activity.description}</p>
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-sm text-gray-500 flex items-center">
-                    <Clock className="w-4 h-4 mr-1" />
+                <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-4">{activity.description}</p>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="font-body text-xs text-petal-muted flex items-center">
+                    <Clock className="w-3.5 h-3.5 mr-1" strokeWidth={1.5} />
                     {activity.duration}
                   </span>
                   <button
                     onClick={() => handleTryActivity(activity)}
-                    className="bg-gradient-to-r from-pink-500 to-rose-600 text-white px-4 py-2 rounded-full hover:from-pink-600 hover:to-rose-700 transition-colors flex items-center space-x-2"
+                    className="px-4 py-1.5 bg-petal-ink text-petal-cream rounded-full hover:bg-pink-700 transition-colors flex items-center space-x-1.5 font-display italic text-sm"
                   >
-                    <Play className="w-4 h-4" />
+                    <Play className="w-3.5 h-3.5" strokeWidth={1.5} />
                     <span>嘗試</span>
                   </button>
                 </div>
                 <button
                   onClick={() => setSelectedActivity(activity)}
-                  className="text-pink-600 text-sm hover:text-pink-700"
+                  className="font-body text-xs text-petal-ink-soft hover:text-petal-rose-deep transition-colors"
                 >
                   查看詳細提示 →
                 </button>
@@ -2813,38 +2892,40 @@ const LoveTimeApp = () => {
         </div>
 
         {/* Position Suggestions */}
-        <div className="bg-white rounded-2xl shadow-lg p-6">
-          <h3 className="text-xl font-semibold text-gray-800 mb-4">姿勢建議</h3>
+        <div>
+          <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6">
+            姿勢<em className="not-italic font-light italic text-pink-600">建議</em>
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {positionSuggestions.map((position, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                <div className="flex justify-between items-start mb-2">
-                  <h4 className="text-lg font-semibold text-pink-700">{position.name}</h4>
-                  <div className="flex items-center space-x-1 text-yellow-600">
-                    <Coins className="w-4 h-4" />
-                    <span className="font-bold">+{position.coins}</span>
+              <div key={index} className="border border-petal-rule rounded-md p-5 bg-white hover:border-petal-rose transition-colors">
+                <div className="flex justify-between items-start mb-3">
+                  <h4 className="font-display text-base font-medium tracking-tight text-petal-ink">{position.name}</h4>
+                  <div className="font-display italic font-light text-xs text-petal-rose-deep whitespace-nowrap">
+                    <Coins className="inline w-3 h-3 mr-0.5" strokeWidth={1.5} />
+                    +{position.coins}
                   </div>
                 </div>
                 <div className="mb-3">
-                  <span className={`px-2 py-1 rounded-full text-xs ${
-                    position.difficulty === '簡單' ? 'bg-green-100 text-green-800' :
-                    position.difficulty === '中等' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
+                  <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] border ${
+                    position.difficulty === '簡單' ? 'border-petal-sage/60 bg-petal-sage/10 text-petal-sage-deep' :
+                    position.difficulty === '中等' ? 'border-petal-rose-soft bg-petal-rose-soft/30 text-petal-rose-deep' :
+                    'border-petal-ink-soft/30 bg-petal-ink-soft/5 text-petal-ink-soft'
                   }`}>
                     {position.difficulty}
                   </span>
                 </div>
-                <p className="text-gray-600 text-sm mb-3">{position.description}</p>
+                <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-3">{position.description}</p>
                 <div className="flex justify-between items-center">
                   <button
                     onClick={() => setSelectedPosition(position)}
-                    className="text-pink-600 text-sm hover:text-pink-700"
+                    className="font-body text-xs text-petal-ink-soft hover:text-petal-rose-deep transition-colors"
                   >
                     詳細資訊
                   </button>
                   <button
                     onClick={() => handleTryPosition(position)}
-                    className="bg-gradient-to-r from-pink-500 to-rose-600 text-white px-3 py-1 rounded-full text-sm hover:from-pink-600 hover:to-rose-700 transition-colors"
+                    className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                   >
                     嘗試
                   </button>
@@ -2884,7 +2965,7 @@ const LoveTimeApp = () => {
                   handleTryActivity(selectedActivity);
                   setSelectedActivity(null);
                 }}
-                className="w-full bg-gradient-to-r from-pink-500 to-rose-600 text-white py-3 rounded-lg hover:from-pink-600 hover:to-rose-700 transition-colors"
+                className="w-full bg-petal-ink text-petal-cream py-3 rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
               >
                 開始嘗試
               </button>
@@ -2922,7 +3003,7 @@ const LoveTimeApp = () => {
                   handleTryPosition(selectedPosition);
                   setSelectedPosition(null);
                 }}
-                className="w-full bg-gradient-to-r from-pink-500 to-rose-600 text-white py-3 rounded-lg hover:from-pink-600 hover:to-rose-700 transition-colors"
+                className="w-full bg-petal-ink text-petal-cream py-3 rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
               >
                 嘗試這個姿勢
               </button>
@@ -2961,66 +3042,65 @@ const LoveTimeApp = () => {
     };
 
     return (
-      <div className="space-y-6">
-        <div className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white p-6 rounded-2xl">
-          <h2 className="text-2xl font-bold mb-2">我們的愛情旅程</h2>
-          <p className="text-emerald-100">記錄每個重要的時刻和里程碑</p>
+      <div className="space-y-10">
+        <div className="border-b border-petal-rule pb-7">
+          <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+            — 旅程
+          </div>
+          <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
+            我們的<em className="not-italic font-light italic text-pink-600">愛情旅程</em>
+          </h2>
+          <p className="font-display italic font-light text-base text-petal-muted">
+            記錄每個重要的時刻和里程碑。
+          </p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-6">
+        <div>
           <div className="relative">
             {/* Timeline Line */}
-            <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gradient-to-b from-pink-500 to-purple-600"></div>
-            
+            <div className="absolute left-6 top-0 bottom-0 w-px bg-petal-rule"></div>
+
             <div className="space-y-8">
               {sortedMilestones.map((milestone) => (
                 <div key={milestone.id} className="relative flex items-start space-x-6">
                   {/* Timeline Node */}
-                  <div className={`w-16 h-16 rounded-full flex items-center justify-center text-white font-bold relative z-10 ${
-                    milestone.type === 'meeting' ? 'bg-gradient-to-br from-pink-500 to-rose-600' :
-                    milestone.type === 'first_date' ? 'bg-gradient-to-br from-purple-500 to-indigo-600' :
-                    milestone.type === 'first_kiss' ? 'bg-gradient-to-br from-teal-500 to-cyan-600' :
-                    milestone.type === 'first_sex' ? 'bg-gradient-to-br from-pink-500 to-purple-600' :
-                    milestone.type === 'marriage' ? 'bg-gradient-to-br from-orange-500 to-red-600' :
-                    milestone.type === 'child_born' ? 'bg-gradient-to-br from-green-500 to-teal-600' :
-                    'bg-gradient-to-br from-blue-500 to-indigo-600'
-                  }`}>
+                  <div className="w-12 h-12 rounded-full bg-petal-cream border border-petal-rose-soft flex items-center justify-center relative z-10 text-base opacity-80 saturate-75">
                     {milestone.type === 'meeting' ? '💕' :
                      milestone.type === 'first_date' ? '🌹' :
                      milestone.type === 'first_kiss' ? '💋' :
                      milestone.type === 'first_sex' ? '💋' :
                      milestone.type === 'marriage' ? '👫' :
                      milestone.type === 'child_born' ? '👶' :
-                     '🏆'}
+                     '✦'}
                   </div>
 
                   {/* Content */}
-                  <div className="flex-1 bg-gray-50 rounded-lg p-6">
+                  <div className="flex-1 bg-white border border-petal-rule rounded-md p-5">
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <h3 className="text-lg font-bold text-gray-800">{milestone.title}</h3>
-                        <p className="text-sm text-gray-500">
+                        <h3 className="font-display text-lg font-medium tracking-tight text-petal-ink">{milestone.title}</h3>
+                        <p className="font-display italic font-light text-sm text-petal-muted mt-0.5">
                           {milestone.date || (milestone.place ? '—' : '')}
                         </p>
                         {milestone.place && (
-                          <p className="text-sm text-gray-500">地點：{milestone.place}</p>
+                          <p className="font-body text-xs text-petal-muted">地點：{milestone.place}</p>
                         )}
                       </div>
                       {milestone.count && (
-                        <span className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-3 py-1 rounded-full text-sm font-medium">
+                        <span className="font-display italic font-light text-xs text-petal-rose-deep border border-petal-rose-soft px-2.5 py-0.5 rounded-full">
                           第 {milestone.count} 次
                         </span>
                       )}
                     </div>
-                    <p className="text-gray-700 mb-4">{milestone.description}</p>
-                    
+                    <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-3">{milestone.description}</p>
+
                     {milestone.recordId && (
                       <button
                         onClick={() => handleMilestoneClick(milestone)}
-                        className="inline-flex items-center text-pink-600 hover:text-pink-700 font-medium text-sm"
+                        className="inline-flex items-center font-body text-xs text-petal-ink-soft hover:text-petal-rose-deep transition-colors"
                       >
-                        <Heart className="w-4 h-4 mr-1" />
-                        查看詳細記錄
+                        <Heart className="w-3 h-3 mr-1" strokeWidth={1.5} />
+                        查看詳細記錄 →
                       </button>
                     )}
                   </div>
@@ -3029,9 +3109,9 @@ const LoveTimeApp = () => {
             </div>
 
             {/* Future Milestones Preview */}
-            <div className="mt-8 p-6 bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg border-2 border-dashed border-pink-200">
-              <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
-                <Sparkles className="w-5 h-5 mr-2 text-pink-500" />
+            <div className="mt-8 p-6 bg-petal-cream-2/40 rounded-md border border-dashed border-petal-rose-soft">
+              <h3 className="font-display text-lg font-medium tracking-tight text-petal-ink mb-4 flex items-center">
+                <Sparkles className="w-4 h-4 mr-2 text-petal-rose-deep" strokeWidth={1.5} />
                 即將到來的里程碑
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3094,16 +3174,23 @@ const LoveTimeApp = () => {
           showNotification={showNotification}
         />;
         default: return (
-          <div className="flex items-center justify-center min-h-64">
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">歡迎使用 Twogether</h2>
-              <p className="text-gray-600 mb-6">登入以開始記錄你們的愛情時光</p>
+          <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="text-center max-w-md">
+              <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-4">
+                — 歡迎
+              </div>
+              <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-4">
+                歡迎使用 <em className="not-italic font-light italic text-pink-600">Twogether</em>
+              </h2>
+              <p className="font-display italic font-light text-base text-petal-muted mb-8">
+                登入以開始記錄你們的愛情時光。
+              </p>
               <button
                 onClick={() => setShowAuthModal(true)}
-                className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-6 py-3 rounded-lg hover:shadow-lg transition-colors"
+                className="bg-petal-ink text-petal-cream px-8 py-3 rounded-md hover:bg-pink-700 transition-colors font-display italic text-lg"
                 data-testid="login-button"
               >
-                立即登入
+                立即登入 →
               </button>
             </div>
           </div>
@@ -3209,26 +3296,26 @@ const LoveTimeApp = () => {
     const monthYear = currentMonth.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long' });
 
     return (
-      <div className="bg-white rounded-lg p-4 border">
+      <div className="bg-white rounded-md p-5 border border-petal-rule">
         <div className="flex items-center justify-between mb-4">
           <button
             onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
-            className="p-2 hover:bg-gray-100 rounded"
+            className="w-8 h-8 border border-petal-rule rounded-full text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors"
           >
             ‹
           </button>
-          <h3 className="font-semibold text-gray-800">{monthYear}</h3>
+          <h3 className="font-display italic font-light text-lg text-petal-ink">{monthYear}</h3>
           <button
             onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
-            className="p-2 hover:bg-gray-100 rounded"
+            className="w-8 h-8 border border-petal-rule rounded-full text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors"
           >
             ›
           </button>
         </div>
-        
+
         <div className="grid grid-cols-7 gap-1 mb-2">
           {['日', '一', '二', '三', '四', '五', '六'].map(day => (
-            <div key={day} className="p-2 text-center text-sm font-medium text-gray-500">
+            <div key={day} className="p-2 text-center font-body text-[10px] font-medium uppercase tracking-[0.14em] text-petal-muted">
               {day}
             </div>
           ))}
@@ -3239,16 +3326,16 @@ const LoveTimeApp = () => {
             const { date, isCurrentMonth } = dayInfo;
             const selected = isSelected(date);
             const today = isToday(date);
-            
+
             return (
               <button
                 key={index}
                 onClick={() => onDateSelect(formatDate(date))}
                 className={`
-                  p-2 text-sm rounded hover:bg-gray-100 transition-colors
-                  ${isCurrentMonth ? 'text-gray-900' : 'text-gray-400'}
-                  ${selected ? 'bg-pink-500 text-white hover:bg-pink-600' : ''}
-                  ${today && !selected ? 'bg-blue-100 text-blue-600' : ''}
+                  p-2 font-display text-sm rounded-full hover:bg-petal-cream-2 transition-colors
+                  ${isCurrentMonth ? 'text-petal-ink' : 'text-petal-rule'}
+                  ${selected ? 'bg-petal-rose-deep text-petal-cream hover:bg-petal-rose-deep italic' : ''}
+                  ${today && !selected ? 'border border-petal-rose-deep text-petal-rose-deep' : ''}
                 `}
               >
                 {date.getDate()}
@@ -3261,7 +3348,7 @@ const LoveTimeApp = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-100 via-purple-50 to-indigo-100">
+    <div className="min-h-screen bg-petal-cream">
       {/* Header */}
       <Header
         authState={authState}
@@ -3292,29 +3379,31 @@ const LoveTimeApp = () => {
       )}
 
       {showPairingPrompt && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-40 p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl">
-            <div className="text-center mb-5">
-              <div className="w-14 h-14 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center mx-auto mb-3">
-                <span className="text-2xl">💑</span>
+        <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-40 p-4">
+          <div className="bg-petal-cream rounded-md p-7 max-w-md w-full shadow-petal border border-petal-rule">
+            <div className="text-center mb-6 pb-5 border-b border-petal-rule">
+              <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-2">
+                — 配對伴侶
               </div>
-              <h2 className="text-xl font-bold text-gray-800 mb-1">邀請你的伴侶</h2>
-              <p className="text-sm text-gray-500">
+              <h2 className="font-display text-2xl font-light tracking-tight text-petal-ink mb-2">
+                邀請<em className="not-italic font-light italic text-pink-600">你的伴侶</em>
+              </h2>
+              <p className="font-body text-sm text-petal-ink-soft leading-relaxed">
                 配對後，日曆、親密紀錄與成就將自動同步。
               </p>
             </div>
 
             {pairingPromptSent ? (
               <div className="text-center py-4">
-                <p className="text-green-600 font-medium mb-1">邀請已寄出！</p>
-                <p className="text-sm text-gray-500 mb-4">請通知伴侶查看信箱，連結 7 天內有效。</p>
+                <p className="font-display italic text-petal-sage-deep mb-1">邀請已寄出</p>
+                <p className="font-body text-sm text-petal-muted mb-4">請通知伴侶查看信箱 — 連結 7 天內有效。</p>
                 <button
                   onClick={() => {
                     setShowPairingPrompt(false);
                     setPairingPromptSent(false);
                     setPairingPromptEmail('');
                   }}
-                  className="text-gray-500 hover:text-gray-700 text-sm"
+                  className="font-body text-sm text-petal-muted hover:text-petal-ink transition-colors"
                 >
                   關閉
                 </button>
@@ -3322,13 +3411,13 @@ const LoveTimeApp = () => {
             ) : (
               <div className="space-y-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">伴侶的 Email</label>
+                  <label className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">伴侶的 Email</label>
                   <input
                     type="email"
                     value={pairingPromptEmail}
                     onChange={(e) => setPairingPromptEmail(e.target.value)}
                     placeholder="partner@example.com"
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent text-sm"
+                    className="w-full border border-petal-rule rounded-md px-3 py-2.5 focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink"
                     disabled={pairingPromptSending}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && pairingPromptEmail.trim()) {
@@ -3361,20 +3450,20 @@ const LoveTimeApp = () => {
                     }
                   }}
                   disabled={pairingPromptSending || !pairingPromptEmail.trim()}
-                  className={`w-full py-2.5 rounded-lg font-medium text-sm transition-colors ${
+                  className={`w-full py-3 rounded-md font-display italic text-base transition-colors ${
                     pairingPromptSending || !pairingPromptEmail.trim()
-                      ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                      : 'bg-gradient-to-r from-pink-500 to-rose-600 text-white hover:from-pink-600 hover:to-rose-700'
+                      ? 'bg-petal-cream-2 text-petal-muted cursor-not-allowed'
+                      : 'bg-petal-ink text-petal-cream hover:bg-pink-700'
                   }`}
                 >
-                  {pairingPromptSending ? '發送中...' : '💌 發送邀請連結'}
+                  {pairingPromptSending ? '發送中…' : '發送邀請連結 →'}
                 </button>
                 <button
                   onClick={() => {
                     setCurrentView('settings');
                     setShowPairingPrompt(false);
                   }}
-                  className="w-full text-pink-600 hover:text-pink-800 py-1.5 text-sm border border-pink-200 rounded-lg hover:bg-pink-50 transition-colors"
+                  className="w-full text-petal-ink py-2 font-body text-sm border border-petal-rule rounded-md hover:bg-petal-cream-2 transition-colors"
                 >
                   使用配對碼配對
                 </button>
@@ -3384,7 +3473,7 @@ const LoveTimeApp = () => {
                     setPairingPromptDismissed(true);
                     localStorage.setItem('pairingPromptDismissed', 'true');
                   }}
-                  className="w-full text-gray-400 hover:text-gray-600 py-1 text-xs"
+                  className="w-full text-petal-muted hover:text-petal-ink py-1 font-body text-xs transition-colors"
                 >
                   稍後再說
                 </button>
@@ -3394,28 +3483,31 @@ const LoveTimeApp = () => {
         </div>
       )}
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-10">
         {/* Tagline */}
-        <div className="text-center mb-8">
-          <p className="text-gray-600">為熱戀中的你們，記錄每一段親密時光</p>
+        <div className="text-center mb-10">
+          <p className="font-display italic font-light text-base text-petal-muted">
+            為熱戀中的你們 — <span className="text-petal-ink">記錄每一段親密時光</span>
+          </p>
         </div>
 
         {/* Navigation */}
-        <div className="flex flex-wrap justify-center gap-2 mb-8">
+        <div className="flex flex-wrap justify-center gap-1.5 mb-10">
           {navItems.map((item) => {
             const Icon = item.icon;
+            const isActive = currentView === item.id;
             return (
               <button
                 key={item.id}
                 onClick={() => setCurrentView(item.id)}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-full transition-all ${
-                  currentView === item.id
-                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white shadow-lg'
-                    : 'bg-white text-gray-600 hover:bg-pink-50 hover:text-pink-600'
+                className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full transition-colors border ${
+                  isActive
+                    ? 'bg-petal-ink text-petal-cream border-petal-ink'
+                    : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
                 }`}
               >
-                <Icon className="w-4 h-4" />
-                <span className="text-sm font-medium">{item.label}</span>
+                <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <span className="font-body text-[13px] font-medium tracking-tight">{item.label}</span>
               </button>
             );
           })}

@@ -118,19 +118,26 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
   }
 
   return (
-    <div className="space-y-6">
-      <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white p-6 rounded-2xl">
-        <h2 className="text-2xl font-bold mb-2">親密邀請紀錄</h2>
-        <p className="text-blue-100">查看你發送與收到的所有邀請</p>
+    <div className="space-y-10">
+      <div className="border-b border-petal-rule pb-7">
+        <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+          — 紀錄
+        </div>
+        <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
+          親密<em className="not-italic font-light italic text-pink-600">邀請紀錄</em>
+        </h2>
+        <p className="font-display italic font-light text-base text-petal-muted">
+          查看你發送與收到的所有邀請。
+        </p>
       </div>
 
       {loading && (
         <div className="flex items-center justify-center py-10">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-500"></div>
+          <div className="animate-spin rounded-full h-6 w-6 border-2 border-petal-rule border-t-petal-rose-deep"></div>
         </div>
       )}
       {error && (
-        <div className="text-center text-red-600">{error}</div>
+        <div className="text-center font-display italic text-petal-rose-deep">{error}</div>
       )}
 
       {!loading && !error && (
@@ -211,13 +218,13 @@ function StatsOverview({
                 type="button"
                 onClick={onSendNudgeEmail}
                 disabled={sendingEmail}
-                className={`inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-semibold transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 ${
+                className={`inline-flex items-center justify-center rounded-md px-5 py-2 font-display italic text-sm transition-colors focus:outline-none ${
                   sendingEmail
-                    ? 'bg-amber-200 text-amber-600 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:from-pink-600 hover:to-rose-600 focus:ring-rose-200'
+                    ? 'bg-petal-cream-2 text-petal-muted cursor-not-allowed'
+                    : 'bg-petal-ink text-petal-cream hover:bg-pink-700'
                 }`}
               >
-                {sendingEmail ? '寄送中...' : '寄送提醒信給伴侶'}
+                {sendingEmail ? '寄送中…' : '寄送提醒信給伴侶 →'}
               </button>
               {feedback && (
                 <span
@@ -276,10 +283,10 @@ function StatsCard({
   ];
 
   return (
-    <div className="rounded-xl border border-gray-100 bg-gradient-to-br from-gray-50 to-white p-5">
+    <div className="rounded-md border border-petal-rule bg-white p-5">
       <div className="flex items-baseline justify-between">
-        <h4 className="text-base font-semibold text-gray-800">{label}</h4>
-        <span className="text-xs uppercase tracking-wide text-gray-400">{emphasis === 'week' ? '7日內' : '30日內'}</span>
+        <h4 className="font-display text-lg font-medium tracking-tight text-petal-ink">{label}</h4>
+        <span className="font-body text-[10px] uppercase tracking-[0.14em] text-petal-muted">{emphasis === 'week' ? '7 日內' : '30 日內'}</span>
       </div>
       <div className="mt-4 flex flex-col gap-3">
         {chips.map((chip) => (

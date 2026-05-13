@@ -400,21 +400,30 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-6 rounded-2xl">
-        <div className="flex items-center justify-between">
+    <div className="space-y-10">
+      <div className="border-b border-petal-rule pb-7">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
           <div>
-            <h2 className="text-2xl font-bold mb-1">設定</h2>
-            <p className="text-indigo-100">個人化你們的愛情應用</p>
+            <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+              — 設定
+            </div>
+            <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
+              <em className="not-italic font-light italic text-pink-600">設定</em>
+            </h2>
+            <p className="font-display italic font-light text-base text-petal-muted">
+              個人化你們的愛情應用。
+            </p>
           </div>
           <button
             onClick={handleSaveSettings}
             disabled={isSavingSettings}
-            className={`inline-flex items-center px-4 py-2 rounded-lg text-white transition-colors ${
-              isSavingSettings ? 'bg-white/30 cursor-not-allowed' : 'bg-white/20 hover:bg-white/30'
+            className={`px-6 py-2.5 rounded-md font-display italic text-base transition-colors ${
+              isSavingSettings
+                ? 'bg-petal-cream-2 text-petal-muted cursor-not-allowed'
+                : 'bg-petal-ink text-petal-cream hover:bg-pink-700'
             }`}
           >
-            {isSavingSettings ? '保存中…' : '保存設定'}
+            {isSavingSettings ? '保存中…' : '保存設定 →'}
           </button>
         </div>
       </div>
@@ -615,7 +624,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           <p className="text-gray-600 mb-4">登入以同步你們的愛情數據，並與伴侶分享美好時光</p>
           <button
             onClick={() => setShowAuthModal(true)}
-            className="w-full bg-gradient-to-r from-pink-500 to-rose-600 text-white py-3 rounded-lg hover:from-pink-600 hover:to-rose-700 transition-colors"
+            className="w-full bg-petal-ink text-petal-cream py-3 rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
           >
             開始登入
           </button>
@@ -699,13 +708,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                     <button
                       onClick={handleSendEmailInvitation}
                       disabled={isSendingInvitation || !recipientEmail.trim()}
-                      className={`w-full py-3 rounded-lg font-medium transition-colors ${
+                      className={`w-full py-3 rounded-md font-display italic text-base transition-colors ${
                         isSendingInvitation || !recipientEmail.trim()
-                          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                          : 'bg-gradient-to-r from-pink-500 to-rose-500 text-white hover:from-pink-600 hover:to-rose-600'
+                          ? 'bg-petal-cream-2 text-petal-muted cursor-not-allowed'
+                          : 'bg-petal-ink text-petal-cream hover:bg-pink-700'
                       }`}
                     >
-                      {isSendingInvitation ? '發送中...' : '💌 發送邀請'}
+                      {isSendingInvitation ? '發送中…' : '發送邀請 →'}
                     </button>
                   </div>
                 </div>

@@ -194,15 +194,17 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
 
   if (error) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4">
+      <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-petal-cream rounded-md p-8 max-w-md w-full shadow-petal border border-petal-rule">
           <div className="text-center">
-            <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">邀請無效</h2>
-            <p className="text-gray-600 mb-6">{error}</p>
+            <AlertCircle className="w-10 h-10 text-petal-rose-deep mx-auto mb-4 opacity-75" strokeWidth={1.2} />
+            <h2 className="font-display text-2xl font-light tracking-tight text-petal-ink mb-3">
+              邀請<em className="not-italic font-light italic text-pink-600">無效</em>
+            </h2>
+            <p className="font-body text-sm text-petal-ink-soft mb-6 leading-relaxed">{error}</p>
             <button
               onClick={onClose}
-              className="w-full bg-gray-500 text-white py-3 rounded-lg hover:bg-gray-600 transition-colors"
+              className="w-full border border-petal-rule text-petal-ink py-3 rounded-md hover:bg-petal-cream-2 transition-colors font-body text-sm"
             >
               關閉
             </button>
@@ -213,56 +215,58 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4">
+    <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-petal-cream rounded-md p-8 max-w-md w-full shadow-petal border border-petal-rule">
         <div className="text-center">
           {/* Header */}
-          <div className="mb-6">
-            <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Heart className="w-8 h-8 text-white" />
+          <div className="mb-7 pb-6 border-b border-petal-rule">
+            <Heart className="w-10 h-10 text-petal-rose-deep mx-auto mb-4 opacity-80" strokeWidth={1.2} />
+            <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-2">
+              — 配對邀請
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">配對邀請</h2>
-            <p className="text-gray-600">您收到了一個 Twogether 配對邀請</p>
+            <h2 className="font-display text-2xl font-light tracking-tight text-petal-ink mb-2">
+              一份來自 <em className="not-italic font-light italic text-pink-600">Twogether</em> 的邀請
+            </h2>
+            <p className="font-display italic font-light text-sm text-petal-muted">您收到了一個配對邀請。</p>
           </div>
 
           {/* Invitation Details */}
-          <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-xl p-6 mb-6">
-            <div className="flex items-center justify-center mb-3">
-              <Mail className="w-5 h-5 text-pink-500 mr-2" />
-              <span className="text-sm text-gray-600">來自</span>
+          <div className="bg-petal-cream-2/40 rounded-md p-5 mb-6 border border-petal-rule-soft">
+            <div className="font-body text-[11px] uppercase tracking-[0.14em] text-petal-muted mb-2">
+              <Mail className="inline w-3.5 h-3.5 mr-1.5 text-petal-rose-deep" strokeWidth={1.5} />來自
             </div>
-            <p className="text-xl font-bold text-gray-800 mb-3">
+            <p className="font-display text-xl font-medium tracking-tight text-petal-ink mb-3">
               {invitation?.senderNickname}
             </p>
 
             {invitation?.message && (
-              <div className="border-t border-pink-200 pt-4 mt-4">
-                <p className="text-sm text-gray-500 mb-2">個人訊息：</p>
-                <p className="text-gray-700 italic">"{invitation.message}"</p>
+              <div className="border-t border-petal-rule-soft pt-4 mt-3">
+                <p className="font-body text-[11px] uppercase tracking-[0.14em] text-petal-muted mb-2">個人訊息</p>
+                <p className="font-display italic font-light text-base text-petal-ink-soft leading-relaxed">"{invitation.message}"</p>
               </div>
             )}
           </div>
 
           {/* Action Buttons */}
-          <div className="space-y-4">
+          <div className="space-y-3">
             <button
               onClick={handleAccept}
               disabled={processing}
-              className={`w-full py-3 rounded-lg font-medium transition-colors ${
+              className={`w-full py-3 rounded-md font-display italic text-base transition-colors ${
                 processing
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-green-500 to-green-600 text-white hover:from-green-600 hover:to-green-700'
+                  ? 'bg-petal-cream-2 text-petal-muted cursor-not-allowed'
+                  : 'bg-petal-ink text-petal-cream hover:bg-pink-700'
               }`}
             >
               {processing ? (
                 <div className="flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  處理中...
+                  <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-petal-muted border-t-transparent mr-2"></div>
+                  處理中…
                 </div>
               ) : (
                 <div className="flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 mr-2" />
-                  接受邀請
+                  <CheckCircle className="w-4 h-4 mr-1.5" strokeWidth={1.5} />
+                  接受邀請 →
                 </div>
               )}
             </button>
@@ -270,13 +274,13 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
             <button
               onClick={handleReject}
               disabled={processing}
-              className={`w-full py-3 rounded-lg font-medium transition-colors ${
+              className={`w-full py-3 rounded-md font-body text-sm transition-colors ${
                 processing
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-gray-500 text-white hover:bg-gray-600'
+                  ? 'bg-petal-cream-2 text-petal-muted cursor-not-allowed'
+                  : 'border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink'
               }`}
             >
-              {processing ? '處理中...' : (
+              {processing ? '處理中…' : (
                 <div className="flex items-center justify-center">
                   <X className="w-5 h-5 mr-2" />
                   拒絕邀請

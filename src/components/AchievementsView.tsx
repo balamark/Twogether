@@ -174,48 +174,42 @@ export function AchievementsView() {
 
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-800 mb-2">親密統計</h1>
-        <p className="text-gray-600">查看你們的親密統計與成就徽章</p>
+      <div className="border-b border-petal-rule pb-7 mb-10">
+        <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+          — 統計
+        </div>
+        <h1 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
+          親密<em className="not-italic font-light italic text-pink-600">統計</em>
+        </h1>
+        <p className="font-display italic font-light text-base text-petal-muted">
+          查看你們的親密統計與成就徽章。
+        </p>
       </div>
 
       {/* Intimacy Stats Section */}
       {stats && (
-        <div className="space-y-6 mb-10">
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-              <div className="flex items-center">
-                <span className="text-2xl mr-3">💗</span>
-                <div>
-                  <p className="text-sm text-gray-600">總記錄</p>
-                  <p className="text-2xl font-bold text-gray-800">{stats.total_moments}</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-              <div className="flex items-center">
-                <span className="text-2xl mr-3">📈</span>
-                <div>
-                  <p className="text-sm text-gray-600">月平均</p>
-                  <p className="text-2xl font-bold text-gray-800">{(stats.average_per_month || 0).toFixed(1)}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-          {/* Weekly/Monthly Stats */}
+        <div className="space-y-8 mb-10">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-            <div className="bg-pink-50 rounded-lg p-4 border border-pink-200 text-center">
-              <div className="text-lg font-bold text-pink-600">本週次數</div>
-              <div className="text-2xl font-bold">{currentStats.thisWeek}</div>
+            <div className="bg-white rounded-md p-5 border border-petal-rule">
+              <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1.5">總記錄</div>
+              <div className="font-display italic font-light text-3xl text-petal-ink">{stats.total_moments}</div>
             </div>
-            <div className="bg-purple-50 rounded-lg p-4 border border-purple-200 text-center">
-              <div className="text-lg font-bold text-purple-600">本月次數</div>
-              <div className="text-2xl font-bold">{currentStats.thisMonth}</div>
+            <div className="bg-white rounded-md p-5 border border-petal-rule">
+              <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1.5">月平均</div>
+              <div className="font-display italic font-light text-3xl text-petal-ink">{(stats.average_per_month || 0).toFixed(1)}</div>
+            </div>
+            <div className="bg-petal-rose-soft/30 rounded-md p-5 border border-petal-rose-soft">
+              <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-rose-deep mb-1.5">本週次數</div>
+              <div className="font-display italic font-light text-3xl text-petal-rose-deep">{currentStats.thisWeek}</div>
+            </div>
+            <div className="bg-petal-sage/15 rounded-md p-5 border border-petal-sage/40">
+              <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-sage-deep mb-1.5">本月次數</div>
+              <div className="font-display italic font-light text-3xl text-petal-sage-deep">{currentStats.thisMonth}</div>
             </div>
           </div>
 
           {/* Interactive Month Heatmap */}
-          <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
+          <div className="bg-white rounded-md border border-petal-rule p-5 sm:p-6">
             <CalendarHeatmap
               data={records}
               year={currentYear}
@@ -229,20 +223,24 @@ export function AchievementsView() {
             />
           </div>
           {/* Badges */}
-          <div className="bg-white rounded-2xl shadow-lg p-6">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">愛情成就徽章</h3>
+          <div>
+            <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6">
+              愛情<em className="not-italic font-light italic text-pink-600">成就徽章</em>
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {badges.length > 0 ? badges.map((badge, index) => (
-                <div key={index} className="flex items-center space-x-4 p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border-2 border-yellow-200">
-                  <div className="text-3xl">{badge.icon}</div>
+                <div key={index} className="flex items-center space-x-4 p-4 bg-white rounded-md border border-petal-rule hover:border-petal-rose transition-colors">
+                  <div className="text-xl opacity-75 saturate-75">{badge.icon}</div>
                   <div>
-                    <div className="font-bold text-gray-800">{badge.name}</div>
-                    <div className="text-sm text-gray-600">{badge.desc}</div>
+                    <div className="font-display text-base font-medium text-petal-ink">{badge.name}</div>
+                    <div className="font-body text-sm text-petal-ink-soft">{badge.desc}</div>
                   </div>
                 </div>
               )) : (
-                <div className="col-span-2 text-center py-8 text-gray-500">
-                  開始記錄你們的愛情，解鎖更多成就徽章！
+                <div className="col-span-2 border border-dashed border-petal-rule rounded-md py-10 px-6 text-center">
+                  <p className="font-display italic font-light text-base text-petal-muted">
+                    開始記錄你們的愛情 — 解鎖更多成就徽章
+                  </p>
                 </div>
               )}
             </div>
@@ -253,16 +251,16 @@ export function AchievementsView() {
       {/* Achievements Section */}
       {achievements && stats && (
         <div className="space-y-6">
-          <div className="bg-gradient-to-r from-pink-50 to-purple-50 rounded-lg p-6">
+          <div className="bg-petal-cream-2/40 rounded-md p-6 border border-petal-rule">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold text-gray-800">成就進度</h2>
-              <span className="text-2xl font-bold text-pink-600">
-                {Math.round(achievements.completion_percentage || 0)}%
+              <h2 className="font-display text-xl font-medium tracking-tight text-petal-ink">成就<em className="not-italic font-light italic text-pink-600">進度</em></h2>
+              <span className="font-display italic font-light text-3xl text-petal-rose-deep">
+                {Math.round(achievements.completion_percentage || 0)}<span className="text-base">%</span>
               </span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
+            <div className="w-full bg-petal-cream rounded-full h-1.5 border border-petal-rule-soft">
               <div
-                className="bg-gradient-to-r from-pink-500 to-purple-500 h-3 rounded-full transition-all duration-500"
+                className="bg-petal-rose-deep h-full rounded-full transition-all duration-500"
                 style={{ width: `${achievements.completion_percentage || 0}%` }}
               ></div>
             </div>
@@ -394,23 +392,23 @@ export function AchievementsView() {
                   }`}
                 >
                   <div className="flex items-center mb-3">
-                    <span className="text-2xl mr-3">{achievement.icon}</span>
+                    <span className="text-base mr-3 opacity-75 saturate-75">{achievement.icon}</span>
                     <div>
-                      <h4 className="font-semibold text-gray-800">{achievement.title}</h4>
-                      <p className="text-sm text-gray-600">{achievement.description}</p>
+                      <h4 className="font-display text-base font-medium tracking-tight text-petal-ink">{achievement.title}</h4>
+                      <p className="font-body text-sm text-petal-ink-soft">{achievement.description}</p>
                     </div>
                   </div>
                   <div className="mb-2">
-                    <div className="flex justify-between text-xs text-gray-500 mb-1">
+                    <div className="flex justify-between font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1.5">
                       <span>進度</span>
-                      <span>{achievement.progress} / {achievement.max_progress}</span>
+                      <span className="font-display italic">{achievement.progress} / {achievement.max_progress}</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-petal-cream-2 rounded-full h-1 border border-petal-rule-soft">
                       <div
-                        className={`h-2 rounded-full transition-all duration-500 ${
+                        className={`h-full rounded-full transition-all duration-500 ${
                           achievement.is_unlocked
-                            ? 'bg-gradient-to-r from-green-400 to-green-600'
-                            : 'bg-gradient-to-r from-gray-300 to-gray-400'
+                            ? 'bg-petal-sage-deep'
+                            : 'bg-petal-rule'
                         }`}
                         style={{
                           width: `${Math.min((achievement.progress / achievement.max_progress) * 100, 100)}%`,
@@ -419,7 +417,7 @@ export function AchievementsView() {
                     </div>
                   </div>
                   {achievement.is_unlocked && (
-                    <p className="text-xs text-green-600 font-medium">✅ 已解鎖</p>
+                    <p className="font-display italic font-light text-xs text-petal-sage-deep">— 已解鎖</p>
                   )}
                 </div>
               ))}

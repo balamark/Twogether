@@ -67,15 +67,18 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <div className="bg-white shadow-sm border-b border-gray-200">
+    <div className="bg-petal-cream border-b border-petal-rule">
       <div className="container mx-auto px-4 py-3">
         <div className="flex items-center justify-between">
           {/* Logo and Title */}
           <div className="flex items-center space-x-3">
-            <div className="flex items-center space-x-2">
-              <Heart className="w-8 h-8 text-pink-500" />
-              <h1 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-pink-600 to-purple-600">
-                Twogether 圖在一起
+            <div className="flex items-baseline space-x-2">
+              <Heart className="w-6 h-6 text-pink-500 self-center opacity-80" strokeWidth={1.5} />
+              <h1 className="font-display text-2xl font-medium tracking-tight text-petal-ink">
+                Two<em className="not-italic font-light italic text-pink-600">gether</em>
+                <span className="ml-2 font-body text-xs font-normal uppercase tracking-[0.18em] text-petal-muted align-middle">
+                  圖在一起
+                </span>
               </h1>
             </div>
           </div>
@@ -86,7 +89,7 @@ const Header: React.FC<HeaderProps> = ({
             {authState.isAuthenticated && authState.partnerConnected && (
               <button
                 onClick={onShowIntimacyRequest}
-                className="flex items-center space-x-2 bg-gradient-to-r from-pink-500 to-red-500 text-white px-4 py-2 rounded-full hover:from-pink-600 hover:to-red-600 transition-colors"
+                className="flex items-center space-x-2 bg-pink-500 text-white px-4 py-2 rounded-full hover:bg-pink-600 transition-colors"
                 title="發送親密邀請"
               >
                 <Send className="w-4 h-4" />
@@ -98,12 +101,12 @@ const Header: React.FC<HeaderProps> = ({
             {authState.isAuthenticated && (
               <button
                 onClick={handleNotificationClick}
-                className="relative p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors"
+                className="relative p-2 text-petal-ink-soft hover:text-petal-ink hover:bg-petal-cream-2 rounded-full transition-colors"
                 title="通知中心"
               >
-                <Bell className="w-5 h-5" />
+                <Bell className="w-4 h-4" strokeWidth={1.5} />
                 {unreadNotificationCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                  <span className="absolute -top-0.5 -right-0.5 bg-pink-600 text-white font-body text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
                     {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
                   </span>
                 )}
@@ -114,10 +117,10 @@ const Header: React.FC<HeaderProps> = ({
             {authState.isAuthenticated && (
               <div
                 data-testid="coin-balance"
-                className="flex items-center space-x-2 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-3 py-2 rounded-full"
+                className="flex items-center space-x-1.5 border border-petal-rule px-3 py-1.5 rounded-full"
               >
-                <Coins className="w-4 h-4" />
-                <span className="font-bold text-sm">{totalCoins}</span>
+                <Coins className="w-3.5 h-3.5 text-pink-600" strokeWidth={1.5} />
+                <span className="font-display italic text-sm text-petal-ink">{totalCoins}</span>
               </div>
             )}
 
@@ -126,42 +129,42 @@ const Header: React.FC<HeaderProps> = ({
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center space-x-2 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-full transition-colors"
+                  className="flex items-center space-x-1.5 border border-petal-rule hover:border-petal-ink px-3 py-1.5 rounded-full transition-colors"
                 >
-                  <User className="w-4 h-4 text-gray-600" />
-                  <span className="text-sm font-medium text-gray-700">
+                  <User className="w-3.5 h-3.5 text-petal-ink-soft" strokeWidth={1.5} />
+                  <span className="font-body text-sm text-petal-ink">
                     {authState.user?.nickname || '用戶'}
                   </span>
                 </button>
 
                 {/* User Dropdown */}
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                    <div className="p-4 border-b border-gray-100">
-                      <div className="text-sm font-medium text-gray-900">
+                  <div className="absolute right-0 mt-2 w-64 bg-petal-cream rounded-md shadow-petal border border-petal-rule z-50">
+                    <div className="p-4 border-b border-petal-rule">
+                      <div className="font-display text-base font-medium text-petal-ink">
                         {authState.user?.nickname}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="font-body text-xs text-petal-muted mt-0.5">
                         {authState.user?.email}
                       </div>
                       {authState.partnerConnected ? (
-                        <div className="mt-2 flex items-center space-x-1">
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <span className="text-xs text-green-600">已連接伴侶</span>
+                        <div className="mt-2.5 flex items-center space-x-1.5">
+                          <div className="w-1.5 h-1.5 bg-petal-sage-deep rounded-full"></div>
+                          <span className="font-body text-xs text-petal-sage-deep">已連接伴侶</span>
                         </div>
                       ) : (
-                        <div className="mt-2 flex items-center space-x-1">
-                          <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                          <span className="text-xs text-orange-600">等待伴侶連接</span>
+                        <div className="mt-2.5 flex items-center space-x-1.5">
+                          <div className="w-1.5 h-1.5 bg-petal-rose-deep rounded-full"></div>
+                          <span className="font-body text-xs text-petal-rose-deep">等待伴侶連接</span>
                         </div>
                       )}
                     </div>
                     <div className="p-2">
                       <button
                         onClick={handleLogout}
-                        className="w-full flex items-center space-x-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                        className="w-full flex items-center space-x-2 px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
                       >
-                        <LogOut className="w-4 h-4" />
+                        <LogOut className="w-3.5 h-3.5" strokeWidth={1.5} />
                         <span>登出</span>
                       </button>
                     </div>
@@ -179,7 +182,7 @@ const Header: React.FC<HeaderProps> = ({
             ) : (
               <button
                 onClick={onShowAuthModal}
-                className="bg-gradient-to-r from-pink-500 to-purple-600 text-white px-4 py-2 rounded-full hover:from-pink-600 hover:to-purple-700 transition-colors text-sm font-medium"
+                className="bg-petal-ink text-white px-5 py-2 rounded-full hover:bg-pink-700 transition-colors text-sm font-medium tracking-wide"
               >
                 登入 / 註冊
               </button>

@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Twogether — 03 Bloom</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,300;12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    :root {
+      --bg: #FFFFFF;
+      --bg-cream: #FFFBF5;
+      --bg-pink: #FFF4F2;
+      --bg-yellow: #FFF8DD;
+      --bg-lilac: #F6EEFB;
+      --bg-mint: #E8F7F0;
+      --coral: #FF6B6B;
+      --coral-deep: #E54848;
+      --coral-soft: #FFD3CD;
+      --butter: #FFE5A0;
+      --butter-deep: #D4A82A;
+      --lilac: #E8D5F2;
+      --lilac-deep: #9569B5;
+      --mint: #B8E5C8;
+      --mint-deep: #5BA679;
+      --ink: #1A1424;
+      --ink-soft: #4A4456;
+      --muted: #8A8398;
+      --line: #F0EBE5;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--ink);
+      font-family: 'Plus Jakarta Sans', 'Noto Sans TC', system-ui, sans-serif;
+      font-weight: 400;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+    .display { font-family: 'Bricolage Grotesque', 'Noto Sans TC', sans-serif; font-variation-settings: 'opsz' 48; }
+    .num-feat { font-feature-settings: 'tnum'; font-variant-numeric: tabular-nums; }
+
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 0 32px; }
+    @media (max-width: 760px) { .wrap { padding: 0 16px; } }
+
+    /* Vibe header bar */
+    .vibe-bar {
+      background: var(--ink);
+      color: #fff;
+      padding: 14px 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12.5px;
+      font-weight: 500;
+    }
+    .vibe-bar a { color: rgba(255,255,255,0.7); text-decoration: none; }
+    .vibe-bar a:hover { color: #fff; }
+    .vibe-bar .palette { display: flex; gap: 5px; }
+    .vibe-bar .swatch { width: 16px; height: 16px; border-radius: 50%; }
+
+    /* App header */
+    header.app {
+      padding: 20px 0;
+    }
+    .app-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-cream);
+      padding: 14px 22px;
+      border-radius: 999px;
+      border: 1px solid var(--line);
+    }
+    .logo {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      letter-spacing: -0.04em;
+      font-variation-settings: 'opsz' 24;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .logo-dot {
+      width: 12px;
+      height: 12px;
+      background: var(--coral);
+      border-radius: 50%;
+      box-shadow: 0 0 0 4px var(--coral-soft);
+      display: inline-block;
+    }
+    nav.app-nav { display: flex; gap: 4px; }
+    nav.app-nav a {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--ink-soft);
+      text-decoration: none;
+      padding: 8px 16px;
+      border-radius: 999px;
+      transition: all 0.2s;
+    }
+    nav.app-nav a:hover { background: var(--bg-pink); color: var(--coral-deep); }
+    nav.app-nav a.active { background: var(--ink); color: #fff; }
+    .header-right { display: flex; align-items: center; gap: 10px; }
+    .coin {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 13px;
+      background: var(--bg-yellow);
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--butter-deep);
+    }
+    .coin::before {
+      content: '';
+      width: 10px;
+      height: 10px;
+      background: var(--butter-deep);
+      border-radius: 50%;
+    }
+    .bell-btn {
+      width: 36px;
+      height: 36px;
+      background: var(--bg);
+      border: 1px solid var(--line);
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      position: relative;
+      font-size: 14px;
+    }
+    .bell-btn::after {
+      content: '';
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 8px;
+      height: 8px;
+      background: var(--coral);
+      border-radius: 50%;
+      border: 2px solid var(--bg);
+    }
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--coral) 0%, var(--coral-deep) 100%);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    /* Hero intro */
+    .hero {
+      padding: 40px 0 24px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+      gap: 32px;
+      align-items: end;
+    }
+    @media (max-width: 760px) { .hero { grid-template-columns: 1fr; gap: 16px; } }
+    .hero-title {
+      font-family: 'Bricolage Grotesque', 'Noto Sans TC', sans-serif;
+      font-weight: 700;
+      font-size: clamp(40px, 6vw, 72px);
+      letter-spacing: -0.045em;
+      line-height: 0.95;
+      font-variation-settings: 'opsz' 96;
+    }
+    .hero-title em { font-style: italic; font-weight: 400; color: var(--coral); font-variation-settings: 'opsz' 96; }
+    .hero-emoji { font-size: 0.8em; vertical-align: -8px; }
+    .hero-sub {
+      font-size: 16px;
+      color: var(--ink-soft);
+      line-height: 1.5;
+      padding-bottom: 12px;
+    }
+    .hero-sub strong { color: var(--ink); font-weight: 700; }
+
+    /* Section heading */
+    .section { padding: 32px 0 72px; }
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .section-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: var(--bg-pink);
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--coral-deep);
+      letter-spacing: -0.005em;
+      margin-bottom: 12px;
+    }
+    .section-tag::before { content: '◉'; }
+    .section-tag.lilac { background: var(--bg-lilac); color: var(--lilac-deep); }
+    .section-tag.mint { background: var(--bg-mint); color: var(--mint-deep); }
+    .section-title {
+      font-family: 'Bricolage Grotesque', 'Noto Sans TC', sans-serif;
+      font-weight: 700;
+      font-size: 38px;
+      letter-spacing: -0.035em;
+      line-height: 1.05;
+      font-variation-settings: 'opsz' 48;
+    }
+    .section-title em { font-style: italic; font-weight: 400; color: var(--coral); }
+
+    /* === SECTION A — Calendar bento === */
+    .bento {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 16px;
+    }
+    .card {
+      background: var(--bg-cream);
+      border-radius: 28px;
+      padding: 24px;
+      border: 1px solid var(--line);
+      position: relative;
+      overflow: hidden;
+    }
+    .card.pink { background: var(--bg-pink); border-color: rgba(255, 107, 107, 0.12); }
+    .card.yellow { background: var(--bg-yellow); border-color: rgba(212, 168, 42, 0.15); }
+    .card.lilac { background: var(--bg-lilac); border-color: rgba(149, 105, 181, 0.15); }
+    .card.mint { background: var(--bg-mint); border-color: rgba(91, 166, 121, 0.15); }
+    .card.dark { background: var(--ink); color: #fff; border-color: var(--ink); }
+    .card.white { background: #fff; }
+
+    /* Today hero card */
+    .today-card { grid-column: span 7; padding: 32px; min-height: 280px; display: flex; flex-direction: column; justify-content: space-between; }
+    @media (max-width: 920px) { .today-card { grid-column: span 12; } }
+    .today-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .today-meta { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--ink-soft); font-weight: 600; }
+    .today-meta-dot { width: 8px; height: 8px; background: var(--coral); border-radius: 50%; box-shadow: 0 0 0 4px var(--coral-soft); animation: breath 2s ease-in-out infinite; }
+    @keyframes breath { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+    .today-date {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 700;
+      font-size: 84px;
+      letter-spacing: -0.06em;
+      line-height: 0.85;
+      font-variation-settings: 'opsz' 96;
+    }
+    .today-date small {
+      font-size: 24px;
+      font-weight: 500;
+      letter-spacing: -0.02em;
+      color: var(--ink-soft);
+      vertical-align: super;
+      margin-left: 6px;
+    }
+    .today-sub {
+      font-size: 16px;
+      color: var(--ink-soft);
+      font-weight: 500;
+      margin-top: 12px;
+    }
+    .today-bottom {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .today-stat {
+      display: flex;
+      gap: 24px;
+    }
+    .stat-num {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 700;
+      font-size: 36px;
+      letter-spacing: -0.04em;
+      line-height: 1;
+    }
+    .stat-num em { color: var(--coral); font-style: normal; }
+    .stat-label {
+      font-size: 11.5px;
+      color: var(--muted);
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-top: 4px;
+    }
+    .blob-deco {
+      position: absolute;
+      width: 240px;
+      height: 240px;
+      background: radial-gradient(circle, var(--coral-soft) 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    /* Quick action cards */
+    .action-card { grid-column: span 5; min-height: 280px; display: flex; flex-direction: column; gap: 14px; }
+    @media (max-width: 920px) { .action-card { grid-column: span 12; min-height: auto; } }
+    .action-card-head { display: flex; align-items: center; justify-content: space-between; }
+    .action-card-title {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      letter-spacing: -0.025em;
+    }
+    .quick-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .quick-btn {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: left;
+      font-family: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .quick-btn:hover { transform: translateY(-2px); border-color: var(--coral); box-shadow: 0 4px 0 -1px var(--coral-soft); }
+    .quick-btn .emoji { font-size: 24px; line-height: 1; margin-bottom: 4px; }
+    .quick-btn .label { font-size: 13.5px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
+    .quick-btn .hint { font-size: 11.5px; color: var(--muted); font-weight: 500; }
+
+    /* Mini month calendar */
+    .month-card { grid-column: span 7; padding: 24px; }
+    @media (max-width: 920px) { .month-card { grid-column: span 12; } }
+    .month-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .month-label {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 700;
+      font-size: 24px;
+      letter-spacing: -0.03em;
+    }
+    .month-label small { font-size: 14px; font-weight: 500; color: var(--muted); margin-left: 6px; }
+    .month-controls { display: flex; gap: 6px; }
+    .month-controls button {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: #fff;
+      border: 1px solid var(--line);
+      cursor: pointer;
+      font-size: 14px;
+      color: var(--ink-soft);
+      display: grid;
+      place-items: center;
+      transition: all 0.2s;
+    }
+    .month-controls button:hover { background: var(--coral-soft); border-color: var(--coral); color: var(--coral-deep); }
+
+    .mini-cal {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+    .mini-dow {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-align: center;
+      padding: 4px 0;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .mini-day {
+      aspect-ratio: 1;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-size: 13px;
+      font-weight: 600;
+      position: relative;
+      cursor: pointer;
+      transition: all 0.18s;
+    }
+    .mini-day:hover { background: #fff; }
+    .mini-day.dim { color: var(--line); cursor: default; }
+    .mini-day.dim:hover { background: transparent; }
+    .mini-day.has { background: #fff; }
+    .mini-day.has::after {
+      content: '';
+      position: absolute;
+      bottom: 5px;
+      width: 4px;
+      height: 4px;
+      border-radius: 50%;
+      background: var(--coral);
+    }
+    .mini-day.today {
+      background: var(--coral);
+      color: #fff;
+      transform: scale(1.05);
+      box-shadow: 0 4px 0 -1px var(--coral-soft);
+    }
+    .mini-day.today::after { background: #fff; }
+
+    /* Recent entries */
+    .entries-card { grid-column: span 5; padding: 24px; max-height: 100%; }
+    @media (max-width: 920px) { .entries-card { grid-column: span 12; } }
+    .entries-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .entries-card .action-card-title { font-size: 22px; }
+    .entries-count {
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      background: var(--coral);
+      color: #fff;
+      border-radius: 999px;
+    }
+    .entry {
+      padding: 14px 0;
+      border-bottom: 1px dashed var(--line);
+      display: grid;
+      grid-template-columns: 44px 1fr;
+      gap: 14px;
+      align-items: start;
+    }
+    .entry:last-child { border-bottom: 0; }
+    .entry-em {
+      width: 44px;
+      height: 44px;
+      background: #fff;
+      border-radius: 14px;
+      display: grid;
+      place-items: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    .entry-time {
+      font-size: 11.5px;
+      color: var(--muted);
+      font-weight: 700;
+      letter-spacing: -0.005em;
+      margin-bottom: 3px;
+    }
+    .entry-desc {
+      font-size: 14px;
+      color: var(--ink);
+      line-height: 1.45;
+      font-family: 'Noto Sans TC', 'Plus Jakarta Sans', sans-serif;
+      margin-bottom: 6px;
+    }
+    .entry-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+    .tag-pill {
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 3px 9px;
+      background: var(--bg);
+      border-radius: 999px;
+      color: var(--ink-soft);
+      border: 1px solid var(--line);
+    }
+    .tag-pill.lilac { background: var(--bg-lilac); color: var(--lilac-deep); border-color: transparent; }
+    .tag-pill.mint { background: var(--bg-mint); color: var(--mint-deep); border-color: transparent; }
+
+    /* === SECTION B — Invite === */
+    .invite-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 920px) { .invite-grid { grid-template-columns: 1fr; } }
+    .invite-stack { display: flex; flex-direction: column; gap: 16px; }
+
+    .step-card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 24px;
+    }
+    .step-card.active { border-color: var(--coral); box-shadow: 0 6px 0 -2px var(--coral-soft); }
+    .step-card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 18px;
+    }
+    .step-num {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+    .step-num .badge {
+      display: inline-grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      background: var(--bg-pink);
+      color: var(--coral-deep);
+      border-radius: 50%;
+      font-size: 12.5px;
+      font-weight: 800;
+    }
+    .step-card.active .step-num .badge { background: var(--coral); color: #fff; }
+    .step-status {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .step-card.active .step-status { color: var(--coral); }
+
+    .cat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    @media (max-width: 600px) { .cat-grid { grid-template-columns: 1fr 1fr; } }
+    .cat {
+      background: var(--bg-cream);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    .cat:hover { background: #fff; transform: translateY(-2px); }
+    .cat.selected { background: var(--bg-pink); border-color: var(--coral); }
+    .cat-emoji { font-size: 30px; display: block; margin-bottom: 8px; line-height: 1; }
+    .cat-name {
+      font-family: 'Bricolage Grotesque', 'Noto Sans TC', sans-serif;
+      font-weight: 700;
+      font-size: 14px;
+      letter-spacing: -0.015em;
+      margin-bottom: 2px;
+    }
+    .cat-desc { font-size: 11px; color: var(--muted); line-height: 1.35; font-weight: 500; }
+
+    .tmpl-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 4px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: thin;
+    }
+    .tmpl-pick {
+      flex-shrink: 0;
+      width: 220px;
+      padding: 16px;
+      background: var(--bg-cream);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      cursor: pointer;
+    }
+    .tmpl-pick.on { background: var(--bg-yellow); border-color: var(--butter-deep); }
+    .tmpl-pri {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      background: #fff;
+      border-radius: 999px;
+      margin-bottom: 8px;
+      color: var(--coral-deep);
+    }
+    .tmpl-pri::before { content: '●'; }
+    .tmpl-hint { font-size: 11.5px; color: var(--muted); margin-bottom: 6px; font-weight: 500; }
+    .tmpl-setup { font-size: 13px; line-height: 1.5; color: var(--ink); font-family: 'Noto Sans TC', sans-serif; }
+
+    .form-row { margin-bottom: 14px; }
+    .form-row:last-child { margin-bottom: 0; }
+    .form-label {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+      display: block;
+    }
+    .seg {
+      display: inline-flex;
+      padding: 4px;
+      background: var(--bg-cream);
+      border-radius: 999px;
+      gap: 2px;
+    }
+    .seg button {
+      padding: 7px 16px;
+      background: transparent;
+      border: 0;
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--ink-soft);
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    .seg button.on { background: var(--ink); color: #fff; }
+
+    .textarea {
+      width: 100%;
+      padding: 14px 16px;
+      background: var(--bg-cream);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      font-family: 'Noto Sans TC', 'Plus Jakarta Sans', sans-serif;
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--ink);
+      resize: vertical;
+      min-height: 100px;
+    }
+    .textarea:focus { outline: 0; border-color: var(--coral); }
+    .textarea-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11.5px;
+      color: var(--muted);
+      margin-top: 6px;
+      font-weight: 600;
+    }
+    .dt-row { display: flex; gap: 8px; }
+    .dt-row input {
+      flex: 1;
+      padding: 11px 16px;
+      background: var(--bg-cream);
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      font-family: inherit;
+      font-size: 13px;
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .preview-card {
+      background: linear-gradient(135deg, var(--bg-pink) 0%, var(--bg-yellow) 100%);
+      border-radius: 24px;
+      padding: 24px;
+      border: 1px solid var(--coral-soft);
+      position: relative;
+    }
+    .preview-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--coral-deep);
+      margin-bottom: 14px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .preview-tag::before { content: '✉'; font-size: 14px; }
+    .preview-msg {
+      font-size: 15px;
+      line-height: 1.6;
+      color: var(--ink);
+      font-family: 'Noto Sans TC', sans-serif;
+      margin-bottom: 18px;
+    }
+    .preview-foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 14px;
+      border-top: 1px solid rgba(229, 72, 72, 0.15);
+      font-size: 11.5px;
+      color: var(--ink-soft);
+      font-weight: 600;
+    }
+
+    .btn {
+      padding: 11px 20px;
+      background: var(--ink);
+      color: #fff;
+      border: 0;
+      border-radius: 999px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 13.5px;
+      font-weight: 700;
+      letter-spacing: -0.005em;
+      cursor: pointer;
+      transition: all 0.18s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 0 -2px var(--ink); }
+    .btn.coral { background: var(--coral); }
+    .btn.coral:hover { box-shadow: 0 6px 0 -2px var(--coral-soft); }
+    .btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+    .btn.ghost:hover { background: var(--bg-cream); transform: none; box-shadow: none; }
+
+    /* === SECTION C — Inbox === */
+    .inbox-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+      gap: 16px;
+    }
+    @media (max-width: 920px) { .inbox-grid { grid-template-columns: 1fr; } }
+
+    .inbox-card {
+      background: var(--bg-cream);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 8px;
+    }
+    .inbox-tabs {
+      display: flex;
+      gap: 4px;
+      padding: 8px 12px 12px;
+      border-bottom: 1px solid var(--line);
+      margin-bottom: 4px;
+    }
+    .inbox-tabs button {
+      padding: 6px 12px;
+      background: transparent;
+      border: 0;
+      font-family: inherit;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--muted);
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    .inbox-tabs button.on { background: var(--ink); color: #fff; }
+    .notif-item {
+      padding: 14px;
+      margin: 4px 0;
+      background: transparent;
+      border-radius: 16px;
+      display: grid;
+      grid-template-columns: 40px 1fr auto;
+      gap: 12px;
+      cursor: pointer;
+      transition: background 0.18s;
+      align-items: start;
+    }
+    .notif-item:hover { background: #fff; }
+    .notif-item.unread { background: #fff; box-shadow: 0 1px 0 var(--line); }
+    .notif-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+    }
+    .notif-icon.coral { background: var(--bg-pink); }
+    .notif-icon.yellow { background: var(--bg-yellow); }
+    .notif-icon.lilac { background: var(--bg-lilac); }
+    .notif-icon.mint { background: var(--bg-mint); }
+    .notif-title {
+      font-family: 'Plus Jakarta Sans', 'Noto Sans TC', sans-serif;
+      font-weight: 700;
+      font-size: 13.5px;
+      color: var(--ink);
+      margin-bottom: 3px;
+      letter-spacing: -0.005em;
+    }
+    .notif-item:not(.unread) .notif-title { font-weight: 600; color: var(--ink-soft); }
+    .notif-snippet { font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+    .notif-time { font-size: 11px; color: var(--muted); white-space: nowrap; font-weight: 700; }
+    .notif-item.unread .notif-time { color: var(--coral); }
+
+    /* Active request */
+    .req {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      overflow: hidden;
+    }
+    .req-header {
+      padding: 24px;
+      background: linear-gradient(135deg, var(--bg-pink) 0%, var(--bg-lilac) 100%);
+      position: relative;
+    }
+    .req-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: rgba(255,255,255,0.7);
+      backdrop-filter: blur(8px);
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 700;
+      color: var(--coral-deep);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+    .req-status::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: var(--coral);
+      border-radius: 50%;
+      box-shadow: 0 0 0 4px rgba(255,107,107,0.25);
+      animation: breath 2s ease-in-out infinite;
+    }
+    .req-from-block {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    .req-from-avatar {
+      width: 56px;
+      height: 56px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--coral) 0%, var(--coral-deep) 100%);
+      display: grid;
+      place-items: center;
+      color: #fff;
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+    }
+    .req-from-name { font-size: 13px; color: var(--muted); font-weight: 600; margin-bottom: 2px; }
+    .req-from-title {
+      font-family: 'Bricolage Grotesque', 'Noto Sans TC', sans-serif;
+      font-weight: 700;
+      font-size: 22px;
+      letter-spacing: -0.025em;
+      line-height: 1.15;
+    }
+    .req-from-title em { font-style: italic; font-weight: 400; color: var(--coral-deep); }
+
+    .req-body { padding: 24px; }
+    .req-message {
+      padding: 18px 20px;
+      background: var(--bg-cream);
+      border-radius: 18px;
+      font-family: 'Noto Sans TC', sans-serif;
+      font-size: 14.5px;
+      line-height: 1.65;
+      color: var(--ink);
+      margin-bottom: 16px;
+      border-left: 4px solid var(--coral);
+    }
+    .req-meta {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--bg-pink);
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--coral-deep);
+    }
+    .meta-pill.lilac { background: var(--bg-lilac); color: var(--lilac-deep); }
+    .meta-pill.mint { background: var(--bg-mint); color: var(--mint-deep); }
+
+    .req-respond {
+      padding-top: 18px;
+      border-top: 1px dashed var(--line);
+    }
+    .req-respond textarea {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--bg-cream);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      font-family: 'Noto Sans TC', sans-serif;
+      font-size: 13.5px;
+      resize: vertical;
+      min-height: 60px;
+      margin-bottom: 12px;
+      color: var(--ink);
+    }
+    .req-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+    .alt-section {
+      padding: 24px;
+      background: var(--bg-cream);
+      border-top: 1px solid var(--line);
+    }
+    .alt-h {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-weight: 700;
+      font-size: 16px;
+      letter-spacing: -0.02em;
+      margin-bottom: 14px;
+    }
+    .alt-h::after { content: ' ✨'; }
+    .alt-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    @media (max-width: 600px) { .alt-grid { grid-template-columns: 1fr; } }
+    .alt-cat {
+      padding: 14px;
+      background: #fff;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+    }
+    .alt-cat-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .alt-cat-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      font-size: 14px;
+    }
+    .alt-cat-icon.body { background: var(--bg-pink); color: var(--coral-deep); }
+    .alt-cat-icon.emo { background: #FCE0E5; color: #B84A66; }
+    .alt-cat-icon.play { background: var(--bg-yellow); color: var(--butter-deep); }
+    .alt-cat-icon.daily { background: var(--bg-mint); color: var(--mint-deep); }
+    .alt-cat-name { font-size: 13px; font-weight: 700; letter-spacing: -0.01em; }
+    .alt-opt {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 12px;
+    }
+    .alt-opt b { color: var(--ink); font-weight: 600; font-family: 'Noto Sans TC', sans-serif; }
+    .alt-opt span { color: var(--muted); font-weight: 700; }
+
+    footer.page-end {
+      padding: 40px 0 56px;
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    footer.page-end em {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-style: italic;
+      color: var(--coral);
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="vibe-bar">
+    <a href="./index.html">← All themes</a>
+    <span>03 · Bloom · Playful</span>
+    <div class="palette">
+      <span class="swatch" style="background:#FFFFFF; border: 1px solid rgba(255,255,255,0.3)"></span>
+      <span class="swatch" style="background:#FF6B6B"></span>
+      <span class="swatch" style="background:#FFE5A0"></span>
+      <span class="swatch" style="background:#E8D5F2"></span>
+    </div>
+  </div>
+
+  <header class="app">
+    <div class="wrap">
+      <div class="app-inner">
+        <div class="logo"><span class="logo-dot"></span>twogether</div>
+        <nav class="app-nav">
+          <a href="#cal" class="active">記錄</a>
+          <a href="#invite">邀請</a>
+          <a href="#inbox">通知</a>
+          <a href="#">旅程</a>
+          <a href="#">商店</a>
+          <a href="#">設定</a>
+        </nav>
+        <div class="header-right">
+          <div class="coin">248</div>
+          <button class="bell-btn">🔔</button>
+          <div class="avatar">小</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="hero">
+      <h1 class="hero-title display">嗨，又見面了 <span class="hero-emoji">🌸</span><br/><em>今天想留下什麼呢？</em></h1>
+      <p class="hero-sub">已陪伴 <strong>248</strong> 天 · 本月相遇 <strong>7</strong> 次 · 比上週多 <strong>1</strong> 次相遇 — 你們在變得更靠近。</p>
+    </div>
+  </div>
+
+  <!-- SECTION A -->
+  <section class="section" id="cal">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="section-tag">A · 記錄時光</div>
+          <h2 class="section-title">這個月，<em>七個夜晚</em>。</h2>
+        </div>
+      </div>
+
+      <div class="bento">
+
+        <!-- Today hero -->
+        <div class="card pink today-card">
+          <div class="blob-deco" style="top: -100px; right: -80px;"></div>
+          <div class="today-top">
+            <div class="today-meta"><span class="today-meta-dot"></span>今天 · 星期三</div>
+            <div style="font-size: 13px; color: var(--ink-soft); font-weight: 700;">2026 / 五月</div>
+          </div>
+          <div>
+            <div class="today-date display">13<small>日</small></div>
+            <div class="today-sub">22:40 · 你們有了 <strong style="color:var(--coral-deep)">一個慢慢的夜晚</strong> 🌟</div>
+          </div>
+          <div class="today-bottom">
+            <div class="today-stat">
+              <div>
+                <div class="stat-num display">7<em>+1</em></div>
+                <div class="stat-label">本月相遇</div>
+              </div>
+              <div>
+                <div class="stat-num display">248</div>
+                <div class="stat-label">陪伴天數</div>
+              </div>
+              <div>
+                <div class="stat-num display">3 <em>🔥</em></div>
+                <div class="stat-label">連續週數</div>
+              </div>
+            </div>
+            <button class="btn coral">+ 記下今晚</button>
+          </div>
+        </div>
+
+        <!-- Quick actions -->
+        <div class="card white action-card">
+          <div class="action-card-head">
+            <div class="action-card-title">想做點什麼？</div>
+            <span style="font-size: 12px; color: var(--muted); font-weight: 600;">快速入口</span>
+          </div>
+          <div class="quick-actions">
+            <button class="quick-btn">
+              <span class="emoji">✉️</span>
+              <span class="label">發送邀請</span>
+              <span class="hint">給她寫一段話</span>
+            </button>
+            <button class="quick-btn">
+              <span class="emoji">📓</span>
+              <span class="label">記錄今夜</span>
+              <span class="hint">新增一筆</span>
+            </button>
+            <button class="quick-btn">
+              <span class="emoji">🎭</span>
+              <span class="label">角色扮演</span>
+              <span class="hint">12 個劇本</span>
+            </button>
+            <button class="quick-btn">
+              <span class="emoji">🎁</span>
+              <span class="label">金幣商店</span>
+              <span class="hint">248 枚可用</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Mini month -->
+        <div class="card month-card">
+          <div class="month-head">
+            <div>
+              <span class="month-label display">5月 <small>May 2026</small></span>
+            </div>
+            <div class="month-controls">
+              <button>‹</button>
+              <button>›</button>
+            </div>
+          </div>
+          <div class="mini-cal">
+            <div class="mini-dow">日</div><div class="mini-dow">一</div><div class="mini-dow">二</div><div class="mini-dow">三</div><div class="mini-dow">四</div><div class="mini-dow">五</div><div class="mini-dow">六</div>
+
+            <div class="mini-day dim">26</div>
+            <div class="mini-day dim">27</div>
+            <div class="mini-day dim">28</div>
+            <div class="mini-day dim">29</div>
+            <div class="mini-day dim">30</div>
+            <div class="mini-day">1</div>
+            <div class="mini-day has">2</div>
+
+            <div class="mini-day">3</div>
+            <div class="mini-day has">4</div>
+            <div class="mini-day">5</div>
+            <div class="mini-day">6</div>
+            <div class="mini-day has">7</div>
+            <div class="mini-day">8</div>
+            <div class="mini-day has">9</div>
+
+            <div class="mini-day">10</div>
+            <div class="mini-day has">11</div>
+            <div class="mini-day">12</div>
+            <div class="mini-day today">13</div>
+            <div class="mini-day">14</div>
+            <div class="mini-day">15</div>
+            <div class="mini-day">16</div>
+
+            <div class="mini-day has">17</div>
+            <div class="mini-day">18</div>
+            <div class="mini-day">19</div>
+            <div class="mini-day">20</div>
+            <div class="mini-day">21</div>
+            <div class="mini-day">22</div>
+            <div class="mini-day">23</div>
+
+            <div class="mini-day">24</div>
+            <div class="mini-day">25</div>
+            <div class="mini-day">26</div>
+            <div class="mini-day">27</div>
+            <div class="mini-day">28</div>
+            <div class="mini-day">29</div>
+            <div class="mini-day">30</div>
+
+            <div class="mini-day">31</div>
+            <div class="mini-day dim">1</div>
+            <div class="mini-day dim">2</div>
+            <div class="mini-day dim">3</div>
+            <div class="mini-day dim">4</div>
+            <div class="mini-day dim">5</div>
+            <div class="mini-day dim">6</div>
+          </div>
+        </div>
+
+        <!-- Recent entries -->
+        <div class="card lilac entries-card">
+          <div class="entries-head">
+            <div class="action-card-title">最近的記錄</div>
+            <span class="entries-count">7 次</span>
+          </div>
+
+          <div class="entry">
+            <div class="entry-em">🌟</div>
+            <div>
+              <div class="entry-time">5/13 · 22:40 · 今夜</div>
+              <p class="entry-desc">慢慢的、靠近的，像在讀一封寫了很久的信。</p>
+              <div class="entry-tags">
+                <span class="tag-pill lilac">臥室</span>
+                <span class="tag-pill">45 分鐘</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="entry">
+            <div class="entry-em">😘</div>
+            <div>
+              <div class="entry-time">5/11 · 02:15</div>
+              <p class="entry-desc">下雨的禮拜一，沒人想起床。</p>
+              <div class="entry-tags">
+                <span class="tag-pill">老師/學生</span>
+                <span class="tag-pill">客廳</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="entry">
+            <div class="entry-em">🔥</div>
+            <div>
+              <div class="entry-time">5/9 · 23:08</div>
+              <p class="entry-desc">慶祝她拿到 offer，香檳開了兩瓶。</p>
+              <div class="entry-tags">
+                <span class="tag-pill mint">慶祝</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION B -->
+  <section class="section" id="invite">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="section-tag lilac">B · 親密邀請</div>
+          <h2 class="section-title">寫一封 <em>會讓她笑</em> 的邀請。</h2>
+        </div>
+      </div>
+
+      <div class="invite-grid">
+
+        <div class="invite-stack">
+          <div class="step-card">
+            <div class="step-card-head">
+              <div class="step-num"><span class="badge">1</span>選擇邀請類型</div>
+              <div class="step-status">✓ 已選 · 甜蜜讚美</div>
+            </div>
+            <div class="cat-grid">
+              <div class="cat selected">
+                <span class="cat-emoji">💕</span>
+                <div class="cat-name">甜蜜讚美</div>
+                <div class="cat-desc">溫馨的讚美與愛意</div>
+              </div>
+              <div class="cat">
+                <span class="cat-emoji">🤝</span>
+                <div class="cat-name">真心和解</div>
+                <div class="cat-desc">吵架後的挽回</div>
+              </div>
+              <div class="cat">
+                <span class="cat-emoji">📸</span>
+                <div class="cat-name">偶像/攝影師</div>
+                <div class="cat-desc">私密角色扮演</div>
+              </div>
+              <div class="cat">
+                <span class="cat-emoji">📚</span>
+                <div class="cat-name">老師/學生</div>
+                <div class="cat-desc">特別的課程</div>
+              </div>
+              <div class="cat">
+                <span class="cat-emoji">✈️</span>
+                <div class="cat-name">留學生邂逅</div>
+                <div class="cat-desc">浪漫的約會</div>
+              </div>
+              <div class="cat">
+                <span class="cat-emoji">✨</span>
+                <div class="cat-name">自訂訊息</div>
+                <div class="cat-desc">完全客製</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="step-card">
+            <div class="step-card-head">
+              <div class="step-num"><span class="badge">2</span>選擇模板</div>
+              <div class="step-status">推薦 · 4 個</div>
+            </div>
+            <div class="tmpl-row">
+              <div class="tmpl-pick on">
+                <div class="tmpl-pri">輕柔</div>
+                <div class="tmpl-hint">傍晚六點之後</div>
+                <div class="tmpl-setup">想用最樸實的方式告訴你：謝謝你一直在我身邊⋯⋯</div>
+              </div>
+              <div class="tmpl-pick">
+                <div class="tmpl-pri">浪漫</div>
+                <div class="tmpl-hint">深夜時分</div>
+                <div class="tmpl-setup">你的溫柔像春風，你的愛像暖陽⋯⋯</div>
+              </div>
+              <div class="tmpl-pick">
+                <div class="tmpl-pri">大膽</div>
+                <div class="tmpl-hint">下班後</div>
+                <div class="tmpl-setup">無論什麼時候，你都是我心中最特別的⋯⋯</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="step-card active">
+            <div class="step-card-head">
+              <div class="step-num"><span class="badge">3</span>編輯訊息</div>
+              <div class="step-status">● 進行中</div>
+            </div>
+
+            <div class="form-row">
+              <span class="form-label">送達時機</span>
+              <div class="seg">
+                <button class="on">立即邀請</button>
+                <button>預約時間</button>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <span class="form-label">訊息內容</span>
+              <textarea class="textarea">無論什麼時候，你都是我心中最特別的那個人 💝 想念你的整個下午。今晚六點半在家等你 — 為你準備了一些事情，慢慢來。</textarea>
+              <div class="textarea-meta">
+                <span>78 / 1000 字</span>
+                <span>草稿已自動儲存</span>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <span class="form-label">預約時間（選填）</span>
+              <div class="dt-row">
+                <input type="text" value="2026 / 05 / 13" />
+                <input type="text" value="18:30" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="step-card" style="height: fit-content; position: sticky; top: 24px;">
+          <div class="step-card-head">
+            <div class="step-num"><span class="badge">4</span>確認送出</div>
+            <div class="step-status">即將送達 · 小美</div>
+          </div>
+
+          <div class="preview-card">
+            <div class="preview-tag">給 小美 的邀請</div>
+            <p class="preview-msg">無論什麼時候，你都是我心中最特別的那個人 💝 想念你的整個下午。今晚六點半在家等你 — 為你準備了一些事情，慢慢來。</p>
+            <div class="preview-foot">
+              <div>
+                <div>送達 · 18:30 今天</div>
+                <div style="opacity:0.6; margin-top: 2px;">約 2 小時後</div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display: flex; gap: 8px; margin-top: 16px;">
+            <button class="btn coral" style="flex:1;">送出邀請 →</button>
+            <button class="btn ghost">回上一步</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION C -->
+  <section class="section" id="inbox">
+    <div class="wrap">
+      <div class="section-head">
+        <div>
+          <div class="section-tag mint">C · 收件匣</div>
+          <h2 class="section-title">小美 <em>等著你</em> ⏳</h2>
+        </div>
+      </div>
+
+      <div class="inbox-grid">
+
+        <div class="inbox-card">
+          <div class="inbox-tabs">
+            <button class="on">全部 · 4</button>
+            <button>邀請</button>
+            <button>徽章</button>
+            <button>系統</button>
+          </div>
+
+          <div class="notif-item unread">
+            <div class="notif-icon coral">💌</div>
+            <div>
+              <div class="notif-title">來自 小美 的親密邀請</div>
+              <div class="notif-snippet">今晚六點半在家等你 — 為你準備了一些事情⋯⋯</div>
+            </div>
+            <span class="notif-time">剛剛</span>
+          </div>
+
+          <div class="notif-item unread">
+            <div class="notif-icon yellow">⭐</div>
+            <div>
+              <div class="notif-title">你獲得了一枚新徽章</div>
+              <div class="notif-snippet">「連續七日的早安」— 收下 50 枚金幣</div>
+            </div>
+            <span class="notif-time">2h</span>
+          </div>
+
+          <div class="notif-item">
+            <div class="notif-icon mint">↩</div>
+            <div>
+              <div class="notif-title">小美 回覆了你的邀請</div>
+              <div class="notif-snippet">"接受你的邀請 💕 — 我也想你了"</div>
+            </div>
+            <span class="notif-time">昨天</span>
+          </div>
+
+          <div class="notif-item">
+            <div class="notif-icon lilac">∼</div>
+            <div>
+              <div class="notif-title">本週親密總結已就緒</div>
+              <div class="notif-snippet">這一週你們相遇了 4 次，比上週多 1 次</div>
+            </div>
+            <span class="notif-time">3d</span>
+          </div>
+        </div>
+
+        <div class="req">
+          <div class="req-header">
+            <div class="req-status">親密邀請 · 等待回覆</div>
+            <div class="req-from-block">
+              <div class="req-from-avatar">美</div>
+              <div>
+                <div class="req-from-name">小美 · 1 分鐘前</div>
+                <div class="req-from-title">來自 <em>小美</em> 的親密邀請</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="req-body">
+            <div class="req-message">
+              "今晚六點半在家等你 — 為你準備了一些事情，慢慢來。<br />
+              無論你多累，我都想第一個聽你說今天的故事。"
+            </div>
+
+            <div class="req-meta">
+              <span class="meta-pill">⏰ 今晚 18:30</span>
+              <span class="meta-pill lilac">約 2 小時後</span>
+              <span class="meta-pill mint">類型 · 甜蜜讚美</span>
+            </div>
+
+            <div class="req-respond">
+              <span class="form-label" style="margin-bottom: 8px;">回覆她</span>
+              <textarea>接受你的邀請 💕</textarea>
+              <div class="req-actions">
+                <button class="btn coral">接受邀請 ✓</button>
+                <button class="btn ghost">改個時間 ↺</button>
+                <button class="btn ghost">試試別的 ↘</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="alt-section">
+            <div class="alt-h">現在不太合適，但我們可以試試這個 💝</div>
+            <div class="alt-grid">
+              <div class="alt-cat">
+                <div class="alt-cat-head"><div class="alt-cat-icon body">✋</div><span class="alt-cat-name">肢體親密</span></div>
+                <div class="alt-opt"><b>長長的擁抱</b><span>5'</span></div>
+                <div class="alt-opt"><b>幫對方按摩肩頸</b><span>15'</span></div>
+              </div>
+              <div class="alt-cat">
+                <div class="alt-cat-head"><div class="alt-cat-icon emo">♥</div><span class="alt-cat-name">情感親密</span></div>
+                <div class="alt-opt"><b>分享今天最開心的事</b><span>10'</span></div>
+                <div class="alt-opt"><b>讀一段詩給對方聽</b><span>5'</span></div>
+              </div>
+              <div class="alt-cat">
+                <div class="alt-cat-head"><div class="alt-cat-icon play">☺</div><span class="alt-cat-name">趣味互動</span></div>
+                <div class="alt-opt"><b>一起看搞笑短片</b><span>20'</span></div>
+                <div class="alt-opt"><b>玩心電感應遊戲</b><span>15'</span></div>
+              </div>
+              <div class="alt-cat">
+                <div class="alt-cat-head"><div class="alt-cat-icon daily">☕</div><span class="alt-cat-name">日常陪伴</span></div>
+                <div class="alt-opt"><b>一起喝杯熱茶</b><span>20'</span></div>
+                <div class="alt-opt"><b>陪她散步回家</b><span>30'</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <footer class="page-end">
+    03 · <em>Bloom</em> · Playful but contained · Twogether prototypes
+  </footer>
+
+</body>
+</html>
