@@ -1647,6 +1647,7 @@ const LoveTimeApp = () => {
               />
             </div>
             <button
+              data-testid="add-record-button"
               onClick={() => {
                 setRecordForm({...recordForm, date: selectedDate});
                 setShowRecordModal(true);

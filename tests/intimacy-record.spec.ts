@@ -30,7 +30,7 @@ test.describe('Intimacy Record Flow', () => {
 
     // Handle login if required
     const loginButton = page.locator('button:has-text("登入 / 註冊")');
-    const recordButton = page.locator('button:has-text("記錄今天的愛 ❤️")');
+    const recordButton = page.locator('[data-testid="add-record-button"]');
 
     // Check if we're already logged in by looking for the record button
     const alreadyLoggedIn = await recordButton.isVisible({ timeout: 2000 });
@@ -104,7 +104,7 @@ test.describe('Intimacy Record Flow', () => {
     }
 
     // Click the record button (using the correct text from source code including emoji)
-    const addRecordButton = page.locator('button:has-text("記錄今天的愛 ❤️")');
+    const addRecordButton = page.locator('[data-testid="add-record-button"]');
     await expect(addRecordButton).toBeVisible({ timeout: 5000 });
     await addRecordButton.click({ force: true });
     await page.waitForTimeout(2000);

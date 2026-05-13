@@ -30,7 +30,7 @@ test.describe('Custom Script Upload and Persistence', () => {
 
     // Handle login if required
     const loginButton = page.locator('button:has-text("登入 / 註冊")');
-    const recordButton = page.locator('button:has-text("記錄今天的愛 ❤️")');
+    const recordButton = page.locator('[data-testid="add-record-button"]');
 
     const alreadyLoggedIn = await recordButton.isVisible({ timeout: 2000 });
     if (!alreadyLoggedIn && await loginButton.isVisible({ timeout: 3000 })) {
@@ -219,7 +219,7 @@ test.describe('Custom Script Upload and Persistence', () => {
     await page.waitForTimeout(2000);
 
     // Verify the script modal appears
-    const scriptModal = page.locator('text=劇本對話：');
+    const scriptModal = page.locator('text=劇本對話');
     await expect(scriptModal).toBeVisible({ timeout: 5000 });
 
     // Verify success message about automatic record
@@ -245,7 +245,7 @@ test.describe('Custom Script Upload and Persistence', () => {
 
     // Verify the count is displayed
     const scriptCount = await customScriptsHeader.textContent();
-    expect(scriptCount).toMatch(/自訂劇本 \(\d+\)/);
+    expect(scriptCount).toMatch(/自訂劇本\s*\(\d+\)/);
   });
 
   test('should validate custom script form fields', async ({ page }) => {
