@@ -4,7 +4,6 @@ const cors = require('cors');
 const helmet = require('helmet');
 const bodyParser = require('body-parser');
 const session = require('express-session');
-const rateLimit = require('express-rate-limit');
 const path = require('path');
 
 // PostgreSQL session store for production
@@ -30,19 +29,10 @@ const { requestLogger, errorHandler, asyncHandler } = require('./middleware/logg
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Trust proxy for Google Cloud (fixes rate limiting X-Forwarded-For header issue)
+// Trust proxy for Google Cloud (correct X-Forwarded-For handling behind GAE).
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', true);
 }
-
-// Rate limiting - disabled for test environment
-const limiter = process.env.NODE_ENV === 'test' || process.env.DISABLE_RATE_LIMIT === 'true'
-  ? (req, res, next) => next() // No-op middleware for tests
-  : rateLimit({
-      windowMs: 15 * 60 * 1000, // 15 minutes
-      max: 100, // limit each IP to 100 requests per windowMs
-      message: 'Too many requests from this IP, please try again later.'
-    });
 
 // Session configuration
 const sessionConfig = {
@@ -89,7 +79,6 @@ if (['development', 'test'].includes(process.env.NODE_ENV)) {
   }));
 }
 
-app.use(limiter);
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 

@@ -938,37 +938,8 @@ const LoveTimeApp = () => {
 
   // Note: Intimate records are now persisted in the backend, no localStorage needed
 
-  // Use ref to track previous nicknames to avoid unnecessary API calls
-  const previousNicknames = useRef<{ partner1: string; partner2: string }>({ partner1: '', partner2: '' });
-
-  useEffect(() => {
-    // Only save nicknames if user is authenticated and nicknames are not default values
-    if (!authState.isAuthenticated ||
-        (nicknames.partner1 === '親愛的' && nicknames.partner2 === '寶貝')) {
-      return;
-    }
-
-    // Check if nicknames have actually changed
-    const hasChanged =
-      previousNicknames.current.partner1 !== nicknames.partner1 ||
-      previousNicknames.current.partner2 !== nicknames.partner2;
-
-    if (!hasChanged) {
-      return;
-    }
-
-    const saveNicknames = async () => {
-      try {
-        await apiService.updateNicknames(nicknames);
-        // Update the ref only after successful save
-        previousNicknames.current = { ...nicknames };
-      } catch (error) {
-        console.error('Error saving nicknames:', error);
-      }
-    };
-
-    saveNicknames();
-  }, [nicknames, authState.isAuthenticated]);
+  // Nicknames are persisted through the explicit Save button in SettingsView,
+  // not on every keystroke — see SettingsView.handleSaveSettings.
 
   // Backend is the source of truth for nicknames, customGifts, customScripts,
   // and totalCoins. They are never cached in localStorage — see /api/* loaders

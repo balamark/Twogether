@@ -502,33 +502,15 @@ class ApiService {
   }
 
   async updateNicknames(nicknames: { partner1?: string; partner2?: string }): Promise<void> {
-    // Get current user info to determine which nickname belongs to them
     const authUserRaw = localStorage.getItem('authUser');
     const currentUserId = authUserRaw ? JSON.parse(authUserRaw)?.id : null;
+    if (!currentUserId) return;
 
-    if (!currentUserId) {
-      // Not authenticated — nothing to persist (backend is the only store).
-      return;
-    }
+    // partner1 always represents the current user (see getNicknames convention).
+    const myNickname = nicknames.partner1?.trim();
+    if (!myNickname || myNickname.length < 2) return;
 
-    // Get couple info to determine which partner the current user is
-    const couple = await this.getCouple();
-
-    let currentUserNickname: string | undefined;
-    if (couple && couple.user1Id === currentUserId) {
-      currentUserNickname = nicknames.partner1?.trim();
-    } else if (couple && couple.user2Id === currentUserId) {
-      currentUserNickname = nicknames.partner2?.trim();
-    } else {
-      // No couple relationship yet — nothing to persist server-side.
-      return;
-    }
-
-    if (!currentUserNickname || currentUserNickname.length < 2) {
-      return;
-    }
-
-    await apiClient.put('/couples/nicknames', { nickname: currentUserNickname });
+    await apiClient.put('/couples/nicknames', { nickname: myNickname });
   }
 
   // Coins
