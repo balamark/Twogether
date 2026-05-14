@@ -205,30 +205,38 @@ test.describe('Custom Script Upload and Persistence', () => {
     await roleplayTab.first().click();
     await page.waitForTimeout(2000);
 
-    // Find any custom script with "使用" (use) button
-    const useButton = page.locator('button:has-text("使用")').first();
+    // Open a custom script in view mode. "查看" button is on each custom
+    // script card under the 自訂劇本 section.
+    const viewButton = page.locator('button:has-text("查看")').first();
 
     // If no custom scripts exist, skip this test
-    if (!(await useButton.isVisible({ timeout: 3000 }))) {
+    if (!(await viewButton.isVisible({ timeout: 3000 }))) {
       test.skip();
       return;
     }
 
-    // Click the use button
-    await useButton.click();
+    await viewButton.click();
     await page.waitForTimeout(2000);
 
-    // Verify the script modal appears
+    // Verify the script modal appears (劇本對話 section)
     const scriptModal = page.locator('text=劇本對話');
     await expect(scriptModal).toBeVisible({ timeout: 5000 });
 
-    // Verify success message about automatic record
-    const autoRecordMessage = page.locator('text=已自動記錄一次親密時光');
-    await expect(autoRecordMessage).toBeVisible({ timeout: 3000 });
+    // Viewing alone should NOT have created a record yet
+    await expect(page.locator('text=已記錄一次親密時光')).toHaveCount(0);
 
-    // Close the modal
-    const closeButton = page.locator('button:has-text("關閉")');
-    await closeButton.click();
+    // Explicitly trigger the role-play to record the intimacy moment
+    const beginButton = page.locator('button:has-text("開始扮演")');
+    await expect(beginButton).toBeVisible({ timeout: 3000 });
+    await beginButton.click();
+
+    // Now the record-confirmation banner should appear
+    const recordedMessage = page.locator('text=已記錄一次親密時光');
+    await expect(recordedMessage).toBeVisible({ timeout: 3000 });
+
+    // Close the modal via the "完成 →" finish button (shown post-begin)
+    const finishButton = page.locator('button:has-text("完成")');
+    await finishButton.click();
     await page.waitForTimeout(1000);
   });
 
