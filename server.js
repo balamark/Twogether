@@ -63,9 +63,14 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      // Google Fonts stylesheet is hosted on fonts.googleapis.com (style-src)
+      // and the actual font files are served from fonts.gstatic.com (font-src).
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
-      imgSrc: ["'self'", "data:", "https:", "http:"],
+      // blob: is needed for URL.createObjectURL() previews (e.g. thumbnail
+      // preview in the custom script upload/edit modal).
+      imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
       connectSrc: ["'self'", "https:"]
     }
   }

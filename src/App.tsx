@@ -1235,9 +1235,12 @@ const LoveTimeApp = () => {
     }
   };
 
-  // Edit an existing custom script. Backend PUT only supports text fields
-  // (title, category, scenario, content, tags, duration) — thumbnail updates
-  // require deleting and re-uploading.
+  // Edit an existing custom script. Accepts an optional new thumbnail; when
+  // provided the request goes multipart (api.ts handles the switch) and the
+  // backend PUT route uploads it to Supabase storage.
+  // NOTE: content is NOT re-run through parseScriptContent here — the form
+  // is initialized from script.content (already parsed at creation), and
+  // re-parsing would double-format dialogue.
   const updateCustomScript = async (
     id: string,
     updates: {
@@ -1246,6 +1249,7 @@ const LoveTimeApp = () => {
       scenario: string;
       content: string;
       tags: string[];
+      thumbnail?: File;
     }
   ) => {
     try {
@@ -1253,8 +1257,9 @@ const LoveTimeApp = () => {
         title: updates.title,
         category: updates.category,
         scenario: updates.scenario,
-        content: parseScriptContent(updates.content),
+        content: updates.content,
         tags: updates.tags,
+        thumbnail: updates.thumbnail,
       });
 
       const typedScript = rawScript as ApiCustomScript;
@@ -1266,8 +1271,11 @@ const LoveTimeApp = () => {
                 title: typedScript.title || updates.title,
                 category: typedScript.category || updates.category,
                 scenario: typedScript.scenario || updates.scenario,
-                script: typedScript.script || typedScript.content || parseScriptContent(updates.content),
+                script: typedScript.script || typedScript.content || updates.content,
                 tags: typedScript.tags || updates.tags,
+                // Server may have updated the thumbnail URL; fall back to
+                // the existing image if no new one was uploaded.
+                image: typedScript.thumbnailUrl ?? s.image,
               }
             : s
         )
@@ -2715,6 +2723,7 @@ const LoveTimeApp = () => {
           scenario: scriptData.scenario,
           content: scriptData.content,
           tags,
+          thumbnail: thumbnail ?? undefined,
         });
       } else {
         addCustomScript(
@@ -2851,31 +2860,43 @@ const LoveTimeApp = () => {
               />
             </div>
 
-            {!isEditMode && (
-              <div>
-                <label htmlFor="script-thumbnail" className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
-                  縮圖（選填，最大 5MB）
-                </label>
-                <input
-                  id="script-thumbnail"
-                  name="script-thumbnail"
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={handleThumbnailChange}
-                  className="w-full text-sm text-petal-ink-soft file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:font-body file:text-xs file:bg-petal-cream-2 file:text-petal-ink hover:file:bg-petal-rose-soft hover:file:text-petal-rose-deep"
+            <div>
+              <label htmlFor="script-thumbnail" className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
+                縮圖（選填，最大 5MB）{isEditMode && editingScript?.image ? ' · 上傳新圖以替換' : ''}
+              </label>
+              <input
+                id="script-thumbnail"
+                name="script-thumbnail"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleThumbnailChange}
+                className="w-full text-sm text-petal-ink-soft file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:font-body file:text-xs file:bg-petal-cream-2 file:text-petal-ink hover:file:bg-petal-rose-soft hover:file:text-petal-rose-deep"
+              />
+              {/* Preview: new file beats existing image, else show existing image in edit mode. */}
+              {thumbnailPreview ? (
+                <img
+                  src={thumbnailPreview}
+                  alt="thumbnail preview"
+                  className="mt-3 w-24 h-24 object-cover rounded-md border border-petal-rule"
                 />
-                {thumbnailPreview && (
+              ) : isEditMode && editingScript?.image ? (
+                <div className="mt-3 flex items-center gap-3">
                   <img
-                    src={thumbnailPreview}
-                    alt="thumbnail preview"
-                    className="mt-3 w-24 h-24 object-cover rounded-md border border-petal-rule"
+                    src={editingScript.image}
+                    alt="current thumbnail"
+                    className="w-24 h-24 object-cover rounded-md border border-petal-rule"
                   />
-                )}
+                  <span className="font-display italic font-light text-xs text-petal-muted">
+                    目前的縮圖
+                  </span>
+                </div>
+              ) : null}
+              {!isEditMode && (
                 <p className="mt-2 font-display italic font-light text-xs text-petal-muted">
                   未上傳縮圖時，會使用編輯式預設圖。
                 </p>
-              </div>
-            )}
+              )}
+            </div>
 
             <div className="flex gap-2 pt-2">
               {isEditMode && (

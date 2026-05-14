@@ -1136,9 +1136,26 @@ class ApiService {
     content?: string;
     tags?: string[];
     duration?: string;
+    thumbnail?: File;
   }): Promise<unknown> {
     try {
-      const response = await apiClient.put(`/custom-scripts/${id}`, updates);
+      // Multipart path when a new thumbnail is provided — mirrors createCustomScript.
+      if (updates.thumbnail) {
+        const fd = new FormData();
+        if (updates.title !== undefined) fd.append('title', updates.title);
+        if (updates.category !== undefined) fd.append('category', updates.category);
+        if (updates.scenario !== undefined) fd.append('scenario', updates.scenario);
+        if (updates.content !== undefined) fd.append('content', updates.content);
+        if (updates.duration !== undefined) fd.append('duration', updates.duration);
+        if (updates.tags !== undefined) fd.append('tags', JSON.stringify(updates.tags));
+        fd.append('thumbnail', updates.thumbnail);
+        const response = await apiClient.put(`/custom-scripts/${id}`, fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data.custom_script;
+      }
+      const { thumbnail: _unused, ...payload } = updates;
+      const response = await apiClient.put(`/custom-scripts/${id}`, payload);
       return response.data.custom_script;
     } catch (error) {
       console.error('Failed to update custom script:', error);

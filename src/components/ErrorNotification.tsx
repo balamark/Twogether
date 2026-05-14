@@ -122,7 +122,7 @@ export const NotificationContainer: React.FC<NotificationContainerProps> = ({ no
   if (notifications.length === 0) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-50 space-y-3 max-w-md w-full">
+    <div className="fixed top-4 right-4 left-4 sm:left-auto z-[60] space-y-3 sm:max-w-md w-auto pointer-events-none [&>*]:pointer-events-auto">
       {notifications.map((notification) => (
         <ErrorNotification
           key={notification.id}

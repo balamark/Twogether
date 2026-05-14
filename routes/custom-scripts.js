@@ -175,8 +175,9 @@ router.post('/', thumbnailUpload.single('thumbnail'), [
   }
 });
 
-// Update custom script
-router.put('/:id', [
+// Update custom script — accepts multipart (with optional `thumbnail` file)
+// or plain JSON, mirroring the POST handler.
+router.put('/:id', thumbnailUpload.single('thumbnail'), [
   body('title')
     .optional()
     .isLength({ min: 1, max: 100 })
@@ -193,10 +194,6 @@ router.put('/:id', [
     .optional()
     .isLength({ min: 1, max: 5000 })
     .withMessage('劇本內容必須在1-5000個字符之間'),
-  body('tags')
-    .optional()
-    .isArray()
-    .withMessage('標籤必須是數組格式'),
   body('duration')
     .optional()
     .isLength({ max: 50 })
@@ -214,7 +211,12 @@ router.put('/:id', [
 
     const scriptId = req.params.id;
     const userId = req.user.id;
-    const updates = req.body;
+    const updates = { ...req.body };
+
+    // Normalize tags: in multipart it arrives as a JSON string; in JSON as an array.
+    if (updates.tags !== undefined) {
+      updates.tags = normalizeTags(updates.tags);
+    }
 
     // Verify script ownership - check if user created it or is in the couple
     const scriptResult = await db.query(`
@@ -235,6 +237,19 @@ router.put('/:id', [
       });
     }
 
+    // If a new thumbnail file was uploaded, process and persist it. The
+    // previous thumbnail in storage isn't deleted (matches POST behavior —
+    // a janitor sweep can clean orphans later).
+    let newThumbnailUrl = null;
+    if (req.file) {
+      const processed = await sharp(req.file.buffer)
+        .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 80, progressive: true })
+        .toBuffer();
+      const fileName = `custom-script-thumbnails/${uuidv4()}-${Date.now()}.jpg`;
+      newThumbnailUrl = await uploadToSupabase(processed, fileName, 'image/jpeg');
+    }
+
     // Build update query
     const updateFields = [];
     const updateValues = [];
@@ -252,6 +267,12 @@ router.put('/:id', [
       }
     });
 
+    if (newThumbnailUrl) {
+      updateFields.push(`thumbnail_url = $${paramIndex}`);
+      updateValues.push(newThumbnailUrl);
+      paramIndex++;
+    }
+
     if (updateFields.length === 0) {
       return res.status(400).json({
         success: false,
@@ -262,11 +283,13 @@ router.put('/:id', [
     updateFields.push(`updated_at = NOW()`);
     updateValues.push(scriptId);
 
+    // RETURNING includes thumbnail_url so the client always sees canonical
+    // state even when the thumbnail wasn't changed in this request.
     const updateQuery = `
       UPDATE custom_scripts
       SET ${updateFields.join(', ')}
       WHERE id = $${paramIndex}
-      RETURNING id, title, category, scenario, content, tags, duration, created_by, created_at, updated_at
+      RETURNING id, title, category, scenario, content, tags, duration, thumbnail_url, created_by, created_at, updated_at
     `;
 
     const updatedResult = await db.query(updateQuery, updateValues);
@@ -281,8 +304,9 @@ router.put('/:id', [
         category: script.category,
         scenario: script.scenario,
         script: script.content,
-        tags: JSON.parse(script.tags || '[]'),
+        tags: Array.isArray(script.tags) ? script.tags : JSON.parse(script.tags || '[]'),
         duration: script.duration,
+        thumbnailUrl: script.thumbnail_url,
         isCustom: true,
         createdBy: script.created_by,
         createdAt: script.created_at
@@ -290,11 +314,8 @@ router.put('/:id', [
     });
 
   } catch (error) {
-    console.error('Update custom script error:', error);
-    res.status(500).json({
-      success: false,
-      message: '更新劇本失敗'
-    });
+    logDbError('Update custom script error:', error, { user_id: req.user?.id, script_id: req.params.id });
+    res.status(500).json(errorResponseBody('更新劇本失敗', error));
   }
 });
 
