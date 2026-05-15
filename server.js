@@ -156,7 +156,7 @@ app.use(errorHandler);
 app.listen(PORT, async () => {
   console.log(`🚀 Twogether app running on port ${PORT}`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📧 Email configured: ${!!process.env.RESEND_API_KEY}`);
+  console.log(`📧 Email configured: ${!!process.env.SMTP_HOST && !!process.env.SMTP_USER}`);
   console.log(`🗄️  Database: ${process.env.DATABASE_URL ? 'Connected' : 'Not configured'}`);
   console.log(`🎨 Frontend: Serving from /dist (Vite build output)`);
   
