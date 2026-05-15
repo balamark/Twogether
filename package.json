@@ -21,7 +21,7 @@
     "migrate:status": "node scripts/migrate.js status"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "dependencies": {
     "@headlessui/react": "^2.2.4",
