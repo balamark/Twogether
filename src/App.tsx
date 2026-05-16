@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Heart, Calendar, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Upload, Play, Coins, Plus, X, User, ShoppingBag, Inbox, Pause } from 'lucide-react';
+import { Heart, Calendar, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Upload, Play, Coins, Plus, X, User, ShoppingBag, Inbox, Pause, StickyNote } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import RoleplayView from './components/RoleplayView';
+import WallView from './components/WallView';
+import type { WallExample } from './components/WallPostComposer';
 import { AchievementsView } from './components/AchievementsView';
 import Header from './components/Header';
 import { NotificationContainer } from './components/ErrorNotification';
@@ -319,6 +321,47 @@ const defaultRoleplayScripts = [
 - 📷 拍下你懺悔的樣子，傳給老師做「學習記錄」。`,
     duration: '20-30分鐘'
   }
+];
+
+// Wall mood tag whitelist — must match WALL_MOOD_TAGS in routes/wall.js
+const WALL_MOOD_TAGS = [
+  '想念你', '需要空間', '想被抱抱', '想溝通',
+  '感謝', '撒嬌', '開心', '難過', '有想法',
+] as const;
+
+// Built-in starter examples shown in the composer's "從範本開始" section and
+// as a demo card when the wall is empty. The first entry is the framework
+// the user wrote — a meta-communication template for "how I want to be
+// responded to when you approach me and I'm tired."
+const defaultWallExamples: WallExample[] = [
+  {
+    id: 'example-affirm-alternative',
+    title: '當我累了又被靠近時，我希望你這樣回應我',
+    category: 'important',
+    mood_tag: '想溝通',
+    content: `（1）先肯定我
+「我知道你想靠近我，這樣讓我覺得很甜。」
+
+（2）再給一個解決方式（不一定要做愛）
+・「我現在沒有力氣做愛，但我可以抱你一下。」
+・「我現在不行，可是我可以摸摸你的手。」
+・「我們可以聊天黏一下，不要嘿咻好嗎？」
+
+（3）如果真的沒有力氣，給一個「確切時間」
+・「我現在真的累爆，晚上九點我來抱你。」
+・「你先讓我休息一下，我 20 分鐘後來找你。」
+
+（4）最後加一點撒嬌／貼心動作，讓我覺得被愛
+不需要花大力氣，只要一點點：
+・輕輕捏一下我的手
+・抱一下
+・撫摸一下後頸
+・用可愛的語氣說一句「你這樣亂勾引，我會想你啦～」
+・眼神看我一下笑一下
+
+我要你明白：
+我不是要「嘿咻」，我要的是「我被愛、我被放在心上、我不是孤單」。`,
+  },
 ];
 
 // Add interfaces for the data structures
@@ -2307,6 +2350,96 @@ const LoveTimeApp = () => {
       },
     ];
 
+    // Conflict response phrases — three intensities + two situational tiers.
+    // Pick by emotional temperature: 柔和 (warming up) → 堅定 (overflowing).
+    const conflictPhraseTiers: {
+      key: string;
+      dot: string;
+      badge: string;
+      title: string;
+      when: string;
+      cardClass: string;
+      badgeClass: string;
+      phrases: string[];
+      note: string;
+    }[] = [
+      {
+        key: 'gentle',
+        dot: '🔵',
+        badge: '柔和版',
+        title: '我需要喘息，不是拒絕你',
+        when: '情緒升溫，但雙方還沒爆',
+        cardClass: 'bg-sky-50/60 border-sky-200',
+        badgeClass: 'text-sky-800 bg-sky-100/80',
+        phrases: [
+          '我現在心有點亂，但我有在聽。等我平靜一下，我會回來聽你完整說。',
+          '我聽到你的意思了，但我情緒還在上來。我需要三分鐘緩衝，等一下我們再繼續。',
+          '你的話我都有收到，只是我的狀態不太能處理這個。等我一下，我整理好再跟你說。',
+        ],
+        note: '讓他知道：你不是在逃，而是在「準備一個更好的你」。',
+      },
+      {
+        key: 'standard',
+        dot: '🟡',
+        badge: '標準版',
+        title: '我聽到了，但現在不安全',
+        when: '你已經不太舒服，現場快升溫',
+        cardClass: 'bg-amber-50/70 border-amber-200',
+        badgeClass: 'text-amber-900 bg-amber-100/80',
+        phrases: [
+          '我聽到你說的每一句，但我現在已經不太舒服了。這個狀態再講下去，我怕我們都會後悔。',
+          '你講的我都有理解，但我現在的情緒撐不住。我需要暫停一下，不然我沒辦法好好回應你。',
+          '我知道你想解釋，但我現在沒有能力吸收。我需要一點時間，等我穩定後我會回來聽你。',
+        ],
+        note: '你成功傳達：你有在聽 · 你感受到後果 · 你不是拒絕對話，只是延後。',
+      },
+      {
+        key: 'firm',
+        dot: '🔴',
+        badge: '堅定版',
+        title: '我已經有情緒反應，需要暫停',
+        when: '你已經不行了，再講會爆',
+        cardClass: 'bg-red-50/60 border-red-200',
+        badgeClass: 'text-red-800 bg-red-100/80',
+        phrases: [
+          '你的話我有聽進去，也產生了一些不舒服的感受。在我情緒升上來之前，我需要離開一下。',
+          '我不是不尊重你，但你現在說的內容對我造成壓力了。我需要先讓自己冷靜，再回來面對這件事。',
+          '這些話我都有收到，但它們已經讓我情緒反應過大。我現在必須停下，不然我們都會受傷。',
+        ],
+        note: '這是踩剎車 — 不是逃避、不失控，而是保護關係。',
+      },
+      {
+        key: 'special',
+        dot: '⚫',
+        badge: '特別版',
+        title: '對方持續追問、不讓你離開時',
+        when: '當他說：「你為什麼要走？你是不是不在乎？」',
+        cardClass: 'bg-zinc-50 border-zinc-300',
+        badgeClass: 'text-zinc-800 bg-zinc-200/70',
+        phrases: [
+          '我不是要離開你，我是要離開現在的情緒。等我穩定，我會回來。',
+          '你現在追問我，我只會更混亂。我真的有在乎你，所以才需要一點空間讓自己冷靜。',
+          '我現在說任何話都可能是錯的。你值得一個平靜、能思考的我，所以請給我一點時間。',
+        ],
+        note: '溫柔但堅定 — 讓他安心，不會誤會你在拒絕關係。',
+      },
+      {
+        key: 'followup',
+        dot: '🟣',
+        badge: '後續跟進',
+        title: '離開現場後傳的補充訊息',
+        when: '冷靜下來之後，把連結補回去',
+        cardClass: 'bg-violet-50/60 border-violet-200',
+        badgeClass: 'text-violet-800 bg-violet-100/80',
+        phrases: [
+          '謝謝你給我空間。剛才那些話我都有聽到，只是我需要時間消化。等我情緒比較穩，我會跟你好好說。',
+          '剛剛我不是不想溝通，是我的身體反應太大了。我想要好好跟你講，所以才暫停一下。',
+          '我知道那不是你故意的，但那些內容確實對我造成了情緒影響。我們等彼此都冷靜一點再談，好嗎？',
+        ],
+        note: '這是你的保險繩 — 讓他確信你不是逃避、不在乎、或不愛他。',
+      },
+    ];
+
     const TURN_SECONDS = 90;
     const [pauseStep, setPauseStep] = useState<1 | 2 | 3 | 4 | null>(null);
     const [pauseEmotion, setPauseEmotion] = useState<EmotionKey | null>(null);
@@ -2541,6 +2674,72 @@ const LoveTimeApp = () => {
           ))}
         </div>
       </div>
+
+      {/* Conflict response phrases —現場可直接使用的話語範例 */}
+      <section>
+        <header className="mb-6">
+          <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+            — 衝突時的應對工具
+          </div>
+          <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-2">
+            可以解決衝突的<em className="not-italic font-light italic text-pink-600">話語範例</em>
+          </h3>
+          <p className="font-body text-sm text-petal-ink-soft leading-relaxed">
+            三種強度（柔和／標準／堅定）＋兩種情境工具。依現場火藥味與情緒強度選用，照念就好。
+          </p>
+        </header>
+
+        <div className="space-y-5">
+          {conflictPhraseTiers.map((tier) => (
+            <article
+              key={tier.key}
+              className={`rounded-md border-2 ${tier.cardClass} p-5 md:p-7`}
+            >
+              <header className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-2">
+                <span
+                  className={`inline-flex items-center gap-1.5 font-body text-[11px] font-semibold uppercase tracking-[0.16em] ${tier.badgeClass} px-2.5 py-1 rounded`}
+                >
+                  <span aria-hidden>{tier.dot}</span>
+                  {tier.badge}
+                </span>
+                <h4 className="font-display text-lg md:text-xl font-medium text-petal-ink leading-snug">
+                  {tier.title}
+                </h4>
+              </header>
+
+              <p className="font-body text-xs text-petal-ink-soft mb-5 italic">
+                適合 — {tier.when}
+              </p>
+
+              <ol className="space-y-3 mb-5">
+                {tier.phrases.map((phrase, i) => (
+                  <li
+                    key={i}
+                    className="flex gap-3 bg-white/70 rounded-md p-3.5 md:p-4 border border-white"
+                  >
+                    <span className="font-display italic text-petal-rose-deep text-sm leading-relaxed flex-shrink-0 mt-0.5 w-5">
+                      {i + 1}.
+                    </span>
+                    <blockquote className="font-display text-[15px] md:text-base leading-relaxed text-petal-ink flex-1">
+                      「{phrase}」
+                    </blockquote>
+                  </li>
+                ))}
+              </ol>
+
+              {tier.note && (
+                <p className="font-body text-xs md:text-sm text-petal-ink-soft leading-relaxed border-t border-petal-rule-soft pt-3">
+                  {tier.note}
+                </p>
+              )}
+            </article>
+          ))}
+        </div>
+
+        <p className="font-display italic text-center text-sm text-petal-muted mt-6 leading-relaxed">
+          停下來，不是逃避 — 是給彼此一個更好的版本回來相見。
+        </p>
+      </section>
 
       {/* Pause Mode — full-screen guided flow */}
       {pauseStep !== null && (
@@ -3981,6 +4180,7 @@ const LoveTimeApp = () => {
     { id: 'games', label: '情趣遊戲', icon: Gamepad2 },
     { id: 'conflict', label: '和諧相處', icon: MessageCircle },
     { id: 'roleplay', label: '角色扮演', icon: Play },
+    { id: 'wall', label: '我們的牆', icon: StickyNote },
     { id: 'journey', label: '愛情旅程', icon: Trophy },
     { id: 'intimacy-history', label: '邀請紀錄', icon: Inbox },
     { id: 'settings', label: '設定', icon: Heart }
@@ -4054,6 +4254,13 @@ const LoveTimeApp = () => {
         showNotification={showNotification}
       />;
       case 'journey': return <OurJourneyView />;
+      case 'wall': return <WallView
+        authState={authState}
+        nicknames={nicknames}
+        defaultWallExamples={defaultWallExamples}
+        moodTags={WALL_MOOD_TAGS}
+        showNotification={showNotification}
+      />;
       case 'settings': return <SettingsView
         nicknames={nicknames}
         handleNicknameChange={handleNicknameChange}
@@ -4385,6 +4592,7 @@ const LoveTimeApp = () => {
         onClose={() => setShowNotificationInbox(false)}
         unreadCount={unreadNotificationCount}
         onUnreadCountChange={setUnreadNotificationCount}
+        onNavigate={setCurrentView}
       />
 
       {/* Record Detail Modal */}

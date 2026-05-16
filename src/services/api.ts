@@ -219,6 +219,41 @@ interface Notification {
   priority: number;
 }
 
+export type WallPostCategory = 'important' | 'general';
+
+export interface WallPost {
+  id: string;
+  content: string;
+  mood_tag: string | null;
+  category: WallPostCategory;
+  author_id: string;
+  author_nickname: string | null;
+  reply_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WallReply {
+  id: string;
+  post_id: string;
+  content: string;
+  author_id: string;
+  author_nickname: string | null;
+  created_at: string;
+}
+
+export interface CreateWallPostInput {
+  content: string;
+  mood_tag?: string | null;
+  category?: WallPostCategory;
+}
+
+export interface UpdateWallPostInput {
+  content?: string;
+  mood_tag?: string | null;
+  category?: WallPostCategory;
+}
+
 // Enhanced API Client with error handling
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -1168,6 +1203,75 @@ class ApiService {
       await apiClient.delete(`/custom-scripts/${id}`);
     } catch (error) {
       console.error('Failed to delete custom script:', error);
+      throw error;
+    }
+  }
+
+  // Wall API — couple-shared notes/moods with threaded replies
+  async getWallPosts(): Promise<WallPost[]> {
+    try {
+      const response = await apiClient.get('/wall');
+      return (response.data.wall_posts || []) as WallPost[];
+    } catch (error) {
+      console.error('Failed to fetch wall posts:', error);
+      throw error;
+    }
+  }
+
+  async createWallPost(input: CreateWallPostInput): Promise<WallPost> {
+    try {
+      const response = await apiClient.post('/wall', input);
+      return response.data.wall_post as WallPost;
+    } catch (error) {
+      console.error('Failed to create wall post:', error);
+      throw error;
+    }
+  }
+
+  async updateWallPost(id: string, updates: UpdateWallPostInput): Promise<WallPost> {
+    try {
+      const response = await apiClient.put(`/wall/${id}`, updates);
+      return response.data.wall_post as WallPost;
+    } catch (error) {
+      console.error('Failed to update wall post:', error);
+      throw error;
+    }
+  }
+
+  async deleteWallPost(id: string): Promise<void> {
+    try {
+      await apiClient.delete(`/wall/${id}`);
+    } catch (error) {
+      console.error('Failed to delete wall post:', error);
+      throw error;
+    }
+  }
+
+  async getWallPostReplies(postId: string): Promise<WallReply[]> {
+    try {
+      const response = await apiClient.get(`/wall/${postId}/replies`);
+      return (response.data.replies || []) as WallReply[];
+    } catch (error) {
+      console.error('Failed to fetch wall replies:', error);
+      throw error;
+    }
+  }
+
+  async createWallPostReply(postId: string, content: string): Promise<WallReply> {
+    try {
+      const response = await apiClient.post(`/wall/${postId}/replies`, { content });
+      return response.data.reply as WallReply;
+    } catch (error) {
+      console.error('Failed to create wall reply:', error);
+      throw error;
+    }
+  }
+
+  async deleteWallPostReply(replyId: string): Promise<void> {
+    try {
+      await apiClient.delete(`/wall/replies/${replyId}`);
+    } catch (error) {
+      console.error('Failed to delete wall reply:', error);
       throw error;
     }
   }

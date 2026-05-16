@@ -23,6 +23,7 @@ interface NotificationInboxProps {
   onClose: () => void;
   unreadCount: number;
   onUnreadCountChange: (count: number) => void;
+  onNavigate?: (view: string) => void;
 }
 
 const NotificationInbox: React.FC<NotificationInboxProps> = ({
@@ -30,6 +31,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
   onClose,
   unreadCount,
   onUnreadCountChange,
+  onNavigate,
 }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [activeRequest, setActiveRequest] = useState<IntimacyRequest | null>(null);
@@ -94,6 +96,16 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
   };
 
   const handleNotificationClick = function(notification: Notification) {
+    if (
+      notification.notificationType === 'wall_post' ||
+      notification.notificationType === 'wall_reply'
+    ) {
+      if (onNavigate) {
+        onNavigate('wall');
+        onClose();
+      }
+      return;
+    }
     if (notification.intimacyRequestId) {
       fetchIntimacyRequest(notification.intimacyRequestId);
     }
