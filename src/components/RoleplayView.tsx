@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil } from 'lucide-react';
+import type { Notification } from './ErrorNotification';
 
 interface RoleplayScript {
   id: string;
@@ -35,6 +36,7 @@ interface RoleplayViewProps {
     activityType?: string
   ) => void;
   onEditScript?: (script: RoleplayScript) => void;
+  showNotification: (notification: Omit<Notification, 'id'>) => void;
 }
 
 const CATEGORY_META: Record<RoleplayScript['category'], { label: string; emoji: string; tint: string }> = {
@@ -72,6 +74,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   parseScriptContent,
   addIntimateRecord,
   onEditScript,
+  showNotification,
 }) => {
   const [selectedScript, setSelectedScript] = useState<RoleplayScript | null>(null);
   const [showScriptModal, setShowScriptModal] = useState(false);
@@ -87,8 +90,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     setShowScriptModal(true);
   }, [parseScriptContent]);
 
-  const handleBeginRoleplay = useCallback(() => {
-    if (!selectedScript) return;
+  const recordRoleplay = useCallback((script: RoleplayScript) => {
     const time = new Date().toLocaleTimeString('zh-TW', {
       hour: '2-digit',
       minute: '2-digit',
@@ -98,16 +100,31 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
       new Date().toISOString().split('T')[0],
       time,
       '🔥',
-      `使用角色扮演劇本：${selectedScript.title}`,
+      `使用角色扮演劇本：${script.title}`,
       undefined,
-      selectedScript.scenario,
-      selectedScript.duration || '15-30分鐘',
+      script.scenario,
+      script.duration || '15-30分鐘',
       '私人空間',
-      selectedScript.title,
+      script.title,
       'roleplay'
     );
+  }, [addIntimateRecord]);
+
+  const handleBeginRoleplay = useCallback(() => {
+    if (!selectedScript) return;
+    recordRoleplay(selectedScript);
     setHasBegun(true);
-  }, [selectedScript, addIntimateRecord]);
+  }, [selectedScript, recordRoleplay]);
+
+  const handleQuickPlay = useCallback((script: RoleplayScript) => {
+    recordRoleplay(script);
+    showNotification({
+      type: 'success',
+      title: '已開始扮演',
+      message: `已將「${script.title}」記入今晚的愛情日曆`,
+      duration: 4000,
+    });
+  }, [recordRoleplay, showNotification]);
 
   const closeModal = useCallback(() => {
     setShowScriptModal(false);
@@ -201,13 +218,22 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                 </div>
                 <h4 className="font-display text-base font-medium tracking-tight text-petal-ink mb-1.5">{script.title}</h4>
                 <p className="font-body text-sm text-petal-ink-soft mb-3 line-clamp-2 leading-relaxed">{script.scenario}</p>
-                <button
-                  onClick={() => handleViewScript(script)}
-                  className="w-full border border-petal-ink text-petal-ink py-2 rounded-md font-display italic text-sm hover:bg-petal-ink hover:text-petal-cream transition-colors"
-                >
-                  <Eye className="w-3.5 h-3.5 inline mr-1.5" strokeWidth={1.5} />
-                  查看劇本
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => handleViewScript(script)}
+                    className="border border-petal-ink text-petal-ink py-2 rounded-md font-display italic text-sm hover:bg-petal-ink hover:text-petal-cream transition-colors"
+                  >
+                    <Eye className="w-3.5 h-3.5 inline mr-1.5" strokeWidth={1.5} />
+                    查看
+                  </button>
+                  <button
+                    onClick={() => handleQuickPlay(script)}
+                    className="bg-petal-ink text-petal-cream py-2 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors"
+                  >
+                    <Play className="w-3.5 h-3.5 inline mr-1.5" strokeWidth={1.5} />
+                    開始扮演
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -274,6 +300,13 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                         <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
                         查看
                       </button>
+                      <button
+                        onClick={() => handleQuickPlay(script)}
+                        className="bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                      >
+                        <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                        開始
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -321,6 +354,13 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                         <Eye className="w-3.5 h-3.5 inline mr-1" strokeWidth={1.5} />
                         查看劇本
                       </button>
+                      <button
+                        onClick={() => handleQuickPlay(script)}
+                        className="bg-petal-rose-deep text-petal-cream px-4 py-1.5 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors"
+                      >
+                        <Play className="w-3.5 h-3.5 inline mr-1" strokeWidth={1.5} />
+                        開始扮演
+                      </button>
                       {script.isCustom && onEditScript && (
                         <button
                           onClick={() => onEditScript(script)}
@@ -342,27 +382,27 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
       {/* Script Modal — view-only by default; record only on explicit 開始扮演 */}
       {showScriptModal && selectedScript && (
         <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-petal-cream rounded-md shadow-petal max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-petal-rule">
-            <div className="p-8">
-              <div className="flex justify-between items-end mb-7 pb-5 border-b border-petal-rule">
-                <div>
-                  <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
-                    — {selectedScript.isCustom ? '自訂劇本' : '劇本'}
-                  </div>
-                  <h3 className="font-display text-2xl font-light tracking-tight text-petal-ink mb-1">
-                    {selectedScript.title}
-                  </h3>
-                  <p className="font-display italic font-light text-sm text-petal-muted">{selectedScript.scenario}</p>
+          <div className="bg-petal-cream rounded-md shadow-petal max-w-4xl w-full max-h-[90vh] border border-petal-rule flex flex-col">
+            <div className="px-8 pt-8 pb-5 border-b border-petal-rule flex justify-between items-end flex-shrink-0">
+              <div>
+                <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
+                  — {selectedScript.isCustom ? '自訂劇本' : '劇本'}
                 </div>
-                <button
-                  onClick={closeModal}
-                  className="text-petal-muted hover:text-petal-ink text-2xl font-light leading-none transition-colors"
-                  aria-label="關閉"
-                >
-                  ×
-                </button>
+                <h3 className="font-display text-2xl font-light tracking-tight text-petal-ink mb-1">
+                  {selectedScript.title}
+                </h3>
+                <p className="font-display italic font-light text-sm text-petal-muted">{selectedScript.scenario}</p>
               </div>
+              <button
+                onClick={closeModal}
+                className="text-petal-muted hover:text-petal-ink text-2xl font-light leading-none transition-colors"
+                aria-label="關閉"
+              >
+                ×
+              </button>
+            </div>
 
+            <div className="px-8 py-6 overflow-y-auto flex-1">
               <div className="bg-petal-cream-2/40 p-6 rounded-md border border-petal-rule-soft">
                 <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-4 flex items-center">
                   <Play className="w-3.5 h-3.5 mr-1.5 text-petal-rose-deep" strokeWidth={1.5} />
@@ -381,37 +421,37 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                   </p>
                 </div>
               )}
+            </div>
 
-              <div className="flex flex-col sm:flex-row justify-end gap-2 mt-6">
-                {selectedScript.isCustom && onEditScript && !hasBegun && (
-                  <button
-                    onClick={() => {
-                      onEditScript(selectedScript);
-                      closeModal();
-                    }}
-                    className="px-5 py-2 border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink rounded-md font-body text-sm transition-colors"
-                  >
-                    <Pencil className="w-3.5 h-3.5 inline mr-1.5" strokeWidth={1.5} />
-                    編輯這份劇本
-                  </button>
-                )}
-                {!hasBegun ? (
-                  <button
-                    onClick={handleBeginRoleplay}
-                    className="px-6 py-2 bg-petal-ink text-petal-cream rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
-                  >
-                    <Play className="w-4 h-4 inline mr-1.5" strokeWidth={1.5} />
-                    開始扮演 — 記入今晚
-                  </button>
-                ) : (
-                  <button
-                    onClick={closeModal}
-                    className="px-6 py-2 bg-petal-ink text-petal-cream rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
-                  >
-                    完成 →
-                  </button>
-                )}
-              </div>
+            <div className="px-8 py-4 border-t border-petal-rule bg-petal-cream/95 backdrop-blur-sm flex flex-col sm:flex-row justify-end gap-2 flex-shrink-0">
+              {selectedScript.isCustom && onEditScript && !hasBegun && (
+                <button
+                  onClick={() => {
+                    onEditScript(selectedScript);
+                    closeModal();
+                  }}
+                  className="px-5 py-2 border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink rounded-md font-body text-sm transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5 inline mr-1.5" strokeWidth={1.5} />
+                  編輯這份劇本
+                </button>
+              )}
+              {!hasBegun ? (
+                <button
+                  onClick={handleBeginRoleplay}
+                  className="px-6 py-2 bg-petal-ink text-petal-cream rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
+                >
+                  <Play className="w-4 h-4 inline mr-1.5" strokeWidth={1.5} />
+                  開始扮演 — 記入今晚
+                </button>
+              ) : (
+                <button
+                  onClick={closeModal}
+                  className="px-6 py-2 bg-petal-ink text-petal-cream rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
+                >
+                  完成 →
+                </button>
+              )}
             </div>
           </div>
         </div>

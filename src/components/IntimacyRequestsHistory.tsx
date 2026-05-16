@@ -203,9 +203,9 @@ function StatsOverview({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-        <StatsCard label="過去一週" stats={stats.week} emphasis="week" />
-        <StatsCard label="過去一個月" stats={stats.month} emphasis="month" />
+      <div className="space-y-5 mt-6">
+        <StatsBar label="過去一週" stats={stats.week} />
+        <StatsBar label="過去一個月" stats={stats.month} />
       </div>
 
       {nudge?.shouldNudge && nudge.message && (
@@ -252,69 +252,67 @@ function StatsOverview({
   );
 }
 
-function StatsCard({
+function StatsBar({
   label,
   stats,
-  emphasis,
 }: {
   label: string;
   stats: IntimacyRequestStats['week'];
-  emphasis: 'week' | 'month';
 }) {
-  const chips = [
-    {
-      label: '已接受',
-      value: stats.accepted,
-      color: 'bg-green-50 text-green-700 border border-green-200',
-      description: '代表你願意的回應次數'
-    },
-    {
-      label: '已婉拒',
-      value: stats.rejected,
-      color: 'bg-red-50 text-red-700 border border-red-200',
-      description: '可協助伴侶了解你的狀態'
-    },
-    {
-      label: '待回應',
-      value: stats.unanswered,
-      color: 'bg-yellow-50 text-yellow-700 border border-yellow-200',
-      description: '提醒你可以回覆或溝通'
-    }
-  ];
+  const total = stats.accepted + stats.rejected + stats.unanswered;
+  const pct = (n: number) => (total === 0 ? 0 : (n / total) * 100);
 
   return (
-    <div className="rounded-md border border-petal-rule bg-white p-5">
-      <div className="flex items-baseline justify-between">
-        <h4 className="font-display text-lg font-medium tracking-tight text-petal-ink">{label}</h4>
-        <span className="font-body text-[10px] uppercase tracking-[0.14em] text-petal-muted">{emphasis === 'week' ? '7 日內' : '30 日內'}</span>
+    <div>
+      <div className="flex items-baseline justify-between mb-2">
+        <span className="font-display text-base font-medium text-petal-ink">{label}</span>
+        <span className="font-display italic text-sm text-petal-muted">
+          共 <b className="not-italic font-medium text-petal-ink">{total}</b> 次
+        </span>
       </div>
-      <div className="mt-4 flex flex-col gap-3">
-        {chips.map((chip) => (
-          <StatChip key={chip.label} {...chip} />
-        ))}
-      </div>
-    </div>
-  );
-}
 
-function StatChip({
-  label,
-  value,
-  color,
-  description
-}: {
-  label: string;
-  value: number;
-  color: string;
-  description: string;
-}) {
-  return (
-    <div className={`${color} rounded-lg px-4 py-3 transition-shadow hover:shadow-sm`}>
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-semibold">{label}</span>
-        <span className="text-xl font-bold">{value}</span>
+      <div className="flex h-3 w-full overflow-hidden rounded-full bg-petal-cream-2 border border-petal-rule-soft">
+        {stats.accepted > 0 && (
+          <div
+            className="bg-petal-sage-deep"
+            style={{ width: `${pct(stats.accepted)}%` }}
+            title={`已接受 ${stats.accepted}`}
+          />
+        )}
+        {stats.rejected > 0 && (
+          <div
+            className="bg-petal-rose-deep"
+            style={{ width: `${pct(stats.rejected)}%` }}
+            title={`已婉拒 ${stats.rejected}`}
+          />
+        )}
+        {stats.unanswered > 0 && (
+          <div
+            className="bg-amber-300"
+            style={{ width: `${pct(stats.unanswered)}%` }}
+            title={`待回應 ${stats.unanswered}`}
+          />
+        )}
       </div>
-      <p className="mt-1 text-xs text-gray-600">{description}</p>
+
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-petal-ink-soft">
+        <span className="inline-flex items-center">
+          <span className="w-2.5 h-2.5 rounded-sm bg-petal-sage-deep mr-1.5" />
+          已接受 <b className="not-italic font-medium text-petal-ink ml-1">{stats.accepted}</b>
+        </span>
+        <span className="inline-flex items-center">
+          <span className="w-2.5 h-2.5 rounded-sm bg-petal-rose-deep mr-1.5" />
+          已婉拒 <b className="not-italic font-medium text-petal-ink ml-1">{stats.rejected}</b>
+        </span>
+        <span className="inline-flex items-center">
+          <span className="w-2.5 h-2.5 rounded-sm bg-amber-300 mr-1.5" />
+          待回應 <b className="not-italic font-medium text-petal-ink ml-1">{stats.unanswered}</b>
+        </span>
+      </div>
+
+      {total === 0 && (
+        <p className="mt-2 font-display italic text-xs text-petal-muted">尚無紀錄</p>
+      )}
     </div>
   );
 }

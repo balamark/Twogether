@@ -1,7 +1,7 @@
 import React from 'react';
 import { AlertCircle, CheckCircle, Info, AlertTriangle, X, Coins, Star } from 'lucide-react';
 
-interface Notification {
+export interface Notification {
   id: string;
   type: 'success' | 'error' | 'info' | 'warning';
   title: string;

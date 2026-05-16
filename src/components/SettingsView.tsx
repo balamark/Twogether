@@ -70,6 +70,10 @@ interface SettingsViewProps {
   setShowAuthModal: React.Dispatch<React.SetStateAction<boolean>>;
   onAuthStateUpdate?: (authState: AuthState) => void;
   showNotification: (notification: Omit<Notification, 'id'>) => void;
+  customMemoryQuestions: string[];
+  setCustomMemoryQuestions: React.Dispatch<React.SetStateAction<string[]>>;
+  customEmotions: string[];
+  setCustomEmotions: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({
@@ -80,8 +84,45 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   authState,
   setShowAuthModal,
   onAuthStateUpdate,
-  showNotification
+  showNotification,
+  customMemoryQuestions,
+  setCustomMemoryQuestions,
+  customEmotions,
+  setCustomEmotions
 }) => {
+  const [newMemoryQuestion, setNewMemoryQuestion] = useState('');
+  const [newEmotion, setNewEmotion] = useState('');
+
+  const addMemoryQuestion = () => {
+    const trimmed = newMemoryQuestion.trim();
+    if (!trimmed) return;
+    if (customMemoryQuestions.includes(trimmed)) {
+      setNewMemoryQuestion('');
+      return;
+    }
+    setCustomMemoryQuestions(prev => [...prev, trimmed]);
+    setNewMemoryQuestion('');
+  };
+
+  const removeMemoryQuestion = (index: number) => {
+    setCustomMemoryQuestions(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const addEmotion = () => {
+    const trimmed = newEmotion.trim();
+    if (!trimmed) return;
+    if (customEmotions.includes(trimmed)) {
+      setNewEmotion('');
+      return;
+    }
+    setCustomEmotions(prev => [...prev, trimmed]);
+    setNewEmotion('');
+  };
+
+  const removeEmotion = (index: number) => {
+    setCustomEmotions(prev => prev.filter((_, i) => i !== index));
+  };
+
   // Helper function to format ISO date string to YYYY-MM-DD for HTML date input
   const formatDateForInput = (isoDateString: string): string => {
     if (!isoDateString) return '';
@@ -610,6 +651,110 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               }}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Custom Game Content — 自訂遊戲內容 */}
+      <div className="bg-white rounded-2xl shadow-lg p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-1">自訂遊戲內容</h3>
+        <p className="text-xs text-gray-500 mb-5">
+          💡 這裡新增的題目與情緒，會出現在「情趣遊戲 → 回憶倒帶 / 情緒模仿秀」的隨機抽取清單中，與預設內容一起被抽到。
+        </p>
+
+        {/* 回憶倒帶 questions */}
+        <div className="mb-6">
+          <label htmlFor="new-memory-question" className="block text-sm font-medium text-gray-700 mb-2">
+            回憶倒帶 — 自訂題目
+          </label>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {customMemoryQuestions.length === 0 ? (
+              <p className="font-display italic font-light text-sm text-petal-muted">尚未新增自訂題目</p>
+            ) : (
+              customMemoryQuestions.map((q, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-start max-w-full px-3 py-1.5 bg-petal-cream-2 border border-petal-rule rounded-md text-sm text-petal-ink"
+                >
+                  <span className="break-words leading-snug">{q}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeMemoryQuestion(i)}
+                    className="ml-2 text-petal-muted hover:text-petal-rose-deep flex-shrink-0 leading-snug"
+                    aria-label={`移除題目：${q}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))
+            )}
+          </div>
+          <div className="flex gap-2">
+            <input
+              id="new-memory-question"
+              type="text"
+              value={newMemoryQuestion}
+              onChange={(e) => setNewMemoryQuestion(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addMemoryQuestion(); } }}
+              placeholder="例如：你最喜歡我哪一個小習慣？"
+              className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+            />
+            <button
+              type="button"
+              onClick={addMemoryQuestion}
+              disabled={!newMemoryQuestion.trim()}
+              className="px-4 py-3 bg-petal-ink text-petal-cream rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              加入
+            </button>
+          </div>
+        </div>
+
+        {/* 情緒模仿秀 emotions */}
+        <div>
+          <label htmlFor="new-emotion" className="block text-sm font-medium text-gray-700 mb-2">
+            情緒模仿秀 — 自訂情緒
+          </label>
+          <div className="flex flex-wrap gap-2 mb-3">
+            {customEmotions.length === 0 ? (
+              <p className="font-display italic font-light text-sm text-petal-muted">尚未新增自訂情緒</p>
+            ) : (
+              customEmotions.map((emo, i) => (
+                <span
+                  key={i}
+                  className="inline-flex items-center px-3 py-1.5 bg-petal-rose-soft/30 border border-petal-rose-soft rounded-full text-sm text-petal-ink"
+                >
+                  {emo}
+                  <button
+                    type="button"
+                    onClick={() => removeEmotion(i)}
+                    className="ml-2 text-petal-muted hover:text-petal-rose-deep flex-shrink-0"
+                    aria-label={`移除情緒：${emo}`}
+                  >
+                    ×
+                  </button>
+                </span>
+              ))
+            )}
+          </div>
+          <div className="flex gap-2">
+            <input
+              id="new-emotion"
+              type="text"
+              value={newEmotion}
+              onChange={(e) => setNewEmotion(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addEmotion(); } }}
+              placeholder="例如：得意、賴皮、想被寵"
+              className="flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+            />
+            <button
+              type="button"
+              onClick={addEmotion}
+              disabled={!newEmotion.trim()}
+              className="px-4 py-3 bg-petal-ink text-petal-cream rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              加入
+            </button>
           </div>
         </div>
       </div>

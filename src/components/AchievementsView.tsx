@@ -173,17 +173,14 @@ export function AchievementsView() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-4 sm:p-6">
-      <div className="border-b border-petal-rule pb-7 mb-10">
-        <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-          — 統計
-        </div>
-        <h1 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
+    <div className="space-y-10">
+      <div className="flex items-baseline justify-between">
+        <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink">
           親密<em className="not-italic font-light italic text-pink-600">統計</em>
-        </h1>
-        <p className="font-display italic font-light text-base text-petal-muted">
-          查看你們的親密統計與成就徽章。
-        </p>
+        </h3>
+        <span className="font-display italic font-light text-sm text-petal-muted">
+          你們的數據與成就
+        </span>
       </div>
 
       {/* Intimacy Stats Section */}

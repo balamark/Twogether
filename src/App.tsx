@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Heart, Calendar, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Upload, Play, Coins, Plus, X, User, ShoppingBag, Inbox } from 'lucide-react';
+import { Heart, Calendar, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Upload, Play, Coins, Plus, X, User, ShoppingBag, Inbox, Pause } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import RoleplayView from './components/RoleplayView';
 import { AchievementsView } from './components/AchievementsView';
@@ -342,6 +342,42 @@ const LoveTimeApp = () => {
   const [currentView, setCurrentView] = useState('record');
   const [intimateRecords, setIntimateRecords] = useState<IntimateRecord[]>([]);
   const [nicknames, setNicknames] = useState<Nicknames>({ partner1: '親愛的', partner2: '寶貝' });
+
+  // Custom game content — user-added items that get merged into the default lists
+  // of 回憶倒帶 (questions) and 情緒模仿秀 (emotions) inside 情趣遊戲. Persisted
+  // to localStorage for now; can be promoted to a couple-shared API endpoint later.
+  const [customMemoryQuestions, setCustomMemoryQuestions] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('customMemoryQuestions');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [customEmotions, setCustomEmotions] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('customEmotions');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('customMemoryQuestions', JSON.stringify(customMemoryQuestions));
+    } catch (e) {
+      console.warn('Failed to persist customMemoryQuestions:', e);
+    }
+  }, [customMemoryQuestions]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('customEmotions', JSON.stringify(customEmotions));
+    } catch (e) {
+      console.warn('Failed to persist customEmotions:', e);
+    }
+  }, [customEmotions]);
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [showRecordModal, setShowRecordModal] = useState(false);
@@ -1471,8 +1507,8 @@ const LoveTimeApp = () => {
         '最溫柔纏綿的早晨'
       ]
     },
-    { 
-      title: '慾望清單', 
+    {
+      title: '慾望清單',
       desc: '分享彼此的性幻想和願望',
       instructions: [
         '1. 各自寫下5個親密願望',
@@ -1487,6 +1523,45 @@ const LoveTimeApp = () => {
         '新的親密方式',
         '感官刺激體驗',
         '浪漫情境設定'
+      ]
+    },
+    {
+      title: '回憶倒帶',
+      desc: 'App 隨機抽一題溫柔回憶，說完後讓另一方做一個「回饋動作」',
+      instructions: [
+        '1. 一人從下方問題中隨機抽一題',
+        '2. 認真回想，誠實分享你的答案',
+        '3. 另一方靜靜聽完，選擇一個回饋動作回應',
+        '4. 回饋動作：摸頭、擁抱、輕靠肩，或任何溫柔的肢體互動',
+        '5. 輪流換邊抽題，慢慢回顧你們的點滴'
+      ],
+      questions: [
+        '第一次覺得對方很可愛是什麼時候？',
+        '最近一次被對方感動是因為？',
+        '對方做過最讓你心動的小事是什麼？',
+        '想到我們最幸福的一天，你會想到哪一天？',
+        '對方哪一個習慣讓你忍不住微笑？',
+        ...customMemoryQuestions
+      ]
+    },
+    {
+      title: '情緒模仿秀',
+      desc: '抽到一個情緒，不能說話，只能用身體或眼神表演，對方猜',
+      instructions: [
+        '1. 一人從下方情緒中隨機抽一個',
+        '2. 不能說話，只能用身體動作、表情、眼神演出來',
+        '3. 對方在 60 秒內猜出情緒',
+        '4. 猜對換邊；猜錯也好玩，互相回饋哪裡演得像、哪裡可以再加強',
+        '5. 過程輕鬆，氣氛帶點曖昧'
+      ],
+      emotions: [
+        '害羞',
+        '惹人疼',
+        '想撒嬌',
+        '吃醋',
+        '欲拒還迎',
+        '故作冷淡',
+        ...customEmotions
       ]
     }
   ];
@@ -1560,7 +1635,81 @@ const LoveTimeApp = () => {
       description: '站立進行，增加新鮮感和刺激',
       coins: 400,
       benefits: ['新鮮體驗', '不同角度', '增加難度挑戰']
+    },
+    {
+      name: '開瓶器式',
+      difficulty: '中等',
+      description: '側躺在床或長凳的邊緣，大腿併攏，伴侶從你身後站立進入。',
+      coins: 300,
+      benefits: ['雙腿併攏使緊緻感更強', '便於伴侶從身後深入', '進階：用屁股配合伴侶的節奏']
+    },
+    {
+      name: '捲餅沾醬式',
+      difficulty: '中等',
+      description: '右側躺下，伴侶跨坐在你的右腿上，左腿環繞在他身體的左側。',
+      coins: 300,
+      benefits: ['深度插入的同時保持目光接觸', '結合狗狗式的深度與面對面的親密', '進階：讓伴侶摩擦你的陰蒂']
+    },
+    {
+      name: '女牛仔騎乘位',
+      difficulty: '中等',
+      description: '跪在伴侶身上，按壓他的胸部，沿著他的大腿上下滑動；他可以抓住你的大腿或臀部抬起插入。',
+      coins: 300,
+      benefits: ['伴侶分擔體重，緩解雙腿疲勞', '女性主導，更容易達到高潮', '能延遲男性高潮，雙贏體驗']
+    },
+    {
+      name: '獨輪車式',
+      difficulty: '困難',
+      description: '手腳並用撐地，伴侶從骨盆向下抱住你，腰部放在你的大腿之間。',
+      coins: 400,
+      benefits: ['插入更深，刺激更強', '同時鍛鍊手臂力量', '挑戰耐力與默契']
+    },
+    {
+      name: '背面騎乘位',
+      difficulty: '中等',
+      description: '伴侶仰臥，你反向跨坐在他身上，朝向他的腳。',
+      coins: 300,
+      benefits: ['女性主導節奏與深度', '可以引導伴侶學習你喜歡的節奏', '不同角度的視覺刺激']
+    },
+    {
+      name: '拱門式',
+      difficulty: '簡單',
+      description: '面對面坐下，雙腿伸直，膝蓋放在對方大腿上，上半身都稍微向後傾斜。',
+      coins: 200,
+      benefits: ['能看到對方整個身體', '自由控制插入的深度、速度與角度', '進階：身體越後傾，G 點刺激越強']
+    },
+    {
+      name: '彈珠大師式',
+      difficulty: '困難',
+      description: '用肩膀支撐身體做半橋式，伴侶以跪姿插入。',
+      coins: 400,
+      benefits: ['對伴侶來說姿勢舒適', '能同時刺激陰蒂並按摩陰阜', '挑戰核心與肩膀力量']
     }
+  ];
+
+  // 連續組合技：一次連續換多個姿勢的進階挑戰。完成可獲得額外金幣獎金（高於單獨嘗試各姿勢的總和）。
+  const comboSuggestions = [
+    {
+      name: '溫柔三部曲',
+      difficulty: '簡單',
+      description: '從親密接觸慢慢加深連結，適合放鬆的夜晚。',
+      sequence: ['蓮花式', '側臥式', '後入式'],
+      bonusCoins: 900,
+    },
+    {
+      name: '漸進挑戰',
+      difficulty: '中等',
+      description: '由淺入深、節奏漸強的中階組合，考驗默契。',
+      sequence: ['側臥式', '後入式', '站立式'],
+      bonusCoins: 1200,
+    },
+    {
+      name: '大膽探索',
+      difficulty: '困難',
+      description: '高強度組合，挑戰你們的耐力與創意。',
+      sequence: ['站立式', '後入式', '蓮花式'],
+      bonusCoins: 1500,
+    },
   ];
 
 
@@ -1943,7 +2092,7 @@ const LoveTimeApp = () => {
               共 <b className="not-italic font-normal text-petal-ink">{intimateRecords.length}</b> 次
             </span>
           </div>
-          <div className="max-h-[36rem] overflow-y-auto">
+          <div className="max-h-[36rem] overflow-y-auto overflow-x-hidden">
             {intimateRecords.slice().reverse().map((record, idx) => (
               <article
                 key={record.id}
@@ -1966,21 +2115,21 @@ const LoveTimeApp = () => {
                   )}
                   <div className="flex flex-wrap gap-2 text-[11px] text-petal-muted mt-1.5">
                     {record.duration && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 border border-petal-rule rounded-full">
-                        <Clock className="w-3 h-3 mr-1" />
-                        {record.duration}
+                      <span className="inline-flex items-start max-w-full px-2.5 py-0.5 border border-petal-rule rounded-md">
+                        <Clock className="w-3 h-3 mr-1 mt-[3px] flex-shrink-0" />
+                        <span className="break-words leading-snug">{record.duration}</span>
                       </span>
                     )}
                     {record.location && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 border border-petal-rule rounded-full">
-                        <MapPin className="w-3 h-3 mr-1" />
-                        {record.location}
+                      <span className="inline-flex items-start max-w-full px-2.5 py-0.5 border border-petal-rule rounded-md">
+                        <MapPin className="w-3 h-3 mr-1 mt-[3px] flex-shrink-0" />
+                        <span className="break-words leading-snug">{record.location}</span>
                       </span>
                     )}
                     {record.roleplayScript && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 border border-petal-sage/60 bg-petal-sage/10 text-petal-sage-deep rounded-full">
-                        <Play className="w-3 h-3 mr-1" />
-                        {record.roleplayScript}
+                      <span className="inline-flex items-start max-w-full px-2.5 py-0.5 border border-petal-sage/60 bg-petal-sage/10 text-petal-sage-deep rounded-md">
+                        <Play className="w-3 h-3 mr-1 mt-[3px] flex-shrink-0" />
+                        <span className="break-words leading-snug">{record.roleplayScript}</span>
                       </span>
                     )}
                   </div>
@@ -2008,6 +2157,10 @@ const LoveTimeApp = () => {
             )}
           </div>
         </div>
+
+        <div className="border-t border-petal-rule pt-10">
+          <AchievementsView />
+        </div>
       </div>
     );
   };
@@ -2017,18 +2170,54 @@ const LoveTimeApp = () => {
   const GamesView = () => (
     <div className="space-y-10">
       <div className="border-b border-petal-rule pb-7">
-        <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-          — 情趣
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+          <div>
+            <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+              — 情趣
+            </div>
+            <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
+              情趣<em className="not-italic font-light italic text-pink-600">遊戲</em>
+            </h2>
+            <p className="font-display italic font-light text-base text-petal-muted">
+              增進彼此感情的遊戲、前戲與姿勢建議 — 一個個慢慢來。
+            </p>
+          </div>
+          <div className="font-display italic font-light text-xl text-petal-ink">
+            <Coins className="inline w-4 h-4 mr-1.5 text-petal-rose-deep" strokeWidth={1.5} />
+            <b className="not-italic font-medium">{totalCoins}</b> <span className="text-sm text-petal-muted">枚</span>
+          </div>
         </div>
-        <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
-          情趣<em className="not-italic font-light italic text-pink-600">遊戲</em>
-        </h2>
-        <p className="font-display italic font-light text-base text-petal-muted">
-          增進彼此感情的有趣活動 — 一個個慢慢來。
-        </p>
       </div>
 
-      <div className="space-y-6">
+      <nav className="!mt-0 sticky top-0 z-20 -mx-4 px-4 py-3 bg-petal-cream/95 backdrop-blur-sm border-b border-petal-rule-soft" aria-label="情趣遊戲分區">
+        <div className="overflow-x-auto">
+          <div className="flex gap-2 whitespace-nowrap">
+            {[
+              { id: 'games-list', label: '情趣遊戲' },
+              { id: 'foreplay-activities', label: '前戲活動' },
+              { id: 'position-suggestions', label: '姿勢建議' },
+              { id: 'combo-suggestions', label: '連續組合技' },
+            ].map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                onClick={() => {
+                  document.getElementById(section.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="px-3 py-1.5 border border-petal-rule rounded-full font-body text-xs text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors"
+              >
+                {section.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </nav>
+
+      <div id="games-list" className="scroll-mt-24">
+        <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6">
+          情趣<em className="not-italic font-light italic text-pink-600">遊戲</em>
+        </h3>
+        <div className="space-y-6">
         {romanticGames.map((game, index) => (
           <div key={index} className="bg-white rounded-md border border-petal-rule p-7">
             <div className="flex items-start space-x-4 mb-5 pb-5 border-b border-petal-rule-soft">
@@ -2057,10 +2246,11 @@ const LoveTimeApp = () => {
                    game.tips ? '小貼士' :
                    game.variations ? '變化玩法' :
                    game.phrases ? '調情話語' :
-                   game.scenarios ? '場景建議' : '願望類別'}
+                   game.scenarios ? '場景建議' :
+                   game.emotions ? '情緒選項' : '願望類別'}
                 </h4>
                 <ul className="space-y-2">
-                  {(game.questions || game.tips || game.variations || game.phrases || game.scenarios || game.categories || []).map((item, i) => (
+                  {(game.questions || game.tips || game.variations || game.phrases || game.scenarios || game.emotions || game.categories || []).map((item, i) => (
                     <li key={i} className="font-body text-sm text-petal-ink-soft leading-relaxed">{item}</li>
                   ))}
                 </ul>
@@ -2068,11 +2258,128 @@ const LoveTimeApp = () => {
             </div>
           </div>
         ))}
+        </div>
       </div>
+
+      <ForeplayView />
     </div>
   );
 
-  const ConflictView = () => (
+  const ConflictView = () => {
+    const ArticleDivider = () => (
+      <div aria-hidden className="flex justify-center py-2">
+        <span className="font-display italic text-petal-muted/60 text-sm tracking-[0.5em]">· · ·</span>
+      </div>
+    );
+
+    // Pause mode — multi-step flow for couples already in a heated argument.
+    // Step 1: emotion selection · Step 2: safety phrase · Step 3: enforced
+    // turn-taking with 90s timer · Step 4: closing affirmation.
+    type EmotionKey = 'angry' | 'hurt' | 'cold' | 'overwhelmed';
+    const EMOTION_OPTIONS: { key: EmotionKey; emoji: string; label: string; sub: string; phrase: string }[] = [
+      {
+        key: 'angry',
+        emoji: '😡',
+        label: '生氣',
+        sub: '想反擊',
+        phrase: '我現在有點激動，我怕我會講出傷人的話，我想先停一下，但我不是不在乎你。',
+      },
+      {
+        key: 'hurt',
+        emoji: '😞',
+        label: '受傷',
+        sub: '想被理解',
+        phrase: '我現在其實有點難過，我需要你先聽我講完，不然我會更失落。',
+      },
+      {
+        key: 'cold',
+        emoji: '😐',
+        label: '冷掉',
+        sub: '不想講了',
+        phrase: '我現在腦袋有點關機，我需要一點時間消化，但我會回來，不是不在乎。',
+      },
+      {
+        key: 'overwhelmed',
+        emoji: '😣',
+        label: '快爆了',
+        sub: '撐不住了',
+        phrase: '我快撐不住了，我需要先暫停喘口氣，這不是不想處理，是先讓自己冷靜。',
+      },
+    ];
+
+    const TURN_SECONDS = 90;
+    const [pauseStep, setPauseStep] = useState<1 | 2 | 3 | 4 | null>(null);
+    const [pauseEmotion, setPauseEmotion] = useState<EmotionKey | null>(null);
+    const [pauseRound, setPauseRound] = useState<1 | 2>(1);
+    const [pauseSeconds, setPauseSeconds] = useState(TURN_SECONDS);
+    const [listenerNudge, setListenerNudge] = useState<string | null>(null);
+
+    // Tick timer while on Step 3
+    useEffect(() => {
+      if (pauseStep !== 3) return;
+      const id = setInterval(() => setPauseSeconds(s => Math.max(0, s - 1)), 1000);
+      return () => clearInterval(id);
+    }, [pauseStep, pauseRound]);
+
+    // When timer hits 0, advance to next round or to Step 4
+    useEffect(() => {
+      if (pauseStep !== 3 || pauseSeconds > 0) return;
+      if (pauseRound === 1) {
+        setPauseRound(2);
+        setPauseSeconds(TURN_SECONDS);
+        setListenerNudge(null);
+      } else {
+        setPauseStep(4);
+      }
+    }, [pauseSeconds, pauseStep, pauseRound]);
+
+    const openPause = () => {
+      setPauseEmotion(null);
+      setPauseRound(1);
+      setPauseSeconds(TURN_SECONDS);
+      setListenerNudge(null);
+      setPauseStep(1);
+    };
+    const closePause = () => setPauseStep(null);
+
+    const pickEmotion = (key: EmotionKey) => {
+      setPauseEmotion(key);
+      setPauseStep(2);
+    };
+
+    const enterTurnTaking = () => {
+      setPauseRound(1);
+      setPauseSeconds(TURN_SECONDS);
+      setListenerNudge(null);
+      setPauseStep(3);
+    };
+
+    const skipTurn = () => {
+      if (pauseRound === 1) {
+        setPauseRound(2);
+        setPauseSeconds(TURN_SECONDS);
+        setListenerNudge(null);
+      } else {
+        setPauseStep(4);
+      }
+    };
+
+    const handleListenerReact = (label: string) => {
+      setListenerNudge(label);
+      window.setTimeout(() => {
+        setListenerNudge(current => (current === label ? null : current));
+      }, 2200);
+    };
+
+    const formatTime = (s: number) => {
+      const m = Math.floor(s / 60).toString().padStart(2, '0');
+      const ss = (s % 60).toString().padStart(2, '0');
+      return `${m}:${ss}`;
+    };
+
+    const selectedPhrase = pauseEmotion ? EMOTION_OPTIONS.find(o => o.key === pauseEmotion) : null;
+
+    return (
     <div className="space-y-10">
       <div className="border-b border-petal-rule pb-7">
         <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
@@ -2086,23 +2393,353 @@ const LoveTimeApp = () => {
         </p>
       </div>
 
-      <div className="space-y-4">
-        {conflictResolutions.map((solution, index) => (
-          <div key={index} className="bg-white rounded-md border border-petal-rule p-6">
-            <div className="flex items-start space-x-4">
-              <div className="w-10 h-10 border border-petal-sage/60 bg-petal-sage/10 rounded-full flex items-center justify-center">
-                <MessageCircle className="w-4 h-4 text-petal-sage-deep" strokeWidth={1.5} />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-display text-lg font-medium tracking-tight text-petal-ink mb-1.5">{solution.title}</h3>
-                <p className="font-body text-sm text-petal-ink-soft leading-relaxed">{solution.desc}</p>
+      {/* Emergency Pause — entry card for couples in active conflict */}
+      <div className="bg-amber-50 border-2 border-amber-300 rounded-md p-5 md:p-6">
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <div className="flex-1">
+            <h3 className="font-display text-lg font-medium tracking-tight text-amber-900 mb-1 flex items-center">
+              <Pause className="w-4 h-4 mr-2 fill-amber-700 text-amber-700" strokeWidth={1.5} />
+              正在爭吵中？
+            </h3>
+            <p className="font-body text-sm text-amber-900/80 leading-relaxed">
+              進入<b className="not-italic font-medium">冷靜連結模式</b>：4 步引導你們先降溫、再說話，而不是讓溝通變成武器。
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={openPause}
+            className="px-5 py-3 bg-amber-600 text-white rounded-md text-base font-medium hover:bg-amber-700 transition-colors whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-2"
+          >
+            <Pause className="w-4 h-4 fill-white" strokeWidth={1.5} />
+            暫停一下
+          </button>
+        </div>
+      </div>
+
+      {/* Featured Long-Read — 翻譯彼此的語言 */}
+      <article className="bg-white rounded-md border border-petal-rule p-6 md:p-10">
+        <header className="mb-7 pb-5 border-b border-petal-rule-soft">
+          <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+            — 閱讀
+          </div>
+          <h3 className="font-display text-3xl font-light tracking-tight text-petal-ink leading-[1.15] mb-3">
+            翻譯彼此的<em className="not-italic font-light italic text-pink-600">語言</em>
+          </h3>
+          <p className="font-display italic font-light text-sm text-petal-muted leading-relaxed">
+            在親密關係裡，最常見的衝突往往不是「不愛了」，而是「聽不懂彼此在說什麼」。
+          </p>
+        </header>
+
+        <div className="space-y-5 font-body text-[15px] leading-loose text-petal-ink">
+          <p>在一段親密關係裡，最常見的衝突，往往不是「不愛了」，而是「聽不懂彼此在說什麼」。</p>
+          <p>很多時候，兩個人其實都還在乎對方，只是用完全不同的方式在表達需求。</p>
+
+          <ArticleDivider />
+
+          <p>有一對伴侶，先生和太太，正在經歷這樣的狀況。</p>
+          <p>先生其實不是只想要性。他更多時候，是在某些疲憊或空虛的瞬間，想靠近太太，確認彼此還是連結著的。他會想抱一下、想靠近一點、想讓對方知道：「我還在這裡，我想你也還在我身邊。」</p>
+          <p>而太太其實也不是不在乎他。只是她常常在忙碌、疲累，或情緒沒有空間的時候，需要安靜與界線。</p>
+          <p>問題是，兩個人的「靠近方式」開始產生錯位。</p>
+
+          <ArticleDivider />
+
+          <p>有一次，先生又在晚上試著靠近她。他沒有很強烈地要求什麼，只是用那種想要親近的方式，想拉近距離。</p>
+          <p>但太太那天已經很累了。她一開始其實是溫柔的，她說：「我現在有點累。」</p>
+          <p>但先生還是想再靠近一點、再確認一點。</p>
+          <p>不是故意的，只是他沒有接收到那個「已經不行了」的訊號已經很清楚。</p>
+
+          <ArticleDivider />
+
+          <p>太太開始感覺到一種熟悉的壓力——她明明已經很溫柔了，但好像還是不被停下來。</p>
+          <p>於是她的語氣變了。</p>
+          <p>從溫柔，變成比較直接。</p>
+          <p>甚至有一點冷。</p>
+          <p>她心裡想的是：「如果我不講得更清楚，你是不是不會停？」</p>
+          <p>但她沒有說出口的是——她並不是不想連結，而是她已經沒有力氣再用更溫柔的方式了。</p>
+
+          <ArticleDivider />
+
+          <p>先生在那一刻感受到的，是另一種痛。</p>
+          <p>他不是被「需求」拒絕，而是感覺到自己好像被推開了。</p>
+          <p>他心裡會想：「我只是想靠近你，為什麼你變得這麼冷？」</p>
+          <p>但他沒有看見的是，太太的強硬，其實不是遠離，而是一種防禦。</p>
+          <p>她不是在說「我不愛你」，而是在說：「我需要你現在先停一下，因為我已經沒有空間了。」</p>
+
+          <ArticleDivider />
+
+          <p>這就是兩人之間最常見的誤會。</p>
+          <p className="font-display italic text-petal-ink-soft">當溫柔沒有被理解時，會變成更強的界線。</p>
+          <p className="font-display italic text-petal-ink-soft">當界線被感覺成拒絕時，會變成更深的失落。</p>
+          <p>兩個人都在保護自己，但方式卻讓彼此越來越遠。</p>
+
+          <ArticleDivider />
+
+          <p>後來，他們開始學著翻譯彼此的語言。</p>
+          <p>太太慢慢發現，先生很多時候要的不是「做什麼」，而是「還連不連得上」。</p>
+          <p>於是她開始嘗試，在無法配合的時候，不只是說「不行」，而是補上一點連結：</p>
+          <ul className="space-y-2 pl-5 list-disc marker:text-petal-rose-deep">
+            <li>輕輕抱一下</li>
+            <li>摸一下手</li>
+            <li>說一句：「我現在真的累，但我還在」</li>
+            <li>或是給一個明確時間：「等一下／晚點／明天」</li>
+          </ul>
+          <p>這些小小的動作，對先生來說，比任何解釋都更有安定感。</p>
+
+          <ArticleDivider />
+
+          <p>而先生也開始理解，太太的直接，不是冷漠，而是她的極限已經到了。</p>
+          <p>她不是不想溫柔，而是她曾經溫柔過，但那種溫柔沒有被理解，於是她只能換一種更清楚的方式保護自己。</p>
+
+          <ArticleDivider />
+
+          <p>慢慢地，他們才發現一件很重要的事：</p>
+          <p className="font-display italic text-lg text-petal-ink leading-relaxed">親密關係的問題，從來不是「要不要答應」，而是「有沒有被理解」。</p>
+
+          <ArticleDivider />
+
+          <div className="space-y-3">
+            <p><span className="font-medium text-petal-rose-deep">男生</span>想要的，很多時候不是結果，而是被肯定、被看見、被連結。</p>
+            <p><span className="font-medium text-petal-rose-deep">女生</span>需要的，很多時候不是拒絕，而是界線被尊重，同時關係沒有斷掉。</p>
+          </div>
+
+          <ArticleDivider />
+
+          <p>當兩個人開始願意翻譯彼此的語言時，關係會開始改變。</p>
+          <p>不再是「你要或不要」。</p>
+          <p>而變成：</p>
+
+          <blockquote className="my-2 py-4 px-5 border-l-2 border-petal-rose-soft bg-petal-cream-2/40 font-display italic text-base leading-relaxed text-petal-ink space-y-2">
+            <p>「我現在不行，但我還在。」</p>
+            <p>「我聽見你了，但我們換一種方式靠近。」</p>
+          </blockquote>
+
+          <ArticleDivider />
+
+          <p className="font-display italic text-lg leading-relaxed text-petal-ink text-center py-2">
+            親密關係真正的成熟，不是永遠一致，而是即使不同步，也不讓彼此失聯。
+          </p>
+        </div>
+      </article>
+
+      <div>
+        <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6">
+          相處<em className="not-italic font-light italic text-pink-600">練習</em>
+        </h3>
+        <div className="space-y-4">
+          {conflictResolutions.map((solution, index) => (
+            <div key={index} className="bg-white rounded-md border border-petal-rule p-6">
+              <div className="flex items-start space-x-4">
+                <div className="w-10 h-10 border border-petal-sage/60 bg-petal-sage/10 rounded-full flex items-center justify-center">
+                  <MessageCircle className="w-4 h-4 text-petal-sage-deep" strokeWidth={1.5} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-display text-lg font-medium tracking-tight text-petal-ink mb-1.5">{solution.title}</h3>
+                  <p className="font-body text-sm text-petal-ink-soft leading-relaxed">{solution.desc}</p>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
+
+      {/* Pause Mode — full-screen guided flow */}
+      {pauseStep !== null && (
+        <div className="fixed inset-0 z-50 bg-petal-cream overflow-y-auto">
+          <div className="max-w-2xl mx-auto px-5 sm:px-8 py-8 min-h-screen flex flex-col">
+            {/* Top bar */}
+            <div className="flex items-start justify-between mb-8">
+              <div>
+                <div className="font-body text-[11px] uppercase tracking-[0.18em] text-amber-700 mb-1">— 暫停模式</div>
+                <div className="font-display text-xl text-petal-ink">冷靜連結模式</div>
+                <div className="font-body text-xs text-petal-muted mt-0.5">Step {pauseStep} / 4</div>
+              </div>
+              <button
+                type="button"
+                onClick={closePause}
+                aria-label="關閉"
+                className="text-petal-muted hover:text-petal-ink text-3xl leading-none p-2 -m-2"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Step 1 — Emotion selection */}
+            {pauseStep === 1 && (
+              <div className="flex-1 flex flex-col">
+                <h2 className="font-display text-2xl md:text-3xl font-light text-petal-ink leading-snug mb-2">
+                  你現在比較像哪一種狀態？
+                </h2>
+                <p className="font-body text-sm text-petal-ink-soft mb-8">
+                  選一個最接近的。這一步不是分析，是讓情緒被命名。
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
+                  {EMOTION_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => pickEmotion(opt.key)}
+                      className="bg-white border-2 border-petal-rule rounded-md p-5 text-left hover:border-amber-400 hover:bg-amber-50/50 transition-colors min-h-[5.5rem]"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl leading-none" aria-hidden>{opt.emoji}</span>
+                        <div>
+                          <div className="font-display text-lg font-medium text-petal-ink">{opt.label}</div>
+                          <div className="font-body text-xs text-petal-ink-soft mt-0.5">{opt.sub}</div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Step 2 — Safety phrase */}
+            {pauseStep === 2 && selectedPhrase && (
+              <div className="flex-1 flex flex-col">
+                <div className="font-body text-xs uppercase tracking-[0.14em] text-petal-muted mb-3">
+                  你選的狀態：{selectedPhrase.emoji} {selectedPhrase.label}
+                </div>
+                <h2 className="font-display text-2xl md:text-3xl font-light text-petal-ink leading-snug mb-2">
+                  照念這句話給對方聽
+                </h2>
+                <p className="font-body text-sm text-petal-ink-soft mb-8">
+                  不用自己想，直接念。重點是把界線講清楚，又不切斷連結。
+                </p>
+
+                <div className="bg-white border-2 border-amber-300 rounded-md p-6 md:p-8 mb-8 flex-1 flex items-center">
+                  <p className="font-display text-xl md:text-2xl font-light text-petal-ink leading-relaxed text-center w-full">
+                    「{selectedPhrase.phrase}」
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPauseStep(1)}
+                    className="px-5 py-3 border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink rounded-md font-body text-sm transition-colors"
+                  >
+                    ← 換一個情緒
+                  </button>
+                  <button
+                    type="button"
+                    onClick={enterTurnTaking}
+                    className="flex-1 px-5 py-3 bg-amber-600 text-white rounded-md text-base font-medium hover:bg-amber-700 transition-colors"
+                  >
+                    我念完了，開始輪流說 →
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3 — Enforced turn-taking */}
+            {pauseStep === 3 && (
+              <div className="flex-1 flex flex-col">
+                <div className="font-body text-xs uppercase tracking-[0.14em] text-petal-muted mb-2">
+                  第 {pauseRound} 輪 / 共 2 輪
+                </div>
+                <h2 className="font-display text-2xl md:text-3xl font-light text-petal-ink leading-snug mb-1">
+                  現在輪到：<span className="text-amber-700">{pauseRound === 1 ? 'A 方' : 'B 方'}</span> 說話
+                </h2>
+                <p className="font-body text-sm text-petal-ink-soft mb-6">
+                  {pauseRound === 1
+                    ? 'A 方＝剛剛選擇情緒的那位。另一方只能聽，不能打斷。'
+                    : 'B 方＝另一位。同樣只能聽，不能打斷。'}
+                </p>
+
+                {/* Timer */}
+                <div className="bg-white border-2 border-amber-200 rounded-md p-6 mb-6 text-center">
+                  <div className="font-body text-xs uppercase tracking-[0.14em] text-petal-muted mb-2">剩餘時間</div>
+                  <div className="font-display text-5xl md:text-6xl font-light text-amber-700 tabular-nums tracking-wide">
+                    {formatTime(pauseSeconds)}
+                  </div>
+                  <div className="w-full h-1.5 bg-amber-100 rounded-full mt-4 overflow-hidden">
+                    <div
+                      className="h-full bg-amber-500 transition-all duration-1000 ease-linear"
+                      style={{ width: `${(pauseSeconds / TURN_SECONDS) * 100}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Listener reactions */}
+                <div className="flex-1">
+                  <p className="font-body text-xs uppercase tracking-[0.14em] text-petal-muted mb-3 text-center">
+                    聆聽者只能回應 — 不能打斷
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => handleListenerReact('我在聽')}
+                      className="bg-white border-2 border-petal-rule rounded-md p-4 hover:border-amber-400 hover:bg-amber-50/40 transition-colors text-petal-ink font-body text-base"
+                    >
+                      <span className="text-2xl mr-2" aria-hidden>👍</span>
+                      我在聽
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleListenerReact('我理解你在努力說')}
+                      className="bg-white border-2 border-petal-rule rounded-md p-4 hover:border-amber-400 hover:bg-amber-50/40 transition-colors text-petal-ink font-body text-base"
+                    >
+                      <span className="text-2xl mr-2" aria-hidden>💛</span>
+                      我理解你在努力說
+                    </button>
+                  </div>
+                  {listenerNudge && (
+                    <p className="mt-4 font-display italic text-center text-amber-700 text-sm" role="status">
+                      ✓ {listenerNudge}
+                    </p>
+                  )}
+                </div>
+
+                {/* Skip turn */}
+                <div className="mt-6 pt-4 border-t border-petal-rule-soft text-center">
+                  <button
+                    type="button"
+                    onClick={skipTurn}
+                    className="font-body text-xs text-petal-muted hover:text-petal-ink transition-colors"
+                  >
+                    {pauseRound === 1 ? '已經講完，換對方 →' : '已經講完，進入收尾 →'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 4 — Closing */}
+            {pauseStep === 4 && (
+              <div className="flex-1 flex flex-col justify-center">
+                <h2 className="font-display text-2xl md:text-3xl font-light text-petal-ink leading-snug mb-2 text-center">
+                  你們做到了。
+                </h2>
+                <p className="font-body text-sm text-petal-ink-soft text-center mb-10 leading-relaxed">
+                  不一定要現在解決所有事，<br />
+                  能夠暫停、聽到彼此，已經是進展。
+                </p>
+
+                <div className="space-y-3">
+                  <button
+                    type="button"
+                    onClick={closePause}
+                    className="w-full px-5 py-4 bg-amber-600 text-white rounded-md text-base font-medium hover:bg-amber-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span className="text-xl" aria-hidden>🤝</span>
+                    我理解你現在的感覺
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closePause}
+                    className="w-full px-5 py-4 bg-white border-2 border-amber-300 text-amber-900 rounded-md text-base font-medium hover:bg-amber-50 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Pause className="w-4 h-4 fill-amber-700 text-amber-700" strokeWidth={1.5} />
+                    我們先暫停 10 分鐘
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
-  );
+    );
+  };
 
   // RoleplayView component moved to separate file
 
@@ -2969,30 +3606,30 @@ const LoveTimeApp = () => {
       });
     };
 
+    const handleCompleteCombo = async (combo: typeof comboSuggestions[number]) => {
+      const coinsEarned = combo.bonusCoins;
+
+      try {
+        await apiService.updateCoins(coinsEarned);
+        setTotalCoins(prev => prev + coinsEarned);
+      } catch (error) {
+        console.warn('Failed to update coins via API, using local update only:', error);
+        setTotalCoins(prev => prev + coinsEarned);
+      }
+
+      showNotification({
+        type: 'success',
+        title: `組合技達成 — ${combo.name}！`,
+        message: `連續完成 ${combo.sequence.length} 種姿勢，記得記錄這次親密時光`,
+        coins: coinsEarned,
+        duration: 5000,
+      });
+    };
+
     return (
       <div className="space-y-10">
-        <div className="border-b border-petal-rule pb-7">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-            <div>
-              <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-                — 探索
-              </div>
-              <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
-                前戲與<em className="not-italic font-light italic text-pink-600">探索</em>
-              </h2>
-              <p className="font-display italic font-light text-base text-petal-muted">
-                增進親密感的活動和建議 — 慢慢來。
-              </p>
-            </div>
-            <div className="font-display italic font-light text-xl text-petal-ink">
-              <Coins className="inline w-4 h-4 mr-1.5 text-petal-rose-deep" strokeWidth={1.5} />
-              <b className="not-italic font-medium">{totalCoins}</b> <span className="text-sm text-petal-muted">枚</span>
-            </div>
-          </div>
-        </div>
-
         {/* Foreplay Activities */}
-        <div>
+        <div id="foreplay-activities" className="scroll-mt-24">
           <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6">
             前戲<em className="not-italic font-light italic text-pink-600">活動</em>
           </h3>
@@ -3032,7 +3669,7 @@ const LoveTimeApp = () => {
         </div>
 
         {/* Position Suggestions */}
-        <div>
+        <div id="position-suggestions" className="scroll-mt-24">
           <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6">
             姿勢<em className="not-italic font-light italic text-pink-600">建議</em>
           </h3>
@@ -3068,6 +3705,58 @@ const LoveTimeApp = () => {
                     className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                   >
                     嘗試
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Combo Suggestions — 連續組合技 */}
+        <div id="combo-suggestions" className="scroll-mt-24">
+          <div className="flex items-baseline justify-between mb-6">
+            <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink">
+              連續<em className="not-italic font-light italic text-pink-600">組合技</em>
+            </h3>
+            <span className="font-display italic font-light text-sm text-petal-muted">
+              一次連續多種姿勢，額外金幣獎勵
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {comboSuggestions.map((combo, index) => (
+              <div key={index} className="border border-petal-rose-soft bg-petal-rose-soft/10 rounded-md p-5 hover:border-petal-rose transition-colors flex flex-col">
+                <div className="flex justify-between items-start mb-3">
+                  <h4 className="font-display text-lg font-medium tracking-tight text-petal-ink">{combo.name}</h4>
+                  <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] border ${
+                    combo.difficulty === '簡單' ? 'border-petal-sage/60 bg-petal-sage/10 text-petal-sage-deep' :
+                    combo.difficulty === '中等' ? 'border-petal-rose-soft bg-petal-rose-soft/30 text-petal-rose-deep' :
+                    'border-petal-ink-soft/30 bg-petal-ink-soft/5 text-petal-ink-soft'
+                  }`}>
+                    {combo.difficulty}
+                  </span>
+                </div>
+                <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-4">{combo.description}</p>
+                <ol className="space-y-1.5 mb-4">
+                  {combo.sequence.map((step, i) => (
+                    <li key={i} className="flex items-center font-body text-sm text-petal-ink">
+                      <span className="w-5 h-5 rounded-full bg-petal-ink text-petal-cream font-display italic text-[11px] flex items-center justify-center mr-2.5 flex-shrink-0">
+                        {i + 1}
+                      </span>
+                      {step}
+                    </li>
+                  ))}
+                </ol>
+                <div className="mt-auto flex items-center justify-between pt-3 border-t border-petal-rule-soft">
+                  <div className="font-display italic font-light text-sm text-petal-rose-deep whitespace-nowrap">
+                    <Coins className="inline w-3.5 h-3.5 mr-1" strokeWidth={1.5} />
+                    +{combo.bonusCoins} 獎勵
+                  </div>
+                  <button
+                    onClick={() => handleCompleteCombo(combo)}
+                    className="px-4 py-1.5 bg-petal-ink text-petal-cream rounded-full hover:bg-pink-700 transition-colors flex items-center space-x-1.5 font-display italic text-sm"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
+                    <span>完成組合技</span>
                   </button>
                 </div>
               </div>
@@ -3287,9 +3976,7 @@ const LoveTimeApp = () => {
   };
 
   const navItems = [
-    { id: 'foreplay', label: '前戲探索', icon: Sparkles },
     { id: 'record', label: '記錄時光', icon: Calendar },
-    { id: 'achievements', label: '親密統計', icon: Trophy },
     { id: 'shop', label: '金幣商店', icon: ShoppingBag },
     { id: 'games', label: '情趣遊戲', icon: Gamepad2 },
     { id: 'conflict', label: '和諧相處', icon: MessageCircle },
@@ -3303,7 +3990,7 @@ const LoveTimeApp = () => {
     // Show login prompt for private content when not authenticated
     if (!authState.isAuthenticated) {
       switch (currentView) {
-        case 'settings': return <SettingsView 
+        case 'settings': return <SettingsView
           nicknames={nicknames}
           handleNicknameChange={handleNicknameChange}
           journeyMilestones={journeyMilestones}
@@ -3312,6 +3999,10 @@ const LoveTimeApp = () => {
           setShowAuthModal={setShowAuthModal}
           onAuthStateUpdate={setAuthState}
           showNotification={showNotification}
+          customMemoryQuestions={customMemoryQuestions}
+          setCustomMemoryQuestions={setCustomMemoryQuestions}
+          customEmotions={customEmotions}
+          setCustomEmotions={setCustomEmotions}
         />;
         default: return (
           <div className="flex items-center justify-center min-h-[60vh]">
@@ -3340,11 +4031,13 @@ const LoveTimeApp = () => {
 
     // Show authenticated content
     switch (currentView) {
-      case 'foreplay': return <ForeplayView />;
-      case 'record': return <CalendarView />;
-      case 'achievements': return <AchievementsView />;
+      case 'record':
+      case 'achievements':
+        return <CalendarView />;
       case 'shop': return <CoinShopView />;
-      case 'games': return <GamesView />;
+      case 'foreplay':
+      case 'games':
+        return <GamesView />;
       case 'conflict': return <ConflictView />;
       case 'roleplay': return <RoleplayView
         defaultRoleplayScripts={defaultRoleplayScripts}
@@ -3358,9 +4051,10 @@ const LoveTimeApp = () => {
           setEditingScript(script);
           setShowScriptUploadModal(true);
         }}
+        showNotification={showNotification}
       />;
       case 'journey': return <OurJourneyView />;
-      case 'settings': return <SettingsView 
+      case 'settings': return <SettingsView
         nicknames={nicknames}
         handleNicknameChange={handleNicknameChange}
         journeyMilestones={journeyMilestones}
@@ -3369,6 +4063,10 @@ const LoveTimeApp = () => {
         setShowAuthModal={setShowAuthModal}
         onAuthStateUpdate={setAuthState}
         showNotification={showNotification}
+        customMemoryQuestions={customMemoryQuestions}
+        setCustomMemoryQuestions={setCustomMemoryQuestions}
+        customEmotions={customEmotions}
+        setCustomEmotions={setCustomEmotions}
       />;
       case 'intimacy-history': return (
         <IntimacyRequestsHistory
@@ -3376,7 +4074,7 @@ const LoveTimeApp = () => {
           partnerNickname={nicknames.partner2}
         />
       );
-      default: return <ForeplayView />;
+      default: return <GamesView />;
     }
   };
 
