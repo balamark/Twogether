@@ -34,6 +34,7 @@ jobs:
               - 'test*.sh'
               - '**/*test*.js'
               - '**/*test*.ts'
+              - 'tests/**'
               - 'server.js'
               - 'package.json'
               - 'package-lock.json'
