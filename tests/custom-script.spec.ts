@@ -225,8 +225,11 @@ test.describe('Custom Script Upload and Persistence', () => {
     // Viewing alone should NOT have created a record yet
     await expect(page.locator('text=已記錄一次親密時光')).toHaveCount(0);
 
-    // Explicitly trigger the role-play to record the intimacy moment
-    const beginButton = page.locator('button:has-text("開始扮演")');
+    // Explicitly trigger the role-play to record the intimacy moment.
+    // Modal CTA carries the editorial "— 記入今晚" suffix; card-level
+    // direct-play buttons added in fb1f6df just say "開始扮演", so anchor
+    // to the unique modal label to avoid strict-mode multi-match.
+    const beginButton = page.locator('button:has-text("開始扮演 — 記入今晚")');
     await expect(beginButton).toBeVisible({ timeout: 3000 });
     await beginButton.click();
 
