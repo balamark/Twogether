@@ -34,3 +34,12 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: #B5A99B;
 }
+
+/* Hide scrollbar on horizontally-scrolling utility bars (e.g. sticky section nav). */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

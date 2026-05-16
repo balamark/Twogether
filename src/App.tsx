@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Heart, Calendar, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Upload, Play, Coins, Plus, X, User, ShoppingBag, Inbox, Pause, StickyNote } from 'lucide-react';
+import { Heart, Calendar, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Upload, Play, Coins, Plus, X, User, ShoppingBag, Inbox, Pause, StickyNote, ChevronDown, ChevronUp, Send, Check } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import RoleplayView from './components/RoleplayView';
 import WallView from './components/WallView';
@@ -2447,6 +2447,62 @@ const LoveTimeApp = () => {
     const [pauseSeconds, setPauseSeconds] = useState(TURN_SECONDS);
     const [listenerNudge, setListenerNudge] = useState<string | null>(null);
 
+    // Article expand/collapse — keep long-read tucked away by default so the page stays scannable.
+    const [articleExpanded, setArticleExpanded] = useState(false);
+
+    // Per-phrase send-to-partner state. Key = `${tier.key}-${phraseIndex}`.
+    const [phraseStatus, setPhraseStatus] = useState<Record<string, 'idle' | 'sending' | 'sent'>>({});
+
+    const handleSendPhrase = async (phrase: string, key: string) => {
+      if (!partnerConnected) {
+        showNotification({
+          type: 'warning',
+          title: '尚未配對伴侶',
+          message: '需要先配對伴侶才能直接傳訊息給對方。',
+          duration: 4000,
+        });
+        return;
+      }
+      if (phraseStatus[key] === 'sending' || phraseStatus[key] === 'sent') return;
+      const confirmed = window.confirm(`確定要把這句話傳給TA嗎？\n\n「${phrase}」`);
+      if (!confirmed) return;
+      setPhraseStatus(prev => ({ ...prev, [key]: 'sending' }));
+      try {
+        await apiService.createIntimacyRequest({
+          messageContent: phrase,
+          requestType: 'reconciliation',
+        });
+        setPhraseStatus(prev => ({ ...prev, [key]: 'sent' }));
+        showNotification({
+          type: 'success',
+          title: '已送給TA',
+          message: '訊息已送到對方的邀請紀錄。',
+          duration: 3000,
+        });
+      } catch (err) {
+        setPhraseStatus(prev => ({ ...prev, [key]: 'idle' }));
+        showNotification({
+          type: 'error',
+          title: '送出失敗',
+          message: (err as Error)?.message || '請稍後再試。',
+          duration: 4000,
+        });
+      }
+    };
+
+    const scrollToSection = (id: string) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+
+    const sectionNav: { id: string; label: string }[] = [
+      { id: 'conflict-pause', label: '正在爭吵中' },
+      { id: 'conflict-article', label: '閱讀' },
+      { id: 'conflict-practice', label: '相處練習' },
+      { id: 'conflict-phrases', label: '話語範例' },
+    ];
+
     // Tick timer while on Step 3
     useEffect(() => {
       if (pauseStep !== 3) return;
@@ -2526,8 +2582,27 @@ const LoveTimeApp = () => {
         </p>
       </div>
 
+      {/* Sticky section nav — quick jumps within 和諧相處 */}
+      <nav
+        aria-label="頁面區塊"
+        className="sticky top-0 z-30 -mt-6 -mx-4 px-4 py-2.5 bg-petal-cream/95 backdrop-blur-sm border-b border-petal-rule"
+      >
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1">
+          {sectionNav.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => scrollToSection(s.id)}
+              className="flex-shrink-0 px-3 py-1.5 rounded-full border border-petal-rule bg-white/70 text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink font-body text-xs font-medium tracking-tight transition-colors"
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      </nav>
+
       {/* Emergency Pause — entry card for couples in active conflict */}
-      <div className="bg-amber-50 border-2 border-amber-300 rounded-md p-5 md:p-6">
+      <div id="conflict-pause" className="bg-amber-50 border-2 border-amber-300 rounded-md p-5 md:p-6 scroll-mt-20">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
           <div className="flex-1">
             <h3 className="font-display text-lg font-medium tracking-tight text-amber-900 mb-1 flex items-center">
@@ -2549,9 +2624,9 @@ const LoveTimeApp = () => {
         </div>
       </div>
 
-      {/* Featured Long-Read — 翻譯彼此的語言 */}
-      <article className="bg-white rounded-md border border-petal-rule p-6 md:p-10">
-        <header className="mb-7 pb-5 border-b border-petal-rule-soft">
+      {/* Featured Long-Read — 翻譯彼此的語言 (collapsible to keep page scannable) */}
+      <article id="conflict-article" className="bg-white rounded-md border border-petal-rule p-6 md:p-10 scroll-mt-20">
+        <header className={articleExpanded ? 'mb-7 pb-5 border-b border-petal-rule-soft' : ''}>
           <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
             — 閱讀
           </div>
@@ -2563,6 +2638,23 @@ const LoveTimeApp = () => {
           </p>
         </header>
 
+        {!articleExpanded && (
+          <div className="mt-5 pt-5 border-t border-petal-rule-soft flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <p className="font-body text-xs text-petal-muted leading-relaxed">
+              一則關於先生與太太、靠近與界線的長文 — 約 5 分鐘閱讀。
+            </p>
+            <button
+              type="button"
+              onClick={() => setArticleExpanded(true)}
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-petal-rule rounded-md font-body text-sm text-petal-rose-deep hover:border-petal-rose-deep hover:bg-petal-cream-2/40 transition-colors self-start sm:self-auto"
+            >
+              閱讀全文
+              <ChevronDown className="w-4 h-4" strokeWidth={1.5} />
+            </button>
+          </div>
+        )}
+
+        {articleExpanded && (
         <div className="space-y-5 font-body text-[15px] leading-loose text-petal-ink">
           <p>在一段親密關係裡，最常見的衝突，往往不是「不愛了」，而是「聽不懂彼此在說什麼」。</p>
           <p>很多時候，兩個人其實都還在乎對方，只是用完全不同的方式在表達需求。</p>
@@ -2651,10 +2743,25 @@ const LoveTimeApp = () => {
           <p className="font-display italic text-lg leading-relaxed text-petal-ink text-center py-2">
             親密關係真正的成熟，不是永遠一致，而是即使不同步，也不讓彼此失聯。
           </p>
+
+          <div className="pt-5 border-t border-petal-rule-soft flex justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                setArticleExpanded(false);
+                scrollToSection('conflict-article');
+              }}
+              className="inline-flex items-center gap-1.5 px-4 py-2 border border-petal-rule rounded-md font-body text-sm text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors"
+            >
+              <ChevronUp className="w-4 h-4" strokeWidth={1.5} />
+              收起
+            </button>
+          </div>
         </div>
+        )}
       </article>
 
-      <div>
+      <div id="conflict-practice" className="scroll-mt-20">
         <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6">
           相處<em className="not-italic font-light italic text-pink-600">練習</em>
         </h3>
@@ -2676,7 +2783,7 @@ const LoveTimeApp = () => {
       </div>
 
       {/* Conflict response phrases —現場可直接使用的話語範例 */}
-      <section>
+      <section id="conflict-phrases" className="scroll-mt-20">
         <header className="mb-6">
           <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
             — 衝突時的應對工具
@@ -2686,6 +2793,11 @@ const LoveTimeApp = () => {
           </h3>
           <p className="font-body text-sm text-petal-ink-soft leading-relaxed">
             三種強度（柔和／標準／堅定）＋兩種情境工具。依現場火藥味與情緒強度選用，照念就好。
+            {partnerConnected && (
+              <span className="block mt-1.5 text-petal-muted text-xs">
+                點每一句後面的「傳給TA」即可直接送到對方的邀請紀錄。
+              </span>
+            )}
           </p>
         </header>
 
@@ -2712,19 +2824,57 @@ const LoveTimeApp = () => {
               </p>
 
               <ol className="space-y-3 mb-5">
-                {tier.phrases.map((phrase, i) => (
-                  <li
-                    key={i}
-                    className="flex gap-3 bg-white/70 rounded-md p-3.5 md:p-4 border border-white"
-                  >
-                    <span className="font-display italic text-petal-rose-deep text-sm leading-relaxed flex-shrink-0 mt-0.5 w-5">
-                      {i + 1}.
-                    </span>
-                    <blockquote className="font-display text-[15px] md:text-base leading-relaxed text-petal-ink flex-1">
-                      「{phrase}」
-                    </blockquote>
-                  </li>
-                ))}
+                {tier.phrases.map((phrase, i) => {
+                  const phraseKey = `${tier.key}-${i}`;
+                  const status = phraseStatus[phraseKey] || 'idle';
+                  return (
+                    <li
+                      key={i}
+                      className="flex flex-col sm:flex-row sm:items-start gap-3 bg-white/70 rounded-md p-3.5 md:p-4 border border-white"
+                    >
+                      <div className="flex gap-3 flex-1 min-w-0">
+                        <span className="font-display italic text-petal-rose-deep text-sm leading-relaxed flex-shrink-0 mt-0.5 w-5">
+                          {i + 1}.
+                        </span>
+                        <blockquote className="font-display text-[15px] md:text-base leading-relaxed text-petal-ink flex-1">
+                          「{phrase}」
+                        </blockquote>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleSendPhrase(phrase, phraseKey)}
+                        disabled={status === 'sending' || status === 'sent'}
+                        title={partnerConnected ? '直接傳送這句話給TA' : '需要先配對伴侶'}
+                        className={`flex-shrink-0 self-end sm:self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-body text-xs font-medium tracking-tight border transition-colors ${
+                          status === 'sent'
+                            ? 'border-petal-sage bg-petal-sage/15 text-petal-sage-deep cursor-default'
+                            : status === 'sending'
+                              ? 'border-petal-rule bg-white text-petal-muted cursor-wait'
+                              : partnerConnected
+                                ? 'border-petal-rose bg-white text-petal-rose-deep hover:bg-petal-rose hover:text-white hover:border-petal-rose'
+                                : 'border-petal-rule bg-white text-petal-muted opacity-60'
+                        }`}
+                      >
+                        {status === 'sent' ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" strokeWidth={2} />
+                            已送出
+                          </>
+                        ) : status === 'sending' ? (
+                          <>
+                            <span className="w-3.5 h-3.5 border-2 border-petal-muted border-t-transparent rounded-full animate-spin" />
+                            傳送中
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-3.5 h-3.5" strokeWidth={1.75} />
+                            傳給TA
+                          </>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
               </ol>
 
               {tier.note && (
