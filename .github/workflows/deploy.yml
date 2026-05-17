@@ -8,6 +8,8 @@ on:
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  # Run JS-based actions on Node 24 now (Node 20 runtime is deprecated, forced default 2026-06-02).
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 concurrency:
   group: deploy-${{ github.ref }}
