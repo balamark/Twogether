@@ -221,6 +221,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => handleViewScript(script)}
+                    data-testid={`script-featured-view-button-${index}`}
                     className="border border-petal-ink text-petal-ink py-2 rounded-md font-display italic text-sm hover:bg-petal-ink hover:text-petal-cream transition-colors"
                   >
                     <Eye className="w-3.5 h-3.5 inline mr-1.5" strokeWidth={1.5} />
@@ -228,6 +229,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                   </button>
                   <button
                     onClick={() => handleQuickPlay(script)}
+                    data-testid={`script-featured-play-button-${index}`}
                     className="bg-petal-ink text-petal-cream py-2 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors"
                   >
                     <Play className="w-3.5 h-3.5 inline mr-1.5" strokeWidth={1.5} />
@@ -249,6 +251,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             </h3>
             <button
               onClick={() => setShowScriptUploadModal(true)}
+              data-testid="script-upload-button"
               className="bg-petal-ink text-petal-cream px-4 py-1.5 rounded-full font-body text-xs hover:bg-pink-700 transition-colors flex items-center space-x-1.5"
             >
               <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -259,7 +262,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           {customScripts.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {customScripts.map((script) => (
-                <div key={script.id} className="bg-white border border-petal-rule rounded-md p-4 hover:border-petal-rose transition-colors">
+                <div key={script.id} data-testid={`script-card-custom-${script.id}`} className="bg-white border border-petal-rule rounded-md p-4 hover:border-petal-rose transition-colors">
                   <div className="flex items-start gap-3 mb-2">
                     <div className="w-14 h-14 rounded-md flex-shrink-0 overflow-hidden border border-petal-rule">
                       {renderThumb(script, 'w-full h-full')}
@@ -267,7 +270,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <h4 className="font-display text-base font-medium tracking-tight text-petal-ink truncate">{script.title}</h4>
-                        <span className="px-2 py-0.5 font-body text-[10px] uppercase tracking-[0.1em] rounded-full border border-petal-rule text-petal-muted flex-shrink-0">
+                        <span data-testid="script-card-custom-badge" className="px-2 py-0.5 font-body text-[10px] uppercase tracking-[0.1em] rounded-full border border-petal-rule text-petal-muted flex-shrink-0">
                           自訂
                         </span>
                       </div>
@@ -295,6 +298,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                       )}
                       <button
                         onClick={() => handleViewScript(script)}
+                        data-testid={`script-card-custom-view-button-${script.id}`}
                         className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                       >
                         <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
@@ -302,6 +306,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                       </button>
                       <button
                         onClick={() => handleQuickPlay(script)}
+                        data-testid={`script-card-custom-play-button-${script.id}`}
                         className="bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                       >
                         <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
@@ -349,6 +354,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleViewScript(script)}
+                        data-testid={`script-list-view-button-${index}`}
                         className="bg-petal-ink text-petal-cream px-4 py-1.5 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors"
                       >
                         <Eye className="w-3.5 h-3.5 inline mr-1" strokeWidth={1.5} />
@@ -356,6 +362,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                       </button>
                       <button
                         onClick={() => handleQuickPlay(script)}
+                        data-testid={`script-list-play-button-${index}`}
                         className="bg-petal-rose-deep text-petal-cream px-4 py-1.5 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors"
                       >
                         <Play className="w-3.5 h-3.5 inline mr-1" strokeWidth={1.5} />
@@ -381,7 +388,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
 
       {/* Script Modal — view-only by default; record only on explicit 開始扮演 */}
       {showScriptModal && selectedScript && (
-        <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div data-testid="roleplay-modal" className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-petal-cream rounded-md shadow-petal max-w-4xl w-full max-h-[90vh] border border-petal-rule flex flex-col">
             <div className="px-8 pt-8 pb-5 border-b border-petal-rule flex justify-between items-end flex-shrink-0">
               <div>
@@ -395,6 +402,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               </div>
               <button
                 onClick={closeModal}
+                data-testid="roleplay-modal-close-button"
                 className="text-petal-muted hover:text-petal-ink text-2xl font-light leading-none transition-colors"
                 aria-label="關閉"
               >
@@ -430,6 +438,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                     onEditScript(selectedScript);
                     closeModal();
                   }}
+                  data-testid="roleplay-modal-edit-button"
                   className="px-5 py-2 border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink rounded-md font-body text-sm transition-colors"
                 >
                   <Pencil className="w-3.5 h-3.5 inline mr-1.5" strokeWidth={1.5} />
@@ -439,6 +448,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               {!hasBegun ? (
                 <button
                   onClick={handleBeginRoleplay}
+                  data-testid="roleplay-modal-begin-button"
                   className="px-6 py-2 bg-petal-ink text-petal-cream rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
                 >
                   <Play className="w-4 h-4 inline mr-1.5" strokeWidth={1.5} />
@@ -447,6 +457,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               ) : (
                 <button
                   onClick={closeModal}
+                  data-testid="roleplay-modal-finish-button"
                   className="px-6 py-2 bg-petal-ink text-petal-cream rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
                 >
                   完成 →

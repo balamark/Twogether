@@ -1929,12 +1929,13 @@ const LoveTimeApp = () => {
                     <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
                       — 新的記錄
                     </div>
-                    <h3 className="font-display text-3xl font-light tracking-tight text-petal-ink">
+                    <h3 data-testid="record-modal-heading" className="font-display text-3xl font-light tracking-tight text-petal-ink">
                       記錄<em className="not-italic font-light italic text-pink-600">親密時光</em>
                     </h3>
                   </div>
                   <button
                     onClick={() => setShowRecordModal(false)}
+                    data-testid="record-modal-close-button"
                     className="text-petal-muted hover:text-petal-ink text-2xl font-light transition-colors leading-none"
                   >
                     ×
@@ -2020,6 +2021,7 @@ const LoveTimeApp = () => {
                       value={recordForm.description}
                       onChange={(e) => setRecordForm({...recordForm, description: e.target.value})}
                       placeholder="分享這個美好時光的細節..."
+                      data-testid="record-description-input"
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 h-20"
                     />
                   </div>
@@ -2035,6 +2037,7 @@ const LoveTimeApp = () => {
                         value={recordForm.duration}
                         onChange={(e) => setRecordForm({...recordForm, duration: e.target.value})}
                         placeholder="例如：30分鐘"
+                        data-testid="record-duration-input"
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                       />
                     </div>
@@ -2048,6 +2051,7 @@ const LoveTimeApp = () => {
                         value={recordForm.location}
                         onChange={(e) => setRecordForm({...recordForm, location: e.target.value})}
                         placeholder="例如：臥室、客廳"
+                        data-testid="record-location-input"
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                       />
                     </div>
@@ -2062,6 +2066,7 @@ const LoveTimeApp = () => {
                     <select
                       value={recordForm.roleplayScript}
                       onChange={(e) => setRecordForm({...recordForm, roleplayScript: e.target.value})}
+                      data-testid="record-roleplay-select"
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                     >
                       <option value="">未使用劇本</option>
@@ -2102,6 +2107,7 @@ const LoveTimeApp = () => {
                       value={recordForm.notes}
                       onChange={(e) => setRecordForm({...recordForm, notes: e.target.value})}
                       placeholder="記錄這個特別時刻的感受..."
+                      data-testid="record-notes-input"
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 h-20"
                     />
                   </div>
@@ -2110,12 +2116,14 @@ const LoveTimeApp = () => {
                 <div className="flex space-x-3 mt-8 pt-6 border-t border-petal-rule">
                   <button
                     onClick={() => setShowRecordModal(false)}
+                    data-testid="record-cancel-button"
                     className="flex-1 px-4 py-3 border border-petal-rule text-petal-ink rounded-md hover:bg-petal-cream-2 transition-colors font-body text-sm"
                   >
                     取消
                   </button>
                   <button
                     onClick={handleSubmitRecord}
+                    data-testid="record-submit-button"
                     className="flex-1 px-4 py-3 bg-petal-ink text-petal-cream rounded-md hover:bg-pink-700 transition-colors font-display italic text-base"
                   >
                     保存記錄
@@ -3252,7 +3260,7 @@ const LoveTimeApp = () => {
               <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
                 — {authMode === 'login' ? '登入' : authMode === 'register' ? '註冊' : '連接'}
               </div>
-              <h3 className="font-display text-2xl font-light tracking-tight text-petal-ink">
+              <h3 data-testid="auth-modal-heading" className="font-display text-2xl font-light tracking-tight text-petal-ink">
                 {authMode === 'login' ? <>登入<em className="not-italic font-light italic text-pink-600">愛的時光</em></> :
                  authMode === 'register' ? <>註冊<em className="not-italic font-light italic text-pink-600">新帳號</em></> :
                  <>連接<em className="not-italic font-light italic text-pink-600">伴侶</em></>}
@@ -3260,6 +3268,7 @@ const LoveTimeApp = () => {
             </div>
             <button
               onClick={() => setShowAuthModal(false)}
+              data-testid="auth-modal-close-button"
               className="text-petal-muted hover:text-petal-ink transition-colors"
             >
               <X className="w-5 h-5" strokeWidth={1.5} />
@@ -3276,6 +3285,7 @@ const LoveTimeApp = () => {
                   <input
                     id="auth-email"
                     name="auth-email"
+                    data-testid="auth-email-input"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -3291,6 +3301,7 @@ const LoveTimeApp = () => {
                   <input
                     id="auth-password"
                     name="auth-password"
+                    data-testid="auth-password-input"
                     type="password"
                     autoComplete="current-password"
                     value={password}
@@ -3383,6 +3394,7 @@ const LoveTimeApp = () => {
             <button
               type="submit"
               disabled={isLoading}
+              data-testid="auth-submit-button"
               className={`w-full py-3 rounded-md font-display italic text-base transition-colors ${
                 isLoading
                   ? 'bg-petal-cream-2 text-petal-muted cursor-not-allowed'
@@ -3896,6 +3908,7 @@ const LoveTimeApp = () => {
               )}
               <button
                 type="submit"
+                data-testid="script-upload-submit-button"
                 className="flex-1 bg-petal-ink text-petal-cream py-3 rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
               >
                 {isEditMode ? '保存修改 →' : '上傳劇本 (+200 金幣)'}
@@ -4699,6 +4712,7 @@ const LoveTimeApp = () => {
               <button
                 key={item.id}
                 onClick={() => setCurrentView(item.id)}
+                data-testid={`nav-tab-${item.id}`}
                 className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full transition-colors border ${
                   isActive
                     ? 'bg-petal-ink text-petal-cream border-petal-ink'

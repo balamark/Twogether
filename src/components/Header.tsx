@@ -182,6 +182,7 @@ const Header: React.FC<HeaderProps> = ({
             ) : (
               <button
                 onClick={onShowAuthModal}
+                data-testid="header-auth-button"
                 className="bg-petal-ink text-white px-5 py-2 rounded-full hover:bg-pink-700 transition-colors text-sm font-medium tracking-wide"
               >
                 登入 / 註冊
