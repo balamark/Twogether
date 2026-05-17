@@ -489,8 +489,8 @@ const LoveTimeApp = () => {
     },
     {
       id: 'first_date',
-      type: 'first_date', 
-      date: '2024-01-15',
+      type: 'first_date',
+      date: '',
       title: '開始交往',
       description: '緊張又興奮的第一次約會，從此心中只有彼此'
     },
@@ -1769,8 +1769,11 @@ const LoveTimeApp = () => {
   const formatChineseDate = (d: Date): string =>
     `${chineseYear(d.getFullYear())}年${toChineseNum(d.getMonth() + 1)}月${toChineseNum(d.getDate())}日`;
 
-  // Earliest meaningful "together since" date — earliest record, else user account.
+  // "Together since" date — prefers the user-set 交往日期 milestone, then
+  // earliest intimate record, then the account creation date.
   const togetherSince = (() => {
+    const firstDate = journeyMilestones.find(m => m.type === 'first_date')?.date;
+    if (firstDate) return new Date(firstDate);
     if (intimateRecords.length > 0) {
       const earliest = intimateRecords.reduce(
         (min, r) => (r.date < min.date ? r : min),
@@ -4271,7 +4274,7 @@ const LoveTimeApp = () => {
                       <div>
                         <h3 className="font-display text-lg font-medium tracking-tight text-petal-ink">{milestone.title}</h3>
                         <p className="font-display italic font-light text-sm text-petal-muted mt-0.5">
-                          {milestone.date || (milestone.place ? '—' : '')}
+                          {milestone.date ? milestone.date.slice(0, 10) : (milestone.place ? '—' : '')}
                         </p>
                         {milestone.place && (
                           <p className="font-body text-xs text-petal-muted">地點：{milestone.place}</p>
