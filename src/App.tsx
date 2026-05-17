@@ -2361,93 +2361,139 @@ const LoveTimeApp = () => {
       },
     ];
 
-    // Conflict response phrases — three intensities + two situational tiers.
-    // Pick by emotional temperature: 柔和 (warming up) → 堅定 (overflowing).
+    // Partner-facing guide — 8 small steps your partner can take when you're upset.
+    // Reframed from "what I say to defuse" to "what TA can do/say to bring me back."
+    // Each step has a phrase set the user can send to their partner.
     const conflictPhraseTiers: {
       key: string;
       dot: string;
       badge: string;
       title: string;
-      when: string;
+      why: string;
       cardClass: string;
       badgeClass: string;
       phrases: string[];
       note: string;
     }[] = [
       {
-        key: 'gentle',
-        dot: '🔵',
-        badge: '柔和版',
-        title: '我需要喘息，不是拒絕你',
-        when: '情緒升溫，但雙方還沒爆',
+        key: 'pause',
+        dot: '①',
+        badge: '先停一下',
+        title: '先停下來，不要反擊、不要解釋',
+        why: '我在情緒裡時真的聽不進去，越解釋我越受傷。先別急著講道理、辯解或繼續講你的觀點。',
         cardClass: 'bg-sky-50/60 border-sky-200',
         badgeClass: 'text-sky-800 bg-sky-100/80',
         phrases: [
-          '我現在心有點亂，但我有在聽。等我平靜一下，我會回來聽你完整說。',
-          '我聽到你的意思了，但我情緒還在上來。我需要三分鐘緩衝，等一下我們再繼續。',
-          '你的話我都有收到，只是我的狀態不太能處理這個。等我一下，我整理好再跟你說。',
+          '好，我先停一下。我想理解你的感受。',
+          '我知道你現在不舒服，我先陪你。',
+          '我們不急著講完，我先聽你。',
         ],
-        note: '讓他知道：你不是在逃，而是在「準備一個更好的你」。',
+        note: '你越快停下，我越快冷靜 — 這是降溫的第一步。',
       },
       {
-        key: 'standard',
-        dot: '🟡',
-        badge: '標準版',
-        title: '我聽到了，但現在不安全',
-        when: '你已經不太舒服，現場快升溫',
+        key: 'acknowledge',
+        dot: '②',
+        badge: '承認情緒',
+        title: '用一句話承認我的情緒',
+        why: '一句話就能讓我冷靜一半。我不是要你認錯，是要你讓我覺得：你「有看見我」。',
         cardClass: 'bg-amber-50/70 border-amber-200',
         badgeClass: 'text-amber-900 bg-amber-100/80',
         phrases: [
-          '我聽到你說的每一句，但我現在已經不太舒服了。這個狀態再講下去，我怕我們都會後悔。',
-          '你講的我都有理解，但我現在的情緒撐不住。我需要暫停一下，不然我沒辦法好好回應你。',
-          '我知道你想解釋，但我現在沒有能力吸收。我需要一點時間，等我穩定後我會回來聽你。',
+          '我知道我剛剛的話讓你受傷了。',
+          '我看得出來你現在不開心。',
+          '對，我的語氣太急了，我懂。',
         ],
-        note: '你成功傳達：你有在聽 · 你感受到後果 · 你不是拒絕對話，只是延後。',
+        note: '被看見，比被解釋更能讓我放下武裝。',
       },
       {
-        key: 'firm',
-        dot: '🔴',
-        badge: '堅定版',
-        title: '我已經有情緒反應，需要暫停',
-        when: '你已經不行了，再講會爆',
-        cardClass: 'bg-red-50/60 border-red-200',
-        badgeClass: 'text-red-800 bg-red-100/80',
+        key: 'soften',
+        dot: '③',
+        badge: '語氣放軟',
+        title: '語氣放軟，用溫柔代替強硬',
+        why: '內容可以一樣，但語氣要軟很多。我對情緒很敏感 — 語氣比內容還重要。',
+        cardClass: 'bg-rose-50/60 border-rose-200',
+        badgeClass: 'text-rose-800 bg-rose-100/80',
         phrases: [
-          '你的話我有聽進去，也產生了一些不舒服的感受。在我情緒升上來之前，我需要離開一下。',
-          '我不是不尊重你，但你現在說的內容對我造成壓力了。我需要先讓自己冷靜，再回來面對這件事。',
-          '這些話我都有收到，但它們已經讓我情緒反應過大。我現在必須停下，不然我們都會受傷。',
+          '你先別急，我在這裡。',
+          '寶貝，我不是對你生氣。',
+          '我想先照顧你的感受，事情等等再說。',
         ],
-        note: '這是踩剎車 — 不是逃避、不失控，而是保護關係。',
+        note: '同一句話，溫柔說 — 是完全不一樣的訊息。',
       },
       {
-        key: 'special',
-        dot: '⚫',
-        badge: '特別版',
-        title: '對方持續追問、不讓你離開時',
-        when: '當他說：「你為什麼要走？你是不是不在乎？」',
-        cardClass: 'bg-zinc-50 border-zinc-300',
-        badgeClass: 'text-zinc-800 bg-zinc-200/70',
-        phrases: [
-          '我不是要離開你，我是要離開現在的情緒。等我穩定，我會回來。',
-          '你現在追問我，我只會更混亂。我真的有在乎你，所以才需要一點空間讓自己冷靜。',
-          '我現在說任何話都可能是錯的。你值得一個平靜、能思考的我，所以請給我一點時間。',
-        ],
-        note: '溫柔但堅定 — 讓他安心，不會誤會你在拒絕關係。',
-      },
-      {
-        key: 'followup',
-        dot: '🟣',
-        badge: '後續跟進',
-        title: '離開現場後傳的補充訊息',
-        when: '冷靜下來之後，把連結補回去',
+        key: 'soothe',
+        dot: '④',
+        badge: '輕輕安撫',
+        title: '給我一點點安撫 — 肢體或語言都好',
+        why: '不一定要抱我，但一個輕柔的動作能讓我安心很多。',
         cardClass: 'bg-violet-50/60 border-violet-200',
         badgeClass: 'text-violet-800 bg-violet-100/80',
         phrases: [
-          '謝謝你給我空間。剛才那些話我都有聽到，只是我需要時間消化。等我情緒比較穩，我會跟你好好說。',
-          '剛剛我不是不想溝通，是我的身體反應太大了。我想要好好跟你講，所以才暫停一下。',
-          '我知道那不是你故意的，但那些內容確實對我造成了情緒影響。我們等彼此都冷靜一點再談，好嗎？',
+          '我在，你先呼吸一下。',
+          '我牽你的手，好嗎？',
+          '讓我抱你一下，不用說話也可以。',
         ],
-        note: '這是你的保險繩 — 讓他確信你不是逃避、不在乎、或不愛他。',
+        note: '一個小動作，常常比一千句解釋還有效。',
+      },
+      {
+        key: 'reassure',
+        dot: '⑤',
+        badge: '給我保證',
+        title: '保證一下：不是要吵架，是希望彼此更好',
+        why: '一句保證，能讓我從戒備狀態裡放下來。',
+        cardClass: 'bg-emerald-50/60 border-emerald-200',
+        badgeClass: 'text-emerald-800 bg-emerald-100/80',
+        phrases: [
+          '我不是要跟你吵，我想靠近你。',
+          '我希望我們是一起的，不是對立的。',
+          '我想先把你的情緒接住，事情等等再談。',
+        ],
+        note: '把方向定清楚 — 我們是同一隊，不是敵人。',
+      },
+      {
+        key: 'step-down',
+        dot: '⑥',
+        badge: '給我台階',
+        title: '給我一個台階 — 讓我知道你願意等',
+        why: '有台階，我就會回頭。沒有台階，我只會越走越遠。',
+        cardClass: 'bg-orange-50/60 border-orange-200',
+        badgeClass: 'text-orange-800 bg-orange-100/80',
+        phrases: [
+          '你先休息一下，等你準備好我就在這裡。',
+          '你想等 10 分鐘再聊，還是等到我們都冷靜？',
+          '你先慢慢來，我陪你。',
+        ],
+        note: '願意等，比逼著解決更能打開門。',
+      },
+      {
+        key: 'tender',
+        dot: '⑦',
+        badge: '撒嬌靠近',
+        title: '撒嬌一點、軟軟地靠近我',
+        why: '這對你來說可能很小，但對我來說常常是最有效的。',
+        cardClass: 'bg-pink-50/60 border-pink-200',
+        badgeClass: 'text-pink-800 bg-pink-100/80',
+        phrases: [
+          '我也會怕你生氣，我很在意你。',
+          '我想你了，過來一下嘛。',
+          '我希望你被我好好愛著。',
+        ],
+        note: '硬碰硬會兩敗俱傷 — 軟下來的人，才贏。',
+      },
+      {
+        key: 'affirm',
+        dot: '⑧',
+        badge: '溫柔收尾',
+        title: '等我冷下來，用一句肯定句收尾',
+        why: '不要急著講道理或立場，先肯定我 — 我才真的有辦法聽進你的想法。',
+        cardClass: 'bg-stone-50 border-stone-300',
+        badgeClass: 'text-stone-800 bg-stone-200/70',
+        phrases: [
+          '你對我很重要。',
+          '我希望你每天都很安心。',
+          '我很愛你，我不想你難過。',
+        ],
+        note: '先給情緒一個落腳的地方，事情再來談。',
       },
     ];
 
@@ -2463,6 +2509,89 @@ const LoveTimeApp = () => {
 
     // Per-phrase send-to-partner state. Key = `${tier.key}-${phraseIndex}`.
     const [phraseStatus, setPhraseStatus] = useState<Record<string, 'idle' | 'sending' | 'sent'>>({});
+
+    // Toolkit Step 2 accordion — which "need" is currently expanded.
+    const [expandedNeed, setExpandedNeed] = useState<string | null>(null);
+
+    // Custom-message composer state — per-step drafts and expanded/collapsed.
+    const [customDrafts, setCustomDrafts] = useState<Record<string, string>>({});
+    const [customExpanded, setCustomExpanded] = useState<Record<string, boolean>>({});
+
+    // Toolkit content — 4-step interactive flow for active conflict.
+    const emotionFullMessage = '我聽到你了，但我現在情緒有點滿，需要先停一下。我等一下會回來跟你說。';
+
+    const partnerNeedsItems: {
+      key: string;
+      icon: string;
+      title: string;
+      body: string;
+      suggestions?: string[];
+    }[] = [
+      {
+        key: 'pause-no-explain',
+        icon: '①',
+        title: '先停下來，不要解釋，不要辯論',
+        body: '我現在聽不進理性內容，你越解釋，我越痛。你只要先停下來，我會比較快冷靜。',
+      },
+      {
+        key: 'affirm-feeling',
+        icon: '②',
+        title: '用一句肯定我情緒的話（一定要有）',
+        body: '我不是要你道歉，是要你讓我覺得「你有看見我」。',
+        suggestions: [
+          '我知道我剛的話讓你不舒服了。',
+          '我看得出來你在生氣。',
+          '我先陪你一下。',
+        ],
+      },
+      {
+        key: 'give-step-down',
+        icon: '③',
+        title: '給我一個台階：你願意等我',
+        body: '有台階，我就會回頭。沒有台階，我只會越走越遠。',
+        suggestions: [
+          '你先休息一下，我在這裡等你。',
+          '等你準備好了，我們再一起聊。',
+        ],
+      },
+    ];
+
+    const exitOptions: { key: string; numeral: string; label: string; message: string }[] = [
+      {
+        key: 'pause-10min',
+        numeral: '1️⃣',
+        label: '暫停 10 分鐘',
+        message: '我會離開一下下，十分鐘後我們再回到同一個話題。',
+      },
+      {
+        key: 'pause-until-calm',
+        numeral: '2️⃣',
+        label: '暫停到情緒穩定',
+        message: '我現在想先讓情緒平穩，等我冷靜，我會主動來找你。',
+      },
+      {
+        key: 'switch-to-text',
+        numeral: '3️⃣',
+        label: '用文字聊代替現場聊',
+        message: '我現在用說的會越來越激動，我們改用訊息聊，好讓彼此舒服。',
+      },
+    ];
+
+    const tenderPhrases: string[] = [
+      '我沒有要跟你對立，我想靠近你。',
+      '你的感受我放在心上。',
+      '我在這裡，你慢慢來。',
+    ];
+
+    const soothingEmojis: string[] = ['🤝', '🫶', '🌙', '🤍', '🐻', '✨'];
+
+    const caringQuestion = '現在我能怎麼讓你舒服一點？';
+
+    const caringReplyOptions: string[] = [
+      '給我 5 分鐘就好。',
+      '說一句讓我安心的話。',
+      '先抱一下我。',
+    ];
 
     const handleSendPhrase = async (phrase: string, key: string) => {
       if (!partnerConnected) {
@@ -2501,6 +2630,138 @@ const LoveTimeApp = () => {
       }
     };
 
+    // Custom-message sender — same reconciliation channel, but uses the per-step textarea draft.
+    // Resets composer state on success so users can send multiple custom messages in a row.
+    const handleSendCustom = async (key: string) => {
+      const draft = (customDrafts[key] || '').trim();
+      if (!draft) {
+        showNotification({
+          type: 'warning',
+          title: '訊息不能為空',
+          message: '請先寫一些字再送出。',
+          duration: 3000,
+        });
+        return;
+      }
+      if (!partnerConnected) {
+        showNotification({
+          type: 'warning',
+          title: '尚未配對伴侶',
+          message: '需要先配對伴侶才能直接傳訊息給對方。',
+          duration: 4000,
+        });
+        return;
+      }
+      if (phraseStatus[key] === 'sending') return;
+      const confirmed = window.confirm(`確定要把這則自訂訊息傳給TA嗎？\n\n「${draft}」`);
+      if (!confirmed) return;
+      setPhraseStatus(prev => ({ ...prev, [key]: 'sending' }));
+      try {
+        await apiService.createIntimacyRequest({
+          messageContent: draft,
+          requestType: 'reconciliation',
+        });
+        showNotification({
+          type: 'success',
+          title: '已送給TA',
+          message: '自訂訊息已送到對方的邀請紀錄。',
+          duration: 3000,
+        });
+        setPhraseStatus(prev => ({ ...prev, [key]: 'idle' }));
+        setCustomDrafts(prev => ({ ...prev, [key]: '' }));
+        setCustomExpanded(prev => ({ ...prev, [key]: false }));
+      } catch (err) {
+        setPhraseStatus(prev => ({ ...prev, [key]: 'idle' }));
+        showNotification({
+          type: 'error',
+          title: '送出失敗',
+          message: (err as Error)?.message || '請稍後再試。',
+          duration: 4000,
+        });
+      }
+    };
+
+    // Inline custom-message composer — collapsed button by default, expands to textarea + send.
+    const renderCustomComposer = (key: string, placeholder = '寫一句自己想說的話傳給TA…') => {
+      const draft = customDrafts[key] || '';
+      const expanded = !!customExpanded[key];
+      const status = phraseStatus[key] || 'idle';
+      const isSending = status === 'sending';
+
+      if (!expanded) {
+        return (
+          <button
+            type="button"
+            onClick={() => setCustomExpanded(prev => ({ ...prev, [key]: true }))}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-body text-xs font-medium border border-dashed border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink hover:bg-white/70 transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" strokeWidth={1.75} />
+            寫自己的訊息
+          </button>
+        );
+      }
+
+      const trimmedLen = draft.trim().length;
+      const canSend = !isSending && trimmedLen > 0 && partnerConnected;
+
+      return (
+        <div className="bg-white/90 rounded-md border border-petal-rule p-3">
+          <textarea
+            value={draft}
+            onChange={(e) => setCustomDrafts(prev => ({ ...prev, [key]: e.target.value }))}
+            placeholder={placeholder}
+            rows={2}
+            maxLength={300}
+            disabled={isSending}
+            className="w-full font-body text-sm text-petal-ink leading-relaxed bg-transparent border-0 resize-none focus:outline-none placeholder:text-petal-muted/70"
+          />
+          <div className="flex items-center justify-between gap-2 mt-1.5 pt-2 border-t border-petal-rule-soft">
+            <span className="font-body text-[11px] text-petal-muted">
+              {draft.length}/300
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomExpanded(prev => ({ ...prev, [key]: false }));
+                  setCustomDrafts(prev => ({ ...prev, [key]: '' }));
+                }}
+                disabled={isSending}
+                className="px-3 py-1.5 rounded-full font-body text-xs text-petal-muted hover:text-petal-ink transition-colors"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSendCustom(key)}
+                disabled={!canSend}
+                title={!partnerConnected ? '需要先配對伴侶' : ''}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-body text-xs font-medium border transition-colors ${
+                  isSending
+                    ? 'border-petal-rule bg-white text-petal-muted cursor-wait'
+                    : canSend
+                      ? 'border-petal-rose bg-white text-petal-rose-deep hover:bg-petal-rose hover:text-white hover:border-petal-rose'
+                      : 'border-petal-rule bg-white text-petal-muted opacity-60 cursor-not-allowed'
+                }`}
+              >
+                {isSending ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-petal-muted border-t-transparent rounded-full animate-spin" />
+                    傳送中
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-3.5 h-3.5" strokeWidth={1.75} />
+                    傳給TA
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
     const scrollToSection = (id: string) => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -2509,9 +2770,10 @@ const LoveTimeApp = () => {
 
     const sectionNav: { id: string; label: string }[] = [
       { id: 'conflict-pause', label: '正在爭吵中' },
+      { id: 'conflict-toolkit', label: '應對工具' },
       { id: 'conflict-article', label: '閱讀' },
       { id: 'conflict-practice', label: '相處練習' },
-      { id: 'conflict-phrases', label: '話語範例' },
+      { id: 'conflict-phrases', label: '給TA指引' },
     ];
 
     // Tick timer while on Step 3
@@ -2634,6 +2896,500 @@ const LoveTimeApp = () => {
           </button>
         </div>
       </div>
+
+      {/* Both-sides conflict toolkit — 4-step interactive guide with sendable messages per step */}
+      <section id="conflict-toolkit" className="scroll-mt-20">
+        <header className="mb-6">
+          <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+            — 衝突進行中的工具箱
+          </div>
+          <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-2">
+            雙方衝突時的<em className="not-italic font-light italic text-pink-600">應對工具</em>
+          </h3>
+          <p className="font-body text-sm text-petal-ink-soft leading-relaxed">
+            四個小步驟，從「我滿了」走到「我們重新靠近」。每一步都有一鍵就能送到TA那裡的訊息。
+            {!partnerConnected && (
+              <span className="block mt-1.5 text-petal-muted text-xs">
+                配對伴侶後，點任何「傳給TA」按鈕即可直接送出。
+              </span>
+            )}
+          </p>
+        </header>
+
+        <div className="space-y-5">
+          {/* Step 1 — Notify TA that you're emotionally full */}
+          <article className="bg-violet-50/60 border-2 border-violet-200 rounded-md p-5 md:p-7">
+            <header className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-2">
+              <span className="inline-flex items-center gap-1.5 font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-800 bg-violet-100/80 px-2.5 py-1 rounded">
+                <span aria-hidden>🟣</span>
+                Step 1
+              </span>
+              <h4 className="font-display text-lg md:text-xl font-medium text-petal-ink leading-snug">
+                我現在情緒滿了
+              </h4>
+            </header>
+            <p className="font-body text-[13px] text-petal-ink-soft mb-4 leading-relaxed">
+              用一句話讓TA知道你需要空間 — 不是生氣、不是不想聽，只是情緒太滿了。
+            </p>
+            <blockquote className="font-display italic text-[15px] text-petal-ink bg-white/70 rounded-md p-4 border border-white mb-4 leading-relaxed">
+              「我現在需要一下下的空間，不是生你的氣，也不是不想聽，只是情緒太滿了。」
+            </blockquote>
+
+            <div className="bg-white/80 rounded-md p-4 border border-violet-200/50">
+              <div className="font-body text-[11px] uppercase tracking-[0.14em] text-violet-800/80 mb-2">
+                📩 一鍵傳送（自動訊息）
+              </div>
+              <p className="font-display italic text-[14px] text-petal-ink mb-3 leading-relaxed">
+                「{emotionFullMessage}」
+              </p>
+              {(() => {
+                const key = 'toolkit-step1-notify';
+                const status = phraseStatus[key] || 'idle';
+                return (
+                  <button
+                    type="button"
+                    onClick={() => handleSendPhrase(emotionFullMessage, key)}
+                    disabled={status === 'sending' || status === 'sent'}
+                    className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-md font-body text-sm font-medium border transition-colors ${
+                      status === 'sent'
+                        ? 'border-petal-sage bg-petal-sage/15 text-petal-sage-deep cursor-default'
+                        : status === 'sending'
+                          ? 'border-petal-rule bg-white text-petal-muted cursor-wait'
+                          : partnerConnected
+                            ? 'border-violet-400 bg-violet-600 text-white hover:bg-violet-700 hover:border-violet-700'
+                            : 'border-petal-rule bg-white text-petal-muted opacity-60'
+                    }`}
+                  >
+                    {status === 'sent' ? (
+                      <>
+                        <Check className="w-4 h-4" strokeWidth={2} />
+                        已傳送：情緒已滿的通知
+                      </>
+                    ) : status === 'sending' ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-petal-muted border-t-transparent rounded-full animate-spin" />
+                        傳送中…
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" strokeWidth={1.75} />
+                        傳送：情緒已滿的通知
+                      </>
+                    )}
+                  </button>
+                );
+              })()}
+            </div>
+
+            <div className="mt-4">
+              {renderCustomComposer('toolkit-step1-custom', '想用自己的話告訴TA「我滿了」？寫在這…')}
+            </div>
+          </article>
+
+          {/* Step 2 — 3 things TA most needs to know (accordion) */}
+          <article className="bg-sky-50/60 border-2 border-sky-200 rounded-md p-5 md:p-7">
+            <header className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-2">
+              <span className="inline-flex items-center gap-1.5 font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-800 bg-sky-100/80 px-2.5 py-1 rounded">
+                <span aria-hidden>🔵</span>
+                Step 2
+              </span>
+              <h4 className="font-display text-lg md:text-xl font-medium text-petal-ink leading-snug">
+                給TA看的：3 件我最需要的事情
+              </h4>
+            </header>
+            <p className="font-body text-[13px] text-petal-ink-soft mb-4 leading-relaxed">
+              點開每一項，讓TA了解你最需要什麼。展開後的建議話語可以一鍵傳給TA。
+            </p>
+
+            <div className="space-y-2">
+              {partnerNeedsItems.map((item) => {
+                const isExpanded = expandedNeed === item.key;
+                return (
+                  <div key={item.key} className="bg-white/80 rounded-md border border-sky-200/50 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedNeed(isExpanded ? null : item.key)}
+                      className="w-full px-4 py-3 flex items-center gap-3 text-left hover:bg-sky-50/40 transition-colors"
+                      aria-expanded={isExpanded}
+                    >
+                      <span className="font-display text-petal-rose-deep text-base flex-shrink-0">{item.icon}</span>
+                      <span className="font-display text-[15px] font-medium text-petal-ink flex-1 leading-snug">
+                        {item.title}
+                      </span>
+                      <ChevronDown
+                        className={`w-4 h-4 text-petal-muted flex-shrink-0 transform transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                        strokeWidth={1.5}
+                      />
+                    </button>
+                    {isExpanded && (
+                      <div className="px-4 pb-4 pt-1 border-t border-sky-100">
+                        <p className="font-body text-[13px] text-petal-ink-soft mb-3 leading-relaxed">
+                          {item.body}
+                        </p>
+                        {item.suggestions && (
+                          <>
+                            <div className="font-body text-[11px] uppercase tracking-[0.14em] text-sky-800/80 mb-2">
+                              建議話語
+                            </div>
+                            <ul className="space-y-2">
+                              {item.suggestions.map((s, i) => {
+                                const key = `toolkit-step2-${item.key}-${i}`;
+                                const status = phraseStatus[key] || 'idle';
+                                return (
+                                  <li
+                                    key={i}
+                                    className="flex flex-col sm:flex-row sm:items-start gap-2 bg-white rounded-md p-3 border border-sky-100"
+                                  >
+                                    <blockquote className="font-display text-[14px] text-petal-ink leading-relaxed flex-1">
+                                      「{s}」
+                                    </blockquote>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSendPhrase(s, key)}
+                                      disabled={status === 'sending' || status === 'sent'}
+                                      title={partnerConnected ? '傳送這句話給TA' : '需要先配對伴侶'}
+                                      className={`flex-shrink-0 self-end sm:self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-body text-xs font-medium border transition-colors ${
+                                        status === 'sent'
+                                          ? 'border-petal-sage bg-petal-sage/15 text-petal-sage-deep cursor-default'
+                                          : status === 'sending'
+                                            ? 'border-petal-rule bg-white text-petal-muted cursor-wait'
+                                            : partnerConnected
+                                              ? 'border-sky-300 bg-white text-sky-800 hover:bg-sky-600 hover:text-white hover:border-sky-600'
+                                              : 'border-petal-rule bg-white text-petal-muted opacity-60'
+                                      }`}
+                                    >
+                                      {status === 'sent' ? (
+                                        <>
+                                          <Check className="w-3.5 h-3.5" strokeWidth={2} />
+                                          已送出
+                                        </>
+                                      ) : status === 'sending' ? (
+                                        <>
+                                          <span className="w-3.5 h-3.5 border-2 border-petal-muted border-t-transparent rounded-full animate-spin" />
+                                          傳送中
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Send className="w-3.5 h-3.5" strokeWidth={1.75} />
+                                          傳給TA
+                                        </>
+                                      )}
+                                    </button>
+                                  </li>
+                                );
+                              })}
+                            </ul>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-4">
+              {renderCustomComposer('toolkit-step2-custom', '想自己跟TA說「我最需要的是…」？寫在這…')}
+            </div>
+          </article>
+
+          {/* Step 3 — 3 exit options for pausing the conflict */}
+          <article className="bg-orange-50/60 border-2 border-orange-200 rounded-md p-5 md:p-7">
+            <header className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-2">
+              <span className="inline-flex items-center gap-1.5 font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-orange-800 bg-orange-100/80 px-2.5 py-1 rounded">
+                <span aria-hidden>🟠</span>
+                Step 3
+              </span>
+              <h4 className="font-display text-lg md:text-xl font-medium text-petal-ink leading-snug">
+                衝突升起時的退場流程
+              </h4>
+            </header>
+            <p className="font-body text-[13px] text-petal-ink-soft mb-4 leading-relaxed">
+              選一種暫停方式，一鍵把對應的暫停訊息送給TA。
+            </p>
+
+            <div className="space-y-3">
+              {exitOptions.map((opt) => {
+                const key = `toolkit-step3-${opt.key}`;
+                const status = phraseStatus[key] || 'idle';
+                return (
+                  <div key={opt.key} className="bg-white/80 rounded-md p-4 border border-orange-200/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-base" aria-hidden>{opt.numeral}</span>
+                      <span className="font-display text-[15px] font-medium text-petal-ink">
+                        {opt.label}
+                      </span>
+                    </div>
+                    <p className="font-display italic text-[14px] text-petal-ink-soft mb-3 leading-relaxed">
+                      「{opt.message}」
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleSendPhrase(opt.message, key)}
+                      disabled={status === 'sending' || status === 'sent'}
+                      title={partnerConnected ? '傳送這個暫停訊息給TA' : '需要先配對伴侶'}
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-md font-body text-sm font-medium border transition-colors ${
+                        status === 'sent'
+                          ? 'border-petal-sage bg-petal-sage/15 text-petal-sage-deep cursor-default'
+                          : status === 'sending'
+                            ? 'border-petal-rule bg-white text-petal-muted cursor-wait'
+                            : partnerConnected
+                              ? 'border-orange-400 bg-white text-orange-800 hover:bg-orange-600 hover:text-white hover:border-orange-600'
+                              : 'border-petal-rule bg-white text-petal-muted opacity-60'
+                      }`}
+                    >
+                      {status === 'sent' ? (
+                        <>
+                          <Check className="w-4 h-4" strokeWidth={2} />
+                          已傳送
+                        </>
+                      ) : status === 'sending' ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-petal-muted border-t-transparent rounded-full animate-spin" />
+                          傳送中…
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" strokeWidth={1.75} />
+                          選這個 — 傳給TA
+                        </>
+                      )}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-4">
+              {renderCustomComposer('toolkit-step3-custom', '想自己寫一個暫停的方式？例如「等我洗完澡再聊」…')}
+            </div>
+          </article>
+
+          {/* Step 4 — 3 small tasks to bring me back */}
+          <article className="bg-amber-50/70 border-2 border-amber-200 rounded-md p-5 md:p-7">
+            <header className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-2">
+              <span className="inline-flex items-center gap-1.5 font-body text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-900 bg-amber-100/80 px-2.5 py-1 rounded">
+                <span aria-hidden>🟡</span>
+                Step 4
+              </span>
+              <h4 className="font-display text-lg md:text-xl font-medium text-petal-ink leading-snug">
+                讓我冷靜後願意回來的關鍵
+              </h4>
+            </header>
+            <p className="font-body text-[13px] text-petal-ink-soft mb-5 leading-relaxed">
+              當你準備好靠近TA時 — 或想告訴TA「這樣對我最有效」 — 這三件小事最能拉近距離。
+            </p>
+
+            {/* Task 1 — tender phrase */}
+            <div className="mb-6">
+              <div className="font-body text-[12px] font-semibold tracking-tight text-amber-900 mb-2 flex items-center gap-1.5">
+                <span aria-hidden>✔</span>
+                任務 1 — 傳一句溫柔語氣
+              </div>
+              <ul className="space-y-2">
+                {tenderPhrases.map((p, i) => {
+                  const key = `toolkit-step4-tender-${i}`;
+                  const status = phraseStatus[key] || 'idle';
+                  return (
+                    <li
+                      key={i}
+                      className="flex flex-col sm:flex-row sm:items-start gap-2 bg-white/80 rounded-md p-3 border border-amber-200/50"
+                    >
+                      <blockquote className="font-display text-[14px] text-petal-ink leading-relaxed flex-1">
+                        「{p}」
+                      </blockquote>
+                      <button
+                        type="button"
+                        onClick={() => handleSendPhrase(p, key)}
+                        disabled={status === 'sending' || status === 'sent'}
+                        title={partnerConnected ? '傳送這句話給TA' : '需要先配對伴侶'}
+                        className={`flex-shrink-0 self-end sm:self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-body text-xs font-medium border transition-colors ${
+                          status === 'sent'
+                            ? 'border-petal-sage bg-petal-sage/15 text-petal-sage-deep cursor-default'
+                            : status === 'sending'
+                              ? 'border-petal-rule bg-white text-petal-muted cursor-wait'
+                              : partnerConnected
+                                ? 'border-amber-400 bg-white text-amber-800 hover:bg-amber-600 hover:text-white hover:border-amber-600'
+                                : 'border-petal-rule bg-white text-petal-muted opacity-60'
+                        }`}
+                      >
+                        {status === 'sent' ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" strokeWidth={2} />
+                            已送出
+                          </>
+                        ) : status === 'sending' ? (
+                          <>
+                            <span className="w-3.5 h-3.5 border-2 border-petal-muted border-t-transparent rounded-full animate-spin" />
+                            傳送中
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-3.5 h-3.5" strokeWidth={1.75} />
+                            傳給TA
+                          </>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+
+            {/* Task 2 — soothing emoji */}
+            <div className="mb-6">
+              <div className="font-body text-[12px] font-semibold tracking-tight text-amber-900 mb-2 flex items-center gap-1.5">
+                <span aria-hidden>✔</span>
+                任務 2 — 傳一個安撫 emoji
+              </div>
+              <p className="font-body text-xs text-petal-ink-soft mb-3 leading-relaxed">
+                點一個 emoji 就送出，不用任何文字。
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {soothingEmojis.map((emoji, i) => {
+                  const key = `toolkit-step4-emoji-${i}`;
+                  const status = phraseStatus[key] || 'idle';
+                  const isSent = status === 'sent';
+                  const isSending = status === 'sending';
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => handleSendPhrase(emoji, key)}
+                      disabled={isSent || isSending}
+                      title={
+                        isSent ? '已送出' : partnerConnected ? `傳送 ${emoji} 給TA` : '需要先配對伴侶'
+                      }
+                      className={`w-12 h-12 text-2xl rounded-full border-2 flex items-center justify-center transition-colors ${
+                        isSent
+                          ? 'border-petal-sage bg-petal-sage/15 cursor-default'
+                          : isSending
+                            ? 'border-petal-rule bg-white opacity-60 cursor-wait'
+                            : partnerConnected
+                              ? 'border-amber-300 bg-white hover:bg-amber-100 hover:border-amber-500'
+                              : 'border-petal-rule bg-white opacity-60'
+                      }`}
+                    >
+                      {emoji}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Task 3 — caring question with pre-prepared replies */}
+            <div>
+              <div className="font-body text-[12px] font-semibold tracking-tight text-amber-900 mb-2 flex items-center gap-1.5">
+                <span aria-hidden>✔</span>
+                任務 3 — 問一個貼心小問題
+              </div>
+              <div className="bg-white/80 rounded-md p-4 border border-amber-200/50">
+                <blockquote className="font-display italic text-[15px] text-petal-ink mb-3 leading-relaxed">
+                  「{caringQuestion}」
+                </blockquote>
+                {(() => {
+                  const key = 'toolkit-step4-question';
+                  const status = phraseStatus[key] || 'idle';
+                  return (
+                    <button
+                      type="button"
+                      onClick={() => handleSendPhrase(caringQuestion, key)}
+                      disabled={status === 'sending' || status === 'sent'}
+                      title={partnerConnected ? '把這個問題傳給TA' : '需要先配對伴侶'}
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-md font-body text-sm font-medium border transition-colors ${
+                        status === 'sent'
+                          ? 'border-petal-sage bg-petal-sage/15 text-petal-sage-deep cursor-default'
+                          : status === 'sending'
+                            ? 'border-petal-rule bg-white text-petal-muted cursor-wait'
+                            : partnerConnected
+                              ? 'border-amber-400 bg-white text-amber-800 hover:bg-amber-600 hover:text-white hover:border-amber-600'
+                              : 'border-petal-rule bg-white text-petal-muted opacity-60'
+                      }`}
+                    >
+                      {status === 'sent' ? (
+                        <>
+                          <Check className="w-4 h-4" strokeWidth={2} />
+                          已傳送
+                        </>
+                      ) : status === 'sending' ? (
+                        <>
+                          <span className="w-4 h-4 border-2 border-petal-muted border-t-transparent rounded-full animate-spin" />
+                          傳送中…
+                        </>
+                      ) : (
+                        <>
+                          <Send className="w-4 h-4" strokeWidth={1.75} />
+                          傳這句話給TA
+                        </>
+                      )}
+                    </button>
+                  );
+                })()}
+
+                <div className="font-body text-[11px] uppercase tracking-[0.14em] text-petal-muted mt-5 mb-2">
+                  你可以選的回覆（一鍵送出）
+                </div>
+                <ul className="space-y-2">
+                  {caringReplyOptions.map((r, i) => {
+                    const key = `toolkit-step4-reply-${i}`;
+                    const status = phraseStatus[key] || 'idle';
+                    return (
+                      <li
+                        key={i}
+                        className="flex flex-col sm:flex-row sm:items-start gap-2 bg-white rounded-md p-3 border border-amber-100"
+                      >
+                        <blockquote className="font-display text-[14px] text-petal-ink leading-relaxed flex-1">
+                          「{r}」
+                        </blockquote>
+                        <button
+                          type="button"
+                          onClick={() => handleSendPhrase(r, key)}
+                          disabled={status === 'sending' || status === 'sent'}
+                          title={partnerConnected ? '把這個回覆送給TA' : '需要先配對伴侶'}
+                          className={`flex-shrink-0 self-end sm:self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-body text-xs font-medium border transition-colors ${
+                            status === 'sent'
+                              ? 'border-petal-sage bg-petal-sage/15 text-petal-sage-deep cursor-default'
+                              : status === 'sending'
+                                ? 'border-petal-rule bg-white text-petal-muted cursor-wait'
+                                : partnerConnected
+                                  ? 'border-amber-400 bg-white text-amber-800 hover:bg-amber-600 hover:text-white hover:border-amber-600'
+                                  : 'border-petal-rule bg-white text-petal-muted opacity-60'
+                          }`}
+                        >
+                          {status === 'sent' ? (
+                            <>
+                              <Check className="w-3.5 h-3.5" strokeWidth={2} />
+                              已送出
+                            </>
+                          ) : status === 'sending' ? (
+                            <>
+                              <span className="w-3.5 h-3.5 border-2 border-petal-muted border-t-transparent rounded-full animate-spin" />
+                              傳送中
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-3.5 h-3.5" strokeWidth={1.75} />
+                              傳給TA
+                            </>
+                          )}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            </div>
+
+            <div className="mt-5 pt-5 border-t border-amber-200/60">
+              {renderCustomComposer('toolkit-step4-custom', '想自己寫一句靠近TA的話？寫在這…')}
+            </div>
+          </article>
+        </div>
+
+        <p className="font-display italic text-center text-sm text-petal-muted mt-6 leading-relaxed">
+          工具是橋 — 一步步走，回到彼此身邊。
+        </p>
+      </section>
 
       {/* Featured Long-Read — 翻譯彼此的語言 (collapsible to keep page scannable) */}
       <article id="conflict-article" className="bg-white rounded-md border border-petal-rule p-6 md:p-10 scroll-mt-20">
@@ -2793,20 +3549,20 @@ const LoveTimeApp = () => {
         </div>
       </div>
 
-      {/* Conflict response phrases —現場可直接使用的話語範例 */}
+      {/* Partner-facing guide — what TA can do when I'm upset, with sendable phrases per step */}
       <section id="conflict-phrases" className="scroll-mt-20">
         <header className="mb-6">
           <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-            — 衝突時的應對工具
+            — 給TA的對話指引
           </div>
           <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-2">
-            可以解決衝突的<em className="not-italic font-light italic text-pink-600">話語範例</em>
+            當我生氣時，你可以<em className="not-italic font-light italic text-pink-600">這樣做</em>
           </h3>
           <p className="font-body text-sm text-petal-ink-soft leading-relaxed">
-            三種強度（柔和／標準／堅定）＋兩種情境工具。依現場火藥味與情緒強度選用，照念就好。
+            八個小步驟，不是要你道歉或認錯 — 而是希望我們在情緒裡也能靠近。你越溫柔，我越能下台階。
             {partnerConnected && (
               <span className="block mt-1.5 text-petal-muted text-xs">
-                點每一句後面的「傳給TA」即可直接送到對方的邀請紀錄。
+                點每一句後面的「傳給TA」，就能把這句話直接送到對方的邀請紀錄。
               </span>
             )}
           </p>
@@ -2830,8 +3586,8 @@ const LoveTimeApp = () => {
                 </h4>
               </header>
 
-              <p className="font-body text-xs text-petal-ink-soft mb-5 italic">
-                適合 — {tier.when}
+              <p className="font-body text-[13px] text-petal-ink-soft mb-5 leading-relaxed">
+                {tier.why}
               </p>
 
               <ol className="space-y-3 mb-5">
@@ -2888,6 +3644,10 @@ const LoveTimeApp = () => {
                 })}
               </ol>
 
+              <div className="mb-5">
+                {renderCustomComposer(`${tier.key}-custom`, `這一步想自己說一句話？寫給TA…`)}
+              </div>
+
               {tier.note && (
                 <p className="font-body text-xs md:text-sm text-petal-ink-soft leading-relaxed border-t border-petal-rule-soft pt-3">
                   {tier.note}
@@ -2898,7 +3658,7 @@ const LoveTimeApp = () => {
         </div>
 
         <p className="font-display italic text-center text-sm text-petal-muted mt-6 leading-relaxed">
-          停下來，不是逃避 — 是給彼此一個更好的版本回來相見。
+          你越溫柔，我越能回來 — 不是輸贏，是回到彼此身邊。
         </p>
       </section>
 
