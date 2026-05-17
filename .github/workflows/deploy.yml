@@ -41,6 +41,7 @@ jobs:
               - 'package.json'
               - 'package-lock.json'
               - 'app.yaml'
+              - 'app.staging.yaml'
               - 'vite.config.ts'
               - 'tsconfig*.json'
               - 'playwright.config.ts'
@@ -206,3 +207,99 @@ jobs:
           else
             echo "❌ Deployment failed"
           fi
+
+  deploy-staging:
+    needs: test-and-deploy
+    if: |
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Google Auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Setup Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Run Staging Database Migrations
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          NODE_ENV: production
+        run: |
+          echo "🗄️ Running staging database migrations..."
+          npm run migrate
+
+      - name: Deploy to App Engine (staging)
+        timeout-minutes: 15
+        env:
+          _STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          _STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+          _STAGING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+          _JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          _EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          _EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+          _RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          _SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          _SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          _SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+          _SMTP_USER: ${{ secrets.SMTP_USER }}
+          _SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          _CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
+        run: |
+          echo "🚀 Deploying PR #${{ github.event.pull_request.number }} to staging..."
+          envsubst < app.staging.yaml > app.staging.yaml.tmp && mv app.staging.yaml.tmp app.staging.yaml
+          gcloud app deploy app.staging.yaml --quiet --project=${{ env.PROJECT_ID }}
+
+      - name: Comment staging URL on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const url = 'https://staging-dot-twogether-couples-app.de.r.appspot.com';
+            const marker = '<!-- staging-deploy -->';
+            const sha = context.sha.slice(0, 7);
+            const body = `${marker}\n🚀 **Staging deployed:** ${url}\n\nLatest commit: \`${sha}\``;
+            const { data: comments } = await github.rest.issues.listComments({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+            });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                comment_id: existing.id,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body,
+              });
+            }

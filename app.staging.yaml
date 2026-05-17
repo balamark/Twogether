@@ -1,0 +1,68 @@
+runtime: nodejs22
+service: staging
+
+# Staging service — separate from prod (default) service. Same project,
+# isolated URL + DB. Auto-deployed by .github/workflows/deploy.yml on PRs.
+env_variables:
+  NODE_ENV: "production"
+  PORT: "8080"
+  # Staging database (separate Supabase project)
+  DATABASE_URL: $_STAGING_DATABASE_URL
+  # Reuse prod JWT secret so existing test accounts work across envs
+  JWT_SECRET: $_JWT_SECRET
+  # Staging Supabase (separate project).
+  # Note: SUPABASE_SERVICE_ROLE_KEY holds the new "Secret" API key value
+  # post-Supabase key rotation. SUPABASE_ANON_KEY (now "Publishable") isn't
+  # plumbed because nothing in the backend reads it.
+  SUPABASE_URL: $_STAGING_SUPABASE_URL
+  SUPABASE_SERVICE_ROLE_KEY: $_STAGING_SUPABASE_SERVICE_ROLE_KEY
+  # Email — shared with prod (staging emails go through same Gmail/Resend)
+  EMAIL_FROM: $_EMAIL_FROM
+  EMAIL_PASS: $_EMAIL_PASS
+  RESEND_API_KEY: $_RESEND_API_KEY
+  SMTP_HOST: $_SMTP_HOST
+  SMTP_PORT: $_SMTP_PORT
+  SMTP_SECURE: $_SMTP_SECURE
+  SMTP_USER: $_SMTP_USER
+  SMTP_PASS: $_SMTP_PASS
+  CORS_ORIGIN: $_CORS_ORIGIN
+  # Outbound email links point at staging, not prod
+  FRONTEND_URL: "https://staging-dot-twogether-couples-app.de.r.appspot.com"
+
+automatic_scaling:
+  min_instances: 0
+  max_instances: 1
+  target_cpu_utilization: 0.8
+
+instance_class: F1
+
+handlers:
+  - url: /assets/(.*)
+    static_files: dist/assets/\1
+    upload: dist/assets/(.*)
+    secure: always
+    expiration: "1d"
+
+  - url: /images/(.*)
+    static_files: dist/images/\1
+    upload: dist/images/(.*)
+    secure: always
+    expiration: "1h"
+
+  - url: /(.*\.(ico|png|svg))$
+    static_files: dist/\1
+    upload: dist/.*\.(ico|png|svg)$
+    secure: always
+    expiration: "1d"
+
+  - url: /api/.*
+    script: auto
+    secure: always
+
+  - url: /health
+    script: auto
+    secure: always
+
+  - url: /.*
+    script: auto
+    secure: always
