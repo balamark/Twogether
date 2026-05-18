@@ -169,6 +169,8 @@ jobs:
           _SMTP_USER: ${{ secrets.SMTP_USER }}
           _SMTP_PASS: ${{ secrets.SMTP_PASS }}
           _CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
+          _LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'claude' }}
+          _ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           echo "🚀 Deploying Twogether app directly to App Engine..."
           # Create app.yaml with actual environment variables
@@ -267,6 +269,8 @@ jobs:
           _SMTP_USER: ${{ secrets.SMTP_USER }}
           _SMTP_PASS: ${{ secrets.SMTP_PASS }}
           _CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
+          _LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'claude' }}
+          _ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           echo "🚀 Deploying PR #${{ github.event.pull_request.number }} to staging..."
           envsubst < app.staging.yaml > app.staging.yaml.tmp && mv app.staging.yaml.tmp app.staging.yaml

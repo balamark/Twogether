@@ -1,0 +1,138 @@
+import { useEffect, useState } from 'react';
+import { Sparkles, BarChart3, ListChecks, Plus } from 'lucide-react';
+import EventHistoryList from './EventHistoryList';
+import ComposeEventFlow from './ComposeEventFlow';
+import EventDetail from './EventDetail';
+import EventAnalytics from './EventAnalytics';
+
+type EventsSubView = 'list' | 'compose' | 'detail' | 'analytics';
+
+interface AuthState {
+  isAuthenticated: boolean;
+  user: { id: string; nickname?: string; email?: string } | null;
+  partnerConnected: boolean;
+}
+
+interface NotificationInput {
+  type: 'success' | 'error' | 'info' | 'warning';
+  title: string;
+  message: string;
+  duration?: number;
+}
+
+interface EventsViewProps {
+  authState: AuthState;
+  showNotification: (notification: NotificationInput) => void;
+}
+
+export default function EventsView({ authState, showNotification }: EventsViewProps) {
+  const [view, setView] = useState<EventsSubView>('list');
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (view !== 'detail') setSelectedEventId(null);
+  }, [view]);
+
+  const openDetail = (id: string) => {
+    setSelectedEventId(id);
+    setView('detail');
+  };
+
+  const onEventCreated = (id: string | null) => {
+    setRefreshKey((k) => k + 1);
+    if (id) openDetail(id);
+    else setView('list');
+  };
+
+  if (!authState.isAuthenticated) {
+    return (
+      <div className="max-w-2xl mx-auto p-6 text-center text-petal-ink-soft">
+        <h2 className="text-2xl font-serif text-petal-ink mb-2">事件 × 破冰</h2>
+        <p>請先登入才能使用此功能。</p>
+      </div>
+    );
+  }
+
+  if (!authState.partnerConnected) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <div className="bg-petal-cream border border-petal-rule rounded-2xl p-6 text-center">
+          <Sparkles className="w-8 h-8 mx-auto mb-3 text-petal-rose-deep" />
+          <h2 className="text-xl font-serif text-petal-ink mb-2">尚未配對伴侶</h2>
+          <p className="text-petal-ink-soft text-sm">
+            事件 × 破冰功能需要先完成伴侶配對才能使用。請到設定頁完成配對。
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto p-4 md:p-6">
+      <header className="mb-5">
+        <h1 className="text-2xl md:text-3xl font-serif text-petal-ink mb-1">事件 × 破冰</h1>
+        <p className="text-sm text-petal-ink-soft">
+          當下情緒不會直接送出。AI 會協助你把感受整理成三種破冰版本，由你選擇要不要送出。
+        </p>
+      </header>
+
+      <nav className="flex flex-wrap gap-2 mb-5 border-b border-petal-rule pb-3">
+        <TabButton active={view === 'list'} onClick={() => setView('list')} icon={ListChecks} label="歷史" />
+        <TabButton
+          active={view === 'compose'}
+          onClick={() => setView('compose')}
+          icon={Plus}
+          label="建立事件"
+          primary
+        />
+        <TabButton active={view === 'analytics'} onClick={() => setView('analytics')} icon={BarChart3} label="分析" />
+      </nav>
+
+      <div>
+        {view === 'list' && (
+          <EventHistoryList key={refreshKey} onOpenEvent={openDetail} currentUserId={authState.user?.id || ''} />
+        )}
+        {view === 'compose' && (
+          <ComposeEventFlow
+            onCreated={onEventCreated}
+            onCancel={() => setView('list')}
+            showNotification={showNotification}
+          />
+        )}
+        {view === 'detail' && selectedEventId && (
+          <EventDetail
+            eventId={selectedEventId}
+            currentUserId={authState.user?.id || ''}
+            onBack={() => setView('list')}
+            showNotification={showNotification}
+          />
+        )}
+        {view === 'analytics' && <EventAnalytics />}
+      </div>
+    </div>
+  );
+}
+
+interface TabButtonProps {
+  active: boolean;
+  onClick: () => void;
+  icon: typeof Sparkles;
+  label: string;
+  primary?: boolean;
+}
+
+function TabButton({ active, onClick, icon: Icon, label, primary }: TabButtonProps) {
+  const base = 'flex items-center gap-2 px-4 py-2 rounded-full text-sm transition-colors border';
+  const cls = active
+    ? 'bg-petal-ink text-petal-cream border-petal-ink'
+    : primary
+      ? 'bg-petal-rose-soft text-petal-ink border-petal-rose'
+      : 'bg-transparent text-petal-ink border-petal-rule hover:bg-petal-sage/20';
+  return (
+    <button type="button" onClick={onClick} className={`${base} ${cls}`}>
+      <Icon className="w-4 h-4" />
+      <span>{label}</span>
+    </button>
+  );
+}

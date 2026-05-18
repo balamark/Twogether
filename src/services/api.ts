@@ -219,6 +219,84 @@ interface Notification {
   priority: number;
 }
 
+// Event × Icebreaker feature
+export type EventVersionKey = 'neutral' | 'firm' | 'warm';
+export type EventStatus = 'open' | 'resolve_pending' | 'resolved';
+
+export interface EventVersions {
+  neutral: string;
+  firm: string;
+  warm: string;
+}
+
+export interface IcebreakerPreview {
+  title: string;
+  summary: string;
+  emotions: string[];
+  tags: string[];
+  toxicityFlags: string[];
+  versions: EventVersions;
+}
+
+export interface EventMessage {
+  id: string;
+  eventId: string;
+  senderId: string;
+  content: string;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export interface EventRecord {
+  id: string;
+  coupleId: string;
+  createdBy: string;
+  title: string;
+  summary: string;
+  emotions: string[];
+  tags: string[];
+  toxicityFlags: string[];
+  versions: EventVersions;
+  selectedVersion: EventVersionKey | null;
+  status: EventStatus;
+  isPrivate: boolean;
+  resolveRequestedBy: string | null;
+  resolveRequestedAt: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  unreadCount: number;
+  lastMessagePreview: string | null;
+  messages: EventMessage[];
+}
+
+export interface CreateEventInput {
+  title: string;
+  summary: string;
+  emotions: string[];
+  tags: string[];
+  toxicityFlags: string[];
+  versions: EventVersions;
+  selectedVersion: EventVersionKey | null;
+  isPrivate: boolean;
+}
+
+export interface EventListFilters {
+  status?: EventStatus | 'all';
+  tag?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface EventAnalyticsData {
+  counts: { last7: number; last30: number };
+  resolutionRate: number;
+  avgResolutionHours: number | null;
+  tagDistribution: { tag: string; count: number }[];
+  dailyTrend: { date: string; count: number }[];
+  hotspotHours: { hour: number; count: number }[];
+}
+
 export type WallPostCategory = 'important' | 'general';
 
 export interface WallPost {
@@ -1450,6 +1528,210 @@ class ApiService {
       accepted: toNumber(typed?.accepted),
       rejected: toNumber(typed?.rejected),
       unanswered: toNumber(typed?.unanswered),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Events × Icebreaker
+  // ---------------------------------------------------------------------------
+
+  async previewIcebreaker(rawText: string): Promise<IcebreakerPreview> {
+    try {
+      const response = await apiClient.post('/events/icebreaker', { rawText });
+      const p = response.data.preview ?? {};
+      return {
+        title: p.title || '',
+        summary: p.summary || '',
+        emotions: Array.isArray(p.emotions) ? p.emotions : [],
+        tags: Array.isArray(p.tags) ? p.tags : [],
+        toxicityFlags: Array.isArray(p.toxicityFlags) ? p.toxicityFlags : [],
+        versions: {
+          neutral: p.versions?.neutral || '',
+          firm: p.versions?.firm || '',
+          warm: p.versions?.warm || '',
+        },
+      };
+    } catch (error: unknown) {
+      console.error('Failed to preview icebreaker:', error);
+      this.throwApiError(error, '無法解析輸入內容');
+    }
+  }
+
+  async createEvent(input: CreateEventInput): Promise<EventRecord> {
+    try {
+      const payload = {
+        title: input.title,
+        summary: input.summary,
+        emotions: input.emotions,
+        tags: input.tags,
+        toxicity_flags: input.toxicityFlags,
+        ai_neutral: input.versions.neutral,
+        ai_firm: input.versions.firm,
+        ai_warm: input.versions.warm,
+        selected_version: input.selectedVersion,
+        is_private: input.isPrivate,
+      };
+      const response = await apiClient.post('/events', payload);
+      return this.transformEvent(response.data.event);
+    } catch (error: unknown) {
+      console.error('Failed to create event:', error);
+      this.throwApiError(error, '無法建立事件');
+    }
+  }
+
+  async listEvents(filters: EventListFilters = {}): Promise<{ events: EventRecord[]; total: number }> {
+    try {
+      const params: Record<string, string | number> = {};
+      if (filters.status) params.status = filters.status;
+      if (filters.tag) params.tag = filters.tag;
+      if (filters.limit) params.limit = filters.limit;
+      if (filters.offset) params.offset = filters.offset;
+      const response = await apiClient.get('/events', { params });
+      const events = (response.data.events || []).map((row: unknown) => this.transformEvent(row));
+      return { events, total: response.data.total || 0 };
+    } catch (error: unknown) {
+      console.error('Failed to list events:', error);
+      this.throwApiError(error, '無法取得事件列表');
+    }
+  }
+
+  async getEvent(id: string): Promise<EventRecord> {
+    try {
+      const response = await apiClient.get(`/events/${id}`);
+      return this.transformEvent(response.data.event);
+    } catch (error: unknown) {
+      console.error('Failed to fetch event:', error);
+      this.throwApiError(error, '無法取得事件詳情');
+    }
+  }
+
+  async replyToEvent(id: string, content: string): Promise<EventMessage> {
+    try {
+      const response = await apiClient.post(`/events/${id}/messages`, { content });
+      return this.transformEventMessage(response.data.message);
+    } catch (error: unknown) {
+      console.error('Failed to reply to event:', error);
+      this.throwApiError(error, '無法送出訊息');
+    }
+  }
+
+  async markEventMessageRead(eventId: string, msgId: string): Promise<void> {
+    try {
+      await apiClient.put(`/events/${eventId}/messages/${msgId}/read`);
+    } catch (error: unknown) {
+      console.error('Failed to mark event message read:', error);
+      // Silent: read receipts are best-effort
+    }
+  }
+
+  async requestEventResolve(id: string): Promise<EventRecord> {
+    try {
+      const response = await apiClient.post(`/events/${id}/resolve-request`);
+      return this.transformEvent(response.data.event);
+    } catch (error: unknown) {
+      console.error('Failed to request event resolve:', error);
+      this.throwApiError(error, '無法發起解決請求');
+    }
+  }
+
+  async confirmEventResolve(id: string): Promise<EventRecord> {
+    try {
+      const response = await apiClient.post(`/events/${id}/resolve-confirm`);
+      return this.transformEvent(response.data.event);
+    } catch (error: unknown) {
+      console.error('Failed to confirm event resolve:', error);
+      this.throwApiError(error, '無法確認解決');
+    }
+  }
+
+  async getEventAnalytics(): Promise<EventAnalyticsData> {
+    try {
+      const response = await apiClient.get('/events/analytics');
+      const a = response.data.analytics ?? {};
+      return {
+        counts: {
+          last7: Number(a.counts?.last7) || 0,
+          last30: Number(a.counts?.last30) || 0,
+        },
+        resolutionRate: Number(a.resolution_rate) || 0,
+        avgResolutionHours: a.avg_resolution_hours == null ? null : Number(a.avg_resolution_hours),
+        tagDistribution: Array.isArray(a.tag_distribution) ? a.tag_distribution : [],
+        dailyTrend: Array.isArray(a.daily_trend) ? a.daily_trend : [],
+        hotspotHours: Array.isArray(a.hotspot_hours) ? a.hotspot_hours : [],
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch event analytics:', error);
+      this.throwApiError(error, '無法取得分析資料');
+    }
+  }
+
+  private transformEvent(data: unknown): EventRecord {
+    const r = (data ?? {}) as {
+      id?: string;
+      couple_id?: string;
+      created_by?: string;
+      title?: string;
+      summary?: string;
+      emotions?: string[];
+      tags?: string[];
+      toxicity_flags?: string[];
+      versions?: { neutral?: string; firm?: string; warm?: string };
+      selected_version?: EventVersionKey | null;
+      status?: EventStatus;
+      is_private?: boolean;
+      resolve_requested_by?: string | null;
+      resolve_requested_at?: string | null;
+      resolved_at?: string | null;
+      created_at?: string;
+      updated_at?: string;
+      unread_count?: number;
+      last_message_preview?: string | null;
+      messages?: unknown[];
+    };
+    return {
+      id: r.id || '',
+      coupleId: r.couple_id || '',
+      createdBy: r.created_by || '',
+      title: r.title || '',
+      summary: r.summary || '',
+      emotions: r.emotions ?? [],
+      tags: r.tags ?? [],
+      toxicityFlags: r.toxicity_flags ?? [],
+      versions: {
+        neutral: r.versions?.neutral || '',
+        firm: r.versions?.firm || '',
+        warm: r.versions?.warm || '',
+      },
+      selectedVersion: r.selected_version ?? null,
+      status: (r.status as EventStatus) || 'open',
+      isPrivate: Boolean(r.is_private),
+      resolveRequestedBy: r.resolve_requested_by ?? null,
+      resolveRequestedAt: r.resolve_requested_at ?? null,
+      resolvedAt: r.resolved_at ?? null,
+      createdAt: r.created_at || '',
+      updatedAt: r.updated_at || '',
+      unreadCount: Number(r.unread_count) || 0,
+      lastMessagePreview: r.last_message_preview ?? null,
+      messages: Array.isArray(r.messages) ? r.messages.map((m) => this.transformEventMessage(m)) : [],
+    };
+  }
+
+  private transformEventMessage(data: unknown): EventMessage {
+    const r = (data ?? {}) as {
+      id?: string;
+      event_id?: string;
+      sender_id?: string;
+      content?: string;
+      created_at?: string;
+      read_at?: string | null;
+    };
+    return {
+      id: r.id || '',
+      eventId: r.event_id || '',
+      senderId: r.sender_id || '',
+      content: r.content || '',
+      createdAt: r.created_at || '',
+      readAt: r.read_at ?? null,
     };
   }
 }
