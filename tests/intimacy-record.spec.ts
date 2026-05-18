@@ -26,13 +26,19 @@ test.describe('Intimacy Record Flow', () => {
       localStorage.setItem('pairingPromptDismissed', 'true');
     });
     await page.goto('/');
-
-    await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(3000);
+    await page.waitForLoadState('domcontentloaded');
 
     // Handle login if required
     const loginButton = page.getByTestId('header-auth-button');
     const recordButton = page.getByTestId('add-record-button');
+
+    // Wait until the app's auth state is determinate — either the login button
+    // or the record button must show. networkidle is racy under parallel load
+    // (poll loops keep the network busy and it never settles).
+    await Promise.race([
+      loginButton.waitFor({ state: 'visible', timeout: 20000 }),
+      recordButton.waitFor({ state: 'visible', timeout: 20000 }),
+    ]).catch(() => {});
 
     const alreadyLoggedIn = await recordButton.isVisible({ timeout: 2000 });
     if (!alreadyLoggedIn && await loginButton.isVisible({ timeout: 3000 })) {
@@ -74,9 +80,9 @@ test.describe('Intimacy Record Flow', () => {
         await page.waitForTimeout(1000);
       }
 
-      // Additional wait for app to fully initialize after login
-      await page.waitForLoadState('networkidle');
-      await page.waitForTimeout(2000);
+      // Wait for app to fully initialize after login — record button signals
+      // that the home view is ready.
+      await recordButton.waitFor({ state: 'visible', timeout: 20000 });
     } else {
       throw new Error('Neither login button nor record button found - app may not have loaded correctly');
     }
