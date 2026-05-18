@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Heart, Calendar, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Upload, Play, Coins, Plus, X, User, ShoppingBag, Inbox, Pause, StickyNote, ChevronDown, ChevronUp, Send, Check } from 'lucide-react';
+import { Heart, Calendar, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Upload, Play, Coins, Plus, X, User, ShoppingBag, Inbox, Pause, StickyNote, ChevronDown, ChevronUp, Send, Check, MessageSquareHeart } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import RoleplayView from './components/RoleplayView';
 import WallView from './components/WallView';
+import EventsView from './components/EventsView';
 import type { WallExample } from './components/WallPostComposer';
 import { AchievementsView } from './components/AchievementsView';
 import Header from './components/Header';
@@ -4345,6 +4346,7 @@ const LoveTimeApp = () => {
     { id: 'shop', label: '金幣商店', icon: ShoppingBag },
     { id: 'games', label: '情趣遊戲', icon: Gamepad2 },
     { id: 'conflict', label: '和諧相處', icon: MessageCircle },
+    { id: 'events', label: '事件', icon: MessageSquareHeart },
     { id: 'roleplay', label: '角色扮演', icon: Play },
     { id: 'wall', label: '我們的牆', icon: StickyNote },
     { id: 'journey', label: '愛情旅程', icon: Trophy },
@@ -4405,6 +4407,7 @@ const LoveTimeApp = () => {
       case 'games':
         return <GamesView />;
       case 'conflict': return <ConflictView />;
+      case 'events': return <EventsView authState={authState} showNotification={showNotification} />;
       case 'roleplay': return <RoleplayView
         defaultRoleplayScripts={defaultRoleplayScripts}
         customScripts={customScripts}
