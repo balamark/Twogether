@@ -108,8 +108,8 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
   const handleResolveRequest = async () => {
     setResolving(true);
     try {
-      const updated = await apiService.requestEventResolve(eventId);
-      setEvent(updated);
+      await apiService.requestEventResolve(eventId);
+      await refresh();
       showNotification({
         type: 'success',
         title: '已發起解決請求',
@@ -129,8 +129,8 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
   const handleResolveConfirm = async () => {
     setResolving(true);
     try {
-      const updated = await apiService.confirmEventResolve(eventId);
-      setEvent(updated);
+      await apiService.confirmEventResolve(eventId);
+      await refresh();
       showNotification({ type: 'success', title: '事件已解決', message: '雙方確認完成' });
     } catch (err) {
       showNotification({
