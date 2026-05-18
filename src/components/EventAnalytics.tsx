@@ -92,7 +92,7 @@ export default function EventAnalytics() {
           </ChartCard>
 
           {data.hotspotHours.length > 0 && (
-            <ChartCard title="熱點時段（每日）">
+            <ChartCard title="容易起衝突的時間">
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={[...data.hotspotHours].sort((a, b) => a.hour - b.hour)}>
                   <CartesianGrid stroke={GRID} strokeDasharray="3 3" />

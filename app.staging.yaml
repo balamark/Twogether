@@ -28,6 +28,10 @@ env_variables:
   CORS_ORIGIN: $_CORS_ORIGIN
   # Outbound email links point at staging, not prod
   FRONTEND_URL: "https://staging-dot-twogether-couples-app.de.r.appspot.com"
+  # LLM provider for events × icebreaker (services/llmService.js).
+  # If ANTHROPIC_API_KEY is missing, llmService falls back to the mock.
+  LLM_PROVIDER: $_LLM_PROVIDER
+  ANTHROPIC_API_KEY: $_ANTHROPIC_API_KEY
 
 automatic_scaling:
   min_instances: 0

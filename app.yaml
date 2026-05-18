@@ -23,6 +23,9 @@ env_variables:
   SMTP_PASS: $_SMTP_PASS
   # CORS origin (not needed for combined app)
   CORS_ORIGIN: $_CORS_ORIGIN
+  # LLM provider for events × icebreaker (services/llmService.js).
+  LLM_PROVIDER: $_LLM_PROVIDER
+  ANTHROPIC_API_KEY: $_ANTHROPIC_API_KEY
 
 # Automatic scaling (free tier compatible)
 automatic_scaling:
