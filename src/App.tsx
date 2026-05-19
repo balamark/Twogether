@@ -445,6 +445,7 @@ const LoveTimeApp = () => {
   const [pairingPromptSent, setPairingPromptSent] = useState(false);
 
   const [customScripts, setCustomScripts] = useState<RoleplayScript[]>([]);
+  const [favoriteScriptIds, setFavoriteScriptIds] = useState<Set<string>>(new Set());
   const [showScriptUploadModal, setShowScriptUploadModal] = useState(false);
   // When set, the upload modal opens in edit mode pre-filled from this script.
   const [editingScript, setEditingScript] = useState<RoleplayScript | null>(null);
@@ -1003,6 +1004,14 @@ const LoveTimeApp = () => {
           console.error('Failed to load custom scripts:', scriptError);
         }
 
+        // Load favorite scripts from backend
+        try {
+          const favs = await apiService.getScriptFavorites();
+          setFavoriteScriptIds(new Set(favs));
+        } catch (favError) {
+          console.error('Failed to load script favorites:', favError);
+        }
+
         // Load custom gifts from backend
         try {
           const gifts = await apiService.getCustomGifts();
@@ -1032,10 +1041,43 @@ const LoveTimeApp = () => {
     const id = Date.now().toString();
     const newNotification = { ...notification, id };
     setNotifications(prev => [...prev, newNotification]);
-    
+
     setTimeout(() => {
       setNotifications(prev => prev.filter(n => n.id !== id));
     }, notification.duration || 5000);
+  };
+
+  // Optimistic toggle for roleplay script favorites — flips local set first,
+  // rolls back and notifies on API failure.
+  const toggleFavoriteScript = async (scriptId: string) => {
+    const wasFav = favoriteScriptIds.has(scriptId);
+    setFavoriteScriptIds(prev => {
+      const next = new Set(prev);
+      if (wasFav) next.delete(scriptId);
+      else next.add(scriptId);
+      return next;
+    });
+    try {
+      if (wasFav) {
+        await apiService.removeScriptFavorite(scriptId);
+      } else {
+        await apiService.addScriptFavorite(scriptId);
+      }
+    } catch (e) {
+      console.error('Failed to toggle script favorite:', e);
+      setFavoriteScriptIds(prev => {
+        const next = new Set(prev);
+        if (wasFav) next.add(scriptId);
+        else next.delete(scriptId);
+        return next;
+      });
+      showNotification({
+        type: 'error',
+        title: '操作失敗',
+        message: '無法更新最愛劇本，請稍後再試。',
+        duration: 4000,
+      });
+    }
   };
 
   const calculateCoins = (activityType: string, duration?: string, isNewScript?: boolean): number => {
@@ -5181,6 +5223,8 @@ const LoveTimeApp = () => {
           setShowScriptUploadModal(true);
         }}
         showNotification={showNotification}
+        favoriteScriptIds={favoriteScriptIds}
+        onToggleFavorite={toggleFavoriteScript}
       />;
       case 'journey': return <OurJourneyView />;
       case 'wall': return <WallView

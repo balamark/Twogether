@@ -1285,6 +1285,36 @@ class ApiService {
     }
   }
 
+  // Script Favorites API — couple-scoped list of favorited script ids
+  // (both built-in default ids and custom UUIDs).
+  async getScriptFavorites(): Promise<string[]> {
+    try {
+      const response = await apiClient.get('/script-favorites');
+      return response.data.favorites || [];
+    } catch (error) {
+      console.error('Failed to fetch script favorites:', error);
+      throw error;
+    }
+  }
+
+  async addScriptFavorite(scriptId: string): Promise<void> {
+    try {
+      await apiClient.post('/script-favorites', { scriptId });
+    } catch (error) {
+      console.error('Failed to add script favorite:', error);
+      throw error;
+    }
+  }
+
+  async removeScriptFavorite(scriptId: string): Promise<void> {
+    try {
+      await apiClient.delete(`/script-favorites/${encodeURIComponent(scriptId)}`);
+    } catch (error) {
+      console.error('Failed to remove script favorite:', error);
+      throw error;
+    }
+  }
+
   // Wall API — couple-shared notes/moods with threaded replies
   async getWallPosts(): Promise<WallPost[]> {
     try {

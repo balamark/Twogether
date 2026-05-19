@@ -37,6 +37,8 @@ interface RoleplayViewProps {
   ) => void;
   onEditScript?: (script: RoleplayScript) => void;
   showNotification: (notification: Omit<Notification, 'id'>) => void;
+  favoriteScriptIds: Set<string>;
+  onToggleFavorite: (scriptId: string) => void;
 }
 
 const CATEGORY_META: Record<RoleplayScript['category'], { label: string; emoji: string; tint: string }> = {
@@ -75,6 +77,8 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   addIntimateRecord,
   onEditScript,
   showNotification,
+  favoriteScriptIds,
+  onToggleFavorite,
 }) => {
   const [selectedScript, setSelectedScript] = useState<RoleplayScript | null>(null);
   const [showScriptModal, setShowScriptModal] = useState(false);
@@ -136,7 +140,35 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     ? allScripts
     : allScripts.filter(script => script.category === roleplayFilter);
 
-  const featuredScripts = defaultRoleplayScripts.slice(0, 3);
+  // 我的最愛 — pulls from both default and custom scripts. Falls back to the
+  // original top-3 featured selection when the couple has no favorites yet,
+  // so the top section never goes empty.
+  const favoriteScripts = allScripts.filter(s => favoriteScriptIds.has(s.id));
+  const hasFavorites = favoriteScripts.length > 0;
+  const topScripts = hasFavorites ? favoriteScripts : defaultRoleplayScripts.slice(0, 3);
+  const topSectionTitle = hasFavorites ? '我的最愛' : '精選';
+
+  const FavoriteButton: React.FC<{ scriptId: string; className?: string }> = ({ scriptId, className = '' }) => {
+    const isFav = favoriteScriptIds.has(scriptId);
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleFavorite(scriptId);
+        }}
+        data-testid={`script-favorite-toggle-${scriptId}`}
+        aria-label={isFav ? '取消最愛' : '加入最愛'}
+        aria-pressed={isFav}
+        className={`inline-flex items-center justify-center rounded-full transition-colors ${className}`}
+      >
+        <Heart
+          className={`w-4 h-4 transition-colors ${isFav ? 'fill-petal-rose-deep text-petal-rose-deep' : 'text-petal-muted hover:text-petal-rose-deep'}`}
+          strokeWidth={1.5}
+        />
+      </button>
+    );
+  };
 
   // Renders either the real thumbnail, or the editorial placeholder if image
   // is missing / fails to load.
@@ -204,17 +236,25 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           })}
         </div>
 
-        {/* Featured Scripts */}
-        <div className="mb-10">
+        {/* Top section — favorites if any, else fallback featured */}
+        <div className="mb-10" data-testid={hasFavorites ? 'roleplay-favorites-section' : 'roleplay-featured-section'}>
           <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6 flex items-center">
-            <Sparkles className="w-4 h-4 mr-2 text-petal-rose-deep" strokeWidth={1.5} />
-            精選<em className="not-italic font-light italic text-pink-600 ml-1">劇本</em>
+            {hasFavorites ? (
+              <Heart className="w-4 h-4 mr-2 text-petal-rose-deep fill-petal-rose-deep" strokeWidth={1.5} />
+            ) : (
+              <Sparkles className="w-4 h-4 mr-2 text-petal-rose-deep" strokeWidth={1.5} />
+            )}
+            {topSectionTitle}<em className="not-italic font-light italic text-pink-600 ml-1">劇本</em>
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {featuredScripts.map((script, index) => (
-              <div key={index} className="bg-white rounded-md p-4 border border-petal-rule hover:border-petal-rose transition-colors">
-                <div className="aspect-video bg-petal-cream-2 rounded-md mb-3 overflow-hidden">
+            {topScripts.map((script, index) => (
+              <div key={script.id ?? index} className="bg-white rounded-md p-4 border border-petal-rule hover:border-petal-rose transition-colors">
+                <div className="relative aspect-video bg-petal-cream-2 rounded-md mb-3 overflow-hidden">
                   {renderThumb(script, 'w-full h-full')}
+                  <FavoriteButton
+                    scriptId={script.id}
+                    className="absolute top-2 right-2 w-8 h-8 bg-white/85 backdrop-blur-sm border border-petal-rule shadow-sm hover:bg-white"
+                  />
                 </div>
                 <h4 className="font-display text-base font-medium tracking-tight text-petal-ink mb-1.5">{script.title}</h4>
                 <p className="font-body text-sm text-petal-ink-soft mb-3 line-clamp-2 leading-relaxed">{script.scenario}</p>
@@ -270,9 +310,12 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <h4 className="font-display text-base font-medium tracking-tight text-petal-ink truncate">{script.title}</h4>
-                        <span data-testid="script-card-custom-badge" className="px-2 py-0.5 font-body text-[10px] uppercase tracking-[0.1em] rounded-full border border-petal-rule text-petal-muted flex-shrink-0">
-                          自訂
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <span data-testid="script-card-custom-badge" className="px-2 py-0.5 font-body text-[10px] uppercase tracking-[0.1em] rounded-full border border-petal-rule text-petal-muted">
+                            自訂
+                          </span>
+                          <FavoriteButton scriptId={script.id} className="w-7 h-7 hover:bg-petal-cream-2" />
+                        </div>
                       </div>
                       <p className="font-body text-sm text-petal-ink-soft mt-1 leading-relaxed">{script.scenario}</p>
                     </div>
@@ -350,6 +393,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                           自訂
                         </span>
                       )}
+                      <FavoriteButton scriptId={script.id} className="ml-auto w-7 h-7 hover:bg-petal-cream-2" />
                     </div>
                     <p className="font-body text-sm text-petal-ink-soft mb-3 leading-relaxed">{script.scenario}</p>
                     <div className="flex items-center gap-2">
@@ -391,8 +435,15 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
       {/* Script Modal — view-only by default; record only on explicit 開始扮演 */}
       {showScriptModal && selectedScript && (
         <div data-testid="roleplay-modal" className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-petal-cream rounded-md shadow-petal max-w-4xl w-full max-h-[90vh] border border-petal-rule flex flex-col">
-            <div className="px-8 pt-8 pb-5 border-b border-petal-rule flex justify-between items-end flex-shrink-0">
+          <div className="bg-petal-cream rounded-md shadow-petal max-w-4xl w-full max-h-[90vh] border border-petal-rule flex flex-col overflow-hidden">
+            <div className="relative aspect-[16/7] w-full bg-petal-cream-2 flex-shrink-0 overflow-hidden border-b border-petal-rule">
+              {renderThumb(selectedScript, 'w-full h-full')}
+              <FavoriteButton
+                scriptId={selectedScript.id}
+                className="absolute top-3 right-3 w-9 h-9 bg-white/85 backdrop-blur-sm border border-petal-rule shadow-sm hover:bg-white"
+              />
+            </div>
+            <div className="px-8 pt-6 pb-5 border-b border-petal-rule flex justify-between items-end flex-shrink-0">
               <div>
                 <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
                   — {selectedScript.isCustom ? '自訂劇本' : '劇本'}

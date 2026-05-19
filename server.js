@@ -23,6 +23,7 @@ const customScriptsRoutes = require('./routes/custom-scripts');
 const customGiftsRoutes = require('./routes/custom-gifts');
 const wallRoutes = require('./routes/wall');
 const eventRoutes = require('./routes/events');
+const scriptFavoritesRoutes = require('./routes/script-favorites');
 
 // Import database and middleware
 const db = require('./database/db');
@@ -116,6 +117,7 @@ app.use('/api/custom-scripts', customScriptsRoutes);
 app.use('/api/custom-gifts', customGiftsRoutes);
 app.use('/api/wall', wallRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/script-favorites', scriptFavoritesRoutes);
 // Additional mount for intimacy endpoints (frontend compatibility)
 app.use('/api/intimacy', intimacyRequestRoutes);
 
