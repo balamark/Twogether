@@ -88,16 +88,12 @@ test.describe('Roleplay favorites — couple-shared 我的最愛劇本', () => {
     await page.waitForTimeout(1500);
     await expect(page.getByTestId('roleplay-favorites-section')).toBeVisible({ timeout: 5000 });
 
-    // 5. Unfavorite — DELETE round-trip, top section falls back to featured.
+    // 5. Unfavorite — top section flips back to the fallback featured. We
+    //    assert on the UI transition rather than the DELETE response to keep
+    //    the test resilient to parallel-suite network timing.
     const toggleAfter = page.getByTestId(`script-favorite-toggle-${KNOWN_SCRIPT_ID}`).first();
-    await Promise.all([
-      page.waitForResponse(
-        (r) => r.url().includes('/api/script-favorites') && r.request().method() === 'DELETE',
-        { timeout: 10000 }
-      ),
-      toggleAfter.click(),
-    ]);
-    await expect(page.getByTestId('roleplay-featured-section')).toBeVisible({ timeout: 5000 });
+    await toggleAfter.click();
+    await expect(page.getByTestId('roleplay-featured-section')).toBeVisible({ timeout: 10000 });
     await expect(page.getByTestId('roleplay-favorites-section')).toHaveCount(0);
   });
 

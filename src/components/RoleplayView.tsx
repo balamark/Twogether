@@ -171,17 +171,20 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   };
 
   // Renders either the real thumbnail, or the editorial placeholder if image
-  // is missing / fails to load.
-  const renderThumb = (script: RoleplayScript, className: string) => {
+  // is missing / fails to load. `fit` controls the <img> object-fit — use
+  // 'contain' for the modal hero (show the whole image) and 'cover' for grid
+  // cards (fill the slot edge-to-edge).
+  const renderThumb = (script: RoleplayScript, className: string, fit: 'cover' | 'contain' = 'cover') => {
     if (!script.image) {
       return <ScriptThumbPlaceholder category={script.category} title={script.title} className={className} />;
     }
+    const fitClass = fit === 'contain' ? 'object-contain' : 'object-cover';
     return (
       <>
         <img
           src={script.image}
           alt={script.title}
-          className={`${className} object-cover`}
+          className={`${className} ${fitClass}`}
           onError={(e) => {
             e.currentTarget.style.display = 'none';
             (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'flex';
@@ -250,7 +253,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             {topScripts.map((script, index) => (
               <div key={script.id ?? index} className="bg-white rounded-md p-4 border border-petal-rule hover:border-petal-rose transition-colors">
                 <div className="relative aspect-video bg-petal-cream-2 rounded-md mb-3 overflow-hidden">
-                  {renderThumb(script, 'w-full h-full')}
+                  {renderThumb(script, 'w-full h-full', 'contain')}
                   <FavoriteButton
                     scriptId={script.id}
                     className="absolute top-2 right-2 w-8 h-8 bg-white/85 backdrop-blur-sm border border-petal-rule shadow-sm hover:bg-white"
@@ -436,8 +439,8 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
       {showScriptModal && selectedScript && (
         <div data-testid="roleplay-modal" className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-petal-cream rounded-md shadow-petal max-w-4xl w-full max-h-[90vh] border border-petal-rule flex flex-col overflow-hidden">
-            <div className="relative aspect-[16/7] w-full bg-petal-cream-2 flex-shrink-0 overflow-hidden border-b border-petal-rule">
-              {renderThumb(selectedScript, 'w-full h-full')}
+            <div className="relative aspect-video w-full bg-petal-cream-2 flex-shrink-0 overflow-hidden border-b border-petal-rule">
+              {renderThumb(selectedScript, 'w-full h-full', 'contain')}
               <FavoriteButton
                 scriptId={selectedScript.id}
                 className="absolute top-3 right-3 w-9 h-9 bg-white/85 backdrop-blur-sm border border-petal-rule shadow-sm hover:bg-white"
