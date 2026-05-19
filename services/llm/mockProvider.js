@@ -110,4 +110,21 @@ async function generateIcebreaker(rawText /* , context */) {
   return { title, summary, emotions, tags, toxicityFlags, versions };
 }
 
-module.exports = { generateIcebreaker };
+function buildReplyVersions(rawReply) {
+  const masked = maskToxicWords(rawReply.trim());
+  const neutral = `就剛剛的事，我這邊看到的是：${masked} 想先把這個放出來。`;
+  const firm = `我這邊的感受是：${masked} 我不是要指責，只是想讓你知道我的想法。`;
+  const warm = `${firm} 也想聽你的角度，等彼此都比較平靜時我們再聊。`;
+  return { neutral, firm, warm };
+}
+
+async function rewriteReply({ rawReply /* , eventSummary, recentMessages */ }) {
+  if (typeof rawReply !== 'string' || rawReply.trim().length === 0) {
+    throw new Error('rawReply is required');
+  }
+  const toxicityFlags = detectToxicity(rawReply);
+  const versions = buildReplyVersions(rawReply);
+  return { versions, toxicityFlags };
+}
+
+module.exports = { generateIcebreaker, rewriteReply };

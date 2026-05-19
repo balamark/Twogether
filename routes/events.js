@@ -480,6 +480,49 @@ router.post(
   }
 );
 
+// Preview-only AI rewrite for a reply. Stateless — no DB write. Loads the
+// event summary + recent messages so the LLM can rewrite the draft in context.
+router.post(
+  '/:id/messages/preview-rewrite',
+  [
+    param('id').isUUID(),
+    body('rawReply').isString().isLength({ min: 1, max: 2000 }).withMessage('回覆需在 1–2000 字之間'),
+  ],
+  async (req, res) => {
+    if (sendValidationError(req, res)) return;
+    try {
+      const access = await assertEventAccess(req.params.id, req.user.id);
+      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (access.event.is_private) {
+        return res.status(403).json({ success: false, message: '私人事件不支援 AI 回覆改寫' });
+      }
+
+      const recent = await db.query(
+        `SELECT sender_id, content
+           FROM event_messages
+          WHERE event_id = $1
+          ORDER BY created_at DESC
+          LIMIT 5`,
+        [req.params.id]
+      );
+      const recentMessages = recent.rows.reverse().map((m) => ({
+        fromSelf: m.sender_id === req.user.id,
+        content: m.content,
+      }));
+
+      const preview = await llmService.rewriteReply({
+        rawReply: req.body.rawReply,
+        eventSummary: access.event.summary,
+        recentMessages,
+      });
+      res.json({ success: true, preview });
+    } catch (err) {
+      console.error('Reply rewrite preview error:', err);
+      res.status(500).json({ success: false, message: 'AI 改寫失敗，請稍後再試' });
+    }
+  }
+);
+
 // Mark an inbound message as read
 router.put(
   '/:id/messages/:msgId/read',

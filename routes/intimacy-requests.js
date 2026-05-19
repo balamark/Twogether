@@ -873,9 +873,9 @@ router.get('/notifications', async (req, res) => {
 
     // Check if notifications table exists, if not create it
     const result = await db.query(`
-      SELECT 
+      SELECT
         n.id, n.notification_type, n.title, n.content,
-        n.intimacy_request_id, n.is_read, n.read_at,
+        n.intimacy_request_id, n.event_id, n.is_read, n.read_at,
         n.created_at, n.priority,
         related_user.nickname as related_user_nickname
       FROM notifications n
@@ -925,6 +925,7 @@ router.get('/notifications', async (req, res) => {
       title: row.title,
       content: row.content,
       intimacy_request_id: row.intimacy_request_id,
+      event_id: row.event_id,
       related_user_nickname: row.related_user_nickname,
       is_read: row.is_read,
       read_at: row.read_at,

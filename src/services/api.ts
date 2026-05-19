@@ -212,6 +212,7 @@ interface Notification {
   title: string;
   content: string;
   intimacyRequestId?: string;
+  eventId?: string;
   relatedUserNickname?: string;
   isRead: boolean;
   readAt?: string;
@@ -236,6 +237,11 @@ export interface IcebreakerPreview {
   tags: string[];
   toxicityFlags: string[];
   versions: EventVersions;
+}
+
+export interface ReplyRewritePreview {
+  versions: EventVersions;
+  toxicityFlags: string[];
 }
 
 export interface EventMessage {
@@ -1496,6 +1502,7 @@ class ApiService {
       title?: string;
       content?: string;
       intimacy_request_id?: string;
+      event_id?: string;
       related_user_nickname?: string;
       is_read?: boolean;
       read_at?: string;
@@ -1509,6 +1516,7 @@ class ApiService {
       title: typedData?.title || '',
       content: typedData?.content || '',
       intimacyRequestId: typedData?.intimacy_request_id,
+      eventId: typedData?.event_id,
       relatedUserNickname: typedData?.related_user_nickname,
       isRead: typedData?.is_read || false,
       readAt: typedData?.read_at,
@@ -1612,6 +1620,24 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to reply to event:', error);
       this.throwApiError(error, '無法送出訊息');
+    }
+  }
+
+  async previewReplyRewrite(eventId: string, rawReply: string): Promise<ReplyRewritePreview> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/messages/preview-rewrite`, { rawReply });
+      const p = response.data.preview ?? {};
+      return {
+        versions: {
+          neutral: p.versions?.neutral || '',
+          firm: p.versions?.firm || '',
+          warm: p.versions?.warm || '',
+        },
+        toxicityFlags: Array.isArray(p.toxicityFlags) ? p.toxicityFlags : [],
+      };
+    } catch (error: unknown) {
+      console.error('Failed to preview reply rewrite:', error);
+      this.throwApiError(error, '無法改寫回覆，請稍後再試');
     }
   }
 

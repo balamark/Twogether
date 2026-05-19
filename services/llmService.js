@@ -15,5 +15,6 @@ try {
 
 module.exports = {
   generateIcebreaker: provider.generateIcebreaker,
+  rewriteReply: provider.rewriteReply,
   providerName: PROVIDER_NAME,
 };

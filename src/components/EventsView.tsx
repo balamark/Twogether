@@ -23,9 +23,16 @@ interface NotificationInput {
 interface EventsViewProps {
   authState: AuthState;
   showNotification: (notification: NotificationInput) => void;
+  initialEventId?: string | null;
+  onInitialEventConsumed?: () => void;
 }
 
-export default function EventsView({ authState, showNotification }: EventsViewProps) {
+export default function EventsView({
+  authState,
+  showNotification,
+  initialEventId,
+  onInitialEventConsumed,
+}: EventsViewProps) {
   const [view, setView] = useState<EventsSubView>('list');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -33,6 +40,17 @@ export default function EventsView({ authState, showNotification }: EventsViewPr
   useEffect(() => {
     if (view !== 'detail') setSelectedEventId(null);
   }, [view]);
+
+  // When the parent passes an initialEventId (e.g. from a notification tap),
+  // jump straight to detail. Clear the parent's pending id so re-mounting the
+  // view later doesn't reopen the same event.
+  useEffect(() => {
+    if (initialEventId) {
+      setSelectedEventId(initialEventId);
+      setView('detail');
+      onInitialEventConsumed?.();
+    }
+  }, [initialEventId, onInitialEventConsumed]);
 
   const openDetail = (id: string) => {
     setSelectedEventId(id);
