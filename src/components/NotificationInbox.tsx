@@ -23,7 +23,7 @@ interface NotificationInboxProps {
   onClose: () => void;
   unreadCount: number;
   onUnreadCountChange: (count: number) => void;
-  onNavigate?: (view: string) => void;
+  onNavigate?: (view: string, payload?: string) => void;
 }
 
 const NotificationInbox: React.FC<NotificationInboxProps> = ({
@@ -102,6 +102,13 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
     ) {
       if (onNavigate) {
         onNavigate('wall');
+        onClose();
+      }
+      return;
+    }
+    if (notification.notificationType === 'event_created' && notification.eventId) {
+      if (onNavigate) {
+        onNavigate('events', notification.eventId);
         onClose();
       }
       return;
@@ -385,6 +392,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
                 notifications.map((notification) => (
                   <div
                     key={notification.id}
+                    data-testid={`notification-item-${notification.notificationType}`}
                     className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${
                       !notification.isRead ? 'bg-blue-50' : ''
                     }`}

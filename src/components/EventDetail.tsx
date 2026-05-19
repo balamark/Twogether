@@ -7,8 +7,16 @@ import {
   Tag,
   Loader2,
   Lock,
+  Sparkles,
+  X,
 } from 'lucide-react';
-import apiService, { type EventRecord, type EventStatus } from '../services/api';
+import apiService, {
+  type EventRecord,
+  type EventStatus,
+  type ReplyRewritePreview,
+  type EventVersionKey,
+} from '../services/api';
+import ReplyStepBar from './ReplyStepBar';
 
 interface NotificationInput {
   type: 'success' | 'error' | 'info' | 'warning';
@@ -66,6 +74,36 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
   const [resolving, setResolving] = useState(false);
+  const [rewriting, setRewriting] = useState(false);
+  const [rewritePreview, setRewritePreview] = useState<ReplyRewritePreview | null>(null);
+
+  const insertPhrase = (phrase: string) => {
+    setReply((prev) => (prev.trim().length > 0 ? `${prev}\n${phrase}` : phrase));
+  };
+
+  const requestRewrite = async () => {
+    const draft = reply.trim();
+    if (!draft) return;
+    setRewriting(true);
+    try {
+      const preview = await apiService.previewReplyRewrite(eventId, draft);
+      setRewritePreview(preview);
+    } catch (err) {
+      showNotification({
+        type: 'error',
+        title: 'AI 改寫失敗',
+        message: err instanceof Error ? err.message : '請稍後再試',
+      });
+    } finally {
+      setRewriting(false);
+    }
+  };
+
+  const applyRewriteVersion = (key: EventVersionKey) => {
+    if (!rewritePreview) return;
+    setReply(rewritePreview.versions[key]);
+    setRewritePreview(null);
+  };
 
   const refresh = async () => {
     try {
@@ -227,7 +265,9 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
 
       {canSendMessage && (
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-3">
+          <ReplyStepBar onInsertPhrase={insertPhrase} />
           <textarea
+            data-testid="event-reply-input"
             value={reply}
             onChange={(e) => setReply(e.target.value)}
             placeholder="回覆…"
@@ -235,9 +275,21 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
             maxLength={2000}
             className="w-full p-2 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y"
           />
-          <div className="flex justify-end mt-2">
+          <div className="flex flex-wrap justify-end gap-2 mt-2">
             <button
               type="button"
+              data-testid="event-reply-rewrite-button"
+              onClick={requestRewrite}
+              disabled={rewriting || reply.trim().length === 0}
+              className="px-3 py-2 rounded-full border border-petal-sage text-petal-ink inline-flex items-center gap-2 disabled:opacity-50 hover:bg-petal-sage/20"
+              title="讓 AI 把你的回覆改得更中性、客觀"
+            >
+              {rewriting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              <span>讓 AI 重寫</span>
+            </button>
+            <button
+              type="button"
+              data-testid="event-reply-send-button"
               onClick={sendReply}
               disabled={sending || reply.trim().length === 0}
               className="px-4 py-2 rounded-full bg-petal-ink text-petal-cream inline-flex items-center gap-2 disabled:opacity-50"
@@ -247,6 +299,14 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
             </button>
           </div>
         </div>
+      )}
+
+      {rewritePreview && (
+        <RewritePicker
+          preview={rewritePreview}
+          onApply={applyRewriteVersion}
+          onCancel={() => setRewritePreview(null)}
+        />
       )}
 
       {!event.isPrivate && event.status !== 'resolved' && (
@@ -326,5 +386,81 @@ function BackButton({ onBack }: { onBack: () => void }) {
       <ArrowLeft className="w-4 h-4" />
       回到歷史
     </button>
+  );
+}
+
+const VERSION_LABELS: Record<EventVersionKey, { title: string; hint: string }> = {
+  neutral: { title: '中性版', hint: '第三方客觀描述，不示弱也不指責' },
+  firm: { title: '堅定版', hint: '以「我訊息」說感受，不指責' },
+  warm: { title: '善意版', hint: '在堅定的基礎上多一份願意聊聊的善意' },
+};
+
+function RewritePicker({
+  preview,
+  onApply,
+  onCancel,
+}: {
+  preview: ReplyRewritePreview;
+  onApply: (key: EventVersionKey) => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      data-testid="event-reply-rewrite-modal"
+    >
+      <div className="bg-petal-cream rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto p-5">
+        <div className="flex items-start justify-between mb-3">
+          <div>
+            <h3 className="text-lg font-serif text-petal-ink">AI 幫你改寫的版本</h3>
+            <p className="text-xs text-petal-ink-soft mt-1">挑一個版本套用到你的草稿，或保留原文。</p>
+          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-petal-ink-soft hover:text-petal-ink"
+            aria-label="取消"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          {(Object.keys(VERSION_LABELS) as EventVersionKey[]).map((key) => (
+            <div
+              key={key}
+              className="bg-white border border-petal-rule rounded-xl p-3"
+              data-testid={`event-reply-rewrite-card-${key}`}
+            >
+              <div className="flex items-baseline justify-between mb-1">
+                <div className="text-sm font-medium text-petal-ink">{VERSION_LABELS[key].title}</div>
+                <div className="text-[11px] text-petal-muted">{VERSION_LABELS[key].hint}</div>
+              </div>
+              <p className="text-sm text-petal-ink whitespace-pre-wrap mb-2">{preview.versions[key]}</p>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  data-testid={`event-reply-rewrite-apply-${key}`}
+                  onClick={() => onApply(key)}
+                  className="text-sm px-3 py-1.5 rounded-full bg-petal-ink text-petal-cream hover:opacity-90"
+                >
+                  使用這個版本
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex justify-end mt-4">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-sm px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20"
+          >
+            保留原文
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

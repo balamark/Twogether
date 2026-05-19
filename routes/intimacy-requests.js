@@ -863,19 +863,36 @@ router.get('/alternative-intimacy-options', async (req, res) => {
   }
 });
 
+// Ensure-on-first-call: the `event_id` column was added later for the events
+// × 破冰 deep-link. Older deployments may not have it yet, and the events
+// route only adds it when an event is actually created. Run an idempotent
+// ALTER once per process so the SELECT below doesn't 500.
+let notificationsEventIdEnsured = false;
+async function ensureNotificationsEventIdColumn() {
+  if (notificationsEventIdEnsured) return;
+  try {
+    await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS event_id UUID`);
+    notificationsEventIdEnsured = true;
+  } catch (err) {
+    console.warn('⚠️ ensureNotificationsEventIdColumn failed:', err.message);
+  }
+}
+
 // Get notifications for user
 router.get('/notifications', async (req, res) => {
   try {
     const userId = req.user.id;
     const { notification_type, is_read, limit = 50, offset = 0 } = req.query;
-    
+
     console.info(`🔔 Getting notifications for user ${userId} - type: ${notification_type || 'all'}, read: ${is_read}, limit: ${limit}`);
+
+    await ensureNotificationsEventIdColumn();
 
     // Check if notifications table exists, if not create it
     const result = await db.query(`
-      SELECT 
+      SELECT
         n.id, n.notification_type, n.title, n.content,
-        n.intimacy_request_id, n.is_read, n.read_at,
+        n.intimacy_request_id, n.event_id, n.is_read, n.read_at,
         n.created_at, n.priority,
         related_user.nickname as related_user_nickname
       FROM notifications n
@@ -898,6 +915,7 @@ router.get('/notifications', async (req, res) => {
             title VARCHAR(200) NOT NULL,
             content TEXT NOT NULL,
             intimacy_request_id UUID REFERENCES intimacy_requests(id) ON DELETE CASCADE,
+            event_id UUID,
             related_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
             is_read BOOLEAN NOT NULL DEFAULT FALSE,
             read_at TIMESTAMP WITH TIME ZONE,
@@ -925,6 +943,7 @@ router.get('/notifications', async (req, res) => {
       title: row.title,
       content: row.content,
       intimacy_request_id: row.intimacy_request_id,
+      event_id: row.event_id,
       related_user_nickname: row.related_user_nickname,
       is_read: row.is_read,
       read_at: row.read_at,

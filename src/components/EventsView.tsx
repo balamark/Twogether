@@ -23,9 +23,16 @@ interface NotificationInput {
 interface EventsViewProps {
   authState: AuthState;
   showNotification: (notification: NotificationInput) => void;
+  initialEventId?: string | null;
+  onInitialEventConsumed?: () => void;
 }
 
-export default function EventsView({ authState, showNotification }: EventsViewProps) {
+export default function EventsView({
+  authState,
+  showNotification,
+  initialEventId,
+  onInitialEventConsumed,
+}: EventsViewProps) {
   const [view, setView] = useState<EventsSubView>('list');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -33,6 +40,17 @@ export default function EventsView({ authState, showNotification }: EventsViewPr
   useEffect(() => {
     if (view !== 'detail') setSelectedEventId(null);
   }, [view]);
+
+  // When the parent passes an initialEventId (e.g. from a notification tap),
+  // jump straight to detail. Clear the parent's pending id so re-mounting the
+  // view later doesn't reopen the same event.
+  useEffect(() => {
+    if (initialEventId) {
+      setSelectedEventId(initialEventId);
+      setView('detail');
+      onInitialEventConsumed?.();
+    }
+  }, [initialEventId, onInitialEventConsumed]);
 
   const openDetail = (id: string) => {
     setSelectedEventId(id);
@@ -48,7 +66,7 @@ export default function EventsView({ authState, showNotification }: EventsViewPr
   if (!authState.isAuthenticated) {
     return (
       <div className="max-w-2xl mx-auto p-6 text-center text-petal-ink-soft">
-        <h2 className="text-2xl font-serif text-petal-ink mb-2">事件 × 破冰</h2>
+        <h2 className="text-2xl font-serif text-petal-ink mb-2">事件 × 由 AI 替你說</h2>
         <p>請先登入才能使用此功能。</p>
       </div>
     );
@@ -61,7 +79,7 @@ export default function EventsView({ authState, showNotification }: EventsViewPr
           <Sparkles className="w-8 h-8 mx-auto mb-3 text-petal-rose-deep" />
           <h2 className="text-xl font-serif text-petal-ink mb-2">尚未配對伴侶</h2>
           <p className="text-petal-ink-soft text-sm">
-            事件 × 破冰功能需要先完成伴侶配對才能使用。請到設定頁完成配對。
+            事件 × 由 AI 替你說功能需要先完成伴侶配對才能使用。請到設定頁完成配對。
           </p>
         </div>
       </div>
@@ -71,9 +89,9 @@ export default function EventsView({ authState, showNotification }: EventsViewPr
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6">
       <header className="mb-5">
-        <h1 className="text-2xl md:text-3xl font-serif text-petal-ink mb-1">事件 × 破冰</h1>
+        <h1 className="text-2xl md:text-3xl font-serif text-petal-ink mb-1">事件 × 由 AI 替你說</h1>
         <p className="text-sm text-petal-ink-soft">
-          當下情緒不會直接送出。AI 會協助你把感受整理成三種破冰版本，由你選擇要不要送出。
+          當下情緒不會直接送出。AI 會協助你把感受整理成三種「由 AI 替你說」的版本，由你選擇要不要送出。
         </p>
       </header>
 

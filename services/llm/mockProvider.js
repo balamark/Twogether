@@ -100,6 +100,7 @@ async function generateIcebreaker(rawText /* , context */) {
     throw new Error('rawText is required');
   }
 
+  const startedAt = Date.now();
   const title = deriveTitle(rawText);
   const summary = deriveSummary(rawText);
   const emotions = pickEmotions(rawText);
@@ -107,7 +108,49 @@ async function generateIcebreaker(rawText /* , context */) {
   const toxicityFlags = detectToxicity(rawText);
   const versions = buildVersions({ summary, emotions, tags });
 
-  return { title, summary, emotions, tags, toxicityFlags, versions };
+  return {
+    title,
+    summary,
+    emotions,
+    tags,
+    toxicityFlags,
+    versions,
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+    },
+  };
 }
 
-module.exports = { generateIcebreaker };
+function buildReplyVersions(rawReply) {
+  const masked = maskToxicWords(rawReply.trim());
+  const neutral = `就剛剛的事，我這邊看到的是：${masked} 想先把這個放出來。`;
+  const firm = `我這邊的感受是：${masked} 我不是要指責，只是想讓你知道我的想法。`;
+  const warm = `${firm} 也想聽你的角度，等彼此都比較平靜時我們再聊。`;
+  return { neutral, firm, warm };
+}
+
+async function rewriteReply({ rawReply /* , eventSummary, recentMessages */ }) {
+  if (typeof rawReply !== 'string' || rawReply.trim().length === 0) {
+    throw new Error('rawReply is required');
+  }
+  const startedAt = Date.now();
+  const toxicityFlags = detectToxicity(rawReply);
+  const versions = buildReplyVersions(rawReply);
+  return {
+    versions,
+    toxicityFlags,
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+    },
+  };
+}
+
+module.exports = { generateIcebreaker, rewriteReply };

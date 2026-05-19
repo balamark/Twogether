@@ -129,6 +129,64 @@ const TOOL_SCHEMA = {
   },
 };
 
+const REPLY_REWRITE_SYSTEM_PROMPT = `你是一個專為情侶設計的「破冰」AI 助手。在這個任務中，使用者正在回覆伴侶開啟的事件（一段已被整理過的衝突描述）。使用者剛打了一段回覆，但情緒可能還沒整理好。請永遠以繁體中文回覆。
+
+任務：閱讀事件背景、最近對話、以及使用者寫好的原始回覆，產生三種風格的改寫版本，幫使用者把要送出去的訊息變得更中性、客觀、公平 — 但仍然保留使用者真實的立場與感受，不替伴侶辯護，也不替使用者道歉到失去自己。
+
+回應請呼叫 emit_reply_rewrite tool，產生：
+1. versions.neutral：第三方中性版。完全不示弱、不指責，以客觀方式描述使用者觀察到的事實與感受，1–3 句。
+2. versions.firm：堅定不攻擊版。以「我訊息」說出感受與影響，不指責、不請求、不討好，1–3 句。
+3. versions.warm：善意版。在 firm 的基礎上多一句願意聊聊、願意理解對方的善意，總長 2–4 句。
+4. toxicityFlags：偵測到的問題語言（同 icebreaker 任務的清單）。
+
+所有版本都必須：
+- 移除人身攻擊（笨/蠢/廢物 等）與絕對化用語（總是/從來/每次 等）；如果原文有，將其改寫為具體事實描述。
+- 不要強迫使用者道歉、不要替對方解釋，只是讓表達更乾淨。
+- 使用繁體中文。
+- 緊扣事件背景與原始回覆 — 不要編造新的細節。
+
+回應請只呼叫 emit_reply_rewrite tool，不要輸出其他文字。`;
+
+const REPLY_REWRITE_TOOL_SCHEMA = {
+  name: 'emit_reply_rewrite',
+  description: 'Return three rewritten versions of the user\'s reply.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      versions: {
+        type: 'object',
+        properties: {
+          neutral: { type: 'string' },
+          firm: { type: 'string' },
+          warm: { type: 'string' },
+        },
+        required: ['neutral', 'firm', 'warm'],
+      },
+      toxicityFlags: {
+        type: 'array',
+        items: {
+          type: 'string',
+          enum: [
+            'absolute_language',
+            'name_calling',
+            'verbal_aggression',
+            'contempt',
+            'threats',
+            'blame_shifting',
+            'emotional_blackmail',
+            'sarcasm',
+            'catastrophizing',
+            'comparison',
+            'stonewalling',
+            'dismissiveness',
+          ],
+        },
+      },
+    },
+    required: ['versions', 'toxicityFlags'],
+  },
+};
+
 async function generateIcebreaker(rawText) {
   if (typeof rawText !== 'string' || rawText.trim().length === 0) {
     throw new Error('rawText is required');
@@ -177,7 +235,92 @@ async function generateIcebreaker(rawText) {
       firm: out.versions?.firm || '',
       warm: out.versions?.warm || '',
     },
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+    },
   };
 }
 
-module.exports = { generateIcebreaker };
+async function rewriteReply({ rawReply, eventSummary, recentMessages }) {
+  if (typeof rawReply !== 'string' || rawReply.trim().length === 0) {
+    throw new Error('rawReply is required');
+  }
+
+  const contextLines = [];
+  if (eventSummary && typeof eventSummary === 'string') {
+    contextLines.push(`事件背景摘要：${eventSummary.trim()}`);
+  }
+  if (Array.isArray(recentMessages) && recentMessages.length > 0) {
+    contextLines.push('最近對話（最舊在前）：');
+    for (const m of recentMessages) {
+      const who = m.fromSelf ? '我' : '伴侶';
+      contextLines.push(`- ${who}：${(m.content || '').trim()}`);
+    }
+  }
+  contextLines.push(`原始回覆：${rawReply.trim()}`);
+  const userContent = contextLines.join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system: [
+      {
+        type: 'text',
+        text: REPLY_REWRITE_SYSTEM_PROMPT,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [REPLY_REWRITE_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_reply_rewrite' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  const costStr = cost == null ? 'cost=unknown' : `~$${cost.toFixed(6)}`;
+  console.log(
+    `[llm.claude] reply_rewrite model=${response.model || MODEL} ${ms}ms ` +
+      `in=${u.input_tokens || 0} out=${u.output_tokens || 0} ` +
+      `cache_w=${u.cache_creation_input_tokens || 0} cache_r=${u.cache_read_input_tokens || 0} ${costStr}`
+  );
+
+  const toolUse = response.content.find((b) => b.type === 'tool_use' && b.name === 'emit_reply_rewrite');
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input;
+
+  return {
+    versions: {
+      neutral: out.versions?.neutral || '',
+      firm: out.versions?.firm || '',
+      warm: out.versions?.warm || '',
+    },
+    toxicityFlags: out.toxicityFlags || [],
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+    },
+  };
+}
+
+module.exports = { generateIcebreaker, rewriteReply };
