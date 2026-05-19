@@ -133,7 +133,7 @@ function buildReplyVersions(rawReply) {
   return { neutral, firm, warm };
 }
 
-async function rewriteReply({ rawReply /* , eventSummary, recentMessages */ }) {
+async function rewriteReply({ rawReply /* , eventSummary, recentMessages, createdBySelf */ }) {
   if (typeof rawReply !== 'string' || rawReply.trim().length === 0) {
     throw new Error('rawReply is required');
   }
@@ -149,6 +149,7 @@ async function rewriteReply({ rawReply /* , eventSummary, recentMessages */ }) {
       durationMs: Date.now() - startedAt,
       usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
       costUsd: 0,
+      assembledPrompt: `[mock] rawReply=${rawReply.trim()}`,
     },
   };
 }

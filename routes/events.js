@@ -19,6 +19,13 @@ const VERSION_KEYS = ['neutral', 'firm', 'warm'];
 // Per-user daily cap on icebreaker LLM calls. Override via env for staging.
 const ICEBREAKER_DAILY_LIMIT = Number(process.env.EVENTS_AI_DAILY_LIMIT || 5);
 
+// Diagnostic: log the assembled user prompt for the first N reply rewrites
+// each process so we can verify role-tag wiring in prod. Set to 0 to silence.
+// Counter resets on every deploy — intentional, we want fresh visibility.
+let REPLY_PROMPT_LOG_REMAINING = Number(
+  process.env.REPLY_REWRITE_LOG_PROMPT_N || 20
+);
+
 async function ensureEventAiUsageTable() {
   try {
     await db.query(`
@@ -618,7 +625,7 @@ router.post(
            FROM event_messages
           WHERE event_id = $1
           ORDER BY created_at DESC
-          LIMIT 5`,
+          LIMIT 10`,
         [req.params.id]
       );
       const recentMessages = recent.rows.reverse().map((m) => ({
@@ -626,10 +633,13 @@ router.post(
         content: m.content,
       }));
 
+      const createdBySelf = access.event.created_by === userId;
+
       const preview = await llmService.rewriteReply({
         rawReply,
         eventSummary: access.event.summary,
         recentMessages,
+        createdBySelf,
       });
       const meta = preview._meta;
       delete preview._meta;
@@ -637,8 +647,17 @@ router.post(
       const costStr = meta?.costUsd == null ? 'unknown' : `$${meta.costUsd.toFixed(6)}`;
       console.log(
         `[events.reply_rewrite.cost] user=${userId} provider=${meta?.provider} model=${meta?.model} ` +
-          `cost=${costStr} duration=${meta?.durationMs}ms`
+          `cost=${costStr} duration=${meta?.durationMs}ms created_by_self=${createdBySelf}`
       );
+
+      if (REPLY_PROMPT_LOG_REMAINING > 0 && meta?.assembledPrompt) {
+        REPLY_PROMPT_LOG_REMAINING -= 1;
+        console.log(
+          `[events.reply_rewrite.prompt] user=${userId} event=${req.params.id} ` +
+            `remaining=${REPLY_PROMPT_LOG_REMAINING} ` +
+            `prompt=${JSON.stringify(meta.assembledPrompt)}`
+        );
+      }
 
       await recordAiUsage(userId, 'reply_rewrite', rawReply, meta);
       res.json({ success: true, preview });

@@ -145,6 +145,12 @@ const REPLY_REWRITE_SYSTEM_PROMPT = `你是一個專為情侶設計的「破冰�
 - 使用繁體中文。
 - 緊扣事件背景與原始回覆 — 不要編造新的細節。
 
+身分守則（最重要）：
+- 你要改寫的只有 [你的草稿]。改寫後仍是 [你] 的話，從 [你] 的視角發出。
+- 「事件背景摘要」和 [對方] 訊息裡的「我」不是 [你]，請依使用者訊息開頭的「角色說明」判斷。
+- 絕對不要把 [對方] 的經驗（例如被撞、被嘲笑、身體不適等）說成是 [你] 經歷過的事。你可以以同理的方式 acknowledge 那是 [對方] 的經驗（例如「我知道你被撞到很難受」），但不要寫成「我被撞到…」。
+- 改寫要忠於 [你的草稿] 真正想表達的立場與感受，不要加入草稿裡沒有的新指控或新故事。
+
 回應請只呼叫 emit_reply_rewrite tool，不要輸出其他文字。`;
 
 const REPLY_REWRITE_TOOL_SCHEMA = {
@@ -250,23 +256,37 @@ async function generateIcebreaker(rawText) {
   };
 }
 
-async function rewriteReply({ rawReply, eventSummary, recentMessages }) {
+async function rewriteReply({ rawReply, eventSummary, recentMessages, createdBySelf }) {
   if (typeof rawReply !== 'string' || rawReply.trim().length === 0) {
     throw new Error('rawReply is required');
   }
 
-  const contextLines = [];
+  const summaryOwner = createdBySelf ? '你' : '對方';
+  const contextLines = [
+    '角色說明：',
+    '- [你] = 正在寫這則回覆的人（請從這個視角改寫草稿）',
+    '- [對方] = 你的伴侶（事件中的另一方）',
+    '',
+  ];
   if (eventSummary && typeof eventSummary === 'string') {
-    contextLines.push(`事件背景摘要：${eventSummary.trim()}`);
+    contextLines.push(
+      `事件背景摘要（由 [${summaryOwner}] 開啟；以下文中的「我」= [${summaryOwner}]）：`,
+      eventSummary.trim(),
+      ''
+    );
   }
   if (Array.isArray(recentMessages) && recentMessages.length > 0) {
-    contextLines.push('最近對話（最舊在前）：');
+    contextLines.push('最近對話（最舊在前，每行已標註發話者）：');
     for (const m of recentMessages) {
-      const who = m.fromSelf ? '我' : '伴侶';
-      contextLines.push(`- ${who}：${(m.content || '').trim()}`);
+      const tag = m.fromSelf ? '[你]' : '[對方]';
+      contextLines.push(`${tag}：${(m.content || '').trim()}`);
     }
+    contextLines.push('');
   }
-  contextLines.push(`原始回覆：${rawReply.trim()}`);
+  contextLines.push(
+    '[你的草稿]（你想送出去但希望被改寫的內容）：',
+    rawReply.trim()
+  );
   const userContent = contextLines.join('\n');
 
   const startedAt = Date.now();
@@ -319,6 +339,7 @@ async function rewriteReply({ rawReply, eventSummary, recentMessages }) {
         cacheReadTokens: u.cache_read_input_tokens || 0,
       },
       costUsd: cost,
+      assembledPrompt: userContent,
     },
   };
 }
