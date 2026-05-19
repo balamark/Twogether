@@ -29,6 +29,7 @@ jobs:
               - 'routes/**'
               - 'database/**'
               - 'middleware/**'
+              - 'lib/**'
               - 'scripts/**'
               - 'test*.js'
               - 'test*.sh'
