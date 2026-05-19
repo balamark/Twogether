@@ -16,6 +16,85 @@ router.use(authenticateToken);
 const TAG_VOCAB = ['語氣', '誤會', '家務', '行程', '金錢', '育兒', '家人'];
 const VERSION_KEYS = ['neutral', 'firm', 'warm'];
 
+// Per-user daily cap on icebreaker LLM calls. Override via env for staging.
+const ICEBREAKER_DAILY_LIMIT = Number(process.env.EVENTS_AI_DAILY_LIMIT || 5);
+
+async function ensureEventAiUsageTable() {
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS event_ai_usage (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind VARCHAR(32) NOT NULL,
+        provider VARCHAR(32),
+        model VARCHAR(64),
+        duration_ms INTEGER,
+        input_tokens INTEGER,
+        output_tokens INTEGER,
+        cache_create_tokens INTEGER,
+        cache_read_tokens INTEGER,
+        cost_usd NUMERIC(12, 8),
+        raw_input TEXT,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+      );
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_event_ai_usage_user_day
+        ON event_ai_usage (user_id, kind, created_at DESC)
+    `);
+  } catch (err) {
+    console.warn('⚠️ ensureEventAiUsageTable failed:', err.message);
+  }
+}
+
+async function countTodayIcebreakerUsage(userId) {
+  try {
+    await ensureEventAiUsageTable();
+    const result = await db.query(
+      `SELECT COUNT(*)::int AS c
+         FROM event_ai_usage
+        WHERE user_id = $1
+          AND kind = 'icebreaker'
+          AND created_at >= DATE_TRUNC('day', NOW())`,
+      [userId]
+    );
+    return result.rows[0]?.c || 0;
+  } catch (err) {
+    // If the count fails, fail open — we'd rather serve the user than block them.
+    console.warn('⚠️ countTodayIcebreakerUsage failed:', err.message);
+    return 0;
+  }
+}
+
+async function recordAiUsage(userId, kind, rawInput, meta) {
+  try {
+    await ensureEventAiUsageTable();
+    const usage = meta?.usage || {};
+    await db.query(
+      `INSERT INTO event_ai_usage (
+         user_id, kind, provider, model, duration_ms,
+         input_tokens, output_tokens, cache_create_tokens, cache_read_tokens,
+         cost_usd, raw_input
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [
+        userId,
+        kind,
+        meta?.provider || null,
+        meta?.model || null,
+        meta?.durationMs ?? null,
+        usage.inputTokens ?? null,
+        usage.outputTokens ?? null,
+        usage.cacheCreateTokens ?? null,
+        usage.cacheReadTokens ?? null,
+        meta?.costUsd ?? null,
+        rawInput,
+      ]
+    );
+  } catch (err) {
+    console.warn(`⚠️ recordAiUsage(${kind}) failed:`, err.message);
+  }
+}
+
 async function ensureNotificationsTable() {
   // Mirrors the lazy creation in routes/intimacy-requests.js but adds an
   // optional event_id column so we can wire event notifications to a row.
@@ -134,14 +213,44 @@ function sendValidationError(req, res) {
 // Routes
 // ---------------------------------------------------------------------------
 
-// Preview only — no DB write. Raw text never leaves this request cycle.
+// Preview only — no DB write into events. The raw text IS persisted into
+// event_ai_usage for offline debugging / cost auditing, but never returned
+// in any API response and never shown in UI.
 router.post(
   '/icebreaker',
   [body('rawText').isString().isLength({ min: 1, max: 4000 }).withMessage('原始文字需在 1–4000 字之間')],
   async (req, res) => {
     if (sendValidationError(req, res)) return;
+    const userId = req.user.id;
+    const rawText = req.body.rawText;
+    // Backend-only audit log of the user's original words. Single tagged
+    // line so it's easy to grep in Cloud Logging.
+    console.log(`[events.icebreaker.input] user=${userId} len=${rawText.length} raw=${JSON.stringify(rawText)}`);
+
     try {
-      const preview = await llmService.generateIcebreaker(req.body.rawText);
+      const usedToday = await countTodayIcebreakerUsage(userId);
+      if (usedToday >= ICEBREAKER_DAILY_LIMIT) {
+        console.log(`[events.icebreaker.limit] user=${userId} used=${usedToday}/${ICEBREAKER_DAILY_LIMIT} blocked`);
+        return res.status(429).json({
+          success: false,
+          message: `今日 AI 整理次數已達上限（${ICEBREAKER_DAILY_LIMIT} 次／天），明天再試試看`,
+          error_code: 'AI_DAILY_LIMIT_REACHED',
+          limit: ICEBREAKER_DAILY_LIMIT,
+          used: usedToday,
+        });
+      }
+
+      const preview = await llmService.generateIcebreaker(rawText);
+      const meta = preview._meta;
+      delete preview._meta;
+
+      const costStr = meta?.costUsd == null ? 'unknown' : `$${meta.costUsd.toFixed(6)}`;
+      console.log(
+        `[events.icebreaker.cost] user=${userId} provider=${meta?.provider} model=${meta?.model} ` +
+          `cost=${costStr} duration=${meta?.durationMs}ms daily=${usedToday + 1}/${ICEBREAKER_DAILY_LIMIT}`
+      );
+
+      await recordAiUsage(userId, 'icebreaker', rawText, meta);
       res.json({ success: true, preview });
     } catch (err) {
       console.error('Icebreaker preview error:', err);
@@ -497,6 +606,13 @@ router.post(
         return res.status(403).json({ success: false, message: '私人事件不支援 AI 回覆改寫' });
       }
 
+      const userId = req.user.id;
+      const rawReply = req.body.rawReply;
+      console.log(
+        `[events.reply_rewrite.input] user=${userId} event=${req.params.id} ` +
+          `len=${rawReply.length} raw=${JSON.stringify(rawReply)}`
+      );
+
       const recent = await db.query(
         `SELECT sender_id, content
            FROM event_messages
@@ -506,15 +622,25 @@ router.post(
         [req.params.id]
       );
       const recentMessages = recent.rows.reverse().map((m) => ({
-        fromSelf: m.sender_id === req.user.id,
+        fromSelf: m.sender_id === userId,
         content: m.content,
       }));
 
       const preview = await llmService.rewriteReply({
-        rawReply: req.body.rawReply,
+        rawReply,
         eventSummary: access.event.summary,
         recentMessages,
       });
+      const meta = preview._meta;
+      delete preview._meta;
+
+      const costStr = meta?.costUsd == null ? 'unknown' : `$${meta.costUsd.toFixed(6)}`;
+      console.log(
+        `[events.reply_rewrite.cost] user=${userId} provider=${meta?.provider} model=${meta?.model} ` +
+          `cost=${costStr} duration=${meta?.durationMs}ms`
+      );
+
+      await recordAiUsage(userId, 'reply_rewrite', rawReply, meta);
       res.json({ success: true, preview });
     } catch (err) {
       console.error('Reply rewrite preview error:', err);

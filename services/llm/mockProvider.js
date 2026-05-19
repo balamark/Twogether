@@ -100,6 +100,7 @@ async function generateIcebreaker(rawText /* , context */) {
     throw new Error('rawText is required');
   }
 
+  const startedAt = Date.now();
   const title = deriveTitle(rawText);
   const summary = deriveSummary(rawText);
   const emotions = pickEmotions(rawText);
@@ -107,7 +108,21 @@ async function generateIcebreaker(rawText /* , context */) {
   const toxicityFlags = detectToxicity(rawText);
   const versions = buildVersions({ summary, emotions, tags });
 
-  return { title, summary, emotions, tags, toxicityFlags, versions };
+  return {
+    title,
+    summary,
+    emotions,
+    tags,
+    toxicityFlags,
+    versions,
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+    },
+  };
 }
 
 function buildReplyVersions(rawReply) {
@@ -122,9 +137,20 @@ async function rewriteReply({ rawReply /* , eventSummary, recentMessages */ }) {
   if (typeof rawReply !== 'string' || rawReply.trim().length === 0) {
     throw new Error('rawReply is required');
   }
+  const startedAt = Date.now();
   const toxicityFlags = detectToxicity(rawReply);
   const versions = buildReplyVersions(rawReply);
-  return { versions, toxicityFlags };
+  return {
+    versions,
+    toxicityFlags,
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+    },
+  };
 }
 
 module.exports = { generateIcebreaker, rewriteReply };

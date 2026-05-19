@@ -235,6 +235,18 @@ async function generateIcebreaker(rawText) {
       firm: out.versions?.firm || '',
       warm: out.versions?.warm || '',
     },
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+    },
   };
 }
 
@@ -296,6 +308,18 @@ async function rewriteReply({ rawReply, eventSummary, recentMessages }) {
       warm: out.versions?.warm || '',
     },
     toxicityFlags: out.toxicityFlags || [],
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+    },
   };
 }
 
