@@ -289,6 +289,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                       {onEditScript && (
                         <button
                           onClick={() => onEditScript(script)}
+                          data-testid={`script-edit-button-${script.id}`}
                           className="border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors"
                           aria-label={`編輯 ${script.title}`}
                         >
@@ -371,6 +372,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                       {script.isCustom && onEditScript && (
                         <button
                           onClick={() => onEditScript(script)}
+                          data-testid={`script-list-edit-button-${script.id}`}
                           className="border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-4 py-1.5 rounded-md font-body text-sm transition-colors"
                         >
                           <Pencil className="w-3 h-3 inline mr-1" strokeWidth={1.5} />

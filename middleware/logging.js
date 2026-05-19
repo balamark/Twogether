@@ -1,4 +1,5 @@
 const express = require('express');
+const { logError } = require('../lib/logger');
 
 const QUIET = process.env.NODE_ENV === 'test' && process.env.LOG_VERBOSE !== '1';
 
@@ -52,13 +53,15 @@ const requestLogger = (req, res, next) => {
           }, {}) : responseData
       });
 
-      // Log errors in detail
+      // Log errors in detail — structured for Cloud Logging.
       if (res.statusCode >= 400) {
-        console.error(`Error Response ${req.method} ${req.path}:`, {
+        logError(`Error Response ${req.method} ${req.path}`, {
+          method: req.method,
+          path: req.path,
           status: res.statusCode,
           error: responseData,
           requestBody: req.body,
-          user: req.user ? req.user.id : 'anonymous'
+          user: req.user ? req.user.id : 'anonymous',
         });
       }
     } catch (error) {
@@ -81,14 +84,16 @@ const requestLogger = (req, res, next) => {
         dataLength: obj && obj.data && Array.isArray(obj.data) ? obj.data.length : undefined
       });
 
-      // Log detailed error information
+      // Log detailed error information — structured for Cloud Logging.
       if (res.statusCode >= 400) {
-        console.error(`JSON Error Response ${req.method} ${req.path}:`, {
+        logError(`JSON Error Response ${req.method} ${req.path}`, {
+          method: req.method,
+          path: req.path,
           status: res.statusCode,
           error: obj,
           stack: obj && obj.stack ? obj.stack : undefined,
           requestBody: req.body,
-          user: req.user ? req.user.id : 'anonymous'
+          user: req.user ? req.user.id : 'anonymous',
         });
       }
     } catch (error) {
@@ -101,20 +106,24 @@ const requestLogger = (req, res, next) => {
   next();
 };
 
-// Global error handler with detailed logging
+// Global error handler with detailed structured logging.
 const errorHandler = (err, req, res, next) => {
-  console.error(`Unhandled Error in ${req.method} ${req.path}:`, {
-    error: err.message,
+  logError(`Unhandled Error in ${req.method} ${req.path}`, {
+    method: req.method,
+    path: req.path,
+    errorMessage: err.message,
+    code: err.code,
+    status: err.status,
+    responseData: err.responseData,
     stack: err.stack,
-    timestamp: new Date().toISOString(),
     requestBody: req.body,
     query: req.query,
     params: req.params,
     user: req.user ? { id: req.user.id, nickname: req.user.nickname } : undefined,
     headers: {
       'content-type': req.get('content-type'),
-      'authorization': req.get('authorization') ? 'Bearer [REDACTED]' : undefined
-    }
+      'authorization': req.get('authorization') ? 'Bearer [REDACTED]' : undefined,
+    },
   });
 
   // Send error response

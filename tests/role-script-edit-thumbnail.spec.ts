@@ -1,0 +1,144 @@
+import { test, expect, Page } from '@playwright/test';
+
+const TEST_USER = {
+  email: 'test-e2e@twogether.app',
+  password: 'test123456',
+};
+
+// 1x1 red PNG, base64 encoded. Same fixture used by tests/custom-script-api.spec.ts.
+const ONE_PX_PNG_B64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+
+async function loginIfNeeded(page: Page) {
+  await page.addInitScript(() => {
+    localStorage.setItem('pairingPromptDismissed', 'true');
+  });
+  await page.goto('/');
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(2000);
+
+  const loginButton = page.getByTestId('header-auth-button');
+  const recordButton = page.getByTestId('add-record-button');
+
+  const alreadyLoggedIn = await recordButton.isVisible({ timeout: 2000 });
+  if (alreadyLoggedIn) return;
+  if (!(await loginButton.isVisible({ timeout: 3000 }))) return;
+
+  await loginButton.click();
+  await page.waitForTimeout(1000);
+  await expect(page.getByTestId('auth-modal-heading')).toBeVisible({ timeout: 5000 });
+
+  await page.getByTestId('auth-email-input').fill(TEST_USER.email);
+  await page.getByTestId('auth-password-input').fill(TEST_USER.password);
+  await page.getByTestId('auth-submit-button').click();
+
+  await Promise.race([
+    page.waitForResponse((r) => r.url().includes('/auth/login'), { timeout: 15000 }),
+    recordButton.waitFor({ timeout: 15000 }),
+  ]).catch(() => {});
+
+  const closeBtn = page.getByTestId('auth-modal-close-button');
+  if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await closeBtn.click();
+  } else {
+    await page.keyboard.press('Escape');
+  }
+  await page.waitForLoadState('networkidle');
+  await page.waitForTimeout(2000);
+}
+
+async function createCustomScript(page: Page, title: string) {
+  await page.getByTestId('script-upload-button').click();
+  await page.waitForTimeout(1000);
+
+  await expect(page.locator('h3:has-text("上傳自訂劇本")')).toBeVisible({ timeout: 5000 });
+
+  await page.locator('input#script-title').fill(title);
+  await page.locator('select#script-category').selectOption('romantic');
+  await page.locator('input#script-scenario').fill('Edit-thumbnail test scenario');
+  await page.locator('textarea#script-content').fill('[男]: hi\n[女]: hello');
+
+  // Scroll the modal so the submit button is in view, then submit.
+  await page.evaluate(() => {
+    const modal = document.querySelector('.max-h-\\[90vh\\]');
+    if (modal) modal.scrollTop = modal.scrollHeight;
+  });
+  await page.waitForTimeout(300);
+
+  const submit = page.getByTestId('script-upload-submit-button');
+  await submit.scrollIntoViewIfNeeded();
+  await submit.click();
+
+  // Wait for the success toast (text is the contract).
+  await expect(
+    page.locator('text=劇本上傳成功').or(page.locator('text=已加入你的劇本庫')).first()
+  ).toBeVisible({ timeout: 10000 });
+  await page.waitForTimeout(2000);
+}
+
+test.describe('Role script edit — thumbnail upload', () => {
+  test.beforeEach(async ({ page }) => {
+    await loginIfNeeded(page);
+
+    // Navigate to roleplay.
+    const roleplayTab = page.getByTestId('nav-tab-roleplay');
+    await expect(roleplayTab).toBeVisible({ timeout: 5000 });
+    await roleplayTab.click();
+    await page.waitForTimeout(2000);
+  });
+
+  test('edit an existing custom script and upload a new thumbnail', async ({ page }) => {
+    // 1. Make sure we have a custom script to edit. Always create a fresh one so
+    //    the test is independent of seed data.
+    const title = `Edit Thumb Test ${Date.now()}`;
+    await createCustomScript(page, title);
+
+    // 2. Find the just-created card and locate its edit button. The card view
+    //    button carries `script-card-custom-view-button-{id}`; the edit button
+    //    we just added uses `script-edit-button-{id}`.
+    const viewBtn = page.locator('[data-testid^="script-card-custom-view-button-"]').first();
+    await expect(viewBtn).toBeVisible({ timeout: 5000 });
+    const viewTestId = await viewBtn.getAttribute('data-testid');
+    expect(viewTestId).toBeTruthy();
+    const scriptId = viewTestId!.replace('script-card-custom-view-button-', '');
+
+    const editBtn = page.getByTestId(`script-edit-button-${scriptId}`);
+    await expect(editBtn).toBeVisible({ timeout: 3000 });
+    await editBtn.click();
+
+    // 3. The edit modal opens. Heading text is the contract for "edit" mode.
+    await expect(page.locator('h3:has-text("編輯")').first()).toBeVisible({ timeout: 5000 });
+
+    // 4. Upload a new PNG as the replacement thumbnail.
+    const png = Buffer.from(ONE_PX_PNG_B64, 'base64');
+    await page.locator('#script-thumbnail').setInputFiles({
+      name: 'new-thumb.png',
+      mimeType: 'image/png',
+      buffer: png,
+    });
+
+    // The preview <img> renders once the file is read in.
+    await expect(page.locator('img[alt="thumbnail preview"]')).toBeVisible({ timeout: 3000 });
+
+    // 5. Surface any unexpected size-limit alert immediately rather than letting
+    //    the test silently dismiss it. A 67-byte PNG must not trigger this.
+    page.on('dialog', async (dialog) => {
+      throw new Error(`Unexpected dialog during thumbnail upload: "${dialog.message()}"`);
+    });
+
+    // 6. Save.
+    const submit = page.getByTestId('script-upload-submit-button');
+    await submit.scrollIntoViewIfNeeded();
+    await expect(submit).toHaveText(/保存修改/);
+    await submit.click();
+
+    // 7. The edit modal closes on success. We also expect no "更新失敗" toast.
+    await expect(page.locator('#script-thumbnail')).toBeHidden({ timeout: 10000 });
+    await expect(page.locator('text=更新失敗')).toHaveCount(0);
+
+    // 8. Sanity check: the script card is still present after the edit.
+    await expect(page.getByTestId(`script-card-custom-view-button-${scriptId}`)).toBeVisible({
+      timeout: 5000,
+    });
+  });
+});
