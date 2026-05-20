@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, LogOut, Coins, Heart, Bell, Send } from 'lucide-react';
+import { User, LogOut, Coins, Heart, Bell, Send, Settings } from 'lucide-react';
 import { apiService } from '../services/api';
 
 interface User {
@@ -24,15 +24,19 @@ interface HeaderProps {
   onLogout: () => void;
   onShowIntimacyRequest: () => void;
   onShowNotifications: () => void;
+  onShowCoinShop: () => void;
+  onShowSettings: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ 
-  authState, 
-  totalCoins, 
-  onShowAuthModal, 
+const Header: React.FC<HeaderProps> = ({
+  authState,
+  totalCoins,
+  onShowAuthModal,
   onLogout,
   onShowIntimacyRequest,
   onShowNotifications,
+  onShowCoinShop,
+  onShowSettings,
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -115,13 +119,15 @@ const Header: React.FC<HeaderProps> = ({
 
             {/* Coins Display */}
             {authState.isAuthenticated && (
-              <div
+              <button
+                onClick={onShowCoinShop}
                 data-testid="coin-balance"
-                className="flex items-center space-x-1.5 border border-petal-rule px-3 py-1.5 rounded-full"
+                title="前往金幣商店"
+                className="flex items-center space-x-1.5 border border-petal-rule hover:border-petal-ink px-3 py-1.5 rounded-full transition-colors"
               >
                 <Coins className="w-3.5 h-3.5 text-pink-600" strokeWidth={1.5} />
                 <span className="font-display italic text-sm text-petal-ink">{totalCoins}</span>
-              </div>
+              </button>
             )}
 
             {/* User Section */}
@@ -160,6 +166,17 @@ const Header: React.FC<HeaderProps> = ({
                       )}
                     </div>
                     <div className="p-2">
+                      <button
+                        onClick={() => {
+                          onShowSettings();
+                          setShowUserMenu(false);
+                        }}
+                        data-testid="user-menu-settings"
+                        className="w-full flex items-center space-x-2 px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
+                      >
+                        <Settings className="w-3.5 h-3.5" strokeWidth={1.5} />
+                        <span>設定</span>
+                      </button>
                       <button
                         onClick={handleLogout}
                         className="w-full flex items-center space-x-2 px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
