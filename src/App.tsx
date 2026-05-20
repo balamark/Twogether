@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Heart, Calendar, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Upload, Play, Coins, Plus, X, User, ShoppingBag, Inbox, Pause, StickyNote, ChevronDown, ChevronUp, Send, Check, MessageSquareHeart } from 'lucide-react';
+import { Heart, Calendar, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Upload, Play, Coins, Plus, X, User, Inbox, Pause, StickyNote, ChevronDown, ChevronUp, Send, Check, MessageSquareHeart } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import RoleplayView from './components/RoleplayView';
 import WallView from './components/WallView';
@@ -5011,14 +5011,13 @@ const LoveTimeApp = () => {
 
   const navItems = [
     { id: 'record', label: '記錄時光', icon: Calendar },
-    { id: 'shop', label: '金幣商店', icon: ShoppingBag },
     { id: 'games', label: '情趣遊戲', icon: Gamepad2 },
     { id: 'conflict', label: '和諧相處', icon: MessageCircle },
     { id: 'events', label: '事件', icon: MessageSquareHeart },
     { id: 'roleplay', label: '角色扮演', icon: Play },
     { id: 'wall', label: '我們的牆', icon: StickyNote },
     { id: 'journey', label: '愛情旅程', icon: Trophy },
-    { id: 'intimacy-history', label: '邀請紀錄', icon: Inbox },
+    { id: 'intimacy-history', label: '訊息紀錄', icon: Inbox },
     { id: 'settings', label: '設定', icon: Heart }
   ];
 
@@ -5252,6 +5251,7 @@ const LoveTimeApp = () => {
         onLogout={handleLogout}
         onShowIntimacyRequest={() => setShowIntimacyRequestForm(true)}
         onShowNotifications={() => setShowNotificationInbox(true)}
+        onShowCoinShop={() => setCurrentView('shop')}
       />
       
       {/* Notification Container */}

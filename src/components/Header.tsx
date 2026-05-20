@@ -24,15 +24,17 @@ interface HeaderProps {
   onLogout: () => void;
   onShowIntimacyRequest: () => void;
   onShowNotifications: () => void;
+  onShowCoinShop: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ 
-  authState, 
-  totalCoins, 
-  onShowAuthModal, 
+const Header: React.FC<HeaderProps> = ({
+  authState,
+  totalCoins,
+  onShowAuthModal,
   onLogout,
   onShowIntimacyRequest,
   onShowNotifications,
+  onShowCoinShop,
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -115,13 +117,15 @@ const Header: React.FC<HeaderProps> = ({
 
             {/* Coins Display */}
             {authState.isAuthenticated && (
-              <div
+              <button
+                onClick={onShowCoinShop}
                 data-testid="coin-balance"
-                className="flex items-center space-x-1.5 border border-petal-rule px-3 py-1.5 rounded-full"
+                title="前往金幣商店"
+                className="flex items-center space-x-1.5 border border-petal-rule hover:border-petal-ink px-3 py-1.5 rounded-full transition-colors"
               >
                 <Coins className="w-3.5 h-3.5 text-pink-600" strokeWidth={1.5} />
                 <span className="font-display italic text-sm text-petal-ink">{totalCoins}</span>
-              </div>
+              </button>
             )}
 
             {/* User Section */}
