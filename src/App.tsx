@@ -5017,8 +5017,7 @@ const LoveTimeApp = () => {
     { id: 'roleplay', label: '角色扮演', icon: Play },
     { id: 'wall', label: '我們的牆', icon: StickyNote },
     { id: 'journey', label: '愛情旅程', icon: Trophy },
-    { id: 'intimacy-history', label: '訊息紀錄', icon: Inbox },
-    { id: 'settings', label: '設定', icon: Heart }
+    { id: 'intimacy-history', label: '訊息紀錄', icon: Inbox }
   ];
 
   const renderView = () => {
@@ -5252,6 +5251,7 @@ const LoveTimeApp = () => {
         onShowIntimacyRequest={() => setShowIntimacyRequestForm(true)}
         onShowNotifications={() => setShowNotificationInbox(true)}
         onShowCoinShop={() => setCurrentView('shop')}
+        onShowSettings={() => setCurrentView('settings')}
       />
       
       {/* Notification Container */}
