@@ -1,25 +1,48 @@
 import { useEffect } from 'react';
 
-// Reference-counted body-scroll-lock. Multiple modals stacking concurrently
-// share the same lock; the body stays locked until every active caller becomes
-// inactive or unmounts. Without the counter, a nested modal closing would
-// prematurely release the lock its parent still needs.
+// Reference-counted body-scroll-lock with iOS-Safari-safe fixed-position
+// pattern. Plain `overflow: hidden` on <body> is enough for desktop and
+// Chromium-based mobile, but iOS Safari lets touch-momentum scroll bypass it.
+// Pinning the body via `position: fixed` and restoring `scrollY` on release is
+// the canonical workaround. The reference counter lets stacked modals share
+// one lock — closing a nested modal doesn't drop the lock its parent needs.
 let lockCount = 0;
-let savedOverflow: string | null = null;
+let saved: {
+  overflow: string;
+  position: string;
+  top: string;
+  width: string;
+  scrollY: number;
+} | null = null;
 
 function acquire() {
   if (lockCount === 0) {
-    savedOverflow = document.body.style.overflow;
+    const scrollY = window.scrollY;
+    saved = {
+      overflow: document.body.style.overflow,
+      position: document.body.style.position,
+      top: document.body.style.top,
+      width: document.body.style.width,
+      scrollY,
+    };
     document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
+    document.body.style.width = '100%';
   }
   lockCount += 1;
 }
 
 function release() {
   lockCount = Math.max(0, lockCount - 1);
-  if (lockCount === 0) {
-    document.body.style.overflow = savedOverflow ?? '';
-    savedOverflow = null;
+  if (lockCount === 0 && saved) {
+    const { overflow, position, top, width, scrollY } = saved;
+    document.body.style.overflow = overflow;
+    document.body.style.position = position;
+    document.body.style.top = top;
+    document.body.style.width = width;
+    window.scrollTo(0, scrollY);
+    saved = null;
   }
 }
 

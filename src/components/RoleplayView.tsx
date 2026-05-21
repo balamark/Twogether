@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil } from 'lucide-react';
+import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil, X } from 'lucide-react';
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
 
@@ -440,36 +440,41 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
 
       {/* Script Modal — view-only by default; record only on explicit 開始扮演 */}
       {showScriptModal && selectedScript && (
-        <div data-testid="roleplay-modal" className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-petal-cream rounded-md shadow-petal max-w-4xl w-full max-h-[90vh] border border-petal-rule flex flex-col overflow-hidden">
-            <div className="relative aspect-video w-full bg-petal-cream-2 flex-shrink-0 overflow-hidden border-b border-petal-rule">
+        <div
+          data-testid="roleplay-modal"
+          className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={closeModal}
+        >
+          <div
+            className="relative bg-petal-cream rounded-md shadow-petal max-w-4xl w-full max-h-[90vh] border border-petal-rule overflow-y-auto overscroll-contain"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative aspect-video w-full bg-petal-cream-2 overflow-hidden border-b border-petal-rule">
               {renderThumb(selectedScript, 'w-full h-full', 'contain')}
+              <button
+                onClick={closeModal}
+                data-testid="roleplay-modal-close-button"
+                aria-label="關閉"
+                className="absolute top-3 left-3 w-9 h-9 inline-flex items-center justify-center rounded-full bg-white/85 backdrop-blur-sm border border-petal-rule shadow-sm text-petal-ink hover:bg-white transition-colors"
+              >
+                <X className="w-4 h-4" strokeWidth={1.5} />
+              </button>
               <FavoriteButton
                 scriptId={selectedScript.id}
                 className="absolute top-3 right-3 w-9 h-9 bg-white/85 backdrop-blur-sm border border-petal-rule shadow-sm hover:bg-white"
               />
             </div>
-            <div className="px-8 pt-6 pb-5 border-b border-petal-rule flex justify-between items-end flex-shrink-0">
-              <div>
-                <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
-                  — {selectedScript.isCustom ? '自訂劇本' : '劇本'}
-                </div>
-                <h3 className="font-display text-2xl font-light tracking-tight text-petal-ink mb-1">
-                  {selectedScript.title}
-                </h3>
-                <p className="font-display italic font-light text-sm text-petal-muted">{selectedScript.scenario}</p>
+            <div className="px-8 pt-6 pb-5 border-b border-petal-rule">
+              <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
+                — {selectedScript.isCustom ? '自訂劇本' : '劇本'}
               </div>
-              <button
-                onClick={closeModal}
-                data-testid="roleplay-modal-close-button"
-                className="text-petal-muted hover:text-petal-ink text-2xl font-light leading-none transition-colors"
-                aria-label="關閉"
-              >
-                ×
-              </button>
+              <h3 className="font-display text-2xl font-light tracking-tight text-petal-ink mb-1">
+                {selectedScript.title}
+              </h3>
+              <p className="font-display italic font-light text-sm text-petal-muted">{selectedScript.scenario}</p>
             </div>
 
-            <div className="px-8 py-6 overflow-y-auto overscroll-contain flex-1">
+            <div className="px-8 py-6">
               <div className="bg-petal-cream-2/40 p-6 rounded-md border border-petal-rule-soft">
                 <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-4 flex items-center">
                   <Play className="w-3.5 h-3.5 mr-1.5 text-petal-rose-deep" strokeWidth={1.5} />
@@ -490,7 +495,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               )}
             </div>
 
-            <div className="px-8 py-4 border-t border-petal-rule bg-petal-cream/95 backdrop-blur-sm flex flex-col sm:flex-row justify-end gap-2 flex-shrink-0">
+            <div className="sticky bottom-0 z-10 px-8 py-4 border-t border-petal-rule bg-petal-cream/95 backdrop-blur-sm flex flex-col sm:flex-row justify-end gap-2">
               {selectedScript.isCustom && onEditScript && !hasBegun && (
                 <button
                   onClick={() => {
