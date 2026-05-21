@@ -338,6 +338,61 @@ export interface UpdateWallPostInput {
   category?: WallPostCategory;
 }
 
+// Auth storage keys — keep in sync with reads in App.tsx.
+const AUTH_STORAGE_KEYS = ['authToken', 'authUser', 'authState', 'authTokenExpiresAt'] as const;
+
+export const clearAuthStorage = (): void => {
+  AUTH_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+};
+
+export type SessionExpiredReason = 'expired' | 'invalid' | 'manual';
+
+// Module-level guard so we only dispatch the expiration event once per
+// "logged-in session". A burst of parallel requests (each returning 401) would
+// otherwise trigger the redirect handler N times.
+let sessionExpiredDispatched = false;
+
+export const dispatchSessionExpired = (reason: SessionExpiredReason): void => {
+  if (sessionExpiredDispatched) return;
+  sessionExpiredDispatched = true;
+  if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+    window.dispatchEvent(new CustomEvent('auth:session-expired', { detail: { reason } }));
+  }
+};
+
+// Called by the auth flow after a successful login/register so the next
+// expiration can be detected.
+export const resetSessionExpiredGuard = (): void => {
+  sessionExpiredDispatched = false;
+};
+
+// Returns the unix-ms timestamp at which the current token expires, or null
+// if no token is stored or the expiry can't be determined. Prefers the
+// authoritative `authTokenExpiresAt` value set at login; falls back to
+// decoding the JWT payload for already-logged-in clients that pre-date this
+// change.
+export const getTokenExpiry = (): number | null => {
+  const stored = localStorage.getItem('authTokenExpiresAt');
+  if (stored) {
+    const ms = Date.parse(stored);
+    if (!Number.isNaN(ms)) return ms;
+  }
+  const token = localStorage.getItem('authToken');
+  if (!token) return null;
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  try {
+    // base64url → base64
+    const payload = JSON.parse(
+      atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'))
+    ) as { exp?: number };
+    if (typeof payload.exp === 'number') return payload.exp * 1000;
+  } catch {
+    return null;
+  }
+  return null;
+};
+
 // Enhanced API Client with error handling
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -380,10 +435,17 @@ apiClient.interceptors.response.use(
       const errorCode = data?.error_code || data?.error?.code || data?.error?.error_code;
       const requestUrl = error.config?.url || '';
       
+      // Treat these error codes as "the session is no longer valid, send the
+      // user back to login" regardless of whether the status is 401 or 403.
+      // The backend (middleware/auth.js) uses 401 for "no/invalid token" and
+      // 403 for "jwt.verify failed (expired/malformed)".
+      const sessionExpiredCodes = new Set(['TOKEN_EXPIRED', 'TOKEN_INVALID', 'TOKEN_MISSING']);
+      const isAuthEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
+
       // Handle specific error cases
       if (status === 401) {
         // Check if this is a login/register request - don't clear tokens for these
-        if (requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register')) {
+        if (isAuthEndpoint) {
           const authError = new Error('登錄信息錯誤，請檢查郵箱和密碼') as Error & { error_code?: string; status?: number; data?: unknown };
           authError.error_code = errorCode;
           authError.status = status;
@@ -391,9 +453,8 @@ apiClient.interceptors.response.use(
           throw authError;
         } else {
           // Token expired or invalid for authenticated requests
-          localStorage.removeItem('authToken');
-          localStorage.removeItem('authUser');
-          localStorage.removeItem('authState');
+          clearAuthStorage();
+          dispatchSessionExpired('expired');
           const authError = new Error('登錄已過期，請重新登錄') as Error & { error_code?: string; status?: number; data?: unknown };
           authError.error_code = errorCode;
           authError.status = status;
@@ -401,6 +462,19 @@ apiClient.interceptors.response.use(
           throw authError;
         }
       } else if (status === 403) {
+        // A 403 with a session-related error_code means the JWT was rejected
+        // by the auth middleware — treat it like a 401 and send the user to
+        // login. A 403 without one of these codes is a legitimate
+        // authorization failure (e.g. accessing someone else's resource).
+        if (!isAuthEndpoint && sessionExpiredCodes.has(errorCode)) {
+          clearAuthStorage();
+          dispatchSessionExpired(errorCode === 'TOKEN_EXPIRED' ? 'expired' : 'invalid');
+          const authError = new Error('登錄已過期，請重新登錄') as Error & { error_code?: string; status?: number; data?: unknown };
+          authError.error_code = errorCode;
+          authError.status = status;
+          authError.data = data;
+          throw authError;
+        }
         const forbiddenError = new Error('沒有權限執行此操作') as Error & { error_code?: string; status?: number; data?: unknown };
         forbiddenError.error_code = errorCode;
         forbiddenError.status = status;
@@ -725,27 +799,39 @@ class ApiService {
   // Authentication
   async login(email: string, password: string): Promise<{ token: string; user: unknown }> {
     const response = await apiClient.post('/auth/login', { email, password });
-    const { token, user } = response.data;
-    
+    const { token, user, tokenExpiresAt } = response.data;
+
     localStorage.setItem('authToken', token);
     localStorage.setItem('authUser', JSON.stringify(user));
-    
+    if (tokenExpiresAt) localStorage.setItem('authTokenExpiresAt', tokenExpiresAt);
+    resetSessionExpiredGuard();
+
     return { token, user };
   }
 
   async register(email: string, nickname: string, password: string): Promise<{ token: string; user: unknown }> {
     const response = await apiClient.post('/auth/register', { email, nickname, password });
-    const { token, user } = response.data;
-    
+    const { token, user, tokenExpiresAt } = response.data;
+
     localStorage.setItem('authToken', token);
     localStorage.setItem('authUser', JSON.stringify(user));
-    
+    if (tokenExpiresAt) localStorage.setItem('authTokenExpiresAt', tokenExpiresAt);
+    resetSessionExpiredGuard();
+
     return { token, user };
   }
 
   async logout(): Promise<void> {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('authUser');
+    clearAuthStorage();
+    resetSessionExpiredGuard();
+  }
+
+  // Lightweight session-validity probe — hits GET /auth/me. If the token is
+  // no longer accepted, the response interceptor will dispatch the global
+  // expiration event; callers don't need to handle the failure themselves.
+  async getCurrentUser(): Promise<unknown> {
+    const response = await apiClient.get('/auth/me');
+    return response.data?.user;
   }
 
   // Token validation
