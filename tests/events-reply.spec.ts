@@ -75,7 +75,7 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
           body: JSON.stringify({ success: true, user: FAKE_USER, partnerConnected: true }),
         });
       }
-      return route.continue();
+      return route.fallback();
     });
 
     // Stub the events list + detail + rewrite preview.
@@ -109,7 +109,7 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
         });
       }
 
-      return route.continue();
+      return route.fallback();
     });
 
     await page.route('**/api/events*', async (route) => {
@@ -127,7 +127,7 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
           }),
         });
       }
-      return route.continue();
+      return route.fallback();
     });
   });
 
