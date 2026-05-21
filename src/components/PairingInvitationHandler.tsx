@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Heart, CheckCircle, X, AlertCircle, Mail } from 'lucide-react';
 import { apiService } from '../services/api';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 interface PairingInvitationHandlerProps {
   token: string;
@@ -74,6 +75,8 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
     autoAcceptFired.current = false;
     fetchInvitationDetails();
   }, [fetchInvitationDetails]);
+
+  useScrollLock(true);
 
   const handleAccept = useCallback(async () => {
     if (!authState.isAuthenticated) {

@@ -10,13 +10,14 @@ import {
   HandHeart
 } from 'lucide-react';
 import { apiService } from '../services/api';
-import type { 
-  Notification, 
-  IntimacyRequest, 
+import type {
+  Notification,
+  IntimacyRequest,
   AlternativeIntimacyOptionsGrouped,
   AlternativeIntimacyOption,
-  RespondToIntimacyRequestRequest 
+  RespondToIntimacyRequestRequest
 } from '../services/api';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 interface NotificationInboxProps {
   isOpen: boolean;
@@ -214,6 +215,8 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
     return date.toLocaleDateString('zh-TW');
   };
 
+  useScrollLock(isOpen);
+
   if (!isOpen) return null;
 
   return (
@@ -239,7 +242,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto overscroll-contain">
           {error && (
             <div className="p-4 bg-red-50 border-b border-red-200">
               <p className="text-red-600 text-sm">{error}</p>

@@ -14,6 +14,7 @@ import NotificationInbox from './components/NotificationInbox';
 import PairingInvitationHandler from './components/PairingInvitationHandler';
 import { apiService } from './services/api';
 import { conflictPhraseTiers } from './data/conflictSteps';
+import { useScrollLock } from './hooks/useScrollLock';
 
 interface IntimateRecord {
   id: number;
@@ -518,6 +519,10 @@ const LoveTimeApp = () => {
 
   const [selectedRecord, setSelectedRecord] = useState<IntimateRecord | null>(null);
   const [showRecordDetail, setShowRecordDetail] = useState(false);
+
+  useScrollLock(showRecordModal);
+  useScrollLock(showPairingPrompt);
+  useScrollLock(showRecordDetail && !!selectedRecord);
 
   // File input refs
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1970,7 +1975,7 @@ const LoveTimeApp = () => {
         {/* Enhanced Record Modal */}
         {showRecordModal && (
           <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-petal-cream rounded-md shadow-petal max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-petal-rule">
+            <div className="bg-petal-cream rounded-md shadow-petal max-w-2xl w-full max-h-[90vh] overflow-y-auto overscroll-contain border border-petal-rule">
               <div className="p-8">
                 <div className="flex justify-between items-end mb-8 pb-5 border-b border-petal-rule">
                   <div>
@@ -2408,6 +2413,7 @@ const LoveTimeApp = () => {
 
     const TURN_SECONDS = 90;
     const [pauseStep, setPauseStep] = useState<1 | 2 | 3 | 4 | null>(null);
+    useScrollLock(pauseStep !== null);
     const [pauseEmotion, setPauseEmotion] = useState<EmotionKey | null>(null);
     const [pauseRound, setPauseRound] = useState<1 | 2>(1);
     const [pauseSeconds, setPauseSeconds] = useState(TURN_SECONDS);
@@ -3781,6 +3787,7 @@ const LoveTimeApp = () => {
     const [confirmPassword, setConfirmPassword] = useState('');
     const [partnerCode, setPartnerCode] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    useScrollLock(true);
 
     const handleSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -4144,6 +4151,7 @@ const LoveTimeApp = () => {
   // Coin Shop Component
   const CoinShopView = () => {
     const [showAddGiftModal, setShowAddGiftModal] = useState(false);
+    useScrollLock(showAddGiftModal);
     const [newGift, setNewGift] = useState({
       title: '',
       description: '',
@@ -4357,6 +4365,7 @@ const LoveTimeApp = () => {
     }));
     const [thumbnail, setThumbnail] = useState<File | null>(null);
     const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+    useScrollLock(true);
 
     useEffect(() => {
       if (!thumbnail) {
@@ -4409,7 +4418,7 @@ const LoveTimeApp = () => {
 
     return (
       <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-        <div className="bg-petal-cream rounded-md shadow-petal max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-petal-rule">
+        <div className="bg-petal-cream rounded-md shadow-petal max-w-2xl w-full max-h-[90vh] overflow-y-auto overscroll-contain border border-petal-rule">
           <div className="p-7">
             <div className="flex justify-between items-end mb-6 pb-5 border-b border-petal-rule">
               <div>
@@ -4597,6 +4606,8 @@ const LoveTimeApp = () => {
   const ForeplayView = () => {
     const [selectedActivity, setSelectedActivity] = useState<ForeplayActivity | null>(null);
     const [selectedPosition, setSelectedPosition] = useState<PositionSuggestion | null>(null);
+    useScrollLock(!!selectedActivity);
+    useScrollLock(!!selectedPosition);
 
     const handleTryActivity = async (activity: ForeplayActivity) => {
       const coinsEarned = activity.coins;
@@ -5450,7 +5461,7 @@ const LoveTimeApp = () => {
       {/* Record Detail Modal */}
       {showRecordDetail && selectedRecord && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto overscroll-contain">
             <div className="p-6">
               <div className="flex justify-between items-center mb-6">
                 <h3 className="text-2xl font-bold text-gray-800">親密時光詳情</h3>

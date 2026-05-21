@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil } from 'lucide-react';
 import type { Notification } from './ErrorNotification';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 interface RoleplayScript {
   id: string;
@@ -86,6 +87,8 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   // explicitly clicked "開始扮演" and we recorded an intimacy moment. View
   // alone does NOT record; only this transition does.
   const [hasBegun, setHasBegun] = useState(false);
+
+  useScrollLock(showScriptModal && !!selectedScript);
 
   const handleViewScript = useCallback((script: RoleplayScript) => {
     const parsedScript = parseScriptContent(script.script);
@@ -466,7 +469,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               </button>
             </div>
 
-            <div className="px-8 py-6 overflow-y-auto flex-1">
+            <div className="px-8 py-6 overflow-y-auto overscroll-contain flex-1">
               <div className="bg-petal-cream-2/40 p-6 rounded-md border border-petal-rule-soft">
                 <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-4 flex items-center">
                   <Play className="w-3.5 h-3.5 mr-1.5 text-petal-rose-deep" strokeWidth={1.5} />
