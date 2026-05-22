@@ -41,7 +41,53 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
         JSON.stringify({ user, isAuthenticated: true, partnerConnected: true })
       );
       localStorage.setItem('pairingPromptDismissed', 'true');
+      // Set the token expiry far in the future so the new client-side
+      // proactive-expiration logic in App.tsx doesn't immediately log the
+      // fake user out.
+      localStorage.setItem(
+        'authTokenExpiresAt',
+        new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      );
     }, FAKE_USER);
+
+    // Catch-all stub for any /api/** request the test doesn't explicitly
+    // mock. Registered FIRST so the more-specific routes below override it
+    // (Playwright matches in reverse-registration order). This prevents
+    // unmocked endpoints (e.g. /api/love-moments) from hitting the real
+    // backend with a fake JWT and returning 401 — which would trigger the
+    // new global session-expiration handler in App.tsx and log the test
+    // user out before the assertions run.
+    await page.route('**/api/**', async (route) => {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true }),
+      });
+    });
+
+    // Stub /api/couples specifically — App.tsx reads user2_nickname on mount
+    // to compute `partnerConnected`, and the catch-all's empty payload would
+    // flip it to false, making EventsView render the "pair first" prompt
+    // instead of the event list.
+    await page.route('**/api/couples**', async (route) => {
+      if (route.request().method() === 'GET') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            couple: {
+              id: FAKE_EVENT.couple_id,
+              user1_id: FAKE_USER.id,
+              user1_nickname: FAKE_USER.nickname,
+              user2_id: '88888888-8888-8888-8888-888888888888',
+              user2_nickname: 'B',
+            },
+          }),
+        });
+      }
+      return route.fallback();
+    });
 
     // Stub anything that might verify auth / re-fetch user state to keep
     // the seeded localStorage authoritative.
@@ -53,7 +99,7 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
           body: JSON.stringify({ success: true, user: FAKE_USER, partnerConnected: true }),
         });
       }
-      return route.continue();
+      return route.fallback();
     });
 
     // Stub the events list + detail + rewrite preview.
@@ -87,7 +133,7 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
         });
       }
 
-      return route.continue();
+      return route.fallback();
     });
 
     await page.route('**/api/events*', async (route) => {
@@ -105,7 +151,7 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
           }),
         });
       }
-      return route.continue();
+      return route.fallback();
     });
   });
 

@@ -63,7 +63,7 @@ router.post('/register', [
     const user = result.rows[0];
 
     // Generate token
-    const token = generateToken(user.id);
+    const { token, expiresAt } = generateToken(user.id);
 
     console.log(`✅ User registered successfully: ${email}`);
 
@@ -71,6 +71,7 @@ router.post('/register', [
       success: true,
       message: '註冊成功',
       token,
+      tokenExpiresAt: expiresAt,
       user: {
         id: user.id,
         nickname: user.nickname,
@@ -141,7 +142,7 @@ router.post('/login', [
     );
 
     // Generate token
-    const token = generateToken(user.id);
+    const { token, expiresAt } = generateToken(user.id);
 
     console.log(`✅ User logged in successfully: ${email}`);
 
@@ -149,6 +150,7 @@ router.post('/login', [
       success: true,
       message: '登入成功',
       token,
+      tokenExpiresAt: expiresAt,
       user: {
         id: user.id,
         nickname: user.nickname,

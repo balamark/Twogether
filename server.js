@@ -28,6 +28,7 @@ const scriptFavoritesRoutes = require('./routes/script-favorites');
 // Import database and middleware
 const db = require('./database/db');
 const { requestLogger, errorHandler, asyncHandler } = require('./middleware/logging');
+const { JWT_EXPIRES_IN, JWT_EXPIRES_IN_MS } = require('./middleware/auth');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -37,7 +38,10 @@ if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', true);
 }
 
-// Session configuration
+// Session configuration. Cookie maxAge is kept in sync with the JWT TTL
+// (JWT_EXPIRES_IN) so the express-session cookie and the JWT can't expire at
+// wildly different times — both are the "session lifespan" from the user's
+// perspective.
 const sessionConfig = {
   secret: process.env.SESSION_SECRET || 'twogether-session-secret-2024',
   resave: false,
@@ -45,11 +49,13 @@ const sessionConfig = {
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000, // 24 hours
+    maxAge: JWT_EXPIRES_IN_MS,
     sameSite: 'lax'
   },
   name: 'twogether.session'
 };
+
+console.log(`🔐 Session TTL: ${JWT_EXPIRES_IN} (${JWT_EXPIRES_IN_MS}ms)`);
 
 // Use PostgreSQL session store in production to avoid memory leaks
 if (process.env.NODE_ENV === 'production') {

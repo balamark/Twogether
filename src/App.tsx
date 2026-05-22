@@ -12,7 +12,7 @@ import IntimacyRequestsHistory from './components/IntimacyRequestsHistory';
 import IntimacyRequestForm from './components/IntimacyRequestForm';
 import NotificationInbox from './components/NotificationInbox';
 import PairingInvitationHandler from './components/PairingInvitationHandler';
-import { apiService } from './services/api';
+import { apiService, getTokenExpiry, clearAuthStorage } from './services/api';
 import { conflictPhraseTiers } from './data/conflictSteps';
 import { useScrollLock } from './hooks/useScrollLock';
 
@@ -876,6 +876,81 @@ const LoveTimeApp = () => {
 
     loadInitialData();
   }, []);
+
+  // Global session-expiration handler. The axios response interceptor in
+  // src/services/api.ts dispatches `auth:session-expired` whenever it sees a
+  // 401 (or 403 with a TOKEN_* error_code) on a non-login request. We listen
+  // here and flip the app back into the "logged out" state in one place,
+  // instead of every component handling 401s independently.
+  useEffect(() => {
+    const handleSessionExpired = (event: Event) => {
+      const detail = (event as CustomEvent<{ reason?: string }>).detail;
+      // Idempotent: if we already showed the modal, don't stack notifications.
+      setAuthState((prev) => {
+        if (!prev.isAuthenticated) return prev;
+        return { user: null, isAuthenticated: false, partnerConnected: false };
+      });
+      clearAuthStorage();
+      setCurrentView('record');
+      setShowAuthModal(true);
+      showNotification({
+        type: 'warning',
+        title: '登入已過期',
+        message: detail?.reason === 'invalid'
+          ? '登入資訊已失效，請重新登入'
+          : '為了你的帳號安全，請重新登入',
+        duration: 6000
+      });
+    };
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+    return () => window.removeEventListener('auth:session-expired', handleSessionExpired);
+  }, []);
+
+  // Proactive expiration: schedule a logout when the JWT is due to expire,
+  // and re-check on visibilitychange so users who put their machine to sleep
+  // for days don't wake up to a "dead" page that still shows them logged in.
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const dispatchExpired = () => {
+      window.dispatchEvent(new CustomEvent('auth:session-expired', { detail: { reason: 'expired' } }));
+    };
+
+    const scheduleExpiry = () => {
+      if (timer) { clearTimeout(timer); timer = null; }
+      const expiresAt = getTokenExpiry();
+      if (expiresAt == null) return;
+      const msUntilExpiry = expiresAt - Date.now();
+      if (msUntilExpiry <= 0) {
+        dispatchExpired();
+        return;
+      }
+      // setTimeout truncates to a 32-bit int (~24.8 days). Cap the schedule.
+      timer = setTimeout(dispatchExpired, Math.min(msUntilExpiry, 2_147_000_000));
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      const expiresAt = getTokenExpiry();
+      if (expiresAt != null && expiresAt <= Date.now()) {
+        dispatchExpired();
+        return;
+      }
+      // Token still looks valid client-side — confirm with the server in case
+      // it was revoked (e.g. user deleted) or the clock is skewed. Failures
+      // flow through the axios interceptor, which dispatches the same event.
+      apiService.getCurrentUser().catch(() => { /* interceptor handles it */ });
+      scheduleExpiry();
+    };
+
+    scheduleExpiry();
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      if (timer) clearTimeout(timer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [isAuthenticated]);
 
   // Load authenticated data when user logs in
   useEffect(() => {
