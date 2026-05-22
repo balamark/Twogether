@@ -173,7 +173,8 @@ router.get('/me', authenticateToken, async (req, res) => {
     // Get user with couple information
     const userResult = await db.query(`
       SELECT
-        u.id, u.nickname, u.email, u.gender, u.created_at, u.last_login,
+        u.id, u.nickname, u.email, u.gender, u.email_notifications_enabled,
+        u.created_at, u.last_login,
         c.id as couple_id, c.couple_name, c.anniversary_date,
         c.user1_id, c.user2_id
       FROM users u
@@ -212,6 +213,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         nickname: userData.nickname,
         email: userData.email,
         gender: userData.gender,
+        email_notifications_enabled: userData.email_notifications_enabled !== false,
         created_at: userData.created_at,
         last_login: userData.last_login,
         couple: userData.couple_id ? {
@@ -273,6 +275,44 @@ router.put('/user/gender', authenticateToken, [
     res.status(500).json({
       success: false,
       message: '更新性別設定失敗'
+    });
+  }
+});
+
+// Toggle per-user opt-out for partner-activity email notifications.
+router.put('/user/email-notifications', authenticateToken, [
+  body('email_notifications_enabled')
+    .isBoolean()
+    .withMessage('email_notifications_enabled 必須為布林值')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: '驗證失敗',
+        errors: errors.array()
+      });
+    }
+
+    const userId = req.user.id;
+    const enabled = !!req.body.email_notifications_enabled;
+
+    await db.query(
+      `UPDATE users SET email_notifications_enabled = $1 WHERE id = $2`,
+      [enabled, userId]
+    );
+
+    res.json({
+      success: true,
+      message: '電子郵件通知設定已更新',
+      email_notifications_enabled: enabled
+    });
+  } catch (error) {
+    console.error('Update email notifications pref error:', error);
+    res.status(500).json({
+      success: false,
+      message: '更新電子郵件通知設定失敗'
     });
   }
 });
