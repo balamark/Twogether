@@ -1975,8 +1975,8 @@ const LoveTimeApp = () => {
         {/* Enhanced Record Modal */}
         {showRecordModal && (
           <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-petal-cream rounded-md shadow-petal max-w-2xl w-full max-h-[90vh] overflow-y-auto overscroll-contain border border-petal-rule">
-              <div className="p-8">
+            <div className="bg-petal-cream rounded-md shadow-petal max-w-2xl w-full max-h-[min(90vh,calc(100dvh-80px))] overflow-y-auto overscroll-contain border border-petal-rule">
+              <div className="p-5 sm:p-6 md:p-8">
                 <div className="flex justify-between items-end mb-8 pb-5 border-b border-petal-rule">
                   <div>
                     <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
@@ -2294,7 +2294,7 @@ const LoveTimeApp = () => {
       </div>
 
       <nav className="!mt-0 sticky top-0 z-20 -mx-4 px-4 py-3 bg-petal-cream/95 backdrop-blur-sm border-b border-petal-rule-soft" aria-label="情趣遊戲分區">
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto no-scrollbar">
           <div className="flex gap-2 whitespace-nowrap">
             {[
               { id: 'games-list', label: '情趣遊戲' },

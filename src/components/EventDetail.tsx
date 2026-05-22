@@ -411,7 +411,7 @@ function RewritePicker({
       className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
       data-testid="event-reply-rewrite-modal"
     >
-      <div className="bg-petal-cream rounded-2xl max-w-lg w-full max-h-[85vh] overflow-y-auto overscroll-contain p-5">
+      <div className="bg-petal-cream rounded-2xl max-w-lg w-full max-h-[min(85vh,calc(100dvh-80px))] overflow-y-auto overscroll-contain p-4 sm:p-5">
         <div className="flex items-start justify-between mb-3">
           <div>
             <h3 className="text-lg font-serif text-petal-ink">AI 幫你改寫的版本</h3>

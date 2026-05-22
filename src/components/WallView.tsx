@@ -320,7 +320,7 @@ const WallView: React.FC<WallViewProps> = ({
         </div>
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
-            <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
+            <h2 className="font-display text-2xl sm:text-3xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.1] md:leading-[1.05] mb-3">
               我們的<em className="not-italic font-light italic text-pink-600">牆</em>
             </h2>
             <p className="font-display italic font-light text-base text-petal-muted">

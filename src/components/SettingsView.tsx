@@ -441,14 +441,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   return (
-    <div className="space-y-10">
-      <div className="border-b border-petal-rule pb-7">
-        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+    <div className="space-y-6 sm:space-y-10">
+      <div className="border-b border-petal-rule pb-5 sm:pb-7">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 md:gap-6">
           <div>
-            <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+            <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-2 sm:mb-3">
               — 設定
             </div>
-            <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
+            <h2 className="font-display text-2xl sm:text-3xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.1] md:leading-[1.05] mb-3">
               <em className="not-italic font-light italic text-pink-600">設定</em>
             </h2>
             <p className="font-display italic font-light text-base text-petal-muted">
@@ -469,7 +469,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-lg p-6">
+      <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
         <h3 className="text-lg font-bold text-gray-800 mb-4">暱稱設定</h3>
         <div className="space-y-4">
           <div>
@@ -507,7 +507,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       {/* Gender Selection */}
-      <div className="bg-white rounded-2xl shadow-lg p-6">
+      <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
         <h3 className="text-lg font-bold text-gray-800 mb-4">性別設定</h3>
         <div className="space-y-4">
           <div>
@@ -557,7 +557,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       {/* Journey Milestones Management */}
-      <div className="bg-white rounded-2xl shadow-lg p-6">
+      <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
         <h3 className="text-lg font-bold text-gray-800 mb-4">愛情里程碑設定</h3>
         <div className="space-y-4">
           <div>
@@ -656,7 +656,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       {/* Custom Game Content — 自訂遊戲內容 */}
-      <div className="bg-white rounded-2xl shadow-lg p-6">
+      <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
         <h3 className="text-lg font-bold text-gray-800 mb-1">自訂遊戲內容</h3>
         <p className="text-xs text-gray-500 mb-5">
           💡 這裡新增的題目與情緒，會出現在「情趣遊戲 → 回憶倒帶 / 情緒模仿秀」的隨機抽取清單中，與預設內容一起被抽到。
@@ -761,7 +761,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
       {/* Authentication and Pairing Section */}
       {!authState.isAuthenticated ? (
-        <div className="bg-white rounded-2xl shadow-lg p-6">
+        <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
           <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
             <User className="w-5 h-5 mr-2 text-pink-500" />
             帳號設定
@@ -775,7 +775,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           </button>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl shadow-lg p-6">
+        <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
           <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
             <Users className="w-5 h-5 mr-2 text-green-500" />
             情侶配對

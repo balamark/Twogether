@@ -136,9 +136,9 @@ export default function EventHistoryList({
             <h3 className="font-serif text-petal-ink truncate flex-1">{event.title}</h3>
             <div className="flex items-center gap-2 flex-shrink-0">
               {event.isPrivate && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-petal-ink/10 text-petal-ink inline-flex items-center gap-1">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-petal-ink/10 text-petal-ink inline-flex items-center gap-1" title="私人">
                   <Lock className="w-3 h-3" />
-                  私人
+                  <span className="hidden sm:inline">私人</span>
                 </span>
               )}
               {statusPill(event.status)}
@@ -159,7 +159,7 @@ export default function EventHistoryList({
             <p className="text-sm text-petal-ink-soft line-clamp-2 mb-2">{event.lastMessagePreview}</p>
           )}
 
-          <div className="flex flex-wrap gap-1.5">
+          <div className="hidden sm:flex flex-wrap gap-1.5">
             {event.tags.map((t) => (
               <span
                 key={t}
