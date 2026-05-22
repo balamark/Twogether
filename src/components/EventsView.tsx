@@ -90,8 +90,11 @@ export default function EventsView({
     <div className="max-w-4xl mx-auto p-4 md:p-6">
       <header className="mb-5">
         <h1 className="text-2xl md:text-3xl font-serif text-petal-ink mb-1">事件 × 由 AI 替你說</h1>
-        <p className="text-sm text-petal-ink-soft">
+        <p className="hidden sm:block text-sm text-petal-ink-soft">
           當下情緒不會直接送出。AI 會協助你把感受整理成三種「由 AI 替你說」的版本，由你選擇要不要送出。
+        </p>
+        <p className="sm:hidden text-sm text-petal-ink-soft">
+          AI 會幫你把當下情緒整理成幾種可送出的版本。
         </p>
       </header>
 

@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { logDbError, errorResponseBody } = require('../lib/db-errors');
+const emailService = require('../services/emailService');
 
 const router = express.Router();
 
@@ -27,7 +28,7 @@ function partnerOf(couple, userId) {
   return couple.user1_id === userId ? couple.user2_id : couple.user1_id;
 }
 
-async function notifyPartner(partnerId, type, title, content, relatedUserId) {
+async function notifyPartner(partnerId, type, title, content, relatedUserId, opts = {}) {
   if (!partnerId) return;
   try {
     await db.query(
@@ -38,6 +39,26 @@ async function notifyPartner(partnerId, type, title, content, relatedUserId) {
     );
   } catch (err) {
     console.warn(`⚠️ Failed to create ${type} notification:`, err.message);
+  }
+
+  // Fire-and-forget email to the partner. Honors per-user opt-out.
+  try {
+    const partner = await emailService.getUserEmailIfOptedIn(db, partnerId);
+    if (!partner) return;
+    let senderName = opts.senderName;
+    if (!senderName && relatedUserId) {
+      const r = await db.query(`SELECT nickname FROM users WHERE id = $1`, [relatedUserId]);
+      senderName = r.rows[0]?.nickname || null;
+    }
+    await emailService.sendWallPostNotification({
+      senderName,
+      recipientEmail: partner.email,
+      isImportant: !!opts.isImportant,
+      isReply: type === 'wall_reply',
+      content,
+    });
+  } catch (err) {
+    console.warn(`⚠️ Failed to send ${type} email:`, err.message);
   }
 }
 
@@ -157,7 +178,10 @@ router.post(
 
       const partnerId = partnerOf(couple, userId);
       const title = category === 'important' ? '對方留下了重要的話 ⭐' : '對方在牆上留言';
-      await notifyPartner(partnerId, 'wall_post', title, content, userId);
+      await notifyPartner(partnerId, 'wall_post', title, content, userId, {
+        isImportant: category === 'important',
+        senderName: enriched.rows[0]?.author_nickname || null,
+      });
 
       res.json({
         success: true,
@@ -414,7 +438,8 @@ router.post(
         'wall_reply',
         '對方回覆了你的貼文',
         content,
-        userId
+        userId,
+        { senderName: enriched.rows[0]?.author_nickname || null }
       );
 
       res.json({

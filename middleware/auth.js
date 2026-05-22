@@ -53,11 +53,14 @@ const authenticateToken = async (req, res, next) => {
     req.user = userResult.rows[0];
     next();
   } catch (error) {
+    console.error('Token verification error:', error);
     // jwt.verify throws TokenExpiredError when exp has passed and
-    // JsonWebTokenError for malformed / bad-signature tokens. Both map to 403
-    // but we expose distinct error codes so the frontend can react.
+    // JsonWebTokenError for malformed / bad-signature tokens. Both are an
+    // authentication failure (HTTP 401) — distinct error codes let the
+    // frontend distinguish "session ran out" from "garbage in the token
+    // header" for messaging without changing the recovery flow.
     const isExpired = error && error.name === 'TokenExpiredError';
-    return res.status(403).json({
+    return res.status(401).json({
       success: false,
       message: isExpired ? 'Session expired' : 'Invalid token',
       error_code: isExpired ? 'TOKEN_EXPIRED' : 'TOKEN_INVALID'

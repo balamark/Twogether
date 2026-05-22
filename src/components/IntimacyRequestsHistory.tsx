@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import apiService from '../services/api';
 import type { IntimacyRequest, IntimacyRequestStats, IntimacyRequestNudge } from '../services/api';
+import IntimacyRequestActionPanel from './IntimacyRequestActionPanel';
 
 interface User {
   id: string;
@@ -35,6 +36,24 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
   const meId = authState.user?.id || '';
   const partnerNickname = partnerNicknameOverride || authState.user?.partnerNickname || '';
 
+  const fetchAll = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [all, statsResponse] = await Promise.all([
+        apiService.getIntimacyRequests(),
+        apiService.getIntimacyRequestStats(),
+      ]);
+      setItems(all);
+      setStats(statsResponse.statistics);
+      setNudge(statsResponse.nudge);
+    } catch (e) {
+      setError((e as Error)?.message || '載入失敗');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!authState.isAuthenticated) {
       setItems([]);
@@ -44,26 +63,9 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
       setSendingEmail(false);
       return;
     }
-    (async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        setEmailFeedback(null);
-        // Fetch invitation records and statistics in parallel
-        const [all, statsResponse] = await Promise.all([
-          apiService.getIntimacyRequests(),
-          apiService.getIntimacyRequestStats()
-        ]);
-        setItems(all);
-        setStats(statsResponse.statistics);
-        setNudge(statsResponse.nudge);
-      } catch (e) {
-        setError((e as Error)?.message || '載入失敗');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [authState.isAuthenticated]);
+    setEmailFeedback(null);
+    fetchAll();
+  }, [authState.isAuthenticated, fetchAll]);
 
   const { sent, received } = useMemo(() => {
     const s: IntimacyRequest[] = [];
@@ -123,7 +125,7 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
         <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
           — 紀錄
         </div>
-        <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
+        <h2 className="font-display text-2xl sm:text-3xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.1] md:leading-[1.05] mb-3">
           親密<em className="not-italic font-light italic text-pink-600">邀請紀錄</em>
         </h2>
         <p className="font-display italic font-light text-base text-petal-muted">
@@ -166,6 +168,8 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
                 emptyText="尚無收到紀錄"
                 meId={meId}
                 partnerNickname={partnerNickname}
+                showActionsForPending
+                onResponded={fetchAll}
               />
             </div>
           </div>
@@ -352,11 +356,15 @@ function RequestList({
   emptyText,
   meId,
   partnerNickname,
+  showActionsForPending = false,
+  onResponded,
 }: {
   items: IntimacyRequest[];
   emptyText: string;
   meId: string;
   partnerNickname?: string;
+  showActionsForPending?: boolean;
+  onResponded?: () => void;
 }) {
   if (items.length === 0) {
     return <div className="text-gray-500 text-sm">{emptyText}</div>;
@@ -370,20 +378,26 @@ function RequestList({
           meId,
           partnerNickname,
         });
+        const showActions = showActionsForPending && it.status === 'pending';
         return (
-          <li key={it.id} className="py-3 flex items-start justify-between">
-            <div>
-              <div className="text-sm text-gray-600">
-                <span className="font-medium text-gray-800">{senderLabel}</span>
-                <span className="mx-1">→</span>
-                <span className="font-medium text-gray-800">{receiverLabel}</span>
+          <li key={it.id} className="py-3">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="text-sm text-gray-600">
+                  <span className="font-medium text-gray-800">{senderLabel}</span>
+                  <span className="mx-1">→</span>
+                  <span className="font-medium text-gray-800">{receiverLabel}</span>
+                </div>
+                <div className="text-gray-700 text-sm mt-1">{it.messageContent}</div>
+                <div className="text-xs text-gray-400 mt-1">{new Date(it.createdAt).toLocaleString('zh-TW')}</div>
               </div>
-            <div className="text-gray-700 text-sm mt-1">{it.messageContent}</div>
-            <div className="text-xs text-gray-400 mt-1">{new Date(it.createdAt).toLocaleString('zh-TW')}</div>
-          </div>
-          <span className={`text-xs px-2 py-1 rounded-full ${
-            it.status === 'accepted' ? 'bg-green-100 text-green-700' : it.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-          }`}>{translateStatus(it.status)}</span>
+              <span className={`text-xs px-2 py-1 rounded-full ${
+                it.status === 'accepted' ? 'bg-green-100 text-green-700' : it.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+              }`}>{translateStatus(it.status)}</span>
+            </div>
+            {showActions && onResponded && (
+              <IntimacyRequestActionPanel request={it} onResponded={onResponded} />
+            )}
           </li>
         );
       })}

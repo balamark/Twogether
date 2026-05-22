@@ -71,16 +71,16 @@ const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <div className="bg-petal-cream border-b border-petal-rule">
+    <div className="bg-petal-cream border-b border-petal-rule safe-pt safe-px">
       <div className="container mx-auto px-4 py-3">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           {/* Logo and Title */}
-          <div className="flex items-center space-x-3">
-            <div className="flex items-baseline space-x-2">
-              <Heart className="w-6 h-6 text-pink-500 self-center opacity-80" strokeWidth={1.5} />
-              <h1 className="font-display text-2xl font-medium tracking-tight text-petal-ink">
+          <div className="flex items-center min-w-0">
+            <div className="flex items-baseline space-x-2 min-w-0">
+              <Heart className="w-6 h-6 text-pink-500 self-center opacity-80 shrink-0" strokeWidth={1.5} />
+              <h1 className="font-display text-xl sm:text-2xl font-medium tracking-tight text-petal-ink truncate">
                 Two<em className="not-italic font-light italic text-pink-600">gether</em>
-                <span className="ml-2 font-body text-xs font-normal uppercase tracking-[0.18em] text-petal-muted align-middle">
+                <span className="hidden sm:inline ml-2 font-body text-xs font-normal uppercase tracking-[0.18em] text-petal-muted align-middle">
                   圖在一起
                 </span>
               </h1>
@@ -88,12 +88,12 @@ const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* Right Side - Actions, Coins and User */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-1.5 sm:space-x-3 md:space-x-4 shrink-0">
             {/* Intimacy Request Button */}
             {authState.isAuthenticated && authState.partnerConnected && (
               <button
                 onClick={onShowIntimacyRequest}
-                className="flex items-center space-x-2 bg-pink-500 text-white px-4 py-2 rounded-full hover:bg-pink-600 transition-colors"
+                className="flex items-center space-x-2 bg-pink-500 text-white p-2 sm:px-4 sm:py-2 rounded-full hover:bg-pink-600 transition-colors min-h-[40px] min-w-[40px] justify-center"
                 title="發送親密邀請"
               >
                 <Send className="w-4 h-4" />
@@ -110,7 +110,7 @@ const Header: React.FC<HeaderProps> = ({
               >
                 <Bell className="w-4 h-4" strokeWidth={1.5} />
                 {unreadNotificationCount > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 bg-pink-600 text-white font-body text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
+                  <span className="absolute -top-0.5 -right-0.5 bg-pink-600 text-white font-body text-[11px] leading-none w-[18px] h-[18px] rounded-full flex items-center justify-center">
                     {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
                   </span>
                 )}
@@ -123,7 +123,7 @@ const Header: React.FC<HeaderProps> = ({
                 onClick={onShowCoinShop}
                 data-testid="coin-balance"
                 title="前往金幣商店"
-                className="flex items-center space-x-1.5 border border-petal-rule hover:border-petal-ink px-3 py-1.5 rounded-full transition-colors"
+                className="flex items-center space-x-1 sm:space-x-1.5 border border-petal-rule hover:border-petal-ink px-2 sm:px-3 py-1.5 rounded-full transition-colors min-h-[40px]"
               >
                 <Coins className="w-3.5 h-3.5 text-pink-600" strokeWidth={1.5} />
                 <span className="font-display italic text-sm text-petal-ink">{totalCoins}</span>
@@ -135,17 +135,17 @@ const Header: React.FC<HeaderProps> = ({
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center space-x-1.5 border border-petal-rule hover:border-petal-ink px-3 py-1.5 rounded-full transition-colors"
+                  className="flex items-center space-x-1 sm:space-x-1.5 border border-petal-rule hover:border-petal-ink px-2 sm:px-3 py-1.5 rounded-full transition-colors min-h-[40px] max-w-[140px] sm:max-w-none"
                 >
-                  <User className="w-3.5 h-3.5 text-petal-ink-soft" strokeWidth={1.5} />
-                  <span className="font-body text-sm text-petal-ink">
+                  <User className="w-3.5 h-3.5 text-petal-ink-soft shrink-0" strokeWidth={1.5} />
+                  <span className="font-body text-sm text-petal-ink truncate">
                     {authState.user?.nickname || '用戶'}
                   </span>
                 </button>
 
                 {/* User Dropdown */}
                 {showUserMenu && (
-                  <div className="absolute right-0 mt-2 w-64 bg-petal-cream rounded-md shadow-petal border border-petal-rule z-50">
+                  <div className="absolute right-0 mt-2 w-[min(16rem,calc(100vw-2rem))] bg-petal-cream rounded-md shadow-petal border border-petal-rule z-50">
                     <div className="p-4 border-b border-petal-rule">
                       <div className="font-display text-base font-medium text-petal-ink">
                         {authState.user?.nickname}

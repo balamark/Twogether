@@ -402,6 +402,22 @@ const apiClient = axios.create({
   },
 });
 
+// Reject anything that isn't shaped like a JWT before it can poison
+// localStorage and trigger the malformed-token 403/401 loop on every
+// subsequent request. Also persists the server-supplied expiry so the
+// proactive-logout timer in App.tsx doesn't need to decode the JWT.
+function persistAuth(token: unknown, user: unknown, tokenExpiresAt?: unknown): void {
+  if (typeof token !== 'string' || token.split('.').length !== 3) {
+    throw new Error('登錄失敗：伺服器回傳的憑證格式異常');
+  }
+  localStorage.setItem('authToken', token);
+  localStorage.setItem('authUser', JSON.stringify(user));
+  if (typeof tokenExpiresAt === 'string' && tokenExpiresAt.length > 0) {
+    localStorage.setItem('authTokenExpiresAt', tokenExpiresAt);
+  }
+  resetSessionExpiredGuard();
+}
+
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
@@ -462,11 +478,18 @@ apiClient.interceptors.response.use(
           throw authError;
         }
       } else if (status === 403) {
-        // A 403 with a session-related error_code means the JWT was rejected
-        // by the auth middleware — treat it like a 401 and send the user to
-        // login. A 403 without one of these codes is a legitimate
-        // authorization failure (e.g. accessing someone else's resource).
-        if (!isAuthEndpoint && sessionExpiredCodes.has(errorCode)) {
+        // A 403 with a session-related error_code (or the legacy "Invalid
+        // or expired token" message from older deployments) means the JWT
+        // was rejected by the auth middleware — treat it like a 401, clear
+        // storage, and send the user back to login. A 403 without one of
+        // these signals is a legitimate authorization failure (e.g. trying
+        // to access someone else's resource) and stays "沒有權限".
+        const dataObj = (data ?? {}) as { message?: string };
+        const tokenIssue =
+          sessionExpiredCodes.has(errorCode) ||
+          errorCode === 'INVALID_TOKEN' ||
+          dataObj.message === 'Invalid or expired token';
+        if (!isAuthEndpoint && tokenIssue) {
           clearAuthStorage();
           dispatchSessionExpired(errorCode === 'TOKEN_EXPIRED' ? 'expired' : 'invalid');
           const authError = new Error('登錄已過期，請重新登錄') as Error & { error_code?: string; status?: number; data?: unknown };
@@ -800,24 +823,14 @@ class ApiService {
   async login(email: string, password: string): Promise<{ token: string; user: unknown }> {
     const response = await apiClient.post('/auth/login', { email, password });
     const { token, user, tokenExpiresAt } = response.data;
-
-    localStorage.setItem('authToken', token);
-    localStorage.setItem('authUser', JSON.stringify(user));
-    if (tokenExpiresAt) localStorage.setItem('authTokenExpiresAt', tokenExpiresAt);
-    resetSessionExpiredGuard();
-
+    persistAuth(token, user, tokenExpiresAt);
     return { token, user };
   }
 
   async register(email: string, nickname: string, password: string): Promise<{ token: string; user: unknown }> {
     const response = await apiClient.post('/auth/register', { email, nickname, password });
     const { token, user, tokenExpiresAt } = response.data;
-
-    localStorage.setItem('authToken', token);
-    localStorage.setItem('authUser', JSON.stringify(user));
-    if (tokenExpiresAt) localStorage.setItem('authTokenExpiresAt', tokenExpiresAt);
-    resetSessionExpiredGuard();
-
+    persistAuth(token, user, tokenExpiresAt);
     return { token, user };
   }
 
@@ -1143,6 +1156,17 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to update user gender:', error);
       throw new Error((error as ApiErrorResponse)?.message || '更新性別設定失敗');
+    }
+  }
+
+  async updateEmailNotificationsEnabled(enabled: boolean): Promise<void> {
+    try {
+      await apiClient.put('/auth/user/email-notifications', {
+        email_notifications_enabled: enabled,
+      });
+    } catch (error: unknown) {
+      console.error('Failed to update email notifications pref:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '更新電子郵件通知設定失敗');
     }
   }
 

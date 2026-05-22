@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { X, Sparkles, Star } from 'lucide-react';
 import type { WallPost, WallPostCategory } from '../services/api';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 export interface WallExample {
   id: string;
@@ -62,6 +63,8 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
     }
     setError(null);
   }, [isOpen, editingPost, initialTemplate]);
+
+  useScrollLock(isOpen);
 
   if (!isOpen) return null;
 

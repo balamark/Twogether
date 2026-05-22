@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const llmService = require('../services/llmService');
+const emailService = require('../services/emailService');
 
 const router = express.Router();
 
@@ -140,6 +141,26 @@ async function notify(userId, type, title, content, eventId, relatedUserId, prio
     );
   } catch (err) {
     console.warn(`⚠️ notify(${type}) failed:`, err.message);
+  }
+
+  // Fire-and-forget email mirroring the in-app notification. Skips silently
+  // when the recipient is opted out, unconfigured, or unreachable.
+  try {
+    const recipient = await emailService.getUserEmailIfOptedIn(db, userId);
+    if (!recipient) return;
+    let senderName = null;
+    if (relatedUserId) {
+      const r = await db.query(`SELECT nickname FROM users WHERE id = $1`, [relatedUserId]);
+      senderName = r.rows[0]?.nickname || null;
+    }
+    await emailService.sendEventNotification({
+      senderName,
+      recipientEmail: recipient.email,
+      eventTitle: content,
+      type,
+    });
+  } catch (err) {
+    console.warn(`⚠️ notify(${type}) email failed:`, err.message);
   }
 }
 

@@ -552,6 +552,250 @@ ${message ? `個人訊息："${message}"` : ''}
       throw error;
     }
   }
+
+  // Resolve the paired partner's email + opt-out status for a given user.
+  // Returns null when the user is unpaired, the partner row is missing, or
+  // the partner has opted out of email notifications. Callers treat null as
+  // "skip silently" — no errors, no logs.
+  async getPartnerEmailIfOptedIn(db, userId) {
+    if (!userId) return null;
+    try {
+      const result = await db.query(
+        `SELECT u.email, u.nickname, u.email_notifications_enabled
+           FROM couples c
+           JOIN users u ON u.id = CASE
+             WHEN c.user1_id = $1 THEN c.user2_id ELSE c.user1_id END
+          WHERE (c.user1_id = $1 OR c.user2_id = $1)
+            AND c.user2_id IS NOT NULL`,
+        [userId]
+      );
+      const row = result.rows[0];
+      if (!row || !row.email_notifications_enabled || !row.email) return null;
+      return { email: row.email, nickname: row.nickname };
+    } catch (err) {
+      console.warn('⚠️ getPartnerEmailIfOptedIn failed:', err.message);
+      return null;
+    }
+  }
+
+  // Resolve a specific user's email + opt-out status. Used when the target
+  // is not the partner-of-the-actor (e.g. intimacy response → email original
+  // requester directly by user id).
+  async getUserEmailIfOptedIn(db, userId) {
+    if (!userId) return null;
+    try {
+      const result = await db.query(
+        `SELECT email, nickname, email_notifications_enabled
+           FROM users WHERE id = $1`,
+        [userId]
+      );
+      const row = result.rows[0];
+      if (!row || !row.email_notifications_enabled || !row.email) return null;
+      return { email: row.email, nickname: row.nickname };
+    } catch (err) {
+      console.warn('⚠️ getUserEmailIfOptedIn failed:', err.message);
+      return null;
+    }
+  }
+
+  // Shared lightweight HTML wrapper used by the partner-activity emails so
+  // we don't repeat 100 lines of CSS per template.
+  _activityEmailHtml({ headerEmoji, headerTitle, headerSubtitle, bodyHtml, ctaLabel = '💕 打開 Twogether 查看' }) {
+    const frontendUrl = process.env.FRONTEND_URL || 'https://twogether-couples-app.de.r.appspot.com';
+    return `
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${headerTitle}</title>
+  <style>
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5; }
+    .container { max-width: 600px; margin: 0 auto; background-color: white; }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 32px 20px; text-align: center; }
+    .header h1 { margin: 0; font-size: 24px; font-weight: 400; }
+    .header p { margin: 6px 0 0; opacity: 0.85; font-size: 14px; }
+    .content { padding: 32px 20px; color: #2d3436; line-height: 1.6; }
+    .quote { background: #f8f9fa; border-left: 4px solid #e17055; padding: 16px 20px; border-radius: 8px; margin: 16px 0; color: #2d3436; }
+    .cta-button { display: inline-block; background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); color: white; text-decoration: none; padding: 14px 28px; border-radius: 25px; font-weight: bold; }
+    .cta-wrap { text-align: center; margin-top: 28px; }
+    .footer { background-color: #2d3436; color: white; padding: 20px; text-align: center; font-size: 12px; opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>${headerEmoji} ${headerTitle}</h1>
+      ${headerSubtitle ? `<p>${headerSubtitle}</p>` : ''}
+    </div>
+    <div class="content">
+      ${bodyHtml}
+      <div class="cta-wrap">
+        <a href="${frontendUrl}" class="cta-button">${ctaLabel}</a>
+      </div>
+    </div>
+    <div class="footer">
+      <p>© 2024 Twogether</p>
+      <p>如果你不想收到此類郵件，請在應用內調整通知設定。</p>
+    </div>
+  </div>
+</body>
+</html>`;
+  }
+
+  _escape(text = '') {
+    return String(text)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  async sendWallPostNotification({ senderName, recipientEmail, isImportant = false, isReply = false, content = '' }) {
+    if (!this.isConfigured()) return;
+    if (!recipientEmail) return;
+
+    const safeSender = this._escape(senderName || '你的伴侶');
+    const safeContent = this._escape(content).slice(0, 600);
+    const headerTitle = isReply
+      ? '伴侶回覆了你的貼文'
+      : (isImportant ? '伴侶留下了重要的話 ⭐' : '伴侶在牆上留言');
+    const subject = isReply
+      ? `💬 ${senderName || '你的伴侶'} 回覆了你的貼文`
+      : (isImportant
+        ? `⭐ ${senderName || '你的伴侶'} 留下了重要的話`
+        : `💌 ${senderName || '你的伴侶'} 在牆上留言`);
+
+    const bodyHtml = `
+      <p><strong>${safeSender}</strong> ${isReply ? '回覆了你的貼文：' : '在你們的牆上留下了訊息：'}</p>
+      <div class="quote">${safeContent.replace(/\n/g, '<br>')}</div>
+      <p style="color: #636e72; font-size: 14px;">登入 Twogether 查看完整內容並回覆。</p>
+    `;
+    const html = this._activityEmailHtml({
+      headerEmoji: isImportant ? '⭐' : '💌',
+      headerTitle,
+      headerSubtitle: '你的伴侶想和你分享一些事',
+      bodyHtml,
+    });
+
+    const text = [
+      `${senderName || '你的伴侶'} ${isReply ? '回覆了你的貼文' : '在牆上留言'}：`,
+      content || '',
+      '',
+      '打開 Twogether 查看完整內容。',
+    ].join('\n');
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+        to: recipientEmail,
+        subject,
+        text,
+        html,
+      });
+      console.log(`✅ Wall ${isReply ? 'reply' : 'post'} email sent to ${recipientEmail}`);
+    } catch (error) {
+      console.error('❌ Failed to send wall post email:', error.message);
+    }
+  }
+
+  async sendEventNotification({ senderName, recipientEmail, eventTitle = '', type }) {
+    if (!this.isConfigured()) return;
+    if (!recipientEmail) return;
+
+    const safeSender = this._escape(senderName || '你的伴侶');
+    const safeTitle = this._escape(eventTitle).slice(0, 200);
+
+    const meta = {
+      event_created:        { emoji: '📣', headline: '伴侶開啟了一個事件',         subject: `📣 ${senderName || '你的伴侶'} 開啟了一個事件` },
+      event_reply:          { emoji: '💬', headline: '伴侶在事件中回覆',           subject: `💬 ${senderName || '你的伴侶'} 在事件中回覆了` },
+      event_resolve_request:{ emoji: '🤝', headline: '伴侶希望標記事件為已解決',   subject: `🤝 ${senderName || '你的伴侶'} 希望標記事件為已解決` },
+      event_resolved:       { emoji: '✅', headline: '事件已解決',                  subject: `✅ 事件已解決` },
+    }[type] || { emoji: '🔔', headline: '事件更新', subject: '🔔 事件更新' };
+
+    const bodyHtml = `
+      <p>${meta.headline}：</p>
+      <div class="quote"><strong>${safeTitle || '(無標題)'}</strong></div>
+      <p style="color: #636e72; font-size: 14px;">登入 Twogether 查看事件詳情。</p>
+    `;
+    const html = this._activityEmailHtml({
+      headerEmoji: meta.emoji,
+      headerTitle: meta.headline,
+      headerSubtitle: safeSender,
+      bodyHtml,
+    });
+
+    const text = [
+      `${meta.headline}`,
+      `事件：${eventTitle || '(無標題)'}`,
+      '',
+      '打開 Twogether 查看事件詳情。',
+    ].join('\n');
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+        to: recipientEmail,
+        subject: meta.subject,
+        text,
+        html,
+      });
+      console.log(`✅ Event email (${type}) sent to ${recipientEmail}`);
+    } catch (error) {
+      console.error('❌ Failed to send event email:', error.message);
+    }
+  }
+
+  async sendIntimacyResponseNotification({ receiverName, senderEmail, response, responseMessage = '' }) {
+    if (!this.isConfigured()) return;
+    if (!senderEmail) return;
+
+    const accepted = response === 'accepted';
+    const safeReceiver = this._escape(receiverName || '你的伴侶');
+    const safeMessage = this._escape(responseMessage).slice(0, 600);
+    const headerTitle = accepted ? '邀請被接受 💕' : '邀請被婉拒';
+    const subject = accepted
+      ? `💕 ${receiverName || '你的伴侶'} 接受了你的親密邀請`
+      : `💌 ${receiverName || '你的伴侶'} 回覆了你的親密邀請`;
+
+    const bodyHtml = accepted
+      ? `<p><strong>${safeReceiver}</strong> 接受了你的親密邀請！</p>
+         ${safeMessage ? `<div class="quote">${safeMessage.replace(/\n/g, '<br>')}</div>` : ''}
+         <p style="color: #636e72; font-size: 14px;">登入 Twogether 安排你們的時光。</p>`
+      : `<p><strong>${safeReceiver}</strong> 暫時婉拒了你的親密邀請。</p>
+         ${safeMessage ? `<div class="quote">${safeMessage.replace(/\n/g, '<br>')}</div>` : ''}
+         <p style="color: #636e72; font-size: 14px;">沒關係，再找一個合適的時刻溝通也很好。</p>`;
+
+    const html = this._activityEmailHtml({
+      headerEmoji: accepted ? '💕' : '💌',
+      headerTitle,
+      headerSubtitle: accepted ? '你們的時光就要開始了' : '溫柔地給彼此空間',
+      bodyHtml,
+    });
+
+    const text = [
+      accepted
+        ? `${receiverName || '你的伴侶'} 接受了你的親密邀請！`
+        : `${receiverName || '你的伴侶'} 暫時婉拒了你的親密邀請。`,
+      responseMessage ? `訊息：${responseMessage}` : '',
+      '',
+      '打開 Twogether 查看詳情。',
+    ].filter(Boolean).join('\n');
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+        to: senderEmail,
+        subject,
+        text,
+        html,
+      });
+      console.log(`✅ Intimacy response email (${response}) sent to ${senderEmail}`);
+    } catch (error) {
+      console.error('❌ Failed to send intimacy response email:', error.message);
+    }
+  }
 }
 
 module.exports = new EmailService();
