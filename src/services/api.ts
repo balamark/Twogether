@@ -1060,6 +1060,17 @@ class ApiService {
     }
   }
 
+  async updateEmailNotificationsEnabled(enabled: boolean): Promise<void> {
+    try {
+      await apiClient.put('/auth/user/email-notifications', {
+        email_notifications_enabled: enabled,
+      });
+    } catch (error: unknown) {
+      console.error('Failed to update email notifications pref:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '更新電子郵件通知設定失敗');
+    }
+  }
+
   async getIntimacyRequests(status?: string): Promise<IntimacyRequest[]> {
     try {
       const params = status ? { status } : {};

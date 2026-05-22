@@ -511,6 +511,22 @@ router.put('/:id/respond', [
       // Don't fail the request if notification creation fails
     }
 
+    // Fire-and-forget email to the original sender. Honors per-user opt-out.
+    try {
+      const sender = await emailService.getUserEmailIfOptedIn(db, request.sender_id);
+      if (sender) {
+        const receiverRow = await db.query(`SELECT nickname FROM users WHERE id = $1`, [userId]);
+        await emailService.sendIntimacyResponseNotification({
+          receiverName: receiverRow.rows[0]?.nickname || null,
+          senderEmail: sender.email,
+          response,
+          responseMessage: response_message || '',
+        });
+      }
+    } catch (emailError) {
+      console.warn('⚠️ Failed to send intimacy response email:', emailError.message);
+    }
+
     console.log(`✅ Intimacy request ${requestId} ${response} by user ${userId}`);
 
     // Fetch the updated request with sender and receiver information
