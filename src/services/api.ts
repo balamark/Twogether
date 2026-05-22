@@ -347,6 +347,17 @@ const apiClient = axios.create({
   },
 });
 
+// Reject anything that isn't shaped like a JWT before it can poison
+// localStorage and trigger the malformed-token 403/401 loop on every
+// subsequent request.
+function persistAuth(token: unknown, user: unknown): void {
+  if (typeof token !== 'string' || token.split('.').length !== 3) {
+    throw new Error('登錄失敗：伺服器回傳的憑證格式異常');
+  }
+  localStorage.setItem('authToken', token);
+  localStorage.setItem('authUser', JSON.stringify(user));
+}
+
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
@@ -401,6 +412,25 @@ apiClient.interceptors.response.use(
           throw authError;
         }
       } else if (status === 403) {
+        // Some backends (incl. older versions of this one) return 403 for
+        // JWT verification failures. Treat that as an auth problem and run
+        // the same recovery as the 401 branch so a poisoned localStorage
+        // token can't trap the user in a permanent loop.
+        const dataObj = (data ?? {}) as { message?: string };
+        const tokenIssue =
+          dataObj.message === 'Invalid or expired token' ||
+          errorCode === 'INVALID_TOKEN' ||
+          errorCode === 'TOKEN_EXPIRED';
+        if (tokenIssue && !requestUrl.includes('/auth/')) {
+          localStorage.removeItem('authToken');
+          localStorage.removeItem('authUser');
+          localStorage.removeItem('authState');
+          const authError = new Error('登錄已過期，請重新登錄') as Error & { error_code?: string; status?: number; data?: unknown };
+          authError.error_code = errorCode;
+          authError.status = status;
+          authError.data = data;
+          throw authError;
+        }
         const forbiddenError = new Error('沒有權限執行此操作') as Error & { error_code?: string; status?: number; data?: unknown };
         forbiddenError.error_code = errorCode;
         forbiddenError.status = status;
@@ -726,20 +756,14 @@ class ApiService {
   async login(email: string, password: string): Promise<{ token: string; user: unknown }> {
     const response = await apiClient.post('/auth/login', { email, password });
     const { token, user } = response.data;
-    
-    localStorage.setItem('authToken', token);
-    localStorage.setItem('authUser', JSON.stringify(user));
-    
+    persistAuth(token, user);
     return { token, user };
   }
 
   async register(email: string, nickname: string, password: string): Promise<{ token: string; user: unknown }> {
     const response = await apiClient.post('/auth/register', { email, nickname, password });
     const { token, user } = response.data;
-    
-    localStorage.setItem('authToken', token);
-    localStorage.setItem('authUser', JSON.stringify(user));
-    
+    persistAuth(token, user);
     return { token, user };
   }
 
