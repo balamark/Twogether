@@ -6,6 +6,7 @@ const API_BASE_URL = '/api';
 // Types
 interface IntimateRecord {
   id: number;
+  apiId?: string;
   date: string;
   time: string;
   mood: string;
@@ -637,6 +638,37 @@ class ApiService {
     }
   }
 
+  async updateIntimateRecord(id: string, record: Partial<IntimateRecord>): Promise<void> {
+    try {
+      if (!id) throw new Error('記錄ID不能為空');
+
+      const apiPayload: Record<string, unknown> = {};
+      if (record.date && record.time) {
+        apiPayload.moment_date = new Date(`${record.date}T${record.time}`).toISOString();
+      }
+      if (record.notes !== undefined) apiPayload.notes = record.notes?.trim() || null;
+      if (record.description !== undefined) apiPayload.description = record.description?.trim() || null;
+      if (record.duration !== undefined) apiPayload.duration = record.duration?.trim() || null;
+      if (record.location !== undefined) apiPayload.location = record.location?.trim() || null;
+      if (record.roleplayScript !== undefined) apiPayload.roleplay_script = record.roleplayScript?.trim() || null;
+
+      await apiClient.put(`/love-moments/${id}`, apiPayload);
+    } catch (error: unknown) {
+      console.error('Failed to update intimate record:', error);
+      this.throwApiError(error, '無法更新記錄');
+    }
+  }
+
+  async deleteIntimateRecord(id: string): Promise<void> {
+    try {
+      if (!id) throw new Error('記錄ID不能為空');
+      await apiClient.delete(`/love-moments/${id}`);
+    } catch (error: unknown) {
+      console.error('Failed to delete intimate record:', error);
+      this.throwApiError(error, '無法刪除記錄');
+    }
+  }
+
   // Photo Upload
   async uploadPhoto(file: File, caption?: string): Promise<{ id: string; url: string }> {
     try {
@@ -913,6 +945,7 @@ class ApiService {
 
     return {
       id: safeId,
+      apiId: typeof apiRecord.id === 'string' ? apiRecord.id : String(apiRecord.id ?? ''),
       date: dateStr,
       time: timeStr,
       mood: '💕', // Default mood
