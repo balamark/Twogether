@@ -567,6 +567,53 @@ npm run dev
 - **Error Tracking**: Automatic error logging
 - **Performance**: Built-in App Engine metrics
 
+### Querying email failures in Cloud Logging
+
+All server code uses `lib/logger.js`, which emits one structured JSON entry
+per call. SMTP errors come with `jsonPayload.code` (e.g. `EAUTH`),
+`jsonPayload.kind` (`pairing_invite`, `intimacy_request`, `wall_post`,
+`event`, `intimacy_response`, etc.), and `jsonPayload.responseCode`.
+
+```bash
+# Tail email-related errors in real time
+gcloud app logs tail -s default --project=$GCP_PROJECT_ID \
+  | grep -iE 'smtp|email'
+
+# Pull the last 24h of email errors as structured rows
+gcloud logging read \
+  'resource.type="gae_app" AND severity>=ERROR AND jsonPayload.message=~"email|SMTP"' \
+  --project=$GCP_PROJECT_ID --limit=50 --freshness=24h \
+  --format='value(timestamp, jsonPayload.message, jsonPayload.code, jsonPayload.kind, jsonPayload.err)'
+
+# Find auth failures specifically (typical when the App Password is wrong
+# or hasn't been redeployed)
+gcloud logging read \
+  'resource.type="gae_app" AND jsonPayload.code="EAUTH"' \
+  --project=$GCP_PROJECT_ID --limit=20 --freshness=7d
+```
+
+### Verifying SMTP credentials locally
+
+Before deploying a new `SMTP_PASS`, confirm the credential works against
+Gmail without sending any user-facing email:
+
+```bash
+# Auth check only (TLS handshake + AUTH)
+node scripts/verify-smtp.js
+
+# Auth check + send a real test email
+node scripts/verify-smtp.js --to you@example.com
+```
+
+The script never prints the password (only a length + first/last char) and
+exits non-zero on failure.
+
+> ⚠️ **Production note**: Updating `SMTP_PASS` in the GitHub secret only
+> takes effect on the *next* `gcloud app deploy` — App Engine env vars are
+> substituted from `_SMTP_PASS` at deploy time. After rotating the
+> credential, push to `main` (or run the deploy workflow manually) before
+> expecting prod emails to start flowing.
+
 ## 💰 Cost Breakdown & Optimization
 
 This project uses the following GCP services and their associated costs:

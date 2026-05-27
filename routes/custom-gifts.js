@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { logDbError, errorResponseBody } = require('../lib/db-errors');
+const { logError } = require('../lib/logger');
 
 const router = express.Router();
 
@@ -234,7 +235,7 @@ router.put('/:id', [
     });
 
   } catch (error) {
-    console.error('Update custom gift error:', error);
+    logError('Update custom gift failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '更新禮品失敗'
@@ -275,7 +276,7 @@ router.delete('/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Delete custom gift error:', error);
+    logError('Delete custom gift failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '刪除禮品失敗'

@@ -3,13 +3,15 @@
 // To add a real provider (e.g. Claude), drop a `<name>Provider.js` file
 // under services/llm/ that exports the same `generateIcebreaker` shape.
 
+const { logWarn } = require('../lib/logger');
+
 const PROVIDER_NAME = process.env.LLM_PROVIDER || 'mock';
 
 let provider;
 try {
   provider = require(`./llm/${PROVIDER_NAME}Provider`);
 } catch (err) {
-  console.warn(`⚠️ LLM provider "${PROVIDER_NAME}" not found, falling back to mock. Error: ${err.message}`);
+  logWarn('LLM provider not found; falling back to mock', { provider: PROVIDER_NAME, err: err.message });
   provider = require('./llm/mockProvider');
 }
 

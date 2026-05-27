@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
+const { logInfo, logError } = require('../lib/logger');
 
 const router = express.Router();
 
@@ -142,7 +143,7 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get achievements error:', error);
+    logError('Get achievements failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '獲取成就失敗'
@@ -261,7 +262,7 @@ router.post('/check', async (req, res) => {
       }
     }
 
-    console.log(`✅ Achievement check for couple ${coupleId}: ${newlyUnlocked.length} new achievements`);
+    logInfo('Achievement check complete', { coupleId, unlockedCount: newlyUnlocked.length });
 
     res.json({
       success: true,
@@ -270,7 +271,7 @@ router.post('/check', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Check achievements error:', error);
+    logError('Check achievements failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '檢查成就失敗'

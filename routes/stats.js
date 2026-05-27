@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
+const { logError } = require('../lib/logger');
 
 const router = express.Router();
 
@@ -142,7 +143,7 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get stats error:', error);
+    logError('Get stats failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '獲取統計數據失敗'
@@ -219,7 +220,7 @@ router.get('/achievements', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get achievement stats error:', error);
+    logError('Get achievement stats failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '獲取成就統計失敗'

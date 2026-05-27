@@ -13,6 +13,7 @@
 //   returns a 500 — falling back to the mock would silently hide outages.
 
 const Anthropic = require('@anthropic-ai/sdk');
+const { logInfo } = require('../../lib/logger');
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 
@@ -223,12 +224,15 @@ async function generateIcebreaker(rawText) {
   const ms = Date.now() - startedAt;
   const u = response.usage || {};
   const cost = estimateCostUSD(response.model || MODEL, u);
-  const costStr = cost == null ? 'cost=unknown' : `~$${cost.toFixed(6)}`;
-  console.log(
-    `[llm.claude] icebreaker model=${response.model || MODEL} ${ms}ms ` +
-      `in=${u.input_tokens || 0} out=${u.output_tokens || 0} ` +
-      `cache_w=${u.cache_creation_input_tokens || 0} cache_r=${u.cache_read_input_tokens || 0} ${costStr}`
-  );
+  logInfo('llm.claude.icebreaker', {
+    model: response.model || MODEL,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
 
   const toolUse = response.content.find((b) => b.type === 'tool_use' && b.name === 'emit_icebreaker');
   if (!toolUse) {
@@ -314,12 +318,15 @@ async function rewriteReply({ rawReply, eventSummary, recentMessages, createdByS
   const ms = Date.now() - startedAt;
   const u = response.usage || {};
   const cost = estimateCostUSD(response.model || MODEL, u);
-  const costStr = cost == null ? 'cost=unknown' : `~$${cost.toFixed(6)}`;
-  console.log(
-    `[llm.claude] reply_rewrite model=${response.model || MODEL} ${ms}ms ` +
-      `in=${u.input_tokens || 0} out=${u.output_tokens || 0} ` +
-      `cache_w=${u.cache_creation_input_tokens || 0} cache_r=${u.cache_read_input_tokens || 0} ${costStr}`
-  );
+  logInfo('llm.claude.reply_rewrite', {
+    model: response.model || MODEL,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
 
   const toolUse = response.content.find((b) => b.type === 'tool_use' && b.name === 'emit_reply_rewrite');
   if (!toolUse) {

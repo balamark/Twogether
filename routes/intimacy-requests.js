@@ -5,6 +5,7 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const emailService = require('../services/emailService');
 const characterMappingService = require('../services/characterMappingService');
+const { logInfo, logWarn, logError } = require('../lib/logger');
 
 const router = express.Router();
 
@@ -98,7 +99,7 @@ router.post('/', [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.warn(`❌ Validation failed for intimacy request by user ${req.user?.id}:`, errors.array());
+      logWarn('Intimacy request validation failed', { userId: req.user?.id, errors: errors.array() });
       return res.status(400).json({
         success: false,
         message: '驗證失敗',
@@ -109,7 +110,7 @@ router.post('/', [
     const userId = req.user.id;
     const { message, request_type } = req.body;
     
-    console.info(`💌 User ${userId} creating intimacy request - type: ${request_type}, has message: ${!!message}`);
+    logInfo('Creating intimacy request', { userId, request_type, hasMessage: !!message });
 
     // Find user's couple and partner
     const coupleResult = await db.query(`
@@ -121,7 +122,7 @@ router.post('/', [
     `, [userId]);
 
     if (coupleResult.rows.length === 0) {
-      console.warn(`⚠️ User ${userId} tried to create intimacy request but has no complete couple relationship`);
+      logWarn('Intimacy request without complete couple', { userId });
       return res.status(404).json({
         success: false,
         message: '您還沒有完整的情侶關係',
@@ -162,9 +163,9 @@ router.post('/', [
         userId,
         2
       ]);
-      console.log(`✅ Created notification for intimacy request ${requestId}`);
+      logInfo('Created intimacy request notification', { requestId });
     } catch (notificationError) {
-      console.warn('⚠️ Failed to create notification:', notificationError.message);
+      logWarn('Failed to create intimacy request notification', { err: notificationError.message });
       // Don't fail the request if notification creation fails
     }
 
@@ -176,7 +177,7 @@ router.post('/', [
         const partnerEmail = partnerResult.rows[0].email;
         const senderNickname = req.user.nickname || '你的伴侶';
 
-        console.log(`📧 Attempting to send intimacy request email to partner ${partnerEmail}...`);
+        logInfo('Sending intimacy request email', { kind: 'intimacy_request', partnerId });
         await emailService.sendIntimacyRequestNotification(
           senderNickname,
           partnerEmail,
@@ -184,14 +185,14 @@ router.post('/', [
           message || ''
         );
       } else {
-        console.warn(`⚠️ Partner email not found for user ${partnerId}`);
+        logWarn('Partner email not found', { partnerId });
       }
     } catch (emailError) {
-      console.warn('⚠️ Failed to send intimacy request email:', emailError.message);
+      logWarn('Failed to send intimacy request email', { kind: 'intimacy_request', err: emailError.message, code: emailError.code });
       // Don't fail the request if email sending fails
     }
 
-    console.log(`✅ Intimacy request created: ${requestId} from ${userId} to ${partnerId}`);
+    logInfo('Intimacy request created', { requestId, fromUserId: userId, toUserId: partnerId });
 
     res.status(201).json({
       success: true,
@@ -206,7 +207,7 @@ router.post('/', [
     });
 
   } catch (error) {
-    console.error('Create intimacy request error:', error);
+    logError('Create intimacy request failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '發送親密請求失敗'
@@ -225,7 +226,7 @@ router.get('/stats', async (req, res) => {
       nudge
     });
   } catch (error) {
-    console.error('Get intimacy request stats error:', error);
+    logError('Get intimacy request stats failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '無法獲取邀請統計'
@@ -273,7 +274,7 @@ router.post('/stats/send-nudge', async (req, res) => {
     }
 
     if (!emailService.isConfigured()) {
-      console.warn('Email service not configured, cannot send intimacy nudge email');
+      logWarn('Email service not configured; cannot send intimacy nudge', { kind: 'intimacy_nudge' });
       return res.json({
         success: false,
         message: '信件服務尚未設定，因此暫時無法寄出提醒。'
@@ -298,7 +299,7 @@ router.post('/stats/send-nudge', async (req, res) => {
       message: '已寄出貼心提醒信，祝你們的對話順利💌'
     });
   } catch (error) {
-    console.error('Send intimacy nudge email error:', error);
+    logError('Send intimacy nudge email failed', { kind: 'intimacy_nudge', err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '寄送提醒信時發生錯誤，請稍後再試。'
@@ -312,7 +313,7 @@ router.get('/', async (req, res) => {
     const userId = req.user.id;
     const { type = 'all', status = 'all', page = 1, limit = 20 } = req.query;
     
-    console.info(`📨 User ${userId} fetching intimacy requests - type: ${type}, status: ${status}, page: ${page}`);
+    logInfo('Fetching intimacy requests', { userId, type, status, page });
     
     const offset = (page - 1) * limit;
 
@@ -390,7 +391,7 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get intimacy requests error:', error);
+    logError('Get intimacy requests failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '獲取親密請求失敗'
@@ -505,9 +506,9 @@ router.put('/:id/respond', [
         userId,
         2
       ]);
-      console.log(`✅ Created response notification for intimacy request ${requestId}`);
+      logInfo('Created intimacy response notification', { requestId });
     } catch (notificationError) {
-      console.warn('⚠️ Failed to create response notification:', notificationError.message);
+      logWarn('Failed to create intimacy response notification', { err: notificationError.message });
       // Don't fail the request if notification creation fails
     }
 
@@ -524,10 +525,10 @@ router.put('/:id/respond', [
         });
       }
     } catch (emailError) {
-      console.warn('⚠️ Failed to send intimacy response email:', emailError.message);
+      logWarn('Failed to send intimacy response email', { kind: 'intimacy_response', err: emailError.message, code: emailError.code });
     }
 
-    console.log(`✅ Intimacy request ${requestId} ${response} by user ${userId}`);
+    logInfo('Intimacy request responded', { requestId, response, userId });
 
     // Fetch the updated request with sender and receiver information
     const updatedRequestResult = await db.query(`
@@ -544,7 +545,7 @@ router.put('/:id/respond', [
     `, [requestId, userId]);
 
     if (updatedRequestResult.rows.length === 0) {
-      console.error(`❌ Failed to fetch updated request ${requestId} after respond`);
+      logError('Failed to fetch updated request after respond', { requestId });
       return res.status(500).json({
         success: false,
         message: '回應成功但無法獲取更新後的請求信息'
@@ -572,7 +573,7 @@ router.put('/:id/respond', [
     });
 
   } catch (error) {
-    console.error('Respond to intimacy request error:', error);
+    logError('Respond to intimacy request failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '回應親密請求失敗'
@@ -599,7 +600,7 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    console.log(`✅ Intimacy request deleted: ${requestId}`);
+    logInfo('Intimacy request deleted', { requestId });
 
     res.json({
       success: true,
@@ -607,7 +608,7 @@ router.delete('/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Delete intimacy request error:', error);
+    logError('Delete intimacy request failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '刪除親密請求失敗'
@@ -619,7 +620,7 @@ router.delete('/:id', async (req, res) => {
 router.get('/notifications/unread-count', async (req, res) => {
   try {
     const userId = req.user.id;
-    console.info(`📊 Getting unread notification count for user ${userId}`);
+    logInfo('Getting unread notification count', { userId });
 
     // Count unread notifications for the user
     const result = await db.query(`
@@ -629,7 +630,7 @@ router.get('/notifications/unread-count', async (req, res) => {
     `, [userId]).catch(async (error) => {
       if (error.message.includes('relation "notifications" does not exist')) {
         // Fallback to counting pending intimacy requests if notifications table doesn't exist
-        console.info('🔧 Notifications table not found, using intimacy requests as fallback');
+        logInfo('Notifications table missing; falling back to intimacy_requests');
         return await db.query(`
           SELECT COUNT(*) as unread_count
           FROM intimacy_requests 
@@ -640,7 +641,7 @@ router.get('/notifications/unread-count', async (req, res) => {
     });
 
     const unreadCount = parseInt(result.rows[0].unread_count) || 0;
-    console.info(`📊 User ${userId} has ${unreadCount} unread notifications`);
+    logInfo('Unread notification count fetched', { userId, unreadCount });
 
     res.json({
       success: true,
@@ -648,7 +649,7 @@ router.get('/notifications/unread-count', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get unread notification count error:', error);
+    logError('Get unread notification count failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '獲取未讀通知數量失敗',
@@ -661,7 +662,7 @@ router.get('/notifications/unread-count', async (req, res) => {
 router.get('/intimacy-templates', async (req, res) => {
   try {
     const userId = req.user.id;
-    console.info(`🎭 Getting intimacy templates for user ${userId}`);
+    logInfo('Getting intimacy templates', { userId });
 
     // Get intimacy templates from existing Supabase table
     const result = await db.query(`
@@ -680,7 +681,7 @@ router.get('/intimacy-templates', async (req, res) => {
       created_at: row.created_at
     }));
 
-    console.info(`✅ Retrieved ${templates.length} intimacy templates`);
+    logInfo('Intimacy templates retrieved', { count: templates.length });
 
     res.json({
       success: true,
@@ -688,7 +689,7 @@ router.get('/intimacy-templates', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get intimacy templates error:', error);
+    logError('Get intimacy templates failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '獲取親密模板失敗',
@@ -703,7 +704,7 @@ router.get('/intimacy-templates/:category', async (req, res) => {
     const userId = req.user.id;
     const { category } = req.params;
 
-    console.info(`🎭 Getting intimacy templates for category ${category} (user ${userId})`);
+    logInfo('Getting intimacy templates by category', { userId, category });
 
     // Get user's gender and couple information for character mapping
     const userResult = await db.query(`
@@ -731,7 +732,7 @@ router.get('/intimacy-templates/:category', async (req, res) => {
       partnerNickname = isUser1 ? userResult.rows[0].user2_nickname : userResult.rows[0].user1_nickname;
     }
 
-    console.info(`👤 User ${userId} - Gender: ${userGender || 'not specified'}, Nickname: ${userNickname}, Partner: ${partnerNickname}`);
+    logInfo('User profile for template processing', { userId, gender: userGender || null, nickname: userNickname, partnerNickname });
 
     const result = await db.query(`
       SELECT id, category, time_hint, roleplay_setup, suggestion_level, created_at
@@ -755,7 +756,7 @@ router.get('/intimacy-templates/:category', async (req, res) => {
       created_at: row.created_at
     }));
 
-    console.info(`✅ Retrieved ${templates.length} templates for category ${category} with gender-aware processing`);
+    logInfo('Templates retrieved with gender-aware processing', { count: templates.length, category });
 
     res.json({
       success: true,
@@ -763,7 +764,7 @@ router.get('/intimacy-templates/:category', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get intimacy templates by category error:', error);
+    logError('Get intimacy templates by category failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '獲取分類親密模板失敗',
@@ -776,7 +777,7 @@ router.get('/intimacy-templates/:category', async (req, res) => {
 router.get('/alternative-intimacy-options', async (req, res) => {
   try {
     const userId = req.user.id;
-    console.info(`🔄 Getting alternative intimacy options for user ${userId}`);
+    logInfo('Getting alternative intimacy options', { userId });
 
     // Check if alternative_intimacy_options table exists, if not create it
     const result = await db.query(`
@@ -785,7 +786,7 @@ router.get('/alternative-intimacy-options', async (req, res) => {
       ORDER BY category, sort_order, title
     `).catch(async (error) => {
       if (error.message.includes('relation "alternative_intimacy_options" does not exist')) {
-        console.info('🔧 Creating alternative_intimacy_options table...');
+        logInfo('Creating alternative_intimacy_options table');
         
         // Create the table
         await db.query(`
@@ -824,7 +825,7 @@ router.get('/alternative-intimacy-options', async (req, res) => {
           ('companionship', '規劃小旅行', '討論下次想一起去的地方', '20分鐘', true, 4)
         `);
 
-        console.info('✅ Created alternative_intimacy_options table with default data');
+        logInfo('Created alternative_intimacy_options table with default data');
         
         // Now fetch the data
         return await db.query(`
@@ -859,7 +860,7 @@ router.get('/alternative-intimacy-options', async (req, res) => {
     });
 
     const totalOptions = result.rows.length;
-    console.info(`✅ Retrieved ${totalOptions} alternative intimacy options`);
+    logInfo('Alternative intimacy options retrieved', { totalOptions });
 
     res.json({
       success: true,
@@ -867,7 +868,7 @@ router.get('/alternative-intimacy-options', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get alternative intimacy options error:', error);
+    logError('Get alternative intimacy options failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '獲取替代親密選項失敗',
@@ -890,7 +891,7 @@ async function ensureNotificationsEventIdColumn() {
     await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS event_id UUID`);
     notificationsEventIdEnsured = true;
   } catch (err) {
-    console.warn('⚠️ ensureNotificationsEventIdColumn failed:', err.message);
+    logWarn('ensureNotificationsEventIdColumn failed', { err: err.message });
   }
 }
 
@@ -900,7 +901,7 @@ router.get('/notifications', async (req, res) => {
     const userId = req.user.id;
     const { notification_type, is_read, limit = 50, offset = 0 } = req.query;
 
-    console.info(`🔔 Getting notifications for user ${userId} - type: ${notification_type || 'all'}, read: ${is_read}, limit: ${limit}`);
+    logInfo('Getting notifications', { userId, type: notification_type || 'all', is_read, limit });
 
     await ensureNotificationsEventIdColumn();
 
@@ -920,7 +921,7 @@ router.get('/notifications', async (req, res) => {
       LIMIT $4 OFFSET $5
     `, [userId, notification_type || null, is_read === 'true' ? true : is_read === 'false' ? false : null, parseInt(limit), parseInt(offset)]).catch(async (error) => {
       if (error.message.includes('relation "notifications" does not exist')) {
-        console.info('🔧 Creating notifications table...');
+        logInfo('Creating notifications table');
         
         // Create the notifications table
         await db.query(`
@@ -945,7 +946,7 @@ router.get('/notifications', async (req, res) => {
           CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at);
         `);
 
-        console.info('✅ Created notifications table');
+        logInfo('Notifications table created');
         
         // Return empty result since table was just created
         return { rows: [] };
@@ -967,7 +968,7 @@ router.get('/notifications', async (req, res) => {
       priority: row.priority
     }));
 
-    console.info(`✅ Retrieved ${notifications.length} notifications`);
+    logInfo('Notifications retrieved', { count: notifications.length });
 
     res.json({
       success: true,
@@ -975,7 +976,7 @@ router.get('/notifications', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get notifications error:', error);
+    logError('Get notifications failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '獲取通知失敗',
@@ -993,7 +994,7 @@ router.put('/notifications/mark-read', [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.warn(`❌ Validation failed for mark notifications read by user ${req.user?.id}:`, errors.array());
+      logWarn('Mark notifications read validation failed', { userId: req.user?.id, errors: errors.array() });
       return res.status(400).json({
         success: false,
         message: '驗證失敗',
@@ -1004,7 +1005,7 @@ router.put('/notifications/mark-read', [
     const userId = req.user.id;
     const { notification_ids } = req.body;
     
-    console.info(`📖 Marking ${notification_ids.length} notifications as read for user ${userId}`);
+    logInfo('Marking notifications as read', { userId, count: notification_ids.length });
 
     // Update notifications individually since PostgreSQL array handling can be complex
     let updatedCount = 0;
@@ -1021,7 +1022,7 @@ router.put('/notifications/mark-read', [
       }
     }
 
-    console.info(`✅ Marked ${updatedCount} notifications as read for user ${userId}`);
+    logInfo('Notifications marked as read', { userId, updatedCount });
 
     res.json({
       success: true,
@@ -1030,7 +1031,7 @@ router.put('/notifications/mark-read', [
     });
 
   } catch (error) {
-    console.error('Mark notifications as read error:', error);
+    logError('Mark notifications as read failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '標記通知為已讀失敗'

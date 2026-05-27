@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const pairingService = require('../services/pairingService');
+const { logInfo, logWarn, logError } = require('../lib/logger');
 
 const router = express.Router();
 
@@ -32,7 +33,7 @@ router.post('/', [
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.warn(`❌ Validation failed for couple creation by user ${req.user?.id}:`, errors.array());
+      logWarn('Couple creation validation failed', { userId: req.user?.id, errors: errors.array() });
       return res.status(400).json({
         success: false,
         message: '驗證失敗',
@@ -44,9 +45,9 @@ router.post('/', [
     const pairing_code = req.body.pairing_code || req.body.pairingCode;
     const userId = req.user.id;
     
-    console.info(`💕 User ${userId} attempting to ${pairing_code ? 'join couple with code' : 'create new couple'}`);
+    logInfo('Couple action requested', { userId, action: pairing_code ? 'join_with_code' : 'create_new' });
     if (pairing_code) {
-      console.info(`🔗 Pairing code: ${pairing_code}`);
+      logInfo('Joining with pairing code', { pairing_code });
     }
 
     if (pairing_code) {
@@ -75,7 +76,7 @@ router.post('/', [
         WHERE c.id = $1
       `, [result.coupleId]);
 
-      console.log(`✅ User ${userId} joined couple ${result.coupleId} with pairing code`);
+      logInfo('User joined couple via pairing code', { userId, coupleId: result.coupleId });
 
       return res.status(201).json({
         success: true,
@@ -95,7 +96,7 @@ router.post('/', [
       if (existingCouple.rows.length > 0) {
         const complete = existingCouple.rows.find((row) => row.user2_id);
         if (complete) {
-          console.warn(`⚠️ User ${userId} already has a complete couple relationship: ${complete.id}`);
+          logWarn('User already in complete couple', { userId, coupleId: complete.id });
           return res.status(409).json({
             success: false,
             message: '您已經在一個情侶關係中',
@@ -134,7 +135,7 @@ router.post('/', [
 
       const couple = result.rows[0];
 
-      console.log(`✅ New couple created: ${coupleId}`);
+      logInfo('New couple created', { coupleId });
 
       res.status(201).json({
         success: true,
@@ -153,7 +154,7 @@ router.post('/', [
     }
 
   } catch (error) {
-    console.error('Create couple error:', error);
+    logError('Create couple failed', { err: error.message, stack: error.stack });
     res.status(error.status || 500).json({
       success: false,
       message: error.message || '創建情侶關係失敗',
@@ -166,7 +167,7 @@ router.post('/', [
 router.post('/pairing-code', async (req, res) => {
   try {
     const userId = req.user.id;
-    console.info(`🔗 User ${userId} requesting pairing code generation`);
+    logInfo('Pairing code generation requested', { userId });
 
     const invitation = await pairingService.createPairingInvite({
       senderId: userId,
@@ -181,7 +182,7 @@ router.post('/pairing-code', async (req, res) => {
       expires_at: invitation.expiresAt
     });
   } catch (error) {
-    console.error('Generate pairing code error:', error);
+    logError('Generate pairing code failed', { err: error.message, stack: error.stack });
     res.status(error.status || 500).json({
       success: false,
       message: error.message || '生成配對碼失敗',
@@ -200,7 +201,7 @@ router.post('/generate-pairing-code', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const userId = req.user.id;
-    console.info(`👫 Getting couple info for user ${userId}`);
+    logInfo('Getting couple info', { userId });
 
     const result = await db.query(`
       SELECT
@@ -215,7 +216,7 @@ router.get('/', async (req, res) => {
     `, [userId]);
 
     if (result.rows.length === 0) {
-      console.info(`📝 User ${userId} has no couple relationship yet`);
+      logInfo('User has no couple relationship', { userId });
       return res.status(200).json({
         success: true,
         message: '您還沒有情侶關係',
@@ -229,7 +230,7 @@ router.get('/', async (req, res) => {
     
     // Check if the couple is complete (has both users)
     if (!couple.user2_id) {
-      console.info(`📝 User ${userId} has incomplete couple ${couple.id} - waiting for partner`);
+      logInfo('User in incomplete couple awaiting partner', { userId, coupleId: couple.id });
       return res.json({
         success: true,
         couple: {
@@ -240,7 +241,7 @@ router.get('/', async (req, res) => {
       });
     }
 
-    console.info(`✅ User ${userId} has complete couple ${couple.id}`);
+    logInfo('User has complete couple', { userId, coupleId: couple.id });
     res.json({
       success: true,
       couple: {
@@ -251,7 +252,7 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get couple error:', error);
+    logError('Get couple failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '獲取情侶信息失敗'
@@ -314,7 +315,7 @@ router.put('/journey', [
         VALUES ($1, $2, $3)
       `, [coupleId, userId, now]);
 
-      console.log(`✅ Created new couple ${coupleId} for user ${userId} during journey update`);
+      logInfo('Created couple during journey update', { coupleId, userId });
     } else {
       coupleId = coupleResult.rows[0].id;
     }
@@ -367,7 +368,7 @@ router.put('/journey', [
       updateValues
     );
 
-    console.log(`✅ Couple journey updated for couple ${coupleId}`);
+    logInfo('Couple journey updated', { coupleId });
 
     res.json({
       success: true,
@@ -375,7 +376,7 @@ router.put('/journey', [
     });
 
   } catch (error) {
-    console.error('Update couple journey error:', error);
+    logError('Update couple journey failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '更新情侶旅程失敗'
@@ -412,14 +413,14 @@ router.put('/nicknames', [
       });
     }
 
-    console.info(`💑 User ${userId} updating their nickname to: ${validNickname}`);
+    logInfo('Updating user nickname', { userId, nickname: validNickname });
 
     // Update the calling user's nickname only
     await db.query(
       'UPDATE users SET nickname = $1 WHERE id = $2',
       [validNickname, userId]
     );
-    console.info(`✅ Updated user ${userId} nickname to: ${validNickname}`);
+    logInfo('User nickname updated', { userId, nickname: validNickname });
 
     res.json({
       success: true,
@@ -427,7 +428,7 @@ router.put('/nicknames', [
     });
 
   } catch (error) {
-    console.error('Update nickname error:', error);
+    logError('Update nickname failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '更新暱稱失敗'

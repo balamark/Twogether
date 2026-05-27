@@ -4,6 +4,7 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { logDbError, errorResponseBody } = require('../lib/db-errors');
 const emailService = require('../services/emailService');
+const { logWarn } = require('../lib/logger');
 
 const router = express.Router();
 
@@ -38,7 +39,7 @@ async function notifyPartner(partnerId, type, title, content, relatedUserId, opt
       [partnerId, type, title, content.slice(0, 200), relatedUserId, 1]
     );
   } catch (err) {
-    console.warn(`⚠️ Failed to create ${type} notification:`, err.message);
+    logWarn('Failed to create notification', { type, err: err.message });
   }
 
   // Fire-and-forget email to the partner. Honors per-user opt-out.
@@ -58,7 +59,7 @@ async function notifyPartner(partnerId, type, title, content, relatedUserId, opt
       content,
     });
   } catch (err) {
-    console.warn(`⚠️ Failed to send ${type} email:`, err.message);
+    logWarn('Failed to send notification email', { type, err: err.message });
   }
 }
 

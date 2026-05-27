@@ -7,6 +7,7 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { uploadToSupabase } = require('../lib/supabase-storage');
 const { logDbError, errorResponseBody } = require('../lib/db-errors');
+const { logError } = require('../lib/logger');
 
 const router = express.Router();
 
@@ -352,7 +353,7 @@ router.delete('/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Delete custom script error:', error);
+    logError('Delete custom script failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '刪除劇本失敗'

@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const db = require('../database/db');
+const { logWarn } = require('../lib/logger');
 
 // Session TTL is sourced from JWT_EXPIRES_IN (e.g. "7d", "24h", "30m").
 // Falls back to 7d for parity with the original hard-coded value. The session
@@ -53,12 +54,7 @@ const authenticateToken = async (req, res, next) => {
     req.user = userResult.rows[0];
     next();
   } catch (error) {
-    console.error('Token verification error:', error);
-    // jwt.verify throws TokenExpiredError when exp has passed and
-    // JsonWebTokenError for malformed / bad-signature tokens. Both are an
-    // authentication failure (HTTP 401) — distinct error codes let the
-    // frontend distinguish "session ran out" from "garbage in the token
-    // header" for messaging without changing the recovery flow.
+    logWarn('Token verification failed', { name: error.name, err: error.message });
     const isExpired = error && error.name === 'TokenExpiredError';
     return res.status(401).json({
       success: false,

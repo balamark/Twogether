@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
+const { logInfo, logError } = require('../lib/logger');
 
 const router = express.Router();
 
@@ -83,7 +84,7 @@ router.post('/', [
 
     const moment = result.rows[0];
 
-    console.log(`✅ Love moment created: ${momentId} for couple ${coupleId}`);
+    logInfo('Love moment created', { momentId, coupleId });
 
     res.status(201).json({
       success: true,
@@ -98,7 +99,7 @@ router.post('/', [
     });
 
   } catch (error) {
-    console.error('Create love moment error:', error);
+    logError('Create love moment failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '記錄愛情時刻失敗'
@@ -190,7 +191,7 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get love moments error:', error);
+    logError('Get love moments failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '獲取愛情時刻失敗'
@@ -248,7 +249,7 @@ router.get('/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get love moment error:', error);
+    logError('Get love moment failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '獲取愛情時刻失敗'
@@ -344,7 +345,7 @@ router.put('/:id', [
       updateValues
     );
 
-    console.log(`✅ Love moment updated: ${momentId}`);
+    logInfo('Love moment updated', { momentId });
 
     res.json({
       success: true,
@@ -352,7 +353,7 @@ router.put('/:id', [
     });
 
   } catch (error) {
-    console.error('Update love moment error:', error);
+    logError('Update love moment failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '更新愛情時刻失敗'
@@ -385,7 +386,7 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    console.log(`✅ Love moment deleted: ${momentId}`);
+    logInfo('Love moment deleted', { momentId });
 
     res.json({
       success: true,
@@ -393,7 +394,7 @@ router.delete('/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Delete love moment error:', error);
+    logError('Delete love moment failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '刪除愛情時刻失敗'

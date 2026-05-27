@@ -1,5 +1,5 @@
 const express = require('express');
-const { logError } = require('../lib/logger');
+const { logInfo, logError } = require('../lib/logger');
 
 const QUIET = process.env.NODE_ENV === 'test' && process.env.LOG_VERBOSE !== '1';
 
@@ -12,13 +12,14 @@ const requestLogger = (req, res, next) => {
   const originalJson = res.json;
 
   // Log incoming request
-  console.log(`${req.method} ${req.path}`, {
-    timestamp: new Date().toISOString(),
+  logInfo(`${req.method} ${req.path}`, {
+    method: req.method,
+    path: req.path,
     ip: req.ip,
     userAgent: req.get('User-Agent'),
     body: req.method !== 'GET' ? req.body : undefined,
     query: Object.keys(req.query).length > 0 ? req.query : undefined,
-    user: req.user ? { id: req.user.id, nickname: req.user.nickname } : undefined
+    user: req.user ? { id: req.user.id, nickname: req.user.nickname } : undefined,
   });
 
   // Override res.send to log responses
@@ -35,8 +36,10 @@ const requestLogger = (req, res, next) => {
         }
       }
 
-      console.log(`${req.method} ${req.path} - ${res.statusCode}`, {
-        duration: `${duration}ms`,
+      logInfo(`${req.method} ${req.path} - ${res.statusCode}`, {
+        method: req.method,
+        path: req.path,
+        durationMs: duration,
         status: res.statusCode,
         responseSize: typeof body === 'string' ? body.length : JSON.stringify(body).length,
         success: res.statusCode < 400,
@@ -50,7 +53,7 @@ const requestLogger = (req, res, next) => {
               preview[key] = responseData[key];
             }
             return preview;
-          }, {}) : responseData
+          }, {}) : responseData,
       });
 
       // Log errors in detail — structured for Cloud Logging.
@@ -65,7 +68,7 @@ const requestLogger = (req, res, next) => {
         });
       }
     } catch (error) {
-      console.error('Logging middleware error:', error);
+      logError('Logging middleware (send) failed', { err: error.message, stack: error.stack });
     }
 
     return originalSend.call(this, body);
@@ -76,12 +79,14 @@ const requestLogger = (req, res, next) => {
     const duration = Date.now() - start;
 
     try {
-      console.log(`${req.method} ${req.path} - ${res.statusCode} (JSON)`, {
-        duration: `${duration}ms`,
+      logInfo(`${req.method} ${req.path} - ${res.statusCode} (JSON)`, {
+        method: req.method,
+        path: req.path,
+        durationMs: duration,
         status: res.statusCode,
         success: res.statusCode < 400,
         responseKeys: obj && typeof obj === 'object' ? Object.keys(obj) : 'not-object',
-        dataLength: obj && obj.data && Array.isArray(obj.data) ? obj.data.length : undefined
+        dataLength: obj && obj.data && Array.isArray(obj.data) ? obj.data.length : undefined,
       });
 
       // Log detailed error information — structured for Cloud Logging.
@@ -97,7 +102,7 @@ const requestLogger = (req, res, next) => {
         });
       }
     } catch (error) {
-      console.error('JSON logging middleware error:', error);
+      logError('Logging middleware (json) failed', { err: error.message, stack: error.stack });
     }
 
     return originalJson.call(this, obj);

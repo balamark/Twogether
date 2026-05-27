@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { uploadToSupabase } = require('../lib/supabase-storage');
+const { logInfo, logError } = require('../lib/logger');
 
 const router = express.Router();
 
@@ -96,7 +97,7 @@ router.post('/upload', upload.single('photo'), async (req, res) => {
 
     const photo = result.rows[0];
 
-    console.log(`✅ Photo uploaded: ${photoId} for couple ${coupleId}`);
+    logInfo('Photo uploaded', { photoId, coupleId });
 
     res.status(201).json({
       success: true,
@@ -111,7 +112,7 @@ router.post('/upload', upload.single('photo'), async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Photo upload error:', error);
+    logError('Photo upload failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: error.message || '圖片上傳失敗'
@@ -185,7 +186,7 @@ router.get('/', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get photos error:', error);
+    logError('Get photos failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '獲取圖片失敗'
@@ -218,7 +219,7 @@ router.delete('/:id', async (req, res) => {
     // TODO: Delete from Supabase storage if needed
     // const filePath = result.rows[0].file_path;
 
-    console.log(`✅ Photo deleted: ${photoId}`);
+    logInfo('Photo deleted', { photoId });
 
     res.json({
       success: true,
@@ -226,7 +227,7 @@ router.delete('/:id', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Delete photo error:', error);
+    logError('Delete photo failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '刪除圖片失敗'

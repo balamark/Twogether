@@ -5,6 +5,7 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const llmService = require('../services/llmService');
 const emailService = require('../services/emailService');
+const { logInfo, logWarn, logError } = require('../lib/logger');
 
 const router = express.Router();
 
@@ -51,7 +52,7 @@ async function ensureEventAiUsageTable() {
         ON event_ai_usage (user_id, kind, created_at DESC)
     `);
   } catch (err) {
-    console.warn('⚠️ ensureEventAiUsageTable failed:', err.message);
+    logWarn('ensureEventAiUsageTable failed', { err: err.message });
   }
 }
 
@@ -69,7 +70,7 @@ async function countTodayIcebreakerUsage(userId) {
     return result.rows[0]?.c || 0;
   } catch (err) {
     // If the count fails, fail open — we'd rather serve the user than block them.
-    console.warn('⚠️ countTodayIcebreakerUsage failed:', err.message);
+    logWarn('countTodayIcebreakerUsage failed', { err: err.message });
     return 0;
   }
 }
@@ -99,7 +100,7 @@ async function recordAiUsage(userId, kind, rawInput, meta) {
       ]
     );
   } catch (err) {
-    console.warn(`⚠️ recordAiUsage(${kind}) failed:`, err.message);
+    logWarn('recordAiUsage failed', { kind, err: err.message });
   }
 }
 
@@ -127,7 +128,7 @@ async function ensureNotificationsTable() {
         ADD COLUMN IF NOT EXISTS event_id UUID REFERENCES events(id) ON DELETE CASCADE
     `);
   } catch (err) {
-    console.warn('⚠️ ensureNotificationsTable failed:', err.message);
+    logWarn('ensureNotificationsTable failed', { err: err.message });
   }
 }
 
@@ -140,7 +141,7 @@ async function notify(userId, type, title, content, eventId, relatedUserId, prio
       [userId, type, title, content, eventId, relatedUserId || null, priority]
     );
   } catch (err) {
-    console.warn(`⚠️ notify(${type}) failed:`, err.message);
+    logWarn('Event notification insert failed', { type, err: err.message });
   }
 
   // Fire-and-forget email mirroring the in-app notification. Skips silently
@@ -160,7 +161,7 @@ async function notify(userId, type, title, content, eventId, relatedUserId, prio
       type,
     });
   } catch (err) {
-    console.warn(`⚠️ notify(${type}) email failed:`, err.message);
+    logWarn('Event notification email failed', { type, err: err.message });
   }
 }
 
@@ -253,12 +254,12 @@ router.post(
     const rawText = req.body.rawText;
     // Backend-only audit log of the user's original words. Single tagged
     // line so it's easy to grep in Cloud Logging.
-    console.log(`[events.icebreaker.input] user=${userId} len=${rawText.length} raw=${JSON.stringify(rawText)}`);
+    logInfo('events.icebreaker.input', { userId, len: rawText.length, raw: rawText });
 
     try {
       const usedToday = await countTodayIcebreakerUsage(userId);
       if (usedToday >= ICEBREAKER_DAILY_LIMIT) {
-        console.log(`[events.icebreaker.limit] user=${userId} used=${usedToday}/${ICEBREAKER_DAILY_LIMIT} blocked`);
+        logInfo('events.icebreaker.limit', { userId, used: usedToday, limit: ICEBREAKER_DAILY_LIMIT, blocked: true });
         return res.status(429).json({
           success: false,
           message: `今日 AI 整理次數已達上限（${ICEBREAKER_DAILY_LIMIT} 次／天），明天再試試看`,
@@ -272,16 +273,20 @@ router.post(
       const meta = preview._meta;
       delete preview._meta;
 
-      const costStr = meta?.costUsd == null ? 'unknown' : `$${meta.costUsd.toFixed(6)}`;
-      console.log(
-        `[events.icebreaker.cost] user=${userId} provider=${meta?.provider} model=${meta?.model} ` +
-          `cost=${costStr} duration=${meta?.durationMs}ms daily=${usedToday + 1}/${ICEBREAKER_DAILY_LIMIT}`
-      );
+      logInfo('events.icebreaker.cost', {
+        userId,
+        provider: meta?.provider,
+        model: meta?.model,
+        costUsd: meta?.costUsd,
+        durationMs: meta?.durationMs,
+        usedToday: usedToday + 1,
+        limit: ICEBREAKER_DAILY_LIMIT,
+      });
 
       await recordAiUsage(userId, 'icebreaker', rawText, meta);
       res.json({ success: true, preview });
     } catch (err) {
-      console.error('Icebreaker preview error:', err);
+      logError('Icebreaker preview failed', { err: err.message, stack: err.stack });
       res.status(500).json({ success: false, message: 'AI 解析失敗，請稍後再試' });
     }
   }
@@ -390,7 +395,7 @@ router.post(
         }),
       });
     } catch (err) {
-      console.error('Create event error:', err);
+      logError('Create event failed', { err: err.message, stack: err.stack });
       res.status(500).json({ success: false, message: '建立事件失敗' });
     }
   }
@@ -478,7 +483,7 @@ router.get('/analytics', async (req, res) => {
       },
     });
   } catch (err) {
-    console.error('Event analytics error:', err);
+    logError('Event analytics failed', { err: err.message, stack: err.stack });
     res.status(500).json({ success: false, message: '無法取得分析資料' });
   }
 });
@@ -542,7 +547,7 @@ router.get(
 
       res.json({ success: true, events, total });
     } catch (err) {
-      console.error('List events error:', err);
+      logError('List events failed', { err: err.message, stack: err.stack });
       res.status(500).json({ success: false, message: '無法取得事件列表' });
     }
   }
@@ -570,7 +575,7 @@ router.get('/:id', [param('id').isUUID()], async (req, res) => {
       }),
     });
   } catch (err) {
-    console.error('Get event error:', err);
+    logError('Get event failed', { err: err.message, stack: err.stack });
     res.status(500).json({ success: false, message: '無法取得事件詳情' });
   }
 });
@@ -611,7 +616,7 @@ router.post(
 
       res.status(201).json({ success: true, message: serializeMessage(msgResult.rows[0]) });
     } catch (err) {
-      console.error('Post event message error:', err);
+      logError('Post event message failed', { err: err.message, stack: err.stack });
       res.status(500).json({ success: false, message: '無法新增訊息' });
     }
   }
@@ -636,10 +641,7 @@ router.post(
 
       const userId = req.user.id;
       const rawReply = req.body.rawReply;
-      console.log(
-        `[events.reply_rewrite.input] user=${userId} event=${req.params.id} ` +
-          `len=${rawReply.length} raw=${JSON.stringify(rawReply)}`
-      );
+      logInfo('events.reply_rewrite.input', { userId, eventId: req.params.id, len: rawReply.length, raw: rawReply });
 
       const recent = await db.query(
         `SELECT sender_id, content
@@ -665,25 +667,29 @@ router.post(
       const meta = preview._meta;
       delete preview._meta;
 
-      const costStr = meta?.costUsd == null ? 'unknown' : `$${meta.costUsd.toFixed(6)}`;
-      console.log(
-        `[events.reply_rewrite.cost] user=${userId} provider=${meta?.provider} model=${meta?.model} ` +
-          `cost=${costStr} duration=${meta?.durationMs}ms created_by_self=${createdBySelf}`
-      );
+      logInfo('events.reply_rewrite.cost', {
+        userId,
+        provider: meta?.provider,
+        model: meta?.model,
+        costUsd: meta?.costUsd,
+        durationMs: meta?.durationMs,
+        createdBySelf,
+      });
 
       if (REPLY_PROMPT_LOG_REMAINING > 0 && meta?.assembledPrompt) {
         REPLY_PROMPT_LOG_REMAINING -= 1;
-        console.log(
-          `[events.reply_rewrite.prompt] user=${userId} event=${req.params.id} ` +
-            `remaining=${REPLY_PROMPT_LOG_REMAINING} ` +
-            `prompt=${JSON.stringify(meta.assembledPrompt)}`
-        );
+        logInfo('events.reply_rewrite.prompt', {
+          userId,
+          eventId: req.params.id,
+          remaining: REPLY_PROMPT_LOG_REMAINING,
+          prompt: meta.assembledPrompt,
+        });
       }
 
       await recordAiUsage(userId, 'reply_rewrite', rawReply, meta);
       res.json({ success: true, preview });
     } catch (err) {
-      console.error('Reply rewrite preview error:', err);
+      logError('Reply rewrite preview failed', { err: err.message, stack: err.stack });
       res.status(500).json({ success: false, message: 'AI 改寫失敗，請稍後再試' });
     }
   }
@@ -709,7 +715,7 @@ router.put(
 
       res.json({ success: true, message: result.rows[0] ? serializeMessage(result.rows[0]) : null });
     } catch (err) {
-      console.error('Mark message read error:', err);
+      logError('Mark message read failed', { err: err.message, stack: err.stack });
       res.status(500).json({ success: false, message: '無法更新已讀狀態' });
     }
   }
@@ -748,7 +754,7 @@ router.post('/:id/resolve-request', [param('id').isUUID()], async (req, res) => 
 
     res.json({ success: true, event: serializeEvent(result.rows[0]) });
   } catch (err) {
-    console.error('Resolve-request error:', err);
+    logError('Resolve-request failed', { err: err.message, stack: err.stack });
     res.status(500).json({ success: false, message: '無法發起解決請求' });
   }
 });
@@ -784,7 +790,7 @@ router.post('/:id/resolve-confirm', [param('id').isUUID()], async (req, res) => 
 
     res.json({ success: true, event: serializeEvent(result.rows[0]) });
   } catch (err) {
-    console.error('Resolve-confirm error:', err);
+    logError('Resolve-confirm failed', { err: err.message, stack: err.stack });
     res.status(500).json({ success: false, message: '無法確認解決' });
   }
 });

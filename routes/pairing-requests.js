@@ -4,6 +4,7 @@ const db = require('../database/db');
 const { authenticateToken, optionalAuth } = require('../middleware/auth');
 const emailService = require('../services/emailService');
 const pairingService = require('../services/pairingService');
+const { logInfo, logWarn, logError } = require('../lib/logger');
 
 const router = express.Router();
 
@@ -33,7 +34,7 @@ const handleCreateInvite = async (req, res, typeOverride = null) => {
     const senderEmail = req.user.email;
     const inviteType = typeOverride || type || 'email';
 
-    console.info(`📧 User ${senderId} (${senderName}) creating ${inviteType} pairing invite`);
+    logInfo('Creating pairing invite', { senderId, senderName, inviteType });
 
     const invitation = await pairingService.createPairingInvite({
       senderId,
@@ -47,12 +48,12 @@ const handleCreateInvite = async (req, res, typeOverride = null) => {
       try {
         if (emailService.isConfigured()) {
           await emailService.sendPairingInvitation(senderName, recipientEmail, invitation.token, message);
-          console.log(`✅ Pairing invitation email sent to ${recipientEmail}`);
+          logInfo('Pairing invitation email sent', { kind: 'pairing_invite' });
         } else {
-          console.warn('⚠️ Email service not configured, invitation saved but email not sent');
+          logWarn('Email service not configured; invitation saved without email', { kind: 'pairing_invite' });
         }
       } catch (emailError) {
-        console.error('❌ Failed to send invitation email:', emailError);
+        logError('Failed to send pairing invitation email', { kind: 'pairing_invite', err: emailError.message, code: emailError.code });
         // Continue execution - invitation is saved even if email fails
       }
     }
@@ -71,7 +72,7 @@ const handleCreateInvite = async (req, res, typeOverride = null) => {
       }
     });
   } catch (error) {
-    console.error('Create pairing invitation error:', error);
+    logError('Create pairing invitation failed', { err: error.message, stack: error.stack });
     return handleRouteError(res, error, '發送配對邀請失敗');
   }
 };
@@ -128,7 +129,7 @@ router.post('/accept/:token', optionalAuth, async (req, res) => {
         await emailService.sendPairingAccepted(result.senderEmail, req.user.nickname);
       }
     } catch (emailError) {
-      console.error('❌ Failed to send pairing accepted notification:', emailError);
+      logError('Failed to send pairing accepted email', { kind: 'pairing_accepted', err: emailError.message, code: emailError.code });
     }
 
     return res.json({
@@ -143,7 +144,7 @@ router.post('/accept/:token', optionalAuth, async (req, res) => {
       pendingConflicts: result.pendingConflicts
     });
   } catch (error) {
-    console.error('Accept pairing invitation error:', error);
+    logError('Accept pairing invitation failed', { err: error.message, stack: error.stack });
     return handleRouteError(res, error, '接受配對邀請失敗');
   }
 });
@@ -211,10 +212,10 @@ router.post('/accept-code', optionalAuth, [
           });
         }
       } catch (checkError) {
-        console.error('Already-paired check failed:', checkError);
+        logError('Already-paired check failed', { err: checkError.message });
       }
     }
-    console.error('Accept pairing code error:', error);
+    logError('Accept pairing code failed', { err: error.message, stack: error.stack });
     return handleRouteError(res, error, '接受配對邀請失敗');
   }
 });
@@ -244,7 +245,7 @@ router.post('/reject/:token', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Reject pairing invitation error:', error);
+    logError('Reject pairing invitation failed', { err: error.message, stack: error.stack });
     return handleRouteError(res, error, '拒絕配對邀請失敗');
   }
 });
@@ -258,7 +259,7 @@ const handleGetInvite = async (req, res) => {
       invitation
     });
   } catch (error) {
-    console.error('Get invitation details error:', error);
+    logError('Get invitation details failed', { err: error.message, stack: error.stack });
     return handleRouteError(res, error, '無法獲取邀請詳情');
   }
 };
@@ -290,7 +291,7 @@ router.post('/:token/cancel', authenticateToken, async (req, res) => {
       message: '已取消配對邀請'
     });
   } catch (error) {
-    console.error('Cancel invitation error:', error);
+    logError('Cancel invitation failed', { err: error.message, stack: error.stack });
     return handleRouteError(res, error, '取消配對邀請失敗');
   }
 });
@@ -332,7 +333,7 @@ router.post('/:token/resend', authenticateToken, async (req, res) => {
       message: '邀請已重新發送'
     });
   } catch (error) {
-    console.error('Resend invitation error:', error);
+    logError('Resend invitation failed', { err: error.message, stack: error.stack });
     return handleRouteError(res, error, '重新發送邀請失敗');
   }
 });
@@ -355,7 +356,7 @@ router.get('/my-invitations', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get my invitations error:', error);
+    logError('Get my invitations failed', { err: error.message, stack: error.stack });
     return handleRouteError(res, error, '無法獲取邀請列表');
   }
 });

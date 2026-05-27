@@ -9,6 +9,8 @@ const path = require('path');
 // PostgreSQL session store for production
 const pgSession = require('connect-pg-simple')(session);
 
+const { logInfo, logError } = require('./lib/logger');
+
 // Import routes
 const authRoutes = require('./routes/auth');
 const coupleRoutes = require('./routes/couples');
@@ -166,29 +168,30 @@ app.use(errorHandler);
 
 // Start server
 app.listen(PORT, async () => {
-  console.log(`🚀 Twogether app running on port ${PORT}`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`📧 Email configured: ${!!process.env.SMTP_HOST && !!process.env.SMTP_USER}`);
-  console.log(`🗄️  Database: ${process.env.DATABASE_URL ? 'Connected' : 'Not configured'}`);
-  console.log(`🎨 Frontend: Serving from /dist (Vite build output)`);
-  
+  logInfo('Twogether app started', {
+    port: PORT,
+    env: process.env.NODE_ENV || 'development',
+    emailConfigured: !!process.env.SMTP_HOST && !!process.env.SMTP_USER,
+    databaseConfigured: !!process.env.DATABASE_URL,
+  });
+
   // Test database connection
   try {
     await db.query('SELECT NOW()');
-    console.log('✅ Database connection successful');
+    logInfo('Database connection successful');
   } catch (error) {
-    console.error('❌ Database connection failed:', error.message);
+    logError('Database connection failed', { err: error.message });
   }
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
+  logInfo('SIGTERM received, shutting down');
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully');
+  logInfo('SIGINT received, shutting down');
   process.exit(0);
 });
 

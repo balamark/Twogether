@@ -1,4 +1,17 @@
 const nodemailer = require('nodemailer');
+const { logInfo, logWarn, logError } = require('../lib/logger');
+
+// Standard fields included with every SMTP-related log entry so that future
+// queries like `jsonPayload.code="EAUTH"` find them in a single hop.
+function smtpErrorFields(err) {
+  return {
+    err: err?.message,
+    code: err?.code,
+    command: err?.command,
+    responseCode: err?.responseCode,
+    host: process.env.SMTP_HOST,
+  };
+}
 
 // Email service for sending pairing invitations
 class EmailService {
@@ -20,7 +33,11 @@ class EmailService {
 
     if (!emailConfig.host || !emailConfig.auth.user || !emailConfig.auth.pass) {
       if (process.env.NODE_ENV !== 'test') {
-        console.warn('Email service not configured properly. Email features will be disabled.');
+        logWarn('Email service not configured; email features disabled', {
+          hasHost: !!emailConfig.host,
+          hasUser: !!emailConfig.auth.user,
+          hasPass: !!emailConfig.auth.pass,
+        });
       }
       return;
     }
@@ -28,10 +45,10 @@ class EmailService {
     try {
       this.transporter = nodemailer.createTransport(emailConfig);
       if (process.env.NODE_ENV !== 'test') {
-        console.log('Email service initialized successfully');
+        logInfo('Email service initialized', { host: emailConfig.host });
       }
     } catch (error) {
-      console.error('Failed to initialize email service:', error);
+      logError('Email service init failed', smtpErrorFields(error));
     }
   }
 
@@ -174,10 +191,10 @@ ${acceptUrl}
 
     try {
       const result = await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Pairing invitation sent to ${recipientEmail}`);
+      logInfo('Pairing invitation sent', { kind: 'pairing_invite' });
       return result;
     } catch (error) {
-      console.error('❌ Failed to send pairing invitation:', error);
+      logError('Failed to send pairing invitation', { kind: 'pairing_invite', ...smtpErrorFields(error) });
       throw error;
     }
   }
@@ -243,19 +260,19 @@ ${acceptUrl}
 
     try {
       const result = await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Pairing accepted notification sent to ${originalSenderEmail}`);
+      logInfo('Pairing accepted email sent', { kind: 'pairing_accepted' });
       return result;
     } catch (error) {
-      console.error('❌ Failed to send pairing accepted notification:', error);
+      logError('Failed to send pairing accepted email', { kind: 'pairing_accepted', ...smtpErrorFields(error) });
       throw error;
     }
   }
 
   async sendIntimacyRequestNotification(senderName, recipientEmail, requestType, message = '') {
-    console.log(`📧 Attempting to send intimacy request email to ${recipientEmail}...`);
+    logInfo('Sending intimacy request email', { kind: 'intimacy_request', requestType });
 
     if (!this.isConfigured()) {
-      console.warn('⚠️ Email service not configured, skipping intimacy request email');
+      logWarn('Email service not configured; skipping intimacy request email', { kind: 'intimacy_request' });
       return;
     }
 
@@ -387,10 +404,10 @@ ${message ? `個人訊息："${message}"` : ''}
 
     try {
       const result = await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Intimacy request notification sent to ${recipientEmail}`);
+      logInfo('Intimacy request email sent', { kind: 'intimacy_request' });
       return result;
     } catch (error) {
-      console.error('❌ Failed to send intimacy request notification:', error);
+      logError('Failed to send intimacy request email', { kind: 'intimacy_request', ...smtpErrorFields(error) });
       throw error;
     }
   }
@@ -545,10 +562,10 @@ ${message ? `個人訊息："${message}"` : ''}
 
     try {
       const result = await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Intimacy invitation insights email sent to ${partnerEmail}`);
+      logInfo('Intimacy nudge email sent', { kind: 'intimacy_nudge' });
       return result;
     } catch (error) {
-      console.error('❌ Failed to send intimacy invitation insights email:', error);
+      logError('Failed to send intimacy nudge email', { kind: 'intimacy_nudge', ...smtpErrorFields(error) });
       throw error;
     }
   }
@@ -573,7 +590,7 @@ ${message ? `個人訊息："${message}"` : ''}
       if (!row || !row.email_notifications_enabled || !row.email) return null;
       return { email: row.email, nickname: row.nickname };
     } catch (err) {
-      console.warn('⚠️ getPartnerEmailIfOptedIn failed:', err.message);
+      logWarn('getPartnerEmailIfOptedIn failed', { err: err.message });
       return null;
     }
   }
@@ -593,7 +610,7 @@ ${message ? `個人訊息："${message}"` : ''}
       if (!row || !row.email_notifications_enabled || !row.email) return null;
       return { email: row.email, nickname: row.nickname };
     } catch (err) {
-      console.warn('⚠️ getUserEmailIfOptedIn failed:', err.message);
+      logWarn('getUserEmailIfOptedIn failed', { err: err.message });
       return null;
     }
   }
@@ -694,9 +711,9 @@ ${message ? `個人訊息："${message}"` : ''}
         text,
         html,
       });
-      console.log(`✅ Wall ${isReply ? 'reply' : 'post'} email sent to ${recipientEmail}`);
+      logInfo('Wall email sent', { kind: isReply ? 'wall_reply' : 'wall_post' });
     } catch (error) {
-      console.error('❌ Failed to send wall post email:', error.message);
+      logError('Failed to send wall email', { kind: isReply ? 'wall_reply' : 'wall_post', ...smtpErrorFields(error) });
     }
   }
 
@@ -741,9 +758,9 @@ ${message ? `個人訊息："${message}"` : ''}
         text,
         html,
       });
-      console.log(`✅ Event email (${type}) sent to ${recipientEmail}`);
+      logInfo('Event email sent', { kind: 'event', type });
     } catch (error) {
-      console.error('❌ Failed to send event email:', error.message);
+      logError('Failed to send event email', { kind: 'event', type, ...smtpErrorFields(error) });
     }
   }
 
@@ -791,9 +808,9 @@ ${message ? `個人訊息："${message}"` : ''}
         text,
         html,
       });
-      console.log(`✅ Intimacy response email (${response}) sent to ${senderEmail}`);
+      logInfo('Intimacy response email sent', { kind: 'intimacy_response', response });
     } catch (error) {
-      console.error('❌ Failed to send intimacy response email:', error.message);
+      logError('Failed to send intimacy response email', { kind: 'intimacy_response', response, ...smtpErrorFields(error) });
     }
   }
 }

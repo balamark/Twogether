@@ -3,6 +3,7 @@ const { body, validationResult } = require('express-validator');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
+const { logInfo, logError } = require('../lib/logger');
 
 const router = express.Router();
 
@@ -45,7 +46,7 @@ router.get('/balance', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get coin balance error:', error);
+    logError('Get coin balance failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '獲取金幣餘額失敗'
@@ -101,7 +102,7 @@ router.get('/transactions', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get coin transactions error:', error);
+    logError('Get coin transactions failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '獲取金幣交易記錄失敗'
@@ -165,7 +166,7 @@ router.post('/add', [
     `, [coupleId]);
     const newBalance = parseInt(balanceResult.rows[0].balance);
 
-    console.log(`✅ Added ${amount} coins to couple ${coupleId}: ${reason}`);
+    logInfo('Added coins', { coupleId, amount, reason });
 
     res.json({
       success: true,
@@ -175,7 +176,7 @@ router.post('/add', [
     });
 
   } catch (error) {
-    console.error('Add coins error:', error);
+    logError('Add coins failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '添加金幣失敗'
@@ -247,7 +248,7 @@ router.post('/spend', [
     `, [coupleId]);
     const newBalance = parseInt(updatedBalanceResult.rows[0].balance);
 
-    console.log(`✅ Couple ${coupleId} spent ${amount} coins: ${reason}`);
+    logInfo('Coins spent', { coupleId, amount, reason });
 
     res.json({
       success: true,
@@ -257,7 +258,7 @@ router.post('/spend', [
     });
 
   } catch (error) {
-    console.error('Spend coins error:', error);
+    logError('Spend coins failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '花費金幣失敗'
@@ -318,7 +319,7 @@ router.post('/daily-claim', async (req, res) => {
     `, [coupleId]);
     const newBalance = parseInt(balanceResult.rows[0].balance);
 
-    console.log(`✅ Couple ${coupleId} claimed daily ${dailyAmount} coins`);
+    logInfo('Daily coins claimed', { coupleId, amount: dailyAmount });
 
     res.json({
       success: true,
@@ -328,7 +329,7 @@ router.post('/daily-claim', async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Daily coin claim error:', error);
+    logError('Daily coin claim failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '領取每日金幣失敗'
@@ -420,7 +421,7 @@ router.post('/transaction', [
     const newBalance = parseInt(balanceResult.rows[0].balance);
 
     const action = transaction_type === 'earn' ? '獲得' : '花費';
-    console.log(`✅ Couple ${coupleId} ${action} ${amount} coins: ${description}`);
+    logInfo('Coin transaction', { coupleId, action, amount, description });
 
     res.json({
       success: true,
@@ -431,7 +432,7 @@ router.post('/transaction', [
     });
 
   } catch (error) {
-    console.error('Coin transaction error:', error);
+    logError('Coin transaction failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '金幣交易失敗'

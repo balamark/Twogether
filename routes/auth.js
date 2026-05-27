@@ -4,6 +4,7 @@ const { body, validationResult } = require('express-validator');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { generateToken, authenticateToken } = require('../middleware/auth');
+const { logInfo, logError } = require('../lib/logger');
 
 const router = express.Router();
 
@@ -65,7 +66,7 @@ router.post('/register', [
     // Generate token
     const { token, expiresAt } = generateToken(user.id);
 
-    console.log(`✅ User registered successfully: ${email}`);
+    logInfo('User registered', { email });
 
     res.status(201).json({
       success: true,
@@ -81,7 +82,7 @@ router.post('/register', [
     });
 
   } catch (error) {
-    console.error('Registration error:', error);
+    logError('Registration failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '註冊失敗，請稍後再試'
@@ -144,7 +145,7 @@ router.post('/login', [
     // Generate token
     const { token, expiresAt } = generateToken(user.id);
 
-    console.log(`✅ User logged in successfully: ${email}`);
+    logInfo('User logged in', { email });
 
     res.json({
       success: true,
@@ -161,7 +162,7 @@ router.post('/login', [
     });
 
   } catch (error) {
-    console.error('Login error:', error);
+    logError('Login failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '登入失敗，請稍後再試'
@@ -228,7 +229,7 @@ router.get('/me', authenticateToken, async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Get user info error:', error);
+    logError('Get user info failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '獲取用戶信息失敗'
@@ -255,7 +256,7 @@ router.put('/user/gender', authenticateToken, [
     const userId = req.user.id;
     const { gender } = req.body;
 
-    console.info(`👤 Updating gender for user ${userId} to: ${gender}`);
+    logInfo('Updating user gender', { userId, gender });
 
     // Update user gender in database
     await db.query(`
@@ -264,7 +265,7 @@ router.put('/user/gender', authenticateToken, [
       WHERE id = $2
     `, [gender, userId]);
 
-    console.info(`✅ Successfully updated gender for user ${userId}`);
+    logInfo('User gender updated', { userId });
 
     res.json({
       success: true,
@@ -273,7 +274,7 @@ router.put('/user/gender', authenticateToken, [
     });
 
   } catch (error) {
-    console.error('Update user gender error:', error);
+    logError('Update user gender failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '更新性別設定失敗'
@@ -311,7 +312,7 @@ router.put('/user/email-notifications', authenticateToken, [
       email_notifications_enabled: enabled
     });
   } catch (error) {
-    console.error('Update email notifications pref error:', error);
+    logError('Update email notifications pref failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
       message: '更新電子郵件通知設定失敗'
