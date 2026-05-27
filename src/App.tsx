@@ -3864,129 +3864,147 @@ const LoveTimeApp = () => {
     const [isLoading, setIsLoading] = useState(false);
     useScrollLock(true);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
       e.preventDefault();
       
       if (isLoading) return; // Prevent double-clicking
       
       setIsLoading(true);
       
+      const formData = new FormData(e.currentTarget);
+      const emailValue = (formData.get('email') as string || '').trim();
+      const passwordValue = (formData.get('password') as string || '');
+      const nicknameValue = (formData.get('nickname') as string || '').trim();
+      const confirmPasswordValue = (formData.get('confirm-password') as string || '');
+      const partnerCodeValue = (formData.get('partner-code') as string || '').trim();
+      
       try {
         if (authMode === 'login') {
-        // Validate login form
-        if (!email.trim()) {
-          showNotification({
-            type: 'error',
-            title: '驗證錯誤',
-            message: '請輸入電子郵件地址',
-            duration: 6000
-          });
-          return;
-        }
-        if (!password.trim()) {
-          showNotification({
-            type: 'error',
-            title: '驗證錯誤',
-            message: '請輸入密碼',
-            duration: 6000
-          });
-          return;
-        }
-        // Basic email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-          showNotification({
-            type: 'error',
-            title: '驗證錯誤',
-            message: '請輸入有效的電子郵件地址',
-            duration: 6000
-          });
-          return;
-        }
-        // Password length validation
-        if (password.length < 6) {
-          showNotification({
-            type: 'error',
-            title: '驗證錯誤',
-            message: '密碼至少需要6個字符',
-            duration: 6000
-          });
-          return;
-        }
-        await handleLogin(email, password);
-      } else if (authMode === 'register') {
-        // Validate registration form
-        if (!email.trim()) {
-          showNotification({
-            type: 'error',
-            title: '驗證錯誤',
-            message: '請輸入電子郵件地址',
-            duration: 6000
-          });
-          return;
-        }
-        if (!nickname.trim()) {
-          showNotification({
-            type: 'error',
-            title: '驗證錯誤',
-            message: '請輸入暱稱',
-            duration: 6000
-          });
-          return;
-        }
-        if (!password.trim()) {
-          showNotification({
-            type: 'error',
-            title: '驗證錯誤',
-            message: '請輸入密碼',
-            duration: 6000
-          });
-          return;
-        }
-        // Basic email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-          showNotification({
-            type: 'error',
-            title: '驗證錯誤',
-            message: '請輸入有效的電子郵件地址',
-            duration: 6000
-          });
-          return;
-        }
-        // Nickname length validation
-        if (nickname.length < 2 || nickname.length > 50) {
-          showNotification({
-            type: 'error',
-            title: '驗證錯誤',
-            message: '暱稱必須在2-50個字符之間',
-            duration: 6000
-          });
-          return;
-        }
-        // Password length validation
-        if (password.length < 6) {
-          showNotification({
-            type: 'error',
-            title: '驗證錯誤',
-            message: '密碼至少需要6個字符',
-            duration: 6000
-          });
-          return;
-        }
-        if (password !== confirmPassword) {
-          showNotification({
-            type: 'error',
-            title: '密碼不匹配',
-            message: '請確認兩次輸入的密碼相同',
-            duration: 6000
-          });
-          return;
-        }
-        await handleRegister(email, nickname, password);
+          // Validate login form
+          if (!emailValue) {
+            showNotification({
+              type: 'error',
+              title: '驗證錯誤',
+              message: '請輸入電子郵件地址',
+              duration: 6000
+            });
+            setIsLoading(false);
+            return;
+          }
+          if (!passwordValue) {
+            showNotification({
+              type: 'error',
+              title: '驗證錯誤',
+              message: '請輸入密碼',
+              duration: 6000
+            });
+            setIsLoading(false);
+            return;
+          }
+          // Basic email validation
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(emailValue)) {
+            showNotification({
+              type: 'error',
+              title: '驗證錯誤',
+              message: '請輸入有效的電子郵件地址',
+              duration: 6000
+            });
+            setIsLoading(false);
+            return;
+          }
+          // Password length validation
+          if (passwordValue.length < 6) {
+            showNotification({
+              type: 'error',
+              title: '驗證錯誤',
+              message: '密碼至少需要6個字符',
+              duration: 6000
+            });
+            setIsLoading(false);
+            return;
+          }
+          await handleLogin(emailValue, passwordValue);
+        } else if (authMode === 'register') {
+          // Validate registration form
+          if (!emailValue) {
+            showNotification({
+              type: 'error',
+              title: '驗證錯誤',
+              message: '請輸入電子郵件地址',
+              duration: 6000
+            });
+            setIsLoading(false);
+            return;
+          }
+          if (!nicknameValue) {
+            showNotification({
+              type: 'error',
+              title: '驗證錯誤',
+              message: '請輸入暱稱',
+              duration: 6000
+            });
+            setIsLoading(false);
+            return;
+          }
+          if (!passwordValue) {
+            showNotification({
+              type: 'error',
+              title: '驗證錯誤',
+              message: '請輸入密碼',
+              duration: 6000
+            });
+            setIsLoading(false);
+            return;
+          }
+          // Basic email validation
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(emailValue)) {
+            showNotification({
+              type: 'error',
+              title: '驗證錯誤',
+              message: '請輸入有效的電子郵件地址',
+              duration: 6000
+            });
+            setIsLoading(false);
+            return;
+          }
+          // Nickname length validation
+          if (nicknameValue.length < 2 || nicknameValue.length > 50) {
+            showNotification({
+              type: 'error',
+              title: '驗證錯誤',
+              message: '暱稱必須在2-50個字符之間',
+              duration: 6000
+            });
+            setIsLoading(false);
+            return;
+          }
+          // Password length validation
+          if (passwordValue.length < 6) {
+            showNotification({
+              type: 'error',
+              title: '驗證錯誤',
+              message: '密碼至少需要6個字符',
+              duration: 6000
+            });
+            setIsLoading(false);
+            return;
+          }
+          if (passwordValue !== confirmPasswordValue) {
+            showNotification({
+              type: 'error',
+              title: '密碼不匹配',
+              message: '請確認兩次輸入的密碼相同',
+              duration: 6000
+            });
+            setIsLoading(false);
+            return;
+          }
+          await handleRegister(emailValue, nicknameValue, passwordValue);
         } else {
           // Validate partner code
-          if (!partnerCode.trim()) {
+          if (!partnerCodeValue) {
             showNotification({
               type: 'error',
               title: '驗證錯誤',
@@ -3996,7 +4014,7 @@ const LoveTimeApp = () => {
             setIsLoading(false);
             return;
           }
-          await handlePartnerConnect(partnerCode);
+          await handlePartnerConnect(partnerCodeValue);
         }
       } catch (error) {
         // Error handling is done in individual functions
@@ -4029,106 +4047,160 @@ const LoveTimeApp = () => {
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {authMode === 'login' ? (
-              <>
-                <div>
-                  <label htmlFor="auth-email" className="block text-sm font-medium text-gray-700 mb-2">
-                    電子郵件
-                  </label>
-                  <input
-                    id="auth-email"
-                    name="auth-email"
-                    data-testid="auth-email-input"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    placeholder="輸入你的電子郵件"
-                    disabled={isLoading}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="auth-password" className="block text-sm font-medium text-gray-700 mb-2">
-                    密碼
-                  </label>
-                  <input
-                    id="auth-password"
-                    name="auth-password"
-                    data-testid="auth-password-input"
-                    type="password"
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    placeholder="輸入你的密碼"
-                    disabled={isLoading}
-                  />
-                </div>
-                {/* Nickname field removed for login - it's retrieved from the database */}
-              </>
-            ) : authMode === 'register' ? (
-              <>
-                <div>
-                  <label htmlFor="auth-email" className="block text-sm font-medium text-gray-700 mb-2">
-                    電子郵件
-                  </label>
-                  <input
-                    id="auth-email"
-                    name="auth-email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    placeholder="輸入你的電子郵件"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="auth-nickname" className="block text-sm font-medium text-gray-700 mb-2">
-                    暱稱
-                  </label>
-                  <input
-                    id="auth-nickname"
-                    name="auth-nickname"
-                    type="text"
-                    value={nickname}
-                    onChange={(e) => setNickname(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    placeholder="輸入你的暱稱"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="auth-password" className="block text-sm font-medium text-gray-700 mb-2">
-                    密碼
-                  </label>
-                  <input
-                    id="auth-password"
-                    name="auth-password"
-                    type="password"
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    placeholder="輸入你的密碼"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="auth-confirm-password" className="block text-sm font-medium text-gray-700 mb-2">
-                    確認密碼
-                  </label>
-                  <input
-                    id="auth-confirm-password"
-                    name="auth-confirm-password"
-                    type="password"
-                    autoComplete="new-password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    placeholder="再次輸入密碼"
-                  />
-                </div>
-              </>
-            ) : (
+          {authMode === 'login' && (
+            <form key="login-form" onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-2">
+                  電子郵件
+                </label>
+                <input
+                  id="login-email"
+                  name="email"
+                  data-testid="auth-email-input"
+                  type="email"
+                  defaultValue={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                  placeholder="輸入你的電子郵件"
+                  disabled={isLoading}
+                  autoComplete="username"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-2">
+                  密碼
+                </label>
+                <input
+                  id="login-password"
+                  name="password"
+                  data-testid="auth-password-input"
+                  type="password"
+                  autoComplete="current-password"
+                  defaultValue={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                  placeholder="輸入你的密碼"
+                  disabled={isLoading}
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isLoading}
+                data-testid="auth-submit-button"
+                className={`w-full py-3 rounded-md font-display italic text-base transition-colors ${
+                  isLoading
+                    ? 'bg-petal-cream-2 text-petal-muted cursor-not-allowed'
+                    : 'bg-petal-ink text-petal-cream hover:bg-pink-700'
+                }`}
+              >
+                {isLoading ? (
+                  <div className="flex items-center justify-center space-x-3">
+                    <div className="w-4 h-4 border-2 border-petal-muted border-t-transparent rounded-full animate-spin"></div>
+                    <span>登入中…</span>
+                  </div>
+                ) : (
+                  <span>開始愛的旅程 →</span>
+                )}
+              </button>
+            </form>
+          )}
+
+          {authMode === 'register' && (
+            <form key="register-form" onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label htmlFor="register-email" className="block text-sm font-medium text-gray-700 mb-2">
+                  電子郵件
+                </label>
+                <input
+                  id="register-email"
+                  name="email"
+                  type="email"
+                  defaultValue={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                  placeholder="輸入你的電子郵件"
+                  disabled={isLoading}
+                  autoComplete="username"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="register-nickname" className="block text-sm font-medium text-gray-700 mb-2">
+                  暱稱
+                </label>
+                <input
+                  id="register-nickname"
+                  name="nickname"
+                  type="text"
+                  defaultValue={nickname}
+                  onChange={(e) => setNickname(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                  placeholder="輸入你的暱稱"
+                  disabled={isLoading}
+                  autoComplete="nickname"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="register-password" className="block text-sm font-medium text-gray-700 mb-2">
+                  密碼
+                </label>
+                <input
+                  id="register-password"
+                  name="password"
+                  type="password"
+                  autoComplete="new-password"
+                  defaultValue={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                  placeholder="輸入你的密碼"
+                  disabled={isLoading}
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="register-confirm-password" className="block text-sm font-medium text-gray-700 mb-2">
+                  確認密碼
+                </label>
+                <input
+                  id="register-confirm-password"
+                  name="confirm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  defaultValue={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                  placeholder="再次輸入密碼"
+                  disabled={isLoading}
+                  required
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isLoading}
+                data-testid="auth-submit-button"
+                className={`w-full py-3 rounded-md font-display italic text-base transition-colors ${
+                  isLoading
+                    ? 'bg-petal-cream-2 text-petal-muted cursor-not-allowed'
+                    : 'bg-petal-ink text-petal-cream hover:bg-pink-700'
+                }`}
+              >
+                {isLoading ? (
+                  <div className="flex items-center justify-center space-x-3">
+                    <div className="w-4 h-4 border-2 border-petal-muted border-t-transparent rounded-full animate-spin"></div>
+                    <span>註冊中…</span>
+                  </div>
+                ) : (
+                  <span>註冊帳號 →</span>
+                )}
+              </button>
+            </form>
+          )}
+
+          {authMode === 'partner' && (
+            <form key="partner-form" onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label htmlFor="partner-code" className="block text-sm font-medium text-gray-700 mb-2">
                   伴侶配對碼
@@ -4137,40 +4209,35 @@ const LoveTimeApp = () => {
                   id="partner-code"
                   name="partner-code"
                   type="text"
-                  value={partnerCode}
+                  defaultValue={partnerCode}
                   onChange={(e) => setPartnerCode(e.target.value.toUpperCase())}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                   placeholder="輸入伴侶的配對碼"
+                  disabled={isLoading}
+                  required
                 />
               </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              data-testid="auth-submit-button"
-              className={`w-full py-3 rounded-md font-display italic text-base transition-colors ${
-                isLoading
-                  ? 'bg-petal-cream-2 text-petal-muted cursor-not-allowed'
-                  : 'bg-petal-ink text-petal-cream hover:bg-pink-700'
-              }`}
-            >
-              {isLoading ? (
-                <div className="flex items-center justify-center space-x-3">
-                  <div className="w-4 h-4 border-2 border-petal-muted border-t-transparent rounded-full animate-spin"></div>
-                  <span>
-                    {authMode === 'login' ? '登入中…' :
-                     authMode === 'register' ? '註冊中…' : '連接中…'}
-                  </span>
-                </div>
-              ) : (
-                <span>
-                  {authMode === 'login' ? '開始愛的旅程 →' :
-                   authMode === 'register' ? '註冊帳號 →' : '連接伴侶 →'}
-                </span>
-              )}
-            </button>
-          </form>
+              <button
+                type="submit"
+                disabled={isLoading}
+                data-testid="auth-submit-button"
+                className={`w-full py-3 rounded-md font-display italic text-base transition-colors ${
+                  isLoading
+                    ? 'bg-petal-cream-2 text-petal-muted cursor-not-allowed'
+                    : 'bg-petal-ink text-petal-cream hover:bg-pink-700'
+                }`}
+              >
+                {isLoading ? (
+                  <div className="flex items-center justify-center space-x-3">
+                    <div className="w-4 h-4 border-2 border-petal-muted border-t-transparent rounded-full animate-spin"></div>
+                    <span>連接中…</span>
+                  </div>
+                ) : (
+                  <span>連接伴侶 →</span>
+                )}
+              </button>
+            </form>
+          )}
 
           <div className="mt-4 text-center space-y-2">
             {authMode === 'login' && (
