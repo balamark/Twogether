@@ -2249,18 +2249,10 @@ const LoveTimeApp = () => {
                   <div className="space-y-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">{recordType === 'period' ? '週期開始日' : '日期選擇'}</label>
-                      <div className="space-y-3">
-                        <input
-                          type="date"
-                          value={recordForm.date}
-                          onChange={(e) => setRecordForm({...recordForm, date: e.target.value})}
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                        />
-                        <CalendarDatePicker
-                          selectedDate={recordForm.date}
-                          onDateSelect={(date) => setRecordForm({...recordForm, date})}
-                        />
-                      </div>
+                      <CalendarDatePicker
+                        selectedDate={recordForm.date}
+                        onDateSelect={(date) => setRecordForm({...recordForm, date})}
+                      />
                     </div>
                     {recordType === 'period' && (
                       <div>

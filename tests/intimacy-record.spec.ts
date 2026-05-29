@@ -98,13 +98,9 @@ test.describe('Intimacy Record Flow', () => {
     await expect(recordFormHeader).toBeVisible({ timeout: 10000 });
 
     // Modal no longer exposes time/duration/mood inputs — confirm they're gone.
+    // (Date is selected via the in-modal CalendarDatePicker; default is today, which is fine here.)
     await expect(page.locator('input[type="time"]')).toHaveCount(0);
     await expect(page.getByTestId('record-duration-input')).toHaveCount(0);
-
-    // Use the first date input in the modal (there are multiple date inputs)
-    const dateInput = page.locator('input[type="date"]').first();
-    await expect(dateInput).toBeVisible({ timeout: 3000 });
-    await dateInput.fill('2023-09-23');
 
     // Fill form fields by testid
     const descriptionField = page.getByTestId('record-description-input');
