@@ -97,10 +97,9 @@ test.describe('Intimacy Record Flow', () => {
     const recordFormHeader = page.getByTestId('record-modal-heading');
     await expect(recordFormHeader).toBeVisible({ timeout: 10000 });
 
-    // Fill out the record form
-    const timeInput = page.locator('input[type="time"]');
-    await expect(timeInput).toBeVisible({ timeout: 3000 });
-    await timeInput.fill('14:30');
+    // Modal no longer exposes time/duration/mood inputs — confirm they're gone.
+    await expect(page.locator('input[type="time"]')).toHaveCount(0);
+    await expect(page.getByTestId('record-duration-input')).toHaveCount(0);
 
     // Use the first date input in the modal (there are multiple date inputs)
     const dateInput = page.locator('input[type="date"]').first();
@@ -111,11 +110,6 @@ test.describe('Intimacy Record Flow', () => {
     const descriptionField = page.getByTestId('record-description-input');
     if (await descriptionField.isVisible({ timeout: 2000 })) {
       await descriptionField.fill(TEST_RECORD.description);
-    }
-
-    const durationField = page.getByTestId('record-duration-input');
-    if (await durationField.isVisible({ timeout: 2000 })) {
-      await durationField.fill(TEST_RECORD.duration);
     }
 
     const locationField = page.getByTestId('record-location-input');

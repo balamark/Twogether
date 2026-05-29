@@ -114,7 +114,7 @@ router.post('/login', [
 
     // Find user
     const userResult = await db.query(
-      'SELECT id, nickname, email, gender, password_hash, created_at FROM users WHERE email = $1',
+      'SELECT id, nickname, email, gender, birth_date, password_hash, created_at FROM users WHERE email = $1',
       [email]
     );
 
@@ -157,6 +157,7 @@ router.post('/login', [
         nickname: user.nickname,
         email: user.email,
         gender: user.gender,
+        birth_date: user.birth_date,
         created_at: user.created_at
       }
     });
@@ -176,7 +177,7 @@ router.get('/me', authenticateToken, async (req, res) => {
     // Get user with couple information
     const userResult = await db.query(`
       SELECT
-        u.id, u.nickname, u.email, u.gender, u.email_notifications_enabled,
+        u.id, u.nickname, u.email, u.gender, u.birth_date, u.email_notifications_enabled,
         u.cycle_tracking_enabled,
         u.created_at, u.last_login,
         c.id as couple_id, c.couple_name, c.anniversary_date,
@@ -217,6 +218,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         nickname: userData.nickname,
         email: userData.email,
         gender: userData.gender,
+        birth_date: userData.birth_date,
         email_notifications_enabled: userData.email_notifications_enabled !== false,
         cycle_tracking_enabled: userData.cycle_tracking_enabled === true,
         created_at: userData.created_at,
@@ -356,6 +358,55 @@ router.put('/user/cycle-tracking', authenticateToken, [
     res.status(500).json({
       success: false,
       message: '更新週期追蹤設定失敗'
+    });
+  }
+});
+
+// Update user birth date (used to compute age for health-reference nudges).
+// Accepts ISO date string (YYYY-MM-DD) or null to clear.
+router.put('/user/birth-date', authenticateToken, [
+  body('birth_date')
+    .custom((value) => {
+      if (value === null) return true;
+      if (typeof value !== 'string') throw new Error('birth_date 必須為日期字串或 null');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new Error('birth_date 必須為 YYYY-MM-DD 格式');
+      const d = new Date(value + 'T00:00:00Z');
+      if (Number.isNaN(d.getTime())) throw new Error('birth_date 無效');
+      const year = d.getUTCFullYear();
+      const today = new Date();
+      if (year < 1900) throw new Error('birth_date 年份太早');
+      if (d.getTime() > today.getTime()) throw new Error('birth_date 不可為未來日期');
+      return true;
+    })
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: '驗證失敗',
+        errors: errors.array()
+      });
+    }
+
+    const userId = req.user.id;
+    const birthDate = req.body.birth_date === null ? null : req.body.birth_date;
+
+    await db.query(
+      `UPDATE users SET birth_date = $1 WHERE id = $2`,
+      [birthDate, userId]
+    );
+
+    res.json({
+      success: true,
+      message: '生日已更新',
+      birth_date: birthDate
+    });
+  } catch (error) {
+    logError('Update birth date failed', { err: error.message, stack: error.stack });
+    res.status(500).json({
+      success: false,
+      message: '更新生日失敗'
     });
   }
 });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Heart, Calendar, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Upload, Play, Coins, Plus, X, User, Inbox, Pause, StickyNote, ChevronDown, ChevronUp, Send, Check, MessageSquareHeart, Trash2, Pencil } from 'lucide-react';
+import { Heart, Calendar, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Play, Coins, Plus, X, User, Inbox, Pause, StickyNote, ChevronDown, ChevronUp, Send, Check, MessageSquareHeart, Trash2, Pencil } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import RoleplayView from './components/RoleplayView';
 import WallView from './components/WallView';
@@ -124,6 +124,7 @@ interface User {
   email: string;
   nickname: string;
   gender?: 'male' | 'female' | 'other';
+  birth_date?: string | null;
   email_notifications_enabled?: boolean;
   cycle_tracking_enabled?: boolean;
   partnerId?: string;
@@ -2193,14 +2194,18 @@ const LoveTimeApp = () => {
         </div>
 
         {/* Intimacy Stats — 4 cards */}
-        <IntimacyStatsCards records={intimateRecords} />
+        <IntimacyStatsCards
+          records={intimateRecords}
+          birthDate={authState.user?.birth_date}
+          onOpenSettings={() => setCurrentView('settings')}
+        />
 
         {/* Enhanced Record Modal */}
         {showRecordModal && (
           <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-petal-cream rounded-md shadow-petal max-w-2xl w-full max-h-[min(90vh,calc(100dvh-80px))] overflow-y-auto overscroll-contain border border-petal-rule">
-              <div className="p-5 sm:p-6 md:p-8">
-                <div className="flex justify-between items-end mb-8 pb-5 border-b border-petal-rule">
+              <div className="p-5 sm:p-6">
+                <div className="flex justify-between items-end mb-5 pb-4 border-b border-petal-rule">
                   <div>
                     <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
                       — {editingRecord ? '編輯記錄' : '新的記錄'}
@@ -2218,7 +2223,7 @@ const LoveTimeApp = () => {
                   </button>
                 </div>
 
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {/* Event type — only when cycle tracking is opted in and creating a new record */}
                   {cycleEnabled && !editingRecord && (
                     <div>
@@ -2241,7 +2246,7 @@ const LoveTimeApp = () => {
                   )}
 
                   {/* Basic Info */}
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">{recordType === 'period' ? '週期開始日' : '日期選擇'}</label>
                       <div className="space-y-3">
@@ -2251,23 +2256,12 @@ const LoveTimeApp = () => {
                           onChange={(e) => setRecordForm({...recordForm, date: e.target.value})}
                           className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                         />
-                        <CalendarDatePicker 
+                        <CalendarDatePicker
                           selectedDate={recordForm.date}
                           onDateSelect={(date) => setRecordForm({...recordForm, date})}
                         />
                       </div>
                     </div>
-                    {recordType !== 'period' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">時間</label>
-                        <input
-                          type="time"
-                          value={recordForm.time}
-                          onChange={(e) => setRecordForm({...recordForm, time: e.target.value})}
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                        />
-                      </div>
-                    )}
                     {recordType === 'period' && (
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">月經天數</label>
@@ -2290,44 +2284,40 @@ const LoveTimeApp = () => {
 
                   {recordType !== 'period' && (
                   <>
-                  {/* Photo Upload */}
+                  {/* Photo Upload — compact */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <Camera className="w-4 h-4 inline mr-2" />
-                      上傳照片 (可選)
-                    </label>
-                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
-                      {recordForm.photo ? (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        data-testid="record-photo-upload-button"
+                        className="inline-flex items-center gap-2 px-3 py-2 border border-petal-rule rounded-md text-sm text-petal-ink hover:bg-petal-cream-2 transition-colors"
+                      >
+                        <Camera className="w-4 h-4" />
+                        {recordForm.photo ? '更換照片' : '上傳照片 (可選)'}
+                      </button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePhotoUpload}
+                        className="hidden"
+                      />
+                      {recordForm.photo && (
                         <div className="relative">
-                          <img 
-                            src={recordForm.photo} 
-                            alt="記憶照片" 
-                            className="max-h-32 mx-auto rounded-lg"
+                          <img
+                            src={recordForm.photo}
+                            alt="記憶照片"
+                            className="w-16 h-16 object-cover rounded-md border border-petal-rule"
                           />
                           <button
+                            type="button"
                             onClick={() => setRecordForm({...recordForm, photo: ''})}
-                            className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-6 h-6 text-sm"
+                            aria-label="移除照片"
+                            className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 text-xs leading-none flex items-center justify-center"
                           >
                             ×
                           </button>
-                        </div>
-                      ) : (
-                        <div>
-                          <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                          <button
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="text-pink-600 hover:text-pink-700 font-medium"
-                          >
-                            點擊上傳照片
-                          </button>
-                          <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept="image/*"
-                            onChange={handlePhotoUpload}
-                            className="hidden"
-                          />
                         </div>
                       )}
                     </div>
@@ -2341,39 +2331,23 @@ const LoveTimeApp = () => {
                       onChange={(e) => setRecordForm({...recordForm, description: e.target.value})}
                       placeholder="分享這個美好時光的細節..."
                       data-testid="record-description-input"
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 h-20"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 h-16"
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <Clock className="w-4 h-4 inline mr-2" />
-                        持續時間
-                      </label>
-                      <input
-                        type="text"
-                        value={recordForm.duration}
-                        onChange={(e) => setRecordForm({...recordForm, duration: e.target.value})}
-                        placeholder="例如：30分鐘"
-                        data-testid="record-duration-input"
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <MapPin className="w-4 h-4 inline mr-2" />
-                        地點
-                      </label>
-                      <input
-                        type="text"
-                        value={recordForm.location}
-                        onChange={(e) => setRecordForm({...recordForm, location: e.target.value})}
-                        placeholder="例如：臥室、客廳"
-                        data-testid="record-location-input"
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <MapPin className="w-4 h-4 inline mr-2" />
+                      地點
+                    </label>
+                    <input
+                      type="text"
+                      value={recordForm.location}
+                      onChange={(e) => setRecordForm({...recordForm, location: e.target.value})}
+                      placeholder="例如：臥室、客廳"
+                      data-testid="record-location-input"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                    />
                   </div>
 
                   {/* Roleplay Script Reference */}
@@ -2400,25 +2374,6 @@ const LoveTimeApp = () => {
                     </select>
                   </div>
 
-                  {/* Mood and Notes */}
-                  <div>
-                    <label className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-3">心情</label>
-                    <div className="flex space-x-2">
-                      {['💕', '🔥', '😍', '🥰', '😘', '🌟'].map(emoji => (
-                        <button
-                          key={emoji}
-                          onClick={() => setRecordForm({...recordForm, mood: emoji})}
-                          className={`w-11 h-11 text-base rounded-full border transition-all ${
-                            recordForm.mood === emoji
-                              ? 'border-petal-rose-deep bg-petal-rose-soft/40 opacity-100 saturate-100'
-                              : 'border-petal-rule hover:border-petal-rose opacity-60 saturate-75 hover:opacity-90 hover:saturate-100'
-                          }`}
-                        >
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                   </>
                   )}
 
@@ -2429,12 +2384,12 @@ const LoveTimeApp = () => {
                       onChange={(e) => setRecordForm({...recordForm, notes: e.target.value})}
                       placeholder="記錄這個特別時刻的感受..."
                       data-testid="record-notes-input"
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 h-20"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 h-16"
                     />
                   </div>
                 </div>
 
-                <div className="flex space-x-3 mt-8 pt-6 border-t border-petal-rule">
+                <div className="flex space-x-3 mt-6 pt-4 border-t border-petal-rule">
                   <button
                     onClick={() => { setShowRecordModal(false); setEditingRecord(null); }}
                     data-testid="record-cancel-button"

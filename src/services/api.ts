@@ -1274,6 +1274,15 @@ class ApiService {
     }
   }
 
+  async updateUserBirthDate(birthDate: string | null): Promise<void> {
+    try {
+      await apiClient.put('/auth/user/birth-date', { birth_date: birthDate });
+    } catch (error: unknown) {
+      console.error('Failed to update user birth date:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '更新生日失敗');
+    }
+  }
+
   async updateEmailNotificationsEnabled(enabled: boolean): Promise<void> {
     try {
       await apiClient.put('/auth/user/email-notifications', {

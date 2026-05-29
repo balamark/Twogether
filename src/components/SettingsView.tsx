@@ -25,6 +25,7 @@ interface User {
   email: string;
   nickname: string;
   gender?: 'male' | 'female' | 'other';
+  birth_date?: string | null;
   email_notifications_enabled?: boolean;
   cycle_tracking_enabled?: boolean;
   partnerId?: string;
@@ -147,6 +148,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   // Gender selection state
   const [userGender, setUserGender] = useState<'male' | 'female' | 'other' | null>(null);
 
+  // Birth date state (used for age-based health-reference suggestions)
+  const [userBirthDate, setUserBirthDate] = useState<string>('');
+
   // Email notifications opt-out state
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState<boolean>(true);
   const [isSavingEmailPref, setIsSavingEmailPref] = useState<boolean>(false);
@@ -171,6 +175,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       setUserGender(authState.user.gender);
     }
   }, [authState.user?.gender]);
+
+  useEffect(() => {
+    const bd = authState.user?.birth_date;
+    setUserBirthDate(bd ? formatDateForInput(bd) : '');
+  }, [authState.user?.birth_date]);
 
   // Load email notification preference from auth state.
   useEffect(() => {
@@ -275,6 +284,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       if (userGender) {
         await apiService.updateUserGender(userGender);
       }
+      // Persist birth date (only if it changed from the auth-state value)
+      const previousBirthDate = authState.user?.birth_date
+        ? formatDateForInput(authState.user.birth_date)
+        : '';
+      const nextBirthDate = userBirthDate || null;
+      if ((previousBirthDate || '') !== (userBirthDate || '')) {
+        await apiService.updateUserBirthDate(nextBirthDate);
+      }
       // Only update current user's nickname
       await apiService.updateNicknames({
         partner1: nicknames.partner1,
@@ -301,6 +318,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             ...authState.user,
             nickname: nicknames.partner1, // Update with the new nickname
             partnerNickname: nicknames.partner2, // Keep partner nickname unchanged
+            birth_date: nextBirthDate,
           },
         };
         onAuthStateUpdate(updatedAuthState);
@@ -662,6 +680,25 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
             <p className="text-xs text-gray-500 mt-2">
               💡 此設定會影響角色扮演劇本中的角色名稱，例如偶像默認為女性角色
+            </p>
+          </div>
+
+          <div className="pt-4 border-t border-gray-100">
+            <label htmlFor="user-birth-date" className="block text-sm font-medium text-gray-700 mb-2">
+              生日 (可選)
+            </label>
+            <input
+              id="user-birth-date"
+              type="date"
+              value={userBirthDate}
+              min="1900-01-01"
+              max={new Date().toISOString().split('T')[0]}
+              onChange={(e) => setUserBirthDate(e.target.value)}
+              data-testid="settings-birth-date-input"
+              className="w-full sm:max-w-xs p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              💡 用於提供依年齡的健康參考建議（非醫療建議）
             </p>
           </div>
         </div>

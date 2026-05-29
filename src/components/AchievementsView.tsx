@@ -460,6 +460,7 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
   const monthNames = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
 
   const maxCount = Math.max(...calendarData.map(d => d.count));
+  const todayStr = new Date().toISOString().split('T')[0];
 
   const navigateMonth = (direction: number) => {
     if (!onNavigate) return;
@@ -529,6 +530,7 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
             return <div key={index} className="aspect-square invisible" />;
           }
           const isSelected = selectedDay === day.dateStr;
+          const isToday = day.dateStr === todayStr;
           const isPeriod = !!periodDates && periodDates.has(day.dateStr!);
           const isPredictedPeriod = !!predictedPeriodDates && predictedPeriodDates.has(day.dateStr!);
           const isFertile = !!fertileDates && fertileDates.has(day.dateStr!);
@@ -537,14 +539,16 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
               key={index}
               type="button"
               onClick={() => onDaySelect?.(day.dateStr!)}
+              data-testid={isToday ? 'calendar-today-cell' : undefined}
               className={`
                 aspect-square rounded-sm border transition-all duration-200 hover:scale-110 hover:z-10 relative group cursor-pointer
                 ${getIntensityClass(day.count)}
+                ${isToday && !isSelected ? 'ring-2 ring-petal-ink ring-offset-1 z-10' : ''}
                 ${isSelected ? 'ring-2 ring-petal-rose-deep ring-offset-1 z-10' : ''}
               `}
             >
               <div className="absolute inset-0 flex items-center justify-center">
-                <span className={`text-xs font-medium ${day.count >= 3 ? 'text-white' : 'text-gray-600'}`}>
+                <span className={`text-xs ${isToday ? 'font-bold' : 'font-medium'} ${day.count >= 3 ? 'text-white' : isToday ? 'text-petal-ink' : 'text-gray-600'}`}>
                   {day.date.getDate()}
                 </span>
               </div>
@@ -602,10 +606,36 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
   );
 }
 
-export function IntimacyStatsCards({ records }: { records: IntimateRecord[] }) {
+interface IntimacyStatsCardsProps {
+  records: IntimateRecord[];
+  birthDate?: string | null;
+  onOpenSettings?: () => void;
+}
+
+function ageFromBirthDate(birthDate: string | null | undefined): number | null {
+  if (!birthDate) return null;
+  const d = new Date(birthDate);
+  if (Number.isNaN(d.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age -= 1;
+  return age;
+}
+
+// General health-reference buckets (not medical advice).
+function weeklyRecommendationForAge(age: number): string | null {
+  if (age < 18) return null;
+  if (age < 30) return '3–4';
+  if (age < 40) return '2–3';
+  if (age < 50) return '1–2';
+  return '約 1';
+}
+
+export function IntimacyStatsCards({ records, birthDate, onOpenSettings }: IntimacyStatsCardsProps) {
   const derived = useMemo(() => {
     if (!records || records.length === 0) {
-      return { total: 0, monthlyAvg: 0, thisWeek: 0, thisMonth: 0 };
+      return { total: 0, monthlyAvg: 0, weeklyAvg: 0, thisWeek: 0, thisMonth: 0, daysSinceLast: null as number | null };
     }
     const now = new Date();
     const startOfWeek = new Date(now);
@@ -616,6 +646,7 @@ export function IntimacyStatsCards({ records }: { records: IntimateRecord[] }) {
     const thisMonth = records.filter(r => new Date(r.date) >= startOfMonth).length;
 
     const earliest = records.reduce((min, r) => (r.date < min ? r.date : min), records[0].date);
+    const latest = records.reduce((max, r) => (r.date > max ? r.date : max), records[0].date);
     const earliestDate = new Date(earliest);
     const monthsSpan = Math.max(
       1,
@@ -623,26 +654,86 @@ export function IntimacyStatsCards({ records }: { records: IntimateRecord[] }) {
     );
     const monthlyAvg = records.length / monthsSpan;
 
-    return { total: records.length, monthlyAvg, thisWeek, thisMonth };
+    const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+    const weeksSpan = Math.max(1, Math.ceil((now.getTime() - earliestDate.getTime()) / msPerWeek));
+    const weeklyAvg = records.length / weeksSpan;
+
+    const latestDate = new Date(latest);
+    latestDate.setHours(0, 0, 0, 0);
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    const daysSinceLast = Math.max(0, Math.floor((today.getTime() - latestDate.getTime()) / (24 * 60 * 60 * 1000)));
+
+    return { total: records.length, monthlyAvg, weeklyAvg, thisWeek, thisMonth, daysSinceLast };
   }, [records]);
 
+  const age = ageFromBirthDate(birthDate);
+  const recommendation = age !== null ? weeklyRecommendationForAge(age) : null;
+  const hasRecords = derived.total > 0;
+
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-      <div className="bg-white rounded-md p-5 border border-petal-rule">
-        <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1.5">總記錄</div>
-        <div className="font-display italic font-light text-3xl text-petal-ink">{derived.total}</div>
+    <div className="space-y-3">
+      {/* Age-based health-reference nudge */}
+      {recommendation && (
+        <div className="bg-petal-rose-soft/20 border border-petal-rose-soft rounded-md p-4">
+          <div className="flex items-baseline flex-wrap gap-x-2">
+            <span className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-rose-deep">健康參考</span>
+            <span className="font-display italic text-petal-ink">
+              建議每週 <em className="not-italic font-semibold">{recommendation}</em> 次
+            </span>
+            <span className="font-body text-xs text-petal-muted">（一般參考，非醫療建議）</span>
+          </div>
+          <details className="mt-2 text-xs text-petal-muted">
+            <summary className="cursor-pointer hover:text-petal-ink">了解規律親密的好處</summary>
+            <ul className="mt-2 ml-4 list-disc space-y-1 text-petal-ink/80">
+              <li>降低壓力與焦慮：促進腦內啡、催產素分泌，降低壓力荷爾蒙皮質醇。</li>
+              <li>改善睡眠：高潮後的催乳素與催產素有助於更深層的睡眠。</li>
+              <li>免疫支持：研究指出每週 1–2 次與較高的免疫球蛋白 A（IgA）有關。</li>
+              <li>心血管健康：屬於輕至中等強度的身體活動，對心臟有益。</li>
+            </ul>
+          </details>
+        </div>
+      )}
+      {!birthDate && onOpenSettings && (
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          data-testid="stats-birthday-prompt"
+          className="block w-full text-left font-body text-xs text-petal-muted hover:text-petal-ink underline decoration-dotted"
+        >
+          新增生日以獲得依年齡的健康參考建議 →
+        </button>
+      )}
+
+      {/* Recent / actionable metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-white rounded-md p-5 border border-petal-rule">
+          <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1.5">周平均</div>
+          <div className="font-display italic font-light text-3xl text-petal-ink">
+            {hasRecords ? derived.weeklyAvg.toFixed(1) : '—'}
+          </div>
+        </div>
+        <div className="bg-petal-rose-soft/30 rounded-md p-5 border border-petal-rose-soft">
+          <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-rose-deep mb-1.5">本週次數</div>
+          <div className="font-display italic font-light text-3xl text-petal-rose-deep">{derived.thisWeek}</div>
+        </div>
+        <div className="bg-petal-sage/15 rounded-md p-5 border border-petal-sage/40">
+          <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-sage-deep mb-1.5">本月次數</div>
+          <div className="font-display italic font-light text-3xl text-petal-sage-deep">{derived.thisMonth}</div>
+        </div>
+        <div className="bg-white rounded-md p-5 border border-petal-rule">
+          <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1.5">已經幾天沒有親密了</div>
+          <div className="font-display italic font-light text-3xl text-petal-ink">
+            {derived.daysSinceLast === null ? '—' : derived.daysSinceLast}
+          </div>
+        </div>
       </div>
-      <div className="bg-white rounded-md p-5 border border-petal-rule">
-        <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1.5">月平均</div>
-        <div className="font-display italic font-light text-3xl text-petal-ink">{derived.monthlyAvg.toFixed(1)}</div>
-      </div>
-      <div className="bg-petal-rose-soft/30 rounded-md p-5 border border-petal-rose-soft">
-        <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-rose-deep mb-1.5">本週次數</div>
-        <div className="font-display italic font-light text-3xl text-petal-rose-deep">{derived.thisWeek}</div>
-      </div>
-      <div className="bg-petal-sage/15 rounded-md p-5 border border-petal-sage/40">
-        <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-sage-deep mb-1.5">本月次數</div>
-        <div className="font-display italic font-light text-3xl text-petal-sage-deep">{derived.thisMonth}</div>
+
+      {/* All-time totals — kept small */}
+      <div className="font-body text-xs text-petal-muted">
+        總記錄 <span className="text-petal-ink font-medium">{derived.total}</span>
+        <span className="mx-2">·</span>
+        月平均 <span className="text-petal-ink font-medium">{derived.monthlyAvg.toFixed(1)}</span>
       </div>
     </div>
   );
