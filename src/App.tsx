@@ -14,7 +14,7 @@ import NotificationInbox from './components/NotificationInbox';
 import PairingInvitationHandler from './components/PairingInvitationHandler';
 import { apiService, getTokenExpiry, clearAuthStorage } from './services/api';
 import type { CycleRecord } from './services/api';
-import { averageCycleLength, predictNextPeriodStart, ovulationWindow, periodDateSet, fertileDateSet, predictedPeriodDateSet } from './utils/cycle';
+import { periodDateSet, fertileDateSet, predictedPeriodDateSet } from './utils/cycle';
 import { conflictPhraseTiers } from './data/conflictSteps';
 import { useScrollLock } from './hooks/useScrollLock';
 
