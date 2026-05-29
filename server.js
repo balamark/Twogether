@@ -15,6 +15,7 @@ const { logInfo, logError } = require('./lib/logger');
 const authRoutes = require('./routes/auth');
 const coupleRoutes = require('./routes/couples');
 const loveMomentRoutes = require('./routes/love-moments');
+const cycleRecordRoutes = require('./routes/cycle-records');
 const photoRoutes = require('./routes/photos');
 const achievementRoutes = require('./routes/achievements');
 const coinRoutes = require('./routes/coins');
@@ -115,6 +116,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/couples', coupleRoutes);
 app.use('/api/love-moments', loveMomentRoutes);
+app.use('/api/cycle-records', cycleRecordRoutes);
 app.use('/api/photos', photoRoutes);
 app.use('/api/achievements', achievementRoutes);
 app.use('/api/coins', coinRoutes);

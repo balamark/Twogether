@@ -36,6 +36,25 @@ interface ApiIntimateRecord {
   activity_type?: string;
 }
 
+export interface CycleRecord {
+  id: string;
+  trackedBy: string;
+  startDate: string;        // YYYY-MM-DD
+  lengthDays: number;
+  notes?: string;
+  createdAt: string;
+}
+
+interface ApiCycleRecord {
+  id: string;
+  tracked_by: string;
+  start_date: string;
+  length_days: number;
+  notes?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
 interface CreateCoupleRequest {
   coupleName?: string;
   anniversaryDate?: string;
@@ -669,6 +688,69 @@ class ApiService {
     }
   }
 
+  // Cycle (period) records
+  async getCycleRecords(): Promise<CycleRecord[]> {
+    try {
+      const response = await apiClient.get('/cycle-records');
+      const rows = (response.data?.cycle_records || []) as ApiCycleRecord[];
+      return rows.map(this.transformCycleRecord);
+    } catch (error: unknown) {
+      console.error('Failed to fetch cycle records:', error);
+      this.throwApiError(error, '無法獲取週期紀錄');
+    }
+  }
+
+  async createCycleRecord(input: { startDate: string; lengthDays?: number; notes?: string }): Promise<CycleRecord> {
+    try {
+      if (!input.startDate) throw new Error('請選擇週期開始日');
+      const response = await apiClient.post('/cycle-records', {
+        start_date: input.startDate,
+        length_days: input.lengthDays ?? 5,
+        notes: input.notes?.trim() || null,
+      });
+      const row = (response.data?.cycle_record || response.data) as ApiCycleRecord;
+      return this.transformCycleRecord(row);
+    } catch (error: unknown) {
+      console.error('Failed to create cycle record:', error);
+      this.throwApiError(error, '無法建立週期紀錄');
+    }
+  }
+
+  async updateCycleRecord(id: string, input: Partial<{ startDate: string; lengthDays: number; notes: string }>): Promise<void> {
+    try {
+      if (!id) throw new Error('紀錄ID不能為空');
+      const payload: Record<string, unknown> = {};
+      if (input.startDate !== undefined) payload.start_date = input.startDate;
+      if (input.lengthDays !== undefined) payload.length_days = input.lengthDays;
+      if (input.notes !== undefined) payload.notes = input.notes?.trim() || null;
+      await apiClient.put(`/cycle-records/${id}`, payload);
+    } catch (error: unknown) {
+      console.error('Failed to update cycle record:', error);
+      this.throwApiError(error, '無法更新週期紀錄');
+    }
+  }
+
+  async deleteCycleRecord(id: string): Promise<void> {
+    try {
+      if (!id) throw new Error('紀錄ID不能為空');
+      await apiClient.delete(`/cycle-records/${id}`);
+    } catch (error: unknown) {
+      console.error('Failed to delete cycle record:', error);
+      this.throwApiError(error, '無法刪除週期紀錄');
+    }
+  }
+
+  private transformCycleRecord(row: ApiCycleRecord): CycleRecord {
+    return {
+      id: String(row.id),
+      trackedBy: String(row.tracked_by),
+      startDate: String(row.start_date).slice(0, 10),
+      lengthDays: Number(row.length_days),
+      notes: row.notes || undefined,
+      createdAt: row.created_at,
+    };
+  }
+
   // Photo Upload
   async uploadPhoto(file: File, caption?: string): Promise<{ id: string; url: string }> {
     try {
@@ -1200,6 +1282,17 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to update email notifications pref:', error);
       throw new Error((error as ApiErrorResponse)?.message || '更新電子郵件通知設定失敗');
+    }
+  }
+
+  async updateCycleTrackingEnabled(enabled: boolean): Promise<void> {
+    try {
+      await apiClient.put('/auth/user/cycle-tracking', {
+        cycle_tracking_enabled: enabled,
+      });
+    } catch (error: unknown) {
+      console.error('Failed to update cycle tracking pref:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '更新週期追蹤設定失敗');
     }
   }
 

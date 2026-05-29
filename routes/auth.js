@@ -177,6 +177,7 @@ router.get('/me', authenticateToken, async (req, res) => {
     const userResult = await db.query(`
       SELECT
         u.id, u.nickname, u.email, u.gender, u.email_notifications_enabled,
+        u.cycle_tracking_enabled,
         u.created_at, u.last_login,
         c.id as couple_id, c.couple_name, c.anniversary_date,
         c.user1_id, c.user2_id
@@ -217,6 +218,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         email: userData.email,
         gender: userData.gender,
         email_notifications_enabled: userData.email_notifications_enabled !== false,
+        cycle_tracking_enabled: userData.cycle_tracking_enabled === true,
         created_at: userData.created_at,
         last_login: userData.last_login,
         couple: userData.couple_id ? {
@@ -316,6 +318,44 @@ router.put('/user/email-notifications', authenticateToken, [
     res.status(500).json({
       success: false,
       message: '更新電子郵件通知設定失敗'
+    });
+  }
+});
+
+// Toggle per-user opt-in for cycle (period) tracking.
+router.put('/user/cycle-tracking', authenticateToken, [
+  body('cycle_tracking_enabled')
+    .isBoolean()
+    .withMessage('cycle_tracking_enabled 必須為布林值')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: '驗證失敗',
+        errors: errors.array()
+      });
+    }
+
+    const userId = req.user.id;
+    const enabled = !!req.body.cycle_tracking_enabled;
+
+    await db.query(
+      `UPDATE users SET cycle_tracking_enabled = $1 WHERE id = $2`,
+      [enabled, userId]
+    );
+
+    res.json({
+      success: true,
+      message: '週期追蹤設定已更新',
+      cycle_tracking_enabled: enabled
+    });
+  } catch (error) {
+    logError('Update cycle tracking pref failed', { err: error.message, stack: error.stack });
+    res.status(500).json({
+      success: false,
+      message: '更新週期追蹤設定失敗'
     });
   }
 });

@@ -399,9 +399,12 @@ interface CalendarHeatmapProps {
   onNavigate?: (year: number, month: number) => void;
   onDaySelect?: (dateStr: string) => void;
   selectedDay?: string | null;
+  periodDates?: Set<string>;
+  predictedPeriodDates?: Set<string>;
+  fertileDates?: Set<string>;
 }
 
-export function CalendarHeatmap({ data, year, month, title, showMonthLabels = true, onNavigate, onDaySelect, selectedDay }: CalendarHeatmapProps) {
+export function CalendarHeatmap({ data, year, month, title, showMonthLabels = true, onNavigate, onDaySelect, selectedDay, periodDates, predictedPeriodDates, fertileDates }: CalendarHeatmapProps) {
   const now = new Date();
   const targetYear = year ?? now.getFullYear();
   const targetMonth = month ?? now.getMonth();
@@ -526,6 +529,9 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
             return <div key={index} className="aspect-square invisible" />;
           }
           const isSelected = selectedDay === day.dateStr;
+          const isPeriod = !!periodDates && periodDates.has(day.dateStr!);
+          const isPredictedPeriod = !!predictedPeriodDates && predictedPeriodDates.has(day.dateStr!);
+          const isFertile = !!fertileDates && fertileDates.has(day.dateStr!);
           return (
             <button
               key={index}
@@ -542,10 +548,22 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
                   {day.date.getDate()}
                 </span>
               </div>
+              {isPeriod && (
+                <span data-testid="cycle-period-dot" className="absolute top-0.5 left-0.5 w-1.5 h-1.5 rounded-full bg-red-500" title="月經" />
+              )}
+              {!isPeriod && isPredictedPeriod && (
+                <span data-testid="cycle-predicted-dot" className="absolute top-0.5 left-0.5 w-1.5 h-1.5 rounded-full border border-red-400" title="預測月經" />
+              )}
+              {isFertile && (
+                <span data-testid="cycle-fertile-dot" className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500" title="適合備孕" />
+              )}
               <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-20 whitespace-nowrap pointer-events-none">
                 {day.date.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })}
                 <br />
                 {day.count} 次記錄
+                {isPeriod && <><br />🔴 月經</>}
+                {!isPeriod && isPredictedPeriod && <><br />⭕ 預測月經</>}
+                {isFertile && <><br />🟢 適合備孕</>}
               </div>
             </button>
           );
@@ -553,7 +571,7 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
       </div>
 
       {/* Legend and stats */}
-      <div className="flex items-center justify-between text-xs text-gray-500">
+      <div className="flex flex-wrap items-center justify-between gap-y-2 text-xs text-gray-500">
         <div className="flex items-center space-x-2">
           <span>較少</span>
           <div className="flex space-x-1">
@@ -565,6 +583,19 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
           </div>
           <span>較多</span>
         </div>
+        {(periodDates || fertileDates || predictedPeriodDates) && (
+          <div className="flex items-center gap-3">
+            {periodDates && periodDates.size > 0 && (
+              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500" /> 月經</span>
+            )}
+            {predictedPeriodDates && predictedPeriodDates.size > 0 && (
+              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full border border-red-400" /> 預測月經</span>
+            )}
+            {fertileDates && fertileDates.size > 0 && (
+              <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> 適合備孕</span>
+            )}
+          </div>
+        )}
         <span>最高 {maxCount} 次</span>
       </div>
     </div>

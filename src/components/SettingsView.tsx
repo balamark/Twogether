@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { User, Users, CheckCircle } from 'lucide-react';
-import { apiService } from '../services/api';
+import { User, Users, CheckCircle, Trash2 } from 'lucide-react';
+import { apiService, type CycleRecord } from '../services/api';
+import { averageCycleLength, predictNextPeriodStart, ovulationWindow, computeCycleLengths } from '../utils/cycle';
 
 interface Nicknames {
   partner1: string;
@@ -25,6 +26,7 @@ interface User {
   nickname: string;
   gender?: 'male' | 'female' | 'other';
   email_notifications_enabled?: boolean;
+  cycle_tracking_enabled?: boolean;
   partnerId?: string;
   partnerCode?: string;
   partnerNickname?: string;
@@ -75,6 +77,8 @@ interface SettingsViewProps {
   setCustomMemoryQuestions: React.Dispatch<React.SetStateAction<string[]>>;
   customEmotions: string[];
   setCustomEmotions: React.Dispatch<React.SetStateAction<string[]>>;
+  cycleRecords?: CycleRecord[];
+  onCycleRecordsChange?: (records: CycleRecord[]) => void;
 }
 
 const SettingsView: React.FC<SettingsViewProps> = ({
@@ -89,7 +93,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   customMemoryQuestions,
   setCustomMemoryQuestions,
   customEmotions,
-  setCustomEmotions
+  setCustomEmotions,
+  cycleRecords = [],
+  onCycleRecordsChange
 }) => {
   const [newMemoryQuestion, setNewMemoryQuestion] = useState('');
   const [newEmotion, setNewEmotion] = useState('');
@@ -145,6 +151,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState<boolean>(true);
   const [isSavingEmailPref, setIsSavingEmailPref] = useState<boolean>(false);
 
+  // Cycle tracking opt-in state
+  const [cycleTrackingEnabled, setCycleTrackingEnabled] = useState<boolean>(false);
+  const [isSavingCyclePref, setIsSavingCyclePref] = useState<boolean>(false);
+
   // Email invitation states
   const [recipientEmail, setRecipientEmail] = useState('');
   const [invitationMessage, setInvitationMessage] = useState('');
@@ -169,6 +179,60 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       setEmailNotificationsEnabled(pref);
     }
   }, [authState.user?.email_notifications_enabled]);
+
+  useEffect(() => {
+    const pref = authState.user?.cycle_tracking_enabled;
+    if (typeof pref === 'boolean') {
+      setCycleTrackingEnabled(pref);
+    }
+  }, [authState.user?.cycle_tracking_enabled]);
+
+  const handleToggleCycleTracking = async (next: boolean) => {
+    const previous = cycleTrackingEnabled;
+    setCycleTrackingEnabled(next);
+    setIsSavingCyclePref(true);
+    try {
+      await apiService.updateCycleTrackingEnabled(next);
+      if (authState.user && onAuthStateUpdate) {
+        const updated = {
+          ...authState,
+          user: { ...authState.user, cycle_tracking_enabled: next },
+        };
+        onAuthStateUpdate(updated);
+        localStorage.setItem('authState', JSON.stringify(updated));
+        localStorage.setItem('authUser', JSON.stringify(updated.user));
+      }
+      showNotification({
+        type: 'success',
+        title: '已更新',
+        message: next ? '已開啟週期追蹤' : '已關閉週期追蹤',
+        duration: 4000,
+      });
+    } catch (err) {
+      setCycleTrackingEnabled(previous);
+      showNotification({
+        type: 'error',
+        title: '更新失敗',
+        message: (err as Error)?.message || '無法更新週期追蹤設定',
+        duration: 5000,
+      });
+    } finally {
+      setIsSavingCyclePref(false);
+    }
+  };
+
+  const handleDeleteCycleRecord = async (id: string) => {
+    if (!onCycleRecordsChange) return;
+    const previous = cycleRecords;
+    onCycleRecordsChange(cycleRecords.filter(r => r.id !== id));
+    try {
+      await apiService.deleteCycleRecord(id);
+      showNotification({ type: 'success', title: '已刪除', message: '週期紀錄已刪除', duration: 3000 });
+    } catch (err) {
+      onCycleRecordsChange(previous);
+      showNotification({ type: 'error', title: '刪除失敗', message: (err as Error)?.message || '無法刪除週期紀錄', duration: 5000 });
+    }
+  };
 
   const handleToggleEmailNotifications = async (next: boolean) => {
     const previous = emailNotificationsEnabled;
@@ -624,6 +688,96 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             className="w-5 h-5 mt-1 accent-pink-500"
           />
         </label>
+      </div>
+
+      {/* Cycle Tracking */}
+      <div className="bg-white rounded-2xl shadow-lg p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-4">週期追蹤</h3>
+        <label className="flex items-start justify-between gap-4 cursor-pointer">
+          <div className="flex-1">
+            <div className="text-sm font-medium text-gray-700">啟用週期追蹤</div>
+            <p className="text-xs text-gray-500 mt-1">
+              記錄月經週期，幫助掌握規律與適合備孕的時機。啟用後，記錄視窗會多一個「月經」選項，日曆會以紅／綠色點標示週期與備孕窗口。
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            data-testid="cycle-tracking-toggle"
+            checked={cycleTrackingEnabled}
+            disabled={isSavingCyclePref}
+            onChange={(e) => handleToggleCycleTracking(e.target.checked)}
+            className="w-5 h-5 mt-1 accent-red-500"
+          />
+        </label>
+
+        {cycleTrackingEnabled && (
+          <div className="mt-6 space-y-5" data-testid="cycle-stats-section">
+            {(() => {
+              const avg = averageCycleLength(cycleRecords);
+              const nextStart = predictNextPeriodStart(cycleRecords);
+              const ov = ovulationWindow(cycleRecords);
+              const lengths = computeCycleLengths(cycleRecords);
+              return (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="bg-petal-cream-2/40 rounded-md p-4 border border-petal-rule">
+                      <div className="text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1">平均週期</div>
+                      <div className="font-display italic font-light text-2xl text-petal-ink">
+                        {avg !== null ? `${avg.toFixed(1)} 天` : '尚需 2 筆以上'}
+                      </div>
+                    </div>
+                    <div className="bg-petal-rose-soft/30 rounded-md p-4 border border-petal-rose-soft">
+                      <div className="text-[11px] uppercase tracking-[0.12em] text-petal-rose-deep mb-1">下次預測</div>
+                      <div className="font-display italic font-light text-2xl text-petal-rose-deep">
+                        {nextStart ?? '—'}
+                      </div>
+                    </div>
+                    <div className="bg-emerald-50 rounded-md p-4 border border-emerald-200">
+                      <div className="text-[11px] uppercase tracking-[0.12em] text-emerald-700 mb-1">排卵日</div>
+                      <div className="font-display italic font-light text-2xl text-emerald-700">
+                        {ov?.ovulation ?? '—'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {lengths.length > 0 && (
+                    <p className="text-xs text-petal-muted">
+                      過去週期長度（天）：{lengths.join(' · ')}
+                    </p>
+                  )}
+
+                  <div>
+                    <div className="text-sm font-medium text-gray-700 mb-2">每一次的週期紀錄</div>
+                    {cycleRecords.length === 0 ? (
+                      <p className="text-xs text-petal-muted italic">尚無紀錄。打開「記錄」視窗，選「月經」即可新增。</p>
+                    ) : (
+                      <ul className="divide-y divide-petal-rule-soft border border-petal-rule rounded-md">
+                        {cycleRecords.map(r => (
+                          <li key={r.id} data-testid="cycle-record-row" className="flex items-center justify-between px-4 py-2.5">
+                            <div className="text-sm text-petal-ink">
+                              <span className="font-display italic">{r.startDate}</span>
+                              <span className="text-petal-muted ml-3">· {r.lengthDays} 天</span>
+                              {r.notes && <span className="text-petal-muted ml-3 text-xs">「{r.notes}」</span>}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCycleRecord(r.id)}
+                              data-testid="cycle-record-delete"
+                              className="text-petal-muted hover:text-red-500 transition-colors p-1"
+                              aria-label="刪除"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        )}
       </div>
 
       {/* Journey Milestones Management */}

@@ -13,6 +13,8 @@ import IntimacyRequestForm from './components/IntimacyRequestForm';
 import NotificationInbox from './components/NotificationInbox';
 import PairingInvitationHandler from './components/PairingInvitationHandler';
 import { apiService, getTokenExpiry, clearAuthStorage } from './services/api';
+import type { CycleRecord } from './services/api';
+import { averageCycleLength, predictNextPeriodStart, ovulationWindow, periodDateSet, fertileDateSet, predictedPeriodDateSet } from './utils/cycle';
 import { conflictPhraseTiers } from './data/conflictSteps';
 import { useScrollLock } from './hooks/useScrollLock';
 
@@ -122,6 +124,8 @@ interface User {
   email: string;
   nickname: string;
   gender?: 'male' | 'female' | 'other';
+  email_notifications_enabled?: boolean;
+  cycle_tracking_enabled?: boolean;
   partnerId?: string;
   partnerCode?: string;
   partnerNickname?: string;
@@ -389,6 +393,7 @@ const LoveTimeApp = () => {
   const [currentView, setCurrentView] = useState('record');
   const [pendingEventId, setPendingEventId] = useState<string | null>(null);
   const [intimateRecords, setIntimateRecords] = useState<IntimateRecord[]>([]);
+  const [cycleRecords, setCycleRecords] = useState<CycleRecord[]>([]);
   const [nicknames, setNicknames] = useState<Nicknames>({ partner1: '親愛的', partner2: '寶貝' });
 
   // Custom game content — user-added items that get merged into the default lists
@@ -981,6 +986,14 @@ const LoveTimeApp = () => {
         } catch (error) {
           console.error('Failed to load intimate records:', error);
           // Keep empty array if API fails
+        }
+
+        // Load cycle records (period tracking)
+        try {
+          const cycles = await apiService.getCycleRecords();
+          setCycleRecords(cycles);
+        } catch (error) {
+          console.error('Failed to load cycle records:', error);
         }
 
         // Load couple information to get partner details and journey fields
@@ -2023,6 +2036,14 @@ const LoveTimeApp = () => {
       return map;
     }, [intimateRecords]);
 
+    const [recordType, setRecordType] = useState<'intimacy' | 'period'>('intimacy');
+    const [periodLengthDays, setPeriodLengthDays] = useState<number>(5);
+
+    const cycleEnabled = !!authState.user?.cycle_tracking_enabled;
+    const periodDates = React.useMemo(() => cycleEnabled ? periodDateSet(cycleRecords) : undefined, [cycleEnabled, cycleRecords]);
+    const fertileDates = React.useMemo(() => cycleEnabled ? fertileDateSet(cycleRecords) : undefined, [cycleEnabled, cycleRecords]);
+    const predictedPeriodDates = React.useMemo(() => cycleEnabled ? predictedPeriodDateSet(cycleRecords) : undefined, [cycleEnabled, cycleRecords]);
+
     const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
       if (!file) return;
@@ -2046,6 +2067,26 @@ const LoveTimeApp = () => {
         showNotification({ type: 'error', title: '驗證錯誤', message: '請選擇日期', duration: 6000 });
         return;
       }
+
+      if (recordType === 'period') {
+        try {
+          const created = await apiService.createCycleRecord({
+            startDate: recordForm.date,
+            lengthDays: periodLengthDays,
+            notes: recordForm.notes || undefined,
+          });
+          setCycleRecords(prev => [created, ...prev]);
+          showNotification({ type: 'success', title: '已儲存', message: '週期紀錄已新增', duration: 3000 });
+        } catch (error: unknown) {
+          showNotification({ type: 'error', title: '建立失敗', message: (error as Error)?.message || '無法建立週期紀錄', duration: 5000 });
+          return;
+        }
+        setShowRecordModal(false);
+        setEditingRecord(null);
+        setRecordType('intimacy');
+        return;
+      }
+
       if (!recordForm.time) {
         showNotification({ type: 'error', title: '驗證錯誤', message: '請選擇時間', duration: 6000 });
         return;
@@ -2165,7 +2206,7 @@ const LoveTimeApp = () => {
                       — {editingRecord ? '編輯記錄' : '新的記錄'}
                     </div>
                     <h3 data-testid="record-modal-heading" className="font-display text-3xl font-light tracking-tight text-petal-ink">
-                      {editingRecord ? '編輯' : '記錄'}<em className="not-italic font-light italic text-pink-600">親密時光</em>
+                      {editingRecord ? '編輯' : '記錄'}<em className="not-italic font-light italic text-pink-600">{recordType === 'period' ? '月經' : '親密時光'}</em>
                     </h3>
                   </div>
                   <button
@@ -2178,10 +2219,31 @@ const LoveTimeApp = () => {
                 </div>
 
                 <div className="space-y-4">
+                  {/* Event type — only when cycle tracking is opted in and creating a new record */}
+                  {cycleEnabled && !editingRecord && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">事件類型</label>
+                      <div className="inline-flex rounded-md border border-petal-rule overflow-hidden" role="tablist">
+                        <button
+                          type="button"
+                          data-testid="record-type-intimacy"
+                          onClick={() => setRecordType('intimacy')}
+                          className={`px-4 py-2 text-sm font-display italic transition-colors ${recordType === 'intimacy' ? 'bg-petal-ink text-petal-cream' : 'bg-white text-petal-ink hover:bg-petal-cream-2'}`}
+                        >親密時光</button>
+                        <button
+                          type="button"
+                          data-testid="record-type-period"
+                          onClick={() => setRecordType('period')}
+                          className={`px-4 py-2 text-sm font-display italic transition-colors border-l border-petal-rule ${recordType === 'period' ? 'bg-red-500 text-white' : 'bg-white text-petal-ink hover:bg-petal-cream-2'}`}
+                        >月經</button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Basic Info */}
                   <div className="space-y-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">日期選擇</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">{recordType === 'period' ? '週期開始日' : '日期選擇'}</label>
                       <div className="space-y-3">
                         <input
                           type="date"
@@ -2195,17 +2257,39 @@ const LoveTimeApp = () => {
                         />
                       </div>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">時間</label>
-                      <input
-                        type="time"
-                        value={recordForm.time}
-                        onChange={(e) => setRecordForm({...recordForm, time: e.target.value})}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                      />
-                    </div>
+                    {recordType !== 'period' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">時間</label>
+                        <input
+                          type="time"
+                          value={recordForm.time}
+                          onChange={(e) => setRecordForm({...recordForm, time: e.target.value})}
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                        />
+                      </div>
+                    )}
+                    {recordType === 'period' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">月經天數</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={14}
+                          value={periodLengthDays}
+                          onChange={(e) => {
+                            const v = parseInt(e.target.value, 10);
+                            if (!Number.isNaN(v)) setPeriodLengthDays(Math.min(14, Math.max(1, v)));
+                          }}
+                          data-testid="record-period-length-input"
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                        />
+                        <p className="text-xs text-petal-muted mt-1">1–14 天，預設 5 天。</p>
+                      </div>
+                    )}
                   </div>
 
+                  {recordType !== 'period' && (
+                  <>
                   {/* Photo Upload */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2335,6 +2419,8 @@ const LoveTimeApp = () => {
                       ))}
                     </div>
                   </div>
+                  </>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">備註</label>
@@ -2384,6 +2470,9 @@ const LoveTimeApp = () => {
               title=""
               showMonthLabels={true}
               selectedDay={calendarSelectedDay}
+              periodDates={periodDates}
+              predictedPeriodDates={predictedPeriodDates}
+              fertileDates={fertileDates}
               onNavigate={(y, m) => setCalendarMonth(new Date(y, m, 1))}
               onDaySelect={(day) => {
                 if (recordsByDate.get(day)?.length) {
@@ -5431,6 +5520,8 @@ const LoveTimeApp = () => {
         setCustomMemoryQuestions={setCustomMemoryQuestions}
         customEmotions={customEmotions}
         setCustomEmotions={setCustomEmotions}
+        cycleRecords={cycleRecords}
+        onCycleRecordsChange={setCycleRecords}
       />;
       case 'intimacy-history': return (
         <IntimacyRequestsHistory
