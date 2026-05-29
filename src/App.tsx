@@ -2375,7 +2375,15 @@ const LoveTimeApp = () => {
           <MonthlyCalendarView
             recordsByDate={recordsByDate}
             calendarSelectedDay={calendarSelectedDay}
-            onDaySelect={(day) => setCalendarSelectedDay(calendarSelectedDay === day ? null : day)}
+            onDaySelect={(day) => {
+              if (recordsByDate.get(day)?.length) {
+                setCalendarSelectedDay(calendarSelectedDay === day ? null : day);
+              } else {
+                setEditingRecord(null);
+                setSelectedDate(day);
+                setShowRecordModal(true);
+              }
+            }}
           />
         </div>
 
