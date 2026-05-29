@@ -63,9 +63,6 @@ export function AchievementsView() {
   const [stats, setStats] = useState<IntimacyStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
-
   // Fetch all records for badge logic
   const [records, setRecords] = useState<IntimateRecord[]>([]);
   useEffect(() => {
@@ -183,42 +180,8 @@ export function AchievementsView() {
         </span>
       </div>
 
-      {/* Intimacy Stats Section */}
       {stats && (
         <div className="space-y-8 mb-10">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-            <div className="bg-white rounded-md p-5 border border-petal-rule">
-              <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1.5">總記錄</div>
-              <div className="font-display italic font-light text-3xl text-petal-ink">{stats.total_moments}</div>
-            </div>
-            <div className="bg-white rounded-md p-5 border border-petal-rule">
-              <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1.5">月平均</div>
-              <div className="font-display italic font-light text-3xl text-petal-ink">{(stats.average_per_month || 0).toFixed(1)}</div>
-            </div>
-            <div className="bg-petal-rose-soft/30 rounded-md p-5 border border-petal-rose-soft">
-              <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-rose-deep mb-1.5">本週次數</div>
-              <div className="font-display italic font-light text-3xl text-petal-rose-deep">{currentStats.thisWeek}</div>
-            </div>
-            <div className="bg-petal-sage/15 rounded-md p-5 border border-petal-sage/40">
-              <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-sage-deep mb-1.5">本月次數</div>
-              <div className="font-display italic font-light text-3xl text-petal-sage-deep">{currentStats.thisMonth}</div>
-            </div>
-          </div>
-
-          {/* Interactive Month Heatmap */}
-          <div className="bg-white rounded-md border border-petal-rule p-5 sm:p-6">
-            <CalendarHeatmap
-              data={records}
-              year={currentYear}
-              month={currentMonth}
-              title="月度記錄分佈"
-              showMonthLabels={true}
-              onNavigate={(year, month) => {
-                setCurrentYear(year);
-                setCurrentMonth(month);
-              }}
-            />
-          </div>
           {/* Badges */}
           <div>
             <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6">
@@ -434,9 +397,11 @@ interface CalendarHeatmapProps {
   title: string;
   showMonthLabels?: boolean;
   onNavigate?: (year: number, month: number) => void;
+  onDaySelect?: (dateStr: string) => void;
+  selectedDay?: string | null;
 }
 
-function CalendarHeatmap({ data, year, month, title, showMonthLabels = true, onNavigate }: CalendarHeatmapProps) {
+export function CalendarHeatmap({ data, year, month, title, showMonthLabels = true, onNavigate, onDaySelect, selectedDay }: CalendarHeatmapProps) {
   const now = new Date();
   const targetYear = year ?? now.getFullYear();
   const targetMonth = month ?? now.getMonth();
@@ -556,36 +521,35 @@ function CalendarHeatmap({ data, year, month, title, showMonthLabels = true, onN
 
       {/* Calendar grid */}
       <div className="grid grid-cols-7 gap-1 mb-4">
-        {calendarData.map((day, index) => (
-          <div
-            key={index}
-            className={`
-              aspect-square rounded-sm border transition-all duration-200 hover:scale-110 hover:z-10 relative group
-              ${day.isEmpty ? 'invisible' : getIntensityClass(day.count)}
-              ${!day.isEmpty && day.count > 0 ? 'cursor-pointer' : ''}
-            `}
-          >
-            {!day.isEmpty && day.date && (
-              <>
-                {/* Day number for mobile */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className={`text-xs font-medium ${
-                    day.count >= 3 ? 'text-white' : 'text-gray-600'
-                  }`}>
-                    {day.date.getDate()}
-                  </span>
-                </div>
-
-                {/* Tooltip */}
-                <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-20 whitespace-nowrap pointer-events-none">
-                  {day.date.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })}
-                  <br />
-                  {day.count} 次記錄
-                </div>
-              </>
-            )}
-          </div>
-        ))}
+        {calendarData.map((day, index) => {
+          if (day.isEmpty || !day.date) {
+            return <div key={index} className="aspect-square invisible" />;
+          }
+          const isSelected = selectedDay === day.dateStr;
+          return (
+            <button
+              key={index}
+              type="button"
+              onClick={() => onDaySelect?.(day.dateStr!)}
+              className={`
+                aspect-square rounded-sm border transition-all duration-200 hover:scale-110 hover:z-10 relative group cursor-pointer
+                ${getIntensityClass(day.count)}
+                ${isSelected ? 'ring-2 ring-petal-rose-deep ring-offset-1 z-10' : ''}
+              `}
+            >
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className={`text-xs font-medium ${day.count >= 3 ? 'text-white' : 'text-gray-600'}`}>
+                  {day.date.getDate()}
+                </span>
+              </div>
+              <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-20 whitespace-nowrap pointer-events-none">
+                {day.date.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })}
+                <br />
+                {day.count} 次記錄
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {/* Legend and stats */}
@@ -602,6 +566,52 @@ function CalendarHeatmap({ data, year, month, title, showMonthLabels = true, onN
           <span>較多</span>
         </div>
         <span>最高 {maxCount} 次</span>
+      </div>
+    </div>
+  );
+}
+
+export function IntimacyStatsCards({ records }: { records: IntimateRecord[] }) {
+  const derived = useMemo(() => {
+    if (!records || records.length === 0) {
+      return { total: 0, monthlyAvg: 0, thisWeek: 0, thisMonth: 0 };
+    }
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const thisWeek = records.filter(r => new Date(r.date) >= startOfWeek).length;
+    const thisMonth = records.filter(r => new Date(r.date) >= startOfMonth).length;
+
+    const earliest = records.reduce((min, r) => (r.date < min ? r.date : min), records[0].date);
+    const earliestDate = new Date(earliest);
+    const monthsSpan = Math.max(
+      1,
+      (now.getFullYear() - earliestDate.getFullYear()) * 12 + (now.getMonth() - earliestDate.getMonth()) + 1
+    );
+    const monthlyAvg = records.length / monthsSpan;
+
+    return { total: records.length, monthlyAvg, thisWeek, thisMonth };
+  }, [records]);
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+      <div className="bg-white rounded-md p-5 border border-petal-rule">
+        <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1.5">總記錄</div>
+        <div className="font-display italic font-light text-3xl text-petal-ink">{derived.total}</div>
+      </div>
+      <div className="bg-white rounded-md p-5 border border-petal-rule">
+        <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1.5">月平均</div>
+        <div className="font-display italic font-light text-3xl text-petal-ink">{derived.monthlyAvg.toFixed(1)}</div>
+      </div>
+      <div className="bg-petal-rose-soft/30 rounded-md p-5 border border-petal-rose-soft">
+        <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-rose-deep mb-1.5">本週次數</div>
+        <div className="font-display italic font-light text-3xl text-petal-rose-deep">{derived.thisWeek}</div>
+      </div>
+      <div className="bg-petal-sage/15 rounded-md p-5 border border-petal-sage/40">
+        <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-sage-deep mb-1.5">本月次數</div>
+        <div className="font-display italic font-light text-3xl text-petal-sage-deep">{derived.thisMonth}</div>
       </div>
     </div>
   );

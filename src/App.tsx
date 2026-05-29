@@ -5,7 +5,7 @@ import RoleplayView from './components/RoleplayView';
 import WallView from './components/WallView';
 import EventsView from './components/EventsView';
 import type { WallExample } from './components/WallPostComposer';
-import { AchievementsView } from './components/AchievementsView';
+import { AchievementsView, IntimacyStatsCards, CalendarHeatmap } from './components/AchievementsView';
 import Header from './components/Header';
 import { NotificationContainer } from './components/ErrorNotification';
 import IntimacyRequestsHistory from './components/IntimacyRequestsHistory';
@@ -524,6 +524,7 @@ const LoveTimeApp = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingRecord, setDeletingRecord] = useState<IntimateRecord | null>(null);
   const [calendarSelectedDay, setCalendarSelectedDay] = useState<string | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
 
   useScrollLock(showRecordModal);
   useScrollLock(showPairingPrompt);
@@ -2150,6 +2151,9 @@ const LoveTimeApp = () => {
           </div>
         </div>
 
+        {/* Intimacy Stats — 4 cards */}
+        <IntimacyStatsCards records={intimateRecords} />
+
         {/* Enhanced Record Modal */}
         {showRecordModal && (
           <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -2372,19 +2376,26 @@ const LoveTimeApp = () => {
               月度<em className="not-italic font-light italic text-pink-600">記錄分佈</em>
             </h3>
           </div>
-          <MonthlyCalendarView
-            recordsByDate={recordsByDate}
-            calendarSelectedDay={calendarSelectedDay}
-            onDaySelect={(day) => {
-              if (recordsByDate.get(day)?.length) {
-                setCalendarSelectedDay(calendarSelectedDay === day ? null : day);
-              } else {
-                setEditingRecord(null);
-                setSelectedDate(day);
-                setShowRecordModal(true);
-              }
-            }}
-          />
+          <div className="bg-white rounded-md border border-petal-rule p-5 sm:p-6">
+            <CalendarHeatmap
+              data={intimateRecords}
+              year={calendarMonth.getFullYear()}
+              month={calendarMonth.getMonth()}
+              title=""
+              showMonthLabels={true}
+              selectedDay={calendarSelectedDay}
+              onNavigate={(y, m) => setCalendarMonth(new Date(y, m, 1))}
+              onDaySelect={(day) => {
+                if (recordsByDate.get(day)?.length) {
+                  setCalendarSelectedDay(calendarSelectedDay === day ? null : day);
+                } else {
+                  setEditingRecord(null);
+                  setSelectedDate(day);
+                  setShowRecordModal(true);
+                }
+              }}
+            />
+          </div>
         </div>
 
         {/* Record List */}
@@ -2407,9 +2418,12 @@ const LoveTimeApp = () => {
               </button>
             </div>
           )}
-          <div className="max-h-[36rem] overflow-y-auto overflow-x-hidden">
+          <div className="max-h-[28rem] overflow-y-auto overflow-x-hidden">
             {(() => {
-              const filtered = intimateRecords.filter(r => calendarSelectedDay ? r.date === calendarSelectedDay : true).slice().reverse();
+              const filtered = intimateRecords
+                .filter(r => calendarSelectedDay ? r.date === calendarSelectedDay : true)
+                .slice()
+                .sort((a, b) => (b.date + 'T' + b.time).localeCompare(a.date + 'T' + a.time));
               return filtered.length > 0 ? filtered.map((record, idx) => (
                 <article
                   key={record.id}
@@ -5432,101 +5446,6 @@ const LoveTimeApp = () => {
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
-  const MonthlyCalendarView = ({ recordsByDate, calendarSelectedDay, onDaySelect }: {
-    recordsByDate: Map<string, IntimateRecord[]>;
-    calendarSelectedDay: string | null;
-    onDaySelect: (date: string) => void;
-  }) => {
-    const [currentMonth, setCurrentMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
-
-    const getDaysInMonth = (date: Date) => {
-      const year = date.getFullYear();
-      const month = date.getMonth();
-      const firstDay = new Date(year, month, 1);
-      const lastDay = new Date(year, month + 1, 0);
-      const daysInMonth = lastDay.getDate();
-      const startingDayOfWeek = firstDay.getDay();
-      const days: { date: Date; isCurrentMonth: boolean }[] = [];
-      for (let i = startingDayOfWeek - 1; i >= 0; i--) {
-        days.push({ date: new Date(year, month, -i), isCurrentMonth: false });
-      }
-      for (let day = 1; day <= daysInMonth; day++) {
-        days.push({ date: new Date(year, month, day), isCurrentMonth: true });
-      }
-      const remainingDays = 42 - days.length;
-      for (let day = 1; day <= remainingDays; day++) {
-        days.push({ date: new Date(year, month + 1, day), isCurrentMonth: false });
-      }
-      return days;
-    };
-
-    const formatDate = (date: Date) => date.toISOString().split('T')[0];
-    const isToday = (date: Date) => date.toDateString() === new Date().toDateString();
-    const days = getDaysInMonth(currentMonth);
-    const monthYear = currentMonth.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long' });
-
-    return (
-      <div className="bg-white rounded-md p-5 border border-petal-rule">
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))}
-            className="w-8 h-8 border border-petal-rule rounded-full text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors"
-          >
-            ‹
-          </button>
-          <h3 className="font-display italic font-light text-lg text-petal-ink">{monthYear}</h3>
-          <button
-            onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))}
-            className="w-8 h-8 border border-petal-rule rounded-full text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors"
-          >
-            ›
-          </button>
-        </div>
-        <div className="grid grid-cols-7 gap-1 mb-2">
-          {['日', '一', '二', '三', '四', '五', '六'].map(day => (
-            <div key={day} className="p-2 text-center font-body text-[10px] font-medium uppercase tracking-[0.14em] text-petal-muted">
-              {day}
-            </div>
-          ))}
-        </div>
-        <div className="grid grid-cols-7 gap-1">
-          {days.map((dayInfo, index) => {
-            const { date, isCurrentMonth } = dayInfo;
-            const dateStr = formatDate(date);
-            const records = recordsByDate.get(dateStr);
-            const hasRecords = records && records.length > 0;
-            const selected = dateStr === calendarSelectedDay;
-            const today = isToday(date);
-
-            return (
-              <button
-                key={index}
-                onClick={() => onDaySelect(dateStr)}
-                className={`
-                  relative p-2 pb-4 font-display text-sm rounded-lg hover:bg-petal-cream-2 transition-colors
-                  ${isCurrentMonth ? 'text-petal-ink' : 'text-petal-rule'}
-                  ${selected ? 'bg-petal-rose-deep text-petal-cream hover:bg-petal-rose-deep italic' : ''}
-                  ${today && !selected ? 'border border-petal-rose-deep text-petal-rose-deep' : ''}
-                `}
-              >
-                {date.getDate()}
-                {hasRecords && (
-                  <span className="absolute bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5">
-                    {Array.from({ length: Math.min(records.length, 3) }).map((_, i) => (
-                      <span
-                        key={i}
-                        className={`w-1.5 h-1.5 rounded-full ${selected ? 'bg-petal-cream' : 'bg-petal-rose-deep'}`}
-                      />
-                    ))}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
 
   // Calendar component for date picking
   const CalendarDatePicker = ({ selectedDate, onDateSelect }: { selectedDate: string, onDateSelect: (date: string) => void }) => {
