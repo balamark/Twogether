@@ -530,6 +530,12 @@ const LoveTimeApp = () => {
   useScrollLock(showRecordDetail && !!selectedRecord);
   useScrollLock(showDeleteConfirm && !!deletingRecord);
 
+  const [showTagline, setShowTagline] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setShowTagline(false), 10000);
+    return () => clearTimeout(timer);
+  }, []);
+
   // File input refs
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -5761,7 +5767,11 @@ const LoveTimeApp = () => {
 
       <div className="container mx-auto px-4 py-10">
         {/* Tagline */}
-        <div className="text-center mb-10">
+        <div
+          className={`text-center overflow-hidden transition-all duration-700 ease-in-out ${
+            showTagline ? 'max-h-12 opacity-100 mb-10' : 'max-h-0 opacity-0 mb-0'
+          }`}
+        >
           <p className="font-display italic font-light text-base text-petal-muted">
             為熱戀中的你們 — <span className="text-petal-ink">記錄每一段親密時光</span>
           </p>
