@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil, X } from 'lucide-react';
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -40,6 +40,8 @@ interface RoleplayViewProps {
   showNotification: (notification: Omit<Notification, 'id'>) => void;
   favoriteScriptIds: Set<string>;
   onToggleFavorite: (scriptId: string) => void;
+  initialScriptTitle?: string | null;
+  onInitialScriptConsumed?: () => void;
 }
 
 const CATEGORY_META: Record<RoleplayScript['category'], { label: string; emoji: string; tint: string }> = {
@@ -80,6 +82,8 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   showNotification,
   favoriteScriptIds,
   onToggleFavorite,
+  initialScriptTitle,
+  onInitialScriptConsumed,
 }) => {
   const [selectedScript, setSelectedScript] = useState<RoleplayScript | null>(null);
   const [showScriptModal, setShowScriptModal] = useState(false);
@@ -96,6 +100,24 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     setHasBegun(false);
     setShowScriptModal(true);
   }, [parseScriptContent]);
+
+  useEffect(() => {
+    if (!initialScriptTitle) return;
+    const match = [...defaultRoleplayScripts, ...customScripts].find(
+      (s) => s.title === initialScriptTitle
+    );
+    if (match) {
+      handleViewScript(match);
+    } else {
+      showNotification({
+        type: 'warning',
+        title: '找不到劇本',
+        message: `「${initialScriptTitle}」可能已被刪除或重新命名`,
+        duration: 4000,
+      });
+    }
+    onInitialScriptConsumed?.();
+  }, [initialScriptTitle, defaultRoleplayScripts, customScripts, handleViewScript, showNotification, onInitialScriptConsumed]);
 
   const recordRoleplay = useCallback((script: RoleplayScript) => {
     const time = new Date().toLocaleTimeString('zh-TW', {

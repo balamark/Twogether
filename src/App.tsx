@@ -393,6 +393,7 @@ interface PositionSuggestion {
 const LoveTimeApp = () => {
   const [currentView, setCurrentView] = useState('record');
   const [pendingEventId, setPendingEventId] = useState<string | null>(null);
+  const [pendingScriptTitle, setPendingScriptTitle] = useState<string | null>(null);
   const [intimateRecords, setIntimateRecords] = useState<IntimateRecord[]>([]);
   const [cycleRecords, setCycleRecords] = useState<CycleRecord[]>([]);
   const [nicknames, setNicknames] = useState<Nicknames>({ partner1: '親愛的', partner2: '寶貝' });
@@ -529,13 +530,15 @@ const LoveTimeApp = () => {
   const [editingRecord, setEditingRecord] = useState<IntimateRecord | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingRecord, setDeletingRecord] = useState<IntimateRecord | null>(null);
-  const [calendarSelectedDay, setCalendarSelectedDay] = useState<string | null>(null);
   const [calendarMonth, setCalendarMonth] = useState<Date>(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [dayPickerDate, setDayPickerDate] = useState<string | null>(null);
+  const [dayPickerRecords, setDayPickerRecords] = useState<IntimateRecord[]>([]);
 
   useScrollLock(showRecordModal);
   useScrollLock(showPairingPrompt);
   useScrollLock(showRecordDetail && !!selectedRecord);
   useScrollLock(showDeleteConfirm && !!deletingRecord);
+  useScrollLock(!!dayPickerDate);
 
   const [showTagline, setShowTagline] = useState(true);
   useEffect(() => {
@@ -2416,18 +2419,26 @@ const LoveTimeApp = () => {
               month={calendarMonth.getMonth()}
               title=""
               showMonthLabels={true}
-              selectedDay={calendarSelectedDay}
               periodDates={periodDates}
               predictedPeriodDates={predictedPeriodDates}
               fertileDates={fertileDates}
               onNavigate={(y, m) => setCalendarMonth(new Date(y, m, 1))}
               onDaySelect={(day) => {
-                if (recordsByDate.get(day)?.length) {
-                  setCalendarSelectedDay(calendarSelectedDay === day ? null : day);
-                } else {
+                const dayRecords = recordsByDate.get(day) || [];
+                if (dayRecords.length === 0) {
                   setEditingRecord(null);
                   setSelectedDate(day);
                   setShowRecordModal(true);
+                } else if (dayRecords.length === 1) {
+                  setSelectedRecord(dayRecords[0]);
+                  setShowRecordDetail(true);
+                } else {
+                  setDayPickerDate(day);
+                  setDayPickerRecords(
+                    dayRecords.slice().sort((a, b) =>
+                      (b.date + 'T' + b.time).localeCompare(a.date + 'T' + a.time)
+                    )
+                  );
                 }
               }}
             />
@@ -2444,20 +2455,9 @@ const LoveTimeApp = () => {
               共 <b className="not-italic font-normal text-petal-ink">{intimateRecords.length}</b> 次
             </span>
           </div>
-          {calendarSelectedDay && (
-            <div className="flex items-center gap-2 mb-4">
-              <span className="px-3 py-1 bg-petal-rose-soft/30 text-petal-rose-deep rounded-full text-sm font-display italic">
-                {calendarSelectedDay}
-              </span>
-              <button onClick={() => setCalendarSelectedDay(null)} className="text-petal-muted hover:text-petal-ink transition-colors">
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          )}
           <div className="max-h-[28rem] overflow-y-auto overflow-x-hidden">
             {(() => {
               const filtered = intimateRecords
-                .filter(r => calendarSelectedDay ? r.date === calendarSelectedDay : true)
                 .slice()
                 .sort((a, b) => (b.date + 'T' + b.time).localeCompare(a.date + 'T' + a.time));
               return filtered.length > 0 ? filtered.map((record, idx) => (
@@ -2525,7 +2525,7 @@ const LoveTimeApp = () => {
               )) : (
                 <div className="border border-dashed border-petal-rule rounded-md py-10 px-6 text-center">
                   <p className="font-display italic font-light text-base text-petal-muted">
-                    {calendarSelectedDay ? '這天還沒有記錄' : '還沒有記錄 — 開始你們的愛情之旅吧'}
+                    還沒有記錄 — 開始你們的愛情之旅吧
                   </p>
                 </div>
               );
@@ -5445,6 +5445,8 @@ const LoveTimeApp = () => {
         showNotification={showNotification}
         favoriteScriptIds={favoriteScriptIds}
         onToggleFavorite={toggleFavoriteScript}
+        initialScriptTitle={pendingScriptTitle}
+        onInitialScriptConsumed={() => setPendingScriptTitle(null)}
       />;
       case 'journey': return <OurJourneyView />;
       case 'wall': return <WallView
@@ -5803,6 +5805,58 @@ const LoveTimeApp = () => {
         }}
       />
 
+      {/* Day Picker Modal — shown when a calendar day has 2+ records */}
+      {dayPickerDate && (
+        <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-petal-cream rounded-md shadow-petal max-w-md w-full max-h-[80vh] overflow-y-auto overscroll-contain border border-petal-rule">
+            <div className="p-5 sm:p-6">
+              <div className="flex justify-between items-end mb-5 pb-4 border-b border-petal-rule">
+                <div>
+                  <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-1">
+                    — {dayPickerDate}
+                  </div>
+                  <h3 className="font-display text-2xl font-light tracking-tight text-petal-ink">
+                    這天的<em className="not-italic font-light italic text-pink-600">記錄</em>
+                  </h3>
+                </div>
+                <button
+                  onClick={() => { setDayPickerDate(null); setDayPickerRecords([]); }}
+                  className="text-petal-muted hover:text-petal-ink text-2xl font-light transition-colors leading-none"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="space-y-1">
+                {dayPickerRecords.map((record) => (
+                  <button
+                    key={record.id}
+                    type="button"
+                    onClick={() => {
+                      setDayPickerDate(null);
+                      setDayPickerRecords([]);
+                      showRecordDetails(record.id);
+                    }}
+                    className="w-full text-left grid grid-cols-[36px_1fr] gap-3 py-3 px-2 -mx-2 rounded-md hover:bg-petal-cream-2/40 transition-colors"
+                  >
+                    <div className="text-2xl opacity-80 saturate-75 leading-none">{record.mood}</div>
+                    <div className="min-w-0">
+                      <div className="font-display italic font-light text-sm text-petal-muted mb-0.5">
+                        {record.time}
+                      </div>
+                      {record.description && (
+                        <p className="font-body text-[14px] leading-relaxed text-petal-ink truncate">
+                          {record.description}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Record Detail Modal */}
       {showRecordDetail && selectedRecord && (
         <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -5846,9 +5900,6 @@ const LoveTimeApp = () => {
                     <div className="font-display text-xl font-medium text-petal-ink">
                       {selectedRecord.date} {selectedRecord.time}
                     </div>
-                    <div className="font-body text-sm text-petal-muted">
-                      {new Date(selectedRecord.timestamp).toLocaleString('zh-TW')}
-                    </div>
                   </div>
                 </div>
 
@@ -5865,7 +5916,7 @@ const LoveTimeApp = () => {
                 {selectedRecord.description && (
                   <div>
                     <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">描述</h4>
-                    <p className="font-body text-[15px] text-petal-ink bg-white p-3 rounded-md border border-petal-rule">
+                    <p className="font-body text-[15px] leading-relaxed text-petal-ink">
                       {selectedRecord.description}
                     </p>
                   </div>
@@ -5885,12 +5936,21 @@ const LoveTimeApp = () => {
                     </div>
                   )}
                   {selectedRecord.roleplayScript && (
-                    <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const title = selectedRecord.roleplayScript!;
+                        setShowRecordDetail(false);
+                        setPendingScriptTitle(title);
+                        setCurrentView('roleplay');
+                      }}
+                      className="flex items-center space-x-2 text-left cursor-pointer group focus:outline-none focus-visible:ring-2 focus-visible:ring-petal-sage-deep/40 rounded-sm -mx-1 px-1"
+                    >
                       <Play className="w-5 h-5 text-petal-sage-deep" />
-                      <span className="font-body text-sm text-petal-ink">劇本: {selectedRecord.roleplayScript}</span>
-                    </div>
+                      <span className="font-body text-sm text-petal-ink group-hover:text-petal-sage-deep group-hover:underline underline-offset-2 transition-colors">劇本: {selectedRecord.roleplayScript}</span>
+                    </button>
                   )}
-                  {selectedRecord.coinsEarned && (
+                  {!!selectedRecord.coinsEarned && (
                     <div className="flex items-center space-x-2">
                       <Coins className="w-5 h-5 text-yellow-500" />
                       <span className="font-body text-sm text-petal-ink">獲得金幣: {selectedRecord.coinsEarned}</span>
