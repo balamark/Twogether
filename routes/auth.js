@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { generateToken, authenticateToken } = require('../middleware/auth');
 const { logInfo, logError } = require('../lib/logger');
+const { TIMEZONE_VALUES } = require('../lib/timezone-options');
 
 const router = express.Router();
 
@@ -114,7 +115,7 @@ router.post('/login', [
 
     // Find user
     const userResult = await db.query(
-      'SELECT id, nickname, email, gender, birth_date, password_hash, created_at FROM users WHERE email = $1',
+      'SELECT id, nickname, email, gender, birth_date, timezone, password_hash, created_at FROM users WHERE email = $1',
       [email]
     );
 
@@ -158,6 +159,7 @@ router.post('/login', [
         email: user.email,
         gender: user.gender,
         birth_date: user.birth_date,
+        timezone: user.timezone,
         created_at: user.created_at
       }
     });
@@ -177,10 +179,11 @@ router.get('/me', authenticateToken, async (req, res) => {
     // Get user with couple information
     const userResult = await db.query(`
       SELECT
-        u.id, u.nickname, u.email, u.gender, u.birth_date, u.email_notifications_enabled,
+        u.id, u.nickname, u.email, u.gender, u.birth_date, u.timezone,
+        u.email_notifications_enabled,
         u.cycle_tracking_enabled,
         u.created_at, u.last_login,
-        c.id as couple_id, c.couple_name, c.anniversary_date,
+        c.id as couple_id, c.couple_name, c.anniversary_date, c.primary_timezone,
         c.user1_id, c.user2_id
       FROM users u
       LEFT JOIN couples c ON (c.user1_id = u.id OR c.user2_id = u.id)
@@ -202,7 +205,7 @@ router.get('/me', authenticateToken, async (req, res) => {
       const partnerId = userData.user1_id === req.user.id ? userData.user2_id : userData.user1_id;
       if (partnerId) {
         const partnerResult = await db.query(
-          'SELECT id, nickname, email FROM users WHERE id = $1',
+          'SELECT id, nickname, email, timezone FROM users WHERE id = $1',
           [partnerId]
         );
         if (partnerResult.rows.length > 0) {
@@ -219,6 +222,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         email: userData.email,
         gender: userData.gender,
         birth_date: userData.birth_date,
+        timezone: userData.timezone,
         email_notifications_enabled: userData.email_notifications_enabled !== false,
         cycle_tracking_enabled: userData.cycle_tracking_enabled === true,
         created_at: userData.created_at,
@@ -227,6 +231,7 @@ router.get('/me', authenticateToken, async (req, res) => {
           id: userData.couple_id,
           couple_name: userData.couple_name,
           anniversary_date: userData.anniversary_date,
+          primary_timezone: userData.primary_timezone,
           partner: partner
         } : null
       }
@@ -407,6 +412,48 @@ router.put('/user/birth-date', authenticateToken, [
     res.status(500).json({
       success: false,
       message: '更新生日失敗'
+    });
+  }
+});
+
+// Update user timezone (IANA string from the curated allow-list).
+router.put('/user/timezone', authenticateToken, [
+  body('timezone')
+    .custom((value) => {
+      if (value === null) return true;
+      if (typeof value !== 'string') throw new Error('timezone 必須為字串或 null');
+      if (!TIMEZONE_VALUES.includes(value)) throw new Error('timezone 不在允許清單中');
+      return true;
+    })
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: '驗證失敗',
+        errors: errors.array()
+      });
+    }
+
+    const userId = req.user.id;
+    const timezone = req.body.timezone === null ? null : req.body.timezone;
+
+    await db.query(
+      `UPDATE users SET timezone = $1 WHERE id = $2`,
+      [timezone, userId]
+    );
+
+    res.json({
+      success: true,
+      message: '時區已更新',
+      timezone: timezone
+    });
+  } catch (error) {
+    logError('Update user timezone failed', { err: error.message, stack: error.stack });
+    res.status(500).json({
+      success: false,
+      message: '更新時區失敗'
     });
   }
 });

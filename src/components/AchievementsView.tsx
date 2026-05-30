@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import apiService from '../services/api';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { formatDate } from '../utils/datetime';
 
 interface IntimateRecord {
   id: number;
@@ -65,6 +67,7 @@ export function AchievementsView() {
   const [error, setError] = useState<string | null>(null);
   // Fetch all records for badge logic
   const [records, setRecords] = useState<IntimateRecord[]>([]);
+  const tz = useTimezone();
   useEffect(() => {
     (async () => {
       try {
@@ -248,7 +251,7 @@ export function AchievementsView() {
                     </div>
                     {achievement.unlocked_at && (
                       <p className="text-xs text-green-600">
-                        解鎖於 {new Date(achievement.unlocked_at).toLocaleDateString('zh-TW')}
+                        解鎖於 {formatDate(achievement.unlocked_at, tz, { year: 'numeric', month: 'numeric', day: 'numeric', withWeekday: false })}
                       </p>
                     )}
                   </div>

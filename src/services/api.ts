@@ -74,6 +74,9 @@ interface CoupleResponse {
   firstIntimacyPlace?: string;
   user1Nickname: string;
   user2Nickname?: string;
+  user1Timezone?: string;
+  user2Timezone?: string;
+  primaryTimezone?: string;
   createdAt: string;
   pairingCode?: string;
   user1Id?: string;
@@ -1207,8 +1210,11 @@ class ApiService {
       first_intimacy_place?: string;
       user1_id?: string;
       user1_nickname?: string;
+      user1_timezone?: string;
       user2_id?: string;
       user2_nickname?: string;
+      user2_timezone?: string;
+      primary_timezone?: string;
       created_at?: string;
       pairing_code?: string;
       pending_conflicts?: Record<string, { inviter: string; accepter: string }>;
@@ -1222,8 +1228,11 @@ class ApiService {
       firstDate: typedData?.first_date,
       user1Id: typedData?.user1_id,
       user1Nickname: typedData?.user1_nickname || '',
+      user1Timezone: typedData?.user1_timezone,
       user2Id: typedData?.user2_id,
       user2Nickname: typedData?.user2_nickname,
+      user2Timezone: typedData?.user2_timezone,
+      primaryTimezone: typedData?.primary_timezone,
       firstKissDate: typedData?.first_kiss_date,
       firstKissPlace: typedData?.first_kiss_place,
       firstIntimacyDate: typedData?.first_intimacy_date,
@@ -1288,6 +1297,24 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to update user birth date:', error);
       throw new Error((error as ApiErrorResponse)?.message || '更新生日失敗');
+    }
+  }
+
+  async updateUserTimezone(timezone: string | null): Promise<void> {
+    try {
+      await apiClient.put('/auth/user/timezone', { timezone });
+    } catch (error: unknown) {
+      console.error('Failed to update user timezone:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '更新時區失敗');
+    }
+  }
+
+  async updateCouplePrimaryTimezone(timezone: string | null): Promise<void> {
+    try {
+      await apiClient.put('/couples/primary-timezone', { primary_timezone: timezone });
+    } catch (error: unknown) {
+      console.error('Failed to update couple primary timezone:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '更新共用時區失敗');
     }
   }
 

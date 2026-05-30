@@ -3,6 +3,8 @@ import { Bell, X } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { Notification } from '../services/api';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { formatRelativeOrDate } from '../utils/datetime';
 
 interface NotificationInboxProps {
   isOpen: boolean;
@@ -22,6 +24,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const tz = useTimezone();
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -78,20 +81,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
     onClose();
   };
 
-  const formatTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-    if (diffMins < 1) return '剛剛';
-    if (diffMins < 60) return `${diffMins}分鐘前`;
-    if (diffHours < 24) return `${diffHours}小時前`;
-    if (diffDays < 7) return `${diffDays}天前`;
-    return date.toLocaleDateString('zh-TW');
-  };
+  const formatTimeAgo = (dateString: string) => formatRelativeOrDate(dateString, tz);
 
   useScrollLock(isOpen);
 

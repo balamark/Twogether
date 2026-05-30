@@ -1,7 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Calendar, Inbox, Send } from 'lucide-react';
 import apiService from '../services/api';
 import type { IntimacyRequest, IntimacyRequestStats, IntimacyRequestNudge } from '../services/api';
 import IntimacyRequestActionPanel from './IntimacyRequestActionPanel';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { formatDateTime } from '../utils/datetime';
 
 interface User {
   id: string;
@@ -23,8 +26,9 @@ interface IntimacyRequestsHistoryProps {
 }
 
 type FeedbackState = { type: 'success' | 'error'; message: string };
+type Tab = 'received' | 'sent';
 
-export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = ({ authState, partnerNickname: partnerNicknameOverride }) => {
+export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = ({ authState }) => {
   const [items, setItems] = useState<IntimacyRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,9 +36,11 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
   const [nudge, setNudge] = useState<IntimacyRequestNudge | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailFeedback, setEmailFeedback] = useState<FeedbackState | null>(null);
+  const [tab, setTab] = useState<Tab>('received');
+  const [tabInitialized, setTabInitialized] = useState(false);
   const me = authState.user?.nickname || '';
   const meId = authState.user?.id || '';
-  const partnerNickname = partnerNicknameOverride || authState.user?.partnerNickname || '';
+  const tz = useTimezone();
 
   const fetchAll = useCallback(async () => {
     try {
@@ -71,26 +77,30 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
     const s: IntimacyRequest[] = [];
     const r: IntimacyRequest[] = [];
     items.forEach((it) => {
-      // Use direction field from backend if available, fallback to nickname comparison
       if (it.direction === 'sent') {
         s.push(it);
       } else if (it.direction === 'received') {
         r.push(it);
-      } else {
-        // Fallback: categorize by id or nickname if direction is not available
-        if (it.senderId && it.senderId === meId) {
-          s.push(it);
-        } else if (it.receiverId && it.receiverId === meId) {
-          r.push(it);
-        } else if (it.senderNickname === me) {
-          s.push(it);
-        } else if (it.receiverNickname === me) {
-          r.push(it);
-        }
+      } else if (it.senderId && it.senderId === meId) {
+        s.push(it);
+      } else if (it.receiverId && it.receiverId === meId) {
+        r.push(it);
+      } else if (it.senderNickname === me) {
+        s.push(it);
+      } else if (it.receiverNickname === me) {
+        r.push(it);
       }
     });
     return { sent: s, received: r };
   }, [items, me, meId]);
+
+  // Smart default: open on 我收到的 when there's something actionable; otherwise 我發送的.
+  useEffect(() => {
+    if (tabInitialized || loading || items.length === 0) return;
+    const hasPendingReceived = received.some((r) => r.status === 'pending');
+    setTab(hasPendingReceived ? 'received' : sent.length > 0 ? 'sent' : 'received');
+    setTabInitialized(true);
+  }, [tabInitialized, loading, items.length, received, sent]);
 
   const handleSendNudgeEmail = useCallback(async () => {
     if (!nudge?.message) {
@@ -118,6 +128,9 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
       <div className="text-center py-10 text-gray-500">請先登入以查看歷史親密邀請</div>
     );
   }
+
+  const activeItems = tab === 'received' ? received : sent;
+  const activeEmptyText = tab === 'received' ? '尚無收到紀錄' : '尚無發送紀錄';
 
   return (
     <div className="space-y-10">
@@ -151,33 +164,61 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
             sendingEmail={sendingEmail}
             feedback={emailFeedback}
           />
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">我發送的</h3>
-              <RequestList
-                items={sent}
-                emptyText="尚無發送紀錄"
-                meId={meId}
-                partnerNickname={partnerNickname}
+          <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
+            <nav className="flex flex-wrap gap-2 mb-5 border-b border-petal-rule pb-3" role="tablist" aria-label="親密邀請紀錄">
+              <TabButton
+                active={tab === 'received'}
+                onClick={() => setTab('received')}
+                icon={Inbox}
+                label="我收到的"
+                count={received.length}
               />
-            </div>
-            <div className="bg-white rounded-2xl shadow-lg p-6">
-              <h3 className="text-lg font-bold text-gray-800 mb-4">我收到的</h3>
-              <RequestList
-                items={received}
-                emptyText="尚無收到紀錄"
-                meId={meId}
-                partnerNickname={partnerNickname}
-                showActionsForPending
-                onResponded={fetchAll}
+              <TabButton
+                active={tab === 'sent'}
+                onClick={() => setTab('sent')}
+                icon={Send}
+                label="我發送的"
+                count={sent.length}
               />
-            </div>
+            </nav>
+
+            <RequestList
+              items={activeItems}
+              emptyText={activeEmptyText}
+              tz={tz}
+              showActionsForPending={tab === 'received'}
+              onResponded={tab === 'received' ? fetchAll : undefined}
+            />
           </div>
         </>
       )}
     </div>
   );
 };
+
+interface TabButtonProps {
+  active: boolean;
+  onClick: () => void;
+  icon: typeof Inbox;
+  label: string;
+  count: number;
+}
+
+function TabButton({ active, onClick, icon: Icon, label, count }: TabButtonProps) {
+  const base = 'flex items-center gap-2 px-4 py-2 rounded-full text-sm transition-colors border';
+  const cls = active
+    ? 'bg-petal-ink text-petal-cream border-petal-ink'
+    : 'bg-transparent text-petal-ink border-petal-rule hover:bg-petal-sage/20';
+  return (
+    <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`${base} ${cls}`}>
+      <Icon className="w-4 h-4" />
+      <span>{label}</span>
+      <span className={`text-xs px-1.5 rounded-full ${active ? 'bg-petal-cream/20 text-petal-cream' : 'bg-petal-cream-2 text-petal-muted'}`}>
+        {count}
+      </span>
+    </button>
+  );
+}
 
 function StatsOverview({
   stats,
@@ -351,58 +392,22 @@ function buildInvitationInsights(stats: IntimacyRequestStats): string[] {
   return insights.slice(0, 4);
 }
 
-function RequestList({
-  items,
-  emptyText,
-  meId,
-  partnerNickname,
-  showActionsForPending = false,
-  onResponded,
-}: {
-  items: IntimacyRequest[];
-  emptyText: string;
-  meId: string;
-  partnerNickname?: string;
-  showActionsForPending?: boolean;
-  onResponded?: () => void;
-}) {
-  if (items.length === 0) {
-    return <div className="text-gray-500 text-sm">{emptyText}</div>;
+function statusAccent(status: string): string {
+  switch (status) {
+    case 'accepted': return 'bg-petal-sage-deep';
+    case 'pending': return 'bg-amber-400';
+    case 'rejected': return 'bg-petal-rose-deep';
+    default: return 'bg-gray-300'; // expired or unknown
   }
+}
 
-  return (
-    <ul className="divide-y divide-gray-100">
-      {items.map((it) => {
-        const { senderLabel, receiverLabel } = resolveRequestLabels({
-          item: it,
-          meId,
-          partnerNickname,
-        });
-        const showActions = showActionsForPending && it.status === 'pending';
-        return (
-          <li key={it.id} className="py-3">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="text-sm text-gray-600">
-                  <span className="font-medium text-gray-800">{senderLabel}</span>
-                  <span className="mx-1">→</span>
-                  <span className="font-medium text-gray-800">{receiverLabel}</span>
-                </div>
-                <div className="text-gray-700 text-sm mt-1">{it.messageContent}</div>
-                <div className="text-xs text-gray-400 mt-1">{new Date(it.createdAt).toLocaleString('zh-TW')}</div>
-              </div>
-              <span className={`text-xs px-2 py-1 rounded-full ${
-                it.status === 'accepted' ? 'bg-green-100 text-green-700' : it.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
-              }`}>{translateStatus(it.status)}</span>
-            </div>
-            {showActions && onResponded && (
-              <IntimacyRequestActionPanel request={it} onResponded={onResponded} />
-            )}
-          </li>
-        );
-      })}
-    </ul>
-  );
+function statusBadgeClass(status: string): string {
+  switch (status) {
+    case 'accepted': return 'bg-green-100 text-green-700';
+    case 'pending': return 'bg-yellow-100 text-yellow-700';
+    case 'rejected': return 'bg-red-100 text-red-700';
+    default: return 'bg-gray-100 text-gray-600';
+  }
 }
 
 function translateStatus(status: string): string {
@@ -412,49 +417,64 @@ function translateStatus(status: string): string {
   return '待回應';
 }
 
-function resolveRequestLabels({
-  item,
-  meId,
-  partnerNickname,
+function RequestList({
+  items,
+  emptyText,
+  tz,
+  showActionsForPending = false,
+  onResponded,
 }: {
-  item: IntimacyRequest;
-  meId: string;
-  partnerNickname?: string;
+  items: IntimacyRequest[];
+  emptyText: string;
+  tz: string;
+  showActionsForPending?: boolean;
+  onResponded?: () => void;
 }) {
-  const fallbackPartner = partnerNickname || '伴侶';
-
-  if (item.direction === 'sent') {
-    return {
-      senderLabel: '你',
-      receiverLabel: partnerNickname || item.receiverNickname || fallbackPartner,
-    };
+  if (items.length === 0) {
+    return <div className="text-gray-500 text-sm py-6 text-center font-display italic">{emptyText}</div>;
   }
 
-  if (item.direction === 'received') {
-    return {
-      senderLabel: partnerNickname || item.senderNickname || fallbackPartner,
-      receiverLabel: '你',
-    };
-  }
-
-  if (item.senderId && item.senderId === meId) {
-    return {
-      senderLabel: '你',
-      receiverLabel: partnerNickname || item.receiverNickname || fallbackPartner,
-    };
-  }
-
-  if (item.receiverId && item.receiverId === meId) {
-    return {
-      senderLabel: partnerNickname || item.senderNickname || fallbackPartner,
-      receiverLabel: '你',
-    };
-  }
-
-  return {
-    senderLabel: item.senderNickname || fallbackPartner,
-    receiverLabel: item.receiverNickname || fallbackPartner,
-  };
+  return (
+    <ul className="space-y-3" role="tabpanel">
+      {items.map((it) => {
+        const showActions = showActionsForPending && it.status === 'pending';
+        return (
+          <li
+            key={it.id}
+            className="flex rounded-xl border border-petal-rule-soft bg-petal-cream-2/30 overflow-hidden"
+          >
+            <div className={`w-1 flex-shrink-0 ${statusAccent(it.status)}`} aria-hidden="true" />
+            <div className="flex-1 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  {it.scheduledTime && (
+                    <div className="inline-flex items-center gap-1.5 text-sm text-petal-ink-soft mb-2">
+                      <Calendar className="w-4 h-4" />
+                      <span>預約 {formatDateTime(it.scheduledTime, tz, { alwaysShowTz: true })}</span>
+                    </div>
+                  )}
+                  <div className="text-petal-ink text-sm leading-relaxed break-words">{it.messageContent}</div>
+                  <div className="text-xs text-petal-muted mt-2">
+                    發送於 {formatDateTime(it.createdAt, tz)}
+                  </div>
+                </div>
+                <span
+                  className={`text-xs whitespace-nowrap flex-shrink-0 min-w-[4.5rem] inline-flex items-center justify-center text-center px-2 py-1 rounded-full ${statusBadgeClass(it.status)}`}
+                >
+                  {translateStatus(it.status)}
+                </span>
+              </div>
+              {showActions && onResponded && (
+                <div className="mt-3 pt-3 border-t border-petal-rule-soft">
+                  <IntimacyRequestActionPanel request={it} onResponded={onResponded} />
+                </div>
+              )}
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
 export default IntimacyRequestsHistory;

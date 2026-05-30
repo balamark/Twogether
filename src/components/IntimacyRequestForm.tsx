@@ -3,6 +3,9 @@ import { Heart, Clock, Send, Sparkles, X } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { IntimacyTemplate } from '../services/api';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { formatDateTime, localInputToIsoInTz } from '../utils/datetime';
+import { getTimezoneShortLabel } from '../utils/timezone-options';
 
 interface IntimacyRequestFormProps {
   isOpen: boolean;
@@ -24,6 +27,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
   const [templates, setTemplates] = useState<IntimacyTemplate[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const tz = useTimezone();
 
   const categories = [
     { id: 'compliment', name: '甜蜜讚美', emoji: '💕', description: '發送溫馨的讚美和愛意給伴侶' },
@@ -87,7 +91,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
         requestType: selectedCategory === 'compliment' ? 'compliment' : selectedCategory === 'reconciliation' ? 'reconciliation' : requestType,
         roleplayCategory: selectedCategory !== 'custom' && selectedCategory !== 'compliment' && selectedCategory !== 'reconciliation' ? selectedCategory : undefined,
         scheduledTime: requestType === 'scheduled' && scheduledTime ?
-          new Date(scheduledTime).toISOString() : undefined,
+          localInputToIsoInTz(scheduledTime, tz) : undefined,
       });
 
       onSuccess();
@@ -361,7 +365,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                 {requestType === 'scheduled' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      預約時間
+                      預約時間（以 {getTimezoneShortLabel(tz)} 顯示）
                     </label>
                     <input
                       type="datetime-local"
@@ -369,6 +373,9 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                       onChange={(e) => setScheduledTime(e.target.value)}
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                     />
+                    <p className="mt-1 text-xs text-gray-500">
+                      💡 雙方都會看到此時間以共用時區（{getTimezoneShortLabel(tz)}）為準，可在設定中調整。
+                    </p>
                   </div>
                 )}
 
@@ -431,7 +438,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                     {requestType === 'scheduled' && scheduledTime && (
                       <div className="mt-3 flex items-center space-x-2 text-sm text-gray-600">
                         <Clock className="w-4 h-4" />
-                        <span>預約時間：{new Date(scheduledTime).toLocaleString('zh-TW')}</span>
+                        <span>預約時間：{formatDateTime(localInputToIsoInTz(scheduledTime, tz), tz, { alwaysShowTz: true })}</span>
                       </div>
                     )}
                   </div>

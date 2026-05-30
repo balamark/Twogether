@@ -18,6 +18,8 @@ import apiService, {
 } from '../services/api';
 import ReplyStepBar from './ReplyStepBar';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { formatDateTime } from '../utils/datetime';
 
 interface NotificationInput {
   type: 'success' | 'error' | 'info' | 'warning';
@@ -54,15 +56,10 @@ function statusPill(status: EventStatus) {
   }
 }
 
-function formatTime(iso: string) {
+function formatTime(iso: string, tz: string) {
   if (!iso) return '';
   try {
-    return new Date(iso).toLocaleString('zh-TW', {
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return formatDateTime(iso, tz);
   } catch {
     return iso;
   }
@@ -77,6 +74,7 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
   const [resolving, setResolving] = useState(false);
   const [rewriting, setRewriting] = useState(false);
   const [rewritePreview, setRewritePreview] = useState<ReplyRewritePreview | null>(null);
+  const tz = useTimezone();
 
   const insertPhrase = (phrase: string) => {
     setReply((prev) => (prev.trim().length > 0 ? `${prev}\n${phrase}` : phrase));
@@ -215,7 +213,7 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
           </div>
         </div>
         <p className="text-xs text-petal-muted mb-3">
-          {formatTime(event.createdAt)}・{isAuthor ? '你發起' : '伴侶發起'}
+          {formatTime(event.createdAt, tz)}・{isAuthor ? '你發起' : '伴侶發起'}
         </p>
 
         <p className="text-sm text-petal-ink-soft leading-relaxed mb-3 whitespace-pre-wrap">{event.summary}</p>
@@ -254,7 +252,7 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
                 >
                   <p className="text-sm text-petal-ink whitespace-pre-wrap">{m.content}</p>
                   <p className="text-[10px] text-petal-muted mt-1 flex items-center gap-1">
-                    <span>{formatTime(m.createdAt)}</span>
+                    <span>{formatTime(m.createdAt, tz)}</span>
                     {mine && m.readAt && <span>・已讀</span>}
                   </p>
                 </div>

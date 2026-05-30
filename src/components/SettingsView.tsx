@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Users, CheckCircle, Trash2 } from 'lucide-react';
 import { apiService, type CycleRecord } from '../services/api';
 import { averageCycleLength, predictNextPeriodStart, ovulationWindow, computeCycleLengths } from '../utils/cycle';
+import { TIMEZONE_OPTIONS } from '../utils/timezone-options';
 
 interface Nicknames {
   partner1: string;
@@ -28,6 +29,9 @@ interface User {
   birth_date?: string | null;
   email_notifications_enabled?: boolean;
   cycle_tracking_enabled?: boolean;
+  timezone?: string | null;
+  couplePrimaryTimezone?: string | null;
+  partnerTimezone?: string | null;
   partnerId?: string;
   partnerCode?: string;
   partnerNickname?: string;
@@ -159,6 +163,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [cycleTrackingEnabled, setCycleTrackingEnabled] = useState<boolean>(false);
   const [isSavingCyclePref, setIsSavingCyclePref] = useState<boolean>(false);
 
+  // Timezone settings — per-user and couple-level primary
+  const browserTz = (() => {
+    try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; }
+  })();
+  const [userTimezone, setUserTimezone] = useState<string>('');
+  const [couplePrimaryTimezone, setCouplePrimaryTimezone] = useState<string>('');
+  const [isSavingUserTz, setIsSavingUserTz] = useState<boolean>(false);
+  const [isSavingCoupleTz, setIsSavingCoupleTz] = useState<boolean>(false);
+
   // Email invitation states
   const [recipientEmail, setRecipientEmail] = useState('');
   const [invitationMessage, setInvitationMessage] = useState('');
@@ -195,6 +208,100 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       setCycleTrackingEnabled(pref);
     }
   }, [authState.user?.cycle_tracking_enabled]);
+
+  useEffect(() => {
+    setUserTimezone(authState.user?.timezone || '');
+  }, [authState.user?.timezone]);
+
+  useEffect(() => {
+    setCouplePrimaryTimezone(authState.user?.couplePrimaryTimezone || '');
+  }, [authState.user?.couplePrimaryTimezone]);
+
+  const handleUpdateUserTimezone = async (next: string) => {
+    const previous = userTimezone;
+    setUserTimezone(next);
+    setIsSavingUserTz(true);
+    try {
+      await apiService.updateUserTimezone(next || null);
+      // First-user-wins default: if no couple primary is set yet, adopt this value.
+      let adoptedAsPrimary = false;
+      if (next && !authState.user?.couplePrimaryTimezone && authState.partnerConnected) {
+        try {
+          await apiService.updateCouplePrimaryTimezone(next);
+          adoptedAsPrimary = true;
+        } catch {
+          // Non-fatal; the user can set it manually below.
+        }
+      }
+      if (authState.user && onAuthStateUpdate) {
+        const updated = {
+          ...authState,
+          user: {
+            ...authState.user,
+            timezone: next || null,
+            ...(adoptedAsPrimary ? { couplePrimaryTimezone: next } : {}),
+          },
+        };
+        onAuthStateUpdate(updated);
+        localStorage.setItem('authState', JSON.stringify(updated));
+        localStorage.setItem('authUser', JSON.stringify(updated.user));
+      }
+      if (adoptedAsPrimary) setCouplePrimaryTimezone(next);
+      showNotification({
+        type: 'success',
+        title: '已更新',
+        message: adoptedAsPrimary ? '我的時區與共用時區已同步設定' : '我的時區已更新',
+        duration: 4000,
+      });
+    } catch (err) {
+      setUserTimezone(previous);
+      showNotification({
+        type: 'error',
+        title: '更新失敗',
+        message: (err as Error)?.message || '無法更新時區設定',
+        duration: 5000,
+      });
+    } finally {
+      setIsSavingUserTz(false);
+    }
+  };
+
+  const handleUpdateCouplePrimaryTimezone = async (next: string) => {
+    const previous = couplePrimaryTimezone;
+    setCouplePrimaryTimezone(next);
+    setIsSavingCoupleTz(true);
+    try {
+      await apiService.updateCouplePrimaryTimezone(next || null);
+      if (authState.user && onAuthStateUpdate) {
+        const updated = {
+          ...authState,
+          user: {
+            ...authState.user,
+            couplePrimaryTimezone: next || null,
+          },
+        };
+        onAuthStateUpdate(updated);
+        localStorage.setItem('authState', JSON.stringify(updated));
+        localStorage.setItem('authUser', JSON.stringify(updated.user));
+      }
+      showNotification({
+        type: 'success',
+        title: '已更新',
+        message: '共用時區已更新',
+        duration: 4000,
+      });
+    } catch (err) {
+      setCouplePrimaryTimezone(previous);
+      showNotification({
+        type: 'error',
+        title: '更新失敗',
+        message: (err as Error)?.message || '無法更新共用時區設定',
+        duration: 5000,
+      });
+    } finally {
+      setIsSavingCoupleTz(false);
+    }
+  };
 
   const handleToggleCycleTracking = async (next: boolean) => {
     const previous = cycleTrackingEnabled;
@@ -703,6 +810,79 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Timezone Settings */}
+      <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-4">我的時區</h3>
+        <div className="space-y-3">
+          <label htmlFor="user-timezone" className="block text-sm font-medium text-gray-700">
+            選擇你所在的時區
+          </label>
+          <select
+            id="user-timezone"
+            data-testid="user-timezone-select"
+            value={userTimezone}
+            disabled={isSavingUserTz}
+            onChange={(e) => handleUpdateUserTimezone(e.target.value)}
+            className="w-full sm:max-w-xs p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-white"
+          >
+            <option value="">
+              {browserTz ? `使用裝置時區（${browserTz}）` : '使用裝置預設時區'}
+            </option>
+            {TIMEZONE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <p className="text-xs text-gray-500">
+            💡 用於協助雙方協調時間。若伴侶尚未設定共用時區，我們會以你的時區作為預設。
+          </p>
+        </div>
+      </div>
+
+      {authState.partnerConnected && (
+        <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
+          <h3 className="text-lg font-bold text-gray-800 mb-1">共用時區</h3>
+          <p className="text-xs text-gray-500 mb-4">
+            用於排程親密邀請、共同事件等時間顯示，雙方都會以此時區看到相同的時間。
+          </p>
+          <div className="space-y-3">
+            <select
+              data-testid="couple-primary-timezone-select"
+              value={couplePrimaryTimezone}
+              disabled={isSavingCoupleTz}
+              onChange={(e) => handleUpdateCouplePrimaryTimezone(e.target.value)}
+              className="w-full sm:max-w-xs p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent bg-white"
+            >
+              <option value="">尚未設定（依各自裝置）</option>
+              {TIMEZONE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+            <div className="flex flex-wrap gap-2">
+              {authState.user?.timezone && (
+                <button
+                  type="button"
+                  onClick={() => handleUpdateCouplePrimaryTimezone(authState.user!.timezone!)}
+                  disabled={isSavingCoupleTz}
+                  className="px-3 py-1.5 text-xs rounded-full border border-petal-rule bg-petal-cream-2 text-petal-ink hover:bg-petal-sage/20 transition-colors disabled:opacity-50"
+                >
+                  套用我的時區
+                </button>
+              )}
+              {authState.user?.partnerTimezone && (
+                <button
+                  type="button"
+                  onClick={() => handleUpdateCouplePrimaryTimezone(authState.user!.partnerTimezone!)}
+                  disabled={isSavingCoupleTz}
+                  className="px-3 py-1.5 text-xs rounded-full border border-petal-rule bg-petal-cream-2 text-petal-ink hover:bg-petal-sage/20 transition-colors disabled:opacity-50"
+                >
+                  套用伴侶的時區
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Email Notification Preferences */}
       <div className="bg-white rounded-2xl shadow-lg p-6">

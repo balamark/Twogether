@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Send, Trash2 } from 'lucide-react';
 import { apiService, type WallReply } from '../services/api';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { formatRelativeOrDate } from '../utils/datetime';
 
 interface WallPostThreadProps {
   postId: string;
@@ -9,19 +11,8 @@ interface WallPostThreadProps {
   onError?: (message: string) => void;
 }
 
-const formatTime = (iso: string) => {
-  const date = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return '剛剛';
-  if (diffMin < 60) return `${diffMin} 分鐘前`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr} 小時前`;
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 7) return `${diffDay} 天前`;
-  return date.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' });
-};
+const formatTime = (iso: string, tz: string) =>
+  formatRelativeOrDate(iso, tz, { month: 'short', day: 'numeric' });
 
 const WallPostThread: React.FC<WallPostThreadProps> = ({
   postId,
@@ -33,6 +24,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const tz = useTimezone();
 
   useEffect(() => {
     let cancelled = false;
@@ -121,7 +113,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
                   {reply.author_nickname || (isOwn ? '我' : '對方')}
                 </span>
                 <span className="font-body text-[11px] text-petal-muted">
-                  {formatTime(reply.created_at)}
+                  {formatTime(reply.created_at, tz)}
                 </span>
               </div>
               {isOwn && (
