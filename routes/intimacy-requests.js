@@ -94,7 +94,15 @@ router.post('/', [
     .withMessage('訊息不能超過1000個字符'),
   body('request_type')
     .isIn(['general', 'romantic', 'playful', 'surprise', 'compliment', 'intimate', 'reconciliation'])
-    .withMessage('請求類型無效')
+    .withMessage('請求類型無效'),
+  body('scheduled_time')
+    .optional({ nullable: true })
+    .isISO8601()
+    .withMessage('scheduled_time 必須為 ISO8601 字串'),
+  body('roleplay_category')
+    .optional({ nullable: true })
+    .isLength({ max: 100 })
+    .withMessage('roleplay_category 過長')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -108,9 +116,9 @@ router.post('/', [
     }
 
     const userId = req.user.id;
-    const { message, request_type } = req.body;
-    
-    logInfo('Creating intimacy request', { userId, request_type, hasMessage: !!message });
+    const { message, request_type, scheduled_time, roleplay_category } = req.body;
+
+    logInfo('Creating intimacy request', { userId, request_type, hasMessage: !!message, hasSchedule: !!scheduled_time });
 
     // Find user's couple and partner
     const coupleResult = await db.query(`
@@ -139,11 +147,11 @@ router.post('/', [
     const result = await db.query(`
       INSERT INTO intimacy_requests (
         id, couple_id, sender_id, receiver_id, message_content, request_type,
-        status, created_at
+        roleplay_category, scheduled_time, status, created_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
-      RETURNING id, message_content, request_type, status, created_at
-    `, [requestId, coupleId, userId, partnerId, message || null, request_type, now]);
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9)
+      RETURNING id, message_content, request_type, roleplay_category, scheduled_time, status, created_at
+    `, [requestId, coupleId, userId, partnerId, message || null, request_type, roleplay_category || null, scheduled_time || null, now]);
 
     const request = result.rows[0];
 
@@ -349,8 +357,11 @@ router.get('/', async (req, res) => {
     params.push(parseInt(limit), offset);
     
     const result = await db.query(`
-      SELECT 
-        ir.id, ir.message_content, ir.request_type, ir.status, ir.created_at, ir.responded_at,
+      SELECT
+        ir.id, ir.message_content, ir.request_type, ir.roleplay_category,
+        ir.scheduled_time, ir.status, ir.created_at, ir.responded_at, ir.expires_at,
+        ir.response_message, ir.alternative_type, ir.alternative_content,
+        ir.alternative_scheduled_time,
         sender.id as sender_id, sender.nickname as sender_nickname,
         receiver.id as receiver_id, receiver.nickname as receiver_nickname,
         CASE WHEN ir.sender_id = $1 THEN 'sent' ELSE 'received' END as direction
@@ -366,10 +377,17 @@ router.get('/', async (req, res) => {
       id: row.id,
       message_content: row.message_content,
       request_type: row.request_type,
+      roleplay_category: row.roleplay_category,
+      scheduled_time: row.scheduled_time,
       status: row.status,
       direction: row.direction,
       created_at: row.created_at,
       responded_at: row.responded_at,
+      expires_at: row.expires_at,
+      response_message: row.response_message,
+      alternative_type: row.alternative_type,
+      alternative_content: row.alternative_content,
+      alternative_scheduled_time: row.alternative_scheduled_time,
       sender_nickname: row.sender_nickname,
       receiver_nickname: row.receiver_nickname,
       requester: {
@@ -402,12 +420,22 @@ router.get('/', async (req, res) => {
 // Respond to intimacy request
 router.put('/:id/respond', [
   body('response')
-    .isIn(['accepted', 'declined'])
-    .withMessage('回應必須是 accepted 或 declined'),
+    .isIn(['accepted', 'declined', 'rejected'])
+    .withMessage('回應必須是 accepted、declined 或 rejected'),
   body('response_message')
-    .optional()
+    .optional({ nullable: true })
     .isLength({ max: 500 })
-    .withMessage('回應訊息不能超過500個字符')
+    .withMessage('回應訊息不能超過500個字符'),
+  body('alternative_type')
+    .optional({ nullable: true })
+    .isLength({ max: 50 }),
+  body('alternative_content')
+    .optional({ nullable: true })
+    .isLength({ max: 500 }),
+  body('alternative_scheduled_time')
+    .optional({ nullable: true })
+    .isISO8601()
+    .withMessage('alternative_scheduled_time 必須為 ISO8601 字串')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -421,7 +449,13 @@ router.put('/:id/respond', [
 
     const userId = req.user.id;
     const requestId = req.params.id;
-    const { response, response_message } = req.body;
+    const {
+      response,
+      response_message,
+      alternative_type,
+      alternative_content,
+      alternative_scheduled_time,
+    } = req.body;
 
     // Check if user is the recipient of this request
     const requestResult = await db.query(
@@ -445,11 +479,31 @@ router.put('/:id/respond', [
       });
     }
 
+    // Normalize: schema canonical is 'rejected' (per migration 009); 'declined' came
+    // in from older clients. Keep the API tolerant but store the canonical value so
+    // the stats query (which counts 'rejected') stays in sync.
+    const normalizedStatus = response === 'accepted' ? 'accepted' : 'rejected';
+
     // Update request status
     const now = new Date().toISOString();
     await db.query(
-      'UPDATE intimacy_requests SET status = $1, response_message = $2, responded_at = $3 WHERE id = $4',
-      [response, response_message || null, now, requestId]
+      `UPDATE intimacy_requests
+       SET status = $1,
+           response_message = $2,
+           responded_at = $3,
+           alternative_type = $4,
+           alternative_content = $5,
+           alternative_scheduled_time = $6
+       WHERE id = $7`,
+      [
+        normalizedStatus,
+        response_message || null,
+        now,
+        alternative_type || null,
+        alternative_content || null,
+        alternative_scheduled_time || null,
+        requestId,
+      ]
     );
 
     // If accepted, award coins to the couple's shared balance. Wrapped in
