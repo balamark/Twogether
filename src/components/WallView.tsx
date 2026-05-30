@@ -19,6 +19,8 @@ import {
 import type { Notification } from './ErrorNotification';
 import WallPostComposer, { type WallExample } from './WallPostComposer';
 import WallPostThread from './WallPostThread';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { formatRelativeOrDate } from '../utils/datetime';
 
 interface WallViewProps {
   authState: {
@@ -41,23 +43,8 @@ const FILTER_TABS: { id: WallFilter; label: string; icon: string }[] = [
   { id: 'mood', label: '帶心情', icon: '💭' },
 ];
 
-const formatTime = (iso: string) => {
-  const date = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return '剛剛';
-  if (diffMin < 60) return `${diffMin} 分鐘前`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr} 小時前`;
-  const diffDay = Math.floor(diffHr / 24);
-  if (diffDay < 7) return `${diffDay} 天前`;
-  return date.toLocaleDateString('zh-TW', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
-};
+const formatTime = (iso: string, tz: string) =>
+  formatRelativeOrDate(iso, tz, { year: 'numeric', month: 'short', day: 'numeric' });
 
 const WallView: React.FC<WallViewProps> = ({
   authState,
@@ -68,6 +55,7 @@ const WallView: React.FC<WallViewProps> = ({
 }) => {
   const userId = authState.user?.id;
   const tutorialKey = `wall_tutorial_seen_${userId || 'anon'}`;
+  const tz = useTimezone();
 
   const [posts, setPosts] = useState<WallPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -216,7 +204,7 @@ const WallView: React.FC<WallViewProps> = ({
               </span>
             )}
             <span className="font-body text-[11px] text-petal-muted">
-              · {formatTime(post.created_at)}
+              · {formatTime(post.created_at, tz)}
             </span>
           </div>
           {isOwn && (

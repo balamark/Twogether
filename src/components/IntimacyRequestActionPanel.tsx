@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Heart, Check, Clock, Smile, Coffee, HandHeart } from 'lucide-react';
+import { Heart, Check, Smile, Coffee, HandHeart } from 'lucide-react';
 import { apiService } from '../services/api';
 import type {
   IntimacyRequest,
@@ -98,19 +98,10 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
   };
 
   return (
-    <div className="mt-3 rounded-xl border border-pink-200 bg-pink-50 p-4">
+    <div className="rounded-xl border border-pink-200 bg-pink-50 p-4">
       {error && (
         <div className="mb-3 rounded-md bg-red-50 border border-red-200 p-2 text-sm text-red-600">
           {error}
-        </div>
-      )}
-
-      {request.scheduledTime && (
-        <div className="flex items-center space-x-2 text-sm text-gray-600 mb-3">
-          <Clock className="w-4 h-4" />
-          <span>
-            預約時間：{new Date(request.scheduledTime).toLocaleString('zh-TW')}
-          </span>
         </div>
       )}
 

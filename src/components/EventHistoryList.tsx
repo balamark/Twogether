@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Tag, CheckCircle2, Clock, Lock, MessageSquareHeart } from 'lucide-react';
 import apiService, { type EventRecord, type EventStatus } from '../services/api';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { formatDateTime } from '../utils/datetime';
 
 interface EventHistoryListProps {
   onOpenEvent: (id: string) => void;
@@ -37,16 +39,10 @@ function statusPill(status: EventStatus) {
   }
 }
 
-function formatDate(iso: string) {
+function formatDate(iso: string, tz: string) {
   if (!iso) return '';
   try {
-    return new Date(iso).toLocaleString('zh-TW', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+    return formatDateTime(iso, tz, { withYear: true });
   } catch {
     return iso;
   }
@@ -62,6 +58,7 @@ export default function EventHistoryList({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<EventStatus | 'all'>(filterStatus ?? 'all');
+  const tz = useTimezone();
 
   useEffect(() => {
     let cancelled = false;
@@ -151,7 +148,7 @@ export default function EventHistoryList({
           </div>
 
           <p className="text-xs text-petal-muted mb-2">
-            {formatDate(event.createdAt)}
+            {formatDate(event.createdAt, tz)}
             {event.createdBy === currentUserId ? '・你發起' : '・伴侶發起'}
           </p>
 

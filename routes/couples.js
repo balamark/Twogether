@@ -5,6 +5,7 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const pairingService = require('../services/pairingService');
 const { logInfo, logWarn, logError } = require('../lib/logger');
+const { TIMEZONE_VALUES } = require('../lib/timezone-options');
 
 const router = express.Router();
 
@@ -207,8 +208,9 @@ router.get('/', async (req, res) => {
       SELECT
         c.id, c.couple_name, c.anniversary_date, c.created_at, c.pending_conflicts,
         c.first_meet_date, c.first_date, c.first_kiss_date, c.first_kiss_place, c.first_intimacy_date, c.first_intimacy_place,
-        u1.id as user1_id, u1.nickname as user1_nickname,
-        u2.id as user2_id, u2.nickname as user2_nickname
+        c.primary_timezone,
+        u1.id as user1_id, u1.nickname as user1_nickname, u1.timezone as user1_timezone,
+        u2.id as user2_id, u2.nickname as user2_nickname, u2.timezone as user2_timezone
       FROM couples c
       JOIN users u1 ON c.user1_id = u1.id
       LEFT JOIN users u2 ON c.user2_id = u2.id
@@ -380,6 +382,67 @@ router.put('/journey', [
     res.status(500).json({
       success: false,
       message: '更新情侶旅程失敗'
+    });
+  }
+});
+
+// Update couple's primary timezone (IANA string from the curated allow-list).
+// Used to capture/display all shared timestamps (scheduled intimacy invitations,
+// events, wall posts, achievements, etc.) so both partners see the same wall-clock.
+router.put('/primary-timezone', [
+  body('primary_timezone')
+    .custom((value) => {
+      if (value === null) return true;
+      if (typeof value !== 'string') throw new Error('primary_timezone 必須為字串或 null');
+      if (!TIMEZONE_VALUES.includes(value)) throw new Error('primary_timezone 不在允許清單中');
+      return true;
+    })
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: '驗證失敗',
+        errors: errors.array()
+      });
+    }
+
+    const userId = req.user.id;
+    const primaryTimezone = req.body.primary_timezone === null ? null : req.body.primary_timezone;
+
+    // Find user's couple (must already exist; this setting is meaningless without a partner).
+    const coupleResult = await db.query(
+      'SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1',
+      [userId]
+    );
+
+    if (coupleResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '您還沒有情侶關係'
+      });
+    }
+
+    const coupleId = coupleResult.rows[0].id;
+
+    await db.query(
+      `UPDATE couples SET primary_timezone = $1 WHERE id = $2`,
+      [primaryTimezone, coupleId]
+    );
+
+    logInfo('Couple primary timezone updated', { coupleId, primaryTimezone });
+
+    res.json({
+      success: true,
+      message: '共用時區已更新',
+      primary_timezone: primaryTimezone
+    });
+  } catch (error) {
+    logError('Update couple primary timezone failed', { err: error.message, stack: error.stack });
+    res.status(500).json({
+      success: false,
+      message: '更新共用時區失敗'
     });
   }
 });

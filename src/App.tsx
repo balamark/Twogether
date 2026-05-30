@@ -15,6 +15,8 @@ import PairingInvitationHandler from './components/PairingInvitationHandler';
 import { apiService, getTokenExpiry, clearAuthStorage } from './services/api';
 import type { CycleRecord } from './services/api';
 import { periodDateSet, fertileDateSet, predictedPeriodDateSet } from './utils/cycle';
+import { getPrimaryTimezone, formatMonthYear } from './utils/datetime';
+import { TimezoneProvider } from './contexts/TimezoneContext';
 import { conflictPhraseTiers } from './data/conflictSteps';
 import { useScrollLock } from './hooks/useScrollLock';
 
@@ -127,6 +129,9 @@ interface User {
   birth_date?: string | null;
   email_notifications_enabled?: boolean;
   cycle_tracking_enabled?: boolean;
+  timezone?: string | null;
+  couplePrimaryTimezone?: string | null;
+  partnerTimezone?: string | null;
   partnerId?: string;
   partnerCode?: string;
   partnerNickname?: string;
@@ -598,6 +603,8 @@ const LoveTimeApp = () => {
         email: string;
         nickname: string;
         gender?: 'male' | 'female' | 'other';
+        birth_date?: string | null;
+        timezone?: string | null;
         created_at?: string;
       };
 
@@ -606,6 +613,8 @@ const LoveTimeApp = () => {
         email: userData.email,
         nickname: userData.nickname,
         gender: userData.gender,
+        birth_date: userData.birth_date,
+        timezone: userData.timezone,
         partnerCode: generatePartnerCode(),
         createdAt: userData.created_at || new Date().toISOString()
       };
@@ -1011,10 +1020,19 @@ const LoveTimeApp = () => {
           if (coupleInfo && authUser) {
             const nextPartnerConnected = !!coupleInfo.user2Nickname;
             const nextPartnerNickname = storedNicknames.partner2 || undefined;
+            const nextCouplePrimaryTz = coupleInfo.primaryTimezone ?? null;
+            const nextPartnerTz =
+              coupleInfo.user1Id === authUser.id
+                ? coupleInfo.user2Timezone ?? null
+                : coupleInfo.user2Id === authUser.id
+                  ? coupleInfo.user1Timezone ?? null
+                  : null;
 
             const needsUpdate =
               authUser.partnerId !== coupleInfo.id ||
               authUser.partnerNickname !== nextPartnerNickname ||
+              authUser.couplePrimaryTimezone !== nextCouplePrimaryTz ||
+              authUser.partnerTimezone !== nextPartnerTz ||
               partnerConnected !== nextPartnerConnected;
 
             if (needsUpdate) {
@@ -1024,7 +1042,9 @@ const LoveTimeApp = () => {
                 user: {
                   ...authUser,
                   partnerId: coupleInfo.id,
-                  partnerNickname: nextPartnerNickname // partner2 is always the partner's nickname
+                  partnerNickname: nextPartnerNickname, // partner2 is always the partner's nickname
+                  couplePrimaryTimezone: nextCouplePrimaryTz,
+                  partnerTimezone: nextPartnerTz,
                 }
               };
 
@@ -5544,7 +5564,7 @@ const LoveTimeApp = () => {
     };
 
     const days = getDaysInMonth(currentMonth);
-    const monthYear = currentMonth.toLocaleDateString('zh-TW', { year: 'numeric', month: 'long' });
+    const monthYear = formatMonthYear(currentMonth, primaryTimezone);
 
     return (
       <div className="bg-white rounded-md p-5 border border-petal-rule">
@@ -5598,7 +5618,13 @@ const LoveTimeApp = () => {
     );
   };
 
+  const primaryTimezone = getPrimaryTimezone({
+    couplePrimaryTz: authState.user?.couplePrimaryTimezone,
+    userTz: authState.user?.timezone,
+  });
+
   return (
+    <TimezoneProvider value={primaryTimezone}>
     <div className="min-h-screen bg-petal-cream">
       {/* Header */}
       <Header
@@ -6019,6 +6045,7 @@ const LoveTimeApp = () => {
         </div>
       )}
     </div>
+    </TimezoneProvider>
   );
 };
 
