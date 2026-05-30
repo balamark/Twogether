@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Calendar, Inbox, Send } from 'lucide-react';
 import apiService from '../services/api';
 import type { IntimacyRequest, IntimacyRequestStats, IntimacyRequestNudge } from '../services/api';
-import IntimacyRequestActionPanel from './IntimacyRequestActionPanel';
+import IntimacyRequestDetailModal from './IntimacyRequestDetailModal';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
 
@@ -38,6 +38,7 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
   const [emailFeedback, setEmailFeedback] = useState<FeedbackState | null>(null);
   const [tab, setTab] = useState<Tab>('received');
   const [tabInitialized, setTabInitialized] = useState(false);
+  const [detailOpenId, setDetailOpenId] = useState<string | null>(null);
   const me = authState.user?.nickname || '';
   const meId = authState.user?.id || '';
   const tz = useTimezone();
@@ -131,6 +132,9 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
 
   const activeItems = tab === 'received' ? received : sent;
   const activeEmptyText = tab === 'received' ? '尚無收到紀錄' : '尚無發送紀錄';
+  const detailRequest = detailOpenId
+    ? items.find((it) => it.id === detailOpenId) ?? null
+    : null;
 
   return (
     <div className="space-y-10">
@@ -186,12 +190,21 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
               items={activeItems}
               emptyText={activeEmptyText}
               tz={tz}
-              showActionsForPending={tab === 'received'}
-              onResponded={tab === 'received' ? fetchAll : undefined}
+              onOpenDetail={(id) => setDetailOpenId(id)}
             />
           </div>
         </>
       )}
+
+      <IntimacyRequestDetailModal
+        request={detailRequest}
+        direction={tab}
+        onClose={() => setDetailOpenId(null)}
+        onResponded={() => {
+          setDetailOpenId(null);
+          fetchAll();
+        }}
+      />
     </div>
   );
 };
@@ -396,7 +409,8 @@ function statusAccent(status: string): string {
   switch (status) {
     case 'accepted': return 'bg-petal-sage-deep';
     case 'pending': return 'bg-amber-400';
-    case 'rejected': return 'bg-petal-rose-deep';
+    case 'rejected':
+    case 'declined': return 'bg-petal-rose-deep';
     default: return 'bg-gray-300'; // expired or unknown
   }
 }
@@ -405,14 +419,15 @@ function statusBadgeClass(status: string): string {
   switch (status) {
     case 'accepted': return 'bg-green-100 text-green-700';
     case 'pending': return 'bg-yellow-100 text-yellow-700';
-    case 'rejected': return 'bg-red-100 text-red-700';
+    case 'rejected':
+    case 'declined': return 'bg-red-100 text-red-700';
     default: return 'bg-gray-100 text-gray-600';
   }
 }
 
 function translateStatus(status: string): string {
   if (status === 'accepted') return '已接受';
-  if (status === 'rejected') return '已拒絕';
+  if (status === 'rejected' || status === 'declined') return '已拒絕';
   if (status === 'expired') return '已過期';
   return '待回應';
 }
@@ -421,14 +436,12 @@ function RequestList({
   items,
   emptyText,
   tz,
-  showActionsForPending = false,
-  onResponded,
+  onOpenDetail,
 }: {
   items: IntimacyRequest[];
   emptyText: string;
   tz: string;
-  showActionsForPending?: boolean;
-  onResponded?: () => void;
+  onOpenDetail: (id: string) => void;
 }) {
   if (items.length === 0) {
     return <div className="text-gray-500 text-sm py-6 text-center font-display italic">{emptyText}</div>;
@@ -437,39 +450,46 @@ function RequestList({
   return (
     <ul className="space-y-3" role="tabpanel">
       {items.map((it) => {
-        const showActions = showActionsForPending && it.status === 'pending';
+        const hasAlternative = !!(it.alternativeContent || it.alternativeScheduledTime);
         return (
-          <li
-            key={it.id}
-            className="flex rounded-xl border border-petal-rule-soft bg-petal-cream-2/30 overflow-hidden"
-          >
-            <div className={`w-1 flex-shrink-0 ${statusAccent(it.status)}`} aria-hidden="true" />
-            <div className="flex-1 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  {it.scheduledTime && (
-                    <div className="inline-flex items-center gap-1.5 text-sm text-petal-ink-soft mb-2">
-                      <Calendar className="w-4 h-4" />
-                      <span>預約 {formatDateTime(it.scheduledTime, tz, { alwaysShowTz: true })}</span>
+          <li key={it.id}>
+            <button
+              type="button"
+              onClick={() => onOpenDetail(it.id)}
+              data-testid="intimacy-card"
+              className="w-full text-left flex rounded-xl border border-petal-rule-soft bg-petal-cream-2/30 overflow-hidden hover:bg-petal-cream-2/60 transition-colors focus:outline-none focus:ring-2 focus:ring-petal-rose-deep/40"
+            >
+              <div className={`w-1 flex-shrink-0 ${statusAccent(it.status)}`} aria-hidden="true" />
+              <div className="flex-1 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    {it.scheduledTime && (
+                      <div className="inline-flex items-center gap-1.5 text-sm text-petal-ink-soft mb-2">
+                        <Calendar className="w-4 h-4" />
+                        <span>預約 {formatDateTime(it.scheduledTime, tz, { alwaysShowTz: true })}</span>
+                      </div>
+                    )}
+                    <div className="text-petal-ink text-sm leading-relaxed break-words">{it.messageContent}</div>
+                    {hasAlternative && (
+                      <div className="mt-2 inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-petal-rose-soft text-petal-rose-deep">
+                        對方提了替代方式
+                        {it.alternativeScheduledTime && (
+                          <> · 改到 {formatDateTime(it.alternativeScheduledTime, tz)}</>
+                        )}
+                      </div>
+                    )}
+                    <div className="text-xs text-petal-muted mt-2">
+                      發送於 {formatDateTime(it.createdAt, tz)}
                     </div>
-                  )}
-                  <div className="text-petal-ink text-sm leading-relaxed break-words">{it.messageContent}</div>
-                  <div className="text-xs text-petal-muted mt-2">
-                    發送於 {formatDateTime(it.createdAt, tz)}
                   </div>
+                  <span
+                    className={`text-xs whitespace-nowrap flex-shrink-0 min-w-[4.5rem] inline-flex items-center justify-center text-center px-2 py-1 rounded-full ${statusBadgeClass(it.status)}`}
+                  >
+                    {translateStatus(it.status)}
+                  </span>
                 </div>
-                <span
-                  className={`text-xs whitespace-nowrap flex-shrink-0 min-w-[4.5rem] inline-flex items-center justify-center text-center px-2 py-1 rounded-full ${statusBadgeClass(it.status)}`}
-                >
-                  {translateStatus(it.status)}
-                </span>
               </div>
-              {showActions && onResponded && (
-                <div className="mt-3 pt-3 border-t border-petal-rule-soft">
-                  <IntimacyRequestActionPanel request={it} onResponded={onResponded} />
-                </div>
-              )}
-            </div>
+            </button>
           </li>
         );
       })}
