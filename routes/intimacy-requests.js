@@ -452,33 +452,30 @@ router.put('/:id/respond', [
       [response, response_message || null, now, requestId]
     );
 
-    // If accepted, award coins to both users. Wrapped in try/catch so a
-    // failure here (e.g. schema drift on users.coins or coin_transactions)
-    // doesn't roll back the user's accept action — the response itself
-    // is already persisted above.
+    // If accepted, award coins to the couple's shared balance. Wrapped in
+    // try/catch so an unexpected failure here doesn't roll back the user's
+    // accept — the response itself is already persisted above. The earlier
+    // version of this block wrote to `users.coins` (no such column in prod)
+    // and inserted `user_id` + `transaction_type='bonus'` rows that violate
+    // the coin_transactions schema (couple_id, transaction_type IN
+    // ('earn','spend')). Both were silently failing for every accept.
     if (response === 'accepted') {
-      const coinAmount = 5; // 5 coins for accepted intimacy request
+      const coinAmount = 10;
       try {
-        await db.transaction(async (client) => {
-          await client.query(
-            'UPDATE users SET coins = COALESCE(coins, 0) + $1 WHERE id = $2',
-            [coinAmount, request.sender_id]
-          );
-          await client.query(
-            'UPDATE users SET coins = COALESCE(coins, 0) + $1 WHERE id = $2',
-            [coinAmount, userId]
-          );
-          const transactionId1 = uuidv4();
-          const transactionId2 = uuidv4();
-          await client.query(`
-            INSERT INTO coin_transactions (id, user_id, amount, transaction_type, description, created_at)
-            VALUES ($1, $2, $3, 'bonus', '親密請求被接受獎勵', $4)
-          `, [transactionId1, request.sender_id, coinAmount, now]);
-          await client.query(`
-            INSERT INTO coin_transactions (id, user_id, amount, transaction_type, description, created_at)
-            VALUES ($1, $2, $3, 'bonus', '接受親密請求獎勵', $4)
-          `, [transactionId2, userId, coinAmount, now]);
-        });
+        const coupleResult = await db.query(
+          `SELECT id FROM couples
+           WHERE (user1_id = $1 AND user2_id = $2)
+              OR (user1_id = $2 AND user2_id = $1)`,
+          [request.sender_id, userId]
+        );
+        if (coupleResult.rows.length > 0) {
+          await db.query(`
+            INSERT INTO coin_transactions (id, couple_id, amount, transaction_type, earned_from, description, transaction_date)
+            VALUES ($1, $2, $3, 'earn', 'intimacy_accept', '親密邀請被接受獎勵', $4)
+          `, [uuidv4(), coupleResult.rows[0].id, coinAmount, now]);
+        } else {
+          logWarn('Skipped intimacy accept coins — couple not found', { requestId });
+        }
       } catch (coinError) {
         logWarn('Failed to award intimacy accept coins', { err: coinError.message, code: coinError.code, requestId });
       }
