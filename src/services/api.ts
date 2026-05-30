@@ -1458,6 +1458,17 @@ class ApiService {
   }
 
   // Custom Scripts API
+  // Extract the most specific server-side error message from an axios failure.
+  // Validation errors come back as { errors: [{ path, msg }] } — surfacing
+  // errors[0].msg tells the user exactly which field was rejected (e.g.
+  // "劇本內容必須在1-50000個字符之間") instead of a generic "驗證失敗".
+  private extractScriptError(error: unknown, fallback: string): Error {
+    const data = (error as { response?: { data?: { errors?: Array<{ msg?: string }>; message?: string } } })?.response?.data;
+    const fieldMsg = data?.errors?.[0]?.msg;
+    const message = fieldMsg || data?.message || fallback;
+    return new Error(message);
+  }
+
   async getCustomScripts(): Promise<unknown[]> {
     try {
       const response = await apiClient.get('/custom-scripts');
@@ -1497,7 +1508,7 @@ class ApiService {
       return response.data.custom_script;
     } catch (error) {
       console.error('Failed to create custom script:', error);
-      throw error;
+      throw this.extractScriptError(error, '無法建立劇本');
     }
   }
 
@@ -1531,7 +1542,7 @@ class ApiService {
       return response.data.custom_script;
     } catch (error) {
       console.error('Failed to update custom script:', error);
-      throw error;
+      throw this.extractScriptError(error, '無法更新劇本');
     }
   }
 

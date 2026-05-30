@@ -1499,8 +1499,8 @@ const LoveTimeApp = () => {
       showNotification({
         type: 'error',
         title: '劇本上傳失敗',
-        message: '無法保存劇本到服務器，請稍後再試',
-        duration: 5000
+        message: (error as Error)?.message || '無法保存劇本到服務器，請稍後再試',
+        duration: 6000
       });
     }
   };
@@ -1565,8 +1565,8 @@ const LoveTimeApp = () => {
       showNotification({
         type: 'error',
         title: '更新失敗',
-        message: '無法保存修改，請稍後再試',
-        duration: 5000,
+        message: (error as Error)?.message || '無法保存修改，請稍後再試',
+        duration: 6000,
       });
     }
   };
@@ -4860,6 +4860,10 @@ const LoveTimeApp = () => {
                 rows={10}
                 required
               />
+              <div className={`mt-1 font-body text-[11px] text-right ${scriptData.content.length > 50000 ? 'text-red-500 font-medium' : 'text-petal-muted'}`}>
+                {scriptData.content.length.toLocaleString()} / 50,000 字
+                {scriptData.content.length > 50000 && ` · 超出 ${(scriptData.content.length - 50000).toLocaleString()} 字`}
+              </div>
             </div>
 
             <div>

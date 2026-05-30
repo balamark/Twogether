@@ -102,8 +102,8 @@ router.post('/', thumbnailUpload.single('thumbnail'), [
     .isLength({ min: 1, max: 500 })
     .withMessage('情境描述必須在1-500個字符之間'),
   body('content')
-    .isLength({ min: 1, max: 5000 })
-    .withMessage('劇本內容必須在1-5000個字符之間'),
+    .isLength({ min: 1, max: 50000 })
+    .withMessage('劇本內容必須在1-50000個字符之間'),
   body('duration')
     .optional()
     .isLength({ max: 50 })
@@ -193,8 +193,8 @@ router.put('/:id', thumbnailUpload.single('thumbnail'), [
     .withMessage('情境描述必須在1-500個字符之間'),
   body('content')
     .optional()
-    .isLength({ min: 1, max: 5000 })
-    .withMessage('劇本內容必須在1-5000個字符之間'),
+    .isLength({ min: 1, max: 50000 })
+    .withMessage('劇本內容必須在1-50000個字符之間'),
   body('duration')
     .optional()
     .isLength({ max: 50 })
