@@ -524,7 +524,11 @@ apiClient.interceptors.response.use(
         forbiddenError.data = data;
         throw forbiddenError;
       } else if (status === 404) {
-        const notFoundError = new Error('請求的資源不存在') as Error & { error_code?: string; status?: number; data?: unknown };
+        // Prefer the backend's specific message (e.g. "這個邀請已被撤回…")
+        // so the user knows what to do, falling back to a generic string
+        // only when the body has none.
+        const backendMessage = data?.message || data?.error?.message;
+        const notFoundError = new Error(backendMessage || '請求的資源不存在') as Error & { error_code?: string; status?: number; data?: unknown };
         notFoundError.error_code = errorCode;
         notFoundError.status = status;
         notFoundError.data = data;
@@ -537,7 +541,11 @@ apiClient.interceptors.response.use(
         validationError.data = data;
         throw validationError;
       } else if (status >= 500) {
-        const serverError = new Error('服務器內部錯誤，請稍後再試') as Error & { error_code?: string; status?: number; data?: unknown };
+        // Same as 404: surface the backend's specific message when it has
+        // one (e.g. "回應親密請求失敗") so the user sees what feature failed
+        // instead of a featureless "服務器內部錯誤".
+        const backendMessage = data?.message || data?.error?.message;
+        const serverError = new Error(backendMessage || '服務器內部錯誤，請稍後再試') as Error & { error_code?: string; status?: number; data?: unknown };
         serverError.error_code = errorCode;
         serverError.status = status;
         serverError.data = data;
