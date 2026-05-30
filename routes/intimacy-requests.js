@@ -432,7 +432,7 @@ router.put('/:id/respond', [
     if (requestResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: '找不到指定的請求或您沒有權限回應'
+        message: '這個邀請已被撤回或無法回應，請重新整理頁面'
       });
     }
 
@@ -452,37 +452,36 @@ router.put('/:id/respond', [
       [response, response_message || null, now, requestId]
     );
 
-    // If accepted, award coins to both users
+    // If accepted, award coins to both users. Wrapped in try/catch so a
+    // failure here (e.g. schema drift on users.coins or coin_transactions)
+    // doesn't roll back the user's accept action — the response itself
+    // is already persisted above.
     if (response === 'accepted') {
       const coinAmount = 5; // 5 coins for accepted intimacy request
-      
-      await db.transaction(async (client) => {
-        // Award coins to requester
-        await client.query(
-          'UPDATE users SET coins = COALESCE(coins, 0) + $1 WHERE id = $2',
-          [coinAmount, request.sender_id]
-        );
-        
-        // Award coins to recipient
-        await client.query(
-          'UPDATE users SET coins = COALESCE(coins, 0) + $1 WHERE id = $2',
-          [coinAmount, userId]
-        );
-        
-        // Record transactions
-        const transactionId1 = uuidv4();
-        const transactionId2 = uuidv4();
-        
-        await client.query(`
-          INSERT INTO coin_transactions (id, user_id, amount, transaction_type, description, created_at)
-          VALUES ($1, $2, $3, 'bonus', '親密請求被接受獎勵', $4)
-        `, [transactionId1, request.sender_id, coinAmount, now]);
-        
-        await client.query(`
-          INSERT INTO coin_transactions (id, user_id, amount, transaction_type, description, created_at)
-          VALUES ($1, $2, $3, 'bonus', '接受親密請求獎勵', $4)
-        `, [transactionId2, userId, coinAmount, now]);
-      });
+      try {
+        await db.transaction(async (client) => {
+          await client.query(
+            'UPDATE users SET coins = COALESCE(coins, 0) + $1 WHERE id = $2',
+            [coinAmount, request.sender_id]
+          );
+          await client.query(
+            'UPDATE users SET coins = COALESCE(coins, 0) + $1 WHERE id = $2',
+            [coinAmount, userId]
+          );
+          const transactionId1 = uuidv4();
+          const transactionId2 = uuidv4();
+          await client.query(`
+            INSERT INTO coin_transactions (id, user_id, amount, transaction_type, description, created_at)
+            VALUES ($1, $2, $3, 'bonus', '親密請求被接受獎勵', $4)
+          `, [transactionId1, request.sender_id, coinAmount, now]);
+          await client.query(`
+            INSERT INTO coin_transactions (id, user_id, amount, transaction_type, description, created_at)
+            VALUES ($1, $2, $3, 'bonus', '接受親密請求獎勵', $4)
+          `, [transactionId2, userId, coinAmount, now]);
+        });
+      } catch (coinError) {
+        logWarn('Failed to award intimacy accept coins', { err: coinError.message, code: coinError.code, requestId });
+      }
     }
 
     // Create notification for the original requester about the response
