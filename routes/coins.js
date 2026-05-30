@@ -209,19 +209,25 @@ router.post('/spend', [
     const userId = req.user.id;
     const { amount, reason, transaction_type } = req.body;
 
-    // Check if user has enough coins
-    const balanceResult = await db.query(
-      'SELECT coins FROM users WHERE id = $1',
+    const coupleResult = await db.query(
+      'SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1',
       [userId]
     );
 
-    if (balanceResult.rows.length === 0) {
+    if (coupleResult.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: '用戶不存在'
+        message: '您還沒有情侶關係'
       });
     }
 
+    const coupleId = coupleResult.rows[0].id;
+
+    const balanceResult = await db.query(`
+      SELECT COALESCE(SUM(CASE WHEN transaction_type = 'earn' THEN amount ELSE -amount END), 0) as balance
+      FROM coin_transactions
+      WHERE couple_id = $1
+    `, [coupleId]);
     const currentBalance = parseInt(balanceResult.rows[0].balance) || 0;
 
     if (currentBalance < amount) {
@@ -233,14 +239,12 @@ router.post('/spend', [
       });
     }
 
-    // Record spend transaction
     const transactionId = uuidv4();
     await db.query(`
       INSERT INTO coin_transactions (id, couple_id, amount, transaction_type, spent_on, description, transaction_date)
       VALUES ($1, $2, $3, 'spend', $4, $5, NOW())
-    `, [transactionId, coupleId, amount, spent_on, reason]);
+    `, [transactionId, coupleId, amount, transaction_type, reason]);
 
-    // Get updated balance
     const updatedBalanceResult = await db.query(`
       SELECT COALESCE(SUM(CASE WHEN transaction_type = 'earn' THEN amount ELSE -amount END), 0) as balance
       FROM coin_transactions
