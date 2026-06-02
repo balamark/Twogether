@@ -6,6 +6,7 @@ import { apiService } from '../services/api';
 import type { MarketplaceScript } from '../services/api';
 import StarRating from './StarRating';
 import MarketplaceScriptDetail from './MarketplaceScriptDetail';
+import PetalSelect from './PetalSelect';
 
 interface RoleplayScript {
   id: string;
@@ -118,7 +119,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     } catch (err) {
       showNotification({
         type: 'error',
-        title: '無法載入 Marketplace',
+        title: '無法載入創作市集',
         message: (err as Error)?.message || '請稍後再試',
         duration: 4000,
       });
@@ -271,10 +272,11 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   };
 
   // Renders either the real thumbnail, or the editorial placeholder if image
-  // is missing / fails to load. `fit` controls the <img> object-fit — use
-  // 'contain' for the modal hero (show the whole image) and 'cover' for grid
-  // cards (fill the slot edge-to-edge).
-  const renderThumb = (script: RoleplayScript, className: string, fit: 'cover' | 'contain' = 'cover') => {
+  // is missing / fails to load. `fit` controls the <img> object-fit. We default
+  // to 'contain' so the full image is always visible — never crop images (see
+  // CLAUDE.md). The slot background (bg-petal-cream-2) shows behind contained
+  // images that don't match the slot's aspect ratio.
+  const renderThumb = (script: RoleplayScript, className: string, fit: 'cover' | 'contain' = 'contain') => {
     if (!script.image) {
       return <ScriptThumbPlaceholder category={script.category} title={script.title} className={className} />;
     }
@@ -315,7 +317,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
       <div className="flex gap-1 mb-6 border-b border-petal-rule">
         {([
           { id: 'mine' as const, label: '我的劇本', icon: <FileText className="w-3.5 h-3.5" strokeWidth={1.5} /> },
-          { id: 'marketplace' as const, label: 'Marketplace', icon: <Store className="w-3.5 h-3.5" strokeWidth={1.5} /> },
+          { id: 'marketplace' as const, label: '創作市集', icon: <Store className="w-3.5 h-3.5" strokeWidth={1.5} /> },
         ]).map((t) => {
           const isActive = mainTab === t.id;
           return (
@@ -503,7 +505,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           <div className="mb-10" data-testid="roleplay-marketplace-favorites-section">
             <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6 flex items-center">
               <Heart className="w-4 h-4 mr-2 text-petal-rose-deep fill-petal-rose-deep" strokeWidth={1.5} />
-              來自 <em className="not-italic font-light italic text-pink-600 mx-1">Marketplace</em> 的收藏
+              來自 <em className="not-italic font-light italic text-pink-600 mx-1">創作市集</em> 的收藏
               <span className="font-display italic font-light text-sm text-petal-muted ml-2">({favoritedMarketplace.length})</span>
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -617,34 +619,34 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
       {mainTab === 'marketplace' && (
         <div data-testid="roleplay-marketplace-tab">
           <div className="flex flex-wrap gap-2 mb-6">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-petal-rule bg-white">
-              <ArrowDownWideNarrow className="w-3.5 h-3.5 text-petal-muted" strokeWidth={1.5} />
-              <select
-                value={marketplaceSort}
-                onChange={(e) => setMarketplaceSort(e.target.value as 'rating' | 'recent' | 'popular')}
-                data-testid="marketplace-sort"
-                className="bg-transparent font-body text-[13px] text-petal-ink focus:outline-none"
-              >
-                <option value="rating">評分最高</option>
-                <option value="popular">最熱門</option>
-                <option value="recent">最新</option>
-              </select>
-            </div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-petal-rule bg-white">
-              <Filter className="w-3.5 h-3.5 text-petal-muted" strokeWidth={1.5} />
-              <select
-                value={marketplaceCategory}
-                onChange={(e) => setMarketplaceCategory(e.target.value as typeof marketplaceCategory)}
-                data-testid="marketplace-category"
-                className="bg-transparent font-body text-[13px] text-petal-ink focus:outline-none"
-              >
-                <option value="all">全部分類</option>
-                <option value="romantic">浪漫</option>
-                <option value="adventurous">冒險</option>
-                <option value="school">校園</option>
-                <option value="bold">大膽</option>
-              </select>
-            </div>
+            <PetalSelect
+              value={marketplaceSort}
+              onChange={(v) => setMarketplaceSort(v as 'rating' | 'recent' | 'popular')}
+              testId="marketplace-sort"
+              optionTestIdPrefix="marketplace-sort"
+              ariaLabel="排序方式"
+              icon={<ArrowDownWideNarrow className="w-3.5 h-3.5 text-petal-muted" strokeWidth={1.5} />}
+              options={[
+                { value: 'rating', label: '評分最高' },
+                { value: 'popular', label: '最熱門' },
+                { value: 'recent', label: '最新' },
+              ]}
+            />
+            <PetalSelect
+              value={marketplaceCategory}
+              onChange={(v) => setMarketplaceCategory(v as typeof marketplaceCategory)}
+              testId="marketplace-category"
+              optionTestIdPrefix="marketplace-category"
+              ariaLabel="分類篩選"
+              icon={<Filter className="w-3.5 h-3.5 text-petal-muted" strokeWidth={1.5} />}
+              options={[
+                { value: 'all', label: '全部分類' },
+                { value: 'romantic', label: '浪漫' },
+                { value: 'adventurous', label: '冒險' },
+                { value: 'school', label: '校園' },
+                { value: 'bold', label: '大膽' },
+              ]}
+            />
           </div>
 
           {marketplaceLoading ? (
@@ -665,7 +667,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                   onClick={() => setMarketplaceDetailId(m.id)}
                 >
                   <div className="relative aspect-video bg-petal-cream-2 rounded-md mb-3 overflow-hidden">
-                    {renderThumb(marketplaceToRoleplay(m), 'w-full h-full', 'cover')}
+                    {renderThumb(marketplaceToRoleplay(m), 'w-full h-full', 'contain')}
                   </div>
                   <h4 className="font-display text-base font-medium tracking-tight text-petal-ink mb-1 truncate">
                     {m.title}

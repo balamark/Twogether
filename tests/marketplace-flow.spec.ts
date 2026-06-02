@@ -118,7 +118,10 @@ test.describe('Marketplace — public script sharing + ratings + favorites', () 
     await expect(page.getByTestId('marketplace-grid')).toBeVisible({ timeout: 5000 });
 
     // 4. Switch the sort dropdown to "最新" so the new script bubbles to the top.
-    await page.getByTestId('marketplace-sort').selectOption('recent');
+    //    The sort control is a custom themed dropdown (not a native <select>),
+    //    so open the trigger then click the option.
+    await page.getByTestId('marketplace-sort').click();
+    await page.getByTestId('marketplace-sort-option-recent').click();
     await page.waitForResponse(
       (r) => r.url().includes('/api/marketplace/scripts') && r.request().method() === 'GET',
       { timeout: 10000 }

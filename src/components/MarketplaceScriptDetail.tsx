@@ -165,7 +165,7 @@ export default function MarketplaceScriptDetail({
       >
         <div className="sticky top-0 z-10 bg-petal-cream/95 backdrop-blur-sm flex items-center justify-between px-5 sm:px-8 py-3 border-b border-petal-rule">
           <span className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted">
-            — Marketplace 劇本
+            — 創作市集 劇本
           </span>
           <button
             type="button"

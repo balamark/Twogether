@@ -92,7 +92,7 @@ router.get(
       });
     } catch (error) {
       logDbError('Marketplace list error:', error, { user_id: req.user?.id });
-      res.status(500).json(errorResponseBody('無法載入 Marketplace 劇本', error));
+      res.status(500).json(errorResponseBody('無法載入創作市集劇本', error));
     }
   }
 );
