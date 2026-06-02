@@ -78,6 +78,7 @@ interface RoleplayScript {
   image?: string;
   script: string;
   isCustom?: boolean;
+  isPublic?: boolean;
   createdBy?: string;
   createdAt?: string;
   tags?: string[];
@@ -95,6 +96,7 @@ interface ApiCustomScript {
   duration?: string;
   thumbnailUrl?: string;
   isCustom?: boolean;
+  isPublic?: boolean;
   createdBy?: string;
   createdAt?: string;
 }
@@ -1128,6 +1130,7 @@ const LoveTimeApp = () => {
             duration: script.duration,
             image: script.thumbnailUrl,
             isCustom: script.isCustom ?? true,
+            isPublic: script.isPublic,
             createdBy: script.createdBy,
             createdAt: script.createdAt
           }));
@@ -1464,7 +1467,15 @@ const LoveTimeApp = () => {
     return formattedLines.join('\n\n');
   };
 
-  const addCustomScript = async (title: string, category: 'romantic' | 'adventurous' | 'school' | 'bold', scenario: string, content: string, tags: string[] = [], thumbnail?: File) => {
+  const addCustomScript = async (
+    title: string,
+    category: 'romantic' | 'adventurous' | 'school' | 'bold',
+    scenario: string,
+    content: string,
+    tags: string[] = [],
+    thumbnail?: File,
+    isPublic: boolean = true,
+  ) => {
     try {
       // Create script via backend API
       const rawScript = await apiService.createCustomScript({
@@ -1474,7 +1485,8 @@ const LoveTimeApp = () => {
         content: parseScriptContent(content),
         tags,
         duration: '15-30分鐘',
-        thumbnail
+        thumbnail,
+        isPublic,
       });
 
       // Transform the response to match RoleplayScript interface
@@ -1489,6 +1501,7 @@ const LoveTimeApp = () => {
         duration: typedScript.duration || '15-30分鐘',
         image: typedScript.thumbnailUrl,
         isCustom: true,
+        isPublic: typedScript.isPublic ?? isPublic,
         createdBy: typedScript.createdBy,
         createdAt: typedScript.createdAt
       };
@@ -1540,6 +1553,7 @@ const LoveTimeApp = () => {
       content: string;
       tags: string[];
       thumbnail?: File;
+      isPublic?: boolean;
     }
   ) => {
     try {
@@ -1550,6 +1564,7 @@ const LoveTimeApp = () => {
         content: updates.content,
         tags: updates.tags,
         thumbnail: updates.thumbnail,
+        isPublic: updates.isPublic,
       });
 
       const typedScript = rawScript as ApiCustomScript;
@@ -1566,6 +1581,7 @@ const LoveTimeApp = () => {
                 // Server may have updated the thumbnail URL; fall back to
                 // the existing image if no new one was uploaded.
                 image: typedScript.thumbnailUrl ?? s.image,
+                isPublic: typedScript.isPublic ?? updates.isPublic ?? s.isPublic,
               }
             : s
         )
@@ -4721,6 +4737,12 @@ const LoveTimeApp = () => {
       content: editingScript?.script ?? '',
       tags: editingScript?.tags ? editingScript.tags.join(', ') : ''
     }));
+    // New scripts default to public (the Marketplace product requirement).
+    // Editing reflects the existing flag — falling back to true if the script
+    // pre-dates the column (legacy rows show as private in the API).
+    const [isPublic, setIsPublic] = useState<boolean>(
+      isEditMode ? (editingScript?.isPublic ?? false) : true
+    );
     const [thumbnail, setThumbnail] = useState<File | null>(null);
     const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
     useScrollLock(true);
@@ -4761,6 +4783,7 @@ const LoveTimeApp = () => {
           content: scriptData.content,
           tags,
           thumbnail: thumbnail ?? undefined,
+          isPublic,
         });
       } else {
         addCustomScript(
@@ -4770,6 +4793,7 @@ const LoveTimeApp = () => {
           scriptData.content,
           tags,
           thumbnail ?? undefined,
+          isPublic,
         );
       }
     };
@@ -4937,6 +4961,26 @@ const LoveTimeApp = () => {
                   未上傳縮圖時，會使用編輯式預設圖。
                 </p>
               )}
+            </div>
+
+            <div className="p-4 bg-petal-cream-2/40 border border-petal-rule-soft rounded-md">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isPublic}
+                  onChange={(e) => setIsPublic(e.target.checked)}
+                  data-testid="script-public-toggle"
+                  className="mt-1 w-4 h-4 accent-petal-rose-deep"
+                />
+                <div className="flex-1">
+                  <div className="font-body text-sm font-medium text-petal-ink">
+                    分享到 Marketplace
+                  </div>
+                  <p className="font-display italic font-light text-xs text-petal-muted mt-0.5 leading-relaxed">
+                    開啟後，其他使用者可以在 Marketplace 看到、評分、收藏這個劇本。
+                  </p>
+                </div>
+              </label>
             </div>
 
             <div className="flex gap-2 pt-2">

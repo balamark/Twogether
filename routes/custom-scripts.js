@@ -58,7 +58,7 @@ router.get('/', async (req, res) => {
     const scriptsResult = await db.query(`
       SELECT
         id, title, category, scenario, content, tags, duration,
-        thumbnail_url, created_by, created_at, updated_at
+        thumbnail_url, is_public, created_by, created_at, updated_at
       FROM custom_scripts
       WHERE couple_id = $1 OR (couple_id IS NULL AND created_by = $2)
       ORDER BY created_at DESC
@@ -73,6 +73,7 @@ router.get('/', async (req, res) => {
       tags: script.tags || [],
       duration: script.duration || '15-30分鐘',
       thumbnailUrl: script.thumbnail_url,
+      isPublic: script.is_public,
       isCustom: true,
       createdBy: script.created_by,
       createdAt: script.created_at
@@ -107,7 +108,11 @@ router.post('/', thumbnailUpload.single('thumbnail'), [
   body('duration')
     .optional()
     .isLength({ max: 50 })
-    .withMessage('時長描述不能超過50個字符')
+    .withMessage('時長描述不能超過50個字符'),
+  body('isPublic')
+    .optional()
+    .isBoolean()
+    .withMessage('isPublic 必須是布林值')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -122,6 +127,11 @@ router.post('/', thumbnailUpload.single('thumbnail'), [
     const { title, category, scenario, content, duration = '15-30分鐘' } = req.body;
     const tags = normalizeTags(req.body.tags);
     const userId = req.user.id;
+    // Default to public — marketplace opt-out is per-script. Multipart sends
+    // the field as the string 'false'; treat both literals correctly.
+    const isPublic = req.body.isPublic === undefined
+      ? true
+      : !(req.body.isPublic === false || req.body.isPublic === 'false');
 
     // Find user's couple (optional - users can create personal scripts)
     const coupleResult = await db.query(
@@ -145,10 +155,10 @@ router.post('/', thumbnailUpload.single('thumbnail'), [
     // Insert custom script
     const scriptResult = await db.query(`
       INSERT INTO custom_scripts (
-        couple_id, title, category, scenario, content, tags, duration, created_by, thumbnail_url
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING id, title, category, scenario, content, tags, duration, thumbnail_url, created_by, created_at
-    `, [coupleId, title, category, scenario, content, JSON.stringify(tags), duration, userId, thumbnailUrl]);
+        couple_id, title, category, scenario, content, tags, duration, created_by, thumbnail_url, is_public
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING id, title, category, scenario, content, tags, duration, thumbnail_url, is_public, created_by, created_at
+    `, [coupleId, title, category, scenario, content, JSON.stringify(tags), duration, userId, thumbnailUrl, isPublic]);
 
     const script = scriptResult.rows[0];
 
@@ -164,6 +174,7 @@ router.post('/', thumbnailUpload.single('thumbnail'), [
         tags: Array.isArray(script.tags) ? script.tags : JSON.parse(script.tags || '[]'),
         duration: script.duration,
         thumbnailUrl: script.thumbnail_url,
+        isPublic: script.is_public,
         isCustom: true,
         createdBy: script.created_by,
         createdAt: script.created_at
@@ -198,7 +209,11 @@ router.put('/:id', thumbnailUpload.single('thumbnail'), [
   body('duration')
     .optional()
     .isLength({ max: 50 })
-    .withMessage('時長描述不能超過50個字符')
+    .withMessage('時長描述不能超過50個字符'),
+  body('isPublic')
+    .optional()
+    .isBoolean()
+    .withMessage('isPublic 必須是布林值')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -213,6 +228,11 @@ router.put('/:id', thumbnailUpload.single('thumbnail'), [
     const scriptId = req.params.id;
     const userId = req.user.id;
     const updates = { ...req.body };
+
+    // Normalize isPublic: multipart sends as string, JSON sends as bool.
+    if (updates.isPublic !== undefined) {
+      updates.isPublic = !(updates.isPublic === false || updates.isPublic === 'false');
+    }
 
     // Normalize tags: in multipart it arrives as a JSON string; in JSON as an array.
     if (updates.tags !== undefined) {
@@ -265,6 +285,10 @@ router.put('/:id', thumbnailUpload.single('thumbnail'), [
         updateFields.push(`tags = $${paramIndex}`);
         updateValues.push(JSON.stringify(updates[key]));
         paramIndex++;
+      } else if (key === 'isPublic') {
+        updateFields.push(`is_public = $${paramIndex}`);
+        updateValues.push(updates[key]);
+        paramIndex++;
       }
     });
 
@@ -290,7 +314,7 @@ router.put('/:id', thumbnailUpload.single('thumbnail'), [
       UPDATE custom_scripts
       SET ${updateFields.join(', ')}
       WHERE id = $${paramIndex}
-      RETURNING id, title, category, scenario, content, tags, duration, thumbnail_url, created_by, created_at, updated_at
+      RETURNING id, title, category, scenario, content, tags, duration, thumbnail_url, is_public, created_by, created_at, updated_at
     `;
 
     const updatedResult = await db.query(updateQuery, updateValues);
@@ -308,6 +332,7 @@ router.put('/:id', thumbnailUpload.single('thumbnail'), [
         tags: Array.isArray(script.tags) ? script.tags : JSON.parse(script.tags || '[]'),
         duration: script.duration,
         thumbnailUrl: script.thumbnail_url,
+        isPublic: script.is_public,
         isCustom: true,
         createdBy: script.created_by,
         createdAt: script.created_at

@@ -1,7 +1,11 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil, X } from 'lucide-react';
+import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow } from 'lucide-react';
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { apiService } from '../services/api';
+import type { MarketplaceScript } from '../services/api';
+import StarRating from './StarRating';
+import MarketplaceScriptDetail from './MarketplaceScriptDetail';
 
 interface RoleplayScript {
   id: string;
@@ -11,6 +15,7 @@ interface RoleplayScript {
   image?: string;
   script: string;
   isCustom?: boolean;
+  isPublic?: boolean;
   createdBy?: string;
   createdAt?: string;
   tags?: string[];
@@ -92,6 +97,53 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   // alone does NOT record; only this transition does.
   const [hasBegun, setHasBegun] = useState(false);
 
+  // Marketplace state — discoverable public scripts shared by other users.
+  const [mainTab, setMainTab] = useState<'mine' | 'marketplace'>('mine');
+  const [marketplaceScripts, setMarketplaceScripts] = useState<MarketplaceScript[]>([]);
+  const [marketplaceLoading, setMarketplaceLoading] = useState(false);
+  const [marketplaceSort, setMarketplaceSort] = useState<'rating' | 'recent' | 'popular'>('rating');
+  const [marketplaceCategory, setMarketplaceCategory] = useState<'all' | RoleplayScript['category']>('all');
+  const [marketplaceDetailId, setMarketplaceDetailId] = useState<string | null>(null);
+  const [favoritedMarketplace, setFavoritedMarketplace] = useState<MarketplaceScript[]>([]);
+
+  const loadMarketplace = useCallback(async () => {
+    setMarketplaceLoading(true);
+    try {
+      const list = await apiService.getMarketplaceScripts({
+        sort: marketplaceSort,
+        category: marketplaceCategory === 'all' ? undefined : marketplaceCategory,
+        limit: 60,
+      });
+      setMarketplaceScripts(list);
+    } catch (err) {
+      showNotification({
+        type: 'error',
+        title: '無法載入 Marketplace',
+        message: (err as Error)?.message || '請稍後再試',
+        duration: 4000,
+      });
+    } finally {
+      setMarketplaceLoading(false);
+    }
+  }, [marketplaceSort, marketplaceCategory, showNotification]);
+
+  const loadFavoritedMarketplace = useCallback(async () => {
+    try {
+      const list = await apiService.getFavoritedMarketplaceScripts();
+      setFavoritedMarketplace(list);
+    } catch {
+      // Quiet fail — the section just stays empty.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (mainTab === 'marketplace') loadMarketplace();
+  }, [mainTab, loadMarketplace]);
+
+  useEffect(() => {
+    loadFavoritedMarketplace();
+  }, [loadFavoritedMarketplace, favoriteScriptIds]);
+
   useScrollLock(showScriptModal && !!selectedScript);
 
   const handleViewScript = useCallback((script: RoleplayScript) => {
@@ -165,6 +217,29 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     ? allScripts
     : allScripts.filter(script => script.category === roleplayFilter);
 
+  // Convert marketplace data shape into the RoleplayScript the play/view
+  // handlers expect. Keeps recordRoleplay logic single-sourced.
+  const marketplaceToRoleplay = (m: MarketplaceScript): RoleplayScript => ({
+    id: m.id,
+    title: m.title,
+    category: m.category,
+    scenario: m.scenario,
+    image: m.thumbnailUrl ?? undefined,
+    script: m.script,
+    isCustom: true,
+    isPublic: m.isPublic,
+    createdBy: m.authorId,
+    createdAt: m.createdAt,
+    tags: m.tags,
+    duration: m.duration,
+  });
+
+  const handleMarketplacePlay = useCallback((m: MarketplaceScript) => {
+    const rp = marketplaceToRoleplay(m);
+    setMarketplaceDetailId(null);
+    handleQuickPlay(rp);
+  }, [handleQuickPlay]);
+
   // 我的最愛 — pulls from both default and custom scripts. Falls back to the
   // original top-3 featured selection when the couple has no favorites yet,
   // so the top section never goes empty.
@@ -236,8 +311,35 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
         </p>
       </div>
 
-      {/* Category Filter Tabs */}
+      {/* Main tabs — My Scripts vs Marketplace */}
+      <div className="flex gap-1 mb-6 border-b border-petal-rule">
+        {([
+          { id: 'mine' as const, label: '我的劇本', icon: <FileText className="w-3.5 h-3.5" strokeWidth={1.5} /> },
+          { id: 'marketplace' as const, label: 'Marketplace', icon: <Store className="w-3.5 h-3.5" strokeWidth={1.5} /> },
+        ]).map((t) => {
+          const isActive = mainTab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setMainTab(t.id)}
+              data-testid={`roleplay-tab-${t.id}`}
+              className={`px-4 py-2.5 font-display text-base tracking-tight transition-colors -mb-px border-b-2 inline-flex items-center gap-2 ${
+                isActive
+                  ? 'text-petal-ink border-petal-rose-deep font-medium'
+                  : 'text-petal-muted border-transparent hover:text-petal-ink'
+              }`}
+            >
+              {t.icon}
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {mainTab === 'mine' && (
       <div>
+        {/* Category Filter Tabs */}
         <div className="flex flex-wrap gap-1.5 mb-8">
           {[
             { id: 'all', label: '全部', icon: '🌟' },
@@ -396,6 +498,57 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           )}
         </div>
 
+        {/* Favorited from Marketplace */}
+        {favoritedMarketplace.length > 0 && (
+          <div className="mb-10" data-testid="roleplay-marketplace-favorites-section">
+            <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6 flex items-center">
+              <Heart className="w-4 h-4 mr-2 text-petal-rose-deep fill-petal-rose-deep" strokeWidth={1.5} />
+              來自 <em className="not-italic font-light italic text-pink-600 mx-1">Marketplace</em> 的收藏
+              <span className="font-display italic font-light text-sm text-petal-muted ml-2">({favoritedMarketplace.length})</span>
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {favoritedMarketplace.map((m) => (
+                <div
+                  key={m.id}
+                  data-testid={`marketplace-favorite-card-${m.id}`}
+                  className="bg-white border border-petal-rule rounded-md p-4 hover:border-petal-rose transition-colors cursor-pointer"
+                  onClick={() => setMarketplaceDetailId(m.id)}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-14 h-14 rounded-md flex-shrink-0 overflow-hidden border border-petal-rule">
+                      {renderThumb(marketplaceToRoleplay(m), 'w-full h-full')}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <h4 className="font-display text-base font-medium tracking-tight text-petal-ink truncate">{m.title}</h4>
+                        {!m.isPublic && (
+                          <span className="text-[10px] text-petal-muted italic flex-shrink-0">作者已停止分享</span>
+                        )}
+                      </div>
+                      <p className="font-body text-xs text-petal-muted mt-0.5">by {m.authorName}</p>
+                      <p className="font-body text-sm text-petal-ink-soft mt-1 line-clamp-2 leading-relaxed">{m.scenario}</p>
+                      <div className="mt-2 flex items-center justify-between">
+                        <StarRating value={m.avgStars} count={m.ratingCount} showCount size={12} />
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleMarketplacePlay(m); }}
+                            data-testid={`marketplace-favorite-play-${m.id}`}
+                            className="bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                          >
+                            <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                            開始
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* All Scripts */}
         <div>
           <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6 flex items-center">
@@ -459,6 +612,102 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           </div>
         </div>
       </div>
+      )}
+
+      {mainTab === 'marketplace' && (
+        <div data-testid="roleplay-marketplace-tab">
+          <div className="flex flex-wrap gap-2 mb-6">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-petal-rule bg-white">
+              <ArrowDownWideNarrow className="w-3.5 h-3.5 text-petal-muted" strokeWidth={1.5} />
+              <select
+                value={marketplaceSort}
+                onChange={(e) => setMarketplaceSort(e.target.value as 'rating' | 'recent' | 'popular')}
+                data-testid="marketplace-sort"
+                className="bg-transparent font-body text-[13px] text-petal-ink focus:outline-none"
+              >
+                <option value="rating">評分最高</option>
+                <option value="popular">最熱門</option>
+                <option value="recent">最新</option>
+              </select>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-petal-rule bg-white">
+              <Filter className="w-3.5 h-3.5 text-petal-muted" strokeWidth={1.5} />
+              <select
+                value={marketplaceCategory}
+                onChange={(e) => setMarketplaceCategory(e.target.value as typeof marketplaceCategory)}
+                data-testid="marketplace-category"
+                className="bg-transparent font-body text-[13px] text-petal-ink focus:outline-none"
+              >
+                <option value="all">全部分類</option>
+                <option value="romantic">浪漫</option>
+                <option value="adventurous">冒險</option>
+                <option value="school">校園</option>
+                <option value="bold">大膽</option>
+              </select>
+            </div>
+          </div>
+
+          {marketplaceLoading ? (
+            <p className="font-display italic font-light text-sm text-petal-muted text-center py-10">
+              載入中…
+            </p>
+          ) : marketplaceScripts.length === 0 ? (
+            <p className="font-display italic font-light text-sm text-petal-muted text-center py-10">
+              目前還沒有公開劇本，第一個發布的就是你！
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="marketplace-grid">
+              {marketplaceScripts.map((m) => (
+                <div
+                  key={m.id}
+                  data-testid={`marketplace-card-${m.id}`}
+                  className="bg-white border border-petal-rule rounded-md p-4 hover:border-petal-rose transition-colors cursor-pointer flex flex-col"
+                  onClick={() => setMarketplaceDetailId(m.id)}
+                >
+                  <div className="relative aspect-video bg-petal-cream-2 rounded-md mb-3 overflow-hidden">
+                    {renderThumb(marketplaceToRoleplay(m), 'w-full h-full', 'cover')}
+                  </div>
+                  <h4 className="font-display text-base font-medium tracking-tight text-petal-ink mb-1 truncate">
+                    {m.title}
+                  </h4>
+                  <p className="font-body text-xs text-petal-muted mb-1.5">by {m.authorName}</p>
+                  <p className="font-body text-sm text-petal-ink-soft mb-3 line-clamp-2 leading-relaxed flex-1">
+                    {m.scenario}
+                  </p>
+                  <div className="flex items-center justify-between gap-2">
+                    <StarRating value={m.avgStars} count={m.ratingCount} showCount size={13} />
+                    <div className="flex items-center gap-1.5">
+                      <FavoriteButton scriptId={m.id} className="w-7 h-7 hover:bg-petal-cream-2" />
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleMarketplacePlay(m); }}
+                        data-testid={`marketplace-play-${m.id}`}
+                        className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                      >
+                        <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                        玩
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {marketplaceDetailId && (
+        <MarketplaceScriptDetail
+          scriptId={marketplaceDetailId}
+          onClose={() => setMarketplaceDetailId(null)}
+          onPlay={(m) => handleMarketplacePlay(m)}
+          onToggleFavorite={async (id) => {
+            await onToggleFavorite(id);
+            await loadFavoritedMarketplace();
+          }}
+          showNotification={showNotification}
+        />
+      )}
 
       {/* Script Modal — view-only by default; record only on explicit 開始扮演 */}
       {showScriptModal && selectedScript && (

@@ -361,6 +361,45 @@ export interface UpdateWallPostInput {
   category?: WallPostCategory;
 }
 
+// Marketplace — public custom-script discovery + community rating
+export type ScriptCategory = 'romantic' | 'adventurous' | 'school' | 'bold';
+export type ScriptReportReason = 'inappropriate' | 'spam' | 'copyright' | 'other';
+
+export interface MarketplaceScript {
+  id: string;
+  title: string;
+  category: ScriptCategory;
+  scenario: string;
+  script: string;
+  tags: string[];
+  duration: string;
+  thumbnailUrl?: string | null;
+  authorId: string;
+  authorName: string;
+  avgStars: number;
+  ratingCount: number;
+  isPublic: boolean;
+  isCustom: true;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface MarketplaceScriptDetail extends MarketplaceScript {
+  myRating: { stars: number; reviewText: string | null } | null;
+  isFavorited: boolean;
+  isAuthor: boolean;
+}
+
+export interface ScriptRatingEntry {
+  id: string;
+  stars: number;
+  reviewText: string | null;
+  userId: string;
+  authorName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Auth storage keys — keep in sync with reads in App.tsx.
 const AUTH_STORAGE_KEYS = ['authToken', 'authUser', 'authState', 'authTokenExpiresAt'] as const;
 
@@ -1514,6 +1553,7 @@ class ApiService {
     tags?: string[];
     duration?: string;
     thumbnail?: File;
+    isPublic?: boolean;
   }): Promise<unknown> {
     try {
       if (script.thumbnail) {
@@ -1525,6 +1565,7 @@ class ApiService {
         fd.append('duration', script.duration ?? '15-30分鐘');
         fd.append('tags', JSON.stringify(script.tags ?? []));
         fd.append('thumbnail', script.thumbnail);
+        if (script.isPublic !== undefined) fd.append('isPublic', String(script.isPublic));
         const response = await apiClient.post('/custom-scripts', fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
@@ -1547,6 +1588,7 @@ class ApiService {
     tags?: string[];
     duration?: string;
     thumbnail?: File;
+    isPublic?: boolean;
   }): Promise<unknown> {
     try {
       // Multipart path when a new thumbnail is provided — mirrors createCustomScript.
@@ -1558,6 +1600,7 @@ class ApiService {
         if (updates.content !== undefined) fd.append('content', updates.content);
         if (updates.duration !== undefined) fd.append('duration', updates.duration);
         if (updates.tags !== undefined) fd.append('tags', JSON.stringify(updates.tags));
+        if (updates.isPublic !== undefined) fd.append('isPublic', String(updates.isPublic));
         fd.append('thumbnail', updates.thumbnail);
         const response = await apiClient.put(`/custom-scripts/${id}`, fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
@@ -1608,6 +1651,79 @@ class ApiService {
       await apiClient.delete(`/script-favorites/${encodeURIComponent(scriptId)}`);
     } catch (error) {
       console.error('Failed to remove script favorite:', error);
+      throw error;
+    }
+  }
+
+  // Marketplace API — public custom-scripts with ratings/reviews/reports
+  async getMarketplaceScripts(params: {
+    sort?: 'rating' | 'recent' | 'popular';
+    category?: 'romantic' | 'adventurous' | 'school' | 'bold';
+    limit?: number;
+    offset?: number;
+  } = {}): Promise<MarketplaceScript[]> {
+    try {
+      const response = await apiClient.get('/marketplace/scripts', { params });
+      return (response.data.scripts || []) as MarketplaceScript[];
+    } catch (error) {
+      console.error('Failed to fetch marketplace scripts:', error);
+      throw error;
+    }
+  }
+
+  async getMarketplaceScript(id: string): Promise<MarketplaceScriptDetail> {
+    try {
+      const response = await apiClient.get(`/marketplace/scripts/${id}`);
+      return response.data.script as MarketplaceScriptDetail;
+    } catch (error) {
+      console.error('Failed to fetch marketplace script:', error);
+      throw error;
+    }
+  }
+
+  async getScriptRatings(id: string, params: { limit?: number; offset?: number } = {}): Promise<ScriptRatingEntry[]> {
+    try {
+      const response = await apiClient.get(`/marketplace/scripts/${id}/ratings`, { params });
+      return (response.data.ratings || []) as ScriptRatingEntry[];
+    } catch (error) {
+      console.error('Failed to fetch script ratings:', error);
+      throw error;
+    }
+  }
+
+  async rateScript(id: string, stars: number, reviewText?: string): Promise<void> {
+    try {
+      await apiClient.post(`/marketplace/scripts/${id}/rate`, { stars, reviewText });
+    } catch (error) {
+      console.error('Failed to submit rating:', error);
+      throw this.extractScriptError(error, '無法送出評分');
+    }
+  }
+
+  async deleteScriptRating(id: string): Promise<void> {
+    try {
+      await apiClient.delete(`/marketplace/scripts/${id}/rate`);
+    } catch (error) {
+      console.error('Failed to delete rating:', error);
+      throw error;
+    }
+  }
+
+  async reportScript(id: string, reason: ScriptReportReason, detail?: string): Promise<void> {
+    try {
+      await apiClient.post(`/marketplace/scripts/${id}/report`, { reason, detail });
+    } catch (error) {
+      console.error('Failed to submit report:', error);
+      throw this.extractScriptError(error, '無法送出檢舉');
+    }
+  }
+
+  async getFavoritedMarketplaceScripts(): Promise<MarketplaceScript[]> {
+    try {
+      const response = await apiClient.get('/marketplace/my-favorites');
+      return (response.data.scripts || []) as MarketplaceScript[];
+    } catch (error) {
+      console.error('Failed to fetch favorited marketplace scripts:', error);
       throw error;
     }
   }
