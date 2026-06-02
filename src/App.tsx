@@ -4974,10 +4974,10 @@ const LoveTimeApp = () => {
                 />
                 <div className="flex-1">
                   <div className="font-body text-sm font-medium text-petal-ink">
-                    分享到 Marketplace
+                    分享到創作市集
                   </div>
                   <p className="font-display italic font-light text-xs text-petal-muted mt-0.5 leading-relaxed">
-                    開啟後，其他使用者可以在 Marketplace 看到、評分、收藏這個劇本。
+                    開啟後，其他使用者可以在創作市集看到、評分、收藏這個劇本。
                   </p>
                 </div>
               </label>
