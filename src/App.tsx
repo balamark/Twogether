@@ -441,26 +441,6 @@ const LoveTimeApp = () => {
     }
   }, [customEmotions]);
 
-  // Funnel top-of-funnel beacon. Fires once per browser tab session when an
-  // unauthenticated visitor reaches the app, so the /admin dashboard can count
-  // distinct landing IPs vs signups. Skipped for already-authenticated users
-  // so reloads don't inflate the visit count.
-  useEffect(() => {
-    if (authState.isAuthenticated) return;
-    try {
-      if (sessionStorage.getItem('tw_landing_beaconed') === '1') return;
-      sessionStorage.setItem('tw_landing_beaconed', '1');
-    } catch {
-      // sessionStorage can throw in private modes — fall through and fire anyway.
-    }
-    fetch('/api/track/landing', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ua: navigator.userAgent }),
-      keepalive: true,
-    }).catch(() => {});
-  }, [authState.isAuthenticated]);
-
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [roleplayFilter, setRoleplayFilter] = useState('all');
@@ -481,6 +461,26 @@ const LoveTimeApp = () => {
   const [pairingPromptEmail, setPairingPromptEmail] = useState('');
   const [pairingPromptSending, setPairingPromptSending] = useState(false);
   const [pairingPromptSent, setPairingPromptSent] = useState(false);
+
+  // Funnel top-of-funnel beacon. Fires once per browser tab session when an
+  // unauthenticated visitor reaches the app, so the /admin dashboard can count
+  // distinct landing IPs vs signups. Skipped for already-authenticated users
+  // so reloads don't inflate the visit count.
+  useEffect(() => {
+    if (authState.isAuthenticated) return;
+    try {
+      if (sessionStorage.getItem('tw_landing_beaconed') === '1') return;
+      sessionStorage.setItem('tw_landing_beaconed', '1');
+    } catch {
+      // sessionStorage can throw in private modes — fall through and fire anyway.
+    }
+    fetch('/api/track/landing', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ua: navigator.userAgent }),
+      keepalive: true,
+    }).catch(() => {});
+  }, [authState.isAuthenticated]);
 
   const [customScripts, setCustomScripts] = useState<RoleplayScript[]>([]);
   const [favoriteScriptIds, setFavoriteScriptIds] = useState<Set<string>>(new Set());
