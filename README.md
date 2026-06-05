@@ -331,6 +331,9 @@ CORS_ORIGIN=http://localhost:5174
 # Email (optional, for notifications)
 RESEND_API_KEY=your-resend-api-key
 EMAIL_FROM=Twogether <no-reply@example.com>
+
+# Admin funnel dashboard (gates /admin and /api/admin/*)
+ADMIN_PASSWORD=pick-a-long-random-password
 ```
 
 ## 🔧 Supabase Setup

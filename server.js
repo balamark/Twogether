@@ -28,18 +28,23 @@ const wallRoutes = require('./routes/wall');
 const eventRoutes = require('./routes/events');
 const scriptFavoritesRoutes = require('./routes/script-favorites');
 const marketplaceRoutes = require('./routes/marketplace');
+const adminRoutes = require('./routes/admin');
 
 // Import database and middleware
 const db = require('./database/db');
 const { requestLogger, errorHandler, asyncHandler } = require('./middleware/logging');
 const { JWT_EXPIRES_IN, JWT_EXPIRES_IN_MS } = require('./middleware/auth');
+const { adminAuth } = require('./middleware/adminAuth');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Trust proxy for Google Cloud (correct X-Forwarded-For handling behind GAE).
+// Trust exactly one hop for Google Cloud (GAE adds a single X-Forwarded-For
+// frontend). `true` would trust ALL hops, letting any client spoof their IP
+// via X-Forwarded-For — that breaks the funnel's distinct-IP signal and any
+// IP-based rate limiting. Adjust if a CDN ever sits in front of GAE.
 if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', true);
+  app.set('trust proxy', 1);
 }
 
 // Session configuration. Cookie maxAge is kept in sync with the JWT TTL
@@ -132,6 +137,14 @@ app.use('/api/script-favorites', scriptFavoritesRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 // Additional mount for intimacy endpoints (frontend compatibility)
 app.use('/api/intimacy', intimacyRequestRoutes);
+
+// Admin funnel dashboard. The public router (POST /api/track/landing) is the
+// anonymous beacon fired from the frontend on the logged-out landing render.
+// The /api/admin/* JSON endpoints and the /admin HTML page are gated by
+// HTTP Basic Auth (ADMIN_PASSWORD env var).
+app.use('/api', adminRoutes.publicRouter);
+app.use('/api/admin', adminAuth, adminRoutes.adminApiRouter);
+app.get('/admin', adminAuth, adminRoutes.htmlHandler);
 
 // Serve static files from the frontend build
 app.use(express.static(path.join(__dirname, 'dist'), {

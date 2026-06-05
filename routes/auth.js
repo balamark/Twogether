@@ -143,6 +143,15 @@ router.post('/login', [
       [new Date().toISOString(), user.id]
     );
 
+    // Record the login event for funnel analytics. Non-blocking — if the
+    // insert fails we still want the user to be able to log in.
+    db.query(
+      'INSERT INTO login_events (user_id, ip) VALUES ($1, $2)',
+      [user.id, req.ip || null]
+    ).catch((err) => {
+      logError('login_events insert failed', { err: err.message });
+    });
+
     // Generate token
     const { token, expiresAt } = generateToken(user.id);
 
