@@ -11,7 +11,7 @@ export interface DateTimeOptions {
   withYear?: boolean;
 }
 
-function browserTz(): string {
+export function browserTz(): string {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
   } catch {
@@ -70,6 +70,21 @@ export function formatTimeOnly(value: string | Date, tz: string): string {
   const date = safeDate(value);
   if (!date) return '';
   return formatPartsZh(date, { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz });
+}
+
+// "2026-06-06" — YYYY-MM-DD in the given tz. Used to key calendar cells and
+// match against date-only record fields. Avoid toISOString().split('T')[0]:
+// that returns UTC YMD and shifts the date by the tz offset (e.g. Saturday
+// midnight in Asia/Taipei renders as the previous Friday).
+export function formatYmdInTz(value: string | Date, tz: string): string {
+  const date = safeDate(value);
+  if (!date) return '';
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(date);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value || '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
 }
 
 // "2026年5月" — calendar header.

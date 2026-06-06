@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import apiService from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
-import { formatDate } from '../utils/datetime';
+import { formatDate, formatYmdInTz } from '../utils/datetime';
 
 interface IntimateRecord {
   id: number;
@@ -408,9 +408,13 @@ interface CalendarHeatmapProps {
 }
 
 export function CalendarHeatmap({ data, year, month, title, showMonthLabels = true, onNavigate, onDaySelect, selectedDay, periodDates, predictedPeriodDates, fertileDates }: CalendarHeatmapProps) {
-  const now = new Date();
-  const targetYear = year ?? now.getFullYear();
-  const targetMonth = month ?? now.getMonth();
+  const tz = useTimezone();
+  // Use the viewer's tz for "now" so the default month/year reflects local
+  // wall-clock (a Taipei viewer sees the Taipei month, not UTC's).
+  const nowYmd = formatYmdInTz(new Date(), tz);
+  const [nowYear, nowMonth] = [Number(nowYmd.slice(0, 4)), Number(nowYmd.slice(5, 7)) - 1];
+  const targetYear = year ?? nowYear;
+  const targetMonth = month ?? nowMonth;
 
   // Generate calendar data
   const calendarData = useMemo(() => {
@@ -418,6 +422,7 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
     const lastDay = new Date(targetYear, targetMonth + 1, 0);
     const daysInMonth = lastDay.getDate();
     const startDayOfWeek = firstDay.getDay();
+    const pad = (n: number) => String(n).padStart(2, '0');
 
     // Create array of days with counts
     const days = [];
@@ -430,13 +435,12 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
     // Add all days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const currentDate = new Date(targetYear, targetMonth, day);
-      const dateStr = currentDate.toISOString().split('T')[0];
+      // Key cells by their calendar date directly. toISOString() would shift
+      // to UTC and mis-key cells by the tz offset.
+      const dateStr = `${targetYear}-${pad(targetMonth + 1)}-${pad(day)}`;
 
-      // Count records for this day
-      const count = data.filter(record => {
-        const recordDate = new Date(record.date);
-        return recordDate.toISOString().split('T')[0] === dateStr;
-      }).length;
+      // record.date is a YYYY-MM-DD string from the API — compare as-is.
+      const count = data.filter(record => record.date === dateStr).length;
 
       days.push({
         date: currentDate,
@@ -463,7 +467,7 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
   const monthNames = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
 
   const maxCount = Math.max(...calendarData.map(d => d.count));
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = formatYmdInTz(new Date(), tz);
 
   const navigateMonth = (direction: number) => {
     if (!onNavigate) return;

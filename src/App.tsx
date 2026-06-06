@@ -15,7 +15,7 @@ import PairingInvitationHandler from './components/PairingInvitationHandler';
 import { apiService, getTokenExpiry, clearAuthStorage } from './services/api';
 import type { CycleRecord } from './services/api';
 import { periodDateSet, fertileDateSet, predictedPeriodDateSet } from './utils/cycle';
-import { getPrimaryTimezone, formatMonthYear } from './utils/datetime';
+import { getPrimaryTimezone, formatMonthYear, formatYmdInTz, browserTz } from './utils/datetime';
 import { TimezoneProvider } from './contexts/TimezoneContext';
 import { conflictPhraseTiers } from './data/conflictSteps';
 import { useScrollLock } from './hooks/useScrollLock';
@@ -441,7 +441,7 @@ const LoveTimeApp = () => {
     }
   }, [customEmotions]);
 
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(() => formatYmdInTz(new Date(), browserTz()));
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [roleplayFilter, setRoleplayFilter] = useState('all');
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -1289,7 +1289,7 @@ const LoveTimeApp = () => {
           const newMilestone: JourneyMilestone = {
             id: `intimacy_${count}`,
             type: 'intimacy_milestone',
-            date: intimateRecords[count - 1]?.date || new Date().toISOString().split('T')[0],
+            date: intimateRecords[count - 1]?.date || formatYmdInTz(new Date(), browserTz()),
             title: `親密時光第 ${count} 次`,
             description: `恭喜你們達成了 ${count} 次親密時光的里程碑！`,
             count,
@@ -5615,7 +5615,12 @@ const LoveTimeApp = () => {
     };
 
     const formatDate = (date: Date) => {
-      return date.toISOString().split('T')[0];
+      // Grid cells are local-time Dates from `new Date(y, m, d)` — read local
+      // components directly. toISOString() would shift to UTC and mis-key.
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, '0');
+      const d = String(date.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
     };
 
     const isSelected = (date: Date) => {

@@ -7,6 +7,8 @@ import type { MarketplaceScript } from '../services/api';
 import StarRating from './StarRating';
 import MarketplaceScriptDetail from './MarketplaceScriptDetail';
 import PetalSelect from './PetalSelect';
+import { useTimezone } from '../contexts/TimezoneContext';
+import { formatYmdInTz } from '../utils/datetime';
 
 interface RoleplayScript {
   id: string;
@@ -91,6 +93,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   initialScriptTitle,
   onInitialScriptConsumed,
 }) => {
+  const tz = useTimezone();
   const [selectedScript, setSelectedScript] = useState<RoleplayScript | null>(null);
   const [showScriptModal, setShowScriptModal] = useState(false);
   // Tracks whether the current modal viewing has been "begun" — i.e. user
@@ -177,9 +180,10 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
+      timeZone: tz,
     });
     addIntimateRecord(
-      new Date().toISOString().split('T')[0],
+      formatYmdInTz(new Date(), tz),
       time,
       '🔥',
       `使用角色扮演劇本：${script.title}`,
@@ -190,7 +194,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
       script.title,
       'roleplay'
     );
-  }, [addIntimateRecord]);
+  }, [addIntimateRecord, tz]);
 
   const handleBeginRoleplay = useCallback(() => {
     if (!selectedScript) return;

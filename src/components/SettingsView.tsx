@@ -3,6 +3,7 @@ import { User, Users, CheckCircle, Trash2 } from 'lucide-react';
 import { apiService, type CycleRecord } from '../services/api';
 import { averageCycleLength, predictNextPeriodStart, ovulationWindow, computeCycleLengths } from '../utils/cycle';
 import { TIMEZONE_OPTIONS } from '../utils/timezone-options';
+import { formatYmdInTz, browserTz as getBrowserTz } from '../utils/datetime';
 
 interface Nicknames {
   partner1: string;
@@ -135,12 +136,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({
     setCustomEmotions(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Helper function to format ISO date string to YYYY-MM-DD for HTML date input
+  // Helper function to format ISO date string to YYYY-MM-DD for HTML date input.
+  // Use the viewer's tz so a midnight-in-local-tz timestamp doesn't roll back to
+  // the previous day via UTC conversion.
   const formatDateForInput = (isoDateString: string): string => {
     if (!isoDateString) return '';
     try {
-      const date = new Date(isoDateString);
-      return date.toISOString().split('T')[0];
+      return formatYmdInTz(isoDateString, getBrowserTz());
     } catch {
       return '';
     }
@@ -799,7 +801,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               type="date"
               value={userBirthDate}
               min="1900-01-01"
-              max={new Date().toISOString().split('T')[0]}
+              max={formatYmdInTz(new Date(), getBrowserTz())}
               onChange={(e) => setUserBirthDate(e.target.value)}
               data-testid="settings-birth-date-input"
               className="w-full sm:max-w-xs p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"

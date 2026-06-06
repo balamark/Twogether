@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { formatYmdInTz, browserTz } from '../utils/datetime';
 
 // API Configuration - Always use relative URLs for single server
 const API_BASE_URL = '/api';
@@ -1065,13 +1066,17 @@ class ApiService {
     let timeStr: string;
 
     try {
-      dateStr = momentDate.toISOString().split('T')[0];
-      timeStr = momentDate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
+      // Server timestamps are UTC; render the calendar date in the viewer's
+      // browser tz so a Taipei moment recorded at 00:30 doesn't show as the
+      // previous day.
+      const tz = browserTz();
+      dateStr = formatYmdInTz(momentDate, tz);
+      timeStr = momentDate.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: tz });
     } catch (error) {
       console.error('Error formatting date/time:', error);
       // Fallback to manual formatting
       const now = new Date();
-      dateStr = now.toISOString().split('T')[0];
+      dateStr = formatYmdInTz(now, browserTz());
       timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     }
 
