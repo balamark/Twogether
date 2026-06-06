@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow } from 'lucide-react';
+import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow, LayoutGrid, List } from 'lucide-react';
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { apiService } from '../services/api';
@@ -100,6 +100,18 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   // explicitly clicked "開始扮演" and we recorded an intimacy moment. View
   // alone does NOT record; only this transition does.
   const [hasBegun, setHasBegun] = useState(false);
+
+  // View mode — grid (thumbnails) vs list (compact text rows). Persisted across visits.
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
+    try {
+      return localStorage.getItem('roleplayViewMode') === 'list' ? 'list' : 'grid';
+    } catch {
+      return 'grid';
+    }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('roleplayViewMode', viewMode); } catch { /* ignore */ }
+  }, [viewMode]);
 
   // Marketplace state — discoverable public scripts shared by other users.
   const [mainTab, setMainTab] = useState<'mine' | 'marketplace'>('mine');
@@ -303,6 +315,51 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     );
   };
 
+  // Compact text-only row used when viewMode === 'list'. Renders the category emoji
+  // as a left-edge marker (no images per the user spec), title + scenario truncated
+  // to keep many scripts visible at once, and an actions slot on the right.
+  const renderScriptListRow = (opts: {
+    key: React.Key;
+    testId?: string;
+    script: RoleplayScript;
+    badge?: React.ReactNode;
+    metaLine?: React.ReactNode;
+    actions: React.ReactNode;
+    onClick?: () => void;
+  }) => {
+    const meta = CATEGORY_META[opts.script.category];
+    return (
+      <div
+        key={opts.key}
+        data-testid={opts.testId}
+        onClick={opts.onClick}
+        className={`flex items-center gap-3 px-3 py-2.5 bg-white border border-petal-rule rounded-md hover:border-petal-rose transition-colors ${opts.onClick ? 'cursor-pointer' : ''}`}
+      >
+        <span className="text-base opacity-70 saturate-75 flex-shrink-0" aria-hidden>
+          {meta?.emoji}
+        </span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <h4 className="font-display text-sm font-medium tracking-tight text-petal-ink truncate">
+              {opts.script.title}
+            </h4>
+            {opts.badge}
+          </div>
+          <p className="font-body text-xs text-petal-ink-soft truncate">
+            {opts.script.scenario}
+          </p>
+          {opts.metaLine}
+        </div>
+        <div
+          className="flex items-center gap-1.5 flex-shrink-0"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {opts.actions}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-10">
       <div className="border-b border-petal-rule pb-7">
@@ -318,29 +375,61 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
       </div>
 
       {/* Main tabs — My Scripts vs Marketplace */}
-      <div className="flex gap-1 mb-6 border-b border-petal-rule">
-        {([
-          { id: 'mine' as const, label: '我的劇本', icon: <FileText className="w-3.5 h-3.5" strokeWidth={1.5} /> },
-          { id: 'marketplace' as const, label: '創作市集', icon: <Store className="w-3.5 h-3.5" strokeWidth={1.5} /> },
-        ]).map((t) => {
-          const isActive = mainTab === t.id;
-          return (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setMainTab(t.id)}
-              data-testid={`roleplay-tab-${t.id}`}
-              className={`px-4 py-2.5 font-display text-base tracking-tight transition-colors -mb-px border-b-2 inline-flex items-center gap-2 ${
-                isActive
-                  ? 'text-petal-ink border-petal-rose-deep font-medium'
-                  : 'text-petal-muted border-transparent hover:text-petal-ink'
-              }`}
-            >
-              {t.icon}
-              {t.label}
-            </button>
-          );
-        })}
+      <div className="flex items-center justify-between gap-2 mb-6 border-b border-petal-rule">
+        <div className="flex gap-1">
+          {([
+            { id: 'mine' as const, label: '我的劇本', icon: <FileText className="w-3.5 h-3.5" strokeWidth={1.5} /> },
+            { id: 'marketplace' as const, label: '創作市集', icon: <Store className="w-3.5 h-3.5" strokeWidth={1.5} /> },
+          ]).map((t) => {
+            const isActive = mainTab === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setMainTab(t.id)}
+                data-testid={`roleplay-tab-${t.id}`}
+                className={`px-4 py-2.5 font-display text-base tracking-tight transition-colors -mb-px border-b-2 inline-flex items-center gap-2 ${
+                  isActive
+                    ? 'text-petal-ink border-petal-rose-deep font-medium'
+                    : 'text-petal-muted border-transparent hover:text-petal-ink'
+                }`}
+              >
+                {t.icon}
+                {t.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex items-center gap-1 pb-1.5">
+          <button
+            type="button"
+            onClick={() => setViewMode('grid')}
+            data-testid="roleplay-view-toggle-grid"
+            aria-label="縮圖檢視"
+            aria-pressed={viewMode === 'grid'}
+            className={`p-1.5 rounded-md transition-colors ${
+              viewMode === 'grid'
+                ? 'text-petal-ink bg-petal-cream-2'
+                : 'text-petal-muted hover:text-petal-ink'
+            }`}
+          >
+            <LayoutGrid className="w-4 h-4" strokeWidth={1.5} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            data-testid="roleplay-view-toggle-list"
+            aria-label="列表檢視"
+            aria-pressed={viewMode === 'list'}
+            className={`p-1.5 rounded-md transition-colors ${
+              viewMode === 'list'
+                ? 'text-petal-ink bg-petal-cream-2'
+                : 'text-petal-muted hover:text-petal-ink'
+            }`}
+          >
+            <List className="w-4 h-4" strokeWidth={1.5} />
+          </button>
+        </div>
       </div>
 
       {mainTab === 'mine' && (
@@ -382,39 +471,71 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             )}
             {topSectionTitle}<em className="not-italic font-light italic text-pink-600 ml-1">劇本</em>
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {topScripts.map((script, index) => (
-              <div key={script.id ?? index} className="bg-white rounded-md p-4 border border-petal-rule hover:border-petal-rose transition-colors">
-                <div className="relative aspect-video bg-petal-cream-2 rounded-md mb-3 overflow-hidden">
-                  {renderThumb(script, 'w-full h-full', 'contain')}
-                  <FavoriteButton
-                    scriptId={script.id}
-                    className="absolute top-2 right-2 w-8 h-8 bg-white/85 backdrop-blur-sm border border-petal-rule shadow-sm hover:bg-white"
-                  />
+          {viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {topScripts.map((script, index) => (
+                <div key={script.id ?? index} className="bg-white rounded-md p-4 border border-petal-rule hover:border-petal-rose transition-colors">
+                  <div className="relative aspect-video bg-petal-cream-2 rounded-md mb-3 overflow-hidden">
+                    {renderThumb(script, 'w-full h-full', 'contain')}
+                    <FavoriteButton
+                      scriptId={script.id}
+                      className="absolute top-2 right-2 w-8 h-8 bg-white/85 backdrop-blur-sm border border-petal-rule shadow-sm hover:bg-white"
+                    />
+                  </div>
+                  <h4 className="font-display text-base font-medium tracking-tight text-petal-ink mb-1.5">{script.title}</h4>
+                  <p className="font-body text-sm text-petal-ink-soft mb-3 line-clamp-2 leading-relaxed">{script.scenario}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => handleViewScript(script)}
+                      data-testid={`script-featured-view-button-${index}`}
+                      className="border border-petal-ink text-petal-ink py-2 rounded-md font-display italic text-sm hover:bg-petal-ink hover:text-petal-cream transition-colors"
+                    >
+                      <Eye className="w-3.5 h-3.5 inline mr-1.5" strokeWidth={1.5} />
+                      查看
+                    </button>
+                    <button
+                      onClick={() => handleQuickPlay(script)}
+                      data-testid={`script-featured-play-button-${index}`}
+                      className="bg-petal-ink text-petal-cream py-2 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors"
+                    >
+                      <Play className="w-3.5 h-3.5 inline mr-1.5" strokeWidth={1.5} />
+                      開始扮演
+                    </button>
+                  </div>
                 </div>
-                <h4 className="font-display text-base font-medium tracking-tight text-petal-ink mb-1.5">{script.title}</h4>
-                <p className="font-body text-sm text-petal-ink-soft mb-3 line-clamp-2 leading-relaxed">{script.scenario}</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => handleViewScript(script)}
-                    data-testid={`script-featured-view-button-${index}`}
-                    className="border border-petal-ink text-petal-ink py-2 rounded-md font-display italic text-sm hover:bg-petal-ink hover:text-petal-cream transition-colors"
-                  >
-                    <Eye className="w-3.5 h-3.5 inline mr-1.5" strokeWidth={1.5} />
-                    查看
-                  </button>
-                  <button
-                    onClick={() => handleQuickPlay(script)}
-                    data-testid={`script-featured-play-button-${index}`}
-                    className="bg-petal-ink text-petal-cream py-2 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors"
-                  >
-                    <Play className="w-3.5 h-3.5 inline mr-1.5" strokeWidth={1.5} />
-                    開始扮演
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {topScripts.map((script, index) =>
+                renderScriptListRow({
+                  key: script.id ?? index,
+                  script,
+                  actions: (
+                    <>
+                      <FavoriteButton scriptId={script.id} className="w-7 h-7 hover:bg-petal-cream-2" />
+                      <button
+                        onClick={() => handleViewScript(script)}
+                        data-testid={`script-featured-view-button-${index}`}
+                        className="border border-petal-ink text-petal-ink px-3 py-1 rounded-full font-body text-xs hover:bg-petal-ink hover:text-petal-cream transition-colors"
+                      >
+                        <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                        查看
+                      </button>
+                      <button
+                        onClick={() => handleQuickPlay(script)}
+                        data-testid={`script-featured-play-button-${index}`}
+                        className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                      >
+                        <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                        開始
+                      </button>
+                    </>
+                  ),
+                })
+              )}
+            </div>
+          )}
         </div>
 
         {/* Custom Scripts Upload */}
@@ -436,67 +557,116 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           </div>
 
           {customScripts.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {customScripts.map((script) => (
-                <div key={script.id} data-testid={`script-card-custom-${script.id}`} className="bg-white border border-petal-rule rounded-md p-4 hover:border-petal-rose transition-colors">
-                  <div className="flex items-start gap-3 mb-2">
-                    <div className="w-14 h-14 rounded-md flex-shrink-0 overflow-hidden border border-petal-rule">
-                      {renderThumb(script, 'w-full h-full')}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-display text-base font-medium tracking-tight text-petal-ink truncate">{script.title}</h4>
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                          <span data-testid="script-card-custom-badge" className="px-2 py-0.5 font-body text-[10px] uppercase tracking-[0.1em] rounded-full border border-petal-rule text-petal-muted">
-                            自訂
-                          </span>
-                          <FavoriteButton scriptId={script.id} className="w-7 h-7 hover:bg-petal-cream-2" />
-                        </div>
+            viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {customScripts.map((script) => (
+                  <div key={script.id} data-testid={`script-card-custom-${script.id}`} className="bg-white border border-petal-rule rounded-md p-4 hover:border-petal-rose transition-colors">
+                    <div className="flex items-start gap-3 mb-2">
+                      <div className="w-14 h-14 rounded-md flex-shrink-0 overflow-hidden border border-petal-rule">
+                        {renderThumb(script, 'w-full h-full')}
                       </div>
-                      <p className="font-body text-sm text-petal-ink-soft mt-1 leading-relaxed">{script.scenario}</p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-display text-base font-medium tracking-tight text-petal-ink truncate">{script.title}</h4>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <span data-testid="script-card-custom-badge" className="px-2 py-0.5 font-body text-[10px] uppercase tracking-[0.1em] rounded-full border border-petal-rule text-petal-muted">
+                              自訂
+                            </span>
+                            <FavoriteButton scriptId={script.id} className="w-7 h-7 hover:bg-petal-cream-2" />
+                          </div>
+                        </div>
+                        <p className="font-body text-sm text-petal-ink-soft mt-1 leading-relaxed">{script.scenario}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center justify-between mt-3">
-                    <div className="flex items-center gap-1.5 text-xs text-petal-muted flex-wrap">
-                      {script.tags?.map((tag, tagIndex) => (
-                        <span key={tagIndex} className="font-body bg-petal-cream-2 px-2 py-0.5 rounded-full">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {onEditScript && (
+                    <div className="flex items-center justify-between mt-3">
+                      <div className="flex items-center gap-1.5 text-xs text-petal-muted flex-wrap">
+                        {script.tags?.map((tag, tagIndex) => (
+                          <span key={tagIndex} className="font-body bg-petal-cream-2 px-2 py-0.5 rounded-full">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        {onEditScript && (
+                          <button
+                            onClick={() => onEditScript(script)}
+                            data-testid={`script-edit-button-${script.id}`}
+                            className="border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors"
+                            aria-label={`編輯 ${script.title}`}
+                          >
+                            <Pencil className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                            編輯
+                          </button>
+                        )}
                         <button
-                          onClick={() => onEditScript(script)}
-                          data-testid={`script-edit-button-${script.id}`}
-                          className="border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors"
-                          aria-label={`編輯 ${script.title}`}
+                          onClick={() => handleViewScript(script)}
+                          data-testid={`script-card-custom-view-button-${script.id}`}
+                          className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                         >
-                          <Pencil className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                          編輯
+                          <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                          查看
                         </button>
-                      )}
-                      <button
-                        onClick={() => handleViewScript(script)}
-                        data-testid={`script-card-custom-view-button-${script.id}`}
-                        className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
-                      >
-                        <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                        查看
-                      </button>
-                      <button
-                        onClick={() => handleQuickPlay(script)}
-                        data-testid={`script-card-custom-play-button-${script.id}`}
-                        className="bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
-                      >
-                        <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                        開始
-                      </button>
+                        <button
+                          onClick={() => handleQuickPlay(script)}
+                          data-testid={`script-card-custom-play-button-${script.id}`}
+                          className="bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                        >
+                          <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                          開始
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {customScripts.map((script) =>
+                  renderScriptListRow({
+                    key: script.id,
+                    testId: `script-card-custom-${script.id}`,
+                    script,
+                    badge: (
+                      <span data-testid="script-card-custom-badge" className="px-2 py-0.5 font-body text-[10px] uppercase tracking-[0.1em] rounded-full border border-petal-rule text-petal-muted flex-shrink-0">
+                        自訂
+                      </span>
+                    ),
+                    actions: (
+                      <>
+                        <FavoriteButton scriptId={script.id} className="w-7 h-7 hover:bg-petal-cream-2" />
+                        {onEditScript && (
+                          <button
+                            onClick={() => onEditScript(script)}
+                            data-testid={`script-edit-button-${script.id}`}
+                            className="border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors"
+                            aria-label={`編輯 ${script.title}`}
+                          >
+                            <Pencil className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                            編輯
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleViewScript(script)}
+                          data-testid={`script-card-custom-view-button-${script.id}`}
+                          className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                        >
+                          <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                          查看
+                        </button>
+                        <button
+                          onClick={() => handleQuickPlay(script)}
+                          data-testid={`script-card-custom-play-button-${script.id}`}
+                          className="bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                        >
+                          <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                          開始
+                        </button>
+                      </>
+                    ),
+                  })
+                )}
+              </div>
+            )
           ) : (
             <p className="font-display italic font-light text-sm text-petal-muted text-center py-4">
               還沒有自訂劇本，點擊上方按鈕開始創作。
@@ -509,49 +679,82 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           <div className="mb-10" data-testid="roleplay-marketplace-favorites-section">
             <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6 flex items-center">
               <Heart className="w-4 h-4 mr-2 text-petal-rose-deep fill-petal-rose-deep" strokeWidth={1.5} />
-              來自 <em className="not-italic font-light italic text-pink-600 mx-1">創作市集</em> 的收藏
+              收藏<em className="not-italic font-light italic text-pink-600 mx-1">劇本</em>
               <span className="font-display italic font-light text-sm text-petal-muted ml-2">({favoritedMarketplace.length})</span>
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {favoritedMarketplace.map((m) => (
-                <div
-                  key={m.id}
-                  data-testid={`marketplace-favorite-card-${m.id}`}
-                  className="bg-white border border-petal-rule rounded-md p-4 hover:border-petal-rose transition-colors cursor-pointer"
-                  onClick={() => setMarketplaceDetailId(m.id)}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="w-14 h-14 rounded-md flex-shrink-0 overflow-hidden border border-petal-rule">
-                      {renderThumb(marketplaceToRoleplay(m), 'w-full h-full')}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <h4 className="font-display text-base font-medium tracking-tight text-petal-ink truncate">{m.title}</h4>
-                        {!m.isPublic && (
-                          <span className="text-[10px] text-petal-muted italic flex-shrink-0">作者已停止分享</span>
-                        )}
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {favoritedMarketplace.map((m) => (
+                  <div
+                    key={m.id}
+                    data-testid={`marketplace-favorite-card-${m.id}`}
+                    className="bg-white border border-petal-rule rounded-md p-4 hover:border-petal-rose transition-colors cursor-pointer"
+                    onClick={() => setMarketplaceDetailId(m.id)}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-14 h-14 rounded-md flex-shrink-0 overflow-hidden border border-petal-rule">
+                        {renderThumb(marketplaceToRoleplay(m), 'w-full h-full')}
                       </div>
-                      <p className="font-body text-xs text-petal-muted mt-0.5">by {m.authorName}</p>
-                      <p className="font-body text-sm text-petal-ink-soft mt-1 line-clamp-2 leading-relaxed">{m.scenario}</p>
-                      <div className="mt-2 flex items-center justify-between">
-                        <StarRating value={m.avgStars} count={m.ratingCount} showCount size={12} />
-                        <div className="flex gap-1.5">
-                          <button
-                            type="button"
-                            onClick={(e) => { e.stopPropagation(); handleMarketplacePlay(m); }}
-                            data-testid={`marketplace-favorite-play-${m.id}`}
-                            className="bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
-                          >
-                            <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                            開始
-                          </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-display text-base font-medium tracking-tight text-petal-ink truncate">{m.title}</h4>
+                          {!m.isPublic && (
+                            <span className="text-[10px] text-petal-muted italic flex-shrink-0">作者已停止分享</span>
+                          )}
+                        </div>
+                        <p className="font-body text-xs text-petal-muted mt-0.5">by {m.authorName}</p>
+                        <p className="font-body text-sm text-petal-ink-soft mt-1 line-clamp-2 leading-relaxed">{m.scenario}</p>
+                        <div className="mt-2 flex items-center justify-between">
+                          <StarRating value={m.avgStars} count={m.ratingCount} showCount size={12} />
+                          <div className="flex gap-1.5">
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleMarketplacePlay(m); }}
+                              data-testid={`marketplace-favorite-play-${m.id}`}
+                              className="bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                            >
+                              <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                              開始
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {favoritedMarketplace.map((m) =>
+                  renderScriptListRow({
+                    key: m.id,
+                    testId: `marketplace-favorite-card-${m.id}`,
+                    script: marketplaceToRoleplay(m),
+                    onClick: () => setMarketplaceDetailId(m.id),
+                    metaLine: (
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="font-body text-[11px] text-petal-muted truncate">by {m.authorName}</span>
+                        <StarRating value={m.avgStars} count={m.ratingCount} showCount size={11} />
+                      </div>
+                    ),
+                    badge: !m.isPublic ? (
+                      <span className="text-[10px] text-petal-muted italic flex-shrink-0">作者已停止分享</span>
+                    ) : undefined,
+                    actions: (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleMarketplacePlay(m); }}
+                        data-testid={`marketplace-favorite-play-${m.id}`}
+                        className="bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                      >
+                        <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                        開始
+                      </button>
+                    ),
+                  })
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -562,60 +765,114 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             所有<em className="not-italic font-light italic text-pink-600 mx-1">劇本</em>
             <span className="font-display italic font-light text-sm text-petal-muted ml-2">({filteredScripts.length})</span>
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
-            {filteredScripts.map((script, index) => (
-              <div key={index} className="bg-white border border-petal-rule rounded-md p-4 sm:p-5 hover:border-petal-rose transition-colors">
-                <div className="flex items-start gap-3 sm:gap-4">
-                  <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-md flex-shrink-0 overflow-hidden border border-petal-rule">
-                    {renderThumb(script, 'w-full h-full')}
+          {viewMode === 'grid' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+              {filteredScripts.map((script, index) => (
+                <div key={index} className="bg-white border border-petal-rule rounded-md p-4 sm:p-5 hover:border-petal-rose transition-colors">
+                  <div className="flex items-start gap-3 sm:gap-4">
+                    <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-md flex-shrink-0 overflow-hidden border border-petal-rule">
+                      {renderThumb(script, 'w-full h-full')}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="font-display text-base font-medium tracking-tight text-petal-ink">{script.title}</h4>
+                        <span className="font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rule text-petal-muted">
+                          {CATEGORY_META[script.category]?.label ?? script.category}
+                        </span>
+                        {script.isCustom && (
+                          <span className="font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rose-soft bg-petal-rose-soft/40 text-petal-rose-deep">
+                            自訂
+                          </span>
+                        )}
+                        <FavoriteButton scriptId={script.id} className="ml-auto w-7 h-7 hover:bg-petal-cream-2" />
+                      </div>
+                      <p className="font-body text-sm text-petal-ink-soft mb-3 leading-relaxed line-clamp-2 sm:line-clamp-none">{script.scenario}</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          onClick={() => handleViewScript(script)}
+                          data-testid={`script-list-view-button-${index}`}
+                          className="bg-petal-ink text-petal-cream px-4 py-2 sm:py-1.5 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors min-h-[40px] sm:min-h-0"
+                        >
+                          <Eye className="w-3.5 h-3.5 inline mr-1" strokeWidth={1.5} />
+                          查看劇本
+                        </button>
+                        <button
+                          onClick={() => handleQuickPlay(script)}
+                          data-testid={`script-list-play-button-${index}`}
+                          className="bg-petal-rose-deep text-petal-cream px-4 py-2 sm:py-1.5 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors min-h-[40px] sm:min-h-0"
+                        >
+                          <Play className="w-3.5 h-3.5 inline mr-1" strokeWidth={1.5} />
+                          開始扮演
+                        </button>
+                        {script.isCustom && onEditScript && (
+                          <button
+                            onClick={() => onEditScript(script)}
+                            data-testid={`script-list-edit-button-${script.id}`}
+                            className="border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-4 py-2 sm:py-1.5 rounded-md font-body text-sm transition-colors min-h-[40px] sm:min-h-0"
+                          >
+                            <Pencil className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                            編輯
+                          </button>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h4 className="font-display text-base font-medium tracking-tight text-petal-ink">{script.title}</h4>
-                      <span className="font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rule text-petal-muted">
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {filteredScripts.map((script, index) =>
+                renderScriptListRow({
+                  key: script.id ?? index,
+                  script,
+                  badge: (
+                    <>
+                      <span className="font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rule text-petal-muted flex-shrink-0">
                         {CATEGORY_META[script.category]?.label ?? script.category}
                       </span>
                       {script.isCustom && (
-                        <span className="font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rose-soft bg-petal-rose-soft/40 text-petal-rose-deep">
+                        <span className="font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rose-soft bg-petal-rose-soft/40 text-petal-rose-deep flex-shrink-0">
                           自訂
                         </span>
                       )}
-                      <FavoriteButton scriptId={script.id} className="ml-auto w-7 h-7 hover:bg-petal-cream-2" />
-                    </div>
-                    <p className="font-body text-sm text-petal-ink-soft mb-3 leading-relaxed line-clamp-2 sm:line-clamp-none">{script.scenario}</p>
-                    <div className="flex flex-wrap items-center gap-2">
+                    </>
+                  ),
+                  actions: (
+                    <>
+                      <FavoriteButton scriptId={script.id} className="w-7 h-7 hover:bg-petal-cream-2" />
                       <button
                         onClick={() => handleViewScript(script)}
                         data-testid={`script-list-view-button-${index}`}
-                        className="bg-petal-ink text-petal-cream px-4 py-2 sm:py-1.5 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors min-h-[40px] sm:min-h-0"
+                        className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                       >
-                        <Eye className="w-3.5 h-3.5 inline mr-1" strokeWidth={1.5} />
-                        查看劇本
+                        <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                        查看
                       </button>
                       <button
                         onClick={() => handleQuickPlay(script)}
                         data-testid={`script-list-play-button-${index}`}
-                        className="bg-petal-rose-deep text-petal-cream px-4 py-2 sm:py-1.5 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors min-h-[40px] sm:min-h-0"
+                        className="bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                       >
-                        <Play className="w-3.5 h-3.5 inline mr-1" strokeWidth={1.5} />
-                        開始扮演
+                        <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                        開始
                       </button>
                       {script.isCustom && onEditScript && (
                         <button
                           onClick={() => onEditScript(script)}
                           data-testid={`script-list-edit-button-${script.id}`}
-                          className="border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-4 py-2 sm:py-1.5 rounded-md font-body text-sm transition-colors min-h-[40px] sm:min-h-0"
+                          className="border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors"
                         >
                           <Pencil className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
                           編輯
                         </button>
                       )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+                    </>
+                  ),
+                })
+              )}
+            </div>
+          )}
         </div>
       </div>
       )}
@@ -662,42 +919,75 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               目前還沒有公開劇本，第一個發布的就是你！
             </p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="marketplace-grid">
-              {marketplaceScripts.map((m) => (
-                <div
-                  key={m.id}
-                  data-testid={`marketplace-card-${m.id}`}
-                  className="bg-white border border-petal-rule rounded-md p-4 hover:border-petal-rose transition-colors cursor-pointer flex flex-col"
-                  onClick={() => setMarketplaceDetailId(m.id)}
-                >
-                  <div className="relative aspect-video bg-petal-cream-2 rounded-md mb-3 overflow-hidden">
-                    {renderThumb(marketplaceToRoleplay(m), 'w-full h-full', 'contain')}
-                  </div>
-                  <h4 className="font-display text-base font-medium tracking-tight text-petal-ink mb-1 truncate">
-                    {m.title}
-                  </h4>
-                  <p className="font-body text-xs text-petal-muted mb-1.5">by {m.authorName}</p>
-                  <p className="font-body text-sm text-petal-ink-soft mb-3 line-clamp-2 leading-relaxed flex-1">
-                    {m.scenario}
-                  </p>
-                  <div className="flex items-center justify-between gap-2">
-                    <StarRating value={m.avgStars} count={m.ratingCount} showCount size={13} />
-                    <div className="flex items-center gap-1.5">
-                      <FavoriteButton scriptId={m.id} className="w-7 h-7 hover:bg-petal-cream-2" />
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); handleMarketplacePlay(m); }}
-                        data-testid={`marketplace-play-${m.id}`}
-                        className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
-                      >
-                        <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                        玩
-                      </button>
+            viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="marketplace-grid">
+                {marketplaceScripts.map((m) => (
+                  <div
+                    key={m.id}
+                    data-testid={`marketplace-card-${m.id}`}
+                    className="bg-white border border-petal-rule rounded-md p-4 hover:border-petal-rose transition-colors cursor-pointer flex flex-col"
+                    onClick={() => setMarketplaceDetailId(m.id)}
+                  >
+                    <div className="relative aspect-video bg-petal-cream-2 rounded-md mb-3 overflow-hidden">
+                      {renderThumb(marketplaceToRoleplay(m), 'w-full h-full', 'contain')}
+                    </div>
+                    <h4 className="font-display text-base font-medium tracking-tight text-petal-ink mb-1 truncate">
+                      {m.title}
+                    </h4>
+                    <p className="font-body text-xs text-petal-muted mb-1.5">by {m.authorName}</p>
+                    <p className="font-body text-sm text-petal-ink-soft mb-3 line-clamp-2 leading-relaxed flex-1">
+                      {m.scenario}
+                    </p>
+                    <div className="flex items-center justify-between gap-2">
+                      <StarRating value={m.avgStars} count={m.ratingCount} showCount size={13} />
+                      <div className="flex items-center gap-1.5">
+                        <FavoriteButton scriptId={m.id} className="w-7 h-7 hover:bg-petal-cream-2" />
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleMarketplacePlay(m); }}
+                          data-testid={`marketplace-play-${m.id}`}
+                          className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                        >
+                          <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                          玩
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5" data-testid="marketplace-grid">
+                {marketplaceScripts.map((m) =>
+                  renderScriptListRow({
+                    key: m.id,
+                    testId: `marketplace-card-${m.id}`,
+                    script: marketplaceToRoleplay(m),
+                    onClick: () => setMarketplaceDetailId(m.id),
+                    metaLine: (
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="font-body text-[11px] text-petal-muted truncate">by {m.authorName}</span>
+                        <StarRating value={m.avgStars} count={m.ratingCount} showCount size={11} />
+                      </div>
+                    ),
+                    actions: (
+                      <>
+                        <FavoriteButton scriptId={m.id} className="w-7 h-7 hover:bg-petal-cream-2" />
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleMarketplacePlay(m); }}
+                          data-testid={`marketplace-play-${m.id}`}
+                          className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                        >
+                          <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                          玩
+                        </button>
+                      </>
+                    ),
+                  })
+                )}
+              </div>
+            )
           )}
         </div>
       )}
