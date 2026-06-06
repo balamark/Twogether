@@ -115,7 +115,7 @@ router.post('/login', [
 
     // Find user
     const userResult = await db.query(
-      'SELECT id, nickname, email, gender, birth_date, timezone, password_hash, created_at FROM users WHERE email = $1',
+      'SELECT id, nickname, email, gender, birth_date, timezone, email_notifications_enabled, cycle_tracking_enabled, password_hash, created_at FROM users WHERE email = $1',
       [email]
     );
 
@@ -169,6 +169,8 @@ router.post('/login', [
         gender: user.gender,
         birth_date: user.birth_date,
         timezone: user.timezone,
+        email_notifications_enabled: user.email_notifications_enabled !== false,
+        cycle_tracking_enabled: user.cycle_tracking_enabled === true,
         created_at: user.created_at
       }
     });

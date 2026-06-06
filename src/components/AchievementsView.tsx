@@ -560,13 +560,23 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
                 </span>
               </div>
               {isPeriod && (
-                <span data-testid="cycle-period-dot" className="absolute top-0.5 left-0.5 w-1.5 h-1.5 rounded-full bg-red-500" title="月經" />
+                <span data-testid="cycle-period-dot" className="absolute top-0.5 left-0.5 w-2 h-2 rounded-full bg-red-500" title="月經" />
               )}
               {!isPeriod && isPredictedPeriod && (
-                <span data-testid="cycle-predicted-dot" className="absolute top-0.5 left-0.5 w-1.5 h-1.5 rounded-full border border-red-400" title="預測月經" />
+                <span data-testid="cycle-predicted-dot" className="absolute top-0.5 left-0.5 w-2 h-2 rounded-full border border-red-400" title="預測月經" />
               )}
               {isFertile && (
-                <span data-testid="cycle-fertile-dot" className="absolute bottom-0.5 right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500" title="適合備孕" />
+                <span data-testid="cycle-fertile-dot" className="absolute bottom-0.5 right-0.5 w-2 h-2 rounded-full bg-emerald-500" title="適合備孕" />
+              )}
+              {day.count > 0 && (
+                <span
+                  data-testid="intimacy-heart"
+                  className={`absolute top-0.5 right-0.5 flex items-center gap-px text-[9px] leading-none font-semibold ${day.count >= 3 ? 'text-white' : 'text-rose-500'}`}
+                  title={`${day.count} 次記錄`}
+                >
+                  <span aria-hidden="true">♥</span>
+                  {day.count}
+                </span>
               )}
               <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-20 whitespace-nowrap pointer-events-none">
                 {day.date.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })}
