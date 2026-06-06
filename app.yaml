@@ -26,6 +26,9 @@ env_variables:
   # LLM provider for events × icebreaker (services/llmService.js).
   LLM_PROVIDER: $_LLM_PROVIDER
   ANTHROPIC_API_KEY: $_ANTHROPIC_API_KEY
+  # Admin funnel dashboard gate (/admin and /api/admin/*). Required to enable
+  # the dashboard — middleware returns 503 when this is unset/empty.
+  ADMIN_PASSWORD: $_ADMIN_PASSWORD
 
 # Automatic scaling (free tier compatible)
 automatic_scaling:

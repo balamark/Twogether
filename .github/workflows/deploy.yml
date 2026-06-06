@@ -172,6 +172,7 @@ jobs:
           _CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
           _LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'claude' }}
           _ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          _ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
         run: |
           echo "🚀 Deploying Twogether app directly to App Engine..."
           # Create app.yaml with actual environment variables
