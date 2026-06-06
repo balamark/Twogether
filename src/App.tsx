@@ -627,6 +627,8 @@ const LoveTimeApp = () => {
         gender?: 'male' | 'female' | 'other';
         birth_date?: string | null;
         timezone?: string | null;
+        email_notifications_enabled?: boolean;
+        cycle_tracking_enabled?: boolean;
         created_at?: string;
       };
 
@@ -637,6 +639,8 @@ const LoveTimeApp = () => {
         gender: userData.gender,
         birth_date: userData.birth_date,
         timezone: userData.timezone,
+        email_notifications_enabled: userData.email_notifications_enabled,
+        cycle_tracking_enabled: userData.cycle_tracking_enabled,
         partnerCode: generatePartnerCode(),
         createdAt: userData.created_at || new Date().toISOString()
       };
