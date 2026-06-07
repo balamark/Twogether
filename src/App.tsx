@@ -19,6 +19,7 @@ import { getPrimaryTimezone, formatMonthYear, formatYmdInTz, browserTz } from '.
 import { TimezoneProvider } from './contexts/TimezoneContext';
 import { conflictPhraseTiers } from './data/conflictSteps';
 import { useScrollLock } from './hooks/useScrollLock';
+import { usePageTracking } from './hooks/usePageTracking';
 
 interface IntimateRecord {
   id: number;
@@ -490,6 +491,42 @@ const LoveTimeApp = () => {
   const [showIntimacyRequestForm, setShowIntimacyRequestForm] = useState(false);
   const [showNotificationInbox, setShowNotificationInbox] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+
+  // Page-view analytics for the /admin Pages + Retention tabs. Only fires for
+  // authenticated users — anon traffic is already covered by landing_visits.
+  // Each useEffect below reports an "enter" by calling track(); the hook
+  // converts that into an "exit" insert on the next call or on tab close.
+  const trackView = usePageTracking(authState.isAuthenticated);
+
+  useEffect(() => {
+    if (!authState.isAuthenticated) return;
+    trackView(currentView, 'view');
+  }, [currentView, authState.isAuthenticated, trackView]);
+
+  useEffect(() => {
+    if (showRecordModal) trackView('modal:record', 'modal');
+    else trackView(currentView, 'view');
+  }, [showRecordModal, currentView, trackView]);
+
+  useEffect(() => {
+    if (showAuthModal) trackView('modal:auth', 'modal');
+    else if (authState.isAuthenticated) trackView(currentView, 'view');
+  }, [showAuthModal, authState.isAuthenticated, currentView, trackView]);
+
+  useEffect(() => {
+    if (showScriptUploadModal) trackView('modal:script-upload', 'modal');
+    else trackView(currentView, 'view');
+  }, [showScriptUploadModal, currentView, trackView]);
+
+  useEffect(() => {
+    if (showIntimacyRequestForm) trackView('modal:intimacy-request', 'modal');
+    else trackView(currentView, 'view');
+  }, [showIntimacyRequestForm, currentView, trackView]);
+
+  useEffect(() => {
+    if (showNotificationInbox) trackView('modal:notification-inbox', 'modal');
+    else trackView(currentView, 'view');
+  }, [showNotificationInbox, currentView, trackView]);
 
   // Pairing invitation states
   const [pairingInvitationToken, setPairingInvitationToken] = useState<string | null>(null);

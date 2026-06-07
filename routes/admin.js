@@ -11,45 +11,55 @@
 const express = require('express');
 const db = require('../database/db');
 const { logInfo, logError, logWarn } = require('../lib/logger');
+const { optionalAuth } = require('../middleware/auth');
 
 const publicRouter = express.Router();
 const adminApiRouter = express.Router();
 
 // ──────────────────────────────────────────────────────────────────────────
-// In-memory per-IP rate limit for the anonymous landing beacon. Since the
-// beacon writes to the DB unauthenticated, an unthrottled flood would (a)
-// fill the table and (b) pollute the funnel's distinct-IP counts. A sliding
-// 1-minute window with a per-IP cap is enough to take the edge off without
-// pulling in a dependency. Bucket is cleared periodically to bound memory.
-const BEACON_WINDOW_MS = 60_000;
-const BEACON_MAX_PER_WINDOW = 6; // 6 beacons/min per IP is plenty for any real visitor
-const beaconHits = new Map(); // ip -> [timestamps...]
+// In-memory per-IP rate limit for the anonymous public beacons. Each beacon
+// route gets its own bucket so a flood of one doesn't starve the other.
+// Sliding 1-minute window per (route, IP). Cheap, no deps, GC'd in the
+// background.
+const RL_WINDOW_MS = 60_000;
+const RL_DEFAULT_MAX = 6;
+const rateBuckets = new Map(); // route key -> Map<ip, number[]>
 
-function beaconRateLimitExceeded(ip) {
-  if (!ip) return false; // can't bucket what we can't identify; rely on table cap below
+function rateLimitExceeded(routeKey, ip, max = RL_DEFAULT_MAX) {
+  if (!ip) return false;
+  let bucket = rateBuckets.get(routeKey);
+  if (!bucket) {
+    bucket = new Map();
+    rateBuckets.set(routeKey, bucket);
+  }
   const now = Date.now();
-  const cutoff = now - BEACON_WINDOW_MS;
-  const hits = (beaconHits.get(ip) || []).filter((t) => t > cutoff);
-  if (hits.length >= BEACON_MAX_PER_WINDOW) {
-    beaconHits.set(ip, hits);
+  const cutoff = now - RL_WINDOW_MS;
+  const hits = (bucket.get(ip) || []).filter((t) => t > cutoff);
+  if (hits.length >= max) {
+    bucket.set(ip, hits);
     return true;
   }
   hits.push(now);
-  beaconHits.set(ip, hits);
+  bucket.set(ip, hits);
   return false;
 }
 
-// Periodically GC the bucket so a long-running process doesn't leak memory
-// from one-off IPs. Runs in test/dev too — cheap and side-effect-free.
-const beaconGcTimer = setInterval(() => {
-  const cutoff = Date.now() - BEACON_WINDOW_MS;
-  for (const [ip, hits] of beaconHits) {
-    const live = hits.filter((t) => t > cutoff);
-    if (live.length === 0) beaconHits.delete(ip);
-    else beaconHits.set(ip, live);
+// Per-route caps. View beacons are higher because authenticated users can
+// legitimately switch views a dozen times in a minute while exploring.
+const RL_MAX_TRACK_VIEW = 30;
+
+const rateGcTimer = setInterval(() => {
+  const cutoff = Date.now() - RL_WINDOW_MS;
+  for (const [route, bucket] of rateBuckets) {
+    for (const [ip, hits] of bucket) {
+      const live = hits.filter((t) => t > cutoff);
+      if (live.length === 0) bucket.delete(ip);
+      else bucket.set(ip, live);
+    }
+    if (bucket.size === 0) rateBuckets.delete(route);
   }
-}, BEACON_WINDOW_MS);
-beaconGcTimer.unref(); // don't keep the event loop alive just for GC
+}, RL_WINDOW_MS);
+rateGcTimer.unref();
 
 // ──────────────────────────────────────────────────────────────────────────
 // Public: anonymous landing visit beacon.
@@ -60,7 +70,7 @@ publicRouter.post('/track/landing', (req, res) => {
 
   // Drop excess beacons silently — 204 either way so an attacker can't tell
   // they're being throttled. Real users with one tab session can't trip this.
-  if (beaconRateLimitExceeded(ip)) {
+  if (rateLimitExceeded('landing', ip)) {
     return res.status(204).end();
   }
 
@@ -73,6 +83,51 @@ publicRouter.post('/track/landing', (req, res) => {
     [ip, ua]
   ).catch((err) => {
     logError('landing_visits insert failed', { err: err.message });
+  });
+
+  res.status(204).end();
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Public: page-view beacon. Called by usePageTracking on view exit (and via
+// navigator.sendBeacon on tab close). optionalAuth attaches req.user when a
+// JWT is present so the row is attributed to the authenticated user.
+// ──────────────────────────────────────────────────────────────────────────
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const UUID_RE = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+publicRouter.post('/track/view', express.json({ type: '*/*' }), optionalAuth, (req, res) => {
+  const ip = req.ip || null;
+  if (rateLimitExceeded('view', ip, RL_MAX_TRACK_VIEW)) {
+    return res.status(204).end();
+  }
+
+  const body = req.body || {};
+  const view = typeof body.view === 'string' ? body.view.slice(0, 64) : null;
+  const viewType = body.view_type === 'modal' ? 'modal' : 'view';
+  const sessionId = typeof body.session_id === 'string' && UUID_RE.test(body.session_id)
+    ? body.session_id : null;
+  const enteredAt = typeof body.entered_at === 'string' ? new Date(body.entered_at) : null;
+  const durationMs = Number.isFinite(body.duration_ms) ? Math.floor(body.duration_ms) : null;
+
+  if (!view) return res.status(204).end();
+  if (!enteredAt || Number.isNaN(enteredAt.getTime())) return res.status(204).end();
+  // Clamp pathological client clocks: drop entries claiming to be from > 2
+  // days ago / in the future, and durations longer than a day.
+  const skewMs = Date.now() - enteredAt.getTime();
+  if (skewMs < -ONE_DAY_MS || skewMs > 2 * ONE_DAY_MS) return res.status(204).end();
+  const safeDuration = durationMs !== null && durationMs >= 0 && durationMs <= ONE_DAY_MS
+    ? durationMs : null;
+
+  const userId = (req.user && req.user.id) || null;
+
+  db.query(
+    `INSERT INTO page_views (user_id, view, view_type, session_id, entered_at, duration_ms)
+     VALUES ($1, $2, $3, $4, $5, $6)`,
+    [userId, view, viewType, sessionId, enteredAt.toISOString(), safeDuration]
+  ).catch((err) => {
+    logError('page_views insert failed', { err: err.message });
   });
 
   res.status(204).end();
@@ -170,6 +225,170 @@ adminApiRouter.get('/funnel', async (req, res) => {
   } catch (err) {
     logError('Admin funnel query failed', { err: err.message, stack: err.stack });
     res.status(500).json({ error: 'funnel query failed' });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Admin: per-view stats (Pages tab).
+// ──────────────────────────────────────────────────────────────────────────
+
+adminApiRouter.get('/page-stats', async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const thirtyAgo = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+    const from = parseDateOr(req.query.from, thirtyAgo);
+    const to = parseDateOr(req.query.to, today);
+
+    if (from === null || to === null) {
+      return res.status(400).json({ error: 'invalid date; expected YYYY-MM-DD calendar date' });
+    }
+    if (from > to) {
+      return res.status(400).json({ error: 'from must be <= to' });
+    }
+
+    // Active users in window = anyone with a login OR a page-view in the
+    // range. Used as the denominator for reach_pct so "% of users who saw
+    // this view" is comparable across views.
+    const result = await db.query(
+      `WITH active AS (
+         SELECT DISTINCT user_id FROM (
+           SELECT user_id FROM login_events
+            WHERE logged_at >= $1::date AND logged_at < ($2::date + INTERVAL '1 day')
+              AND user_id IS NOT NULL
+           UNION
+           SELECT user_id FROM page_views
+            WHERE entered_at >= $1::date AND entered_at < ($2::date + INTERVAL '1 day')
+              AND user_id IS NOT NULL
+         ) t
+       ),
+       total AS (SELECT COUNT(*)::int AS n FROM active)
+       SELECT
+         pv.view,
+         pv.view_type,
+         COUNT(DISTINCT pv.user_id)::int AS unique_users,
+         COUNT(*)::int                   AS total_views,
+         COALESCE(AVG(NULLIF(pv.duration_ms, 0))::int, 0) AS avg_duration_ms,
+         CASE WHEN total.n > 0
+              THEN (COUNT(DISTINCT pv.user_id)::numeric / total.n)::float
+              ELSE NULL END AS reach_pct
+         FROM page_views pv, total
+        WHERE pv.entered_at >= $1::date AND pv.entered_at < ($2::date + INTERVAL '1 day')
+          AND pv.user_id IS NOT NULL
+        GROUP BY pv.view, pv.view_type, total.n
+        ORDER BY unique_users DESC, total_views DESC`,
+      [from, to]
+    );
+
+    res.json({ window: { from, to }, views: result.rows });
+  } catch (err) {
+    logError('Admin page-stats query failed', { err: err.message, stack: err.stack });
+    res.status(500).json({ error: 'page-stats query failed' });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Admin: retention KPIs (Retention tab). D1/D7/D30 from a signup cohort,
+// plus DAU/WAU/MAU + stickiness and a 30-day DAU trend.
+// ──────────────────────────────────────────────────────────────────────────
+
+adminApiRouter.get('/retention', async (req, res) => {
+  try {
+    // D30 needs the cohort to have had at least 30 days to come back, so the
+    // default cohort window ends 31 days ago. Override via query for any
+    // historical look-back.
+    const today = new Date().toISOString().slice(0, 10);
+    const cohortDefaultEnd = new Date(Date.now() - 31 * 86_400_000).toISOString().slice(0, 10);
+    const cohortDefaultStart = new Date(Date.now() - 61 * 86_400_000).toISOString().slice(0, 10);
+    const cohortFrom = parseDateOr(req.query.cohortFrom, cohortDefaultStart);
+    const cohortTo = parseDateOr(req.query.cohortTo, cohortDefaultEnd);
+
+    if (cohortFrom === null || cohortTo === null) {
+      return res.status(400).json({ error: 'invalid date; expected YYYY-MM-DD calendar date' });
+    }
+    if (cohortFrom > cohortTo) {
+      return res.status(400).json({ error: 'cohortFrom must be <= cohortTo' });
+    }
+
+    const [retentionRow, activeRow, trendRows] = await Promise.all([
+      db.query(
+        `WITH cohort AS (
+           SELECT id, (created_at AT TIME ZONE 'UTC')::date AS signup_day
+             FROM users
+            WHERE created_at >= $1::date
+              AND created_at <  ($2::date + INTERVAL '1 day')
+         ),
+         activity AS (
+           SELECT user_id, (logged_at AT TIME ZONE 'UTC')::date AS d
+             FROM login_events WHERE user_id IS NOT NULL
+           UNION
+           SELECT user_id, (entered_at AT TIME ZONE 'UTC')::date AS d
+             FROM page_views   WHERE user_id IS NOT NULL
+         )
+         SELECT
+           (SELECT COUNT(*)::int FROM cohort) AS signups,
+           (SELECT COUNT(DISTINCT c.id)::int FROM cohort c
+             JOIN activity a ON a.user_id = c.id
+            WHERE a.d = c.signup_day + 1) AS d1,
+           (SELECT COUNT(DISTINCT c.id)::int FROM cohort c
+             JOIN activity a ON a.user_id = c.id
+            WHERE a.d = c.signup_day + 7) AS d7,
+           (SELECT COUNT(DISTINCT c.id)::int FROM cohort c
+             JOIN activity a ON a.user_id = c.id
+            WHERE a.d = c.signup_day + 30) AS d30`,
+        [cohortFrom, cohortTo]
+      ),
+      db.query(
+        `WITH activity AS (
+           SELECT user_id, logged_at AS t FROM login_events WHERE user_id IS NOT NULL
+           UNION ALL
+           SELECT user_id, entered_at AS t FROM page_views  WHERE user_id IS NOT NULL
+         )
+         SELECT
+           COUNT(DISTINCT user_id) FILTER (WHERE t >= NOW() - INTERVAL '1 day')::int  AS dau,
+           COUNT(DISTINCT user_id) FILTER (WHERE t >= NOW() - INTERVAL '7 day')::int  AS wau,
+           COUNT(DISTINCT user_id) FILTER (WHERE t >= NOW() - INTERVAL '30 day')::int AS mau
+         FROM activity
+         WHERE t >= NOW() - INTERVAL '30 day'`
+      ),
+      db.query(
+        `WITH activity AS (
+           SELECT user_id, (logged_at AT TIME ZONE 'UTC')::date AS d
+             FROM login_events
+            WHERE user_id IS NOT NULL AND logged_at >= NOW() - INTERVAL '30 day'
+           UNION
+           SELECT user_id, (entered_at AT TIME ZONE 'UTC')::date AS d
+             FROM page_views
+            WHERE user_id IS NOT NULL AND entered_at >= NOW() - INTERVAL '30 day'
+         )
+         SELECT d AS day, COUNT(DISTINCT user_id)::int AS count
+           FROM activity GROUP BY d ORDER BY d`
+      ),
+    ]);
+
+    const r = retentionRow.rows[0];
+    const a = activeRow.rows[0];
+    const signups = r.signups || 0;
+    const pct = (n) => signups > 0 ? (n / signups) : null;
+
+    res.json({
+      cohort: { from: cohortFrom, to: cohortTo, signups },
+      dayN: {
+        d1: pct(r.d1 || 0),
+        d7: pct(r.d7 || 0),
+        d30: pct(r.d30 || 0),
+        absolute: { d1: r.d1 || 0, d7: r.d7 || 0, d30: r.d30 || 0 },
+      },
+      active: {
+        dau: a.dau || 0,
+        wau: a.wau || 0,
+        mau: a.mau || 0,
+        stickiness: a.mau > 0 ? a.dau / a.mau : null,
+      },
+      dauTrend: trendRows.rows.map((row) => ({ date: row.day, count: row.count })),
+    });
+  } catch (err) {
+    logError('Admin retention query failed', { err: err.message, stack: err.stack });
+    res.status(500).json({ error: 'retention query failed' });
   }
 });
 
@@ -309,12 +528,27 @@ const ADMIN_HTML = `<!doctype html>
     .badge.no  { background: #f6eceb; color: #8a4640; }
     .error { color: #b7635a; margin: 12px 0; }
     .muted { color: #b6ada8; }
+    .tabs { display: flex; gap: 4px; border-bottom: 1px solid #ece6e1; margin: 20px 0 16px; }
+    .tab {
+      padding: 8px 16px; border: 0; background: transparent; cursor: pointer;
+      font: inherit; color: #8a807c; border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .tab.active { color: #2a2422; border-bottom-color: #2a2422; font-weight: 500; }
+    .tab:hover { color: #2a2422; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .bar-wrap { display: flex; align-items: center; gap: 10px; }
+    .bar { flex: 1; height: 8px; background: #f1ebe6; border-radius: 4px; overflow: hidden; max-width: 240px; }
+    .bar-fill { height: 100%; background: #d4a5a5; }
+    .pill { display: inline-block; padding: 1px 6px; border-radius: 6px; background: #f1ebe6; color: #8a807c; font-size: 10px; margin-left: 6px; vertical-align: middle; }
+    .sparkline { width: 100%; max-width: 480px; height: 60px; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>Twogether 後台 · 漏斗轉換</h1>
-    <p class="sub">從不重複 IP 進站到註冊、再到回訪的轉換率。最近註冊帳號清單在下方。</p>
+    <h1>Twogether 後台</h1>
+    <p class="sub">轉換漏斗、頁面使用、回訪指標。</p>
 
     <div class="controls">
       <label>From <input type="date" id="from"></label>
@@ -325,13 +559,21 @@ const ADMIN_HTML = `<!doctype html>
 
     <div id="error" class="error" hidden></div>
 
-    <div class="funnel" id="funnelCards"></div>
-    <div class="arrows" id="funnelRates"></div>
+    <div class="tabs">
+      <button class="tab active" data-panel="funnel">漏斗</button>
+      <button class="tab" data-panel="pages">頁面</button>
+      <button class="tab" data-panel="retention">回訪</button>
+    </div>
 
-    <h1 style="margin-top:24px">最近註冊帳號</h1>
-    <p class="sub">依註冊時間倒序。情侶配對狀態、登入天數、互動次數。</p>
-    <div style="overflow-x:auto">
-      <table id="usersTable">
+    <!-- Panel: Funnel (default) -->
+    <div class="panel active" id="panel-funnel">
+      <div class="funnel" id="funnelCards"></div>
+      <div class="arrows" id="funnelRates"></div>
+
+      <h1 style="margin-top:24px">最近註冊帳號</h1>
+      <p class="sub">依註冊時間倒序。情侶配對狀態、登入天數、互動次數。</p>
+      <div style="overflow-x:auto">
+        <table id="usersTable">
         <thead>
           <tr>
             <th>Email / 暱稱</th>
@@ -345,6 +587,40 @@ const ADMIN_HTML = `<!doctype html>
         </thead>
         <tbody></tbody>
       </table>
+      </div>
+    </div>
+
+    <!-- Panel: Pages -->
+    <div class="panel" id="panel-pages">
+      <p class="sub">每個頁面在此區間內的觸及人數、停留時間，以及被多少比例的活躍使用者打開過。冷門頁面（觸及 &lt; 5%）在最下方。</p>
+      <div style="overflow-x:auto">
+        <table id="pagesTable">
+          <thead>
+            <tr>
+              <th>頁面</th>
+              <th class="num">不重複使用者</th>
+              <th class="num">總瀏覽次數</th>
+              <th class="num">平均停留</th>
+              <th>觸及率</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Panel: Retention -->
+    <div class="panel" id="panel-retention">
+      <p class="sub">本期區間用於 DAU/WAU/MAU。Day-N 回訪以下方 cohort 計算。</p>
+      <h3 style="margin:16px 0 6px;font-weight:500;font-size:14px">Day-N 回訪（cohort）</h3>
+      <p class="sub" id="cohortMeta"></p>
+      <div class="funnel" id="dayNCards"></div>
+
+      <h3 style="margin:20px 0 6px;font-weight:500;font-size:14px">活躍使用者（最近 30 天）</h3>
+      <div class="funnel" id="activeCards"></div>
+
+      <h3 style="margin:20px 0 6px;font-weight:500;font-size:14px">DAU 趨勢（30 天）</h3>
+      <svg id="dauSpark" class="sparkline" viewBox="0 0 480 60" preserveAspectRatio="none"></svg>
     </div>
   </div>
 
@@ -373,16 +649,24 @@ const ADMIN_HTML = `<!doctype html>
       $('error').hidden = true;
       try {
         const qs = new URLSearchParams({ from: $('from').value, to: $('to').value });
-        const [funnelRes, usersRes] = await Promise.all([
+        const [funnelRes, usersRes, pagesRes, retRes] = await Promise.all([
           fetch('/api/admin/funnel?' + qs.toString()),
           fetch('/api/admin/recent-users?limit=100'),
+          fetch('/api/admin/page-stats?' + qs.toString()),
+          fetch('/api/admin/retention'),
         ]);
         if (!funnelRes.ok) throw new Error('funnel ' + funnelRes.status);
         if (!usersRes.ok) throw new Error('users ' + usersRes.status);
+        if (!pagesRes.ok) throw new Error('pages ' + pagesRes.status);
+        if (!retRes.ok) throw new Error('retention ' + retRes.status);
         const funnel = await funnelRes.json();
         const usersBody = await usersRes.json();
+        const pages = await pagesRes.json();
+        const retention = await retRes.json();
         renderFunnel(funnel);
         renderUsers(usersBody.users || []);
+        renderPages(pages);
+        renderRetention(retention);
         $('status').textContent = '更新於 ' + new Date().toLocaleTimeString('zh-TW');
       } catch (e) {
         $('status').textContent = '';
@@ -390,6 +674,102 @@ const ADMIN_HTML = `<!doctype html>
         $('error').textContent = '載入失敗: ' + e.message;
       }
     }
+
+    function fmtDuration(ms) {
+      if (!ms || ms < 1000) return (ms || 0) + ' ms';
+      const s = Math.round(ms / 1000);
+      if (s < 60) return s + ' 秒';
+      const m = Math.floor(s / 60), rs = s % 60;
+      return m + ' 分 ' + rs + ' 秒';
+    }
+
+    function renderPages(body) {
+      const tbody = document.querySelector('#pagesTable tbody');
+      const rows = body.views || [];
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="muted">沒有資料 — 等使用者開始操作後再回來看。</td></tr>';
+        return;
+      }
+      const dead = rows.filter((r) => r.reach_pct !== null && r.reach_pct < 0.05);
+      const live = rows.filter((r) => !dead.includes(r));
+      const renderRow = (r, isDead) => {
+        const pct = r.reach_pct === null ? 0 : r.reach_pct;
+        const widthPct = Math.min(100, pct * 100);
+        const label = (r.view + '').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+        const typePill = r.view_type === 'modal' ? '<span class="pill">modal</span>' : '';
+        return '<tr' + (isDead ? ' style="opacity:0.55"' : '') + '>' +
+          '<td>' + label + typePill + '</td>' +
+          '<td class="num">' + r.unique_users + '</td>' +
+          '<td class="num">' + r.total_views + '</td>' +
+          '<td class="num">' + fmtDuration(r.avg_duration_ms) + '</td>' +
+          '<td><div class="bar-wrap"><div class="bar"><div class="bar-fill" style="width:' + widthPct.toFixed(1) + '%"></div></div>' +
+          '<span class="muted" style="font-size:11px">' + (pct * 100).toFixed(1) + '%</span></div></td>' +
+          '</tr>';
+      };
+      let html = live.map((r) => renderRow(r, false)).join('');
+      if (dead.length > 0) {
+        html += '<tr><td colspan="5" class="muted" style="padding-top:14px;font-size:11px">— 冷門頁面（觸及 &lt; 5%）—</td></tr>';
+        html += dead.map((r) => renderRow(r, true)).join('');
+      }
+      tbody.innerHTML = html;
+    }
+
+    function renderRetention(r) {
+      const cohortRange = r.cohort.from + ' → ' + r.cohort.to;
+      $('cohortMeta').textContent = cohortRange + ' 的 ' + r.cohort.signups + ' 位註冊使用者';
+      $('dayNCards').innerHTML = [
+        ['D1', r.dayN.d1, r.dayN.absolute.d1],
+        ['D7', r.dayN.d7, r.dayN.absolute.d7],
+        ['D30', r.dayN.d30, r.dayN.absolute.d30],
+      ].map(([label, p, abs]) => (
+        '<div class="card"><div class="label">' + label + ' 回訪率</div>' +
+        '<div class="value">' + fmtPct(p) + '</div>' +
+        '<div class="delta">' + abs + ' / ' + r.cohort.signups + ' 人</div>' +
+        '</div>'
+      )).join('');
+      $('activeCards').innerHTML = [
+        ['DAU', r.active.dau, '過去 24 小時'],
+        ['WAU', r.active.wau, '過去 7 天'],
+        ['MAU', r.active.mau, '過去 30 天'],
+        ['黏著度', fmtPct(r.active.stickiness), 'DAU / MAU'],
+      ].map(([label, val, delta]) => (
+        '<div class="card"><div class="label">' + label + '</div>' +
+        '<div class="value">' + (typeof val === 'number' ? val.toLocaleString() : val) + '</div>' +
+        '<div class="delta">' + delta + '</div>' +
+        '</div>'
+      )).join('');
+
+      renderSparkline(r.dauTrend || []);
+    }
+
+    function renderSparkline(points) {
+      const svg = $('dauSpark');
+      if (points.length === 0) { svg.innerHTML = ''; return; }
+      const W = 480, H = 60, pad = 4;
+      const max = Math.max(1, ...points.map((p) => p.count));
+      const stepX = points.length > 1 ? (W - pad * 2) / (points.length - 1) : 0;
+      const path = points.map((p, i) => {
+        const x = pad + i * stepX;
+        const y = H - pad - (p.count / max) * (H - pad * 2);
+        return (i === 0 ? 'M' : 'L') + x.toFixed(1) + ' ' + y.toFixed(1);
+      }).join(' ');
+      const lastX = pad + (points.length - 1) * stepX;
+      const lastY = H - pad - (points[points.length - 1].count / max) * (H - pad * 2);
+      svg.innerHTML =
+        '<path d="' + path + '" stroke="#d4a5a5" stroke-width="2" fill="none"/>' +
+        '<circle cx="' + lastX.toFixed(1) + '" cy="' + lastY.toFixed(1) + '" r="3" fill="#b7635a"/>';
+    }
+
+    // Tab switching
+    document.querySelectorAll('.tab').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach((b) => b.classList.toggle('active', b === btn));
+        const panel = btn.getAttribute('data-panel');
+        document.querySelectorAll('.panel').forEach((p) => {
+          p.classList.toggle('active', p.id === 'panel-' + panel);
+        });
+      });
+    });
 
     function renderFunnel(f) {
       $('funnelCards').innerHTML = [
@@ -469,6 +849,25 @@ async function purgeOldLandingVisits() {
     }
   } catch (err) {
     logWarn('landing_visits retention purge failed', { err: err.message });
+  }
+
+  // page_views shares the same retention setting — we keep raw per-view rows
+  // for the analytics window, then drop. Aggregates that need longer history
+  // can be precomputed before the purge runs.
+  try {
+    const result = await db.query(
+      `DELETE FROM page_views
+        WHERE entered_at < NOW() - ($1 || ' days')::interval`,
+      [String(LANDING_VISITS_RETENTION_DAYS)]
+    );
+    if (result.rowCount > 0) {
+      logInfo('page_views retention purge', {
+        deleted: result.rowCount,
+        retentionDays: LANDING_VISITS_RETENTION_DAYS,
+      });
+    }
+  } catch (err) {
+    logWarn('page_views retention purge failed', { err: err.message });
   }
 }
 
