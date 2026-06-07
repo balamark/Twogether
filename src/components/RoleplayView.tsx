@@ -513,7 +513,9 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                   script,
                   actions: (
                     <>
-                      <FavoriteButton scriptId={script.id} className="w-7 h-7 hover:bg-petal-cream-2" />
+                      <span className="hidden sm:inline-flex">
+                        <FavoriteButton scriptId={script.id} className="w-7 h-7 hover:bg-petal-cream-2" />
+                      </span>
                       <button
                         onClick={() => handleViewScript(script)}
                         data-testid={`script-featured-view-button-${index}`}
@@ -525,7 +527,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                       <button
                         onClick={() => handleQuickPlay(script)}
                         data-testid={`script-featured-play-button-${index}`}
-                        className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                        className="hidden sm:inline-flex bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                       >
                         <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
                         開始
@@ -633,12 +635,14 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                     ),
                     actions: (
                       <>
-                        <FavoriteButton scriptId={script.id} className="w-7 h-7 hover:bg-petal-cream-2" />
+                        <span className="hidden sm:inline-flex">
+                          <FavoriteButton scriptId={script.id} className="w-7 h-7 hover:bg-petal-cream-2" />
+                        </span>
                         {onEditScript && (
                           <button
                             onClick={() => onEditScript(script)}
                             data-testid={`script-edit-button-${script.id}`}
-                            className="border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors"
+                            className="hidden sm:inline-flex border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors"
                             aria-label={`編輯 ${script.title}`}
                           >
                             <Pencil className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
@@ -656,7 +660,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                         <button
                           onClick={() => handleQuickPlay(script)}
                           data-testid={`script-card-custom-play-button-${script.id}`}
-                          className="bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                          className="hidden sm:inline-flex bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                         >
                           <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
                           開始
@@ -741,15 +745,29 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                       <span className="text-[10px] text-petal-muted italic flex-shrink-0">作者已停止分享</span>
                     ) : undefined,
                     actions: (
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); handleMarketplacePlay(m); }}
-                        data-testid={`marketplace-favorite-play-${m.id}`}
-                        className="bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
-                      >
-                        <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                        開始
-                      </button>
+                      <>
+                        <span className="hidden sm:inline-flex">
+                          <FavoriteButton scriptId={m.id} className="w-7 h-7 hover:bg-petal-cream-2" />
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); setMarketplaceDetailId(m.id); }}
+                          data-testid={`marketplace-favorite-view-${m.id}`}
+                          className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                        >
+                          <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                          查看
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); handleMarketplacePlay(m); }}
+                          data-testid={`marketplace-favorite-play-${m.id}`}
+                          className="hidden sm:inline-flex bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                        >
+                          <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                          開始
+                        </button>
+                      </>
                     ),
                   })
                 )}
@@ -840,7 +858,9 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                   ),
                   actions: (
                     <>
-                      <FavoriteButton scriptId={script.id} className="w-7 h-7 hover:bg-petal-cream-2" />
+                      <span className="hidden sm:inline-flex">
+                        <FavoriteButton scriptId={script.id} className="w-7 h-7 hover:bg-petal-cream-2" />
+                      </span>
                       <button
                         onClick={() => handleViewScript(script)}
                         data-testid={`script-list-view-button-${index}`}
@@ -852,7 +872,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                       <button
                         onClick={() => handleQuickPlay(script)}
                         data-testid={`script-list-play-button-${index}`}
-                        className="bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                        className="hidden sm:inline-flex bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                       >
                         <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
                         開始
@@ -861,7 +881,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                         <button
                           onClick={() => onEditScript(script)}
                           data-testid={`script-list-edit-button-${script.id}`}
-                          className="border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors"
+                          className="hidden sm:inline-flex border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors"
                         >
                           <Pencil className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
                           編輯
