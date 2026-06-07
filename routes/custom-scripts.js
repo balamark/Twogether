@@ -25,6 +25,18 @@ const thumbnailUpload = multer({
   },
 });
 
+// Preserve close-to-original size for the lightbox view; only downscale truly
+// huge originals. 2048px long edge fits a 4K display; mozjpeg + q90 keeps
+// detail without ballooning bytes. `.rotate()` applies EXIF orientation so
+// portrait phone shots aren't stored sideways.
+async function processThumbnail(buffer) {
+  return sharp(buffer)
+    .rotate()
+    .resize(2048, 2048, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: 90, progressive: true, mozjpeg: true })
+    .toBuffer();
+}
+
 // Parses `tags` form-field (JSON string from multipart) into an array.
 // JSON body requests pass an array directly — return as-is in that case.
 function normalizeTags(input) {
@@ -144,10 +156,7 @@ router.post('/', thumbnailUpload.single('thumbnail'), [
 
     let thumbnailUrl = null;
     if (req.file) {
-      const processed = await sharp(req.file.buffer)
-        .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 80, progressive: true })
-        .toBuffer();
+      const processed = await processThumbnail(req.file.buffer);
       const fileName = `custom-script-thumbnails/${uuidv4()}-${Date.now()}.jpg`;
       thumbnailUrl = await uploadToSupabase(processed, fileName, 'image/jpeg');
     }
@@ -263,10 +272,7 @@ router.put('/:id', thumbnailUpload.single('thumbnail'), [
     // a janitor sweep can clean orphans later).
     let newThumbnailUrl = null;
     if (req.file) {
-      const processed = await sharp(req.file.buffer)
-        .resize(400, 400, { fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 80, progressive: true })
-        .toBuffer();
+      const processed = await processThumbnail(req.file.buffer);
       const fileName = `custom-script-thumbnails/${uuidv4()}-${Date.now()}.jpg`;
       newThumbnailUrl = await uploadToSupabase(processed, fileName, 'image/jpeg');
     }

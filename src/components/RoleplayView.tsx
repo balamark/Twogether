@@ -96,6 +96,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   const tz = useTimezone();
   const [selectedScript, setSelectedScript] = useState<RoleplayScript | null>(null);
   const [showScriptModal, setShowScriptModal] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   // Tracks whether the current modal viewing has been "begun" — i.e. user
   // explicitly clicked "開始扮演" and we recorded an intimacy moment. View
   // alone does NOT record; only this transition does.
@@ -162,6 +163,13 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
 
   useScrollLock(showScriptModal && !!selectedScript);
 
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightboxOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lightboxOpen]);
+
   const handleViewScript = useCallback((script: RoleplayScript) => {
     const parsedScript = parseScriptContent(script.script);
     setSelectedScript({ ...script, script: parsedScript });
@@ -227,6 +235,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   const closeModal = useCallback(() => {
     setShowScriptModal(false);
     setHasBegun(false);
+    setLightboxOpen(false);
   }, []);
 
   const allScripts = [...defaultRoleplayScripts, ...customScripts];
@@ -1027,6 +1036,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
 
       {/* Script Modal — view-only by default; record only on explicit 開始扮演 */}
       {showScriptModal && selectedScript && (
+        <>
         <div
           data-testid="roleplay-modal"
           className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
@@ -1036,20 +1046,29 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             className="relative bg-petal-cream rounded-md shadow-petal max-w-4xl w-full max-h-[min(90vh,calc(100dvh-80px))] border border-petal-rule overflow-y-auto overscroll-contain"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="relative aspect-video w-full bg-petal-cream-2 overflow-hidden border-b border-petal-rule">
+            <div
+              className={`relative aspect-video w-full bg-petal-cream-2 overflow-hidden border-b border-petal-rule ${selectedScript.image ? 'cursor-zoom-in' : ''}`}
+              onClick={() => { if (selectedScript.image) setLightboxOpen(true); }}
+              data-testid="roleplay-modal-thumb"
+            >
               {renderThumb(selectedScript, 'w-full h-full', 'contain')}
               <button
-                onClick={closeModal}
+                onClick={(e) => { e.stopPropagation(); closeModal(); }}
                 data-testid="roleplay-modal-close-button"
                 aria-label="關閉"
                 className="absolute top-3 left-3 w-9 h-9 inline-flex items-center justify-center rounded-full bg-white/85 backdrop-blur-sm border border-petal-rule shadow-sm text-petal-ink hover:bg-white transition-colors"
               >
                 <X className="w-4 h-4" strokeWidth={1.5} />
               </button>
-              <FavoriteButton
-                scriptId={selectedScript.id}
-                className="absolute top-3 right-3 w-9 h-9 bg-white/85 backdrop-blur-sm border border-petal-rule shadow-sm hover:bg-white"
-              />
+              <span
+                className="absolute top-3 right-3"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <FavoriteButton
+                  scriptId={selectedScript.id}
+                  className="w-9 h-9 bg-white/85 backdrop-blur-sm border border-petal-rule shadow-sm hover:bg-white"
+                />
+              </span>
             </div>
             <div className="px-5 sm:px-8 pt-5 sm:pt-6 pb-4 sm:pb-5 border-b border-petal-rule">
               <div className="font-body text-xs sm:text-[11px] font-medium uppercase tracking-[0.08em] sm:tracking-[0.16em] text-petal-muted mb-2">
@@ -1117,6 +1136,34 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             </div>
           </div>
         </div>
+        {lightboxOpen && selectedScript.image && (
+          <div
+            data-testid="roleplay-modal-lightbox"
+            className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center overflow-auto overscroll-contain p-4 sm:p-8"
+            onClick={() => setLightboxOpen(false)}
+            role="dialog"
+            aria-modal="true"
+            aria-label="放大查看劇本縮圖"
+          >
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setLightboxOpen(false); }}
+              data-testid="roleplay-modal-lightbox-close"
+              aria-label="關閉放大檢視"
+              className="fixed top-4 right-4 w-10 h-10 inline-flex items-center justify-center rounded-full bg-white/90 text-petal-ink hover:bg-white shadow-sm"
+            >
+              <X className="w-5 h-5" strokeWidth={1.5} />
+            </button>
+            <img
+              src={selectedScript.image}
+              alt={selectedScript.title}
+              onClick={(e) => e.stopPropagation()}
+              className="block max-w-none cursor-default"
+              data-testid="roleplay-modal-lightbox-image"
+            />
+          </div>
+        )}
+        </>
       )}
     </div>
   );
