@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Heart, Calendar, Trophy, Gamepad2, MessageCircle, Clock, Sparkles, Camera, MapPin, Play, Coins, Plus, X, User, Inbox, Pause, StickyNote, ChevronDown, ChevronUp, Send, Check, MessageSquareHeart, Trash2, Pencil } from 'lucide-react';
+import { Heart, Calendar, MessageCircle, Clock, Sparkles, Camera, MapPin, Play, Coins, Plus, X, User, Pause, StickyNote, ChevronDown, ChevronUp, Send, Check, MessageSquareHeart, Trash2, Pencil } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import RoleplayView from './components/RoleplayView';
 import WallView from './components/WallView';
@@ -5489,13 +5489,10 @@ const LoveTimeApp = () => {
 
   const navItems = [
     { id: 'record', label: '記錄時光', icon: Calendar },
-    { id: 'games', label: '情趣遊戲', icon: Gamepad2 },
     { id: 'conflict', label: '和諧相處', icon: MessageCircle },
     { id: 'events', label: '事件', icon: MessageSquareHeart },
     { id: 'roleplay', label: '角色扮演', icon: Play },
     { id: 'wall', label: '我們的牆', icon: StickyNote },
-    { id: 'journey', label: '愛情旅程', icon: Trophy },
-    { id: 'intimacy-history', label: '訊息紀錄', icon: Inbox }
   ];
 
   const renderView = () => {
@@ -5576,6 +5573,7 @@ const LoveTimeApp = () => {
         onToggleFavorite={toggleFavoriteScript}
         initialScriptTitle={pendingScriptTitle}
         onInitialScriptConsumed={() => setPendingScriptTitle(null)}
+        renderGames={() => <GamesView />}
       />;
       case 'journey': return <OurJourneyView />;
       case 'wall': return <WallView
@@ -5746,6 +5744,8 @@ const LoveTimeApp = () => {
         onShowNotifications={() => setShowNotificationInbox(true)}
         onShowCoinShop={() => setCurrentView('shop')}
         onShowSettings={() => setCurrentView('settings')}
+        onShowJourney={() => setCurrentView('journey')}
+        onShowIntimacyHistory={() => setCurrentView('intimacy-history')}
       />
       
       {/* Notification Container */}

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow, LayoutGrid, List } from 'lucide-react';
+import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow, LayoutGrid, List, Gamepad2 } from 'lucide-react';
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { apiService } from '../services/api';
@@ -50,6 +50,7 @@ interface RoleplayViewProps {
   onToggleFavorite: (scriptId: string) => void;
   initialScriptTitle?: string | null;
   onInitialScriptConsumed?: () => void;
+  renderGames?: () => React.ReactNode;
 }
 
 const CATEGORY_META: Record<RoleplayScript['category'], { label: string; emoji: string; tint: string }> = {
@@ -92,6 +93,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   onToggleFavorite,
   initialScriptTitle,
   onInitialScriptConsumed,
+  renderGames,
 }) => {
   const tz = useTimezone();
   const [selectedScript, setSelectedScript] = useState<RoleplayScript | null>(null);
@@ -115,7 +117,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   }, [viewMode]);
 
   // Marketplace state — discoverable public scripts shared by other users.
-  const [mainTab, setMainTab] = useState<'mine' | 'marketplace'>('mine');
+  const [mainTab, setMainTab] = useState<'mine' | 'marketplace' | 'games'>('mine');
   const [marketplaceScripts, setMarketplaceScripts] = useState<MarketplaceScript[]>([]);
   const [marketplaceLoading, setMarketplaceLoading] = useState(false);
   const [marketplaceSort, setMarketplaceSort] = useState<'rating' | 'recent' | 'popular'>('rating');
@@ -371,6 +373,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
 
   return (
     <div className="space-y-10">
+      {mainTab !== 'games' && (
       <div className="border-b border-petal-rule pb-7">
         <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
           — 劇本
@@ -382,6 +385,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           點燃激情，重溫浪漫 — 慢慢來。
         </p>
       </div>
+      )}
 
       {/* Main tabs — My Scripts vs Marketplace */}
       <div className="flex items-center justify-between gap-2 mb-6 border-b border-petal-rule">
@@ -389,6 +393,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           {([
             { id: 'mine' as const, label: '我的劇本', icon: <FileText className="w-3.5 h-3.5" strokeWidth={1.5} /> },
             { id: 'marketplace' as const, label: '創作市集', icon: <Store className="w-3.5 h-3.5" strokeWidth={1.5} /> },
+            ...(renderGames ? [{ id: 'games' as const, label: '情趣遊戲', icon: <Gamepad2 className="w-3.5 h-3.5" strokeWidth={1.5} /> }] : []),
           ]).map((t) => {
             const isActive = mainTab === t.id;
             return (
@@ -1018,6 +1023,12 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               </div>
             )
           )}
+        </div>
+      )}
+
+      {mainTab === 'games' && renderGames && (
+        <div data-testid="roleplay-tab-games-panel">
+          {renderGames()}
         </div>
       )}
 

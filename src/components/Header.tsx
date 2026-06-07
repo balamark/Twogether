@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, LogOut, Coins, Heart, Bell, Send, Settings } from 'lucide-react';
+import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox } from 'lucide-react';
 import { apiService } from '../services/api';
 
 interface User {
@@ -26,6 +26,8 @@ interface HeaderProps {
   onShowNotifications: () => void;
   onShowCoinShop: () => void;
   onShowSettings: () => void;
+  onShowJourney: () => void;
+  onShowIntimacyHistory: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -37,6 +39,8 @@ const Header: React.FC<HeaderProps> = ({
   onShowNotifications,
   onShowCoinShop,
   onShowSettings,
+  onShowJourney,
+  onShowIntimacyHistory,
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -166,6 +170,28 @@ const Header: React.FC<HeaderProps> = ({
                       )}
                     </div>
                     <div className="p-2">
+                      <button
+                        onClick={() => {
+                          onShowJourney();
+                          setShowUserMenu(false);
+                        }}
+                        data-testid="user-menu-journey"
+                        className="w-full flex items-center space-x-2 px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
+                      >
+                        <Trophy className="w-3.5 h-3.5" strokeWidth={1.5} />
+                        <span>愛情旅程</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          onShowIntimacyHistory();
+                          setShowUserMenu(false);
+                        }}
+                        data-testid="user-menu-intimacy-history"
+                        className="w-full flex items-center space-x-2 px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
+                      >
+                        <Inbox className="w-3.5 h-3.5" strokeWidth={1.5} />
+                        <span>訊息紀錄</span>
+                      </button>
                       <button
                         onClick={() => {
                           onShowSettings();
