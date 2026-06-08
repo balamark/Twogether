@@ -6,8 +6,9 @@ const { body, validationResult } = require('express-validator');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { uploadToSupabase } = require('../lib/supabase-storage');
+const { getCoupleTier, getLimit, checkLimit } = require('../lib/entitlements');
 const { logDbError, errorResponseBody } = require('../lib/db-errors');
-const { logError } = require('../lib/logger');
+const { logError, logInfo } = require('../lib/logger');
 
 const router = express.Router();
 
@@ -153,6 +154,24 @@ router.post('/', thumbnailUpload.single('thumbnail'), [
 
     // Use couple_id if exists, otherwise null for personal scripts
     const coupleId = coupleResult.rows.length > 0 ? coupleResult.rows[0].id : null;
+
+    // Freemium cap: free couples may keep only N custom scripts; premium is
+    // unlimited. Count the same set the GET endpoint returns (couple scripts +
+    // this user's personal scripts) so the number matches what the user sees.
+    const tier = await getCoupleTier(coupleId);
+    if (Number.isFinite(getLimit(tier, 'custom_scripts_total'))) {
+      const countResult = await db.query(
+        `SELECT COUNT(*)::int AS c FROM custom_scripts
+          WHERE couple_id = $1 OR (couple_id IS NULL AND created_by = $2)`,
+        [coupleId, userId]
+      );
+      const used = countResult.rows[0]?.c || 0;
+      const limitCheck = checkLimit({ tier, key: 'custom_scripts_total', used });
+      if (!limitCheck.ok) {
+        logInfo('custom_scripts.limit', { userId, coupleId, used, tier, blocked: true });
+        return res.status(limitCheck.status).json(limitCheck.body);
+      }
+    }
 
     let thumbnailUrl = null;
     if (req.file) {

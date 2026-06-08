@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Heart, Calendar, MessageCircle, Clock, Sparkles, Camera, MapPin, Play, Coins, Plus, X, User, Pause, StickyNote, ChevronDown, ChevronUp, Send, Check, MessageSquareHeart, Trash2, Pencil } from 'lucide-react';
 import SettingsView from './components/SettingsView';
+import UpgradeView, { BillingResultView } from './components/UpgradeView';
 import RoleplayView from './components/RoleplayView';
 import WallView from './components/WallView';
 import EventsView from './components/EventsView';
@@ -400,6 +401,13 @@ interface PositionSuggestion {
 
 const LoveTimeApp = () => {
   const [currentView, setCurrentView] = useState('record');
+  // Message shown atop the Upgrade view when the user is sent there by hitting a
+  // usage cap (set from the global `billing:limit-reached` event).
+  const [upgradeReason, setUpgradeReason] = useState<string | null>(null);
+  // True when ECPay redirected the browser back to /billing/result.
+  const [isBillingResult, setIsBillingResult] = useState(() =>
+    typeof window !== 'undefined' && window.location.pathname.startsWith('/billing/result')
+  );
   const [pendingEventId, setPendingEventId] = useState<string | null>(null);
   const [pendingScriptTitle, setPendingScriptTitle] = useState<string | null>(null);
   const [intimateRecords, setIntimateRecords] = useState<IntimateRecord[]>([]);
@@ -998,6 +1006,19 @@ const LoveTimeApp = () => {
     };
     window.addEventListener('auth:session-expired', handleSessionExpired);
     return () => window.removeEventListener('auth:session-expired', handleSessionExpired);
+  }, []);
+
+  // src/services/api.ts dispatches `billing:limit-reached` on a 429 with one of
+  // our freemium cap error_codes. Send the user to the Upgrade view with the
+  // cap's message as context so the paywall is handled in one place.
+  useEffect(() => {
+    const handleLimitReached = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string }>).detail;
+      setUpgradeReason(detail?.message || '已達免費方案上限，升級 Premium 可解除限制');
+      setCurrentView('upgrade');
+    };
+    window.addEventListener('billing:limit-reached', handleLimitReached);
+    return () => window.removeEventListener('billing:limit-reached', handleLimitReached);
   }, []);
 
   // Proactive expiration: schedule a logout when the JWT is due to expire,
@@ -5605,6 +5626,7 @@ const LoveTimeApp = () => {
           partnerNickname={nicknames.partner2}
         />
       );
+      case 'upgrade': return <UpgradeView reason={upgradeReason} showNotification={showNotification} />;
       default: return <GamesView />;
     }
   };
@@ -5731,6 +5753,20 @@ const LoveTimeApp = () => {
     userTz: authState.user?.timezone,
   });
 
+  // ECPay redirected the browser back here after checkout. The pass was already
+  // granted server-to-server; this screen just confirms and returns to the app.
+  if (isBillingResult) {
+    return (
+      <BillingResultView
+        onDone={() => {
+          window.history.replaceState(null, '', '/');
+          setIsBillingResult(false);
+          setCurrentView('record');
+        }}
+      />
+    );
+  }
+
   return (
     <TimezoneProvider value={primaryTimezone}>
     <div className="min-h-screen bg-petal-cream">
@@ -5746,6 +5782,7 @@ const LoveTimeApp = () => {
         onShowSettings={() => setCurrentView('settings')}
         onShowJourney={() => setCurrentView('journey')}
         onShowIntimacyHistory={() => setCurrentView('intimacy-history')}
+        onShowUpgrade={() => { setUpgradeReason(null); setCurrentView('upgrade'); }}
       />
       
       {/* Notification Container */}

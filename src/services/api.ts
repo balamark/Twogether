@@ -429,6 +429,48 @@ export const resetSessionExpiredGuard = (): void => {
   sessionExpiredDispatched = false;
 };
 
+// Freemium: error_codes the backend returns (429) when a free couple hits a
+// usage cap. The response interceptor turns any of these into a global
+// `billing:limit-reached` event so the app can surface the upgrade paywall
+// uniformly, no matter which feature triggered it.
+export const BILLING_LIMIT_CODES = new Set([
+  'AI_DAILY_LIMIT_REACHED',
+  'SCRIPT_LIMIT_REACHED',
+  'PHOTO_LIMIT_REACHED',
+]);
+
+export interface BillingPlan {
+  id: 'pass_30' | 'pass_90' | 'pass_365';
+  days: number;
+  amount: number;
+  label: string;
+}
+
+export interface BillingStatus {
+  tier: 'free' | 'premium';
+  expiresAt: string | null;
+  hasCouple: boolean;
+  plans: BillingPlan[];
+}
+
+// Builds a hidden form and POSTs it to ECPay's hosted checkout — a full-page
+// navigation, exactly how ECPay expects the redirect to happen.
+export const submitEcpayForm = (actionUrl: string, params: Record<string, string>): void => {
+  const form = document.createElement('form');
+  form.method = 'POST';
+  form.action = actionUrl;
+  form.style.display = 'none';
+  Object.entries(params).forEach(([name, value]) => {
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = name;
+    input.value = String(value);
+    form.appendChild(input);
+  });
+  document.body.appendChild(form);
+  form.submit();
+};
+
 // Returns the unix-ms timestamp at which the current token expires, or null
 // if no token is stored or the expiry can't be determined. Prefers the
 // authoritative `authTokenExpiresAt` value set at login; falls back to
@@ -583,6 +625,22 @@ apiClient.interceptors.response.use(
         validationError.status = status;
         validationError.data = data;
         throw validationError;
+      } else if (status === 429) {
+        // Usage-cap hit. If it's one of our freemium caps, broadcast a global
+        // event so the app can show the upgrade paywall; still throw so the
+        // calling code can stop its own flow. Non-billing 429s (if any) just throw.
+        if (BILLING_LIMIT_CODES.has(errorCode) && typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('billing:limit-reached', {
+              detail: { error_code: errorCode, message: errorMessage },
+            })
+          );
+        }
+        const limitError = new Error(errorMessage) as Error & { error_code?: string; status?: number; data?: unknown };
+        limitError.error_code = errorCode;
+        limitError.status = status;
+        limitError.data = data;
+        throw limitError;
       } else if (status >= 500) {
         // Same as 404: surface the backend's specific message when it has
         // one (e.g. "回應親密請求失敗") so the user sees what feature failed
@@ -2201,6 +2259,40 @@ class ApiService {
       createdAt: r.created_at || '',
       readAt: r.read_at ?? null,
     };
+  }
+
+  // Billing / premium passes
+  async getBillingStatus(): Promise<BillingStatus> {
+    try {
+      const response = await apiClient.get('/billing/status');
+      const d = response.data;
+      return {
+        tier: d.tier === 'premium' ? 'premium' : 'free',
+        expiresAt: d.expires_at ?? null,
+        hasCouple: Boolean(d.has_couple),
+        plans: Array.isArray(d.plans) ? d.plans : [],
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch billing status:', error);
+      this.throwApiError(error, '無法取得訂閱狀態');
+    }
+  }
+
+  // Creates an order and redirects the browser to ECPay's hosted checkout.
+  // Resolves only if the redirect could not be initiated (otherwise the page
+  // navigates away).
+  async startCheckout(plan: BillingPlan['id']): Promise<void> {
+    try {
+      const response = await apiClient.post('/billing/checkout', { plan });
+      const { action_url, params } = response.data || {};
+      if (!action_url || !params) {
+        throw new Error('付款資料異常，請稍後再試');
+      }
+      submitEcpayForm(action_url, params);
+    } catch (error: unknown) {
+      console.error('Failed to start checkout:', error);
+      this.throwApiError(error, '無法建立付款，請稍後再試');
+    }
   }
 }
 

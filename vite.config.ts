@@ -13,7 +13,9 @@ export default defineConfig(({ mode }) => {
       "font-src 'self' data: https://fonts.gstatic.com",
       "worker-src 'self' blob:",
       "frame-src 'none'",
-      "object-src 'none'"
+      "object-src 'none'",
+      // Allow the checkout form to POST to ECPay's hosted payment page.
+      "form-action 'self' https://payment-stage.ecpay.com.tw https://payment.ecpay.com.tw"
     ];
 
     // Development-specific connect-src
