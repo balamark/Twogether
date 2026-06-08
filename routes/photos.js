@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { uploadToSupabase } = require('../lib/supabase-storage');
+const { getCoupleTier, getLimit, checkLimit } = require('../lib/entitlements');
 const { logInfo, logError } = require('../lib/logger');
 
 const router = express.Router();
@@ -53,6 +54,22 @@ router.post('/upload', upload.single('photo'), async (req, res) => {
     }
 
     const coupleId = coupleResult.rows[0].id;
+
+    // Freemium cap: free couples may store up to N photos total; premium is
+    // unlimited. Checked before processing/uploading so we don't do work we'll reject.
+    const tier = await getCoupleTier(coupleId);
+    if (Number.isFinite(getLimit(tier, 'photo_uploads_total'))) {
+      const countResult = await db.query(
+        'SELECT COUNT(*)::int AS c FROM photos WHERE couple_id = $1',
+        [coupleId]
+      );
+      const used = countResult.rows[0]?.c || 0;
+      const limitCheck = checkLimit({ tier, key: 'photo_uploads_total', used });
+      if (!limitCheck.ok) {
+        logInfo('photos.limit', { coupleId, used, tier, blocked: true });
+        return res.status(limitCheck.status).json(limitCheck.body);
+      }
+    }
 
     // Process image with sharp
     let processedBuffer;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox } from 'lucide-react';
+import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown } from 'lucide-react';
 import { apiService } from '../services/api';
 
 interface User {
@@ -28,6 +28,7 @@ interface HeaderProps {
   onShowSettings: () => void;
   onShowJourney: () => void;
   onShowIntimacyHistory: () => void;
+  onShowUpgrade: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -41,6 +42,7 @@ const Header: React.FC<HeaderProps> = ({
   onShowSettings,
   onShowJourney,
   onShowIntimacyHistory,
+  onShowUpgrade,
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -139,6 +141,7 @@ const Header: React.FC<HeaderProps> = ({
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
+                  data-testid="user-menu-toggle"
                   className="flex items-center space-x-1 sm:space-x-1.5 border border-petal-rule hover:border-petal-ink px-2 sm:px-3 py-1.5 rounded-full transition-colors min-h-[40px] max-w-[140px] sm:max-w-none"
                 >
                   <User className="w-3.5 h-3.5 text-petal-ink-soft shrink-0" strokeWidth={1.5} />
@@ -191,6 +194,17 @@ const Header: React.FC<HeaderProps> = ({
                       >
                         <Inbox className="w-3.5 h-3.5" strokeWidth={1.5} />
                         <span>訊息紀錄</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          onShowUpgrade();
+                          setShowUserMenu(false);
+                        }}
+                        data-testid="user-menu-upgrade"
+                        className="w-full flex items-center space-x-2 px-3 py-2 font-body text-sm text-pink-600 hover:bg-petal-cream-2 rounded-md transition-colors"
+                      >
+                        <Crown className="w-3.5 h-3.5" strokeWidth={1.5} />
+                        <span>升級 Premium</span>
                       </button>
                       <button
                         onClick={() => {

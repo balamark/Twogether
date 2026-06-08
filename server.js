@@ -28,6 +28,7 @@ const wallRoutes = require('./routes/wall');
 const eventRoutes = require('./routes/events');
 const scriptFavoritesRoutes = require('./routes/script-favorites');
 const marketplaceRoutes = require('./routes/marketplace');
+const billingRoutes = require('./routes/billing');
 const adminRoutes = require('./routes/admin');
 
 // Import database and middleware
@@ -89,7 +90,9 @@ app.use(helmet({
       // blob: is needed for URL.createObjectURL() previews (e.g. thumbnail
       // preview in the custom script upload/edit modal).
       imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
-      connectSrc: ["'self'", "https:"]
+      connectSrc: ["'self'", "https:"],
+      // Allow the premium checkout form to POST to ECPay's hosted payment page.
+      formAction: ["'self'", "https://payment-stage.ecpay.com.tw", "https://payment.ecpay.com.tw"]
     }
   }
 }));
@@ -135,6 +138,10 @@ app.use('/api/wall', wallRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/script-favorites', scriptFavoritesRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
+// Billing: /status + /checkout are JWT-protected inside the router; the
+// /ecpay/callback (server-to-server) and /ecpay/return (browser POST-back) are
+// intentionally public — ECPay can't present a JWT. Auth is applied per-route.
+app.use('/api/billing', billingRoutes);
 // Additional mount for intimacy endpoints (frontend compatibility)
 app.use('/api/intimacy', intimacyRequestRoutes);
 

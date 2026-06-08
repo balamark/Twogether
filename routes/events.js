@@ -5,6 +5,7 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const llmService = require('../services/llmService');
 const emailService = require('../services/emailService');
+const { getCoupleIdForUser, getCoupleTier, getLimit, checkLimit } = require('../lib/entitlements');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 
 const router = express.Router();
@@ -18,8 +19,9 @@ router.use(authenticateToken);
 const TAG_VOCAB = ['語氣', '誤會', '家務', '行程', '金錢', '育兒', '家人'];
 const VERSION_KEYS = ['neutral', 'firm', 'warm'];
 
-// Per-user daily cap on icebreaker LLM calls. Override via env for staging.
-const ICEBREAKER_DAILY_LIMIT = Number(process.env.EVENTS_AI_DAILY_LIMIT || 5);
+// Daily cap on AI (LLM) calls is now tier-aware and lives in lib/entitlements.js
+// (free vs premium). Both the icebreaker and the reply-rewrite preview count
+// against the same daily budget since both hit the paid LLM.
 
 // Diagnostic: log the assembled user prompt for the first N reply rewrites
 // each process so we can verify role-tag wiring in prod. Set to 0 to silence.
@@ -56,23 +58,32 @@ async function ensureEventAiUsageTable() {
   }
 }
 
-async function countTodayIcebreakerUsage(userId) {
+// Counts today's billable AI calls for a user — both icebreaker and reply
+// rewrites share one daily budget.
+async function countTodayAiUsage(userId) {
   try {
     await ensureEventAiUsageTable();
     const result = await db.query(
       `SELECT COUNT(*)::int AS c
          FROM event_ai_usage
         WHERE user_id = $1
-          AND kind = 'icebreaker'
+          AND kind IN ('icebreaker', 'reply_rewrite')
           AND created_at >= DATE_TRUNC('day', NOW())`,
       [userId]
     );
     return result.rows[0]?.c || 0;
   } catch (err) {
     // If the count fails, fail open — we'd rather serve the user than block them.
-    logWarn('countTodayIcebreakerUsage failed', { err: err.message });
+    logWarn('countTodayAiUsage failed', { err: err.message });
     return 0;
   }
+}
+
+// Resolve the caller's tier + daily AI cap in one shot.
+async function resolveAiLimit(userId) {
+  const coupleId = await getCoupleIdForUser(userId);
+  const tier = await getCoupleTier(coupleId);
+  return { tier, limit: getLimit(tier, 'icebreaker_per_day') };
 }
 
 async function recordAiUsage(userId, kind, rawInput, meta) {
@@ -257,16 +268,12 @@ router.post(
     logInfo('events.icebreaker.input', { userId, len: rawText.length, raw: rawText });
 
     try {
-      const usedToday = await countTodayIcebreakerUsage(userId);
-      if (usedToday >= ICEBREAKER_DAILY_LIMIT) {
-        logInfo('events.icebreaker.limit', { userId, used: usedToday, limit: ICEBREAKER_DAILY_LIMIT, blocked: true });
-        return res.status(429).json({
-          success: false,
-          message: `今日 AI 整理次數已達上限（${ICEBREAKER_DAILY_LIMIT} 次／天），明天再試試看`,
-          error_code: 'AI_DAILY_LIMIT_REACHED',
-          limit: ICEBREAKER_DAILY_LIMIT,
-          used: usedToday,
-        });
+      const { tier, limit } = await resolveAiLimit(userId);
+      const usedToday = await countTodayAiUsage(userId);
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      if (!limitCheck.ok) {
+        logInfo('events.icebreaker.limit', { userId, used: usedToday, limit, tier, blocked: true });
+        return res.status(limitCheck.status).json(limitCheck.body);
       }
 
       const preview = await llmService.generateIcebreaker(rawText);
@@ -280,7 +287,8 @@ router.post(
         costUsd: meta?.costUsd,
         durationMs: meta?.durationMs,
         usedToday: usedToday + 1,
-        limit: ICEBREAKER_DAILY_LIMIT,
+        limit,
+        tier,
       });
 
       await recordAiUsage(userId, 'icebreaker', rawText, meta);
@@ -642,6 +650,15 @@ router.post(
       const userId = req.user.id;
       const rawReply = req.body.rawReply;
       logInfo('events.reply_rewrite.input', { userId, eventId: req.params.id, len: rawReply.length, raw: rawReply });
+
+      // Shares the daily AI budget with the icebreaker (both hit the paid LLM).
+      const { tier, limit } = await resolveAiLimit(userId);
+      const usedToday = await countTodayAiUsage(userId);
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      if (!limitCheck.ok) {
+        logInfo('events.reply_rewrite.limit', { userId, used: usedToday, limit, tier, blocked: true });
+        return res.status(limitCheck.status).json(limitCheck.body);
+      }
 
       const recent = await db.query(
         `SELECT sender_id, content
