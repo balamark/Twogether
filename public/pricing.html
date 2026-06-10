@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Twogether 付費方案 ｜ Premium 會員方案</title>
+    <meta
+      name="description"
+      content="Twogether Premium 會員方案購買頁面 — 30 天 NT$90、90 天 NT$240、365 天 NT$790，支援信用卡與 LINE Pay（綠界 ECPay 金流）。無須登入即可瀏覽商品、價格與退費政策。"
+    />
+    <meta name="robots" content="index, follow" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Noto+Serif+TC:wght@400;500;600;700&family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --cream: #fbf7f2;
+        --cream-2: #f2ebdf;
+        --rose: #d4938a;
+        --rose-soft: #ebcfc8;
+        --rose-deep: #b86e64;
+        --sage: #a8b89e;
+        --sage-deep: #7d8f75;
+        --ink: #2a2520;
+        --ink-soft: #5a4f45;
+        --muted: #8a7e72;
+        --rule: #d9cfc1;
+        --rule-soft: #e8dfd0;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        background: var(--cream);
+        color: var(--ink);
+        font-family: "Noto Sans TC", "Manrope", system-ui, -apple-system, sans-serif;
+        line-height: 1.7;
+        -webkit-font-smoothing: antialiased;
+      }
+      h1, h2, h3, .serif {
+        font-family: "Fraunces", "Noto Serif TC", Georgia, serif;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+      }
+      a { color: var(--rose-deep); }
+      .wrap { max-width: 960px; margin: 0 auto; padding: 0 20px; }
+
+      /* Header */
+      header.site {
+        background: var(--cream-2);
+        border-bottom: 1px solid var(--rule-soft);
+      }
+      header.site .wrap {
+        display: flex; align-items: center; justify-content: space-between;
+        padding-top: 18px; padding-bottom: 18px;
+      }
+      .brand { display: flex; align-items: center; gap: 10px; }
+      .brand .logo {
+        width: 36px; height: 36px; border-radius: 50%;
+        background: linear-gradient(135deg, var(--rose), var(--sage-deep));
+      }
+      .brand .name { font-family: "Fraunces", "Noto Serif TC", serif; font-size: 22px; font-weight: 600; }
+      .nav-cta {
+        display: inline-block; padding: 9px 18px; border-radius: 999px;
+        background: var(--rose-deep); color: #fff; text-decoration: none;
+        font-size: 14px; font-weight: 600;
+      }
+
+      /* Hero */
+      .hero { padding: 56px 0 28px; text-align: center; }
+      .hero h1 { font-size: 38px; line-height: 1.25; margin: 0 0 14px; }
+      .hero p.lead { font-size: 17px; color: var(--ink-soft); max-width: 620px; margin: 0 auto; }
+      .eyebrow {
+        display: inline-block; font-size: 13px; letter-spacing: 0.14em;
+        text-transform: uppercase; color: var(--rose-deep); margin-bottom: 14px; font-weight: 600;
+      }
+
+      /* Plans */
+      section { padding: 28px 0; }
+      .section-title { text-align: center; margin: 0 0 6px; font-size: 26px; }
+      .section-sub { text-align: center; color: var(--muted); margin: 0 0 28px; }
+      .plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+      .plan {
+        background: #fff; border: 1px solid var(--rule-soft); border-radius: 18px;
+        padding: 26px 22px; display: flex; flex-direction: column;
+        box-shadow: 0 1px 0 rgba(42,37,32,0.02);
+      }
+      .plan.featured { border-color: var(--rose); box-shadow: 0 8px 28px rgba(184,110,100,0.14); position: relative; }
+      .plan .tag {
+        position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+        background: var(--rose-deep); color: #fff; font-size: 12px; font-weight: 600;
+        padding: 4px 14px; border-radius: 999px; white-space: nowrap;
+      }
+      .plan h3 { margin: 0 0 4px; font-size: 20px; }
+      .plan .dur { color: var(--muted); font-size: 14px; margin-bottom: 16px; }
+      .price { display: flex; align-items: baseline; gap: 4px; margin-bottom: 6px; }
+      .price .cur { font-size: 16px; color: var(--ink-soft); }
+      .price .amt { font-family: "Fraunces", serif; font-size: 40px; font-weight: 600; line-height: 1; }
+      .price .unit { color: var(--muted); font-size: 14px; }
+      .per-day { color: var(--sage-deep); font-size: 13px; margin-bottom: 18px; }
+      .plan .buy {
+        margin-top: auto; display: inline-block; text-align: center;
+        padding: 12px 16px; border-radius: 12px; text-decoration: none; font-weight: 600;
+        background: var(--cream-2); color: var(--ink); border: 1px solid var(--rule);
+      }
+      .plan.featured .buy { background: var(--rose-deep); color: #fff; border-color: var(--rose-deep); }
+
+      /* Feature list */
+      .features { margin: 0; padding: 0; list-style: none; }
+      .features li { padding: 7px 0; padding-left: 28px; position: relative; color: var(--ink-soft); font-size: 15px; }
+      .features li::before {
+        content: ""; position: absolute; left: 4px; top: 13px; width: 8px; height: 8px;
+        border-radius: 50%; background: var(--sage-deep);
+      }
+      .card {
+        background: #fff; border: 1px solid var(--rule-soft); border-radius: 18px; padding: 26px 28px;
+      }
+      .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+
+      /* Pay methods */
+      .pays { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 10px; }
+      .pay-chip {
+        background: #fff; border: 1px solid var(--rule); border-radius: 999px;
+        padding: 8px 16px; font-size: 14px; color: var(--ink-soft); font-weight: 500;
+      }
+
+      /* Policy */
+      .policy h3 { font-size: 18px; margin: 18px 0 6px; }
+      .policy p, .policy li { color: var(--ink-soft); font-size: 15px; }
+      .policy ul { padding-left: 20px; }
+
+      .note {
+        background: var(--cream-2); border: 1px dashed var(--rule); border-radius: 14px;
+        padding: 16px 20px; color: var(--ink-soft); font-size: 14px;
+      }
+
+      footer.site {
+        border-top: 1px solid var(--rule-soft); margin-top: 24px; padding: 28px 0 48px;
+        color: var(--muted); font-size: 13px; text-align: center;
+      }
+      footer.site a { color: var(--muted); }
+
+      @media (max-width: 760px) {
+        .plans { grid-template-columns: 1fr; }
+        .grid-2 { grid-template-columns: 1fr; }
+        .hero h1 { font-size: 30px; }
+        header.site .wrap { flex-direction: row; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site">
+      <div class="wrap">
+        <div class="brand">
+          <span class="logo" aria-hidden="true"></span>
+          <span class="name">Twogether</span>
+        </div>
+        <a class="nav-cta" href="/">前往 App</a>
+      </div>
+    </header>
+
+    <main>
+      <div class="wrap">
+        <div class="hero">
+          <span class="eyebrow">Premium 會員方案</span>
+          <h1>解鎖 Twogether Premium<br />讓你們的親密時光更自由</h1>
+          <p class="lead">
+            Twogether 是專為情侶設計的親密關係追蹤 App。免費方案即可使用核心功能，
+            升級 Premium 一次付費、買斷天數，雙方共享，無自動續扣。
+          </p>
+        </div>
+      </div>
+
+      <!-- ============ PLANS ============ -->
+      <section>
+        <div class="wrap">
+          <h2 class="section-title">選擇方案</h2>
+          <p class="section-sub">一次性購買，依天數計費。情侶其中一人購買，兩人同享 Premium。</p>
+
+          <div class="plans">
+            <!-- 30 天 -->
+            <div class="plan">
+              <h3>30 天方案</h3>
+              <div class="dur">Twogether Premium 30 天</div>
+              <div class="price">
+                <span class="cur">NT$</span>
+                <span class="amt">90</span>
+                <span class="unit">／ 30 天</span>
+              </div>
+              <div class="per-day">約每天 NT$3</div>
+              <a class="buy" href="/">前往購買</a>
+            </div>
+
+            <!-- 90 天（推薦） -->
+            <div class="plan featured">
+              <span class="tag">最受歡迎</span>
+              <h3>90 天方案</h3>
+              <div class="dur">Twogether Premium 90 天</div>
+              <div class="price">
+                <span class="cur">NT$</span>
+                <span class="amt">240</span>
+                <span class="unit">／ 90 天</span>
+              </div>
+              <div class="per-day">約每天 NT$2.7</div>
+              <a class="buy" href="/">前往購買</a>
+            </div>
+
+            <!-- 365 天 -->
+            <div class="plan">
+              <h3>365 天方案</h3>
+              <div class="dur">Twogether Premium 365 天</div>
+              <div class="price">
+                <span class="cur">NT$</span>
+                <span class="amt">790</span>
+                <span class="unit">／ 365 天</span>
+              </div>
+              <div class="per-day">約每天 NT$2.2</div>
+              <a class="buy" href="/">前往購買</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ WHAT'S INCLUDED ============ -->
+      <section>
+        <div class="wrap">
+          <div class="grid-2">
+            <div class="card">
+              <h3 class="serif" style="margin-top:0;font-size:20px;">Premium 包含</h3>
+              <ul class="features">
+                <li>每日 AI 破冰／訊息整理次數上限提高（5 → 50 次／天）</li>
+                <li>自訂劇本無限建立（免費方案上限 3 個）</li>
+                <li>照片回憶無限上傳（免費方案上限 30 張）</li>
+                <li>購買的天數可累加堆疊，已付費時間不會流失</li>
+                <li>情侶雙方同步享有，無須各自付費</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3 class="serif" style="margin-top:0;font-size:20px;">免費方案也能用</h3>
+              <ul class="features">
+                <li>親密時光紀錄、生理週期追蹤</li>
+                <li>基本互動劇本與成就系統</li>
+                <li>每日 AI 破冰 5 次</li>
+                <li>自訂劇本 3 個、照片上傳 30 張</li>
+                <li>方案到期後自動回到免費版，資料完整保留、不會刪除</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ PAYMENT METHODS ============ -->
+      <section>
+        <div class="wrap" style="text-align:center;">
+          <h2 class="section-title">付款方式</h2>
+          <p class="section-sub">透過綠界科技 ECPay 安全金流付款，支援：</p>
+          <div class="pays">
+            <span class="pay-chip">信用卡（VISA／Mastercard／JCB）</span>
+            <span class="pay-chip">LINE Pay</span>
+          </div>
+          <p style="color:var(--muted);font-size:13px;margin-top:16px;">
+            付款頁面由綠界科技 ECPay 提供，本服務不會儲存您的信用卡卡號等敏感資料。
+          </p>
+        </div>
+      </section>
+
+      <!-- ============ HOW IT WORKS ============ -->
+      <section>
+        <div class="wrap">
+          <div class="card">
+            <h3 class="serif" style="margin-top:0;font-size:20px;">購買流程</h3>
+            <ol style="color:var(--ink-soft);font-size:15px;padding-left:20px;margin:8px 0 0;">
+              <li>於 Twogether App 註冊帳號並與另一半完成配對。</li>
+              <li>在 App 內的「升級 Premium」頁面選擇方案。</li>
+              <li>系統導向綠界 ECPay 付款頁，選擇信用卡或 LINE Pay 完成付款。</li>
+              <li>付款成功後即時開通 Premium，情侶雙方同步生效。</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ POLICY ============ -->
+      <section>
+        <div class="wrap">
+          <div class="card policy">
+            <h2 class="section-title" style="text-align:left;margin-bottom:4px;">交易條件與退費政策</h2>
+
+            <h3>商品性質</h3>
+            <p>
+              本商品為數位內容服務（Twogether Premium 會員權益），屬一次性買斷之定期使用權，
+              依購買方案提供 30／90／365 天的服務期間，<strong>不會自動續訂或自動扣款</strong>。
+            </p>
+
+            <h3>服務開通</h3>
+            <p>付款完成後將立即開通對應天數的 Premium 權益，並於 App 內即時生效。</p>
+
+            <h3>退費政策</h3>
+            <ul>
+              <li>
+                依《消費者保護法》第 19 條，數位內容或線上服務商品於提供後即為消費者開始使用，
+                屬合理例外情形，原則上不適用 7 日鑑賞期之無條件解約。
+              </li>
+              <li>
+                若因系統錯誤導致重複扣款、未開通或無法使用等問題，請於付款後 7 日內聯絡客服，
+                經查證屬實將全額退還該筆款項。
+              </li>
+              <li>已開始使用之服務期間恕不退還剩餘天數之費用。</li>
+            </ul>
+
+            <h3>發票</h3>
+            <p>本服務之金流由綠界科技 ECPay 處理，相關交易紀錄可作為消費證明。</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ CONTACT ============ -->
+      <section>
+        <div class="wrap">
+          <div class="note">
+            <strong>客服聯絡方式</strong><br />
+            如對方案內容、付款或退費有任何疑問，歡迎來信，我們將儘速回覆。<br />
+            Email：<a href="mailto:markgician@gmail.com">markgician@gmail.com</a><br />
+            服務名稱：Twogether（情侶親密追蹤應用）
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site">
+      <div class="wrap">
+        © 2026 Twogether ｜ 本頁面為公開商品販售頁，無須登入即可瀏覽商品內容與價格。<br />
+        付款由綠界科技 ECPay 提供金流服務。
+      </div>
+    </footer>
+  </body>
+</html>
