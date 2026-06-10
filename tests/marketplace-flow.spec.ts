@@ -110,22 +110,31 @@ test.describe('Marketplace — public script sharing + ratings + favorites', () 
     await page.waitForTimeout(1500);
 
     // 3. Switch to Marketplace tab — the new script should appear in the grid.
-    await page.getByTestId('roleplay-tab-marketplace').click();
-    await page.waitForResponse(
-      (r) => r.url().includes('/api/marketplace/scripts') && r.request().method() === 'GET',
-      { timeout: 10000 }
-    );
+    //    Register waitForResponse BEFORE the click that triggers the fetch —
+    //    Playwright only matches future responses, so the post-click `await`
+    //    pattern races with a fast in-memory CI server.
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/api/marketplace/scripts') && r.request().method() === 'GET',
+        { timeout: 10000 }
+      ),
+      page.getByTestId('roleplay-tab-marketplace').click(),
+    ]);
     await expect(page.getByTestId('marketplace-grid')).toBeVisible({ timeout: 5000 });
 
     // 4. Switch the sort dropdown to "最新" so the new script bubbles to the top.
     //    The sort control is a custom themed dropdown (not a native <select>),
-    //    so open the trigger then click the option.
+    //    so open the trigger then click the option. The option click changes
+    //    `marketplaceSort` state, which re-runs the load effect — pair the
+    //    response wait with the click so we don't miss the fetch.
     await page.getByTestId('marketplace-sort').click();
-    await page.getByTestId('marketplace-sort-option-recent').click();
-    await page.waitForResponse(
-      (r) => r.url().includes('/api/marketplace/scripts') && r.request().method() === 'GET',
-      { timeout: 10000 }
-    );
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/api/marketplace/scripts') && r.request().method() === 'GET',
+        { timeout: 10000 }
+      ),
+      page.getByTestId('marketplace-sort-option-recent').click(),
+    ]);
     await page.waitForTimeout(1000);
 
     // 5. Locate the new card by title text inside the grid (the title is the
@@ -191,11 +200,13 @@ test.describe('Marketplace — public script sharing + ratings + favorites', () 
     await page.waitForTimeout(1500);
 
     // Marketplace should NOT show this script (it's private).
-    await page.getByTestId('roleplay-tab-marketplace').click();
-    await page.waitForResponse(
-      (r) => r.url().includes('/api/marketplace/scripts') && r.request().method() === 'GET',
-      { timeout: 10000 }
-    );
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/api/marketplace/scripts') && r.request().method() === 'GET',
+        { timeout: 10000 }
+      ),
+      page.getByTestId('roleplay-tab-marketplace').click(),
+    ]);
     await page.waitForTimeout(1000);
     await expect(page.getByText(privateTitle)).toHaveCount(0);
   });
