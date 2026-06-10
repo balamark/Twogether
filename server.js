@@ -153,6 +153,17 @@ app.use('/api', adminRoutes.publicRouter);
 app.use('/api/admin', adminAuth, adminRoutes.adminApiRouter);
 app.get('/admin', adminAuth, adminRoutes.htmlHandler);
 
+// Public, no-login sales/pricing page. ECPay (綠界) requires a publicly
+// reachable URL that shows the products for sale, their prices, and the
+// refund/contact policy — WITHOUT any login. The SPA gates most views behind
+// auth, so this explicit route (registered before the static/catch-all) serves
+// a self-contained static page that is always public. Prices here MUST stay in
+// sync with the PLANS catalog in routes/billing.js.
+app.get(['/pricing', '/membership', '/plans'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(__dirname, 'public', 'pricing.html'));
+});
+
 // Serve static files from the frontend build
 app.use(express.static(path.join(__dirname, 'dist'), {
   setHeaders: (res, path) => {
