@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>成為諮商師 · Twogether</title>
+  <meta name="description" content="加入 Twogether，成為平台上的諮商心理師，陪伴伴侶與個人面對關係與情緒議題。" />
+  <style>
+    :root {
+      --ink: #2a2422;
+      --ink-soft: #5b524d;
+      --muted: #8a807c;
+      --cream: #fbf7f2;
+      --cream-2: #f2ebdf;
+      --rule: #e4dccf;
+      --rose: #b7635a;
+      --pink: #d4868a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Noto Sans TC", sans-serif;
+      background: var(--cream);
+      color: var(--ink);
+      line-height: 1.6;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
+    header { text-align: center; margin-bottom: 28px; }
+    .eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+    h1 { font-size: 30px; font-weight: 300; margin: 8px 0 6px; letter-spacing: -0.01em; }
+    h1 em { font-style: italic; color: var(--rose); }
+    .lede { color: var(--muted); font-size: 15px; margin: 0; }
+    .card { background: #fff; border: 1px solid var(--rule); border-radius: 12px; padding: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px; }
+    .req { color: var(--rose); }
+    input[type=text], input[type=email], input[type=tel], input[type=number], textarea, select {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 8px;
+      font-size: 14px; font-family: inherit; background: var(--cream); color: var(--ink);
+    }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: var(--ink); }
+    textarea { resize: vertical; min-height: 96px; }
+    .field { margin-bottom: 18px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 999px;
+      border: 1px solid var(--rule); color: var(--ink-soft); font-size: 13px; cursor: pointer;
+      user-select: none; background: var(--cream); transition: all .12s;
+    }
+    .chip input { display: none; }
+    .chip.on { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+    .submit {
+      width: 100%; padding: 13px; border: none; border-radius: 8px; background: var(--ink);
+      color: var(--cream); font-size: 15px; font-weight: 500; cursor: pointer; margin-top: 6px;
+    }
+    .submit:disabled { opacity: .5; cursor: default; }
+    .note { font-size: 13px; color: var(--muted); margin-top: 14px; text-align: center; }
+    .result { display: none; padding: 16px; border-radius: 8px; margin-bottom: 18px; font-size: 14px; }
+    .result.ok { display: block; background: #eef4ea; color: #3f6b3a; border: 1px solid #cfe0c5; }
+    .result.err { display: block; background: #f8ebe9; color: #9a3b33; border: 1px solid #ecccc7; }
+    a.back { display: inline-block; margin-top: 22px; color: var(--muted); font-size: 13px; text-decoration: none; }
+    a.back:hover { color: var(--ink); }
+    @media (max-width: 560px) { .row, .row-3 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="eyebrow">— Twogether 心理諮商</div>
+      <h1>成為 <em>諮商心理師</em></h1>
+      <p class="lede">加入平台，陪伴伴侶與個人面對關係與情緒議題。審核通過後，你的檔案會出現在諮商師列表中供使用者預約。</p>
+    </header>
+
+    <div class="card">
+      <div id="result" class="result"></div>
+      <form id="form">
+        <div class="row">
+          <div class="field">
+            <label>姓名 <span class="req">*</span></label>
+            <input type="text" name="displayName" maxlength="120" required />
+          </div>
+          <div class="field">
+            <label>職稱</label>
+            <input type="text" name="title" maxlength="120" placeholder="諮商心理師 / 臨床心理師" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>證照字號（僅供審核，不公開）</label>
+          <input type="text" name="licenseNo" maxlength="80" />
+        </div>
+
+        <div class="field">
+          <label>專長領域 <span class="req">*</span></label>
+          <div class="chips" id="focus">
+            <label class="chip"><input type="checkbox" value="couple" />💞 伴侶關係</label>
+            <label class="chip"><input type="checkbox" value="family" />🏡 家庭</label>
+            <label class="chip"><input type="checkbox" value="childhood" />🧸 童年/原生家庭</label>
+            <label class="chip"><input type="checkbox" value="individual" />🌱 個人成長</label>
+            <label class="chip"><input type="checkbox" value="sexuality" />🔥 性與親密</label>
+            <label class="chip"><input type="checkbox" value="parenting" />👶 親職教養</label>
+            <label class="chip"><input type="checkbox" value="grief" />🕊️ 悲傷失落</label>
+            <label class="chip"><input type="checkbox" value="anxiety" />🌧️ 焦慮憂鬱</label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>提供語言</label>
+          <div class="chips" id="langs">
+            <label class="chip on"><input type="checkbox" value="zh" checked />中文</label>
+            <label class="chip"><input type="checkbox" value="en" />English</label>
+            <label class="chip"><input type="checkbox" value="ja" />日本語</label>
+            <label class="chip"><input type="checkbox" value="ko" />한국어</label>
+          </div>
+        </div>
+
+        <div class="row-3">
+          <div class="field">
+            <label>年資</label>
+            <input type="number" name="yearsExperience" min="0" max="80" />
+          </div>
+          <div class="field">
+            <label>費率 (NT$) <span class="req">*</span></label>
+            <input type="number" name="rateTwd" min="0" max="100000" value="1600" required />
+          </div>
+          <div class="field">
+            <label>時長 (分)</label>
+            <input type="number" name="sessionMinutes" min="10" max="240" value="50" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>自我介紹</label>
+          <textarea name="bio" maxlength="2000" placeholder="你的取向、擅長陪伴的對象與議題…"></textarea>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label>聯絡 Email <span class="req">*</span></label>
+            <input type="email" name="contactEmail" maxlength="255" required />
+          </div>
+          <div class="field">
+            <label>聯絡電話</label>
+            <input type="tel" name="contactPhone" maxlength="40" />
+          </div>
+        </div>
+
+        <button type="submit" class="submit" id="submit">送出申請</button>
+        <p class="note">送出後我們會在審核後與你聯繫。審核期間你的資料不會公開。</p>
+      </form>
+    </div>
+
+    <div style="text-align:center"><a class="back" href="/">← 回到 Twogether</a></div>
+  </div>
+
+  <script>
+    // Toggle chip visual state when its checkbox changes.
+    document.querySelectorAll('.chip').forEach(function (chip) {
+      var cb = chip.querySelector('input');
+      var sync = function () { chip.classList.toggle('on', cb.checked); };
+      cb.addEventListener('change', sync);
+      sync();
+    });
+
+    function collect(id) {
+      return Array.prototype.slice
+        .call(document.querySelectorAll('#' + id + ' input:checked'))
+        .map(function (i) { return i.value; });
+    }
+
+    var form = document.getElementById('form');
+    var result = document.getElementById('result');
+    var submit = document.getElementById('submit');
+
+    function show(kind, msg) {
+      result.className = 'result ' + kind;
+      result.textContent = msg;
+      result.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var fd = new FormData(form);
+      var focusAreas = collect('focus');
+      if (!fd.get('displayName').trim()) return show('err', '請填寫姓名');
+      if (focusAreas.length === 0) return show('err', '請至少選擇一個專長領域');
+      if (!fd.get('contactEmail').trim()) return show('err', '請填寫聯絡 Email');
+
+      var payload = {
+        displayName: fd.get('displayName').trim(),
+        title: fd.get('title').trim() || undefined,
+        licenseNo: fd.get('licenseNo').trim() || undefined,
+        focusAreas: focusAreas,
+        languages: collect('langs'),
+        yearsExperience: fd.get('yearsExperience') ? Number(fd.get('yearsExperience')) : undefined,
+        bio: fd.get('bio').trim() || undefined,
+        rateTwd: Number(fd.get('rateTwd')) || 0,
+        sessionMinutes: Number(fd.get('sessionMinutes')) || 50,
+        contactEmail: fd.get('contactEmail').trim(),
+        contactPhone: fd.get('contactPhone').trim() || undefined
+      };
+
+      submit.disabled = true;
+      submit.textContent = '送出中…';
+      fetch('/api/therapists/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+        .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, b: b }; }); })
+        .then(function (res) {
+          if (res.ok && res.b.success) {
+            form.reset();
+            document.querySelectorAll('.chip').forEach(function (c) {
+              var cb = c.querySelector('input'); c.classList.toggle('on', cb.checked);
+            });
+            show('ok', '✓ 申請已送出！我們會在審核通過後與你聯繫。');
+          } else {
+            show('err', (res.b && res.b.message) || '送出失敗，請稍後再試');
+          }
+        })
+        .catch(function () { show('err', '網路錯誤，請稍後再試'); })
+        .finally(function () { submit.disabled = false; submit.textContent = '送出申請'; });
+    });
+  </script>
+</body>
+</html>

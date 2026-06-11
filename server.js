@@ -29,6 +29,7 @@ const eventRoutes = require('./routes/events');
 const scriptFavoritesRoutes = require('./routes/script-favorites');
 const marketplaceRoutes = require('./routes/marketplace');
 const billingRoutes = require('./routes/billing');
+const therapistRoutes = require('./routes/therapists');
 const adminRoutes = require('./routes/admin');
 
 // Import database and middleware
@@ -145,6 +146,13 @@ app.use('/api/billing', billingRoutes);
 // Additional mount for intimacy endpoints (frontend compatibility)
 app.use('/api/intimacy', intimacyRequestRoutes);
 
+// Human therapist directory. The public router handles browse + apply
+// (optionalAuth inside) and JWT-protected consultation booking. Admin
+// moderation (approve/reject applications) is Basic-Auth gated like the rest
+// of /api/admin/*.
+app.use('/api/therapists', therapistRoutes.router);
+app.use('/api/admin/therapists', adminAuth, therapistRoutes.adminRouter);
+
 // Admin funnel dashboard. The public router (POST /api/track/landing) is the
 // anonymous beacon fired from the frontend on the logged-out landing render.
 // The /api/admin/* JSON endpoints and the /admin HTML page are gated by
@@ -162,6 +170,15 @@ app.get('/admin', adminAuth, adminRoutes.htmlHandler);
 app.get(['/pricing', '/membership', '/plans'], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'public', 'pricing.html'));
+});
+
+// Public, no-login therapist recruitment / sign-up page. The SPA gates most
+// views behind auth, so this explicit route (registered before the static
+// catch-all) serves a self-contained static form that POSTs to the public
+// /api/therapists/apply endpoint. Anyone can apply without an account.
+app.get(['/therapist-signup', '/become-a-therapist'], (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(__dirname, 'public', 'therapist-signup.html'));
 });
 
 // Serve static files from the frontend build
