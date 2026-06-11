@@ -5,6 +5,7 @@ import UpgradeView, { BillingResultView } from './components/UpgradeView';
 import RoleplayView from './components/RoleplayView';
 import WallView from './components/WallView';
 import EventsView from './components/EventsView';
+import TherapistsView from './components/TherapistsView';
 import type { WallExample } from './components/WallPostComposer';
 import { AchievementsView, IntimacyStatsCards, CalendarHeatmap } from './components/AchievementsView';
 import Header from './components/Header';
@@ -5534,6 +5535,9 @@ const LoveTimeApp = () => {
           customEmotions={customEmotions}
           setCustomEmotions={setCustomEmotions}
         />;
+        // Therapist directory is browseable (and applicable) while logged out;
+        // booking a consultation prompts for login inside the modal.
+        case 'therapists': return <TherapistsView authState={authState} showNotification={showNotification} />;
         default: return (
           <div className="flex items-center justify-center min-h-[60vh]">
             <div className="text-center max-w-md">
@@ -5627,6 +5631,7 @@ const LoveTimeApp = () => {
         />
       );
       case 'upgrade': return <UpgradeView reason={upgradeReason} showNotification={showNotification} />;
+      case 'therapists': return <TherapistsView authState={authState} showNotification={showNotification} />;
       default: return <GamesView />;
     }
   };
@@ -5782,6 +5787,7 @@ const LoveTimeApp = () => {
         onShowSettings={() => setCurrentView('settings')}
         onShowJourney={() => setCurrentView('journey')}
         onShowIntimacyHistory={() => setCurrentView('intimacy-history')}
+        onShowTherapists={() => setCurrentView('therapists')}
         onShowUpgrade={() => { setUpgradeReason(null); setCurrentView('upgrade'); }}
       />
       
