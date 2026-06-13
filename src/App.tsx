@@ -1612,6 +1612,22 @@ const LoveTimeApp = () => {
 
     } catch (error) {
       console.error('Failed to create custom script:', error);
+      // Hitting the free-tier script cap is an expected state, not a failure.
+      // The API interceptor already fires `billing:limit-reached`, which sends
+      // the user to the Upgrade view; here we close the modal so it isn't left
+      // covering that view, and show a clear (non-alarming) explanation instead
+      // of a red "上傳失敗" toast.
+      if ((error as { error_code?: string })?.error_code === 'SCRIPT_LIMIT_REACHED') {
+        setShowScriptUploadModal(false);
+        setEditingScript(null);
+        showNotification({
+          type: 'warning',
+          title: '已達免費方案劇本上限',
+          message: (error as Error)?.message || '免費方案的自訂劇本數量已達上限，升級 Premium 即可無限建立。',
+          duration: 7000,
+        });
+        return;
+      }
       showNotification({
         type: 'error',
         title: '劇本上傳失敗',

@@ -1592,10 +1592,26 @@ class ApiService {
   // errors[0].msg tells the user exactly which field was rejected (e.g.
   // "劇本內容必須在1-50000個字符之間") instead of a generic "驗證失敗".
   private extractScriptError(error: unknown, fallback: string): Error {
-    const data = (error as { response?: { data?: { errors?: Array<{ msg?: string }>; message?: string } } })?.response?.data;
+    const err = error as {
+      message?: string;
+      error_code?: string;
+      status?: number;
+      data?: { errors?: Array<{ msg?: string }>; message?: string };
+      response?: { data?: { errors?: Array<{ msg?: string }>; message?: string } };
+    };
+    // The response interceptor has already unwrapped the body onto `err.data`
+    // (plus a human message + error_code); only a path that bypasses the
+    // interceptor would still carry the raw axios `err.response.data` shape, so
+    // try both. Previously this read only `err.response.data` and so threw away
+    // the interceptor's specific message AND error_code — turning a clear
+    // "免費方案最多建立 N 個自訂劇本" cap message into a generic "無法建立劇本".
+    const data = err?.data ?? err?.response?.data;
     const fieldMsg = data?.errors?.[0]?.msg;
-    const message = fieldMsg || data?.message || fallback;
-    return new Error(message);
+    const message = fieldMsg || err?.message || data?.message || fallback;
+    const result = new Error(message) as Error & { error_code?: string; status?: number };
+    if (err?.error_code) result.error_code = err.error_code;
+    if (err?.status) result.status = err.status;
+    return result;
   }
 
   async getCustomScripts(): Promise<unknown[]> {
