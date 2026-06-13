@@ -9,6 +9,7 @@ import type { WallExample } from './components/WallPostComposer';
 import { AchievementsView, IntimacyStatsCards, CalendarHeatmap } from './components/AchievementsView';
 import Header from './components/Header';
 import { NotificationContainer } from './components/ErrorNotification';
+import ErrorBoundary from './components/ErrorBoundary';
 import IntimacyRequestsHistory from './components/IntimacyRequestsHistory';
 import IntimacyRequestForm from './components/IntimacyRequestForm';
 import NotificationInbox from './components/NotificationInbox';
@@ -4849,7 +4850,37 @@ const LoveTimeApp = () => {
       setThumbnail(file);
     };
 
+    // Has the user entered/changed anything worth protecting? For new scripts
+    // any non-empty field (or a chosen thumbnail / opted-out sharing) counts;
+    // for edits we compare against the script being edited.
+    const isDirty = () => {
+      if (thumbnail !== null) return true;
+      if (isEditMode && editingScript) {
+        return (
+          scriptData.title !== (editingScript.title ?? '') ||
+          scriptData.category !== (editingScript.category ?? 'romantic') ||
+          scriptData.scenario !== (editingScript.scenario ?? '') ||
+          scriptData.content !== (editingScript.script ?? '') ||
+          scriptData.tags !== (editingScript.tags ? editingScript.tags.join(', ') : '') ||
+          isPublic !== (editingScript.isPublic ?? false)
+        );
+      }
+      return (
+        scriptData.title.trim() !== '' ||
+        scriptData.scenario.trim() !== '' ||
+        scriptData.content.trim() !== '' ||
+        scriptData.tags.trim() !== '' ||
+        scriptData.category !== 'romantic' ||
+        isPublic !== true
+      );
+    };
+
+    // Guard accidental dismissal (✕, 取消, or backdrop click) — losing a
+    // half-written script with no warning is the worst-case UX here.
     const closeAndReset = () => {
+      if (isDirty() && !window.confirm('你有尚未儲存的變更，確定要關閉嗎？變更將不會保存。')) {
+        return;
+      }
       setShowScriptUploadModal(false);
       setEditingScript(null);
     };
@@ -5952,7 +5983,15 @@ const LoveTimeApp = () => {
       
       {/* Modals */}
       {showAuthModal && <AuthModal />}
-      {showScriptUploadModal && <ScriptUploadModal />}
+      {showScriptUploadModal && (
+        <ErrorBoundary
+          context="script-upload-modal"
+          inline
+          onReset={() => { setShowScriptUploadModal(false); setEditingScript(null); }}
+        >
+          <ScriptUploadModal />
+        </ErrorBoundary>
+      )}
       
       {/* Intimacy Request Form */}
       <IntimacyRequestForm
