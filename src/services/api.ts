@@ -672,6 +672,81 @@ apiClient.interceptors.response.use(
   }
 );
 
+// Human therapist (心理諮商師) directory types
+export type TherapistFocusArea =
+  | 'family' | 'couple' | 'childhood' | 'individual'
+  | 'sexuality' | 'parenting' | 'grief' | 'anxiety';
+
+export interface Therapist {
+  id: string;
+  displayName: string;
+  title?: string | null;
+  focusAreas: TherapistFocusArea[];
+  languages: string[];
+  yearsExperience?: number | null;
+  bio?: string | null;
+  photoUrl?: string | null;
+  rateTwd: number;
+  sessionMinutes: number;
+  createdAt: string;
+}
+
+export interface TherapistApplicationInput {
+  displayName: string;
+  title?: string;
+  licenseNo?: string;
+  focusAreas: TherapistFocusArea[];
+  languages?: string[];
+  yearsExperience?: number | null;
+  bio?: string;
+  photoUrl?: string;
+  rateTwd: number;
+  sessionMinutes?: number;
+  contactEmail: string;
+  contactPhone?: string;
+}
+
+export interface ConsultationRequestInput {
+  focusArea?: TherapistFocusArea;
+  message?: string;
+  contactEmail?: string;
+  preferredTime?: string;
+}
+
+export interface TherapistConsultation {
+  id: string;
+  therapistName: string;
+  therapistTitle?: string | null;
+  requesterName?: string | null;
+  role: 'therapist' | 'client';
+  focusArea?: TherapistFocusArea | null;
+  message?: string | null;
+  preferredTime?: string | null;
+  status: 'pending' | 'accepted' | 'declined' | 'completed' | 'cancelled';
+  respondedAt?: string | null;
+  responseNote?: string | null;
+  messageCount: number;
+  createdAt: string;
+}
+
+export interface ConsultationMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  body: string;
+  createdAt: string;
+  isTherapist: boolean;
+  isMine: boolean;
+  event: { id: string; title: string; summary: string } | null;
+}
+
+export interface ConsultationThread {
+  role: 'therapist' | 'client';
+  therapistName: string;
+  currentUserId: string;
+  messages: ConsultationMessage[];
+}
+
 // API Service Class
 class ApiService {
   private throwApiError(error: unknown, fallbackMessage: string): never {
@@ -2325,6 +2400,88 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to start checkout:', error);
       this.throwApiError(error, '無法建立付款，請稍後再試');
+    }
+  }
+
+  // --- Human therapists (心理諮商師) ---
+
+  async getTherapists(focus?: TherapistFocusArea): Promise<Therapist[]> {
+    try {
+      const response = await apiClient.get('/therapists', {
+        params: focus ? { focus } : undefined,
+      });
+      return (response.data?.therapists || []) as Therapist[];
+    } catch (error: unknown) {
+      console.error('Failed to fetch therapists:', error);
+      this.throwApiError(error, '無法取得諮商師列表');
+    }
+  }
+
+  async getTherapist(id: string): Promise<Therapist> {
+    try {
+      const response = await apiClient.get(`/therapists/${id}`);
+      return response.data?.therapist as Therapist;
+    } catch (error: unknown) {
+      console.error('Failed to fetch therapist:', error);
+      this.throwApiError(error, '無法取得諮商師資料');
+    }
+  }
+
+  async applyAsTherapist(input: TherapistApplicationInput): Promise<{ id: string; status: string }> {
+    try {
+      const response = await apiClient.post('/therapists/apply', input);
+      return response.data?.application;
+    } catch (error: unknown) {
+      console.error('Failed to submit therapist application:', error);
+      this.throwApiError(error, '送出申請失敗，請稍後再試');
+    }
+  }
+
+  async requestConsultation(therapistId: string, input: ConsultationRequestInput): Promise<{ id: string; status: string }> {
+    try {
+      const response = await apiClient.post(`/therapists/${therapistId}/consult`, input);
+      return response.data?.consultation;
+    } catch (error: unknown) {
+      console.error('Failed to request consultation:', error);
+      this.throwApiError(error, '預約失敗，請稍後再試');
+    }
+  }
+
+  async getMyConsultations(): Promise<TherapistConsultation[]> {
+    try {
+      const response = await apiClient.get('/therapists/consultations/mine');
+      return (response.data?.consultations || []) as TherapistConsultation[];
+    } catch (error: unknown) {
+      console.error('Failed to fetch consultations:', error);
+      this.throwApiError(error, '無法取得預約紀錄');
+    }
+  }
+
+  async getConsultationMessages(consultationId: string): Promise<ConsultationThread> {
+    try {
+      const response = await apiClient.get(`/therapists/consultations/${consultationId}/messages`);
+      const d = response.data || {};
+      return {
+        role: d.role,
+        therapistName: d.therapistName,
+        currentUserId: d.currentUserId,
+        messages: (d.messages || []) as ConsultationMessage[],
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch consultation messages:', error);
+      this.throwApiError(error, '無法載入訊息');
+    }
+  }
+
+  async postConsultationMessage(consultationId: string, body: string, eventId?: string): Promise<void> {
+    try {
+      await apiClient.post(`/therapists/consultations/${consultationId}/messages`, {
+        body,
+        eventId: eventId || undefined,
+      });
+    } catch (error: unknown) {
+      console.error('Failed to post consultation message:', error);
+      this.throwApiError(error, '送出訊息失敗');
     }
   }
 }
