@@ -497,6 +497,18 @@ const LoveTimeApp = () => {
   const [showScriptUploadModal, setShowScriptUploadModal] = useState(false);
   // When set, the upload modal opens in edit mode pre-filled from this script.
   const [editingScript, setEditingScript] = useState<RoleplayScript | null>(null);
+  // When the free-tier script cap blocks an upload we stash the in-progress
+  // draft here and send the user to Upgrade. After they go premium (coupon or
+  // purchase) the upload modal re-opens pre-filled so no work is lost.
+  const [pendingScriptDraft, setPendingScriptDraft] = useState<{
+    title: string;
+    category: 'romantic' | 'adventurous' | 'school' | 'bold';
+    scenario: string;
+    content: string;
+    tags: string;
+    isPublic: boolean;
+    thumbnail: File | null;
+  } | null>(null);
   const [showIntimacyRequestForm, setShowIntimacyRequestForm] = useState(false);
   const [showNotificationInbox, setShowNotificationInbox] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -1592,6 +1604,7 @@ const LoveTimeApp = () => {
       // Update local state
       setCustomScripts(prev => [...prev, newScript]);
       setShowScriptUploadModal(false);
+      setPendingScriptDraft(null);
 
       // Reward for creating content
       try {
@@ -1618,12 +1631,25 @@ const LoveTimeApp = () => {
       // covering that view, and show a clear (non-alarming) explanation instead
       // of a red "上傳失敗" toast.
       if ((error as { error_code?: string })?.error_code === 'SCRIPT_LIMIT_REACHED') {
+        // Keep the user's work — they'll be sent to Upgrade, and the modal
+        // re-opens pre-filled once they go premium (see onRedeemed below).
+        setPendingScriptDraft({
+          title,
+          category,
+          scenario,
+          content,
+          tags: tags.join(', '),
+          isPublic,
+          thumbnail: thumbnail ?? null,
+        });
         setShowScriptUploadModal(false);
         setEditingScript(null);
         showNotification({
           type: 'warning',
           title: '已達免費方案劇本上限',
-          message: (error as Error)?.message || '免費方案的自訂劇本數量已達上限，升級 Premium 即可無限建立。',
+          message:
+            (error as Error)?.message ||
+            '免費方案的自訂劇本數量已達上限。升級 Premium 或輸入優惠碼後即可繼續，你剛剛的劇本草稿已為你保留。',
           duration: 7000,
         });
         return;
@@ -4829,20 +4855,24 @@ const LoveTimeApp = () => {
   // input is hidden in edit mode.
   const ScriptUploadModal = () => {
     const isEditMode = editingScript !== null;
+    // In create mode, restore a draft preserved from a previous cap-blocked
+    // upload (pendingScriptDraft) so the user resumes exactly where they left
+    // off after going premium. Edit mode always wins from editingScript.
+    const draft = isEditMode ? null : pendingScriptDraft;
     const [scriptData, setScriptData] = useState(() => ({
-      title: editingScript?.title ?? '',
-      category: (editingScript?.category ?? 'romantic') as 'romantic' | 'adventurous' | 'school' | 'bold',
-      scenario: editingScript?.scenario ?? '',
-      content: editingScript?.script ?? '',
-      tags: editingScript?.tags ? editingScript.tags.join(', ') : ''
+      title: editingScript?.title ?? draft?.title ?? '',
+      category: (editingScript?.category ?? draft?.category ?? 'romantic') as 'romantic' | 'adventurous' | 'school' | 'bold',
+      scenario: editingScript?.scenario ?? draft?.scenario ?? '',
+      content: editingScript?.script ?? draft?.content ?? '',
+      tags: editingScript?.tags ? editingScript.tags.join(', ') : (draft?.tags ?? '')
     }));
     // New scripts default to public (the Marketplace product requirement).
     // Editing reflects the existing flag — falling back to true if the script
     // pre-dates the column (legacy rows show as private in the API).
     const [isPublic, setIsPublic] = useState<boolean>(
-      isEditMode ? (editingScript?.isPublic ?? false) : true
+      isEditMode ? (editingScript?.isPublic ?? false) : (draft?.isPublic ?? true)
     );
-    const [thumbnail, setThumbnail] = useState<File | null>(null);
+    const [thumbnail, setThumbnail] = useState<File | null>(draft?.thumbnail ?? null);
     const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
     useScrollLock(true);
 
@@ -4899,6 +4929,8 @@ const LoveTimeApp = () => {
       }
       setShowScriptUploadModal(false);
       setEditingScript(null);
+      // Explicit dismissal discards any cap-preserved draft too.
+      setPendingScriptDraft(null);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -5673,7 +5705,19 @@ const LoveTimeApp = () => {
           partnerNickname={nicknames.partner2}
         />
       );
-      case 'upgrade': return <UpgradeView reason={upgradeReason} showNotification={showNotification} />;
+      case 'upgrade': return <UpgradeView
+        reason={upgradeReason}
+        showNotification={showNotification}
+        onRedeemed={() => {
+          // Now premium server-side. If a cap-blocked script draft is waiting,
+          // hop back to Roleplay and re-open the upload modal pre-filled.
+          if (pendingScriptDraft) {
+            setUpgradeReason(null);
+            setCurrentView('roleplay');
+            setShowScriptUploadModal(true);
+          }
+        }}
+      />;
       default: return <GamesView />;
     }
   };

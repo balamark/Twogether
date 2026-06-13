@@ -58,6 +58,111 @@ router.get('/status', authenticateToken, async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// Redeem a coupon code for a free, time-boxed Premium pass. Grants the same
+// per-couple entitlement a paid pass would, with order_id NULL. One redemption
+// per couple per coupon (enforced by both a pre-check and a UNIQUE constraint).
+// ---------------------------------------------------------------------------
+router.post(
+  '/redeem-coupon',
+  authenticateToken,
+  [body('code').isString().trim().isLength({ min: 1, max: 40 }).withMessage('請輸入優惠碼')],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, message: '請輸入優惠碼', errors: errors.array() });
+    }
+
+    const code = String(req.body.code).trim().toUpperCase();
+    try {
+      const coupleId = await getCoupleIdForUser(req.user.id);
+      if (!coupleId) {
+        return res.status(404).json({
+          success: false,
+          message: '配對情侶後才能使用優惠碼',
+          error_code: 'NO_COMPLETE_COUPLE',
+        });
+      }
+
+      const couponResult = await db.query(`SELECT * FROM coupons WHERE code = $1`, [code]);
+      const coupon = couponResult.rows[0];
+      if (!coupon || !coupon.active) {
+        return res.status(404).json({ success: false, message: '優惠碼無效', error_code: 'COUPON_INVALID' });
+      }
+      if (coupon.expires_at && new Date(coupon.expires_at) < new Date()) {
+        return res.status(410).json({ success: false, message: '優惠碼已過期', error_code: 'COUPON_EXPIRED' });
+      }
+      if (coupon.max_redemptions != null && coupon.redeemed_count >= coupon.max_redemptions) {
+        return res.status(409).json({ success: false, message: '優惠碼已被兌換完畢', error_code: 'COUPON_EXHAUSTED' });
+      }
+
+      let newExpiry = null;
+      try {
+        await db.transaction(async (client) => {
+          // Already redeemed by this couple? (fast path; the UNIQUE constraint
+          // is the real guard against a concurrent double-redeem).
+          const dup = await client.query(
+            `SELECT 1 FROM coupon_redemptions WHERE coupon_id = $1 AND couple_id = $2`,
+            [coupon.id, coupleId]
+          );
+          if (dup.rows.length) {
+            const e = new Error('ALREADY_REDEEMED');
+            e.handled = 'ALREADY_REDEEMED';
+            throw e;
+          }
+
+          // Stack on top of any active pass — never throw away existing time.
+          const expiryRow = await client.query(
+            `SELECT MAX(expires_at) AS max_exp FROM couple_entitlements
+              WHERE couple_id = $1 AND expires_at > NOW()`,
+            [coupleId]
+          );
+          const currentMax = expiryRow.rows[0]?.max_exp || null;
+
+          const entRes = await client.query(
+            `INSERT INTO couple_entitlements (couple_id, plan, starts_at, expires_at, order_id)
+             SELECT $1, $2, s, s + make_interval(days => $3), NULL
+               FROM (SELECT GREATEST(NOW(), COALESCE($4::timestamptz, NOW())) AS s) t
+             RETURNING id, expires_at`,
+            [coupleId, `coupon_${coupon.days}`.slice(0, 16), coupon.days, currentMax]
+          );
+          newExpiry = entRes.rows[0].expires_at;
+
+          await client.query(
+            `INSERT INTO coupon_redemptions (coupon_id, couple_id, redeemed_by, entitlement_id)
+             VALUES ($1, $2, $3, $4)`,
+            [coupon.id, coupleId, req.user.id, entRes.rows[0].id]
+          );
+          await client.query(`UPDATE coupons SET redeemed_count = redeemed_count + 1 WHERE id = $1`, [coupon.id]);
+        });
+      } catch (e) {
+        // Both the pre-check and the UNIQUE(coupon_id, couple_id) violation map
+        // to the same user-facing "already used" message.
+        if (e.handled === 'ALREADY_REDEEMED' || e.code === '23505') {
+          return res.status(409).json({
+            success: false,
+            message: '你們已經使用過這組優惠碼了',
+            error_code: 'COUPON_ALREADY_REDEEMED',
+          });
+        }
+        throw e;
+      }
+
+      logInfo('billing.coupon.redeemed', { coupleId, userId: req.user.id, code, days: coupon.days });
+      res.json({
+        success: true,
+        message: `已啟用 Premium ${coupon.days} 天`,
+        days: coupon.days,
+        expires_at: newExpiry,
+        tier: 'premium',
+      });
+    } catch (err) {
+      logError('Coupon redeem failed', { err: err.message, stack: err.stack });
+      res.status(500).json({ success: false, message: '無法兌換優惠碼，請稍後再試' });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
 // Start a checkout. Creates a pending order and returns the ECPay form params
 // the frontend auto-submits to redirect the buyer to ECPay's hosted page.
 // ---------------------------------------------------------------------------

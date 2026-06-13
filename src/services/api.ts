@@ -2294,6 +2294,23 @@ class ApiService {
     }
   }
 
+  // Redeems a coupon code for a free Premium pass. Returns the granted days and
+  // the couple's new expiry on success; throws an Error carrying `error_code`
+  // (COUPON_INVALID / COUPON_EXPIRED / COUPON_EXHAUSTED / COUPON_ALREADY_REDEEMED
+  // / NO_COMPLETE_COUPLE) so the caller can show a specific, actionable message.
+  async redeemCoupon(code: string): Promise<{ days: number; expiresAt: string | null }> {
+    try {
+      const response = await apiClient.post('/billing/redeem-coupon', { code });
+      return {
+        days: Number(response.data?.days) || 0,
+        expiresAt: response.data?.expires_at ?? null,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to redeem coupon:', error);
+      this.throwApiError(error, '無法兌換優惠碼，請稍後再試');
+    }
+  }
+
   // Creates an order and redirects the browser to ECPay's hosted checkout.
   // Resolves only if the redirect could not be initiated (otherwise the page
   // navigates away).

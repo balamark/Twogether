@@ -1,14 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { Sparkles, Check, Crown } from 'lucide-react';
+import { Sparkles, Check, Crown, Ticket } from 'lucide-react';
 import { apiService, type BillingStatus, type BillingPlan } from '../services/api';
 
-type Notify = (n: { type: 'success' | 'error' | 'info'; title: string; message: string; duration?: number }) => void;
+type Notify = (n: { type: 'success' | 'error' | 'info' | 'warning'; title: string; message: string; duration?: number }) => void;
 
 interface UpgradeViewProps {
   // Optional message explaining why the user landed here (e.g. a usage cap
   // they just hit). Shown as a banner above the plans.
   reason?: string | null;
   showNotification?: Notify;
+  // Fired after a coupon is successfully redeemed (couple is now premium) so the
+  // host can resume whatever the user was blocked from doing (e.g. re-open the
+  // script upload they hit the cap on).
+  onRedeemed?: (info: { days: number; expiresAt: string | null }) => void;
 }
 
 // What premium lifts. Kept in sync with lib/entitlements.js FEATURE_LIMITS.
@@ -27,10 +31,12 @@ function formatDate(iso: string | null): string {
   }
 }
 
-const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification }) => {
+const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onRedeemed }) => {
   const [status, setStatus] = useState<BillingStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkoutPlan, setCheckoutPlan] = useState<string | null>(null);
+  const [couponCode, setCouponCode] = useState('');
+  const [redeeming, setRedeeming] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +69,41 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification }) =
     } catch (err) {
       setCheckoutPlan(null);
       showNotification?.({ type: 'error', title: '無法付款', message: (err as Error)?.message || '請稍後再試', duration: 6000 });
+    }
+  };
+
+  const handleRedeem = async () => {
+    const code = couponCode.trim();
+    if (!code || redeeming) return;
+    setRedeeming(true);
+    try {
+      const result = await apiService.redeemCoupon(code);
+      setCouponCode('');
+      // Refresh status so the "Premium 會員" banner appears immediately.
+      try {
+        const s = await apiService.getBillingStatus();
+        setStatus(s);
+      } catch {
+        /* non-fatal: the grant succeeded regardless of this re-fetch */
+      }
+      showNotification?.({
+        type: 'success',
+        title: '優惠碼已套用',
+        message: `已啟用 Premium ${result.days} 天，所有功能都解鎖了！`,
+        duration: 6000,
+      });
+      onRedeemed?.(result);
+    } catch (err) {
+      // err.message carries the specific backend reason (優惠碼無效 / 已過期 /
+      // 已被兌換完畢 / 你們已經使用過這組優惠碼了) — show it verbatim.
+      showNotification?.({
+        type: 'error',
+        title: '無法套用優惠碼',
+        message: (err as Error)?.message || '請確認優惠碼是否正確後再試一次',
+        duration: 6000,
+      });
+    } finally {
+      setRedeeming(false);
     }
   };
 
@@ -155,6 +196,44 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification }) =
           })}
         </div>
       )}
+
+      {/* Coupon redemption */}
+      <div className="mt-8 rounded-md border border-petal-rule bg-petal-cream p-5" data-testid="coupon-section">
+        <div className="flex items-center space-x-2 mb-3">
+          <Ticket className="w-4 h-4 text-pink-600" strokeWidth={1.5} />
+          <span className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted">
+            有優惠碼？
+          </span>
+        </div>
+        <p className="font-display italic font-light text-sm text-petal-muted mb-3">
+          輸入優惠碼，立即免費啟用 Premium。
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={couponCode}
+            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+            onKeyDown={(e) => { if (e.key === 'Enter') handleRedeem(); }}
+            placeholder="輸入優惠碼"
+            data-testid="coupon-input"
+            disabled={redeeming}
+            autoCapitalize="characters"
+            className="flex-1 px-3 py-2.5 border border-petal-rule rounded-md focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink bg-white tracking-wider uppercase placeholder:normal-case placeholder:tracking-normal disabled:opacity-60"
+          />
+          <button
+            onClick={handleRedeem}
+            disabled={redeeming || couponCode.trim() === ''}
+            data-testid="coupon-redeem-button"
+            className={`px-5 py-2.5 rounded-md font-display italic text-sm transition-colors ${
+              redeeming || couponCode.trim() === ''
+                ? 'bg-petal-cream-2 text-petal-muted cursor-not-allowed'
+                : 'bg-petal-ink text-petal-cream hover:bg-pink-700'
+            }`}
+          >
+            {redeeming ? '套用中…' : '套用'}
+          </button>
+        </div>
+      </div>
 
       <p className="mt-6 text-center font-body text-xs text-petal-muted flex items-center justify-center space-x-1.5">
         <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
