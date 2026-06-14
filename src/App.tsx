@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, StickyNote, MessageSquareHeart, Trash2, Pencil } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import UpgradeView, { BillingResultView } from './components/UpgradeView';
+import { BookingResultView } from './components/BookingResultView';
 import RoleplayView from './components/RoleplayView';
 import ScriptUploadModal from './components/ScriptUploadModal';
 import GamesView from './components/GamesView';
@@ -413,6 +414,10 @@ const LoveTimeApp = () => {
   // True when ECPay redirected the browser back to /billing/result.
   const [isBillingResult, setIsBillingResult] = useState(() =>
     typeof window !== 'undefined' && window.location.pathname.startsWith('/billing/result')
+  );
+  // True when ECPay redirected the browser back to /booking/result (video session).
+  const [isBookingResult, setIsBookingResult] = useState(() =>
+    typeof window !== 'undefined' && window.location.pathname.startsWith('/booking/result')
   );
   const [pendingEventId, setPendingEventId] = useState<string | null>(null);
   const [pendingScriptTitle, setPendingScriptTitle] = useState<string | null>(null);
@@ -2032,6 +2037,20 @@ const LoveTimeApp = () => {
           window.history.replaceState(null, '', '/');
           setIsBillingResult(false);
           setCurrentView('record');
+        }}
+      />
+    );
+  }
+
+  // ECPay redirected back after a video-session payment. The session was marked
+  // paid server-to-server; this screen just confirms and returns to the app.
+  if (isBookingResult) {
+    return (
+      <BookingResultView
+        onDone={() => {
+          window.history.replaceState(null, '', '/');
+          setIsBookingResult(false);
+          setCurrentView('therapists');
         }}
       />
     );

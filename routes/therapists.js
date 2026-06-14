@@ -21,10 +21,44 @@ const db = require('../database/db');
 const { authenticateToken, optionalAuth, generateToken } = require('../middleware/auth');
 const { uploadToSupabase } = require('../lib/supabase-storage');
 const emailService = require('../services/emailService');
+const ecpay = require('../lib/ecpay');
+const qaPool = require('../lib/qaPool');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 
 const router = express.Router();
 const adminRouter = express.Router();
+
+// Paid video session economics. The platform keeps PLATFORM_FEE_RATE.standard
+// (20%) of each session, but only PLATFORM_FEE_RATE.intro (10%) for a new
+// therapist's first INTRO_SESSION_LIMIT completed sessions.
+const PLATFORM_FEE_RATE = { intro: 10, standard: 20 };
+const INTRO_SESSION_LIMIT = 10;
+const MEETING_PROVIDERS = ['zoom', 'meet', 'other'];
+
+// External origin ECPay can reach for callbacks (mirrors routes/billing.js).
+const appBaseUrl = () => (process.env.APP_BASE_URL || 'http://localhost:8080').replace(/\/$/, '');
+
+// ECPay MerchantTradeNo: alphanumeric, <= 20 chars, unique (mirrors billing.js).
+const genMerchantTradeNo = () => {
+  const ts = Date.now().toString(36);
+  const rand = crypto.randomBytes(3).toString('hex');
+  return `TS${ts}${rand}`.slice(0, 20).toUpperCase();
+};
+
+// Compute the platform fee split for a therapist's next paid session. A session
+// counts toward the intro window only once it is paid AND completed, so we count
+// counts_toward_intro rows to decide the rate for the NEXT charge.
+const computeFeeSplit = async (therapistId, price) => {
+  const introUsed = await db.query(
+    `SELECT COUNT(*)::int AS c FROM therapist_consultations
+       WHERE therapist_id = $1 AND counts_toward_intro = true`,
+    [therapistId]
+  );
+  const feeRate = introUsed.rows[0].c < INTRO_SESSION_LIMIT ? PLATFORM_FEE_RATE.intro : PLATFORM_FEE_RATE.standard;
+  const platformFee = Math.floor((price * feeRate) / 100);
+  const therapistNet = price - platformFee;
+  return { feeRate, platformFee, therapistNet };
+};
 
 const FOCUS_AREAS = [
   'family',      // 家庭
@@ -59,6 +93,14 @@ const generateTempPassword = () => {
   return out;
 };
 
+// Parse a JSONB column that may come back as a JS array (node-postgres parses
+// jsonb) or, defensively, as a JSON string. Always returns an array.
+const asJsonArray = (value) => {
+  if (Array.isArray(value)) return value;
+  if (typeof value === 'string') { try { const v = JSON.parse(value); return Array.isArray(v) ? v : []; } catch { return []; } }
+  return [];
+};
+
 // Shape the public-facing therapist object. Never leaks license_no /
 // contact_* — those are private to the applicant and admins.
 const toPublicTherapist = (row) => ({
@@ -74,6 +116,17 @@ const toPublicTherapist = (row) => ({
   rateTwd: row.rate_twd,
   sessionMinutes: row.session_minutes,
   identityStatus: row.identity_status,
+  // Rich profile sections (048).
+  introMessage: row.intro_message,
+  approach: row.approach,
+  about: row.about,
+  certifications: row.certifications || [],
+  currentPositions: row.current_positions || [],
+  qualifications: row.qualifications || [],
+  training: row.training || [],
+  publications: asJsonArray(row.publications),
+  articles: asJsonArray(row.articles),
+  acceptingNewClients: row.accepting_new_clients !== false,
   createdAt: row.created_at,
 });
 
@@ -109,6 +162,34 @@ const sanitizeCustomSpecialties = (value) => {
     .map((v) => (typeof v === 'string' ? v.trim().slice(0, MAX_CUSTOM_SPECIALTY_LEN) : ''))
     .filter(Boolean);
   return [...new Set(cleaned)].slice(0, MAX_CUSTOM_SPECIALTIES);
+};
+
+// Rich-profile list limits (positions / qualifications / training / certs).
+const MAX_PROFILE_LIST_ITEMS = 40;
+const MAX_PROFILE_LIST_ITEM_LEN = 300;
+// Generic line-list: trim, drop empties, clamp each line + the list length.
+const sanitizeTextList = (value) => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((v) => (typeof v === 'string' ? v.trim().slice(0, MAX_PROFILE_LIST_ITEM_LEN) : ''))
+    .filter(Boolean)
+    .slice(0, MAX_PROFILE_LIST_ITEMS);
+};
+// Link list (publications/articles): array of { title, source|url }. Keeps only
+// items with a non-empty title; clamps lengths; tolerates either key name.
+const sanitizeLinkList = (value, urlKey) => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const title = typeof item.title === 'string' ? item.title.trim().slice(0, MAX_PROFILE_LIST_ITEM_LEN) : '';
+      if (!title) return null;
+      const raw = item[urlKey] ?? item.url ?? item.source ?? '';
+      const link = typeof raw === 'string' ? raw.trim().slice(0, 1000) : '';
+      return { title, [urlKey]: link };
+    })
+    .filter(Boolean)
+    .slice(0, MAX_PROFILE_LIST_ITEMS);
 };
 
 // In-memory per-IP rate limit for the public (no-login) upload endpoints used
@@ -153,6 +234,16 @@ const documentUpload = multer({
   },
 });
 
+// Anonymise a reviewer's name for public display, like the reference site:
+// 林少湲 → 林O湲, 高媜 → 高O, 李 → 李. Masks the middle so a real name isn't
+// fully exposed on the public profile.
+const maskName = (name) => {
+  const n = (name || '').trim();
+  if (n.length <= 1) return n || '匿名';
+  if (n.length === 2) return `${n[0]}O`;
+  return `${n[0]}O${n[n.length - 1]}`;
+};
+
 const handleValidation = (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -170,6 +261,7 @@ const loadConsultationAccess = async (consultationId, userId) => {
   const result = await db.query(`
     SELECT
       tc.id, tc.therapist_id, tc.requester_id, tc.couple_id, tc.status,
+      tc.public_status, tc.public_title,
       t.user_id AS therapist_user_id, t.display_name AS therapist_name,
       c.user1_id, c.user2_id
     FROM therapist_consultations tc
@@ -368,6 +460,17 @@ router.put('/me', authenticateToken, [
   body('rateTwd').optional().isInt({ min: 0, max: 100000 }).withMessage('費率無效'),
   body('sessionMinutes').optional().isInt({ min: 10, max: 240 }).withMessage('時長無效'),
   body('contactPhone').optional({ nullable: true }).isString().isLength({ max: 40 }),
+  // Rich profile (048)
+  body('introMessage').optional({ nullable: true }).isString().isLength({ max: 8000 }),
+  body('approach').optional({ nullable: true }).isString().isLength({ max: 8000 }),
+  body('about').optional({ nullable: true }).isString().isLength({ max: 8000 }),
+  body('certifications').optional().isArray(),
+  body('currentPositions').optional().isArray(),
+  body('qualifications').optional().isArray(),
+  body('training').optional().isArray(),
+  body('publications').optional().isArray(),
+  body('articles').optional().isArray(),
+  body('acceptingNewClients').optional().isBoolean(),
 ], async (req, res) => {
   if (!handleValidation(req, res)) return;
   try {
@@ -399,6 +502,18 @@ router.put('/me', authenticateToken, [
     if (req.body.rateTwd !== undefined) push('rate_twd', req.body.rateTwd);
     if (req.body.sessionMinutes !== undefined) push('session_minutes', req.body.sessionMinutes);
     if (req.body.contactPhone !== undefined) push('contact_phone', req.body.contactPhone || null);
+
+    // Rich profile sections (048).
+    if (req.body.introMessage !== undefined) push('intro_message', (req.body.introMessage || '').trim() || null);
+    if (req.body.approach !== undefined) push('approach', (req.body.approach || '').trim() || null);
+    if (req.body.about !== undefined) push('about', (req.body.about || '').trim() || null);
+    if (req.body.certifications !== undefined) push('certifications', sanitizeTextList(req.body.certifications));
+    if (req.body.currentPositions !== undefined) push('current_positions', sanitizeTextList(req.body.currentPositions));
+    if (req.body.qualifications !== undefined) push('qualifications', sanitizeTextList(req.body.qualifications));
+    if (req.body.training !== undefined) push('training', sanitizeTextList(req.body.training));
+    if (req.body.publications !== undefined) push('publications', JSON.stringify(sanitizeLinkList(req.body.publications, 'source')));
+    if (req.body.articles !== undefined) push('articles', JSON.stringify(sanitizeLinkList(req.body.articles, 'url')));
+    if (req.body.acceptingNewClients !== undefined) push('accepting_new_clients', Boolean(req.body.acceptingNewClients));
 
     if (updates.length === 0) {
       return res.status(400).json({ success: false, error_code: 'NO_CHANGES', message: '沒有要更新的欄位' });
@@ -455,7 +570,11 @@ router.get('/consultations/mine', authenticateToken, async (req, res) => {
       SELECT
         tc.id, tc.focus_area, tc.message, tc.preferred_time, tc.status,
         tc.responded_at, tc.response_note, tc.created_at,
+        tc.public_status, tc.public_title,
+        tc.booking_type, tc.payment_status, tc.price_twd, tc.meeting_provider, tc.meeting_url,
+        tc.therapist_id,
         t.display_name AS therapist_name, t.title AS therapist_title,
+        t.rate_twd AS therapist_rate_twd, t.session_minutes AS therapist_session_minutes,
         t.user_id AS therapist_user_id,
         requester.nickname AS requester_name,
         (SELECT COUNT(*) FROM consultation_messages cm WHERE cm.consultation_id = tc.id) AS message_count
@@ -473,8 +592,11 @@ router.get('/consultations/mine', authenticateToken, async (req, res) => {
       success: true,
       consultations: result.rows.map((r) => ({
         id: r.id,
+        therapistId: r.therapist_id,
         therapistName: r.therapist_name,
         therapistTitle: r.therapist_title,
+        therapistRateTwd: r.therapist_rate_twd,
+        therapistSessionMinutes: r.therapist_session_minutes,
         requesterName: r.requester_name,
         role: r.therapist_user_id && r.therapist_user_id === req.user.id ? 'therapist' : 'client',
         focusArea: r.focus_area,
@@ -483,6 +605,14 @@ router.get('/consultations/mine', authenticateToken, async (req, res) => {
         status: r.status,
         respondedAt: r.responded_at,
         responseNote: r.response_note,
+        publicStatus: r.public_status,
+        publicTitle: r.public_title,
+        bookingType: r.booking_type,
+        paymentStatus: r.payment_status,
+        priceTwd: r.price_twd,
+        meetingProvider: r.meeting_provider,
+        // Only reveal the meeting link once paid (it's the therapist's room).
+        meetingUrl: r.payment_status === 'paid' ? r.meeting_url : null,
         messageCount: Number(r.message_count) || 0,
         createdAt: r.created_at,
       })),
@@ -518,6 +648,8 @@ router.get('/consultations/:id/messages', authenticateToken, async (req, res) =>
       role: access.role,
       therapistName: access.row.therapist_name,
       currentUserId: req.user.id,
+      publicStatus: access.row.public_status,
+      publicTitle: access.row.public_title,
       messages: msgs.rows.map((m) => ({
         id: m.id,
         senderId: m.sender_id,
@@ -578,7 +710,7 @@ router.post('/consultations/:id/messages', authenticateToken, [
 // POST /api/therapists/consultations/:id/respond — the therapist accepts /
 // declines / completes a consultation. Therapist (linked user) only.
 router.post('/consultations/:id/respond', authenticateToken, [
-  body('action').isIn(['accept', 'decline', 'complete']).withMessage('action 無效'),
+  body('action').isIn(['accept', 'decline', 'complete', 'no_show']).withMessage('action 無效'),
   body('note').optional({ nullable: true }).isString().isLength({ max: 1000 }),
 ], async (req, res) => {
   if (!handleValidation(req, res)) return;
@@ -587,18 +719,157 @@ router.post('/consultations/:id/respond', authenticateToken, [
     if (!access) return res.status(404).json({ success: false, message: '找不到這個預約' });
     if (!access.isTherapist) return res.status(403).json({ success: false, message: '只有諮商師可以回覆預約' });
 
-    const statusMap = { accept: 'accepted', decline: 'declined', complete: 'completed' };
+    const statusMap = { accept: 'accepted', decline: 'declined', complete: 'completed', no_show: 'no_show' };
     const status = statusMap[req.body.action];
+    // A session counts toward the therapist's intro window only when it is both
+    // paid AND completed — flip the flag here (guarded by payment_status in SQL).
+    const willComplete = req.body.action === 'complete';
     const result = await db.query(
       `UPDATE therapist_consultations
-          SET status = $1, response_note = $2, responded_at = NOW()
-        WHERE id = $3 RETURNING id, status`,
-      [status, req.body.note || null, req.params.id]
+          SET status = $1, response_note = $2, responded_at = NOW(),
+              counts_toward_intro = CASE WHEN $4 AND payment_status = 'paid' THEN true ELSE counts_toward_intro END
+        WHERE id = $3 RETURNING id, status, counts_toward_intro`,
+      [status, req.body.note || null, req.params.id, willComplete]
     );
     res.json({ success: true, consultation: result.rows[0] });
   } catch (error) {
     logError('Failed to respond to consultation', { id: req.params.id, err: error.message });
     res.status(500).json({ success: false, message: '回覆預約失敗' });
+  }
+});
+
+// --- 公開問答 (Public Q&A) publish handshake ----------------------------
+//
+// A free consultation chat can be published, read-only and anonymised, so other
+// users can learn from it. Publishing needs BOTH parties to consent: one side
+// proposes (publish-request), the OTHER role approves (publish-approve), and
+// either side can pull it back (publish-withdraw). The asker is never named in
+// the public payload — anonymisation is enforced in the browse routes below.
+
+const MAX_PUBLIC_TITLE_LEN = 200;
+
+// POST /api/therapists/consultations/:id/publish-request — propose publishing.
+// Either participant may propose; records which role asked so the other role's
+// approval is what flips it public.
+router.post('/consultations/:id/publish-request', authenticateToken, [
+  body('title').isString().trim().isLength({ min: 1, max: MAX_PUBLIC_TITLE_LEN })
+    .withMessage(`標題長度需為 1-${MAX_PUBLIC_TITLE_LEN} 字`),
+], async (req, res) => {
+  if (!handleValidation(req, res)) return;
+  try {
+    const access = await loadConsultationAccess(req.params.id, req.user.id);
+    if (!access) return res.status(404).json({ success: false, message: '找不到這個諮商室' });
+    if (!access.isParticipant) return res.status(403).json({ success: false, message: '你沒有權限公開這個對話' });
+
+    // Only propose from a private/withdrawn room. Re-proposing a pending request
+    // or an already-published room is a no-op the UI should already prevent.
+    if (!['private', 'withdrawn'].includes(access.row.public_status)) {
+      return res.status(409).json({
+        success: false,
+        error_code: 'PUBLISH_ALREADY_PENDING',
+        message: access.row.public_status === 'published'
+          ? '這個對話已經公開了'
+          : '已經有一方提議公開，等待另一方同意中',
+      });
+    }
+
+    const nextStatus = access.isTherapist ? 'therapist_requested' : 'client_requested';
+    const result = await db.query(`
+      UPDATE therapist_consultations
+         SET public_status = $1, public_requested_by = $2, public_title = $3,
+             public_approved_by = NULL, published_at = NULL
+       WHERE id = $4
+       RETURNING id, public_status, public_title
+    `, [nextStatus, req.user.id, req.body.title.trim(), req.params.id]);
+
+    logInfo('Public Q&A publish requested', {
+      consultationId: req.params.id, userId: req.user.id, role: access.role,
+    });
+    res.json({
+      success: true,
+      message: access.isTherapist
+        ? '已提議公開，等待個案同意。同意後會匿名顯示在公開問答。'
+        : '已提議公開，等待諮商師同意。同意後會匿名顯示在公開問答。',
+      publicStatus: result.rows[0].public_status,
+      publicTitle: result.rows[0].public_title,
+    });
+  } catch (error) {
+    logError('Failed to request publish', { id: req.params.id, err: error.message });
+    res.status(500).json({ success: false, message: '提議公開失敗，請稍後再試' });
+  }
+});
+
+// POST /api/therapists/consultations/:id/publish-approve — the OTHER party
+// consents, flipping the room to published.
+router.post('/consultations/:id/publish-approve', authenticateToken, async (req, res) => {
+  try {
+    const access = await loadConsultationAccess(req.params.id, req.user.id);
+    if (!access) return res.status(404).json({ success: false, message: '找不到這個諮商室' });
+    if (!access.isParticipant) return res.status(403).json({ success: false, message: '你沒有權限公開這個對話' });
+
+    const status = access.row.public_status;
+    if (!['client_requested', 'therapist_requested'].includes(status)) {
+      return res.status(409).json({
+        success: false,
+        error_code: 'PUBLISH_NOT_PENDING',
+        message: status === 'published' ? '這個對話已經公開了' : '目前沒有待同意的公開提議',
+      });
+    }
+    // Consent must come from the opposite role to whoever proposed it.
+    const approverMustBeTherapist = status === 'client_requested';
+    if (approverMustBeTherapist !== access.isTherapist) {
+      return res.status(403).json({
+        success: false,
+        error_code: 'PUBLISH_NEEDS_OTHER_PARTY',
+        message: approverMustBeTherapist
+          ? '需要由諮商師同意才能公開'
+          : '需要由個案同意才能公開',
+      });
+    }
+
+    const result = await db.query(`
+      UPDATE therapist_consultations
+         SET public_status = 'published', public_approved_by = $1, published_at = NOW()
+       WHERE id = $2
+       RETURNING id, public_status, published_at
+    `, [req.user.id, req.params.id]);
+
+    logInfo('Public Q&A published', { consultationId: req.params.id, userId: req.user.id });
+    res.json({
+      success: true,
+      message: '對話已匿名公開為公開問答，謝謝你願意幫助其他人。',
+      publicStatus: result.rows[0].public_status,
+      publishedAt: result.rows[0].published_at,
+    });
+  } catch (error) {
+    logError('Failed to approve publish', { id: req.params.id, err: error.message });
+    res.status(500).json({ success: false, message: '同意公開失敗，請稍後再試' });
+  }
+});
+
+// POST /api/therapists/consultations/:id/publish-withdraw — either party pulls a
+// pending proposal or a published thread back to private.
+router.post('/consultations/:id/publish-withdraw', authenticateToken, async (req, res) => {
+  try {
+    const access = await loadConsultationAccess(req.params.id, req.user.id);
+    if (!access) return res.status(404).json({ success: false, message: '找不到這個諮商室' });
+    if (!access.isParticipant) return res.status(403).json({ success: false, message: '你沒有權限變更這個對話' });
+
+    if (access.row.public_status === 'private') {
+      return res.json({ success: true, message: '這個對話本來就是私密的', publicStatus: 'private' });
+    }
+    const result = await db.query(`
+      UPDATE therapist_consultations
+         SET public_status = 'withdrawn', published_at = NULL
+       WHERE id = $1
+       RETURNING id, public_status
+    `, [req.params.id]);
+
+    logInfo('Public Q&A withdrawn', { consultationId: req.params.id, userId: req.user.id });
+    res.json({ success: true, message: '已取消公開，這個對話不再顯示於公開問答。', publicStatus: result.rows[0].public_status });
+  } catch (error) {
+    logError('Failed to withdraw publish', { id: req.params.id, err: error.message });
+    res.status(500).json({ success: false, message: '取消公開失敗，請稍後再試' });
   }
 });
 
@@ -625,6 +896,186 @@ router.get('/applications/mine', authenticateToken, async (req, res) => {
   } catch (error) {
     logError('Failed to list my applications', { userId: req.user?.id, err: error.message });
     res.status(500).json({ success: false, message: '無法取得申請紀錄' });
+  }
+});
+
+// --- 公開問答 (Public Q&A) read-only browse -----------------------------
+//
+// Defined before /:id so "qa" isn't captured as a therapist id. These serve the
+// published consultations to everyone (optionalAuth). The asker is ALWAYS
+// anonymised here ("匿名個案") and their sender_id/name/email are never sent; the
+// therapist is shown because the thread showcases their work.
+
+const PUBLIC_QA_PAGE_SIZE = 20;
+const QA_PREVIEW_LEN = 140;
+
+// GET /api/therapists/qa?focus=couple&page=1 — list published threads.
+router.get('/qa', optionalAuth, [
+  queryValidator('focus').optional().isIn(FOCUS_AREAS).withMessage('focus 無效'),
+  queryValidator('page').optional().isInt({ min: 1 }).withMessage('page 無效'),
+], async (req, res) => {
+  if (!handleValidation(req, res)) return;
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const offset = (page - 1) * PUBLIC_QA_PAGE_SIZE;
+    const params = [];
+    let where = `tc.public_status = 'published'`;
+    if (req.query.focus) {
+      params.push(req.query.focus);
+      where += ` AND tc.focus_area = $${params.length}`;
+    }
+    params.push(PUBLIC_QA_PAGE_SIZE + 1, offset); // fetch one extra to detect "hasMore"
+    const result = await db.query(`
+      SELECT tc.id, tc.public_title, tc.focus_area, tc.published_at,
+             t.id AS therapist_id, t.display_name AS therapist_name,
+             t.title AS therapist_title, t.photo_url,
+             (SELECT COUNT(*) FROM consultation_messages cm WHERE cm.consultation_id = tc.id) AS message_count,
+             (SELECT COUNT(*) FROM consultation_public_votes v WHERE v.consultation_id = tc.id) AS helpful_count,
+             (SELECT cm.body FROM consultation_messages cm
+               WHERE cm.consultation_id = tc.id ORDER BY cm.created_at ASC LIMIT 1) AS first_message
+        FROM therapist_consultations tc
+        JOIN therapists t ON t.id = tc.therapist_id
+       WHERE ${where}
+       ORDER BY tc.published_at DESC
+       LIMIT $${params.length - 1} OFFSET $${params.length}
+    `, params);
+
+    const rows = result.rows.slice(0, PUBLIC_QA_PAGE_SIZE);
+    const hasMore = result.rows.length > PUBLIC_QA_PAGE_SIZE;
+    res.json({
+      success: true,
+      page,
+      hasMore,
+      threads: rows.map((r) => ({
+        id: r.id,
+        title: r.public_title,
+        focusArea: r.focus_area,
+        publishedAt: r.published_at,
+        therapist: {
+          id: r.therapist_id,
+          displayName: r.therapist_name,
+          title: r.therapist_title,
+          photoUrl: r.photo_url,
+        },
+        preview: r.first_message
+          ? r.first_message.slice(0, QA_PREVIEW_LEN) + (r.first_message.length > QA_PREVIEW_LEN ? '…' : '')
+          : '',
+        messageCount: Number(r.message_count) || 0,
+        helpfulCount: Number(r.helpful_count) || 0,
+      })),
+    });
+  } catch (error) {
+    logError('Failed to list public Q&A', { err: error.message });
+    res.status(500).json({ success: false, message: '無法取得公開問答列表' });
+  }
+});
+
+// GET /api/therapists/qa/:id — a single published thread, read-only + anonymised.
+router.get('/qa/:id', optionalAuth, async (req, res) => {
+  try {
+    const meta = await db.query(`
+      SELECT tc.id, tc.public_title, tc.focus_area, tc.published_at,
+             t.id AS therapist_id, t.user_id AS therapist_user_id,
+             t.display_name AS therapist_name, t.title AS therapist_title, t.photo_url,
+             (SELECT COUNT(*) FROM consultation_public_votes v WHERE v.consultation_id = tc.id) AS helpful_count
+        FROM therapist_consultations tc
+        JOIN therapists t ON t.id = tc.therapist_id
+       WHERE tc.id = $1 AND tc.public_status = 'published'
+    `, [req.params.id]);
+    if (meta.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '找不到這則公開問答，或它已被取消公開' });
+    }
+    const m = meta.rows[0];
+
+    const msgs = await db.query(`
+      SELECT cm.id, cm.sender_id, cm.body, cm.created_at
+        FROM consultation_messages cm
+       WHERE cm.consultation_id = $1
+       ORDER BY cm.created_at ASC
+    `, [req.params.id]);
+
+    let hasVoted = false;
+    if (req.user) {
+      const v = await db.query(
+        `SELECT 1 FROM consultation_public_votes WHERE consultation_id = $1 AND voter_id = $2`,
+        [req.params.id, req.user.id]
+      );
+      hasVoted = v.rows.length > 0;
+    }
+
+    res.json({
+      success: true,
+      thread: {
+        id: m.id,
+        title: m.public_title,
+        focusArea: m.focus_area,
+        publishedAt: m.published_at,
+        helpfulCount: Number(m.helpful_count) || 0,
+        hasVoted,
+        therapist: {
+          id: m.therapist_id,
+          displayName: m.therapist_name,
+          title: m.therapist_title,
+          photoUrl: m.photo_url,
+        },
+        // Anonymised transcript: never leak the asker's id/name. Only the
+        // therapist is identified; everyone else is "匿名個案".
+        messages: msgs.rows.map((msg) => {
+          const isTherapist = Boolean(m.therapist_user_id) && msg.sender_id === m.therapist_user_id;
+          return {
+            id: msg.id,
+            body: msg.body,
+            createdAt: msg.created_at,
+            isTherapist,
+            senderName: isTherapist ? m.therapist_name : '匿名個案',
+          };
+        }),
+      },
+    });
+  } catch (error) {
+    logError('Failed to load public Q&A thread', { id: req.params.id, err: error.message });
+    res.status(500).json({ success: false, message: '無法載入公開問答' });
+  }
+});
+
+// POST /api/therapists/qa/:id/vote — toggle a "helpful" vote on a published
+// thread. Idempotent per (thread, user); returns the new state + count.
+router.post('/qa/:id/vote', authenticateToken, async (req, res) => {
+  try {
+    const pub = await db.query(
+      `SELECT 1 FROM therapist_consultations WHERE id = $1 AND public_status = 'published'`,
+      [req.params.id]
+    );
+    if (pub.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '找不到這則公開問答' });
+    }
+    const existing = await db.query(
+      `SELECT 1 FROM consultation_public_votes WHERE consultation_id = $1 AND voter_id = $2`,
+      [req.params.id, req.user.id]
+    );
+    let voted;
+    if (existing.rows.length > 0) {
+      await db.query(
+        `DELETE FROM consultation_public_votes WHERE consultation_id = $1 AND voter_id = $2`,
+        [req.params.id, req.user.id]
+      );
+      voted = false;
+    } else {
+      await db.query(
+        `INSERT INTO consultation_public_votes (consultation_id, voter_id)
+         VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        [req.params.id, req.user.id]
+      );
+      voted = true;
+    }
+    const count = await db.query(
+      `SELECT COUNT(*)::int AS c FROM consultation_public_votes WHERE consultation_id = $1`,
+      [req.params.id]
+    );
+    res.json({ success: true, voted, helpfulCount: count.rows[0].c });
+  } catch (error) {
+    logError('Failed to vote public Q&A', { id: req.params.id, err: error.message });
+    res.status(500).json({ success: false, message: '操作失敗，請稍後再試' });
   }
 });
 
@@ -850,6 +1301,388 @@ router.post('/:id/consult', authenticateToken, [
   }
 });
 
+// --- Paid video sessions (視訊諮商) -------------------------------------
+
+// POST /api/therapists/:id/book-video — book a paid 1:1 video session. Snapshots
+// the therapist's price + duration; lands as pending/unpaid. sourceConsultationId
+// links it back to the free chat it grew out of (the "預約視訊諮商" nudge).
+router.post('/:id/book-video', authenticateToken, [
+  body('message').optional({ nullable: true }).isString().isLength({ max: 2000 }),
+  body('preferredTime').optional({ nullable: true }).isISO8601().withMessage('時間格式錯誤'),
+  body('sourceConsultationId').optional({ nullable: true }).isUUID().withMessage('來源無效'),
+], async (req, res) => {
+  if (!handleValidation(req, res)) return;
+  try {
+    const therapistId = req.params.id;
+    const therapist = await db.query(
+      `SELECT id, rate_twd, session_minutes, accepting_new_clients FROM therapists WHERE id = $1 AND status = 'approved'`,
+      [therapistId]
+    );
+    if (therapist.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '找不到這位諮商師' });
+    }
+    const t = therapist.rows[0];
+    if (t.accepting_new_clients === false) {
+      return res.status(409).json({ success: false, error_code: 'NOT_ACCEPTING', message: '這位諮商師目前暫不開放新案預約' });
+    }
+
+    const couple = await db.query(
+      `SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1 LIMIT 1`,
+      [req.user.id]
+    );
+    const coupleId = couple.rows[0] ? couple.rows[0].id : null;
+
+    const result = await db.query(`
+      INSERT INTO therapist_consultations
+        (therapist_id, requester_id, couple_id, message, preferred_time,
+         booking_type, source_consultation_id, duration_minutes, price_twd, payment_status)
+      VALUES ($1,$2,$3,$4,$5,'scheduled',$6,$7,$8,'unpaid')
+      RETURNING id, status, payment_status, created_at
+    `, [
+      therapistId, req.user.id, coupleId, req.body.message || null,
+      req.body.preferredTime || null, req.body.sourceConsultationId || null,
+      t.session_minutes, t.rate_twd,
+    ]);
+
+    logInfo('Video session booked', { userId: req.user.id, therapistId, consultationId: result.rows[0].id });
+    res.status(201).json({
+      success: true,
+      message: '已建立預約，請完成付款以確認時段。',
+      consultation: { id: result.rows[0].id, status: result.rows[0].status, paymentStatus: result.rows[0].payment_status, priceTwd: t.rate_twd },
+    });
+  } catch (error) {
+    logError('Failed to book video session', { userId: req.user?.id, err: error.message });
+    res.status(500).json({ success: false, message: '預約失敗，請稍後再試' });
+  }
+});
+
+// POST /api/therapists/consultations/:id/meeting-link — therapist pastes the
+// third-party video link. Allowed once the booking is accepted.
+router.post('/consultations/:id/meeting-link', authenticateToken, [
+  body('provider').isIn(MEETING_PROVIDERS).withMessage('provider 無效'),
+  body('url').isString().trim().isURL({ require_protocol: true }).withMessage('請貼上有效的會議連結'),
+], async (req, res) => {
+  if (!handleValidation(req, res)) return;
+  try {
+    const access = await loadConsultationAccess(req.params.id, req.user.id);
+    if (!access) return res.status(404).json({ success: false, message: '找不到這個預約' });
+    if (!access.isTherapist) return res.status(403).json({ success: false, message: '只有諮商師可以設定會議連結' });
+    if (access.row.status !== 'accepted') {
+      return res.status(409).json({ success: false, error_code: 'NOT_ACCEPTED', message: '請先接受預約，再設定會議連結' });
+    }
+    const result = await db.query(`
+      UPDATE therapist_consultations
+         SET meeting_provider = $1, meeting_url = $2, meeting_set_at = NOW()
+       WHERE id = $3 RETURNING id, meeting_provider, meeting_url
+    `, [req.body.provider, req.body.url.trim(), req.params.id]);
+    logInfo('Meeting link set', { consultationId: req.params.id, userId: req.user.id });
+    res.json({ success: true, message: '會議連結已提供給對方。', meetingProvider: result.rows[0].meeting_provider, meetingUrl: result.rows[0].meeting_url });
+  } catch (error) {
+    logError('Failed to set meeting link', { id: req.params.id, err: error.message });
+    res.status(500).json({ success: false, message: '設定會議連結失敗，請稍後再試' });
+  }
+});
+
+// POST /api/therapists/consultations/:id/pay — start ECPay checkout for a
+// scheduled session. Computes + snapshots the fee split, creates a pending
+// order, and returns the form params the frontend auto-submits.
+router.post('/consultations/:id/pay', authenticateToken, async (req, res) => {
+  try {
+    const access = await loadConsultationAccess(req.params.id, req.user.id);
+    if (!access) return res.status(404).json({ success: false, message: '找不到這個預約' });
+    if (!access.isParticipant || access.isTherapist) {
+      return res.status(403).json({ success: false, message: '只有預約方可以付款' });
+    }
+
+    const row = await db.query(
+      `SELECT tc.id, tc.therapist_id, tc.booking_type, tc.price_twd, tc.payment_status,
+              t.display_name AS therapist_name
+         FROM therapist_consultations tc JOIN therapists t ON t.id = tc.therapist_id
+        WHERE tc.id = $1`,
+      [req.params.id]
+    );
+    const c = row.rows[0];
+    if (c.booking_type !== 'scheduled') {
+      return res.status(400).json({ success: false, error_code: 'NOT_SCHEDULED', message: '這不是付費視訊預約' });
+    }
+    if (c.payment_status === 'paid') {
+      return res.status(409).json({ success: false, error_code: 'ALREADY_PAID', message: '這個預約已經付款了' });
+    }
+    const price = Number(c.price_twd) || 0;
+    if (price <= 0) {
+      return res.status(400).json({ success: false, error_code: 'INVALID_PRICE', message: '預約金額異常，請重新預約' });
+    }
+
+    const { feeRate, platformFee, therapistNet } = await computeFeeSplit(c.therapist_id, price);
+    const merchantTradeNo = genMerchantTradeNo();
+
+    await db.transaction(async (client) => {
+      await client.query(`
+        INSERT INTO session_payment_orders
+          (consultation_id, payer_id, therapist_id, merchant_trade_no, amount,
+           fee_rate, platform_fee, therapist_net, status)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending')
+      `, [c.id, req.user.id, c.therapist_id, merchantTradeNo, price, feeRate, platformFee, therapistNet]);
+      await client.query(`
+        UPDATE therapist_consultations
+           SET payment_status = 'pending', fee_rate = $2, platform_fee_twd = $3, therapist_net_twd = $4
+         WHERE id = $1
+      `, [c.id, feeRate, platformFee, therapistNet]);
+    });
+
+    const base = appBaseUrl();
+    const { actionUrl, params } = ecpay.buildCheckoutParams({
+      merchantTradeNo,
+      amount: price,
+      itemName: `視訊諮商 — ${c.therapist_name}`.slice(0, 200),
+      tradeDesc: 'Twogether 視訊諮商',
+      returnUrl: `${base}/api/therapists/sessions/ecpay/callback`,
+      orderResultUrl: `${base}/api/therapists/sessions/ecpay/return`,
+      clientBackUrl: `${base}/booking/result`,
+    });
+
+    logInfo('Session checkout created', { consultationId: c.id, userId: req.user.id, merchantTradeNo, amount: price, feeRate });
+    res.json({ success: true, action_url: actionUrl, params });
+  } catch (error) {
+    logError('Failed to start session payment', { id: req.params.id, err: error.message });
+    res.status(500).json({ success: false, message: '無法建立付款，請稍後再試' });
+  }
+});
+
+// POST /api/therapists/sessions/ecpay/callback — ECPay server-to-server callback
+// (PUBLIC, no JWT). Authoritative paid mark + fee-split record. Idempotent.
+router.post('/sessions/ecpay/callback', async (req, res) => {
+  const payload = req.body || {};
+  try {
+    if (!ecpay.verifyCallback(payload)) {
+      logWarn('session.callback.bad_mac', { merchantTradeNo: payload.MerchantTradeNo });
+      return res.status(400).send('0|CheckMacValue Error');
+    }
+    const merchantTradeNo = payload.MerchantTradeNo;
+    const rtnCode = String(payload.RtnCode);
+
+    const orderRes = await db.query(`SELECT * FROM session_payment_orders WHERE merchant_trade_no = $1`, [merchantTradeNo]);
+    const order = orderRes.rows[0];
+    if (!order) {
+      logWarn('session.callback.unknown_order', { merchantTradeNo });
+      return res.send('1|OK');
+    }
+    if (order.status === 'paid') return res.send('1|OK'); // idempotent
+
+    if (Number(payload.TradeAmt) !== Number(order.amount)) {
+      logWarn('session.callback.amount_mismatch', { merchantTradeNo, expected: order.amount, got: payload.TradeAmt });
+      return res.status(400).send('0|Amount Mismatch');
+    }
+
+    if (rtnCode !== '1') {
+      await db.transaction(async (client) => {
+        await client.query(`UPDATE session_payment_orders SET status = 'failed', raw_callback = $2 WHERE id = $1`, [order.id, payload]);
+        await client.query(`UPDATE therapist_consultations SET payment_status = 'failed' WHERE id = $1`, [order.consultation_id]);
+      });
+      logInfo('session.callback.failed', { merchantTradeNo, rtnCode, msg: payload.RtnMsg });
+      return res.send('1|OK');
+    }
+
+    await db.transaction(async (client) => {
+      await client.query(`
+        UPDATE session_payment_orders
+           SET status = 'paid', paid_at = NOW(), ecpay_trade_no = $2, payment_method = $3, raw_callback = $4
+         WHERE id = $1
+      `, [order.id, payload.TradeNo || null, payload.PaymentType || null, payload]);
+      await client.query(`
+        UPDATE therapist_consultations
+           SET payment_status = 'paid', paid_at = NOW(),
+               price_twd = $2, fee_rate = $3, platform_fee_twd = $4, therapist_net_twd = $5
+         WHERE id = $1
+      `, [order.consultation_id, order.amount, order.fee_rate, order.platform_fee, order.therapist_net]);
+    });
+
+    logInfo('session.callback.paid', { merchantTradeNo, consultationId: order.consultation_id, therapistNet: order.therapist_net });
+    res.send('1|OK');
+  } catch (error) {
+    logError('Session callback failed', { err: error.message });
+    res.status(500).send('0|Error');
+  }
+});
+
+// POST /api/therapists/sessions/ecpay/return — browser POST-back (PUBLIC). The
+// grant already happened server-side; just 302 to the SPA result route.
+router.post('/sessions/ecpay/return', (req, res) => {
+  const ok = String(req.body?.RtnCode) === '1';
+  res.redirect(302, `/booking/result?status=${ok ? 'success' : 'failed'}`);
+});
+
+// GET /api/therapists/me/earnings — therapist's session earnings + intro status.
+router.get('/me/earnings', authenticateToken, async (req, res) => {
+  try {
+    const t = await db.query(`SELECT id FROM therapists WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`, [req.user.id]);
+    if (t.rows.length === 0) {
+      return res.status(404).json({ success: false, error_code: 'NO_THERAPIST_PROFILE', message: '你還沒有諮商師檔案' });
+    }
+    const therapistId = t.rows[0].id;
+
+    const introUsed = await db.query(
+      `SELECT COUNT(*)::int AS c FROM therapist_consultations WHERE therapist_id = $1 AND counts_toward_intro = true`,
+      [therapistId]
+    );
+    const introCount = introUsed.rows[0].c;
+    const paid = await db.query(`
+      SELECT tc.id, tc.price_twd, tc.fee_rate, tc.platform_fee_twd, tc.therapist_net_twd,
+             tc.paid_at, tc.status, tc.scheduled_at, tc.preferred_time
+        FROM therapist_consultations tc
+       WHERE tc.therapist_id = $1 AND tc.payment_status = 'paid'
+       ORDER BY tc.paid_at DESC NULLS LAST
+    `, [therapistId]);
+    const totalNet = paid.rows.reduce((sum, r) => sum + (Number(r.therapist_net_twd) || 0), 0);
+
+    res.json({
+      success: true,
+      earnings: {
+        introSessionsUsed: introCount,
+        introSessionsRemaining: Math.max(0, INTRO_SESSION_LIMIT - introCount),
+        currentFeeRate: introCount < INTRO_SESSION_LIMIT ? PLATFORM_FEE_RATE.intro : PLATFORM_FEE_RATE.standard,
+        paidSessionCount: paid.rows.length,
+        totalNetTwd: totalNet,
+        sessions: paid.rows.map((r) => ({
+          id: r.id,
+          priceTwd: r.price_twd,
+          feeRate: r.fee_rate,
+          platformFeeTwd: r.platform_fee_twd,
+          therapistNetTwd: r.therapist_net_twd,
+          paidAt: r.paid_at,
+          status: r.status,
+        })),
+      },
+    });
+  } catch (error) {
+    logError('Failed to load earnings', { userId: req.user?.id, err: error.message });
+    res.status(500).json({ success: false, message: '無法取得收入資料' });
+  }
+});
+
+// --- Client reviews (客戶評價) ------------------------------------------
+
+// GET /api/therapists/:id/reviews — public, approved reviews + summary. Also
+// tells a logged-in user whether they're eligible to review / already have.
+router.get('/:id/reviews', optionalAuth, async (req, res) => {
+  try {
+    const reviews = await db.query(`
+      SELECT id, reviewer_display, rating, body, created_at
+        FROM therapist_reviews
+       WHERE therapist_id = $1 AND status = 'approved'
+       ORDER BY created_at DESC
+    `, [req.params.id]);
+
+    const summary = await db.query(`
+      SELECT COUNT(*)::int AS count,
+             ROUND(AVG(rating)::numeric, 1) AS avg_rating
+        FROM therapist_reviews
+       WHERE therapist_id = $1 AND status = 'approved' AND rating IS NOT NULL
+    `, [req.params.id]);
+
+    // Eligibility: a logged-in user who has booked this therapist (themselves or
+    // via their couple) and hasn't already reviewed may leave one.
+    let canReview = false;
+    let alreadyReviewed = false;
+    if (req.user) {
+      const booked = await db.query(`
+        SELECT 1 FROM therapist_consultations tc
+        LEFT JOIN couples c ON c.id = tc.couple_id
+        WHERE tc.therapist_id = $1
+          AND (tc.requester_id = $2 OR c.user1_id = $2 OR c.user2_id = $2)
+        LIMIT 1
+      `, [req.params.id, req.user.id]);
+      const mine = await db.query(
+        `SELECT status FROM therapist_reviews WHERE therapist_id = $1 AND author_id = $2`,
+        [req.params.id, req.user.id]
+      );
+      alreadyReviewed = mine.rows.length > 0;
+      canReview = booked.rows.length > 0 && !alreadyReviewed;
+    }
+
+    res.json({
+      success: true,
+      summary: {
+        count: summary.rows[0].count || 0,
+        avgRating: summary.rows[0].avg_rating !== null ? Number(summary.rows[0].avg_rating) : null,
+      },
+      canReview,
+      alreadyReviewed,
+      reviews: reviews.rows.map((r) => ({
+        id: r.id,
+        reviewerDisplay: r.reviewer_display,
+        rating: r.rating,
+        body: r.body,
+        createdAt: r.created_at,
+      })),
+    });
+  } catch (error) {
+    logError('Failed to load therapist reviews', { id: req.params.id, err: error.message });
+    res.status(500).json({ success: false, message: '無法取得評價' });
+  }
+});
+
+// POST /api/therapists/:id/reviews — leave a review. Must have booked this
+// therapist; one review per author. Lands as 'pending' for admin moderation.
+router.post('/:id/reviews', authenticateToken, [
+  body('body').isString().trim().isLength({ min: 1, max: 4000 }).withMessage('評價內容需為 1-4000 字'),
+  body('rating').optional({ nullable: true }).isInt({ min: 1, max: 5 }).withMessage('評分需為 1-5'),
+  body('displayName').optional({ nullable: true }).isString().isLength({ max: 80 }),
+], async (req, res) => {
+  if (!handleValidation(req, res)) return;
+  try {
+    const therapistId = req.params.id;
+    const therapist = await db.query(`SELECT id, user_id FROM therapists WHERE id = $1`, [therapistId]);
+    if (therapist.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '找不到這位諮商師' });
+    }
+    if (therapist.rows[0].user_id === req.user.id) {
+      return res.status(400).json({ success: false, error_code: 'SELF_REVIEW', message: '不能評價自己的檔案' });
+    }
+
+    const booked = await db.query(`
+      SELECT 1 FROM therapist_consultations tc
+      LEFT JOIN couples c ON c.id = tc.couple_id
+      WHERE tc.therapist_id = $1
+        AND (tc.requester_id = $2 OR c.user1_id = $2 OR c.user2_id = $2)
+      LIMIT 1
+    `, [therapistId, req.user.id]);
+    if (booked.rows.length === 0) {
+      return res.status(403).json({
+        success: false,
+        error_code: 'REVIEW_REQUIRES_CONSULTATION',
+        message: '與這位諮商師預約過後，才能留下評價',
+      });
+    }
+
+    const dup = await db.query(
+      `SELECT 1 FROM therapist_reviews WHERE therapist_id = $1 AND author_id = $2`,
+      [therapistId, req.user.id]
+    );
+    if (dup.rows.length > 0) {
+      return res.status(409).json({ success: false, error_code: 'ALREADY_REVIEWED', message: '你已經評價過這位諮商師了' });
+    }
+
+    // Use a provided display name, else mask the user's nickname.
+    let display = (req.body.displayName || '').trim();
+    if (!display) {
+      const u = await db.query(`SELECT nickname FROM users WHERE id = $1`, [req.user.id]);
+      display = maskName(u.rows[0] && u.rows[0].nickname);
+    }
+
+    await db.query(`
+      INSERT INTO therapist_reviews (therapist_id, author_id, reviewer_display, rating, body, status)
+      VALUES ($1, $2, $3, $4, $5, 'pending')
+    `, [therapistId, req.user.id, display.slice(0, 80), req.body.rating || null, req.body.body.trim()]);
+
+    logInfo('Therapist review submitted', { therapistId, userId: req.user.id });
+    res.status(201).json({ success: true, message: '感謝你的評價！我們會在審核後公開顯示。' });
+  } catch (error) {
+    logError('Failed to submit therapist review', { id: req.params.id, err: error.message });
+    res.status(500).json({ success: false, message: '送出評價失敗，請稍後再試' });
+  }
+});
+
 // --- Admin moderation (Basic-Auth gated in server.js) -------------------
 
 // GET /api/admin/therapists?status=pending — review queue. 'suspended' is a
@@ -952,6 +1785,233 @@ adminRouter.delete('/:id', async (req, res) => {
   } catch (error) {
     logError('Admin: failed to delete therapist', { id: req.params.id, err: error.message });
     res.status(500).json({ success: false, message: 'Failed to delete therapist' });
+  }
+});
+
+// GET /api/admin/therapists/reviews?status=pending — review moderation queue.
+adminRouter.get('/reviews', async (req, res) => {
+  try {
+    const status = ['pending', 'approved', 'hidden'].includes(req.query.status) ? req.query.status : 'pending';
+    const result = await db.query(`
+      SELECT r.id, r.therapist_id, r.reviewer_display, r.rating, r.body, r.status, r.created_at,
+             t.display_name AS therapist_name
+        FROM therapist_reviews r
+        JOIN therapists t ON t.id = r.therapist_id
+       WHERE r.status = $1
+       ORDER BY r.created_at DESC
+    `, [status]);
+    res.json({ success: true, reviews: result.rows });
+  } catch (error) {
+    logError('Admin: failed to list reviews', { err: error.message });
+    res.status(500).json({ success: false, message: 'Failed to list reviews' });
+  }
+});
+
+// POST /api/admin/therapists/reviews/:id/moderate { action: 'approve'|'hide' }
+adminRouter.post('/reviews/:id/moderate', express.json(), async (req, res) => {
+  try {
+    const action = req.body && req.body.action;
+    const status = { approve: 'approved', hide: 'hidden' }[action];
+    if (!status) {
+      return res.status(400).json({ success: false, message: "action must be 'approve' or 'hide'" });
+    }
+    const result = await db.query(
+      `UPDATE therapist_reviews SET status = $1 WHERE id = $2 RETURNING id, status`,
+      [status, req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Review not found' });
+    }
+    logInfo('Admin moderated review', { id: req.params.id, status });
+    res.json({ success: true, review: result.rows[0] });
+  } catch (error) {
+    logError('Admin: failed to moderate review', { id: req.params.id, err: error.message });
+    res.status(500).json({ success: false, message: 'Failed to moderate review' });
+  }
+});
+
+// --- Admin: monthly Q&A revenue pool ------------------------------------
+//
+// The pool is paid out MANUALLY (ECPay only collects). These endpoints let an
+// admin set a month's pool, compute each active therapist's share from that
+// month's engagement, freeze it, and record manual payouts.
+
+// Aggregate a month's engagement per therapist: free-chat messages they sent,
+// threads they published, and helpful votes their published threads received.
+// The [monthStart, monthStart + 1 month) window is computed in SQL from a
+// 'YYYY-MM-01' string so server-timezone Date math can't shift the month.
+const aggregateMonthlyEngagement = async (periodMonth) => {
+  const result = await db.query(`
+    WITH win AS (SELECT $1::date AS s, ($1::date + interval '1 month') AS e)
+    SELECT t.id AS therapist_id,
+      (SELECT COUNT(*) FROM consultation_messages cm
+         JOIN therapist_consultations tc ON tc.id = cm.consultation_id, win
+        WHERE tc.therapist_id = t.id AND cm.sender_id = t.user_id
+          AND cm.created_at >= win.s AND cm.created_at < win.e) AS message_count,
+      (SELECT COUNT(*) FROM therapist_consultations tc, win
+        WHERE tc.therapist_id = t.id AND tc.public_status = 'published'
+          AND tc.published_at >= win.s AND tc.published_at < win.e) AS published_count,
+      (SELECT COUNT(*) FROM consultation_public_votes v
+         JOIN therapist_consultations tc ON tc.id = v.consultation_id, win
+        WHERE tc.therapist_id = t.id AND v.created_at >= win.s AND v.created_at < win.e) AS vote_count
+    FROM therapists t
+    WHERE t.status = 'approved' AND t.user_id IS NOT NULL
+  `, [periodMonth]);
+  return result.rows.map((r) => ({
+    therapist_id: r.therapist_id,
+    message_count: Number(r.message_count) || 0,
+    published_count: Number(r.published_count) || 0,
+    vote_count: Number(r.vote_count) || 0,
+  }));
+};
+
+// POST /api/admin/therapists/qa/pools { periodMonth: 'YYYY-MM-01', poolTwd, splitStrategy }
+adminRouter.post('/qa/pools', express.json(), async (req, res) => {
+  try {
+    const { periodMonth, poolTwd, splitStrategy } = req.body || {};
+    if (!/^\d{4}-\d{2}-01$/.test(String(periodMonth || ''))) {
+      return res.status(400).json({ success: false, message: "periodMonth must be 'YYYY-MM-01'" });
+    }
+    if (!Number.isInteger(poolTwd) || poolTwd < 0) {
+      return res.status(400).json({ success: false, message: 'poolTwd must be a non-negative integer' });
+    }
+    const strategy = ['even', 'volume', 'engagement'].includes(splitStrategy) ? splitStrategy : 'even';
+    const result = await db.query(`
+      INSERT INTO qa_revenue_pools (period_month, pool_twd, split_strategy, status)
+      VALUES ($1, $2, $3, 'draft')
+      ON CONFLICT (period_month) DO UPDATE
+        SET pool_twd = EXCLUDED.pool_twd, split_strategy = EXCLUDED.split_strategy
+        WHERE qa_revenue_pools.status IN ('draft', 'computed')
+      RETURNING *
+    `, [periodMonth, poolTwd, strategy]);
+    if (result.rows.length === 0) {
+      return res.status(409).json({ success: false, message: 'Pool already finalized for this month' });
+    }
+    logInfo('Admin created/updated QA pool', { periodMonth, poolTwd, strategy });
+    res.json({ success: true, pool: result.rows[0] });
+  } catch (error) {
+    logError('Admin: failed to create QA pool', { err: error.message });
+    res.status(500).json({ success: false, message: 'Failed to create pool' });
+  }
+});
+
+// POST /api/admin/therapists/qa/pools/:id/compute — aggregate the month and
+// (re)compute each therapist's share. Allowed while draft/computed.
+adminRouter.post('/qa/pools/:id/compute', async (req, res) => {
+  try {
+    const poolRes = await db.query(`SELECT * FROM qa_revenue_pools WHERE id = $1`, [req.params.id]);
+    const pool = poolRes.rows[0];
+    if (!pool) return res.status(404).json({ success: false, message: 'Pool not found' });
+    if (!['draft', 'computed'].includes(pool.status)) {
+      return res.status(409).json({ success: false, message: 'Pool is finalized; cannot recompute' });
+    }
+
+    // Format the DATE back to 'YYYY-MM-01' from its own components (node-pg
+    // parses DATE to a local-midnight Date; local components match what's stored).
+    const pm = pool.period_month instanceof Date
+      ? `${pool.period_month.getFullYear()}-${String(pool.period_month.getMonth() + 1).padStart(2, '0')}-01`
+      : String(pool.period_month).slice(0, 10);
+
+    const stats = await aggregateMonthlyEngagement(pm);
+    const shares = qaPool.computeShares(pool.split_strategy, stats, pool.pool_twd);
+
+    await db.transaction(async (client) => {
+      // Recompute is idempotent: clear prior shares for this pool, reinsert.
+      await client.query(`DELETE FROM qa_revenue_shares WHERE pool_id = $1`, [req.params.id]);
+      for (const s of shares) {
+        await client.query(`
+          INSERT INTO qa_revenue_shares
+            (pool_id, therapist_id, message_count, published_count, vote_count, weight, share_twd)
+          VALUES ($1,$2,$3,$4,$5,$6,$7)
+        `, [req.params.id, s.therapist_id, s.message_count, s.published_count, s.vote_count, s.weight, s.share_twd]);
+      }
+      await client.query(`UPDATE qa_revenue_pools SET status = 'computed', computed_at = NOW() WHERE id = $1`, [req.params.id]);
+    });
+
+    logInfo('Admin computed QA pool shares', { poolId: req.params.id, recipients: shares.length });
+    res.json({ success: true, recipients: shares.length, totalAllocated: shares.reduce((a, s) => a + s.share_twd, 0) });
+  } catch (error) {
+    logError('Admin: failed to compute QA pool', { id: req.params.id, err: error.message });
+    res.status(500).json({ success: false, message: 'Failed to compute pool' });
+  }
+});
+
+// POST /api/admin/therapists/qa/pools/:id/finalize — freeze the computed shares.
+adminRouter.post('/qa/pools/:id/finalize', async (req, res) => {
+  try {
+    const result = await db.query(
+      `UPDATE qa_revenue_pools SET status = 'finalized', finalized_at = NOW()
+        WHERE id = $1 AND status = 'computed' RETURNING id, status`,
+      [req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(409).json({ success: false, message: 'Pool must be computed before finalizing' });
+    }
+    logInfo('Admin finalized QA pool', { poolId: req.params.id });
+    res.json({ success: true, pool: result.rows[0] });
+  } catch (error) {
+    logError('Admin: failed to finalize QA pool', { id: req.params.id, err: error.message });
+    res.status(500).json({ success: false, message: 'Failed to finalize pool' });
+  }
+});
+
+// POST /api/admin/therapists/qa/shares/:id/mark-paid { note } — record a manual
+// payout to a therapist (no automated transfer; ECPay only collects).
+adminRouter.post('/qa/shares/:id/mark-paid', express.json(), async (req, res) => {
+  try {
+    const result = await db.query(
+      `UPDATE qa_revenue_shares SET payout_status = 'paid', paid_at = NOW(), payout_note = $2
+        WHERE id = $1 RETURNING id, payout_status`,
+      [req.params.id, (req.body && req.body.note) || null]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Share not found' });
+    }
+    // If all shares for the pool are paid, mark the pool paid_out.
+    await db.query(`
+      UPDATE qa_revenue_pools p SET status = 'paid_out'
+       WHERE p.id = (SELECT pool_id FROM qa_revenue_shares WHERE id = $1)
+         AND p.status = 'finalized'
+         AND NOT EXISTS (SELECT 1 FROM qa_revenue_shares s WHERE s.pool_id = p.id AND s.payout_status <> 'paid')
+    `, [req.params.id]);
+    logInfo('Admin marked QA share paid', { shareId: req.params.id });
+    res.json({ success: true, share: result.rows[0] });
+  } catch (error) {
+    logError('Admin: failed to mark share paid', { id: req.params.id, err: error.message });
+    res.status(500).json({ success: false, message: 'Failed to mark paid' });
+  }
+});
+
+// GET /api/admin/therapists/qa/pools — list pools (newest first).
+adminRouter.get('/qa/pools', async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT p.*,
+        (SELECT COUNT(*) FROM qa_revenue_shares s WHERE s.pool_id = p.id) AS recipient_count,
+        (SELECT COALESCE(SUM(share_twd),0) FROM qa_revenue_shares s WHERE s.pool_id = p.id) AS allocated_twd
+      FROM qa_revenue_pools p ORDER BY p.period_month DESC
+    `);
+    res.json({ success: true, pools: result.rows });
+  } catch (error) {
+    logError('Admin: failed to list QA pools', { err: error.message });
+    res.status(500).json({ success: false, message: 'Failed to list pools' });
+  }
+});
+
+// GET /api/admin/therapists/qa/pools/:id — pool + per-therapist shares.
+adminRouter.get('/qa/pools/:id', async (req, res) => {
+  try {
+    const pool = await db.query(`SELECT * FROM qa_revenue_pools WHERE id = $1`, [req.params.id]);
+    if (pool.rows.length === 0) return res.status(404).json({ success: false, message: 'Pool not found' });
+    const shares = await db.query(`
+      SELECT s.*, t.display_name AS therapist_name
+        FROM qa_revenue_shares s JOIN therapists t ON t.id = s.therapist_id
+       WHERE s.pool_id = $1 ORDER BY s.share_twd DESC
+    `, [req.params.id]);
+    res.json({ success: true, pool: pool.rows[0], shares: shares.rows });
+  } catch (error) {
+    logError('Admin: failed to get QA pool', { id: req.params.id, err: error.message });
+    res.status(500).json({ success: false, message: 'Failed to get pool' });
   }
 });
 

@@ -32,6 +32,9 @@ env_variables:
   # If ANTHROPIC_API_KEY is missing, llmService falls back to the mock.
   LLM_PROVIDER: $_LLM_PROVIDER
   ANTHROPIC_API_KEY: $_ANTHROPIC_API_KEY
+  # Admin dashboard (/admin) Basic-Auth password. Without it, adminAuth returns
+  # 503 "Admin disabled". Shares the prod ADMIN_PASSWORD secret.
+  ADMIN_PASSWORD: $_ADMIN_PASSWORD
 
 automatic_scaling:
   min_instances: 0
