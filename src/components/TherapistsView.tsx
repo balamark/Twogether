@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, Sparkles, X, UserPlus, Clock, Languages, Award, CalendarCheck, MessageCircle, Send, StickyNote, UserCog, Upload, CheckCircle2, AlertCircle, Globe, Users, Video, Wallet } from 'lucide-react';
+import { Heart, X, UserPlus, Clock, Languages, Award, CalendarCheck, MessageCircle, Send, StickyNote, UserCog, Upload, CheckCircle2, AlertCircle, Globe, Users, Video, Wallet } from 'lucide-react';
 import {
   apiService,
   type Therapist,
@@ -142,14 +142,6 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
         <p className="font-display italic font-light text-base text-petal-muted">
           有些議題值得和一位受過專業訓練的人好好談。選擇一位諮商師，預約屬於你們的對話。
         </p>
-
-        {/* AI rephrase remains the cheaper, always-on option */}
-        <div className="mt-5 inline-flex items-center gap-2 px-4 py-2 rounded-full border border-petal-rule bg-petal-cream-2">
-          <Sparkles className="w-3.5 h-3.5 text-pink-500" strokeWidth={1.5} />
-          <span className="font-body text-xs text-petal-ink-soft">
-            只是想換個溫柔的說法？<span className="text-petal-ink">AI 潤稿</span> 仍隨時為你服務，且更省。
-          </span>
-        </div>
       </div>
 
       {/* Mode tabs: 公開問答 (browse) vs 找諮商師 (directory + free chat) */}
