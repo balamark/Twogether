@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>成為諮商師 · Twogether</title>
+  <meta name="description" content="加入 Twogether，成為平台上的諮商心理師，陪伴伴侶與個人面對關係與情緒議題。" />
+  <style>
+    :root {
+      --ink: #2a2422;
+      --ink-soft: #5b524d;
+      --muted: #8a807c;
+      --cream: #fbf7f2;
+      --cream-2: #f2ebdf;
+      --rule: #e4dccf;
+      --rose: #b7635a;
+      --pink: #d4868a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Noto Sans TC", sans-serif;
+      background: var(--cream);
+      color: var(--ink);
+      line-height: 1.6;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
+    header { text-align: center; margin-bottom: 28px; }
+    .eyebrow { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+    h1 { font-size: 30px; font-weight: 300; margin: 8px 0 6px; letter-spacing: -0.01em; }
+    h1 em { font-style: italic; color: var(--rose); }
+    .lede { color: var(--muted); font-size: 15px; margin: 0; }
+    .card { background: #fff; border: 1px solid var(--rule); border-radius: 12px; padding: 24px; box-shadow: 0 1px 2px rgba(0,0,0,0.03); }
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--ink-soft); margin-bottom: 6px; }
+    .req { color: var(--rose); }
+    input[type=text], input[type=email], input[type=tel], input[type=number], textarea, select {
+      width: 100%; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 8px;
+      font-size: 14px; font-family: inherit; background: var(--cream); color: var(--ink);
+    }
+    input:focus, textarea:focus, select:focus { outline: none; border-color: var(--ink); }
+    textarea { resize: vertical; min-height: 96px; }
+    .field { margin-bottom: 18px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 999px;
+      border: 1px solid var(--rule); color: var(--ink-soft); font-size: 13px; cursor: pointer;
+      user-select: none; background: var(--cream); transition: all .12s;
+    }
+    .chip input { display: none; }
+    .chip.on { background: var(--ink); color: var(--cream); border-color: var(--ink); }
+    .submit {
+      width: 100%; padding: 13px; border: none; border-radius: 8px; background: var(--ink);
+      color: var(--cream); font-size: 15px; font-weight: 500; cursor: pointer; margin-top: 6px;
+    }
+    .submit:disabled { opacity: .5; cursor: default; }
+    .note { font-size: 13px; color: var(--muted); margin-top: 14px; text-align: center; }
+    .result { display: none; padding: 16px; border-radius: 8px; margin-bottom: 18px; font-size: 14px; }
+    .result.ok { display: block; background: #eef4ea; color: #3f6b3a; border: 1px solid #cfe0c5; }
+    .result.err { display: block; background: #f8ebe9; color: #9a3b33; border: 1px solid #ecccc7; }
+    a.back { display: inline-block; margin-top: 22px; color: var(--muted); font-size: 13px; text-decoration: none; }
+    a.back:hover { color: var(--ink); }
+    @media (max-width: 560px) { .row, .row-3 { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="eyebrow">— Twogether 心理諮商</div>
+      <h1>成為 <em>諮商心理師</em></h1>
+      <p class="lede">加入平台，陪伴伴侶與個人面對關係與情緒議題。審核通過後，你的檔案會出現在諮商師列表中供使用者預約。</p>
+    </header>
+
+    <div class="card">
+      <div id="result" class="result"></div>
+      <form id="form">
+        <div class="field" style="text-align:center;">
+          <label>大頭照</label>
+          <div style="display:flex; align-items:center; gap:16px; justify-content:center;">
+            <div id="photoSlot" style="width:96px; height:96px; border-radius:50%; overflow:hidden; background:var(--cream-2); border:1px solid var(--rule); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <img id="photoPreview" alt="" style="width:100%; height:100%; object-fit:contain; display:none;" />
+              <span id="photoPlaceholder" style="font-size:32px; color:var(--muted);">🙂</span>
+            </div>
+            <div style="text-align:left;">
+              <input type="file" id="photoFile" accept="image/png,image/jpeg,image/webp" style="display:none;" />
+              <button type="button" id="photoBtn" class="submit" style="width:auto; margin:0; padding:9px 16px;">上傳照片</button>
+              <p class="note" id="photoStatus" style="text-align:left; margin:8px 0 0;">JPG / PNG / WebP，5MB 以內。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label>姓名 <span class="req">*</span></label>
+            <input type="text" name="displayName" maxlength="120" required />
+          </div>
+          <div class="field">
+            <label>職稱</label>
+            <input type="text" name="title" maxlength="120" placeholder="諮商心理師 / 臨床心理師" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>證照字號（僅供審核，不公開）</label>
+          <input type="text" name="licenseNo" maxlength="80" />
+        </div>
+
+        <div class="field">
+          <label>專長領域 <span class="req">*</span></label>
+          <div class="chips" id="focus">
+            <label class="chip"><input type="checkbox" value="couple" />💞 伴侶關係</label>
+            <label class="chip"><input type="checkbox" value="family" />🏡 家庭</label>
+            <label class="chip"><input type="checkbox" value="childhood" />🧸 童年/原生家庭</label>
+            <label class="chip"><input type="checkbox" value="individual" />🌱 個人成長</label>
+            <label class="chip"><input type="checkbox" value="sexuality" />🔥 性與親密</label>
+            <label class="chip"><input type="checkbox" value="parenting" />👶 親職教養</label>
+            <label class="chip"><input type="checkbox" value="grief" />🕊️ 悲傷失落</label>
+            <label class="chip"><input type="checkbox" value="anxiety" />🌧️ 焦慮憂鬱</label>
+            <label class="chip"><input type="checkbox" value="depression" />🌫️ 憂鬱情緒</label>
+            <label class="chip"><input type="checkbox" value="trauma" />💔 創傷</label>
+            <label class="chip"><input type="checkbox" value="addiction" />🎯 成癮</label>
+            <label class="chip"><input type="checkbox" value="lgbtq" />🏳️‍🌈 性別與多元認同</label>
+            <label class="chip"><input type="checkbox" value="career" />💼 職涯/工作壓力</label>
+            <label class="chip"><input type="checkbox" value="self_esteem" />✨ 自我價值</label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>自訂專長 / 取向（選填，最多 8 個）</label>
+          <div class="chips" id="customTags"></div>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <input type="text" id="customInput" maxlength="40" placeholder="例如：EMDR、創傷知情、CBT…" />
+            <button type="button" id="customAdd" class="submit" style="width:auto; margin:0; padding:10px 18px;">新增</button>
+          </div>
+          <p class="note" style="text-align:left; margin-top:8px;">找不到合適的分類？在這裡加上你自己的取向或專長。</p>
+        </div>
+
+        <div class="field">
+          <label>提供語言</label>
+          <div class="chips" id="langs">
+            <label class="chip on"><input type="checkbox" value="zh" checked />中文</label>
+            <label class="chip"><input type="checkbox" value="en" />English</label>
+            <label class="chip"><input type="checkbox" value="ja" />日本語</label>
+            <label class="chip"><input type="checkbox" value="ko" />한국어</label>
+          </div>
+        </div>
+
+        <div class="row-3">
+          <div class="field">
+            <label>年資</label>
+            <input type="number" name="yearsExperience" min="0" max="80" />
+          </div>
+          <div class="field">
+            <label>費率 (NT$) <span class="req">*</span></label>
+            <input type="number" name="rateTwd" min="0" max="100000" value="1600" required />
+          </div>
+          <div class="field">
+            <label>時長 (分)</label>
+            <input type="number" name="sessionMinutes" min="10" max="240" value="50" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>自我介紹</label>
+          <textarea name="bio" maxlength="2000" placeholder="你的取向、擅長陪伴的對象與議題…"></textarea>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label>聯絡 Email <span class="req">*</span></label>
+            <input type="email" name="contactEmail" maxlength="255" required />
+            <p class="note" style="text-align:left; margin-top:6px;">我們會寄一封驗證信到這個信箱。送出後也會用這個 Email 幫你建立登入帳號。</p>
+          </div>
+          <div class="field">
+            <label>聯絡電話</label>
+            <input type="tel" name="contactPhone" maxlength="40" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>證照 / 身分證明文件（選填，建議上傳以加速審核）</label>
+          <div id="docList" style="margin-bottom:8px;"></div>
+          <input type="file" id="docFile" accept="image/png,image/jpeg,image/webp,application/pdf" style="display:none;" />
+          <button type="button" id="docBtn" class="submit" style="width:auto; margin:0; padding:9px 16px;">上傳文件</button>
+          <p class="note" id="docStatus" style="text-align:left; margin:8px 0 0;">諮商師證照、執業執照等。JPG / PNG / WebP / PDF，10MB 以內。文件僅供審核，不會公開。</p>
+        </div>
+
+        <button type="submit" class="submit" id="submit">送出申請</button>
+        <p class="note">送出後我們會在審核後與你聯繫。審核期間你的資料不會公開。</p>
+      </form>
+    </div>
+
+    <div style="text-align:center"><a class="back" href="/">← 回到 Twogether</a></div>
+  </div>
+
+  <script>
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[<>&"]/g, function (c) {
+        return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c];
+      });
+    }
+
+    // Toggle chip visual state when its checkbox changes.
+    document.querySelectorAll('.chip').forEach(function (chip) {
+      var cb = chip.querySelector('input');
+      if (!cb) return;
+      var sync = function () { chip.classList.toggle('on', cb.checked); };
+      cb.addEventListener('change', sync);
+      sync();
+    });
+
+    function collect(id) {
+      return Array.prototype.slice
+        .call(document.querySelectorAll('#' + id + ' input:checked'))
+        .map(function (i) { return i.value; });
+    }
+
+    var form = document.getElementById('form');
+    var result = document.getElementById('result');
+    var submit = document.getElementById('submit');
+
+    function show(kind, html) {
+      result.className = 'result ' + kind;
+      result.innerHTML = html;
+      result.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
+    // ── Profile photo upload ────────────────────────────────────────────────
+    var photoUrl = '';
+    var photoBtn = document.getElementById('photoBtn');
+    var photoFile = document.getElementById('photoFile');
+    var photoStatus = document.getElementById('photoStatus');
+    var photoPreview = document.getElementById('photoPreview');
+    var photoPlaceholder = document.getElementById('photoPlaceholder');
+
+    photoBtn.addEventListener('click', function () { photoFile.click(); });
+    photoFile.addEventListener('change', function () {
+      var file = photoFile.files && photoFile.files[0];
+      if (!file) return;
+      photoBtn.disabled = true;
+      photoStatus.textContent = '上傳中…';
+      var fd = new FormData();
+      fd.append('photo', file);
+      fetch('/api/therapists/upload-photo', { method: 'POST', body: fd })
+        .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, b: b }; }); })
+        .then(function (res) {
+          if (res.ok && res.b.success && res.b.url) {
+            photoUrl = res.b.url;
+            photoPreview.src = photoUrl;
+            photoPreview.style.display = 'block';
+            photoPlaceholder.style.display = 'none';
+            photoStatus.textContent = '✓ 照片已上傳';
+          } else {
+            photoStatus.textContent = (res.b && res.b.message) || '上傳失敗，請換一張或稍後再試';
+          }
+        })
+        .catch(function () { photoStatus.textContent = '網路錯誤，請稍後再試'; })
+        .finally(function () { photoBtn.disabled = false; });
+    });
+
+    // ── Custom specialty tags ───────────────────────────────────────────────
+    var customTags = [];
+    var customWrap = document.getElementById('customTags');
+    var customInput = document.getElementById('customInput');
+    var customAdd = document.getElementById('customAdd');
+
+    function renderTags() {
+      customWrap.innerHTML = customTags.map(function (t, i) {
+        return '<span class="chip on" data-i="' + i + '" style="cursor:default;">' +
+          esc(t) + ' <span data-remove="' + i + '" style="cursor:pointer; margin-left:4px;">✕</span></span>';
+      }).join('');
+      customWrap.querySelectorAll('[data-remove]').forEach(function (el) {
+        el.addEventListener('click', function () {
+          customTags.splice(Number(el.getAttribute('data-remove')), 1);
+          renderTags();
+        });
+      });
+    }
+    function addTag() {
+      var v = (customInput.value || '').trim().slice(0, 40);
+      if (!v) return;
+      if (customTags.length >= 8) { customInput.value = ''; return; }
+      if (customTags.indexOf(v) === -1) customTags.push(v);
+      customInput.value = '';
+      renderTags();
+    }
+    customAdd.addEventListener('click', addTag);
+    customInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') { e.preventDefault(); addTag(); }
+    });
+
+    // ── Credential documents upload ─────────────────────────────────────────
+    var docUrls = [];
+    var docBtn = document.getElementById('docBtn');
+    var docFile = document.getElementById('docFile');
+    var docStatus = document.getElementById('docStatus');
+    var docList = document.getElementById('docList');
+
+    function renderDocs() {
+      docList.innerHTML = docUrls.map(function (u, i) {
+        return '<div style="display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:4px;">' +
+          '<span>📎 文件 ' + (i + 1) + '</span>' +
+          '<a href="' + esc(u) + '" target="_blank" rel="noopener" style="color:var(--rose);">檢視</a>' +
+          '<span data-rmdoc="' + i + '" style="cursor:pointer; color:var(--muted);">移除</span></div>';
+      }).join('');
+      docList.querySelectorAll('[data-rmdoc]').forEach(function (el) {
+        el.addEventListener('click', function () {
+          docUrls.splice(Number(el.getAttribute('data-rmdoc')), 1);
+          renderDocs();
+        });
+      });
+    }
+    docBtn.addEventListener('click', function () { docFile.click(); });
+    docFile.addEventListener('change', function () {
+      var file = docFile.files && docFile.files[0];
+      if (!file) return;
+      docBtn.disabled = true;
+      docStatus.textContent = '上傳中…';
+      var fd = new FormData();
+      fd.append('document', file);
+      fetch('/api/therapists/upload-document', { method: 'POST', body: fd })
+        .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, b: b }; }); })
+        .then(function (res) {
+          if (res.ok && res.b.success && res.b.url) {
+            docUrls.push(res.b.url);
+            renderDocs();
+            docStatus.textContent = '✓ 文件已上傳';
+          } else {
+            docStatus.textContent = (res.b && res.b.message) || '上傳失敗，請稍後再試';
+          }
+        })
+        .catch(function () { docStatus.textContent = '網路錯誤，請稍後再試'; })
+        .finally(function () { docBtn.disabled = false; docFile.value = ''; });
+    });
+
+    // ── Submit application ──────────────────────────────────────────────────
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var fd = new FormData(form);
+      var focusAreas = collect('focus');
+      if (!fd.get('displayName').trim()) return show('err', '請填寫姓名');
+      if (focusAreas.length === 0) return show('err', '請至少選擇一個專長領域');
+      if (!fd.get('contactEmail').trim()) return show('err', '請填寫聯絡 Email');
+
+      var payload = {
+        displayName: fd.get('displayName').trim(),
+        title: fd.get('title').trim() || undefined,
+        licenseNo: fd.get('licenseNo').trim() || undefined,
+        focusAreas: focusAreas,
+        customSpecialties: customTags,
+        languages: collect('langs'),
+        yearsExperience: fd.get('yearsExperience') ? Number(fd.get('yearsExperience')) : undefined,
+        bio: fd.get('bio').trim() || undefined,
+        photoUrl: photoUrl || undefined,
+        identityDocuments: docUrls,
+        rateTwd: Number(fd.get('rateTwd')) || 0,
+        sessionMinutes: Number(fd.get('sessionMinutes')) || 50,
+        contactEmail: fd.get('contactEmail').trim(),
+        contactPhone: fd.get('contactPhone').trim() || undefined
+      };
+
+      submit.disabled = true;
+      submit.textContent = '送出中…';
+      fetch('/api/therapists/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+        .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, b: b }; }); })
+        .then(function (res) {
+          if (res.ok && res.b.success) {
+            // Build a credentials / next-steps panel so the applicant knows
+            // exactly how to log in and that they must verify their email.
+            var acct = res.b.account || {};
+            var loginBlock;
+            if (acct.created && acct.password) {
+              loginBlock =
+                '<div style="margin-top:12px; padding:12px 14px; background:#fff; border:1px dashed var(--rose); border-radius:8px; text-align:left;">' +
+                '<div style="font-weight:600; margin-bottom:6px;">你的登入帳號已建立 🎉</div>' +
+                '<div style="font-size:14px;">帳號（Email）：<code>' + esc(acct.email) + '</code></div>' +
+                '<div style="font-size:14px;">臨時密碼：<code>' + esc(acct.password) + '</code></div>' +
+                '<div style="font-size:13px; color:var(--muted); margin-top:8px;">請記下這組密碼並盡快登入，登入後即可在「我的諮商師檔案」編輯姓名、費率、照片等所有資料。</div>' +
+                '</div>';
+            } else if (acct.existed) {
+              loginBlock =
+                '<div style="margin-top:12px; font-size:14px; text-align:left;">' +
+                '這個 Email（<code>' + esc(acct.email) + '</code>）已經有 Twogether 帳號，請用你原本的密碼登入，' +
+                '即可在「我的諮商師檔案」編輯資料。</div>';
+            } else {
+              loginBlock =
+                '<div style="margin-top:12px; font-size:14px; text-align:left;">' +
+                '你已登入，可直接在「我的諮商師檔案」編輯資料。</div>';
+            }
+            var verifyBlock =
+              '<div style="margin-top:10px; font-size:13px; color:var(--muted); text-align:left;">' +
+              '📧 我們已寄出一封驗證信到 <code>' + esc(acct.email) + '</code>，請點擊信中的連結完成 Email 驗證。</div>';
+            show('ok', '<div style="font-weight:600;">✓ 申請已送出！我們會在審核通過後與你聯繫。</div>' + loginBlock + verifyBlock);
+            form.style.display = 'none';
+          } else {
+            show('err', (res.b && res.b.message) || '送出失敗，請稍後再試');
+          }
+        })
+        .catch(function () { show('err', '網路錯誤，請稍後再試'); })
+        .finally(function () { submit.disabled = false; submit.textContent = '送出申請'; });
+    });
+  </script>
+</body>
+</html>

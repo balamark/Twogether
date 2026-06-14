@@ -764,6 +764,62 @@ ${message ? `個人訊息："${message}"` : ''}
     }
   }
 
+  // Send a therapist their email-verification link after they sign up. The
+  // link points at the public GET /api/therapists/verify-email?token=… route,
+  // which flips email_verified true and shows a confirmation page.
+  async sendTherapistEmailVerification({ recipientEmail, displayName, token }) {
+    if (!this.isConfigured()) {
+      logWarn('Email service not configured; skipping therapist verification email', { kind: 'therapist_verify' });
+      return;
+    }
+    if (!recipientEmail || !token) return;
+
+    const frontendUrl = process.env.FRONTEND_URL || 'https://twogether-couples-app.de.r.appspot.com';
+    const verifyUrl = `${frontendUrl}/api/therapists/verify-email?token=${encodeURIComponent(token)}`;
+    const safeName = this._escape(displayName || '諮商師');
+
+    const bodyHtml = `
+      <p>${safeName} 你好，</p>
+      <p>感謝你申請成為 Twogether 平台的諮商心理師。請點擊下方按鈕驗證這個 Email 是你本人的，我們才能在審核通過後與你聯繫。</p>
+      <p style="color:#636e72;font-size:14px;">如果按鈕無法點擊，請複製以下連結到瀏覽器：<br>
+        <code style="background:#f8f9fa;padding:4px 6px;border-radius:4px;word-break:break-all;">${verifyUrl}</code>
+      </p>
+    `;
+    const html = this._activityEmailHtml({
+      headerEmoji: '🩺',
+      headerTitle: '驗證你的 Email',
+      headerSubtitle: 'Twogether 心理諮商',
+      bodyHtml,
+      ctaLabel: '✓ 驗證我的 Email',
+    }).replace(
+      process.env.FRONTEND_URL || 'https://twogether-couples-app.de.r.appspot.com',
+      verifyUrl
+    );
+
+    const text = [
+      `${displayName || '諮商師'} 你好，`,
+      '',
+      '感謝你申請成為 Twogether 平台的諮商心理師。',
+      '請點擊以下連結驗證你的 Email：',
+      verifyUrl,
+      '',
+      '— Twogether 心理諮商',
+    ].join('\n');
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Twogether 心理諮商" <${process.env.SMTP_USER}>`,
+        to: recipientEmail,
+        subject: '🩺 請驗證你的 Email · Twogether 諮商師申請',
+        text,
+        html,
+      });
+      logInfo('Therapist verification email sent', { kind: 'therapist_verify' });
+    } catch (error) {
+      logError('Failed to send therapist verification email', { kind: 'therapist_verify', ...smtpErrorFields(error) });
+    }
+  }
+
   async sendIntimacyResponseNotification({ receiverName, senderEmail, response, responseMessage = '' }) {
     if (!this.isConfigured()) return;
     if (!senderEmail) return;

@@ -155,6 +155,18 @@ router.post('/', thumbnailUpload.single('thumbnail'), [
     // Use couple_id if exists, otherwise null for personal scripts
     const coupleId = coupleResult.rows.length > 0 ? coupleResult.rows[0].id : null;
 
+    // Log every upload attempt so Cloud Logging can confirm the request
+    // reached the server (and whether a thumbnail came with it) even when the
+    // failure is later/elsewhere.
+    logInfo('custom_scripts.create.attempt', {
+      userId,
+      coupleId,
+      hasThumbnail: !!req.file,
+      thumbnailBytes: req.file ? req.file.size : 0,
+      titleLen: (title || '').length,
+      contentLen: (content || '').length,
+    });
+
     // Freemium cap: free couples may keep only N custom scripts; premium is
     // unlimited. Count the same set the GET endpoint returns (couple scripts +
     // this user's personal scripts) so the number matches what the user sees.
@@ -189,6 +201,13 @@ router.post('/', thumbnailUpload.single('thumbnail'), [
     `, [coupleId, title, category, scenario, content, JSON.stringify(tags), duration, userId, thumbnailUrl, isPublic]);
 
     const script = scriptResult.rows[0];
+
+    logInfo('custom_scripts.create.success', {
+      userId,
+      coupleId,
+      scriptId: script.id,
+      hasThumbnail: !!thumbnailUrl,
+    });
 
     res.json({
       success: true,

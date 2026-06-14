@@ -12,9 +12,11 @@ import CalendarView from './components/CalendarView';
 import ConflictView from './components/ConflictView';
 import WallView from './components/WallView';
 import EventsView from './components/EventsView';
+import TherapistsView from './components/TherapistsView';
 import type { WallExample } from './components/WallPostComposer';
 import Header from './components/Header';
 import { NotificationContainer } from './components/ErrorNotification';
+import ErrorBoundary from './components/ErrorBoundary';
 import IntimacyRequestsHistory from './components/IntimacyRequestsHistory';
 import IntimacyRequestForm from './components/IntimacyRequestForm';
 import NotificationInbox from './components/NotificationInbox';
@@ -500,6 +502,18 @@ const LoveTimeApp = () => {
   const [showScriptUploadModal, setShowScriptUploadModal] = useState(false);
   // When set, the upload modal opens in edit mode pre-filled from this script.
   const [editingScript, setEditingScript] = useState<RoleplayScript | null>(null);
+  // When the free-tier script cap blocks an upload we stash the in-progress
+  // draft here and send the user to Upgrade. After they go premium (coupon or
+  // purchase) the upload modal re-opens pre-filled so no work is lost.
+  const [pendingScriptDraft, setPendingScriptDraft] = useState<{
+    title: string;
+    category: 'romantic' | 'adventurous' | 'school' | 'bold';
+    scenario: string;
+    content: string;
+    tags: string;
+    isPublic: boolean;
+    thumbnail: File | null;
+  } | null>(null);
   const [showIntimacyRequestForm, setShowIntimacyRequestForm] = useState(false);
   const [showNotificationInbox, setShowNotificationInbox] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -1557,6 +1571,7 @@ const LoveTimeApp = () => {
       // Update local state
       setCustomScripts(prev => [...prev, newScript]);
       setShowScriptUploadModal(false);
+      setPendingScriptDraft(null);
 
       // Reward for creating content
       try {
@@ -1577,6 +1592,35 @@ const LoveTimeApp = () => {
 
     } catch (error) {
       console.error('Failed to create custom script:', error);
+      // Hitting the free-tier script cap is an expected state, not a failure.
+      // The API interceptor already fires `billing:limit-reached`, which sends
+      // the user to the Upgrade view; here we close the modal so it isn't left
+      // covering that view, and show a clear (non-alarming) explanation instead
+      // of a red "上傳失敗" toast.
+      if ((error as { error_code?: string })?.error_code === 'SCRIPT_LIMIT_REACHED') {
+        // Keep the user's work — they'll be sent to Upgrade, and the modal
+        // re-opens pre-filled once they go premium (see onRedeemed below).
+        setPendingScriptDraft({
+          title,
+          category,
+          scenario,
+          content,
+          tags: tags.join(', '),
+          isPublic,
+          thumbnail: thumbnail ?? null,
+        });
+        setShowScriptUploadModal(false);
+        setEditingScript(null);
+        showNotification({
+          type: 'warning',
+          title: '已達免費方案劇本上限',
+          message:
+            (error as Error)?.message ||
+            '免費方案的自訂劇本數量已達上限。升級 Premium 或輸入優惠碼後即可繼續，你剛剛的劇本草稿已為你保留。',
+          duration: 7000,
+        });
+        return;
+      }
       showNotification({
         type: 'error',
         title: '劇本上傳失敗',
@@ -1789,6 +1833,9 @@ const LoveTimeApp = () => {
           customEmotions={customEmotions}
           setCustomEmotions={setCustomEmotions}
         />;
+        // Therapist directory is browseable (and applicable) while logged out;
+        // booking a consultation prompts for login inside the modal.
+        case 'therapists': return <TherapistsView authState={authState} showNotification={showNotification} />;
         default: return (
           <div className="flex items-center justify-center min-h-[60vh]">
             <div className="text-center max-w-md">
@@ -1942,7 +1989,20 @@ const LoveTimeApp = () => {
           partnerNickname={nicknames.partner2}
         />
       );
-      case 'upgrade': return <UpgradeView reason={upgradeReason} showNotification={showNotification} />;
+      case 'upgrade': return <UpgradeView
+        reason={upgradeReason}
+        showNotification={showNotification}
+        onRedeemed={() => {
+          // Now premium server-side. If a cap-blocked script draft is waiting,
+          // hop back to Roleplay and re-open the upload modal pre-filled.
+          if (pendingScriptDraft) {
+            setUpgradeReason(null);
+            setCurrentView('roleplay');
+            setShowScriptUploadModal(true);
+          }
+        }}
+      />;
+      case 'therapists': return <TherapistsView authState={authState} showNotification={showNotification} />;
       default: return <GamesView
         totalCoins={totalCoins}
         customMemoryQuestions={customMemoryQuestions}
@@ -1992,6 +2052,7 @@ const LoveTimeApp = () => {
         onShowSettings={() => setCurrentView('settings')}
         onShowJourney={() => setCurrentView('journey')}
         onShowIntimacyHistory={() => setCurrentView('intimacy-history')}
+        onShowTherapists={() => setCurrentView('therapists')}
         onShowUpgrade={() => { setUpgradeReason(null); setCurrentView('upgrade'); }}
       />
       
@@ -2171,15 +2232,23 @@ const LoveTimeApp = () => {
         />
       )}
       {showScriptUploadModal && (
-        <ScriptUploadModal
-          editingScript={editingScript}
-          onClose={() => {
-            setShowScriptUploadModal(false);
-            setEditingScript(null);
-          }}
-          addCustomScript={addCustomScript}
-          updateCustomScript={updateCustomScript}
-        />
+        <ErrorBoundary
+          context="script-upload-modal"
+          inline
+          onReset={() => { setShowScriptUploadModal(false); setEditingScript(null); setPendingScriptDraft(null); }}
+        >
+          <ScriptUploadModal
+            editingScript={editingScript}
+            pendingScriptDraft={pendingScriptDraft}
+            onClose={() => {
+              setShowScriptUploadModal(false);
+              setEditingScript(null);
+              setPendingScriptDraft(null);
+            }}
+            addCustomScript={addCustomScript}
+            updateCustomScript={updateCustomScript}
+          />
+        </ErrorBoundary>
       )}
       
       {/* Intimacy Request Form */}

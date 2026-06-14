@@ -672,6 +672,116 @@ apiClient.interceptors.response.use(
   }
 );
 
+// Human therapist (心理諮商師) directory types
+export type TherapistFocusArea =
+  | 'family' | 'couple' | 'childhood' | 'individual'
+  | 'sexuality' | 'parenting' | 'grief' | 'anxiety'
+  | 'depression' | 'trauma' | 'addiction' | 'lgbtq'
+  | 'career' | 'self_esteem';
+
+export type TherapistIdentityStatus = 'unverified' | 'submitted' | 'verified' | 'rejected';
+
+export interface Therapist {
+  id: string;
+  displayName: string;
+  title?: string | null;
+  focusAreas: TherapistFocusArea[];
+  customSpecialties?: string[];
+  languages: string[];
+  yearsExperience?: number | null;
+  bio?: string | null;
+  photoUrl?: string | null;
+  rateTwd: number;
+  sessionMinutes: number;
+  identityStatus?: TherapistIdentityStatus;
+  createdAt: string;
+}
+
+// The therapist's own private view of their profile (GET /therapists/me).
+export interface OwnTherapistProfile extends Therapist {
+  licenseNo?: string | null;
+  contactEmail: string;
+  contactPhone?: string | null;
+  status: 'pending' | 'approved' | 'rejected' | 'suspended';
+  reviewNote?: string | null;
+  emailVerified: boolean;
+  identityDocuments: string[];
+  identityStatus: TherapistIdentityStatus;
+}
+
+export interface TherapistApplicationInput {
+  displayName: string;
+  title?: string;
+  licenseNo?: string;
+  focusAreas: TherapistFocusArea[];
+  customSpecialties?: string[];
+  languages?: string[];
+  yearsExperience?: number | null;
+  bio?: string;
+  photoUrl?: string;
+  identityDocuments?: string[];
+  rateTwd: number;
+  sessionMinutes?: number;
+  contactEmail: string;
+  contactPhone?: string;
+}
+
+// Fields a therapist may edit on their own profile (PUT /therapists/me).
+export interface TherapistProfileUpdate {
+  displayName?: string;
+  title?: string | null;
+  focusAreas?: TherapistFocusArea[];
+  customSpecialties?: string[];
+  languages?: string[];
+  yearsExperience?: number | null;
+  bio?: string | null;
+  photoUrl?: string | null;
+  rateTwd?: number;
+  sessionMinutes?: number;
+  contactPhone?: string | null;
+}
+
+export interface ConsultationRequestInput {
+  focusArea?: TherapistFocusArea;
+  message?: string;
+  contactEmail?: string;
+  preferredTime?: string;
+}
+
+export interface TherapistConsultation {
+  id: string;
+  therapistName: string;
+  therapistTitle?: string | null;
+  requesterName?: string | null;
+  role: 'therapist' | 'client';
+  focusArea?: TherapistFocusArea | null;
+  message?: string | null;
+  preferredTime?: string | null;
+  status: 'pending' | 'accepted' | 'declined' | 'completed' | 'cancelled';
+  respondedAt?: string | null;
+  responseNote?: string | null;
+  messageCount: number;
+  createdAt: string;
+}
+
+export interface ConsultationMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  body: string;
+  createdAt: string;
+  isTherapist: boolean;
+  isMine: boolean;
+  event: { id: string; title: string; summary: string } | null;
+}
+
+export interface ConsultationThread {
+  role: 'therapist' | 'client';
+  therapistName: string;
+  currentUserId: string;
+  messages: ConsultationMessage[];
+}
+
 // API Service Class
 class ApiService {
   private throwApiError(error: unknown, fallbackMessage: string): never {
@@ -1592,10 +1702,26 @@ class ApiService {
   // errors[0].msg tells the user exactly which field was rejected (e.g.
   // "劇本內容必須在1-50000個字符之間") instead of a generic "驗證失敗".
   private extractScriptError(error: unknown, fallback: string): Error {
-    const data = (error as { response?: { data?: { errors?: Array<{ msg?: string }>; message?: string } } })?.response?.data;
+    const err = error as {
+      message?: string;
+      error_code?: string;
+      status?: number;
+      data?: { errors?: Array<{ msg?: string }>; message?: string };
+      response?: { data?: { errors?: Array<{ msg?: string }>; message?: string } };
+    };
+    // The response interceptor has already unwrapped the body onto `err.data`
+    // (plus a human message + error_code); only a path that bypasses the
+    // interceptor would still carry the raw axios `err.response.data` shape, so
+    // try both. Previously this read only `err.response.data` and so threw away
+    // the interceptor's specific message AND error_code — turning a clear
+    // "免費方案最多建立 N 個自訂劇本" cap message into a generic "無法建立劇本".
+    const data = err?.data ?? err?.response?.data;
     const fieldMsg = data?.errors?.[0]?.msg;
-    const message = fieldMsg || data?.message || fallback;
-    return new Error(message);
+    const message = fieldMsg || err?.message || data?.message || fallback;
+    const result = new Error(message) as Error & { error_code?: string; status?: number };
+    if (err?.error_code) result.error_code = err.error_code;
+    if (err?.status) result.status = err.status;
+    return result;
   }
 
   async getCustomScripts(): Promise<unknown[]> {
@@ -2278,6 +2404,23 @@ class ApiService {
     }
   }
 
+  // Redeems a coupon code for a free Premium pass. Returns the granted days and
+  // the couple's new expiry on success; throws an Error carrying `error_code`
+  // (COUPON_INVALID / COUPON_EXPIRED / COUPON_EXHAUSTED / COUPON_ALREADY_REDEEMED
+  // / NO_COMPLETE_COUPLE) so the caller can show a specific, actionable message.
+  async redeemCoupon(code: string): Promise<{ days: number; expiresAt: string | null }> {
+    try {
+      const response = await apiClient.post('/billing/redeem-coupon', { code });
+      return {
+        days: Number(response.data?.days) || 0,
+        expiresAt: response.data?.expires_at ?? null,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to redeem coupon:', error);
+      this.throwApiError(error, '無法兌換優惠碼，請稍後再試');
+    }
+  }
+
   // Creates an order and redirects the browser to ECPay's hosted checkout.
   // Resolves only if the redirect could not be initiated (otherwise the page
   // navigates away).
@@ -2292,6 +2435,138 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to start checkout:', error);
       this.throwApiError(error, '無法建立付款，請稍後再試');
+    }
+  }
+
+  // --- Human therapists (心理諮商師) ---
+
+  async getTherapists(focus?: TherapistFocusArea): Promise<Therapist[]> {
+    try {
+      const response = await apiClient.get('/therapists', {
+        params: focus ? { focus } : undefined,
+      });
+      return (response.data?.therapists || []) as Therapist[];
+    } catch (error: unknown) {
+      console.error('Failed to fetch therapists:', error);
+      this.throwApiError(error, '無法取得諮商師列表');
+    }
+  }
+
+  async getTherapist(id: string): Promise<Therapist> {
+    try {
+      const response = await apiClient.get(`/therapists/${id}`);
+      return response.data?.therapist as Therapist;
+    } catch (error: unknown) {
+      console.error('Failed to fetch therapist:', error);
+      this.throwApiError(error, '無法取得諮商師資料');
+    }
+  }
+
+  async applyAsTherapist(input: TherapistApplicationInput): Promise<{ id: string; status: string }> {
+    try {
+      const response = await apiClient.post('/therapists/apply', input);
+      return response.data?.application;
+    } catch (error: unknown) {
+      console.error('Failed to submit therapist application:', error);
+      this.throwApiError(error, '送出申請失敗，請稍後再試');
+    }
+  }
+
+  // Self-service therapist profile (logged-in therapist).
+  async getMyTherapistProfile(): Promise<OwnTherapistProfile | null> {
+    try {
+      const response = await apiClient.get('/therapists/me');
+      return response.data?.therapist as OwnTherapistProfile;
+    } catch (error: unknown) {
+      // 404 just means "this user isn't a therapist" — return null, not throw.
+      const code = (error as { response?: { status?: number } })?.response?.status;
+      if (code === 404) return null;
+      console.error('Failed to fetch own therapist profile:', error);
+      this.throwApiError(error, '無法取得諮商師檔案');
+    }
+  }
+
+  async updateMyTherapistProfile(input: TherapistProfileUpdate): Promise<OwnTherapistProfile> {
+    try {
+      const response = await apiClient.put('/therapists/me', input);
+      return response.data?.therapist as OwnTherapistProfile;
+    } catch (error: unknown) {
+      console.error('Failed to update therapist profile:', error);
+      this.throwApiError(error, '更新檔案失敗，請稍後再試');
+    }
+  }
+
+  async addMyTherapistDocument(url: string): Promise<OwnTherapistProfile> {
+    try {
+      const response = await apiClient.post('/therapists/me/documents', { url });
+      return response.data?.therapist as OwnTherapistProfile;
+    } catch (error: unknown) {
+      console.error('Failed to add therapist document:', error);
+      this.throwApiError(error, '上傳文件失敗，請稍後再試');
+    }
+  }
+
+  // Upload a therapist photo (kind='photo') or credential document
+  // (kind='document'). Public endpoints (used by the no-login sign-up form too).
+  async uploadTherapistAsset(file: File, kind: 'photo' | 'document'): Promise<string> {
+    try {
+      const form = new FormData();
+      form.append(kind, file);
+      const response = await apiClient.post(`/therapists/upload-${kind}`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data?.url as string;
+    } catch (error: unknown) {
+      console.error('Failed to upload therapist asset:', error);
+      this.throwApiError(error, '上傳失敗，請稍後再試');
+    }
+  }
+
+  async requestConsultation(therapistId: string, input: ConsultationRequestInput): Promise<{ id: string; status: string }> {
+    try {
+      const response = await apiClient.post(`/therapists/${therapistId}/consult`, input);
+      return response.data?.consultation;
+    } catch (error: unknown) {
+      console.error('Failed to request consultation:', error);
+      this.throwApiError(error, '預約失敗，請稍後再試');
+    }
+  }
+
+  async getMyConsultations(): Promise<TherapistConsultation[]> {
+    try {
+      const response = await apiClient.get('/therapists/consultations/mine');
+      return (response.data?.consultations || []) as TherapistConsultation[];
+    } catch (error: unknown) {
+      console.error('Failed to fetch consultations:', error);
+      this.throwApiError(error, '無法取得預約紀錄');
+    }
+  }
+
+  async getConsultationMessages(consultationId: string): Promise<ConsultationThread> {
+    try {
+      const response = await apiClient.get(`/therapists/consultations/${consultationId}/messages`);
+      const d = response.data || {};
+      return {
+        role: d.role,
+        therapistName: d.therapistName,
+        currentUserId: d.currentUserId,
+        messages: (d.messages || []) as ConsultationMessage[],
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch consultation messages:', error);
+      this.throwApiError(error, '無法載入訊息');
+    }
+  }
+
+  async postConsultationMessage(consultationId: string, body: string, eventId?: string): Promise<void> {
+    try {
+      await apiClient.post(`/therapists/consultations/${consultationId}/messages`, {
+        body,
+        eventId: eventId || undefined,
+      });
+    } catch (error: unknown) {
+      console.error('Failed to post consultation message:', error);
+      this.throwApiError(error, '送出訊息失敗');
     }
   }
 }

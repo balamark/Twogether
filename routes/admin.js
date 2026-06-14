@@ -563,6 +563,7 @@ const ADMIN_HTML = `<!doctype html>
       <button class="tab active" data-panel="funnel">漏斗</button>
       <button class="tab" data-panel="pages">頁面</button>
       <button class="tab" data-panel="retention">回訪</button>
+      <button class="tab" data-panel="therapists">諮商師</button>
     </div>
 
     <!-- Panel: Funnel (default) -->
@@ -621,6 +622,39 @@ const ADMIN_HTML = `<!doctype html>
 
       <h3 style="margin:20px 0 6px;font-weight:500;font-size:14px">DAU 趨勢（30 天）</h3>
       <svg id="dauSpark" class="sparkline" viewBox="0 0 480 60" preserveAspectRatio="none"></svg>
+    </div>
+
+    <!-- Panel: Therapists (approval queue) -->
+    <div class="panel" id="panel-therapists">
+      <p class="sub">諮商師申請審核。通過後檔案才會出現在使用者的諮商師列表中。</p>
+      <div class="controls">
+        <label>狀態
+          <select id="therapistStatus">
+            <option value="pending">待審核</option>
+            <option value="approved">已通過</option>
+            <option value="suspended">已暫停</option>
+            <option value="rejected">未通過</option>
+          </select>
+        </label>
+        <button id="therapistRefresh">重新整理</button>
+        <span class="muted" id="therapistStatusMsg"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="therapistsTable">
+          <thead>
+            <tr>
+              <th>姓名 / 職稱</th>
+              <th>專長</th>
+              <th class="num">費率</th>
+              <th>聯絡 / 證照</th>
+              <th>驗證 / 文件</th>
+              <th>申請時間</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
@@ -813,6 +847,170 @@ const ADMIN_HTML = `<!doctype html>
           '</tr>';
       }).join('');
     }
+
+    // ── Therapists approval queue ──────────────────────────────────────────
+    var THERAPIST_FOCUS = {
+      couple: '伴侶關係', family: '家庭', childhood: '童年/原生家庭',
+      individual: '個人成長', sexuality: '性與親密', parenting: '親職教養',
+      grief: '悲傷失落', anxiety: '焦慮憂鬱', depression: '憂鬱情緒',
+      trauma: '創傷', addiction: '成癮', lgbtq: '性別與多元認同',
+      career: '職涯/工作壓力', self_esteem: '自我價值'
+    };
+    var IDENTITY_STATUS = {
+      unverified: '未提交', submitted: '待審核', verified: '已驗證', rejected: '已退回'
+    };
+    function esc(s) {
+      return (s == null ? '' : String(s)).replace(/[<>&]/g, function (c) {
+        return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c];
+      });
+    }
+
+    async function loadTherapists() {
+      var status = $('therapistStatus').value;
+      $('therapistStatusMsg').textContent = '載入中…';
+      try {
+        var res = await fetch('/api/admin/therapists?status=' + encodeURIComponent(status));
+        if (!res.ok) throw new Error('therapists ' + res.status);
+        var body = await res.json();
+        renderTherapists(body.therapists || [], status);
+        $('therapistStatusMsg').textContent = '更新於 ' + new Date().toLocaleTimeString('zh-TW');
+      } catch (e) {
+        $('therapistStatusMsg').textContent = '載入失敗: ' + e.message;
+      }
+    }
+
+    function renderTherapists(rows, status) {
+      var tbody = document.querySelector('#therapistsTable tbody');
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="muted">沒有資料</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(function (t) {
+        var focus = (t.focus_areas || []).map(function (f) {
+          return '<span class="pill">' + esc(THERAPIST_FOCUS[f] || f) + '</span>';
+        }).join(' ');
+        var custom = (t.custom_specialties || []).map(function (f) {
+          return '<span class="pill">' + esc(f) + '</span>';
+        }).join(' ');
+        var contact = esc(t.contact_email || '—') +
+          (t.license_no ? '<div class="muted" style="font-size:11px">證照: ' + esc(t.license_no) + '</div>' : '');
+
+        // Email verification + uploaded credential documents.
+        var emailBadge = t.email_verified
+          ? '<span class="badge yes">Email 已驗證</span>'
+          : '<span class="badge no">Email 未驗證</span>';
+        var docs = (t.identity_documents || []).map(function (u, i) {
+          return '<a href="' + esc(u) + '" target="_blank" rel="noopener">文件' + (i + 1) + '</a>';
+        }).join(' · ');
+        var idStatus = '<div class="muted" style="font-size:11px;margin-top:3px">身分: ' +
+          esc(IDENTITY_STATUS[t.identity_status] || t.identity_status || '—') + '</div>';
+        var idActions = (t.identity_documents && t.identity_documents.length)
+          ? '<div style="margin-top:4px"><button data-idact="verify" data-id="' + t.id + '">驗證身分</button> ' +
+            '<button data-idact="reject" data-id="' + t.id + '">退回文件</button></div>'
+          : '';
+        var verifyCell = emailBadge + '<div style="font-size:11px;margin-top:3px">' + (docs || '<span class="muted">無文件</span>') + '</div>' + idStatus + idActions;
+
+        // Status-dependent moderation actions. Approved → suspend/delete;
+        // suspended → reactivate/delete; pending → approve/reject; rejected →
+        // approve (give a second chance) / delete.
+        var actions;
+        if (status === 'pending') {
+          actions = '<button data-act="approve" data-id="' + t.id + '">通過</button> ' +
+            '<button data-act="reject" data-id="' + t.id + '">退回</button>';
+        } else if (status === 'approved') {
+          actions = '<button data-act="suspend" data-id="' + t.id + '">暫停</button> ' +
+            '<button data-act="delete" data-id="' + t.id + '" data-name="' + esc(t.display_name) + '">刪除</button>';
+        } else if (status === 'suspended') {
+          actions = '<button data-act="reactivate" data-id="' + t.id + '">恢復上架</button> ' +
+            '<button data-act="delete" data-id="' + t.id + '" data-name="' + esc(t.display_name) + '">刪除</button>';
+        } else { // rejected
+          actions = '<button data-act="approve" data-id="' + t.id + '">通過</button> ' +
+            '<button data-act="delete" data-id="' + t.id + '" data-name="' + esc(t.display_name) + '">刪除</button>';
+        }
+        return '<tr>' +
+          '<td><div>' + esc(t.display_name) + '</div><div class="muted" style="font-size:11px">' + esc(t.title || '') + '</div></td>' +
+          '<td>' + focus + (custom ? '<div style="margin-top:4px">' + custom + '</div>' : '') + '</td>' +
+          '<td class="num">NT$' + (t.rate_twd || 0).toLocaleString() + ' / ' + (t.session_minutes || 50) + '分</td>' +
+          '<td>' + contact + '</td>' +
+          '<td>' + verifyCell + '</td>' +
+          '<td>' + fmtDate(t.created_at) + '</td>' +
+          '<td>' + actions + '</td>' +
+          '</tr>';
+      }).join('');
+
+      tbody.querySelectorAll('button[data-act]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var act = btn.getAttribute('data-act');
+          if (act === 'delete') {
+            deleteTherapist(btn.getAttribute('data-id'), btn.getAttribute('data-name'), btn);
+          } else {
+            reviewTherapist(btn.getAttribute('data-id'), act, btn);
+          }
+        });
+      });
+      tbody.querySelectorAll('button[data-idact]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          verifyIdentity(btn.getAttribute('data-id'), btn.getAttribute('data-idact'), btn);
+        });
+      });
+    }
+
+    async function reviewTherapist(id, act, btn) {
+      btn.disabled = true;
+      try {
+        var res = await fetch('/api/admin/therapists/' + id + '/review', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: act })
+        });
+        if (!res.ok) throw new Error('review ' + res.status);
+        await loadTherapists();
+      } catch (e) {
+        btn.disabled = false;
+        $('therapistStatusMsg').textContent = '操作失敗: ' + e.message;
+      }
+    }
+
+    async function verifyIdentity(id, act, btn) {
+      btn.disabled = true;
+      try {
+        var res = await fetch('/api/admin/therapists/' + id + '/verify-identity', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: act })
+        });
+        if (!res.ok) throw new Error('verify ' + res.status);
+        await loadTherapists();
+      } catch (e) {
+        btn.disabled = false;
+        $('therapistStatusMsg').textContent = '操作失敗: ' + e.message;
+      }
+    }
+
+    async function deleteTherapist(id, name, btn) {
+      if (!window.confirm('確定要永久刪除諮商師「' + (name || '') + '」嗎？此動作無法復原。\n（若只是想暫時下架，請改用「暫停」。）')) return;
+      btn.disabled = true;
+      try {
+        var res = await fetch('/api/admin/therapists/' + id, { method: 'DELETE' });
+        if (!res.ok) throw new Error('delete ' + res.status);
+        await loadTherapists();
+      } catch (e) {
+        btn.disabled = false;
+        $('therapistStatusMsg').textContent = '刪除失敗: ' + e.message;
+      }
+    }
+
+    $('therapistRefresh').addEventListener('click', loadTherapists);
+    $('therapistStatus').addEventListener('change', loadTherapists);
+    // Lazy-load the queue the first time the tab is opened.
+    var therapistsLoaded = false;
+    document.querySelectorAll('.tab').forEach(function (btn) {
+      if (btn.getAttribute('data-panel') === 'therapists') {
+        btn.addEventListener('click', function () {
+          if (!therapistsLoaded) { therapistsLoaded = true; loadTherapists(); }
+        });
+      }
+    });
 
     $('apply').addEventListener('click', load);
     load();

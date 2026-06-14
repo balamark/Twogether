@@ -5,10 +5,24 @@ import type { RoleplayScript } from '../App';
 
 type ScriptCategory = 'romantic' | 'adventurous' | 'school' | 'bold';
 
+// A create-mode draft preserved when the free-tier script cap blocks an upload,
+// so the form can be restored after the user goes premium.
+export interface PendingScriptDraft {
+  title: string;
+  category: ScriptCategory;
+  scenario: string;
+  content: string;
+  tags: string;
+  isPublic: boolean;
+  thumbnail: File | null;
+}
+
 interface ScriptUploadModalProps {
   /** When set, the form opens in edit mode and pre-fills from this script. */
   editingScript: RoleplayScript | null;
-  /** Closes the modal and clears any editing target. */
+  /** In create mode, restores a draft preserved from a cap-blocked upload. */
+  pendingScriptDraft: PendingScriptDraft | null;
+  /** Closes the modal, clears any editing target, and discards any draft. */
   onClose: () => void;
   addCustomScript: (
     title: string,
@@ -41,25 +55,30 @@ interface ScriptUploadModalProps {
 // React to unmount + remount it and wipe the in-progress form. See issue #41.
 const ScriptUploadModal = ({
   editingScript,
+  pendingScriptDraft,
   onClose,
   addCustomScript,
   updateCustomScript,
 }: ScriptUploadModalProps) => {
   const isEditMode = editingScript !== null;
+  // In create mode, restore a draft preserved from a previous cap-blocked
+  // upload (pendingScriptDraft) so the user resumes exactly where they left
+  // off after going premium. Edit mode always wins from editingScript.
+  const draft = isEditMode ? null : pendingScriptDraft;
   const [scriptData, setScriptData] = useState(() => ({
-    title: editingScript?.title ?? '',
-    category: (editingScript?.category ?? 'romantic') as ScriptCategory,
-    scenario: editingScript?.scenario ?? '',
-    content: editingScript?.script ?? '',
-    tags: editingScript?.tags ? editingScript.tags.join(', ') : ''
+    title: editingScript?.title ?? draft?.title ?? '',
+    category: (editingScript?.category ?? draft?.category ?? 'romantic') as ScriptCategory,
+    scenario: editingScript?.scenario ?? draft?.scenario ?? '',
+    content: editingScript?.script ?? draft?.content ?? '',
+    tags: editingScript?.tags ? editingScript.tags.join(', ') : (draft?.tags ?? '')
   }));
   // New scripts default to public (the Marketplace product requirement).
   // Editing reflects the existing flag — falling back to true if the script
   // pre-dates the column (legacy rows show as private in the API).
   const [isPublic, setIsPublic] = useState<boolean>(
-    isEditMode ? (editingScript?.isPublic ?? false) : true
+    isEditMode ? (editingScript?.isPublic ?? false) : (draft?.isPublic ?? true)
   );
-  const [thumbnail, setThumbnail] = useState<File | null>(null);
+  const [thumbnail, setThumbnail] = useState<File | null>(draft?.thumbnail ?? null);
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   useScrollLock(true);
 
@@ -81,6 +100,41 @@ const ScriptUploadModal = ({
       return;
     }
     setThumbnail(file);
+  };
+
+  // Has the user entered/changed anything worth protecting? For new scripts
+  // any non-empty field (or a chosen thumbnail / opted-out sharing) counts;
+  // for edits we compare against the script being edited.
+  const isDirty = () => {
+    if (thumbnail !== null) return true;
+    if (isEditMode && editingScript) {
+      return (
+        scriptData.title !== (editingScript.title ?? '') ||
+        scriptData.category !== (editingScript.category ?? 'romantic') ||
+        scriptData.scenario !== (editingScript.scenario ?? '') ||
+        scriptData.content !== (editingScript.script ?? '') ||
+        scriptData.tags !== (editingScript.tags ? editingScript.tags.join(', ') : '') ||
+        isPublic !== (editingScript.isPublic ?? false)
+      );
+    }
+    return (
+      scriptData.title.trim() !== '' ||
+      scriptData.scenario.trim() !== '' ||
+      scriptData.content.trim() !== '' ||
+      scriptData.tags.trim() !== '' ||
+      scriptData.category !== 'romantic' ||
+      isPublic !== true
+    );
+  };
+
+  // Guard accidental dismissal (✕ or 取消) — losing a half-written script with
+  // no warning is the worst-case UX here. Confirmed dismissal discards any
+  // cap-preserved draft too (handled App-side via onClose).
+  const closeAndReset = () => {
+    if (isDirty() && !window.confirm('你有尚未儲存的變更，確定要關閉嗎？變更將不會保存。')) {
+      return;
+    }
+    onClose();
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -129,7 +183,7 @@ const ScriptUploadModal = ({
               )}
             </div>
             <button
-              onClick={onClose}
+              onClick={closeAndReset}
               className="text-petal-muted hover:text-petal-ink transition-colors"
               aria-label="關閉"
             >
@@ -298,7 +352,7 @@ const ScriptUploadModal = ({
             {isEditMode && (
               <button
                 type="button"
-                onClick={onClose}
+                onClick={closeAndReset}
                 className="px-5 py-3 border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink rounded-md font-body text-sm transition-colors"
               >
                 取消
