@@ -247,6 +247,14 @@ jobs:
         with:
           project_id: ${{ env.PROJECT_ID }}
 
+      - name: Reconcile Staging Migration Ledger
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          NODE_ENV: production
+        run: |
+          echo "🔧 Reconciling staging migration ledger (guarded, idempotent)..."
+          node scripts/repair-migration-ledger.js
+
       - name: Run Staging Database Migrations
         env:
           DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}

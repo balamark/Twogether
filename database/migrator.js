@@ -69,11 +69,19 @@ class Migrator {
         // Execute the migration
         await client.query(sql);
 
-        // Record the migration
+        // Record the migration. UPSERT so a prior failed attempt (which leaves
+        // a success=false row for this version) doesn't wedge the retry with a
+        // duplicate-key error on the primary key.
         const executionTime = Date.now() - startTime;
         await client.query(`
           INSERT INTO _sqlx_migrations (version, description, installed_on, success, checksum, execution_time)
           VALUES ($1, $2, NOW(), true, $3, $4)
+          ON CONFLICT (version) DO UPDATE SET
+            description = EXCLUDED.description,
+            installed_on = EXCLUDED.installed_on,
+            success = EXCLUDED.success,
+            checksum = EXCLUDED.checksum,
+            execution_time = EXCLUDED.execution_time
         `, [migration.version, migration.description, checksum, executionTime]);
       });
 
@@ -88,6 +96,12 @@ class Migrator {
         await db.query(`
           INSERT INTO _sqlx_migrations (version, description, installed_on, success, checksum, execution_time)
           VALUES ($1, $2, NOW(), false, $3, $4)
+          ON CONFLICT (version) DO UPDATE SET
+            description = EXCLUDED.description,
+            installed_on = EXCLUDED.installed_on,
+            success = EXCLUDED.success,
+            checksum = EXCLUDED.checksum,
+            execution_time = EXCLUDED.execution_time
         `, [migration.version, migration.description, Buffer.alloc(0), executionTime]);
       } catch (recordError) {
         console.error('Failed to record migration failure:', recordError.message);
