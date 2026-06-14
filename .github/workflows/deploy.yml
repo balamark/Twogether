@@ -83,7 +83,10 @@ jobs:
       
       - name: Build frontend
         run: npm run build
-      
+
+      - name: Validate admin dashboard inline script
+        run: npm run check:admin
+
       - name: Set up test database and run tests
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/twogether_test

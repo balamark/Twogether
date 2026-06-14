@@ -1985,8 +1985,11 @@ adminRouter.post('/qa/shares/:id/mark-paid', express.json(), async (req, res) =>
 // GET /api/admin/therapists/qa/pools — list pools (newest first).
 adminRouter.get('/qa/pools', async (req, res) => {
   try {
+    // period_month via to_char so server-timezone Date serialization (node-pg
+    // parses DATE to a local-midnight Date) can't shift the displayed month.
     const result = await db.query(`
-      SELECT p.*,
+      SELECT p.id, to_char(p.period_month, 'YYYY-MM-DD') AS period_month,
+        p.pool_twd, p.split_strategy, p.status, p.computed_at, p.finalized_at, p.created_at,
         (SELECT COUNT(*) FROM qa_revenue_shares s WHERE s.pool_id = p.id) AS recipient_count,
         (SELECT COALESCE(SUM(share_twd),0) FROM qa_revenue_shares s WHERE s.pool_id = p.id) AS allocated_twd
       FROM qa_revenue_pools p ORDER BY p.period_month DESC
@@ -2001,7 +2004,11 @@ adminRouter.get('/qa/pools', async (req, res) => {
 // GET /api/admin/therapists/qa/pools/:id — pool + per-therapist shares.
 adminRouter.get('/qa/pools/:id', async (req, res) => {
   try {
-    const pool = await db.query(`SELECT * FROM qa_revenue_pools WHERE id = $1`, [req.params.id]);
+    const pool = await db.query(`
+      SELECT id, to_char(period_month, 'YYYY-MM-DD') AS period_month,
+        pool_twd, split_strategy, status, computed_at, finalized_at, created_at
+      FROM qa_revenue_pools WHERE id = $1
+    `, [req.params.id]);
     if (pool.rows.length === 0) return res.status(404).json({ success: false, message: 'Pool not found' });
     const shares = await db.query(`
       SELECT s.*, t.display_name AS therapist_name

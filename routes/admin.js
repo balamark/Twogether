@@ -1051,7 +1051,7 @@ const ADMIN_HTML = `<!doctype html>
     }
 
     async function deleteTherapist(id, name, btn) {
-      if (!window.confirm('確定要永久刪除諮商師「' + (name || '') + '」嗎？此動作無法復原。\n（若只是想暫時下架，請改用「暫停」。）')) return;
+      if (!window.confirm('確定要永久刪除諮商師「' + (name || '') + '」嗎？此動作無法復原。\\n（若只是想暫時下架，請改用「暫停」。）')) return;
       btn.disabled = true;
       try {
         var res = await fetch('/api/admin/therapists/' + id, { method: 'DELETE' });
@@ -1306,4 +1306,7 @@ if (process.env.NODE_ENV !== 'test') {
   setTimeout(purgeOldLandingVisits, 30_000).unref();
 }
 
-module.exports = { publicRouter, adminApiRouter, htmlHandler, purgeOldLandingVisits };
+// ADMIN_HTML is exported so scripts/check-admin-inline-script.js can validate
+// the embedded <script> (which lives inside a template literal and is therefore
+// invisible to eslint / `node --check` on this module).
+module.exports = { publicRouter, adminApiRouter, htmlHandler, purgeOldLandingVisits, ADMIN_HTML };

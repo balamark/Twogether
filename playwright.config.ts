@@ -61,6 +61,8 @@ export default defineConfig({
         NODE_ENV: 'test',
         DATABASE_URL: process.env.DATABASE_URL || 'postgresql://twogether:twogether123@localhost:5432/twogether_test',
         JWT_SECRET: process.env.JWT_SECRET || 'dev-secret-do-not-use-in-prod',
+        // Enables the /admin dashboard in tests (adminAuth 503s without it).
+        ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'test-admin-pw',
         PORT: '8080'
       }
     },

@@ -17,6 +17,7 @@
     "test:e2e:headed": "npx playwright test --headed",
     "test:e2e:debug": "npx playwright test --debug",
     "lint": "eslint .",
+    "check:admin": "node scripts/check-admin-inline-script.js",
     "migrate": "node scripts/migrate.js migrate",
     "migrate:status": "node scripts/migrate.js status"
   },
