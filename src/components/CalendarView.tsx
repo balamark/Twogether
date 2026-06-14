@@ -1,0 +1,695 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Camera, MapPin, Play, Clock, Trash2 } from 'lucide-react';
+import CalendarDatePicker from './CalendarDatePicker';
+import { AchievementsView, IntimacyStatsCards, CalendarHeatmap } from './AchievementsView';
+import { periodDateSet, fertileDateSet, predictedPeriodDateSet } from '../utils/cycle';
+import { apiService } from '../services/api';
+import type { CycleRecord } from '../services/api';
+import type { IntimateRecord, AuthState, Notification } from '../App';
+
+// Image compression helper — pure, canvas-based. Co-located here since the
+// calendar record form is its only caller.
+const compressImage = (file: File, maxWidth: number = 800, maxHeight: number = 600, quality: number = 0.8): Promise<string> => {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+
+    img.onload = () => {
+      // Calculate new dimensions
+      let { width, height } = img;
+      if (width > height) {
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width = (width * maxHeight) / height;
+          height = maxHeight;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      // Draw and compress
+      ctx?.drawImage(img, 0, 0, width, height);
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+      resolve(compressedDataUrl);
+    };
+
+    img.src = URL.createObjectURL(file);
+  });
+};
+
+// Chinese-numeral date formatter for editorial meta lines. e.g. 二〇二五年九月七日
+const toChineseNum = (n: number): string => {
+  const cn = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+  if (n < 10) return cn[n];
+  if (n < 20) return n === 10 ? '十' : `十${cn[n - 10]}`;
+  if (n < 30) return n === 20 ? '二十' : `二十${cn[n - 20]}`;
+  return n === 30 ? '三十' : `三十${cn[n - 30]}`;
+};
+const chineseYear = (y: number): string =>
+  y.toString().split('').map(c => '〇一二三四五六七八九'[parseInt(c, 10)]).join('');
+const formatChineseDate = (d: Date): string =>
+  `${chineseYear(d.getFullYear())}年${toChineseNum(d.getMonth() + 1)}月${toChineseNum(d.getDate())}日`;
+
+interface CalendarViewProps {
+  selectedDate: string;
+  setSelectedDate: React.Dispatch<React.SetStateAction<string>>;
+  intimateRecords: IntimateRecord[];
+  setIntimateRecords: React.Dispatch<React.SetStateAction<IntimateRecord[]>>;
+  cycleRecords: CycleRecord[];
+  setCycleRecords: React.Dispatch<React.SetStateAction<CycleRecord[]>>;
+  authState: AuthState;
+  calendarMonth: Date;
+  setCalendarMonth: React.Dispatch<React.SetStateAction<Date>>;
+  editingRecord: IntimateRecord | null;
+  setEditingRecord: React.Dispatch<React.SetStateAction<IntimateRecord | null>>;
+  showRecordModal: boolean;
+  setShowRecordModal: React.Dispatch<React.SetStateAction<boolean>>;
+  setSelectedRecord: React.Dispatch<React.SetStateAction<IntimateRecord | null>>;
+  setShowRecordDetail: React.Dispatch<React.SetStateAction<boolean>>;
+  setDayPickerDate: React.Dispatch<React.SetStateAction<string | null>>;
+  setDayPickerRecords: React.Dispatch<React.SetStateAction<IntimateRecord[]>>;
+  setCurrentView: React.Dispatch<React.SetStateAction<string>>;
+  addIntimateRecord: (
+    date: string,
+    time: string,
+    mood: string,
+    notes?: string,
+    photo?: string,
+    description?: string,
+    duration?: string,
+    location?: string,
+    roleplayScript?: string,
+    activityType?: string,
+  ) => Promise<void>;
+  showNotification: (notification: Omit<Notification, 'id'>) => void;
+  showRecordDetails: (recordId: number) => void;
+  openDeleteConfirm: (record: IntimateRecord) => void;
+  defaultRoleplayScripts: { title: string }[];
+  customScripts: { title: string }[];
+  togetherSince: Date | null;
+  daysTogether: number;
+  primaryTimezone: string;
+}
+
+// Calendar / record-keeping view. Defined at module scope (not inside App) so
+// its identity is stable across App re-renders — a nested definition would
+// remount on every render and wipe the in-progress record form. See issue #41.
+const CalendarView = ({
+  selectedDate,
+  setSelectedDate,
+  intimateRecords,
+  setIntimateRecords,
+  cycleRecords,
+  setCycleRecords,
+  authState,
+  calendarMonth,
+  setCalendarMonth,
+  editingRecord,
+  setEditingRecord,
+  showRecordModal,
+  setShowRecordModal,
+  setSelectedRecord,
+  setShowRecordDetail,
+  setDayPickerDate,
+  setDayPickerRecords,
+  setCurrentView,
+  addIntimateRecord,
+  showNotification,
+  showRecordDetails,
+  openDeleteConfirm,
+  defaultRoleplayScripts,
+  customScripts,
+  togetherSince,
+  daysTogether,
+  primaryTimezone,
+}: CalendarViewProps) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const getCurrentTime = () => {
+    const now = new Date();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
+  const [recordForm, setRecordForm] = useState(() => {
+    if (editingRecord) {
+      return {
+        date: editingRecord.date,
+        time: editingRecord.time,
+        mood: editingRecord.mood,
+        notes: editingRecord.notes || '',
+        description: editingRecord.description || '',
+        duration: editingRecord.duration || '',
+        location: editingRecord.location || '',
+        photo: editingRecord.photo || '',
+        roleplayScript: editingRecord.roleplayScript || ''
+      };
+    }
+    return {
+      date: selectedDate,
+      time: getCurrentTime(),
+      mood: '💕',
+      notes: '',
+      description: '',
+      duration: '',
+      location: '',
+      photo: '',
+      roleplayScript: ''
+    };
+  });
+
+  useEffect(() => {
+    if (editingRecord && showRecordModal) {
+      setRecordForm({
+        date: editingRecord.date,
+        time: editingRecord.time,
+        mood: editingRecord.mood,
+        notes: editingRecord.notes || '',
+        description: editingRecord.description || '',
+        duration: editingRecord.duration || '',
+        location: editingRecord.location || '',
+        photo: editingRecord.photo || '',
+        roleplayScript: editingRecord.roleplayScript || ''
+      });
+    }
+  }, [editingRecord, showRecordModal]);
+
+  const recordsByDate = React.useMemo(() => {
+    const map = new Map<string, IntimateRecord[]>();
+    intimateRecords.forEach(r => {
+      const existing = map.get(r.date) || [];
+      existing.push(r);
+      map.set(r.date, existing);
+    });
+    return map;
+  }, [intimateRecords]);
+
+  const [recordType, setRecordType] = useState<'intimacy' | 'period'>('intimacy');
+  const [periodLengthDays, setPeriodLengthDays] = useState<number>(5);
+
+  const cycleEnabled = !!authState.user?.cycle_tracking_enabled;
+  const periodDates = React.useMemo(() => cycleEnabled ? periodDateSet(cycleRecords) : undefined, [cycleEnabled, cycleRecords]);
+  const fertileDates = React.useMemo(() => cycleEnabled ? fertileDateSet(cycleRecords) : undefined, [cycleEnabled, cycleRecords]);
+  const predictedPeriodDates = React.useMemo(() => cycleEnabled ? predictedPeriodDateSet(cycleRecords) : undefined, [cycleEnabled, cycleRecords]);
+
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const compressedImage = await compressImage(file);
+      setRecordForm({...recordForm, photo: compressedImage});
+    } catch (err) {
+      console.error('Failed to upload photo:', err);
+      showNotification({
+        type: 'error',
+        title: '照片上傳失敗',
+        message: '請稍後再試',
+        duration: 3000
+      });
+    }
+  };
+
+  const handleSubmitRecord = async () => {
+    if (!recordForm.date) {
+      showNotification({ type: 'error', title: '驗證錯誤', message: '請選擇日期', duration: 6000 });
+      return;
+    }
+
+    if (recordType === 'period') {
+      try {
+        const created = await apiService.createCycleRecord({
+          startDate: recordForm.date,
+          lengthDays: periodLengthDays,
+          notes: recordForm.notes || undefined,
+        });
+        setCycleRecords(prev => [created, ...prev]);
+        showNotification({ type: 'success', title: '已儲存', message: '週期紀錄已新增', duration: 3000 });
+      } catch (error: unknown) {
+        showNotification({ type: 'error', title: '建立失敗', message: (error as Error)?.message || '無法建立週期紀錄', duration: 5000 });
+        return;
+      }
+      setShowRecordModal(false);
+      setEditingRecord(null);
+      setRecordType('intimacy');
+      return;
+    }
+
+    if (!recordForm.time) {
+      showNotification({ type: 'error', title: '驗證錯誤', message: '請選擇時間', duration: 6000 });
+      return;
+    }
+
+    if (editingRecord) {
+      try {
+        const updates: Partial<IntimateRecord> = {
+          date: recordForm.date,
+          time: recordForm.time,
+          mood: recordForm.mood,
+          notes: recordForm.notes || undefined,
+          description: recordForm.description || undefined,
+          duration: recordForm.duration || undefined,
+          location: recordForm.location || undefined,
+          roleplayScript: recordForm.roleplayScript || undefined,
+        };
+        await apiService.updateIntimateRecord(editingRecord.apiId!, updates);
+        setIntimateRecords(prev => prev.map(r =>
+          r.id === editingRecord.id ? { ...r, ...updates } : r
+        ));
+        showNotification({ type: 'success', title: '已更新', message: '記錄已成功更新', duration: 3000 });
+      } catch (error: unknown) {
+        console.error('Error updating record:', error);
+        showNotification({ type: 'error', title: '更新失敗', message: (error as Error)?.message || '無法更新記錄', duration: 5000 });
+        return;
+      }
+    } else {
+      await addIntimateRecord(
+        recordForm.date,
+        recordForm.time,
+        recordForm.mood,
+        recordForm.notes || undefined,
+        recordForm.photo,
+        recordForm.description || undefined,
+        recordForm.duration || undefined,
+        recordForm.location || undefined,
+        recordForm.roleplayScript || undefined
+      );
+    }
+
+    setShowRecordModal(false);
+    setEditingRecord(null);
+    setRecordForm({
+      date: selectedDate,
+      time: getCurrentTime(),
+      mood: '💕',
+      notes: '',
+      description: '',
+      duration: '',
+      location: '',
+      photo: '',
+      roleplayScript: ''
+    });
+  };
+
+  return (
+    <div className="space-y-10">
+      <div className="border-b border-petal-rule pb-7">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+          <div>
+            <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+              — A · 記錄
+            </div>
+            <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05]">
+              記錄<em className="not-italic font-light italic text-pink-600">時光</em>
+            </h2>
+          </div>
+          <div className="text-left md:text-right font-body text-sm text-petal-muted leading-relaxed">
+            {togetherSince ? (
+              <>
+                <strong className="block text-petal-ink font-display font-semibold text-base tracking-tight mb-0.5">
+                  {daysTogether} days together
+                </strong>
+                自{formatChineseDate(togetherSince)}
+              </>
+            ) : (
+              <span className="font-display italic">— 開始你們的旅程 —</span>
+            )}
+          </div>
+        </div>
+        <div className="mt-6 flex flex-col md:flex-row gap-3 md:items-center">
+          <div className="flex items-center gap-3 md:flex-1">
+            <span className="font-body text-xs uppercase tracking-[0.14em] text-petal-muted">日期</span>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="flex-1 max-w-xs px-4 py-2.5 border border-petal-rule rounded-md bg-white font-body text-sm text-petal-ink focus:outline-none focus:border-petal-rose-deep transition-colors"
+            />
+          </div>
+          <button
+            data-testid="add-record-button"
+            onClick={() => {
+              setEditingRecord(null);
+              setRecordForm({date: selectedDate, time: getCurrentTime(), mood: '💕', notes: '', description: '', duration: '', location: '', photo: '', roleplayScript: ''});
+              setShowRecordModal(true);
+            }}
+            className="px-6 py-2.5 bg-petal-ink text-petal-cream rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
+          >
+            + 為這一天添一筆
+          </button>
+        </div>
+      </div>
+
+      {/* Intimacy Stats — 4 cards */}
+      <IntimacyStatsCards
+        records={intimateRecords}
+        birthDate={authState.user?.birth_date}
+        onOpenSettings={() => setCurrentView('settings')}
+      />
+
+      {/* Enhanced Record Modal */}
+      {showRecordModal && (
+        <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-petal-cream rounded-md shadow-petal max-w-2xl w-full max-h-[min(90vh,calc(100dvh-80px))] overflow-y-auto overscroll-contain border border-petal-rule">
+            <div className="p-5 sm:p-6">
+              <div className="flex justify-between items-end mb-5 pb-4 border-b border-petal-rule">
+                <div>
+                  <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
+                    — {editingRecord ? '編輯記錄' : '新的記錄'}
+                  </div>
+                  <h3 data-testid="record-modal-heading" className="font-display text-3xl font-light tracking-tight text-petal-ink">
+                    {editingRecord ? '編輯' : '記錄'}<em className="not-italic font-light italic text-pink-600">{recordType === 'period' ? '月經' : '親密時光'}</em>
+                  </h3>
+                </div>
+                <button
+                  onClick={() => { setShowRecordModal(false); setEditingRecord(null); }}
+                  data-testid="record-modal-close-button"
+                  className="text-petal-muted hover:text-petal-ink text-2xl font-light transition-colors leading-none"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                {/* Event type — only when cycle tracking is opted in and creating a new record */}
+                {cycleEnabled && !editingRecord && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">事件類型</label>
+                    <div className="inline-flex rounded-md border border-petal-rule overflow-hidden" role="tablist">
+                      <button
+                        type="button"
+                        data-testid="record-type-intimacy"
+                        onClick={() => setRecordType('intimacy')}
+                        className={`px-4 py-2 text-sm font-display italic transition-colors ${recordType === 'intimacy' ? 'bg-petal-ink text-petal-cream' : 'bg-white text-petal-ink hover:bg-petal-cream-2'}`}
+                      >親密時光</button>
+                      <button
+                        type="button"
+                        data-testid="record-type-period"
+                        onClick={() => setRecordType('period')}
+                        className={`px-4 py-2 text-sm font-display italic transition-colors border-l border-petal-rule ${recordType === 'period' ? 'bg-red-500 text-white' : 'bg-white text-petal-ink hover:bg-petal-cream-2'}`}
+                      >月經</button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Basic Info */}
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{recordType === 'period' ? '週期開始日' : '日期選擇'}</label>
+                    <CalendarDatePicker
+                      selectedDate={recordForm.date}
+                      onDateSelect={(date) => setRecordForm({...recordForm, date})}
+                      primaryTimezone={primaryTimezone}
+                    />
+                  </div>
+                  {recordType === 'period' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">月經天數</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={14}
+                        value={periodLengthDays}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value, 10);
+                          if (!Number.isNaN(v)) setPeriodLengthDays(Math.min(14, Math.max(1, v)));
+                        }}
+                        data-testid="record-period-length-input"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                      />
+                      <p className="text-xs text-petal-muted mt-1">1–14 天，預設 5 天。</p>
+                    </div>
+                  )}
+                </div>
+
+                {recordType !== 'period' && (
+                <>
+                {/* Photo Upload — compact */}
+                <div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      data-testid="record-photo-upload-button"
+                      className="inline-flex items-center gap-2 px-3 py-2 border border-petal-rule rounded-md text-sm text-petal-ink hover:bg-petal-cream-2 transition-colors"
+                    >
+                      <Camera className="w-4 h-4" />
+                      {recordForm.photo ? '更換照片' : '上傳照片 (可選)'}
+                    </button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoUpload}
+                      className="hidden"
+                    />
+                    {recordForm.photo && (
+                      <div className="relative">
+                        <img
+                          src={recordForm.photo}
+                          alt="記憶照片"
+                          className="w-16 h-16 object-cover rounded-md border border-petal-rule"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setRecordForm({...recordForm, photo: ''})}
+                          aria-label="移除照片"
+                          className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 text-xs leading-none flex items-center justify-center"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Description and Details */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">描述你們做了什麼</label>
+                  <textarea
+                    value={recordForm.description}
+                    onChange={(e) => setRecordForm({...recordForm, description: e.target.value})}
+                    placeholder="分享這個美好時光的細節..."
+                    data-testid="record-description-input"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 h-16"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <MapPin className="w-4 h-4 inline mr-2" />
+                    地點
+                  </label>
+                  <input
+                    type="text"
+                    value={recordForm.location}
+                    onChange={(e) => setRecordForm({...recordForm, location: e.target.value})}
+                    placeholder="例如：臥室、客廳"
+                    data-testid="record-location-input"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                  />
+                </div>
+
+                {/* Roleplay Script Reference */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Play className="w-4 h-4 inline mr-2" />
+                    角色扮演劇本 (可選)
+                  </label>
+                  <select
+                    value={recordForm.roleplayScript}
+                    onChange={(e) => setRecordForm({...recordForm, roleplayScript: e.target.value})}
+                    data-testid="record-roleplay-select"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                  >
+                    <option value="">未使用劇本</option>
+                    {/* Default scripts */}
+                    {defaultRoleplayScripts.map((script, index) => (
+                      <option key={`default-${index}`} value={script.title}>{script.title}</option>
+                    ))}
+                    {/* Custom scripts */}
+                    {customScripts.map((script, index) => (
+                      <option key={`custom-${index}`} value={script.title}>{script.title} (自定義)</option>
+                    ))}
+                  </select>
+                </div>
+
+                </>
+                )}
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">備註</label>
+                  <textarea
+                    value={recordForm.notes}
+                    onChange={(e) => setRecordForm({...recordForm, notes: e.target.value})}
+                    placeholder="記錄這個特別時刻的感受..."
+                    data-testid="record-notes-input"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 h-16"
+                  />
+                </div>
+              </div>
+
+              <div className="flex space-x-3 mt-6 pt-4 border-t border-petal-rule">
+                <button
+                  onClick={() => { setShowRecordModal(false); setEditingRecord(null); }}
+                  data-testid="record-cancel-button"
+                  className="flex-1 px-4 py-3 border border-petal-rule text-petal-ink rounded-md hover:bg-petal-cream-2 transition-colors font-body text-sm"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={handleSubmitRecord}
+                  data-testid="record-submit-button"
+                  className="flex-1 px-4 py-3 bg-petal-ink text-petal-cream rounded-md hover:bg-pink-700 transition-colors font-display italic text-base"
+                >
+                  {editingRecord ? '更新記錄' : '保存記錄'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Monthly Calendar Distribution */}
+      <div>
+        <div className="flex items-baseline justify-between mb-6">
+          <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink">
+            月度<em className="not-italic font-light italic text-pink-600">記錄分佈</em>
+          </h3>
+        </div>
+        <div className="bg-white rounded-md border border-petal-rule p-5 sm:p-6">
+          <CalendarHeatmap
+            data={intimateRecords}
+            year={calendarMonth.getFullYear()}
+            month={calendarMonth.getMonth()}
+            title=""
+            showMonthLabels={true}
+            periodDates={periodDates}
+            predictedPeriodDates={predictedPeriodDates}
+            fertileDates={fertileDates}
+            onNavigate={(y, m) => setCalendarMonth(new Date(y, m, 1))}
+            onDaySelect={(day) => {
+              const dayRecords = recordsByDate.get(day) || [];
+              if (dayRecords.length === 0) {
+                setEditingRecord(null);
+                setSelectedDate(day);
+                setShowRecordModal(true);
+              } else if (dayRecords.length === 1) {
+                setSelectedRecord(dayRecords[0]);
+                setShowRecordDetail(true);
+              } else {
+                setDayPickerDate(day);
+                setDayPickerRecords(
+                  dayRecords.slice().sort((a, b) =>
+                    (b.date + 'T' + b.time).localeCompare(a.date + 'T' + a.time)
+                  )
+                );
+              }
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Record List */}
+      <div>
+        <div className="flex items-baseline justify-between mb-6">
+          <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink">
+            親密<em className="not-italic font-light italic text-pink-600">記錄</em>
+          </h3>
+          <span className="font-display italic font-light text-sm text-petal-muted">
+            共 <b className="not-italic font-normal text-petal-ink">{intimateRecords.length}</b> 次
+          </span>
+        </div>
+        <div className="max-h-[28rem] overflow-y-auto overflow-x-hidden">
+          {(() => {
+            const filtered = intimateRecords
+              .slice()
+              .sort((a, b) => (b.date + 'T' + b.time).localeCompare(a.date + 'T' + a.time));
+            return filtered.length > 0 ? filtered.map((record, idx) => (
+              <article
+                key={record.id}
+                onClick={() => showRecordDetails(record.id)}
+                className={`group grid grid-cols-[40px_1fr_auto] gap-5 py-5 cursor-pointer hover:bg-petal-cream-2/40 -mx-2 px-2 transition-colors ${
+                  idx === 0 ? '' : 'border-t border-petal-rule-soft'
+                }`}
+              >
+                <div className="text-base opacity-70 saturate-75 mt-1 text-center leading-none">
+                  {record.mood}
+                </div>
+                <div className="min-w-0">
+                  <div className="font-display italic font-light text-sm text-petal-muted mb-1">
+                    {record.date} · {record.time}
+                  </div>
+                  {record.description && (
+                    <p className="font-body text-[15px] leading-relaxed text-petal-ink mb-1.5">
+                      {record.description}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-2 text-[11px] text-petal-muted mt-1.5">
+                    {record.duration && (
+                      <span className="inline-flex items-start max-w-full px-2.5 py-0.5 border border-petal-rule rounded-md">
+                        <Clock className="w-3 h-3 mr-1 mt-[3px] flex-shrink-0" />
+                        <span className="break-words leading-snug">{record.duration}</span>
+                      </span>
+                    )}
+                    {record.location && (
+                      <span className="inline-flex items-start max-w-full px-2.5 py-0.5 border border-petal-rule rounded-md">
+                        <MapPin className="w-3 h-3 mr-1 mt-[3px] flex-shrink-0" />
+                        <span className="break-words leading-snug">{record.location}</span>
+                      </span>
+                    )}
+                    {record.roleplayScript && (
+                      <span className="inline-flex items-start max-w-full px-2.5 py-0.5 border border-petal-sage/60 bg-petal-sage/10 text-petal-sage-deep rounded-md">
+                        <Play className="w-3 h-3 mr-1 mt-[3px] flex-shrink-0" />
+                        <span className="break-words leading-snug">{record.roleplayScript}</span>
+                      </span>
+                    )}
+                  </div>
+                  {record.notes && (
+                    <p className="font-display italic font-light text-sm text-petal-ink-soft mt-2.5 pl-3 border-l border-petal-rose-soft leading-relaxed">
+                      "{record.notes}"
+                    </p>
+                  )}
+                  {record.photo && (
+                    <img
+                      src={record.photo}
+                      alt="記憶照片"
+                      className="mt-3 w-24 h-24 rounded-md object-cover border border-petal-rule"
+                    />
+                  )}
+                </div>
+                <div className="flex items-start pt-1">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); openDeleteConfirm(record); }}
+                    className="opacity-0 group-hover:opacity-100 text-petal-muted hover:text-red-500 transition-all p-1 rounded"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </article>
+            )) : (
+              <div className="border border-dashed border-petal-rule rounded-md py-10 px-6 text-center">
+                <p className="font-display italic font-light text-base text-petal-muted">
+                  還沒有記錄 — 開始你們的愛情之旅吧
+                </p>
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+
+      <div className="border-t border-petal-rule pt-10">
+        <AchievementsView />
+      </div>
+    </div>
+  );
+};
+
+export default CalendarView;
