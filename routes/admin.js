@@ -1051,7 +1051,7 @@ const ADMIN_HTML = `<!doctype html>
     }
 
     async function deleteTherapist(id, name, btn) {
-      if (!window.confirm('確定要永久刪除諮商師「' + (name || '') + '」嗎？此動作無法復原。\n（若只是想暫時下架，請改用「暫停」。）')) return;
+      if (!window.confirm('確定要永久刪除諮商師「' + (name || '') + '」嗎？此動作無法復原。\\n（若只是想暫時下架，請改用「暫停」。）')) return;
       btn.disabled = true;
       try {
         var res = await fetch('/api/admin/therapists/' + id, { method: 'DELETE' });
