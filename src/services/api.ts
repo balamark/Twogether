@@ -675,20 +675,38 @@ apiClient.interceptors.response.use(
 // Human therapist (心理諮商師) directory types
 export type TherapistFocusArea =
   | 'family' | 'couple' | 'childhood' | 'individual'
-  | 'sexuality' | 'parenting' | 'grief' | 'anxiety';
+  | 'sexuality' | 'parenting' | 'grief' | 'anxiety'
+  | 'depression' | 'trauma' | 'addiction' | 'lgbtq'
+  | 'career' | 'self_esteem';
+
+export type TherapistIdentityStatus = 'unverified' | 'submitted' | 'verified' | 'rejected';
 
 export interface Therapist {
   id: string;
   displayName: string;
   title?: string | null;
   focusAreas: TherapistFocusArea[];
+  customSpecialties?: string[];
   languages: string[];
   yearsExperience?: number | null;
   bio?: string | null;
   photoUrl?: string | null;
   rateTwd: number;
   sessionMinutes: number;
+  identityStatus?: TherapistIdentityStatus;
   createdAt: string;
+}
+
+// The therapist's own private view of their profile (GET /therapists/me).
+export interface OwnTherapistProfile extends Therapist {
+  licenseNo?: string | null;
+  contactEmail: string;
+  contactPhone?: string | null;
+  status: 'pending' | 'approved' | 'rejected' | 'suspended';
+  reviewNote?: string | null;
+  emailVerified: boolean;
+  identityDocuments: string[];
+  identityStatus: TherapistIdentityStatus;
 }
 
 export interface TherapistApplicationInput {
@@ -696,14 +714,31 @@ export interface TherapistApplicationInput {
   title?: string;
   licenseNo?: string;
   focusAreas: TherapistFocusArea[];
+  customSpecialties?: string[];
   languages?: string[];
   yearsExperience?: number | null;
   bio?: string;
   photoUrl?: string;
+  identityDocuments?: string[];
   rateTwd: number;
   sessionMinutes?: number;
   contactEmail: string;
   contactPhone?: string;
+}
+
+// Fields a therapist may edit on their own profile (PUT /therapists/me).
+export interface TherapistProfileUpdate {
+  displayName?: string;
+  title?: string | null;
+  focusAreas?: TherapistFocusArea[];
+  customSpecialties?: string[];
+  languages?: string[];
+  yearsExperience?: number | null;
+  bio?: string | null;
+  photoUrl?: string | null;
+  rateTwd?: number;
+  sessionMinutes?: number;
+  contactPhone?: string | null;
 }
 
 export interface ConsultationRequestInput {
@@ -2434,6 +2469,56 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to submit therapist application:', error);
       this.throwApiError(error, '送出申請失敗，請稍後再試');
+    }
+  }
+
+  // Self-service therapist profile (logged-in therapist).
+  async getMyTherapistProfile(): Promise<OwnTherapistProfile | null> {
+    try {
+      const response = await apiClient.get('/therapists/me');
+      return response.data?.therapist as OwnTherapistProfile;
+    } catch (error: unknown) {
+      // 404 just means "this user isn't a therapist" — return null, not throw.
+      const code = (error as { response?: { status?: number } })?.response?.status;
+      if (code === 404) return null;
+      console.error('Failed to fetch own therapist profile:', error);
+      this.throwApiError(error, '無法取得諮商師檔案');
+    }
+  }
+
+  async updateMyTherapistProfile(input: TherapistProfileUpdate): Promise<OwnTherapistProfile> {
+    try {
+      const response = await apiClient.put('/therapists/me', input);
+      return response.data?.therapist as OwnTherapistProfile;
+    } catch (error: unknown) {
+      console.error('Failed to update therapist profile:', error);
+      this.throwApiError(error, '更新檔案失敗，請稍後再試');
+    }
+  }
+
+  async addMyTherapistDocument(url: string): Promise<OwnTherapistProfile> {
+    try {
+      const response = await apiClient.post('/therapists/me/documents', { url });
+      return response.data?.therapist as OwnTherapistProfile;
+    } catch (error: unknown) {
+      console.error('Failed to add therapist document:', error);
+      this.throwApiError(error, '上傳文件失敗，請稍後再試');
+    }
+  }
+
+  // Upload a therapist photo (kind='photo') or credential document
+  // (kind='document'). Public endpoints (used by the no-login sign-up form too).
+  async uploadTherapistAsset(file: File, kind: 'photo' | 'document'): Promise<string> {
+    try {
+      const form = new FormData();
+      form.append(kind, file);
+      const response = await apiClient.post(`/therapists/upload-${kind}`, form, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return response.data?.url as string;
+    } catch (error: unknown) {
+      console.error('Failed to upload therapist asset:', error);
+      this.throwApiError(error, '上傳失敗，請稍後再試');
     }
   }
 
