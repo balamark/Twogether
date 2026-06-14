@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow, LayoutGrid, List, Gamepad2 } from 'lucide-react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow, LayoutGrid, List, Gamepad2, ChevronDown, ArrowUp } from 'lucide-react';
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { apiService } from '../services/api';
@@ -79,6 +79,77 @@ const ScriptThumbPlaceholder: React.FC<{
   );
 };
 
+type ViewMode = 'grid' | 'list';
+
+// Per-section view mode (grid/list) persisted under its own localStorage key so
+// each section — favorites, custom, collection, all, marketplace — remembers its
+// own preference independently rather than sharing one global toggle.
+function usePersistedViewMode(key: string, fallback: ViewMode = 'grid') {
+  const [mode, setMode] = useState<ViewMode>(() => {
+    try {
+      const v = localStorage.getItem(key);
+      return v === 'list' || v === 'grid' ? v : fallback;
+    } catch {
+      return fallback;
+    }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(key, mode); } catch { /* ignore */ }
+  }, [key, mode]);
+  return [mode, setMode] as const;
+}
+
+// Persisted boolean (collapsed/expanded), so a section the user opens once stays
+// open on the next visit. Defaults apply only when nothing is stored yet.
+function usePersistedBool(key: string, fallback: boolean) {
+  const [val, setVal] = useState<boolean>(() => {
+    try {
+      const v = localStorage.getItem(key);
+      return v === null ? fallback : v === '1';
+    } catch {
+      return fallback;
+    }
+  });
+  useEffect(() => {
+    try { localStorage.setItem(key, val ? '1' : '0'); } catch { /* ignore */ }
+  }, [key, val]);
+  return [val, setVal] as const;
+}
+
+// Small grid/list segmented control shown in each section header.
+const ViewToggle: React.FC<{
+  mode: ViewMode;
+  setMode: (m: ViewMode) => void;
+  idPrefix: string;
+}> = ({ mode, setMode, idPrefix }) => (
+  <div className="flex items-center gap-0.5 flex-shrink-0">
+    <button
+      type="button"
+      onClick={() => setMode('grid')}
+      data-testid={`${idPrefix}-view-toggle-grid`}
+      aria-label="縮圖檢視"
+      aria-pressed={mode === 'grid'}
+      className={`p-1.5 rounded-md transition-colors ${
+        mode === 'grid' ? 'text-petal-ink bg-petal-cream-2' : 'text-petal-muted hover:text-petal-ink'
+      }`}
+    >
+      <LayoutGrid className="w-4 h-4" strokeWidth={1.5} />
+    </button>
+    <button
+      type="button"
+      onClick={() => setMode('list')}
+      data-testid={`${idPrefix}-view-toggle-list`}
+      aria-label="列表檢視"
+      aria-pressed={mode === 'list'}
+      className={`p-1.5 rounded-md transition-colors ${
+        mode === 'list' ? 'text-petal-ink bg-petal-cream-2' : 'text-petal-muted hover:text-petal-ink'
+      }`}
+    >
+      <List className="w-4 h-4" strokeWidth={1.5} />
+    </button>
+  </div>
+);
+
 const RoleplayView: React.FC<RoleplayViewProps> = ({
   defaultRoleplayScripts,
   customScripts,
@@ -104,17 +175,43 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   // alone does NOT record; only this transition does.
   const [hasBegun, setHasBegun] = useState(false);
 
-  // View mode — grid (thumbnails) vs list (compact text rows). Persisted across visits.
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>(() => {
-    try {
-      return localStorage.getItem('roleplayViewMode') === 'list' ? 'list' : 'grid';
-    } catch {
-      return 'grid';
-    }
-  });
+  // Per-section view modes (grid/list), each persisted independently so e.g. the
+  // long 所有劇本 list can stay compact while favorites stays as thumbnails.
+  const [favoritesView, setFavoritesView] = usePersistedViewMode('roleplayView:favorites', 'grid');
+  const [customView, setCustomView] = usePersistedViewMode('roleplayView:custom', 'grid');
+  const [collectionView, setCollectionView] = usePersistedViewMode('roleplayView:collection', 'grid');
+  const [allView, setAllView] = usePersistedViewMode('roleplayView:all', 'list');
+  const [marketplaceView, setMarketplaceView] = usePersistedViewMode('roleplayView:marketplace', 'grid');
+
+  // Collapsible sections. 收藏劇本 and 所有劇本 hold the most items and are
+  // collapsed by default so the page is short on mobile; the user can expand
+  // either and the choice sticks.
+  const [collectionOpen, setCollectionOpen] = usePersistedBool('roleplayOpen:collection', false);
+  const [allOpen, setAllOpen] = usePersistedBool('roleplayOpen:all', false);
+
+  // Section anchors for the quick-jump nav. Jumping also expands a collapsed
+  // section so the target content is actually visible after the scroll.
+  const favoritesRef = useRef<HTMLDivElement>(null);
+  const customRef = useRef<HTMLDivElement>(null);
+  const collectionRef = useRef<HTMLDivElement>(null);
+  const allRef = useRef<HTMLDivElement>(null);
+
+  const scrollToSection = useCallback((ref: React.RefObject<HTMLDivElement | null>, expand?: () => void) => {
+    expand?.();
+    // Defer so an expanding section has rendered before we measure its top.
+    requestAnimationFrame(() => {
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, []);
+
+  // Floating back-to-top button — shown once the user has scrolled past a screenful.
+  const [showBackToTop, setShowBackToTop] = useState(false);
   useEffect(() => {
-    try { localStorage.setItem('roleplayViewMode', viewMode); } catch { /* ignore */ }
-  }, [viewMode]);
+    const onScroll = () => setShowBackToTop(window.scrollY > 600);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   // Marketplace state — discoverable public scripts shared by other users.
   const [mainTab, setMainTab] = useState<'mine' | 'marketplace' | 'games'>('mine');
@@ -387,63 +484,32 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
       </div>
       )}
 
-      {/* Main tabs — My Scripts vs Marketplace */}
-      <div className="flex items-center justify-between gap-2 mb-6 border-b border-petal-rule">
-        <div className="flex gap-1">
-          {([
-            { id: 'mine' as const, label: '我的劇本', icon: <FileText className="w-3.5 h-3.5" strokeWidth={1.5} /> },
-            { id: 'marketplace' as const, label: '創作市集', icon: <Store className="w-3.5 h-3.5" strokeWidth={1.5} /> },
-            ...(renderGames ? [{ id: 'games' as const, label: '情趣遊戲', icon: <Gamepad2 className="w-3.5 h-3.5" strokeWidth={1.5} /> }] : []),
-          ]).map((t) => {
-            const isActive = mainTab === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setMainTab(t.id)}
-                data-testid={`roleplay-tab-${t.id}`}
-                className={`px-4 py-2.5 font-display text-base tracking-tight transition-colors -mb-px border-b-2 inline-flex items-center gap-2 ${
-                  isActive
-                    ? 'text-petal-ink border-petal-rose-deep font-medium'
-                    : 'text-petal-muted border-transparent hover:text-petal-ink'
-                }`}
-              >
-                {t.icon}
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex items-center gap-1 pb-1.5">
-          <button
-            type="button"
-            onClick={() => setViewMode('grid')}
-            data-testid="roleplay-view-toggle-grid"
-            aria-label="縮圖檢視"
-            aria-pressed={viewMode === 'grid'}
-            className={`p-1.5 rounded-md transition-colors ${
-              viewMode === 'grid'
-                ? 'text-petal-ink bg-petal-cream-2'
-                : 'text-petal-muted hover:text-petal-ink'
-            }`}
-          >
-            <LayoutGrid className="w-4 h-4" strokeWidth={1.5} />
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            data-testid="roleplay-view-toggle-list"
-            aria-label="列表檢視"
-            aria-pressed={viewMode === 'list'}
-            className={`p-1.5 rounded-md transition-colors ${
-              viewMode === 'list'
-                ? 'text-petal-ink bg-petal-cream-2'
-                : 'text-petal-muted hover:text-petal-ink'
-            }`}
-          >
-            <List className="w-4 h-4" strokeWidth={1.5} />
-          </button>
-        </div>
+      {/* Main tabs — My Scripts vs Marketplace. Icons hide on the narrowest
+          phones and labels never wrap, so 「我的劇本」stays on one line. */}
+      <div className="flex items-stretch gap-0.5 sm:gap-1 mb-6 border-b border-petal-rule overflow-x-auto">
+        {([
+          { id: 'mine' as const, label: '我的劇本', icon: <FileText className="w-3.5 h-3.5" strokeWidth={1.5} /> },
+          { id: 'marketplace' as const, label: '創作市集', icon: <Store className="w-3.5 h-3.5" strokeWidth={1.5} /> },
+          ...(renderGames ? [{ id: 'games' as const, label: '情趣遊戲', icon: <Gamepad2 className="w-3.5 h-3.5" strokeWidth={1.5} /> }] : []),
+        ]).map((t) => {
+          const isActive = mainTab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setMainTab(t.id)}
+              data-testid={`roleplay-tab-${t.id}`}
+              className={`px-2.5 sm:px-4 py-2.5 font-display text-[15px] sm:text-base tracking-tight whitespace-nowrap transition-colors -mb-px border-b-2 inline-flex items-center gap-1.5 sm:gap-2 ${
+                isActive
+                  ? 'text-petal-ink border-petal-rose-deep font-medium'
+                  : 'text-petal-muted border-transparent hover:text-petal-ink'
+              }`}
+            >
+              <span className="hidden xs:inline-flex">{t.icon}</span>
+              {t.label}
+            </button>
+          );
+        })}
       </div>
 
       {mainTab === 'mine' && (
@@ -475,17 +541,45 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           })}
         </div>
 
+        {/* Quick-jump nav — sticks under the tab bar so the user can hop
+            straight to a section instead of scrolling past long lists. */}
+        <div className="sticky top-0 z-20 -mx-1 px-1 py-2 mb-6 bg-petal-cream/95 backdrop-blur-sm border-b border-petal-rule-soft">
+          <div className="flex gap-1.5 overflow-x-auto" data-testid="roleplay-section-nav">
+            {[
+              { label: topSectionTitle, ref: favoritesRef, testId: 'jump-favorites' as const, expand: undefined },
+              { label: '自訂', ref: customRef, testId: 'jump-custom' as const, expand: undefined },
+              ...(favoritedMarketplace.length > 0
+                ? [{ label: '收藏', ref: collectionRef, testId: 'jump-collection' as const, expand: () => setCollectionOpen(true) }]
+                : []),
+              { label: '所有', ref: allRef, testId: 'jump-all' as const, expand: () => setAllOpen(true) },
+            ].map((s) => (
+              <button
+                key={s.testId}
+                type="button"
+                onClick={() => scrollToSection(s.ref, s.expand)}
+                data-testid={`roleplay-section-${s.testId}`}
+                className="flex-shrink-0 px-3 py-1.5 rounded-full border border-petal-rule bg-white text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink font-body text-[13px] font-medium transition-colors whitespace-nowrap"
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Top section — favorites if any, else fallback featured */}
-        <div className="mb-10" data-testid={hasFavorites ? 'roleplay-favorites-section' : 'roleplay-featured-section'}>
-          <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6 flex items-center">
-            {hasFavorites ? (
-              <Heart className="w-4 h-4 mr-2 text-petal-rose-deep fill-petal-rose-deep" strokeWidth={1.5} />
-            ) : (
-              <Sparkles className="w-4 h-4 mr-2 text-petal-rose-deep" strokeWidth={1.5} />
-            )}
-            {topSectionTitle}<em className="not-italic font-light italic text-pink-600 ml-1">劇本</em>
-          </h3>
-          {viewMode === 'grid' ? (
+        <div ref={favoritesRef} className="mb-10 scroll-mt-20" data-testid={hasFavorites ? 'roleplay-favorites-section' : 'roleplay-featured-section'}>
+          <div className="flex items-center justify-between gap-2 mb-6">
+            <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink flex items-center min-w-0">
+              {hasFavorites ? (
+                <Heart className="w-4 h-4 mr-2 text-petal-rose-deep fill-petal-rose-deep flex-shrink-0" strokeWidth={1.5} />
+              ) : (
+                <Sparkles className="w-4 h-4 mr-2 text-petal-rose-deep flex-shrink-0" strokeWidth={1.5} />
+              )}
+              <span className="truncate">{topSectionTitle}<em className="not-italic font-light italic text-pink-600 ml-1">劇本</em></span>
+            </h3>
+            <ViewToggle mode={favoritesView} setMode={setFavoritesView} idPrefix="roleplay-favorites" />
+          </div>
+          {favoritesView === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {topScripts.map((script, index) => (
                 <div key={script.id ?? index} className="bg-white rounded-md p-4 border border-petal-rule hover:border-petal-rose transition-colors">
@@ -555,25 +649,30 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
         </div>
 
         {/* Custom Scripts Upload */}
-        <div className="mb-10 p-5 bg-petal-cream-2/40 rounded-md border border-petal-rule">
-          <div className="flex items-center justify-between mb-5">
-            <h3 className="font-display text-xl font-medium tracking-tight text-petal-ink flex items-center">
-              <FileText className="w-4 h-4 mr-2 text-petal-ink-soft" strokeWidth={1.5} />
-              自訂<em className="not-italic font-light italic text-pink-600 mx-1">劇本</em>
-              <span className="font-display italic font-light text-sm text-petal-muted ml-2">({customScripts.length})</span>
+        <div ref={customRef} className="mb-10 p-5 bg-petal-cream-2/40 rounded-md border border-petal-rule scroll-mt-20">
+          <div className="flex items-center justify-between gap-2 mb-5">
+            <h3 className="font-display text-xl font-medium tracking-tight text-petal-ink flex items-center min-w-0">
+              <FileText className="w-4 h-4 mr-2 text-petal-ink-soft flex-shrink-0" strokeWidth={1.5} />
+              <span className="truncate">自訂<em className="not-italic font-light italic text-pink-600 mx-1">劇本</em>
+              <span className="font-display italic font-light text-sm text-petal-muted ml-1">({customScripts.length})</span></span>
             </h3>
-            <button
-              onClick={() => setShowScriptUploadModal(true)}
-              data-testid="script-upload-button"
-              className="bg-petal-ink text-petal-cream px-4 py-1.5 rounded-full font-body text-xs hover:bg-pink-700 transition-colors flex items-center space-x-1.5"
-            >
-              <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
-              <span>上傳劇本</span>
-            </button>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {customScripts.length > 0 && (
+                <ViewToggle mode={customView} setMode={setCustomView} idPrefix="roleplay-custom" />
+              )}
+              <button
+                onClick={() => setShowScriptUploadModal(true)}
+                data-testid="script-upload-button"
+                className="bg-petal-ink text-petal-cream px-4 py-1.5 rounded-full font-body text-xs hover:bg-pink-700 transition-colors flex items-center space-x-1.5"
+              >
+                <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <span>上傳劇本</span>
+              </button>
+            </div>
           </div>
 
           {customScripts.length > 0 ? (
-            viewMode === 'grid' ? (
+            customView === 'grid' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {customScripts.map((script) => (
                   <div key={script.id} data-testid={`script-card-custom-${script.id}`} className="bg-white border border-petal-rule rounded-md p-4 hover:border-petal-rose transition-colors">
@@ -692,15 +791,32 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           )}
         </div>
 
-        {/* Favorited from Marketplace */}
+        {/* Favorited from Marketplace — collapsed by default (can hold many). */}
         {favoritedMarketplace.length > 0 && (
-          <div className="mb-10" data-testid="roleplay-marketplace-favorites-section">
-            <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6 flex items-center">
-              <Heart className="w-4 h-4 mr-2 text-petal-rose-deep fill-petal-rose-deep" strokeWidth={1.5} />
-              收藏<em className="not-italic font-light italic text-pink-600 mx-1">劇本</em>
-              <span className="font-display italic font-light text-sm text-petal-muted ml-2">({favoritedMarketplace.length})</span>
-            </h3>
-            {viewMode === 'grid' ? (
+          <div ref={collectionRef} className="mb-10 scroll-mt-20" data-testid="roleplay-marketplace-favorites-section">
+            <div className="flex items-center justify-between gap-2 mb-6">
+              <button
+                type="button"
+                onClick={() => setCollectionOpen((o) => !o)}
+                data-testid="roleplay-collection-toggle"
+                aria-expanded={collectionOpen}
+                className="flex items-center min-w-0 group"
+              >
+                <ChevronDown
+                  className={`w-5 h-5 mr-1 text-petal-muted flex-shrink-0 transition-transform ${collectionOpen ? '' : '-rotate-90'}`}
+                  strokeWidth={1.5}
+                />
+                <Heart className="w-4 h-4 mr-2 text-petal-rose-deep fill-petal-rose-deep flex-shrink-0" strokeWidth={1.5} />
+                <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink truncate group-hover:text-petal-rose-deep transition-colors">
+                  收藏<em className="not-italic font-light italic text-pink-600 mx-1">劇本</em>
+                  <span className="font-display italic font-light text-sm text-petal-muted ml-1">({favoritedMarketplace.length})</span>
+                </h3>
+              </button>
+              {collectionOpen && (
+                <ViewToggle mode={collectionView} setMode={setCollectionView} idPrefix="roleplay-collection" />
+              )}
+            </div>
+            {!collectionOpen ? null : collectionView === 'grid' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {favoritedMarketplace.map((m) => (
                   <div
@@ -790,14 +906,41 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           </div>
         )}
 
-        {/* All Scripts */}
-        <div>
-          <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6 flex items-center">
-            <Filter className="w-4 h-4 mr-2 text-petal-ink-soft" strokeWidth={1.5} />
-            所有<em className="not-italic font-light italic text-pink-600 mx-1">劇本</em>
-            <span className="font-display italic font-light text-sm text-petal-muted ml-2">({filteredScripts.length})</span>
-          </h3>
-          {viewMode === 'grid' ? (
+        {/* All Scripts — collapsed by default; this is the longest list so the
+            user opts in to expanding it. */}
+        <div ref={allRef} className="scroll-mt-20">
+          <div className="flex items-center justify-between gap-2 mb-6">
+            <button
+              type="button"
+              onClick={() => setAllOpen((o) => !o)}
+              data-testid="roleplay-all-toggle"
+              aria-expanded={allOpen}
+              className="flex items-center min-w-0 group"
+            >
+              <ChevronDown
+                className={`w-5 h-5 mr-1 text-petal-muted flex-shrink-0 transition-transform ${allOpen ? '' : '-rotate-90'}`}
+                strokeWidth={1.5}
+              />
+              <Filter className="w-4 h-4 mr-2 text-petal-ink-soft flex-shrink-0" strokeWidth={1.5} />
+              <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink truncate group-hover:text-petal-rose-deep transition-colors">
+                所有<em className="not-italic font-light italic text-pink-600 mx-1">劇本</em>
+                <span className="font-display italic font-light text-sm text-petal-muted ml-1">({filteredScripts.length})</span>
+              </h3>
+            </button>
+            {allOpen && (
+              <ViewToggle mode={allView} setMode={setAllView} idPrefix="roleplay-all" />
+            )}
+          </div>
+          {!allOpen ? (
+            <button
+              type="button"
+              onClick={() => setAllOpen(true)}
+              data-testid="roleplay-all-expand"
+              className="w-full py-3 rounded-md border border-dashed border-petal-rule text-petal-muted hover:text-petal-ink hover:border-petal-ink font-body text-sm transition-colors"
+            >
+              展開全部 {filteredScripts.length} 個劇本
+            </button>
+          ) : allView === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
               {filteredScripts.map((script, index) => (
                 <div key={index} className="bg-white border border-petal-rule rounded-md p-4 sm:p-5 hover:border-petal-rose transition-colors">
@@ -913,7 +1056,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
 
       {mainTab === 'marketplace' && (
         <div data-testid="roleplay-marketplace-tab">
-          <div className="flex flex-wrap gap-2 mb-6">
+          <div className="flex flex-wrap items-center gap-2 mb-6">
             <PetalSelect
               value={marketplaceSort}
               onChange={(v) => setMarketplaceSort(v as 'rating' | 'recent' | 'popular')}
@@ -942,6 +1085,9 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                 { value: 'bold', label: '大膽' },
               ]}
             />
+            <div className="ml-auto">
+              <ViewToggle mode={marketplaceView} setMode={setMarketplaceView} idPrefix="roleplay-marketplace" />
+            </div>
           </div>
 
           {marketplaceLoading ? (
@@ -953,7 +1099,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               目前還沒有公開劇本，第一個發布的就是你！
             </p>
           ) : (
-            viewMode === 'grid' ? (
+            marketplaceView === 'grid' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="marketplace-grid">
                 {marketplaceScripts.map((m) => (
                   <div
@@ -1175,6 +1321,19 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           </div>
         )}
         </>
+      )}
+
+      {/* Floating back-to-top — long script lists mean a lot of scrolling. */}
+      {showBackToTop && (
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          data-testid="roleplay-back-to-top"
+          aria-label="回到最上面"
+          className="fixed bottom-6 right-4 sm:bottom-8 sm:right-8 z-40 w-11 h-11 inline-flex items-center justify-center rounded-full bg-petal-ink text-petal-cream shadow-petal border border-petal-ink/10 hover:bg-pink-700 transition-colors safe-pb"
+        >
+          <ArrowUp className="w-5 h-5" strokeWidth={1.5} />
+        </button>
       )}
     </div>
   );

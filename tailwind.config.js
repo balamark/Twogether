@@ -10,6 +10,11 @@ export default {
   ],
   theme: {
     extend: {
+      // Extra-small breakpoint for phones — lets tab bars show icons only once
+      // there's room, keeping labels like 「我的劇本」on one line below it.
+      screens: {
+        xs: '400px',
+      },
       colors: {
         // Stock Tailwind scales remapped to Soft Petal so existing markup just works.
         pink: {

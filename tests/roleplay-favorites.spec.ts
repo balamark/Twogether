@@ -8,6 +8,10 @@ const TEST_USER = {
 async function loginIfNeeded(page: Page) {
   await page.addInitScript(() => {
     localStorage.setItem('pairingPromptDismissed', 'true');
+    // 收藏劇本 / 所有劇本 are collapsed by default; expand them so the
+    // all-scripts cards these tests target are rendered.
+    localStorage.setItem('roleplayOpen:all', '1');
+    localStorage.setItem('roleplayOpen:collection', '1');
   });
   await page.goto('/');
   await page.waitForLoadState('networkidle');

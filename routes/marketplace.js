@@ -307,9 +307,26 @@ router.get('/my-favorites', async (req, res) => {
     );
     const coupleId = coupleRow.rows.length ? coupleRow.rows[0].id : null;
 
+    // Members of the viewer's couple — used to exclude the couple's own
+    // authored scripts from 收藏劇本. A couple's own custom scripts already
+    // live in the 自訂劇本 section; surfacing them again here (and 404-ing on
+    // click, since unpublished scripts aren't in marketplace_scripts_view)
+    // was the bug the author reported.
+    const ownerRow = await db.query(
+      'SELECT user1_id, user2_id FROM couples WHERE id = $1',
+      [coupleId]
+    );
+    const ownerIds = [userId];
+    if (ownerRow.rows.length) {
+      const { user1_id, user2_id } = ownerRow.rows[0];
+      if (user1_id) ownerIds.push(user1_id);
+      if (user2_id) ownerIds.push(user2_id);
+    }
+
     // Pull favorites whose script_id is a UUID that matches a custom script.
     // Join via marketplace view first; fall back to raw custom_scripts for
     // scripts the author has since unpublished (so user keeps access).
+    // Exclude scripts authored by the viewer's couple — those belong in 自訂劇本.
     const result = await db.query(
       `SELECT s.id, s.title, s.category, s.scenario, s.content, s.tags, s.duration,
               s.thumbnail_url, s.is_public, s.created_by, s.created_at, s.updated_at,
@@ -323,10 +340,11 @@ router.get('/my-favorites', async (req, res) => {
            SELECT script_id, AVG(stars)::numeric(3,2) AS avg_stars, COUNT(*) AS rating_count
              FROM script_ratings GROUP BY script_id
          ) r ON r.script_id = s.id
-         WHERE ($1::uuid IS NOT NULL AND f.couple_id = $1)
-            OR ($1::uuid IS NULL AND f.couple_id IS NULL AND f.favorited_by = $2)
+         WHERE (($1::uuid IS NOT NULL AND f.couple_id = $1)
+            OR ($1::uuid IS NULL AND f.couple_id IS NULL AND f.favorited_by = $2))
+           AND s.created_by <> ALL($3::uuid[])
          ORDER BY f.created_at DESC`,
-      [coupleId, userId]
+      [coupleId, userId, ownerIds]
     );
 
     res.json({
