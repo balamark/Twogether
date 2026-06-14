@@ -1306,4 +1306,7 @@ if (process.env.NODE_ENV !== 'test') {
   setTimeout(purgeOldLandingVisits, 30_000).unref();
 }
 
-module.exports = { publicRouter, adminApiRouter, htmlHandler, purgeOldLandingVisits };
+// ADMIN_HTML is exported so scripts/check-admin-inline-script.js can validate
+// the embedded <script> (which lives inside a template literal and is therefore
+// invisible to eslint / `node --check` on this module).
+module.exports = { publicRouter, adminApiRouter, htmlHandler, purgeOldLandingVisits, ADMIN_HTML };
