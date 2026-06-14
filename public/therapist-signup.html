@@ -62,7 +62,29 @@
     a.back { display: inline-block; margin-top: 22px; color: var(--muted); font-size: 13px; text-decoration: none; }
     a.back:hover { color: var(--ink); }
     @media (max-width: 560px) { .row, .row-3 { grid-template-columns: 1fr; } }
-  </style>
+
+    /* 收入與分潤 section */
+    .share { background: var(--cream-2); border: 1px solid var(--rule); border-radius: 10px; padding: 20px; margin-bottom: 22px; }
+    .share-head { margin-bottom: 14px; }
+    .share-title { font-size: 20px; font-weight: 400; margin: 4px 0 4px; letter-spacing: -0.01em; }
+    .share-title em { font-style: italic; color: var(--rose); }
+    .share-lede { color: var(--muted); font-size: 13px; margin: 0; }
+    .share-block { padding: 12px 0; border-top: 1px solid var(--rule); }
+    .share-block-title { font-size: 14px; font-weight: 600; color: var(--ink); margin-bottom: 4px; }
+    .share-block p { font-size: 13px; color: var(--ink-soft); margin: 4px 0; }
+    .share-block strong { color: var(--ink); font-weight: 600; }
+    .split-grid { display: grid; gap: 8px; margin: 10px 0 4px; }
+    .split-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 12px; background: #fff; border: 1px solid var(--rule); border-radius: 8px; font-size: 13px; }
+    .split-row > span { color: var(--muted); }
+    .split-row.intro { border-color: var(--pink); background: #fdf4f3; }
+    .split-row.intro strong { color: var(--rose); }
+    .calc { margin-top: 12px; padding: 12px; background: #fff; border: 1px dashed var(--rule); border-radius: 8px; }
+    .calc-title { font-size: 12px; color: var(--ink-soft); font-weight: 600; margin-bottom: 8px; }
+    .calc-rows { display: grid; gap: 6px; }
+    .calc-item { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; }
+    .calc-item > span { color: var(--muted); font-size: 13px; }
+    .calc-item > b { color: var(--ink); font-variant-numeric: tabular-nums; }
+</style>
 </head>
 <body>
   <div class="wrap">
@@ -186,6 +208,42 @@
           <p class="note" id="docStatus" style="text-align:left; margin:8px 0 0;">諮商師證照、執業執照等。JPG / PNG / WebP / PDF，10MB 以內。文件僅供審核，不會公開。</p>
         </div>
 
+        <div class="field share">
+          <div class="share-head">
+            <span class="eyebrow">— 收入與分潤</span>
+            <h2 class="share-title">你會怎麼<em>賺取收入</em></h2>
+            <p class="share-lede">加入免費，平台只在你實際提供服務時收取分潤。以下是兩種收入方式。</p>
+          </div>
+
+          <div class="share-block">
+            <div class="share-block-title">💬 免費聊天</div>
+            <p>使用者可開啟你的聊天室，免費直接和你對談。聊得來時，系統會邀請對方預約付費視訊諮商。</p>
+          </div>
+
+          <div class="share-block">
+            <div class="share-block-title">🌱 公開問答分潤</div>
+            <p>經你和個案<strong>雙方同意</strong>後，對話可<strong>匿名</strong>公開為「公開問答」，幫助有相同困擾的人參考。</p>
+            <p>平台每月從營收提撥一筆「分潤金」，分給當月有參與的諮商師：<strong>初期平均分配</strong>，未來依參與度（回覆量、被公開、被標記有幫助）加權。每月結算後撥款。</p>
+          </div>
+
+          <div class="share-block">
+            <div class="share-block-title">🎥 視訊諮商抽成</div>
+            <p>1:1 視訊以 Zoom / Google Meet 進行（你接受預約後貼上會議連結）。款項由綠界（ECPay）線上收款，結算後撥付給你。</p>
+            <div class="split-grid">
+              <div class="split-row"><span>標準分潤</span><strong>平台 20%　·　你拿 80%</strong></div>
+              <div class="split-row intro"><span>新進優惠</span><strong>前 10 次完成預約，平台只收 10%　·　你拿 90%</strong></div>
+            </div>
+            <div class="calc" id="shareCalc">
+              <div class="calc-title">以你目前的費率試算每次視訊諮商實拿：</div>
+              <div class="calc-rows">
+                <div class="calc-item"><span>新進優惠（10%）</span><b id="calcIntro">—</b></div>
+                <div class="calc-item"><span>一般（20%）</span><b id="calcStd">—</b></div>
+              </div>
+              <p class="note" style="text-align:left; margin:8px 0 0;">實際撥款金額以平台每月結算為準。</p>
+            </div>
+          </div>
+        </div>
+
         <button type="submit" class="submit" id="submit">送出申請</button>
         <p class="note">送出後我們會在審核後與你聯繫。審核期間你的資料不會公開。</p>
       </form>
@@ -215,6 +273,23 @@
         .call(document.querySelectorAll('#' + id + ' input:checked'))
         .map(function (i) { return i.value; });
     }
+
+    // ── Live revenue-share calculator ───────────────────────────────────────
+    // Mirrors the 20% / 10%-intro split so the therapist sees their take-home
+    // for a video session as they set their rate.
+    function ntd(n) { return 'NT$' + Math.round(n).toLocaleString('en-US'); }
+    var rateField = document.querySelector('input[name="rateTwd"]');
+    var calcIntro = document.getElementById('calcIntro');
+    var calcStd = document.getElementById('calcStd');
+    function updateShareCalc() {
+      var rate = Number(rateField && rateField.value);
+      if (!rate || rate <= 0) { calcIntro.textContent = '—'; calcStd.textContent = '—'; return; }
+      // floor the platform fee, therapist keeps the remainder (matches backend).
+      calcIntro.textContent = ntd(rate - Math.floor(rate * 0.10)); // 90%
+      calcStd.textContent = ntd(rate - Math.floor(rate * 0.20));   // 80%
+    }
+    if (rateField) rateField.addEventListener('input', updateShareCalc);
+    updateShareCalc();
 
     var form = document.getElementById('form');
     var result = document.getElementById('result');

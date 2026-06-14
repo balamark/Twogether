@@ -52,6 +52,13 @@ async function openTherapists(page: Page) {
   await expect(page.getByTestId('therapists-view')).toBeVisible({ timeout: 10000 });
 }
 
+// The view opens on the 公開問答 tab; the directory (cards + booking) lives under
+// the 找諮商師 tab, so switch to it before browsing/booking.
+async function openDirectoryTab(page: Page) {
+  await page.getByTestId('therapist-tab-directory').click();
+  await expect(page.getByTestId('therapist-card').first()).toBeVisible({ timeout: 10000 });
+}
+
 test.describe('Therapist counseling', () => {
   test('public sign-up page accepts an application', async ({ page }) => {
     await page.goto(`${BACKEND_BASE}/therapist-signup`);
@@ -74,6 +81,7 @@ test.describe('Therapist counseling', () => {
   test('browse, book, and chat in a consultation room', async ({ page }) => {
     await login(page);
     await openTherapists(page);
+    await openDirectoryTab(page);
 
     // Browse: the seeded therapists should render as cards.
     const firstCard = page.getByTestId('therapist-card').first();
@@ -102,5 +110,26 @@ test.describe('Therapist counseling', () => {
       page.getByTestId('chat-send').click(),
     ]);
     await expect(page.getByTestId('chat-messages')).toContainText(msg, { timeout: 10000 });
+  });
+
+  test('公開問答 tab is the default and the full profile shows reviews', async ({ page }) => {
+    await login(page);
+    await openTherapists(page);
+
+    // The view opens on the 公開問答 (Public Q&A) tab.
+    await expect(page.getByTestId('public-qa-view')).toBeVisible({ timeout: 10000 });
+
+    // Switch to 找諮商師 and open a therapist's full profile.
+    await openDirectoryTab(page);
+    await page.getByTestId('therapist-card').first().getByTestId('therapist-profile-button').click();
+
+    // The enriched profile modal renders with the client-reviews section.
+    await expect(page.getByTestId('therapist-profile-modal')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('reviews-section')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('reviews-section')).toContainText('客戶評價');
+
+    // Booking from the profile leads into the consultation booking modal.
+    await page.getByTestId('profile-book-button').click();
+    await expect(page.getByTestId('consultation-modal')).toBeVisible({ timeout: 5000 });
   });
 });

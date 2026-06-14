@@ -681,6 +681,13 @@ export type TherapistFocusArea =
 
 export type TherapistIdentityStatus = 'unverified' | 'submitted' | 'verified' | 'rejected';
 
+// Title + optional link, used by publications (source) and articles (url).
+export interface TherapistLinkItem {
+  title: string;
+  url?: string;
+  source?: string;
+}
+
 export interface Therapist {
   id: string;
   displayName: string;
@@ -694,7 +701,33 @@ export interface Therapist {
   rateTwd: number;
   sessionMinutes: number;
   identityStatus?: TherapistIdentityStatus;
+  // Rich profile sections (migration 048).
+  introMessage?: string | null;
+  approach?: string | null;
+  about?: string | null;
+  certifications?: string[];
+  currentPositions?: string[];
+  qualifications?: string[];
+  training?: string[];
+  publications?: TherapistLinkItem[];
+  articles?: TherapistLinkItem[];
+  acceptingNewClients?: boolean;
   createdAt: string;
+}
+
+export interface TherapistReview {
+  id: string;
+  reviewerDisplay: string;
+  rating?: number | null;
+  body: string;
+  createdAt: string;
+}
+
+export interface TherapistReviewsResult {
+  summary: { count: number; avgRating: number | null };
+  canReview: boolean;
+  alreadyReviewed: boolean;
+  reviews: TherapistReview[];
 }
 
 // The therapist's own private view of their profile (GET /therapists/me).
@@ -739,6 +772,17 @@ export interface TherapistProfileUpdate {
   rateTwd?: number;
   sessionMinutes?: number;
   contactPhone?: string | null;
+  // Rich profile sections (048).
+  introMessage?: string | null;
+  approach?: string | null;
+  about?: string | null;
+  certifications?: string[];
+  currentPositions?: string[];
+  qualifications?: string[];
+  training?: string[];
+  publications?: TherapistLinkItem[];
+  articles?: TherapistLinkItem[];
+  acceptingNewClients?: boolean;
 }
 
 export interface ConsultationRequestInput {
@@ -748,20 +792,55 @@ export interface ConsultationRequestInput {
   preferredTime?: string;
 }
 
+// 公開問答 publish lifecycle. private → (client|therapist)_requested → published,
+// or withdrawn. See migration 045 + routes/therapists.js publish handshake.
+export type ConsultationPublicStatus =
+  | 'private' | 'client_requested' | 'therapist_requested' | 'published' | 'withdrawn';
+
 export interface TherapistConsultation {
   id: string;
+  therapistId?: string;
   therapistName: string;
   therapistTitle?: string | null;
+  therapistRateTwd?: number;
+  therapistSessionMinutes?: number;
   requesterName?: string | null;
   role: 'therapist' | 'client';
   focusArea?: TherapistFocusArea | null;
   message?: string | null;
   preferredTime?: string | null;
-  status: 'pending' | 'accepted' | 'declined' | 'completed' | 'cancelled';
+  status: 'pending' | 'accepted' | 'declined' | 'completed' | 'cancelled' | 'no_show';
   respondedAt?: string | null;
   responseNote?: string | null;
+  publicStatus?: ConsultationPublicStatus;
+  publicTitle?: string | null;
+  // Paid video session (046). bookingType 'free' = the no-charge chat.
+  bookingType?: 'free' | 'scheduled';
+  paymentStatus?: 'unpaid' | 'pending' | 'paid' | 'refunded' | 'failed';
+  priceTwd?: number | null;
+  meetingProvider?: 'zoom' | 'meet' | 'other' | null;
+  meetingUrl?: string | null; // only present once paid
   messageCount: number;
   createdAt: string;
+}
+
+export type MeetingProvider = 'zoom' | 'meet' | 'other';
+
+export interface TherapistEarnings {
+  introSessionsUsed: number;
+  introSessionsRemaining: number;
+  currentFeeRate: number;
+  paidSessionCount: number;
+  totalNetTwd: number;
+  sessions: {
+    id: string;
+    priceTwd: number;
+    feeRate: number;
+    platformFeeTwd: number;
+    therapistNetTwd: number;
+    paidAt: string | null;
+    status: string;
+  }[];
 }
 
 export interface ConsultationMessage {
@@ -779,7 +858,47 @@ export interface ConsultationThread {
   role: 'therapist' | 'client';
   therapistName: string;
   currentUserId: string;
+  publicStatus?: ConsultationPublicStatus;
+  publicTitle?: string | null;
   messages: ConsultationMessage[];
+}
+
+// --- 公開問答 (Public Q&A) read-only browse types ---
+
+export interface PublicQaThreadSummary {
+  id: string;
+  title: string;
+  focusArea?: TherapistFocusArea | null;
+  publishedAt: string;
+  therapist: { id: string; displayName: string; title?: string | null; photoUrl?: string | null };
+  preview: string;
+  messageCount: number;
+  helpfulCount: number;
+}
+
+export interface PublicQaMessage {
+  id: string;
+  body: string;
+  createdAt: string;
+  isTherapist: boolean;
+  senderName: string; // therapist name, or "匿名個案"
+}
+
+export interface PublicQaThread {
+  id: string;
+  title: string;
+  focusArea?: TherapistFocusArea | null;
+  publishedAt: string;
+  helpfulCount: number;
+  hasVoted: boolean;
+  therapist: { id: string; displayName: string; title?: string | null; photoUrl?: string | null };
+  messages: PublicQaMessage[];
+}
+
+export interface PublicQaListResult {
+  page: number;
+  hasMore: boolean;
+  threads: PublicQaThreadSummary[];
 }
 
 // API Service Class
@@ -2550,6 +2669,8 @@ class ApiService {
         role: d.role,
         therapistName: d.therapistName,
         currentUserId: d.currentUserId,
+        publicStatus: d.publicStatus,
+        publicTitle: d.publicTitle,
         messages: (d.messages || []) as ConsultationMessage[],
       };
     } catch (error: unknown) {
@@ -2567,6 +2688,171 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to post consultation message:', error);
       this.throwApiError(error, '送出訊息失敗');
+    }
+  }
+
+  // --- 公開問答 (Public Q&A) ---
+
+  // Propose publishing a consultation chat. The other party must approve.
+  async requestPublishConsultation(consultationId: string, title: string): Promise<{ publicStatus: ConsultationPublicStatus; message: string }> {
+    try {
+      const response = await apiClient.post(`/therapists/consultations/${consultationId}/publish-request`, { title });
+      return { publicStatus: response.data?.publicStatus, message: response.data?.message };
+    } catch (error: unknown) {
+      console.error('Failed to request publish:', error);
+      this.throwApiError(error, '提議公開失敗，請稍後再試');
+    }
+  }
+
+  // Consent to a pending publish proposal (must be the other party).
+  async approvePublishConsultation(consultationId: string): Promise<{ publicStatus: ConsultationPublicStatus; message: string }> {
+    try {
+      const response = await apiClient.post(`/therapists/consultations/${consultationId}/publish-approve`);
+      return { publicStatus: response.data?.publicStatus, message: response.data?.message };
+    } catch (error: unknown) {
+      console.error('Failed to approve publish:', error);
+      this.throwApiError(error, '同意公開失敗，請稍後再試');
+    }
+  }
+
+  // Pull a pending/published consultation back to private.
+  async withdrawPublishConsultation(consultationId: string): Promise<{ publicStatus: ConsultationPublicStatus; message: string }> {
+    try {
+      const response = await apiClient.post(`/therapists/consultations/${consultationId}/publish-withdraw`);
+      return { publicStatus: response.data?.publicStatus, message: response.data?.message };
+    } catch (error: unknown) {
+      console.error('Failed to withdraw publish:', error);
+      this.throwApiError(error, '取消公開失敗，請稍後再試');
+    }
+  }
+
+  // Public read-only browse of published Q&A threads.
+  async getPublicQa(focus?: TherapistFocusArea, page = 1): Promise<PublicQaListResult> {
+    try {
+      const response = await apiClient.get('/therapists/qa', {
+        params: { ...(focus ? { focus } : {}), page },
+      });
+      const d = response.data || {};
+      return { page: d.page || page, hasMore: Boolean(d.hasMore), threads: (d.threads || []) as PublicQaThreadSummary[] };
+    } catch (error: unknown) {
+      console.error('Failed to fetch public Q&A:', error);
+      this.throwApiError(error, '無法取得公開問答列表');
+    }
+  }
+
+  async getPublicQaThread(id: string): Promise<PublicQaThread> {
+    try {
+      const response = await apiClient.get(`/therapists/qa/${id}`);
+      return response.data?.thread as PublicQaThread;
+    } catch (error: unknown) {
+      console.error('Failed to fetch public Q&A thread:', error);
+      this.throwApiError(error, '無法載入公開問答');
+    }
+  }
+
+  // Toggle a "helpful" vote. Returns the new state + count.
+  async votePublicQa(id: string): Promise<{ voted: boolean; helpfulCount: number }> {
+    try {
+      const response = await apiClient.post(`/therapists/qa/${id}/vote`);
+      return { voted: Boolean(response.data?.voted), helpfulCount: response.data?.helpfulCount ?? 0 };
+    } catch (error: unknown) {
+      console.error('Failed to vote public Q&A:', error);
+      this.throwApiError(error, '操作失敗，請稍後再試');
+    }
+  }
+
+  // --- Therapist reviews (客戶評價) ---
+
+  async getTherapistReviews(therapistId: string): Promise<TherapistReviewsResult> {
+    try {
+      const response = await apiClient.get(`/therapists/${therapistId}/reviews`);
+      const d = response.data || {};
+      return {
+        summary: d.summary || { count: 0, avgRating: null },
+        canReview: Boolean(d.canReview),
+        alreadyReviewed: Boolean(d.alreadyReviewed),
+        reviews: (d.reviews || []) as TherapistReview[],
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch therapist reviews:', error);
+      this.throwApiError(error, '無法取得評價');
+    }
+  }
+
+  async submitTherapistReview(
+    therapistId: string,
+    input: { body: string; rating?: number | null; displayName?: string },
+  ): Promise<{ message: string }> {
+    try {
+      const response = await apiClient.post(`/therapists/${therapistId}/reviews`, input);
+      return { message: response.data?.message || '感謝你的評價！' };
+    } catch (error: unknown) {
+      console.error('Failed to submit therapist review:', error);
+      this.throwApiError(error, '送出評價失敗，請稍後再試');
+    }
+  }
+
+  // --- Paid video sessions (視訊諮商) ---
+
+  // Book a paid session (off a free chat), then call paySession to charge it.
+  async bookVideoSession(
+    therapistId: string,
+    input: { message?: string; preferredTime?: string; sourceConsultationId?: string },
+  ): Promise<{ id: string; priceTwd: number }> {
+    try {
+      const response = await apiClient.post(`/therapists/${therapistId}/book-video`, input);
+      const c = response.data?.consultation || {};
+      return { id: c.id, priceTwd: c.priceTwd };
+    } catch (error: unknown) {
+      console.error('Failed to book video session:', error);
+      this.throwApiError(error, '預約失敗，請稍後再試');
+    }
+  }
+
+  // Start ECPay checkout for a booked session; redirects the browser on success.
+  async paySession(consultationId: string): Promise<void> {
+    try {
+      const response = await apiClient.post(`/therapists/consultations/${consultationId}/pay`);
+      const { action_url, params } = response.data || {};
+      if (!action_url || !params) throw new Error('付款資料異常，請稍後再試');
+      submitEcpayForm(action_url, params);
+    } catch (error: unknown) {
+      console.error('Failed to start session payment:', error);
+      this.throwApiError(error, '無法建立付款，請稍後再試');
+    }
+  }
+
+  // Therapist responds to a booking: accept / decline / complete / no_show.
+  async respondConsultation(
+    consultationId: string,
+    action: 'accept' | 'decline' | 'complete' | 'no_show',
+    note?: string,
+  ): Promise<void> {
+    try {
+      await apiClient.post(`/therapists/consultations/${consultationId}/respond`, { action, note });
+    } catch (error: unknown) {
+      console.error('Failed to respond to consultation:', error);
+      this.throwApiError(error, '回覆預約失敗，請稍後再試');
+    }
+  }
+
+  // Therapist sets the third-party meeting link (after accepting).
+  async setMeetingLink(consultationId: string, provider: MeetingProvider, url: string): Promise<void> {
+    try {
+      await apiClient.post(`/therapists/consultations/${consultationId}/meeting-link`, { provider, url });
+    } catch (error: unknown) {
+      console.error('Failed to set meeting link:', error);
+      this.throwApiError(error, '設定會議連結失敗，請稍後再試');
+    }
+  }
+
+  async getMyEarnings(): Promise<TherapistEarnings> {
+    try {
+      const response = await apiClient.get('/therapists/me/earnings');
+      return response.data?.earnings as TherapistEarnings;
+    } catch (error: unknown) {
+      console.error('Failed to fetch earnings:', error);
+      this.throwApiError(error, '無法取得收入資料');
     }
   }
 }

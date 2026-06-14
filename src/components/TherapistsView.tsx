@@ -1,17 +1,24 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, Sparkles, X, UserPlus, Clock, Languages, Award, CalendarCheck, MessageCircle, Send, StickyNote, UserCog, Upload, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Heart, Sparkles, X, UserPlus, Clock, Languages, Award, CalendarCheck, MessageCircle, Send, StickyNote, UserCog, Upload, CheckCircle2, AlertCircle, Globe, Users, Video, Wallet } from 'lucide-react';
 import {
   apiService,
   type Therapist,
   type TherapistFocusArea,
   type TherapistConsultation,
   type ConsultationThread,
+  type ConsultationPublicStatus,
+  type MeetingProvider,
+  type TherapistEarnings,
   type EventRecord,
   type OwnTherapistProfile,
   type TherapistProfileUpdate,
 } from '../services/api';
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { FOCUS_AREAS, focusLabel, formatNtd } from './therapistShared';
+import { FilterChip } from './FilterChip';
+import PublicQaView from './PublicQaView';
+import TherapistProfileModal from './TherapistProfileModal';
 
 interface TherapistsViewProps {
   authState: {
@@ -22,29 +29,6 @@ interface TherapistsViewProps {
   showNotification: (notification: Omit<Notification, 'id'>) => void;
 }
 
-// Focus areas — keep the value/label/emoji in one place so the filter chips,
-// cards, and forms all read from the same source of truth. Order matches the
-// backend FOCUS_AREAS list in routes/therapists.js.
-const FOCUS_AREAS: { id: TherapistFocusArea; label: string; emoji: string }[] = [
-  { id: 'couple', label: '伴侶關係', emoji: '💞' },
-  { id: 'family', label: '家庭', emoji: '🏡' },
-  { id: 'childhood', label: '童年/原生家庭', emoji: '🧸' },
-  { id: 'individual', label: '個人成長', emoji: '🌱' },
-  { id: 'sexuality', label: '性與親密', emoji: '🔥' },
-  { id: 'parenting', label: '親職教養', emoji: '👶' },
-  { id: 'grief', label: '悲傷失落', emoji: '🕊️' },
-  { id: 'anxiety', label: '焦慮憂鬱', emoji: '🌧️' },
-  { id: 'depression', label: '憂鬱情緒', emoji: '🌫️' },
-  { id: 'trauma', label: '創傷', emoji: '💔' },
-  { id: 'addiction', label: '成癮', emoji: '🎯' },
-  { id: 'lgbtq', label: '性別與多元認同', emoji: '🏳️‍🌈' },
-  { id: 'career', label: '職涯/工作壓力', emoji: '💼' },
-  { id: 'self_esteem', label: '自我價值', emoji: '✨' },
-];
-
-const focusLabel = (id: string): string =>
-  FOCUS_AREAS.find((f) => f.id === id)?.label || id;
-
 const LANGUAGE_LABEL: Record<string, string> = {
   zh: '中文',
   en: 'English',
@@ -53,14 +37,22 @@ const LANGUAGE_LABEL: Record<string, string> = {
 };
 const languageLabel = (code: string): string => LANGUAGE_LABEL[code] || code;
 
-const formatNtd = (n: number): string => `NT$${n.toLocaleString('en-US')}`;
-
 const CONSULTATION_STATUS: Record<TherapistConsultation['status'], { label: string; cls: string }> = {
   pending: { label: '等待回覆', cls: 'text-petal-rose-deep' },
   accepted: { label: '已接受', cls: 'text-petal-sage-deep' },
   declined: { label: '已婉拒', cls: 'text-petal-muted' },
   completed: { label: '已完成', cls: 'text-petal-sage-deep' },
   cancelled: { label: '已取消', cls: 'text-petal-muted' },
+  no_show: { label: '未出席', cls: 'text-petal-muted' },
+};
+
+// 公開問答 publish state → label shown in the chat room / consultation list.
+const PUBLIC_STATUS_LABEL: Record<ConsultationPublicStatus, string> = {
+  private: '私密',
+  client_requested: '等待對方同意公開',
+  therapist_requested: '等待對方同意公開',
+  published: '已公開為公開問答',
+  withdrawn: '已取消公開',
 };
 
 const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotification }) => {
@@ -69,7 +61,12 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
   const [error, setError] = useState<string | null>(null);
   const [focusFilter, setFocusFilter] = useState<TherapistFocusArea | 'all'>('all');
 
+  // Two separate interfaces: the open 公開問答 browse (default — the showcase /
+  // funnel) and the 找諮商師 directory where you book a (free) chat.
+  const [tab, setTab] = useState<'qa' | 'directory'>('qa');
+
   const [bookingTarget, setBookingTarget] = useState<Therapist | null>(null);
+  const [profileTarget, setProfileTarget] = useState<Therapist | null>(null);
   const [showMine, setShowMine] = useState(false);
   const [chatTarget, setChatTarget] = useState<TherapistConsultation | null>(null);
   const [consultations, setConsultations] = useState<TherapistConsultation[]>([]);
@@ -79,6 +76,7 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
   // can offer a "我的諮商師檔案" editor.
   const [ownProfile, setOwnProfile] = useState<OwnTherapistProfile | null>(null);
   const [showProfileEditor, setShowProfileEditor] = useState(false);
+  const [showEarnings, setShowEarnings] = useState(false);
 
   const loadOwnProfile = useCallback(async () => {
     if (!authState.isAuthenticated) { setOwnProfile(null); return; }
@@ -154,6 +152,40 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
         </div>
       </div>
 
+      {/* Mode tabs: 公開問答 (browse) vs 找諮商師 (directory + free chat) */}
+      <div className="flex justify-center">
+        <div className="inline-flex p-1 rounded-full bg-petal-cream-2 border border-petal-rule">
+          <button
+            onClick={() => setTab('qa')}
+            data-testid="therapist-tab-qa"
+            className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full font-body text-[13px] font-medium transition-colors ${
+              tab === 'qa' ? 'bg-petal-ink text-petal-cream' : 'text-petal-ink-soft hover:text-petal-ink'
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5" strokeWidth={1.5} /> 公開問答
+          </button>
+          <button
+            onClick={() => setTab('directory')}
+            data-testid="therapist-tab-directory"
+            className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full font-body text-[13px] font-medium transition-colors ${
+              tab === 'directory' ? 'bg-petal-ink text-petal-cream' : 'text-petal-ink-soft hover:text-petal-ink'
+            }`}
+          >
+            <Users className="w-3.5 h-3.5" strokeWidth={1.5} /> 找諮商師
+          </button>
+        </div>
+      </div>
+
+      {tab === 'qa' && (
+        <PublicQaView
+          isAuthenticated={authState.isAuthenticated}
+          showNotification={showNotification}
+          onFindTherapist={() => setTab('directory')}
+        />
+      )}
+
+      {tab === 'directory' && (
+      <>
       {/* Actions row */}
       <div className="flex flex-wrap items-center justify-center gap-2">
         {/* Sign-up is a public, no-login page (served by the backend at
@@ -184,6 +216,16 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
           >
             <UserCog className="w-3.5 h-3.5" strokeWidth={1.5} />
             我的諮商師檔案
+          </button>
+        )}
+        {authState.isAuthenticated && ownProfile && (
+          <button
+            onClick={() => setShowEarnings(true)}
+            data-testid="therapist-earnings-button"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors font-body text-[13px] font-medium"
+          >
+            <Wallet className="w-3.5 h-3.5" strokeWidth={1.5} />
+            我的收入
           </button>
         )}
       </div>
@@ -227,9 +269,16 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           {therapists.map((t) => (
-            <TherapistCard key={t.id} therapist={t} onBook={() => setBookingTarget(t)} />
+            <TherapistCard
+              key={t.id}
+              therapist={t}
+              onBook={() => setBookingTarget(t)}
+              onViewProfile={() => setProfileTarget(t)}
+            />
           ))}
         </div>
+      )}
+      </>
       )}
 
       {bookingTarget && (
@@ -252,11 +301,23 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
         />
       )}
 
+      {profileTarget && (
+        <TherapistProfileModal
+          therapist={profileTarget}
+          isAuthenticated={authState.isAuthenticated}
+          onClose={() => setProfileTarget(null)}
+          onBook={() => { const t = profileTarget; setProfileTarget(null); setBookingTarget(t); }}
+          showNotification={showNotification}
+        />
+      )}
+
       {showMine && (
         <MyConsultationsModal
           consultations={consultations}
           onClose={() => setShowMine(false)}
           onOpenRoom={(c) => setChatTarget(c)}
+          onChanged={loadConsultations}
+          showNotification={showNotification}
         />
       )}
 
@@ -266,6 +327,10 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
           onClose={() => { setChatTarget(null); setConsultationsLoaded(false); loadConsultations(); }}
           showNotification={showNotification}
         />
+      )}
+
+      {showEarnings && (
+        <EarningsModal onClose={() => setShowEarnings(false)} showNotification={showNotification} />
       )}
 
       {showProfileEditor && ownProfile && (
@@ -284,27 +349,9 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
   );
 };
 
-// --- Filter chip ----------------------------------------------------------
-
-const FilterChip: React.FC<{ active: boolean; onClick: () => void; label: string; emoji: string }> = ({
-  active, onClick, label, emoji,
-}) => (
-  <button
-    onClick={onClick}
-    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full transition-colors border font-body text-[13px] font-medium tracking-tight ${
-      active
-        ? 'bg-petal-ink text-petal-cream border-petal-ink'
-        : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
-    }`}
-  >
-    <span>{emoji}</span>
-    <span>{label}</span>
-  </button>
-);
-
 // --- Therapist card -------------------------------------------------------
 
-const TherapistCard: React.FC<{ therapist: Therapist; onBook: () => void }> = ({ therapist, onBook }) => (
+const TherapistCard: React.FC<{ therapist: Therapist; onBook: () => void; onViewProfile: () => void }> = ({ therapist, onBook, onViewProfile }) => (
   <div
     className="flex flex-col bg-petal-cream rounded-lg border border-petal-rule shadow-petal overflow-hidden"
     data-testid="therapist-card"
@@ -377,13 +424,22 @@ const TherapistCard: React.FC<{ therapist: Therapist; onBook: () => void }> = ({
         <span className="font-display text-lg text-pink-600">{formatNtd(therapist.rateTwd)}</span>
         <span className="text-petal-muted text-xs"> / {therapist.sessionMinutes} 分鐘</span>
       </div>
-      <button
-        onClick={onBook}
-        data-testid="therapist-book-button"
-        className="px-4 py-2 rounded-full bg-pink-500 text-white hover:bg-pink-600 transition-colors font-body text-[13px] font-medium"
-      >
-        預約諮詢
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={onViewProfile}
+          data-testid="therapist-profile-button"
+          className="px-3.5 py-2 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors font-body text-[13px] font-medium"
+        >
+          完整檔案
+        </button>
+        <button
+          onClick={onBook}
+          data-testid="therapist-book-button"
+          className="px-4 py-2 rounded-full bg-pink-500 text-white hover:bg-pink-600 transition-colors font-body text-[13px] font-medium"
+        >
+          預約諮詢
+        </button>
+      </div>
     </div>
   </div>
 );
@@ -532,7 +588,9 @@ const MyConsultationsModal: React.FC<{
   consultations: TherapistConsultation[];
   onClose: () => void;
   onOpenRoom: (c: TherapistConsultation) => void;
-}> = ({ consultations, onClose, onOpenRoom }) => (
+  onChanged: () => void;
+  showNotification: (n: Omit<Notification, 'id'>) => void;
+}> = ({ consultations, onClose, onOpenRoom, onChanged, showNotification }) => (
   <ModalShell title="我的預約" onClose={onClose}>
     {consultations.length === 0 ? (
       <p className="font-body text-sm text-petal-muted py-6 text-center">
@@ -542,6 +600,7 @@ const MyConsultationsModal: React.FC<{
       <div className="space-y-3" data-testid="my-consultations">
         {consultations.map((c) => {
           const status = CONSULTATION_STATUS[c.status];
+          const isPaidSession = c.bookingType === 'scheduled';
           return (
             <div key={c.id} className="rounded-md border border-petal-rule p-4" data-testid="consultation-row">
               <div className="flex items-center justify-between gap-2">
@@ -558,6 +617,19 @@ const MyConsultationsModal: React.FC<{
                 </div>
                 <span className={`font-body text-xs font-medium ${status.cls}`}>{status.label}</span>
               </div>
+              {isPaidSession && (
+                <div className="mt-1 inline-flex items-center gap-1.5 font-body text-[11px]">
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-pink-50 border border-pink-200 text-pink-700">
+                    <Video className="w-3 h-3" strokeWidth={1.5} /> 視訊諮商
+                  </span>
+                  {c.paymentStatus && (
+                    <span className={c.paymentStatus === 'paid' ? 'text-petal-sage-deep' : 'text-petal-muted'}>
+                      {PAYMENT_STATUS_LABEL[c.paymentStatus]}
+                      {c.priceTwd ? ` · ${formatNtd(c.priceTwd)}` : ''}
+                    </span>
+                  )}
+                </div>
+              )}
               {c.focusArea && (
                 <div className="mt-1 font-body text-xs text-petal-ink-soft">
                   主題：{focusLabel(c.focusArea)}
@@ -577,6 +649,16 @@ const MyConsultationsModal: React.FC<{
                   諮商師回覆：{c.responseNote}
                 </p>
               )}
+              {c.publicStatus && c.publicStatus !== 'private' && c.publicStatus !== 'withdrawn' && (
+                <div className="mt-2 inline-flex items-center gap-1 font-body text-[11px] text-petal-ink-soft">
+                  <Globe className="w-3 h-3" strokeWidth={1.5} />
+                  {PUBLIC_STATUS_LABEL[c.publicStatus]}
+                </div>
+              )}
+
+              {/* Paid-session actions (pay / accept / meeting link / complete) */}
+              <ConsultationSessionActions c={c} onChanged={onChanged} showNotification={showNotification} />
+
               <button
                 onClick={() => onOpenRoom(c)}
                 data-testid="enter-room-button"
@@ -592,6 +674,364 @@ const MyConsultationsModal: React.FC<{
     )}
   </ModalShell>
 );
+
+// Paid-video-session actions on a consultation row: the client pays / joins; the
+// therapist accepts, sets the meeting link, and completes / marks no-show.
+const ConsultationSessionActions: React.FC<{
+  c: TherapistConsultation;
+  onChanged: () => void;
+  showNotification: (n: Omit<Notification, 'id'>) => void;
+}> = ({ c, onChanged, showNotification }) => {
+  const [busy, setBusy] = useState(false);
+  const [provider, setProvider] = useState<MeetingProvider>('meet');
+  const [url, setUrl] = useState('');
+
+  if (c.bookingType !== 'scheduled') return null;
+
+  const notifyErr = (err: unknown) =>
+    showNotification({ type: 'error', title: '操作失敗', message: err instanceof Error ? err.message : '請稍後再試', duration: 4000 });
+
+  const pay = async () => {
+    try { setBusy(true); await apiService.paySession(c.id); } catch (err) { notifyErr(err); setBusy(false); }
+  };
+  const respond = async (action: 'accept' | 'decline' | 'complete' | 'no_show') => {
+    try {
+      setBusy(true);
+      await apiService.respondConsultation(c.id, action);
+      onChanged();
+    } catch (err) { notifyErr(err); } finally { setBusy(false); }
+  };
+  const saveMeeting = async () => {
+    if (!url.trim()) return;
+    try {
+      setBusy(true);
+      await apiService.setMeetingLink(c.id, provider, url.trim());
+      setUrl('');
+      onChanged();
+      showNotification({ type: 'success', title: '已設定會議連結', message: '對方付款後即可看到連結', duration: 3000 });
+    } catch (err) { notifyErr(err); } finally { setBusy(false); }
+  };
+
+  // --- Client side ---
+  if (c.role === 'client') {
+    if (c.paymentStatus === 'unpaid' || c.paymentStatus === 'failed') {
+      return (
+        <button onClick={pay} disabled={busy} data-testid="pay-session-button"
+          className="mt-3 mr-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-pink-500 text-white hover:bg-pink-600 disabled:opacity-50 transition-colors font-body text-xs font-medium">
+          <Wallet className="w-3.5 h-3.5" strokeWidth={1.5} /> {busy ? '前往付款…' : `前往付款 ${c.priceTwd ? formatNtd(c.priceTwd) : ''}`}
+        </button>
+      );
+    }
+    if (c.paymentStatus === 'pending') {
+      return <p className="mt-2 font-body text-xs text-petal-muted">付款確認中，稍候會自動更新。</p>;
+    }
+    if (c.paymentStatus === 'paid') {
+      return c.meetingUrl ? (
+        <a href={c.meetingUrl} target="_blank" rel="noopener noreferrer" data-testid="join-meeting-link"
+          className="mt-3 mr-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-petal-sage-deep text-white hover:opacity-90 transition-opacity font-body text-xs font-medium">
+          <Video className="w-3.5 h-3.5" strokeWidth={1.5} /> 加入{MEETING_LABEL[c.meetingProvider || 'other']}視訊
+        </a>
+      ) : (
+        <p className="mt-2 font-body text-xs text-petal-sage-deep">已付款，等待諮商師提供會議連結。</p>
+      );
+    }
+    return null;
+  }
+
+  // --- Therapist side ---
+  if (c.role === 'therapist') {
+    if (c.status === 'pending') {
+      return (
+        <div className="mt-3 flex items-center gap-2">
+          <button onClick={() => respond('accept')} disabled={busy} data-testid="accept-booking"
+            className="px-3 py-1.5 rounded-full bg-pink-500 text-white hover:bg-pink-600 disabled:opacity-50 font-body text-xs font-medium">接受預約</button>
+          <button onClick={() => respond('decline')} disabled={busy}
+            className="px-3 py-1.5 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink font-body text-xs">婉拒</button>
+        </div>
+      );
+    }
+    if (c.status === 'accepted') {
+      return (
+        <div className="mt-3 space-y-2">
+          {c.meetingUrl ? (
+            <div className="inline-flex items-center gap-1.5 font-body text-xs text-petal-sage-deep">
+              <Video className="w-3.5 h-3.5" strokeWidth={1.5} /> 會議連結已提供（{MEETING_LABEL[c.meetingProvider || 'other']}）
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <select value={provider} onChange={(e) => setProvider(e.target.value as MeetingProvider)} className="px-2 py-1.5 rounded-md border border-petal-rule bg-petal-cream font-body text-xs text-petal-ink">
+                <option value="meet">Google Meet</option>
+                <option value="zoom">Zoom</option>
+                <option value="other">其他</option>
+              </select>
+              <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="貼上會議連結 https://…" data-testid="meeting-link-input"
+                className="flex-1 min-w-[180px] px-3 py-1.5 rounded-md border border-petal-rule bg-petal-cream focus:border-petal-ink focus:outline-none font-body text-xs text-petal-ink" />
+              <button onClick={saveMeeting} disabled={busy || !url.trim()} data-testid="save-meeting-link"
+                className="px-3 py-1.5 rounded-full bg-petal-ink text-petal-cream hover:bg-pink-700 disabled:opacity-50 font-body text-xs font-medium">設定連結</button>
+            </div>
+          )}
+          <div className="flex items-center gap-2">
+            <button onClick={() => respond('complete')} disabled={busy} data-testid="complete-booking"
+              className="px-3 py-1.5 rounded-full border border-petal-sage text-petal-sage-deep hover:bg-petal-sage/10 disabled:opacity-50 font-body text-xs">標記完成</button>
+            <button onClick={() => respond('no_show')} disabled={busy}
+              className="px-3 py-1.5 rounded-full border border-petal-rule text-petal-muted hover:border-petal-ink font-body text-xs">未出席</button>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }
+  return null;
+};
+
+// --- Paid video session: booking modal + helpers -------------------------
+
+const PAYMENT_STATUS_LABEL: Record<NonNullable<TherapistConsultation['paymentStatus']>, string> = {
+  unpaid: '尚未付款',
+  pending: '付款確認中',
+  paid: '已付款',
+  refunded: '已退款',
+  failed: '付款失敗',
+};
+
+const MEETING_LABEL: Record<string, string> = { zoom: 'Zoom', meet: 'Google Meet', other: '視訊' };
+
+// Books a paid video session off a free chat, then redirects to ECPay. Video is
+// third-party; the platform only matches the two parties.
+const VideoBookingModal: React.FC<{
+  therapistId: string;
+  therapistName: string;
+  priceTwd: number;
+  sessionMinutes: number;
+  sourceConsultationId?: string;
+  onClose: () => void;
+  showNotification: (n: Omit<Notification, 'id'>) => void;
+}> = ({ therapistId, therapistName, priceTwd, sessionMinutes, sourceConsultationId, onClose, showNotification }) => {
+  const [message, setMessage] = useState('');
+  const [preferredTime, setPreferredTime] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const proceed = async () => {
+    try {
+      setBusy(true);
+      const booking = await apiService.bookVideoSession(therapistId, {
+        message: message.trim() || undefined,
+        preferredTime: preferredTime ? new Date(preferredTime).toISOString() : undefined,
+        sourceConsultationId,
+      });
+      // Redirects the browser to ECPay (resolves only on failure to start).
+      await apiService.paySession(booking.id);
+    } catch (err) {
+      showNotification({ type: 'error', title: '預約失敗', message: err instanceof Error ? err.message : '請稍後再試', duration: 4000 });
+      setBusy(false);
+    }
+  };
+
+  return (
+    <ModalShell title={`預約視訊諮商 · ${therapistName}`} onClose={onClose}>
+      <div className="space-y-4">
+        <div className="flex items-center justify-between rounded-md bg-petal-cream-2 border border-petal-rule px-4 py-3">
+          <span className="font-body text-sm text-petal-ink-soft">1:1 視訊諮商 · {sessionMinutes} 分鐘</span>
+          <span className="font-display text-lg text-pink-600">{formatNtd(priceTwd)}</span>
+        </div>
+        <p className="font-body text-xs text-petal-muted">
+          視訊以 Zoom / Google Meet 進行，諮商師接受預約後會提供會議連結。付款由綠界（ECPay）處理。
+        </p>
+        <div>
+          <label className={fieldLabel}>希望的時段（選填）</label>
+          <input type="datetime-local" value={preferredTime} onChange={(e) => setPreferredTime(e.target.value)} className={fieldInput} />
+        </div>
+        <div>
+          <label className={fieldLabel}>想先讓諮商師知道的事（選填）</label>
+          <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={3} maxLength={2000} className={`${fieldInput} resize-none`} />
+        </div>
+        <button
+          onClick={proceed}
+          disabled={busy}
+          data-testid="video-pay-button"
+          className="w-full py-3 rounded-md bg-petal-ink text-petal-cream hover:bg-pink-700 disabled:opacity-50 transition-colors font-display italic text-base"
+        >
+          {busy ? '前往付款…' : `前往付款 ${formatNtd(priceTwd)}`}
+        </button>
+      </div>
+    </ModalShell>
+  );
+};
+
+// --- 公開問答 publish controls (inside the chat room) ---------------------
+
+// The two-party consent handshake to publish a chat as 公開問答. Either side may
+// propose (with an anonymised title); the OTHER side approves; either side can
+// withdraw. We infer "did I propose this?" from the publish status + my role,
+// which is enough because the therapist and the couple are the two sides.
+const PublishControls: React.FC<{
+  consultationId: string;
+  status: ConsultationPublicStatus;
+  role: 'therapist' | 'client';
+  onChanged: () => void;
+  showNotification: (n: Omit<Notification, 'id'>) => void;
+}> = ({ consultationId, status, role, onChanged, showNotification }) => {
+  const [proposing, setProposing] = useState(false);
+  const [titleDraft, setTitleDraft] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const canPropose = status === 'private' || status === 'withdrawn';
+  const iRequested =
+    (status === 'client_requested' && role === 'client') ||
+    (status === 'therapist_requested' && role === 'therapist');
+  const iCanApprove =
+    (status === 'client_requested' && role === 'therapist') ||
+    (status === 'therapist_requested' && role === 'client');
+  const published = status === 'published';
+
+  const run = async (fn: () => Promise<{ message: string }>) => {
+    try {
+      setBusy(true);
+      const res = await fn();
+      onChanged();
+      setProposing(false);
+      setTitleDraft('');
+      showNotification({ type: 'success', title: '已更新', message: res.message, duration: 3500 });
+    } catch (err) {
+      showNotification({ type: 'error', title: '操作失敗', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="px-5 py-2.5 border-b border-petal-rule bg-petal-cream-2/60" data-testid="publish-controls">
+      {proposing ? (
+        <div className="space-y-2">
+          <p className="font-body text-[11px] text-petal-muted">
+            匿名公開這段對話，幫助有相同困擾的人。對方同意後才會公開，個案姓名不會顯示。
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              value={titleDraft}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              maxLength={200}
+              placeholder="幫這則公開問答下個標題…"
+              data-testid="publish-title-input"
+              className="flex-1 px-3 py-1.5 rounded-full border border-petal-rule bg-petal-cream focus:border-petal-ink focus:outline-none font-body text-sm text-petal-ink"
+            />
+            <button
+              onClick={() => run(() => apiService.requestPublishConsultation(consultationId, titleDraft.trim()))}
+              disabled={busy || !titleDraft.trim()}
+              data-testid="publish-submit"
+              className="shrink-0 px-3 py-1.5 rounded-full bg-petal-ink text-petal-cream hover:bg-pink-700 disabled:opacity-40 font-body text-xs font-medium"
+            >
+              送出提議
+            </button>
+            <button onClick={() => { setProposing(false); setTitleDraft(''); }} className="shrink-0 text-petal-muted hover:text-petal-ink font-body text-xs">
+              取消
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-2">
+          <div className="inline-flex items-center gap-1.5 font-body text-[11px] text-petal-ink-soft min-w-0">
+            <Globe className="w-3 h-3 shrink-0" strokeWidth={1.5} />
+            <span className="truncate">{PUBLIC_STATUS_LABEL[status]}</span>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {canPropose && (
+              <button onClick={() => setProposing(true)} data-testid="publish-propose" className="font-body text-xs font-medium text-petal-ink underline underline-offset-2 hover:text-pink-700">
+                設為公開問答
+              </button>
+            )}
+            {iRequested && (
+              <button onClick={() => run(() => apiService.withdrawPublishConsultation(consultationId))} disabled={busy} className="font-body text-xs text-petal-muted hover:text-petal-ink disabled:opacity-40">
+                取消提議
+              </button>
+            )}
+            {iCanApprove && (
+              <>
+                <button onClick={() => run(() => apiService.approvePublishConsultation(consultationId))} disabled={busy} data-testid="publish-approve" className="px-3 py-1 rounded-full bg-pink-500 text-white hover:bg-pink-600 disabled:opacity-40 font-body text-xs font-medium">
+                  同意公開
+                </button>
+                <button onClick={() => run(() => apiService.withdrawPublishConsultation(consultationId))} disabled={busy} className="font-body text-xs text-petal-muted hover:text-petal-ink disabled:opacity-40">
+                  婉拒
+                </button>
+              </>
+            )}
+            {published && (
+              <button onClick={() => run(() => apiService.withdrawPublishConsultation(consultationId))} disabled={busy} data-testid="publish-withdraw" className="font-body text-xs text-petal-muted hover:text-petal-ink disabled:opacity-40">
+                取消公開
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- Therapist earnings ---------------------------------------------------
+
+const EarningsModal: React.FC<{
+  onClose: () => void;
+  showNotification: (n: Omit<Notification, 'id'>) => void;
+}> = ({ onClose, showNotification }) => {
+  const [earnings, setEarnings] = useState<TherapistEarnings | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let alive = true;
+    apiService.getMyEarnings()
+      .then((e) => { if (alive) setEarnings(e); })
+      .catch((err) => { if (alive) showNotification({ type: 'error', title: '無法取得收入', message: err instanceof Error ? err.message : '請稍後再試', duration: 4000 }); })
+      .finally(() => { if (alive) setLoading(false); });
+    return () => { alive = false; };
+  }, [showNotification]);
+
+  return (
+    <ModalShell title="我的收入" onClose={onClose}>
+      {loading ? (
+        <p className="font-body text-sm text-petal-muted py-6 text-center">載入中…</p>
+      ) : !earnings ? (
+        <p className="font-body text-sm text-petal-muted py-6 text-center">尚無收入資料。</p>
+      ) : (
+        <div className="space-y-4" data-testid="earnings-modal">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-md border border-petal-rule p-4">
+              <div className="font-body text-xs text-petal-muted">累計實拿</div>
+              <div className="font-display text-2xl text-pink-600">{formatNtd(earnings.totalNetTwd)}</div>
+              <div className="font-body text-[11px] text-petal-muted mt-0.5">{earnings.paidSessionCount} 次已付款諮商</div>
+            </div>
+            <div className="rounded-md border border-petal-rule p-4">
+              <div className="font-body text-xs text-petal-muted">目前平台分潤</div>
+              <div className="font-display text-2xl text-petal-ink">{earnings.currentFeeRate}%</div>
+              <div className="font-body text-[11px] text-petal-muted mt-0.5">
+                {earnings.introSessionsRemaining > 0
+                  ? `新進優惠剩 ${earnings.introSessionsRemaining} 次（10%）`
+                  : '已套用一般分潤（20%）'}
+              </div>
+            </div>
+          </div>
+          <p className="font-body text-[11px] text-petal-muted">
+            視訊諮商款項由平台每月結算後撥付。問答分潤另計（每月結算）。
+          </p>
+          {earnings.sessions.length > 0 && (
+            <div className="space-y-2">
+              <div className="font-body text-xs font-semibold text-petal-ink-soft">已付款的諮商</div>
+              {earnings.sessions.map((s) => (
+                <div key={s.id} className="flex items-center justify-between rounded-md border border-petal-rule px-3 py-2 font-body text-xs">
+                  <span className="text-petal-muted">
+                    {s.paidAt ? new Date(s.paidAt).toLocaleDateString('zh-TW') : '—'} · 平台 {s.feeRate}%
+                  </span>
+                  <span className="text-petal-ink">
+                    {formatNtd(s.priceTwd)} → <span className="text-pink-600 font-medium">實拿 {formatNtd(s.therapistNetTwd)}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </ModalShell>
+  );
+};
 
 // --- Consultation chat room ----------------------------------------------
 
@@ -609,6 +1049,7 @@ const ChatRoom: React.FC<{
   const [selectedEvent, setSelectedEvent] = useState<EventRecord | null>(null);
   const [showEventPicker, setShowEventPicker] = useState(false);
   const [sending, setSending] = useState(false);
+  const [showBooking, setShowBooking] = useState(false);
   const endRef = useRef<HTMLDivElement | null>(null);
 
   const load = useCallback(async () => {
@@ -619,6 +1060,12 @@ const ChatRoom: React.FC<{
       console.error('Failed to load thread:', err);
     }
   }, [consultation.id]);
+
+  // The "預約視訊諮商" nudge is for the client side, and only when we know the
+  // therapist + their rate (from the consultation list payload).
+  const canBookVideo = consultation.role === 'client'
+    && !!consultation.therapistId
+    && typeof consultation.therapistRateTwd === 'number';
 
   useEffect(() => {
     load();
@@ -677,6 +1124,29 @@ const ChatRoom: React.FC<{
             <X className="w-5 h-5" strokeWidth={1.5} />
           </button>
         </div>
+
+        {/* 公開問答 publish handshake */}
+        {thread && (
+          <PublishControls
+            consultationId={consultation.id}
+            status={thread.publicStatus || 'private'}
+            role={thread.role}
+            onChanged={load}
+            showNotification={showNotification}
+          />
+        )}
+
+        {/* Nudge to book a paid video session (the free chat funnel) */}
+        {canBookVideo && (
+          <button
+            onClick={() => setShowBooking(true)}
+            data-testid="book-video-cta"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 border-b border-petal-rule bg-pink-50 text-pink-700 hover:bg-pink-100 transition-colors font-body text-[13px] font-medium"
+          >
+            <Video className="w-3.5 h-3.5" strokeWidth={1.5} />
+            想更深入談談？預約 1:1 視訊諮商（{formatNtd(consultation.therapistRateTwd || 0)} / {consultation.therapistSessionMinutes || 50} 分鐘）
+          </button>
+        )}
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" data-testid="chat-messages">
@@ -759,6 +1229,19 @@ const ChatRoom: React.FC<{
         </div>
       </div>
 
+      {/* Paid video booking */}
+      {showBooking && canBookVideo && (
+        <VideoBookingModal
+          therapistId={consultation.therapistId as string}
+          therapistName={consultation.therapistName}
+          priceTwd={consultation.therapistRateTwd as number}
+          sessionMinutes={consultation.therapistSessionMinutes || 50}
+          sourceConsultationId={consultation.id}
+          onClose={() => setShowBooking(false)}
+          showNotification={showNotification}
+        />
+      )}
+
       {/* Event picker overlay */}
       {showEventPicker && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setShowEventPicker(false)}>
@@ -833,6 +1316,33 @@ const ProfileEditorModal: React.FC<{
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Rich profile (048). List fields are edited as one-item-per-line text and
+  // converted on save; publications/articles are "標題 | 連結" per line.
+  const [introMessage, setIntroMessage] = useState(profile.introMessage || '');
+  const [approach, setApproach] = useState(profile.approach || '');
+  const [about, setAbout] = useState(profile.about || '');
+  const [acceptingNewClients, setAcceptingNewClients] = useState(profile.acceptingNewClients !== false);
+  const [certifications, setCertifications] = useState((profile.certifications || []).join('\n'));
+  const [currentPositions, setCurrentPositions] = useState((profile.currentPositions || []).join('\n'));
+  const [qualifications, setQualifications] = useState((profile.qualifications || []).join('\n'));
+  const [training, setTraining] = useState((profile.training || []).join('\n'));
+  const [publications, setPublications] = useState(
+    (profile.publications || []).map((p) => (p.source ? `${p.title} | ${p.source}` : p.title)).join('\n')
+  );
+  const [articles, setArticles] = useState(
+    (profile.articles || []).map((a) => (a.url ? `${a.title} | ${a.url}` : a.title)).join('\n')
+  );
+
+  // "one per line" → string[]; "標題 | 連結" → {title, [key]} list.
+  const linesToList = (raw: string): string[] =>
+    raw.split('\n').map((l) => l.trim()).filter(Boolean);
+  const linesToLinks = (raw: string, key: 'url' | 'source') =>
+    raw.split('\n').map((l) => l.trim()).filter(Boolean).map((line) => {
+      const [title, ...rest] = line.split('|');
+      const link = rest.join('|').trim();
+      return { title: title.trim(), [key]: link } as { title: string; url?: string; source?: string };
+    }).filter((it) => it.title);
+
   const toggleFocus = (id: TherapistFocusArea) => {
     setFocusAreas((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]));
   };
@@ -890,6 +1400,17 @@ const ProfileEditorModal: React.FC<{
       sessionMinutes: Number(sessionMinutes) || 50,
       yearsExperience: yearsExperience ? Number(yearsExperience) : null,
       contactPhone: contactPhone.trim() || null,
+      // Rich profile sections (048).
+      introMessage: introMessage.trim() || null,
+      approach: approach.trim() || null,
+      about: about.trim() || null,
+      acceptingNewClients,
+      certifications: linesToList(certifications),
+      currentPositions: linesToList(currentPositions),
+      qualifications: linesToList(qualifications),
+      training: linesToList(training),
+      publications: linesToLinks(publications, 'source'),
+      articles: linesToLinks(articles, 'url'),
     };
     try {
       setSaving(true);
@@ -1036,6 +1557,54 @@ const ProfileEditorModal: React.FC<{
         <div>
           <label className={fieldLabel}>自我介紹</label>
           <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={4} maxLength={2000} className={`${fieldInput} resize-none`} />
+        </div>
+
+        {/* Rich profile sections (048) */}
+        <div className="pt-1 border-t border-petal-rule">
+          <div className="font-body text-xs font-semibold text-petal-ink-soft mb-1">完整檔案（選填）</div>
+          <p className="font-body text-[11px] text-petal-muted mb-3">這些內容會顯示在「完整檔案」頁面，幫助來談者更認識你。清單欄位請一行一項。</p>
+        </div>
+
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={acceptingNewClients} onChange={(e) => setAcceptingNewClients(e.target.checked)} className="accent-pink-500" />
+          <span className="font-body text-sm text-petal-ink-soft">目前開放新案預約</span>
+        </label>
+
+        <div>
+          <label className={fieldLabel}>給來談者的一段話</label>
+          <textarea value={introMessage} onChange={(e) => setIntroMessage(e.target.value)} rows={4} maxLength={8000} className={`${fieldInput} resize-y`} placeholder="想對正在考慮預約的人說的話…" />
+        </div>
+        <div>
+          <label className={fieldLabel}>治療取向／治療理念</label>
+          <textarea value={approach} onChange={(e) => setApproach(e.target.value)} rows={4} maxLength={8000} className={`${fieldInput} resize-y`} />
+        </div>
+        <div>
+          <label className={fieldLabel}>認識治療師</label>
+          <textarea value={about} onChange={(e) => setAbout(e.target.value)} rows={3} maxLength={8000} className={`${fieldInput} resize-y`} />
+        </div>
+        <div>
+          <label className={fieldLabel}>心理師證照（一行一項）</label>
+          <textarea value={certifications} onChange={(e) => setCertifications(e.target.value)} rows={2} className={`${fieldInput} resize-y`} placeholder="諮商心理師證書字號／諮心字第 0000 號" />
+        </div>
+        <div>
+          <label className={fieldLabel}>現任（一行一項）</label>
+          <textarea value={currentPositions} onChange={(e) => setCurrentPositions(e.target.value)} rows={2} className={`${fieldInput} resize-y`} />
+        </div>
+        <div>
+          <label className={fieldLabel}>專業資格（一行一項）</label>
+          <textarea value={qualifications} onChange={(e) => setQualifications(e.target.value)} rows={2} className={`${fieldInput} resize-y`} />
+        </div>
+        <div>
+          <label className={fieldLabel}>專業訓練（一行一項）</label>
+          <textarea value={training} onChange={(e) => setTraining(e.target.value)} rows={3} className={`${fieldInput} resize-y`} />
+        </div>
+        <div>
+          <label className={fieldLabel}>心理專業著作（一行一項，可加「標題 | 來源」）</label>
+          <textarea value={publications} onChange={(e) => setPublications(e.target.value)} rows={2} className={`${fieldInput} resize-y`} placeholder="文章標題 | 張老師月刊 No.567" />
+        </div>
+        <div>
+          <label className={fieldLabel}>心理專業文章 / 影音（一行一項，可加「標題 | 連結」）</label>
+          <textarea value={articles} onChange={(e) => setArticles(e.target.value)} rows={3} className={`${fieldInput} resize-y`} placeholder="文章標題 | https://…" />
         </div>
 
         {/* Identity documents */}

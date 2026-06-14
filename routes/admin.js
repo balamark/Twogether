@@ -564,6 +564,8 @@ const ADMIN_HTML = `<!doctype html>
       <button class="tab" data-panel="pages">頁面</button>
       <button class="tab" data-panel="retention">回訪</button>
       <button class="tab" data-panel="therapists">諮商師</button>
+      <button class="tab" data-panel="reviews">評價</button>
+      <button class="tab" data-panel="pool">分潤</button>
     </div>
 
     <!-- Panel: Funnel (default) -->
@@ -654,6 +656,67 @@ const ADMIN_HTML = `<!doctype html>
           </thead>
           <tbody></tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Panel: Reviews (moderation) -->
+    <div class="panel" id="panel-reviews">
+      <p class="sub">客戶評價審核。通過後才會顯示在諮商師的公開檔案。</p>
+      <div class="controls">
+        <label>狀態
+          <select id="reviewStatus">
+            <option value="pending">待審核</option>
+            <option value="approved">已通過</option>
+            <option value="hidden">已隱藏</option>
+          </select>
+        </label>
+        <button id="reviewRefresh">重新整理</button>
+        <span class="muted" id="reviewStatusMsg"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="reviewsTable">
+          <thead>
+            <tr><th>諮商師</th><th>評價者</th><th class="num">評分</th><th>內容</th><th>時間</th><th>操作</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Panel: Q&A revenue pool -->
+    <div class="panel" id="panel-pool">
+      <p class="sub">每月問答分潤池。設定金額後計算各諮商師分潤，結算後逐一標記撥款（平台不會自動轉帳）。</p>
+      <div class="controls">
+        <label>月份 <input type="month" id="poolMonth"></label>
+        <label>金額 (NT$) <input type="number" id="poolAmount" min="0" step="1" style="width:120px"></label>
+        <label>分配方式
+          <select id="poolStrategy">
+            <option value="even">平均分配</option>
+            <option value="volume">依回覆量</option>
+            <option value="engagement">依參與度</option>
+          </select>
+        </label>
+        <button id="poolCreate">建立／更新</button>
+        <span class="muted" id="poolStatusMsg"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="poolsTable">
+          <thead>
+            <tr><th>月份</th><th class="num">金額</th><th>分配方式</th><th>狀態</th><th class="num">人數</th><th class="num">已分配</th><th>操作</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="poolDetail" hidden style="margin-top:20px">
+        <h3 style="margin:0 0 8px;font-weight:500;font-size:14px" id="poolDetailTitle">分潤明細</h3>
+        <div style="overflow-x:auto">
+          <table id="sharesTable">
+            <thead>
+              <tr><th>諮商師</th><th class="num">回覆</th><th class="num">公開</th><th class="num">讚</th><th class="num">權重</th><th class="num">分潤</th><th>撥款</th><th>操作</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
     </div>
   </div>
@@ -1010,6 +1073,172 @@ const ADMIN_HTML = `<!doctype html>
           if (!therapistsLoaded) { therapistsLoaded = true; loadTherapists(); }
         });
       }
+    });
+
+    // ── Reviews moderation ─────────────────────────────────────────────────
+    async function loadReviews() {
+      var status = $('reviewStatus').value;
+      $('reviewStatusMsg').textContent = '載入中…';
+      try {
+        var res = await fetch('/api/admin/therapists/reviews?status=' + encodeURIComponent(status));
+        if (!res.ok) throw new Error('reviews ' + res.status);
+        var body = await res.json();
+        renderReviews(body.reviews || [], status);
+        $('reviewStatusMsg').textContent = '更新於 ' + new Date().toLocaleTimeString('zh-TW');
+      } catch (e) { $('reviewStatusMsg').textContent = '載入失敗: ' + e.message; }
+    }
+    function renderReviews(rows, status) {
+      var tbody = document.querySelector('#reviewsTable tbody');
+      if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="muted">沒有資料</td></tr>'; return; }
+      tbody.innerHTML = rows.map(function (r) {
+        var actions = status === 'approved'
+          ? '<button data-rev="hide" data-id="' + r.id + '">隱藏</button>'
+          : '<button data-rev="approve" data-id="' + r.id + '">通過</button>' +
+            (status === 'pending' ? ' <button data-rev="hide" data-id="' + r.id + '">隱藏</button>' : '');
+        return '<tr>' +
+          '<td>' + esc(r.therapist_name) + '</td>' +
+          '<td>' + esc(r.reviewer_display) + '</td>' +
+          '<td class="num">' + (r.rating != null ? r.rating + ' ★' : '—') + '</td>' +
+          '<td style="max-width:340px">' + esc(r.body) + '</td>' +
+          '<td>' + fmtDate(r.created_at) + '</td>' +
+          '<td>' + actions + '</td>' +
+          '</tr>';
+      }).join('');
+      tbody.querySelectorAll('button[data-rev]').forEach(function (btn) {
+        btn.addEventListener('click', function () { moderateReview(btn.getAttribute('data-id'), btn.getAttribute('data-rev'), btn); });
+      });
+    }
+    async function moderateReview(id, action, btn) {
+      btn.disabled = true;
+      try {
+        var res = await fetch('/api/admin/therapists/reviews/' + id + '/moderate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: action })
+        });
+        if (!res.ok) throw new Error('moderate ' + res.status);
+        await loadReviews();
+      } catch (e) { btn.disabled = false; $('reviewStatusMsg').textContent = '操作失敗: ' + e.message; }
+    }
+    $('reviewRefresh').addEventListener('click', loadReviews);
+    $('reviewStatus').addEventListener('change', loadReviews);
+
+    // ── Q&A revenue pool ───────────────────────────────────────────────────
+    var POOL_STRATEGY = { even: '平均分配', volume: '依回覆量', engagement: '依參與度' };
+    var POOL_STATUS = { draft: '草稿', computed: '已計算', finalized: '已結算', paid_out: '已撥款' };
+    async function loadPools() {
+      $('poolStatusMsg').textContent = '載入中…';
+      try {
+        var res = await fetch('/api/admin/therapists/qa/pools');
+        if (!res.ok) throw new Error('pools ' + res.status);
+        var body = await res.json();
+        renderPools(body.pools || []);
+        $('poolStatusMsg').textContent = '更新於 ' + new Date().toLocaleTimeString('zh-TW');
+      } catch (e) { $('poolStatusMsg').textContent = '載入失敗: ' + e.message; }
+    }
+    function renderPools(rows) {
+      var tbody = document.querySelector('#poolsTable tbody');
+      if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="7" class="muted">尚無分潤池</td></tr>'; return; }
+      tbody.innerHTML = rows.map(function (p) {
+        var month = String(p.period_month).slice(0, 7);
+        var actions = '<button data-pool="view" data-id="' + p.id + '">查看</button>';
+        if (p.status === 'draft' || p.status === 'computed') actions += ' <button data-pool="compute" data-id="' + p.id + '">計算</button>';
+        if (p.status === 'computed') actions += ' <button data-pool="finalize" data-id="' + p.id + '">結算</button>';
+        return '<tr>' +
+          '<td>' + esc(month) + '</td>' +
+          '<td class="num">NT$' + (p.pool_twd || 0).toLocaleString() + '</td>' +
+          '<td>' + esc(POOL_STRATEGY[p.split_strategy] || p.split_strategy) + '</td>' +
+          '<td>' + esc(POOL_STATUS[p.status] || p.status) + '</td>' +
+          '<td class="num">' + (p.recipient_count || 0) + '</td>' +
+          '<td class="num">NT$' + Number(p.allocated_twd || 0).toLocaleString() + '</td>' +
+          '<td>' + actions + '</td>' +
+          '</tr>';
+      }).join('');
+      tbody.querySelectorAll('button[data-pool]').forEach(function (btn) {
+        btn.addEventListener('click', function () { poolAction(btn.getAttribute('data-id'), btn.getAttribute('data-pool'), btn); });
+      });
+    }
+    async function poolAction(id, action, btn) {
+      if (action === 'view') return openPoolDetail(id);
+      btn.disabled = true;
+      try {
+        var path = action === 'compute' ? '/compute' : '/finalize';
+        var res = await fetch('/api/admin/therapists/qa/pools/' + id + path, { method: 'POST' });
+        if (!res.ok) throw new Error(action + ' ' + res.status);
+        await loadPools();
+        if (action === 'compute') openPoolDetail(id);
+      } catch (e) { btn.disabled = false; $('poolStatusMsg').textContent = '操作失敗: ' + e.message; }
+    }
+    var currentPoolId = null;
+    async function openPoolDetail(id) {
+      try {
+        currentPoolId = id;
+        var res = await fetch('/api/admin/therapists/qa/pools/' + id);
+        if (!res.ok) throw new Error('detail ' + res.status);
+        var body = await res.json();
+        $('poolDetail').hidden = false;
+        $('poolDetailTitle').textContent = '分潤明細 · ' + String(body.pool.period_month).slice(0, 7) + '（' + (POOL_STATUS[body.pool.status] || body.pool.status) + '）';
+        renderShares(body.shares || []);
+        $('poolDetail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } catch (e) { $('poolStatusMsg').textContent = '載入明細失敗: ' + e.message; }
+    }
+    function renderShares(rows) {
+      var tbody = document.querySelector('#sharesTable tbody');
+      if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="8" class="muted">尚未計算分潤</td></tr>'; return; }
+      tbody.innerHTML = rows.map(function (s) {
+        var paid = s.payout_status === 'paid'
+          ? '<span class="badge yes">已撥款</span>'
+          : '<span class="badge no">未撥款</span>';
+        var action = s.payout_status === 'paid' ? '—' : '<button data-share="' + s.id + '">標記已撥款</button>';
+        return '<tr>' +
+          '<td>' + esc(s.therapist_name) + '</td>' +
+          '<td class="num">' + (s.message_count || 0) + '</td>' +
+          '<td class="num">' + (s.published_count || 0) + '</td>' +
+          '<td class="num">' + (s.vote_count || 0) + '</td>' +
+          '<td class="num">' + Number(s.weight || 0) + '</td>' +
+          '<td class="num">NT$' + Number(s.share_twd || 0).toLocaleString() + '</td>' +
+          '<td>' + paid + '</td>' +
+          '<td>' + action + '</td>' +
+          '</tr>';
+      }).join('');
+      tbody.querySelectorAll('button[data-share]').forEach(function (btn) {
+        btn.addEventListener('click', function () { markSharePaid(btn.getAttribute('data-share'), btn); });
+      });
+    }
+    async function markSharePaid(id, btn) {
+      var note = window.prompt('撥款備註（選填，例如銀行匯款編號）：') || undefined;
+      btn.disabled = true;
+      try {
+        var res = await fetch('/api/admin/therapists/qa/shares/' + id + '/mark-paid', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ note: note })
+        });
+        if (!res.ok) throw new Error('mark-paid ' + res.status);
+        await loadPools();
+        if (currentPoolId) await openPoolDetail(currentPoolId);
+      } catch (e) { btn.disabled = false; $('poolStatusMsg').textContent = '撥款標記失敗: ' + e.message; }
+    }
+    async function createPool() {
+      var month = $('poolMonth').value; // YYYY-MM
+      var amount = parseInt($('poolAmount').value, 10);
+      if (!month || !(amount >= 0)) { $('poolStatusMsg').textContent = '請輸入月份與金額'; return; }
+      $('poolCreate').disabled = true;
+      try {
+        var res = await fetch('/api/admin/therapists/qa/pools', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ periodMonth: month + '-01', poolTwd: amount, splitStrategy: $('poolStrategy').value })
+        });
+        if (!res.ok) { var b = await res.json().catch(function(){return {};}); throw new Error(b.message || ('create ' + res.status)); }
+        await loadPools();
+        $('poolStatusMsg').textContent = '已建立／更新';
+      } catch (e) { $('poolStatusMsg').textContent = '建立失敗: ' + e.message; }
+      finally { $('poolCreate').disabled = false; }
+    }
+    $('poolCreate').addEventListener('click', createPool);
+
+    // Lazy-load the reviews + pool tabs the first time they're opened.
+    var reviewsLoaded = false, poolLoaded = false;
+    document.querySelectorAll('.tab').forEach(function (btn) {
+      var panel = btn.getAttribute('data-panel');
+      if (panel === 'reviews') btn.addEventListener('click', function () { if (!reviewsLoaded) { reviewsLoaded = true; loadReviews(); } });
+      if (panel === 'pool') btn.addEventListener('click', function () { if (!poolLoaded) { poolLoaded = true; loadPools(); } });
     });
 
     $('apply').addEventListener('click', load);
