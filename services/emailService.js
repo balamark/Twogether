@@ -538,8 +538,8 @@ ${acceptUrl}
 
   // Shared lightweight HTML wrapper used by the partner-activity emails so
   // we don't repeat 100 lines of CSS per template.
-  _activityEmailHtml({ headerEmoji, headerTitle, headerSubtitle, bodyHtml, ctaLabel = '💕 打開 Twogether 查看' }) {
-    const frontendUrl = process.env.FRONTEND_URL || 'https://twogether-couples-app.de.r.appspot.com';
+  _activityEmailHtml({ headerEmoji, headerTitle, headerSubtitle, bodyHtml, ctaLabel = '💕 打開 Twogether 查看', ctaUrl }) {
+    const frontendUrl = ctaUrl || process.env.FRONTEND_URL || 'https://twogether-couples-app.de.r.appspot.com';
     return `
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -788,6 +788,274 @@ ${acceptUrl}
       logInfo('Intimacy response email sent', { kind: 'intimacy_response', response });
     } catch (error) {
       logError('Failed to send intimacy response email', { kind: 'intimacy_response', response, ...smtpErrorFields(error) });
+    }
+  }
+
+  _appBaseUrl() {
+    return (process.env.FRONTEND_URL || 'https://twogether-couples-app.de.r.appspot.com').replace(/\/$/, '');
+  }
+
+  // Welcome + email verification, sent on sign-up. One email, not two: it
+  // greets the new user and asks them to confirm their address via the button.
+  async sendWelcomeEmail({ recipientEmail, nickname, token }) {
+    if (!this.isConfigured()) {
+      logWarn('Email service not configured; skipping welcome email', { kind: 'welcome' });
+      return;
+    }
+    if (!recipientEmail) return;
+
+    const safeName = this._escape(nickname || '你好');
+    const verifyUrl = token
+      ? `${this._appBaseUrl()}/api/auth/verify-email?token=${encodeURIComponent(token)}`
+      : this._appBaseUrl();
+
+    const bodyHtml = `
+      <p>${safeName}，歡迎加入 <strong>Twogether</strong> 💕</p>
+      <p>這裡是專屬於你們倆的小天地 — 記錄親密時光、玩情趣遊戲、化解爭執、收藏劇本。</p>
+      ${token ? `
+      <p>為了確保是你本人，請點下方按鈕完成 Email 驗證：</p>
+      <p style="color:#636e72;font-size:14px;">如果按鈕無法點擊，請複製以下連結到瀏覽器：<br>
+        <code style="background:#f8f9fa;padding:4px 6px;border-radius:4px;word-break:break-all;">${verifyUrl}</code>
+      </p>` : ''}
+    `;
+    const html = this._activityEmailHtml({
+      headerEmoji: '🎉',
+      headerTitle: '歡迎加入 Twogether',
+      headerSubtitle: token ? '還差一步：驗證你的 Email' : '',
+      bodyHtml,
+      ctaLabel: token ? '✓ 驗證我的 Email' : '💕 打開 Twogether',
+      ctaUrl: verifyUrl,
+    });
+
+    const text = [
+      `${nickname || '你好'}，歡迎加入 Twogether！`,
+      '',
+      token ? `請點擊以下連結完成 Email 驗證：\n${verifyUrl}` : '打開 Twogether 開始記錄你們的時光。',
+      '',
+      '— Twogether',
+    ].join('\n');
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+        to: recipientEmail,
+        subject: '🎉 歡迎加入 Twogether！請驗證你的 Email',
+        text,
+        html,
+      });
+      logInfo('Welcome email sent', { kind: 'welcome' });
+    } catch (error) {
+      logError('Failed to send welcome email', { kind: 'welcome', ...smtpErrorFields(error) });
+    }
+  }
+
+  // Password reset link. Caller guarantees the token + expiry are stored.
+  async sendPasswordResetEmail({ recipientEmail, nickname, token }) {
+    if (!this.isConfigured()) {
+      logWarn('Email service not configured; skipping password reset email', { kind: 'password_reset' });
+      return;
+    }
+    if (!recipientEmail || !token) return;
+
+    const safeName = this._escape(nickname || '你好');
+    const resetUrl = `${this._appBaseUrl()}/api/auth/reset-password?token=${encodeURIComponent(token)}`;
+
+    const bodyHtml = `
+      <p>${safeName}，</p>
+      <p>我們收到重設你 Twogether 密碼的請求。點下方按鈕設定新密碼，連結 <strong>1 小時內</strong>有效。</p>
+      <p style="color:#636e72;font-size:14px;">如果這不是你本人操作，請忽略這封信，你的密碼不會變更。</p>
+      <p style="color:#636e72;font-size:14px;">按鈕無法點擊時，請複製連結：<br>
+        <code style="background:#f8f9fa;padding:4px 6px;border-radius:4px;word-break:break-all;">${resetUrl}</code>
+      </p>
+    `;
+    const html = this._activityEmailHtml({
+      headerEmoji: '🔑',
+      headerTitle: '重設你的密碼',
+      headerSubtitle: 'Twogether 帳號安全',
+      bodyHtml,
+      ctaLabel: '🔑 設定新密碼',
+      ctaUrl: resetUrl,
+    });
+
+    const text = [
+      `${nickname || '你好'}，`,
+      '',
+      '我們收到重設你 Twogether 密碼的請求。',
+      '請點擊以下連結設定新密碼（1 小時內有效）：',
+      resetUrl,
+      '',
+      '如果這不是你本人操作，請忽略這封信。',
+      '',
+      '— Twogether',
+    ].join('\n');
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+        to: recipientEmail,
+        subject: '🔑 重設你的 Twogether 密碼',
+        text,
+        html,
+      });
+      logInfo('Password reset email sent', { kind: 'password_reset' });
+    } catch (error) {
+      logError('Failed to send password reset email', { kind: 'password_reset', ...smtpErrorFields(error) });
+    }
+  }
+
+  // Purchase receipt after a successful Premium payment. Sent to the buyer.
+  async sendPaymentReceiptEmail({ recipientEmail, nickname, planLabel, amountTwd, days, orderNo, paidAt, expiresAt }) {
+    if (!this.isConfigured()) {
+      logWarn('Email service not configured; skipping receipt email', { kind: 'payment_receipt' });
+      return;
+    }
+    if (!recipientEmail) return;
+
+    const safeName = this._escape(nickname || '你好');
+    const fmtDate = (d) => {
+      try { return new Date(d).toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' }); }
+      catch { return String(d ?? ''); }
+    };
+    const rows = [
+      ['方案', this._escape(planLabel || 'Premium')],
+      ['天數', `${days} 天`],
+      ['金額', `NT$ ${amountTwd}`],
+      ['訂單編號', this._escape(orderNo || '')],
+      ['付款時間', fmtDate(paidAt || Date.now())],
+      ['有效期限至', fmtDate(expiresAt)],
+    ].map(([k, v]) => `
+      <tr>
+        <td style="padding:8px 12px;color:#636e72;border-bottom:1px solid #eee;">${k}</td>
+        <td style="padding:8px 12px;color:#2d3436;border-bottom:1px solid #eee;text-align:right;font-weight:600;">${v}</td>
+      </tr>`).join('');
+
+    const bodyHtml = `
+      <p>${safeName}，感謝你升級 <strong>Twogether Premium</strong> 💛 這是你的購買收據：</p>
+      <table style="width:100%;border-collapse:collapse;background:#f8f9fa;border-radius:8px;overflow:hidden;margin:16px 0;">
+        ${rows}
+      </table>
+      <p style="color:#636e72;font-size:14px;">Premium 為情侶共用，你的伴侶也會一起享有。如需協助請回覆 support 信箱。</p>
+    `;
+    const html = this._activityEmailHtml({
+      headerEmoji: '🧾',
+      headerTitle: '購買收據',
+      headerSubtitle: 'Twogether Premium',
+      bodyHtml,
+      ctaLabel: '💛 查看我的方案',
+      ctaUrl: `${this._appBaseUrl()}/`,
+    });
+
+    const text = [
+      `${nickname || '你好'}，感謝你升級 Twogether Premium！`,
+      '',
+      `方案：${planLabel || 'Premium'}（${days} 天）`,
+      `金額：NT$ ${amountTwd}`,
+      `訂單編號：${orderNo || ''}`,
+      `付款時間：${fmtDate(paidAt || Date.now())}`,
+      `有效期限至：${fmtDate(expiresAt)}`,
+      '',
+      'Premium 為情侶共用，你的伴侶也會一起享有。',
+      '— Twogether',
+    ].join('\n');
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+        to: recipientEmail,
+        subject: '🧾 Twogether Premium 購買收據',
+        text,
+        html,
+      });
+      logInfo('Payment receipt email sent', { kind: 'payment_receipt' });
+    } catch (error) {
+      logError('Failed to send payment receipt email', { kind: 'payment_receipt', ...smtpErrorFields(error) });
+    }
+  }
+
+  // First-time consultation booking: notify the therapist there's a new case.
+  // Subsequent chat messages do NOT email — they create in-app notifications.
+  async sendConsultationRequestToTherapist({ recipientEmail, therapistName, clientName, focusArea, message }) {
+    if (!this.isConfigured() || !recipientEmail) return;
+
+    const safeTherapist = this._escape(therapistName || '諮商師');
+    const safeClient = this._escape(clientName || '一位使用者');
+    const safeFocus = this._escape(focusArea || '');
+    const safeMessage = this._escape(message || '').slice(0, 600);
+
+    const bodyHtml = `
+      <p>${safeTherapist} 你好，</p>
+      <p><strong>${safeClient}</strong> 透過 Twogether 向你預約了諮商${safeFocus ? `（主題：${safeFocus}）` : ''}。</p>
+      ${safeMessage ? `<div class="quote">${safeMessage.replace(/\n/g, '<br>')}</div>` : ''}
+      <p style="color:#636e72;font-size:14px;">登入 Twogether 查看並回覆。之後的對話只會出現在 App 內，不會再寄 Email。</p>
+    `;
+    const html = this._activityEmailHtml({
+      headerEmoji: '🗓️',
+      headerTitle: '你有一則新的諮商預約',
+      headerSubtitle: safeClient,
+      bodyHtml,
+    });
+
+    const text = [
+      `${therapistName || '諮商師'} 你好，`,
+      `${clientName || '一位使用者'} 透過 Twogether 向你預約了諮商${focusArea ? `（主題：${focusArea}）` : ''}。`,
+      message ? `\n訊息：${message}` : '',
+      '',
+      '登入 Twogether 查看並回覆。之後的對話只會出現在 App 內。',
+    ].join('\n');
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Twogether 心理諮商" <${process.env.SMTP_USER}>`,
+        to: recipientEmail,
+        subject: `🗓️ ${clientName || '有人'} 向你預約了諮商`,
+        text,
+        html,
+      });
+      logInfo('Consultation request email sent', { kind: 'consultation_request' });
+    } catch (error) {
+      logError('Failed to send consultation request email', { kind: 'consultation_request', ...smtpErrorFields(error) });
+    }
+  }
+
+  // First-time consultation booking: confirm to the user that it went through.
+  async sendConsultationBookingConfirmation({ recipientEmail, clientName, therapistName }) {
+    if (!this.isConfigured() || !recipientEmail) return;
+
+    const safeClient = this._escape(clientName || '你好');
+    const safeTherapist = this._escape(therapistName || '諮商師');
+
+    const bodyHtml = `
+      <p>${safeClient}，</p>
+      <p>你向 <strong>${safeTherapist}</strong> 的諮商預約已送出，對方會盡快與你聯繫。</p>
+      <p style="color:#636e72;font-size:14px;">之後諮商室的對話會以 App 內通知提醒你，不會再寄 Email。</p>
+    `;
+    const html = this._activityEmailHtml({
+      headerEmoji: '🗓️',
+      headerTitle: '你的諮商預約已送出',
+      headerSubtitle: safeTherapist,
+      bodyHtml,
+      ctaLabel: '💬 進入諮商室',
+    });
+
+    const text = [
+      `${clientName || '你好'}，`,
+      `你向 ${therapistName || '諮商師'} 的諮商預約已送出，對方會盡快與你聯繫。`,
+      '',
+      '之後諮商室的對話會以 App 內通知提醒你，不會再寄 Email。',
+      '— Twogether 心理諮商',
+    ].join('\n');
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Twogether 心理諮商" <${process.env.SMTP_USER}>`,
+        to: recipientEmail,
+        subject: '🗓️ 你的諮商預約已送出',
+        text,
+        html,
+      });
+      logInfo('Consultation confirmation email sent', { kind: 'consultation_confirm' });
+    } catch (error) {
+      logError('Failed to send consultation confirmation email', { kind: 'consultation_confirm', ...smtpErrorFields(error) });
     }
   }
 }

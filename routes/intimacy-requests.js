@@ -177,23 +177,21 @@ router.post('/', [
       // Don't fail the request if notification creation fails
     }
 
-    // Send email notification to partner
+    // Send email notification to partner — honors the partner's "Email 通知"
+    // switch (the in-app notification above is sent regardless).
     try {
-      // Get partner's email
-      const partnerResult = await db.query('SELECT email FROM users WHERE id = $1', [partnerId]);
-      if (partnerResult.rows.length > 0) {
-        const partnerEmail = partnerResult.rows[0].email;
+      const partner = await emailService.getUserEmailIfOptedIn(db, partnerId);
+      if (partner) {
         const senderNickname = req.user.nickname || '你的伴侶';
-
         logInfo('Sending intimacy request email', { kind: 'intimacy_request', partnerId });
         await emailService.sendIntimacyRequestNotification(
           senderNickname,
-          partnerEmail,
+          partner.email,
           request_type,
           message || ''
         );
       } else {
-        logWarn('Partner email not found', { partnerId });
+        logInfo('Partner opted out of email or unreachable; skipping intimacy request email', { partnerId });
       }
     } catch (emailError) {
       logWarn('Failed to send intimacy request email', { kind: 'intimacy_request', err: emailError.message, code: emailError.code });
@@ -271,13 +269,22 @@ router.post('/stats/send-nudge', async (req, res) => {
 
     const { partner_id: partnerId } = coupleResult.rows[0];
 
-    const partnerResult = await db.query('SELECT email, nickname FROM users WHERE id = $1', [partnerId]);
+    const partnerResult = await db.query('SELECT email, nickname, email_notifications_enabled FROM users WHERE id = $1', [partnerId]);
     const partnerData = partnerResult.rows[0];
 
     if (!partnerData?.email) {
       return res.json({
         success: false,
         message: '找不到伴侶的電子郵件地址，請請伴侶更新資訊。'
+      });
+    }
+
+    // Respect the partner's "Email 通知" switch — this is an email-only nudge,
+    // so if they've opted out there's nothing to send.
+    if (partnerData.email_notifications_enabled === false) {
+      return res.json({
+        success: false,
+        message: '你的伴侶已關閉 Email 通知，目前無法寄出提醒。'
       });
     }
 
