@@ -176,6 +176,65 @@ test.describe('Marketplace — public script sharing + ratings + favorites', () 
     await page.waitForTimeout(500);
   });
 
+  test('author can 取消發布 directly from the marketplace detail view', async ({ page }) => {
+    // Upload a public script.
+    await page.getByTestId('script-upload-button').click();
+    await expect(page.getByTestId('script-public-toggle')).toBeChecked();
+    const title = `Unpublish E2E Script ${Date.now()}`;
+    await page.locator('#script-title').fill(title);
+    await page.locator('#script-scenario').fill('to be unpublished from detail');
+    await page.locator('#script-content').fill('[男]: hi\n[女]: hello');
+
+    const [createResp] = await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/api/custom-scripts') && r.request().method() === 'POST',
+        { timeout: 15000 }
+      ),
+      page.getByTestId('script-upload-submit-button').click(),
+    ]);
+    const created = await createResp.json();
+    if (created?.custom_script?.id) createdScriptIds.push(created.custom_script.id);
+    await page.waitForTimeout(1500);
+
+    // Open Marketplace, sort by newest, find and open the card.
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/api/marketplace/scripts') && r.request().method() === 'GET',
+        { timeout: 10000 }
+      ),
+      page.getByTestId('roleplay-tab-marketplace').click(),
+    ]);
+    await page.getByTestId('marketplace-sort').click();
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/api/marketplace/scripts') && r.request().method() === 'GET',
+        { timeout: 10000 }
+      ),
+      page.getByTestId('marketplace-sort-option-recent').click(),
+    ]);
+    await page.waitForTimeout(1000);
+
+    const card = page.getByTestId('marketplace-grid').locator('div', { hasText: title }).first();
+    await expect(card).toBeVisible({ timeout: 5000 });
+    await card.click();
+    await expect(page.getByTestId('marketplace-detail-modal')).toBeVisible({ timeout: 5000 });
+
+    // The author sees the unpublish action. Click → confirm.
+    await page.getByTestId('marketplace-detail-unpublish-button').click();
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/api/custom-scripts/') && r.request().method() === 'PUT',
+        { timeout: 10000 }
+      ),
+      page.getByTestId('marketplace-detail-unpublish-confirm').click(),
+    ]);
+
+    // Modal closes and the script is gone from the marketplace grid.
+    await expect(page.getByTestId('marketplace-detail-modal')).toHaveCount(0, { timeout: 5000 });
+    await page.waitForTimeout(1000);
+    await expect(page.getByText(title)).toHaveCount(0);
+  });
+
   test('toggle off Marketplace share keeps the script private', async ({ page }) => {
     await page.getByTestId('script-upload-button').click();
     const publicToggle = page.getByTestId('script-public-toggle');

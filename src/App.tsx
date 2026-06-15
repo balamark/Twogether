@@ -1704,6 +1704,16 @@ const LoveTimeApp = () => {
     }
   };
 
+  // Unpublish a custom script straight from the marketplace detail view, so the
+  // author doesn't have to hunt down the matching script in 自訂劇本 to stop
+  // sharing it. Flips is_public=false and reconciles local state.
+  const unpublishScript = async (id: string) => {
+    await apiService.updateCustomScript(id, { isPublic: false });
+    setCustomScripts(prev =>
+      prev.map(s => (s.id === id ? { ...s, isPublic: false } : s))
+    );
+  };
+
   // Gift management functions
   const addCustomGift = async (title: string, description: string, cost: number, category: CoinGift['category'], icon: string) => {
     try {
@@ -1948,6 +1958,7 @@ const LoveTimeApp = () => {
         showNotification={showNotification}
         favoriteScriptIds={favoriteScriptIds}
         onToggleFavorite={toggleFavoriteScript}
+        onUnpublishScript={unpublishScript}
         initialScriptTitle={pendingScriptTitle}
         onInitialScriptConsumed={() => setPendingScriptTitle(null)}
         renderGames={() => <GamesView

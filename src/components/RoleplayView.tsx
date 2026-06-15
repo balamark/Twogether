@@ -48,6 +48,7 @@ interface RoleplayViewProps {
   showNotification: (notification: Omit<Notification, 'id'>) => void;
   favoriteScriptIds: Set<string>;
   onToggleFavorite: (scriptId: string) => void;
+  onUnpublishScript?: (scriptId: string) => Promise<void>;
   initialScriptTitle?: string | null;
   onInitialScriptConsumed?: () => void;
   renderGames?: () => React.ReactNode;
@@ -162,6 +163,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   showNotification,
   favoriteScriptIds,
   onToggleFavorite,
+  onUnpublishScript,
   initialScriptTitle,
   onInitialScriptConsumed,
   renderGames,
@@ -1187,6 +1189,12 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             await onToggleFavorite(id);
             await loadFavoritedMarketplace();
           }}
+          onUnpublish={onUnpublishScript ? async (id) => {
+            await onUnpublishScript(id);
+            // Reflect the new private state everywhere it was listed.
+            await loadMarketplace();
+            await loadFavoritedMarketplace();
+          } : undefined}
           showNotification={showNotification}
         />
       )}

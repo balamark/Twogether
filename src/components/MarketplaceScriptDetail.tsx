@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { X, Play, Heart, Flag, Send, Trash2 } from 'lucide-react';
+import { X, Play, Heart, Flag, Send, Trash2, EyeOff } from 'lucide-react';
 import StarRating from './StarRating';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { apiService } from '../services/api';
@@ -15,6 +15,9 @@ interface Props {
   onClose: () => void;
   onPlay: (script: MarketplaceScriptDetailType) => void;
   onToggleFavorite: (scriptId: string) => Promise<void> | void;
+  // Author-only: stop sharing this script to the marketplace. When omitted, the
+  // unpublish action is hidden.
+  onUnpublish?: (scriptId: string) => Promise<void> | void;
   showNotification: (n: Omit<Notification, 'id'>) => void;
 }
 
@@ -30,6 +33,7 @@ export default function MarketplaceScriptDetail({
   onClose,
   onPlay,
   onToggleFavorite,
+  onUnpublish,
   showNotification,
 }: Props) {
   const [script, setScript] = useState<MarketplaceScriptDetailType | null>(null);
@@ -37,6 +41,8 @@ export default function MarketplaceScriptDetail({
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [showReport, setShowReport] = useState(false);
+  const [showUnpublishConfirm, setShowUnpublishConfirm] = useState(false);
+  const [unpublishing, setUnpublishing] = useState(false);
   const [reportReason, setReportReason] = useState<ScriptReportReason>('inappropriate');
   const [reportDetail, setReportDetail] = useState('');
   const [draftStars, setDraftStars] = useState(0);
@@ -129,6 +135,31 @@ export default function MarketplaceScriptDetail({
         message: (err as Error)?.message || '請稍後再試',
         duration: 4000,
       });
+    }
+  };
+
+  const handleUnpublish = async () => {
+    if (!onUnpublish) return;
+    setUnpublishing(true);
+    try {
+      await onUnpublish(scriptId);
+      setShowUnpublishConfirm(false);
+      showNotification({
+        type: 'success',
+        title: '已取消發布',
+        message: '這個劇本已從創作市集下架，仍保留在你的「自訂劇本」中，隨時可以重新分享。',
+        duration: 5000,
+      });
+      onClose();
+    } catch (err) {
+      showNotification({
+        type: 'error',
+        title: '取消發布失敗',
+        message: (err as Error)?.message || '請稍後再試',
+        duration: 4000,
+      });
+    } finally {
+      setUnpublishing(false);
     }
   };
 
@@ -309,6 +340,17 @@ export default function MarketplaceScriptDetail({
             </div>
 
             <div className="sticky bottom-0 z-10 px-5 sm:px-8 py-4 border-t border-petal-rule bg-petal-cream/95 backdrop-blur-sm flex flex-col sm:flex-row justify-end gap-2 safe-pb">
+              {script.isAuthor && onUnpublish && (
+                <button
+                  type="button"
+                  onClick={() => setShowUnpublishConfirm(true)}
+                  data-testid="marketplace-detail-unpublish-button"
+                  className="px-4 py-2 border border-petal-rule text-petal-muted hover:border-petal-rose-deep hover:text-petal-rose-deep rounded-md font-body text-sm transition-colors inline-flex items-center gap-1.5 sm:mr-auto"
+                >
+                  <EyeOff className="w-3.5 h-3.5" strokeWidth={1.5} />
+                  取消發布
+                </button>
+              )}
               {!script.isAuthor && (
                 <button
                   type="button"
@@ -393,6 +435,39 @@ export default function MarketplaceScriptDetail({
                   className="px-4 py-2 bg-petal-rose-deep text-petal-cream rounded-md font-body text-sm hover:bg-pink-700 transition-colors"
                 >
                   送出檢舉
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showUnpublishConfirm && (
+          <div className="fixed inset-0 bg-petal-ink/50 flex items-center justify-center z-[60] p-4" onClick={() => !unpublishing && setShowUnpublishConfirm(false)}>
+            <div className="bg-petal-cream rounded-md shadow-petal max-w-md w-full p-5" onClick={(e) => e.stopPropagation()}>
+              <h4 className="font-display text-lg font-medium tracking-tight text-petal-ink mb-2">
+                取消發布這個劇本？
+              </h4>
+              <p className="font-body text-sm text-petal-ink-soft mb-4 leading-relaxed">
+                下架後其他人將無法在創作市集找到或開始這個劇本。已收藏的人也會看到「作者已停止分享」。劇本仍保留在你的「自訂劇本」中，隨時可以重新分享。
+              </p>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowUnpublishConfirm(false)}
+                  disabled={unpublishing}
+                  className="px-4 py-2 border border-petal-rule text-petal-ink-soft rounded-md font-body text-sm disabled:opacity-40"
+                >
+                  保持發布
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUnpublish}
+                  disabled={unpublishing}
+                  data-testid="marketplace-detail-unpublish-confirm"
+                  className="px-4 py-2 bg-petal-rose-deep text-petal-cream rounded-md font-body text-sm hover:bg-pink-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed inline-flex items-center gap-1.5"
+                >
+                  <EyeOff className="w-3.5 h-3.5" strokeWidth={1.5} />
+                  {unpublishing ? '處理中…' : '取消發布'}
                 </button>
               </div>
             </div>
