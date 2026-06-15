@@ -140,6 +140,7 @@ interface User {
   birth_date?: string | null;
   email_notifications_enabled?: boolean;
   cycle_tracking_enabled?: boolean;
+  email_verified?: boolean;
   timezone?: string | null;
   couplePrimaryTimezone?: string | null;
   partnerTimezone?: string | null;
@@ -659,6 +660,7 @@ const LoveTimeApp = () => {
         timezone?: string | null;
         email_notifications_enabled?: boolean;
         cycle_tracking_enabled?: boolean;
+        email_verified?: boolean;
         created_at?: string;
       };
 
@@ -671,6 +673,7 @@ const LoveTimeApp = () => {
         timezone: userData.timezone,
         email_notifications_enabled: userData.email_notifications_enabled,
         cycle_tracking_enabled: userData.cycle_tracking_enabled,
+        email_verified: userData.email_verified,
         partnerCode: generatePartnerCode(),
         createdAt: userData.created_at || new Date().toISOString()
       };
@@ -710,13 +713,15 @@ const LoveTimeApp = () => {
         id?: string;
         email: string;
         nickname: string;
+        email_verified?: boolean;
         created_at?: string;
       };
-      
+
       const user: User = {
         id: userData.id || Date.now().toString(),
         email: userData.email,
         nickname: userData.nickname,
+        email_verified: userData.email_verified ?? false,
         partnerCode: generatePartnerCode(),
         createdAt: userData.created_at || new Date().toISOString()
       };
@@ -1820,6 +1825,29 @@ const LoveTimeApp = () => {
     setNicknames(prev => ({...prev, [partner]: value}));
   }, []);
 
+  const handleResendVerification = async () => {
+    try {
+      const result = await apiService.resendVerification();
+      if (result?.alreadyVerified) {
+        // Sync local state so the banner disappears.
+        setAuthState(prev => prev.user ? { ...prev, user: { ...prev.user, email_verified: true } } : prev);
+      }
+      showNotification({
+        type: result?.alreadyVerified ? 'info' : 'success',
+        title: result?.alreadyVerified ? 'Email 已驗證' : '驗證信已寄出',
+        message: result?.message || '請到信箱查收驗證連結。',
+        duration: 6000,
+      });
+    } catch (error) {
+      showNotification({
+        type: 'error',
+        title: '寄送失敗',
+        message: (error as Error)?.message || '無法重寄驗證信，請稍後再試。',
+        duration: 6000,
+      });
+    }
+  };
+
   // SettingsView component moved to separate file
 
   const navItems = [
@@ -2244,6 +2272,25 @@ const LoveTimeApp = () => {
             );
           })}
         </div>
+
+        {/* Soft email-verification reminder — non-blocking; users can keep using
+            the app. Shows only while authenticated and not yet verified. */}
+        {authState.isAuthenticated && authState.user?.email_verified === false && (
+          <div className="max-w-6xl mx-auto mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-petal-rose-soft/30 border border-petal-rose-soft rounded-md px-4 py-3">
+              <p className="flex-1 font-body text-sm text-petal-ink">
+                請驗證你的 Email（{authState.user?.email}）以確保帳號安全。沒收到信？可以重新寄送。
+              </p>
+              <button
+                onClick={handleResendVerification}
+                data-testid="resend-verification-button"
+                className="shrink-0 px-4 py-1.5 bg-petal-ink text-petal-cream rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+              >
+                重新寄送驗證信
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Main Content */}
         <div className="max-w-6xl mx-auto">

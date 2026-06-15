@@ -5,6 +5,7 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { getCoupleIdForUser, getCoupleTier, getActiveExpiry } = require('../lib/entitlements');
 const ecpay = require('../lib/ecpay');
+const emailService = require('../services/emailService');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 
 const router = express.Router();
@@ -310,6 +311,33 @@ router.post('/ecpay/callback', async (req, res) => {
       plan: order.plan,
       days: plan.days,
     });
+
+    // Fire-and-forget purchase receipt to the buyer. Must never affect the
+    // idempotent ack ECPay needs, so it's fully wrapped and awaited-free.
+    (async () => {
+      try {
+        if (!order.created_by) return;
+        const buyer = await db.query('SELECT email, nickname FROM users WHERE id = $1', [order.created_by]);
+        const b = buyer.rows[0];
+        if (!b?.email) return;
+        const entRow = await db.query(
+          'SELECT expires_at FROM couple_entitlements WHERE order_id = $1 ORDER BY expires_at DESC LIMIT 1',
+          [order.id]
+        );
+        await emailService.sendPaymentReceiptEmail({
+          recipientEmail: b.email,
+          nickname: b.nickname,
+          planLabel: plan.label,
+          amountTwd: order.amount,
+          days: plan.days,
+          orderNo: merchantTradeNo,
+          paidAt: new Date(),
+          expiresAt: entRow.rows[0]?.expires_at || null,
+        });
+      } catch (err) {
+        logWarn('Payment receipt email failed', { merchantTradeNo, err: err.message });
+      }
+    })();
 
     res.send('1|OK');
   } catch (err) {

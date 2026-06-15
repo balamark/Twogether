@@ -75,6 +75,9 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       case 'request_response':
         onNavigate('intimacy-history');
         break;
+      case 'consultation_message':
+        onNavigate('therapists');
+        break;
       default:
         break;
     }

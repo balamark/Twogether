@@ -1291,6 +1291,19 @@ class ApiService {
     resetSessionExpiredGuard();
   }
 
+  // Re-send the email-verification link to the logged-in user.
+  async resendVerification(): Promise<{ success: boolean; message: string; alreadyVerified?: boolean }> {
+    const response = await apiClient.post('/auth/resend-verification', {});
+    return response.data;
+  }
+
+  // Start a password reset. Always resolves (the backend never reveals whether
+  // the email exists) — surface the generic message to the user.
+  async forgotPassword(email: string): Promise<{ success: boolean; message: string }> {
+    const response = await apiClient.post('/auth/forgot-password', { email });
+    return response.data;
+  }
+
   // Lightweight session-validity probe — hits GET /auth/me. If the token is
   // no longer accepted, the response interceptor will dispatch the global
   // expiration event; callers don't need to handle the failure themselves.

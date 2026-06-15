@@ -697,6 +697,27 @@ router.post('/consultations/:id/messages', authenticateToken, [
       [req.params.id, req.user.id, req.body.body.trim(), eventId]
     );
     logInfo('Consultation message posted', { consultationId: req.params.id, userId: req.user.id });
+
+    // In-app notification (NOT email) to every other participant. The first
+    // booking already emailed both sides; ongoing chat stays in-app only.
+    try {
+      const r = access.row;
+      const recipients = [...new Set(
+        [r.therapist_user_id, r.requester_id, r.user1_id, r.user2_id]
+          .filter((uid) => uid && uid !== req.user.id)
+      )];
+      const senderName = access.isTherapist ? (r.therapist_name || '諮商師') : (req.user.nickname || '對方');
+      const snippet = req.body.body.trim().slice(0, 120);
+      for (const uid of recipients) {
+        await db.query(
+          `INSERT INTO notifications (user_id, notification_type, title, content, related_user_id, priority)
+           VALUES ($1, 'consultation_message', $2, $3, $4, 2)`,
+          [uid, `${senderName} 在諮商室回覆了`, snippet, req.user.id]
+        );
+      }
+    } catch (notifyErr) {
+      logWarn('Consultation message notification failed', { id: req.params.id, err: notifyErr.message });
+    }
     res.status(201).json({
       success: true,
       message: { id: ins.rows[0].id, createdAt: ins.rows[0].created_at },
@@ -1258,12 +1279,13 @@ router.post('/:id/consult', authenticateToken, [
     const userId = req.user.id;
 
     const therapist = await db.query(
-      `SELECT id FROM therapists WHERE id = $1 AND status = 'approved'`,
+      `SELECT id, contact_email, display_name FROM therapists WHERE id = $1 AND status = 'approved'`,
       [therapistId]
     );
     if (therapist.rows.length === 0) {
       return res.status(404).json({ success: false, message: '找不到這位諮商師' });
     }
+    const therapistRow = therapist.rows[0];
 
     // Record the couple if the requester is paired (either side of the couple).
     const couple = await db.query(
@@ -1286,6 +1308,22 @@ router.post('/:id/consult', authenticateToken, [
     ]);
 
     logInfo('Consultation requested', { userId, therapistId, consultationId: result.rows[0].id });
+
+    // First-booking emails to BOTH sides. Fire-and-forget — the booking already
+    // succeeded. Subsequent chat in the room uses in-app notifications, not email.
+    emailService.sendConsultationRequestToTherapist({
+      recipientEmail: therapistRow.contact_email,
+      therapistName: therapistRow.display_name,
+      clientName: req.user.nickname,
+      focusArea: focusArea || null,
+      message: message || null,
+    }).catch((err) => logWarn('Consultation therapist email failed', { err: err.message }));
+
+    emailService.sendConsultationBookingConfirmation({
+      recipientEmail: contactEmail || req.user.email || null,
+      clientName: req.user.nickname,
+      therapistName: therapistRow.display_name,
+    }).catch((err) => logWarn('Consultation confirmation email failed', { err: err.message }));
     res.status(201).json({
       success: true,
       message: '預約已送出，諮商師將盡快與你聯繫',
@@ -1315,7 +1353,7 @@ router.post('/:id/book-video', authenticateToken, [
   try {
     const therapistId = req.params.id;
     const therapist = await db.query(
-      `SELECT id, rate_twd, session_minutes, accepting_new_clients FROM therapists WHERE id = $1 AND status = 'approved'`,
+      `SELECT id, rate_twd, session_minutes, accepting_new_clients, contact_email, display_name FROM therapists WHERE id = $1 AND status = 'approved'`,
       [therapistId]
     );
     if (therapist.rows.length === 0) {
@@ -1345,6 +1383,22 @@ router.post('/:id/book-video', authenticateToken, [
     ]);
 
     logInfo('Video session booked', { userId: req.user.id, therapistId, consultationId: result.rows[0].id });
+
+    // First-booking emails to both sides (fire-and-forget). Ongoing chat uses
+    // in-app notifications, not email.
+    emailService.sendConsultationRequestToTherapist({
+      recipientEmail: t.contact_email,
+      therapistName: t.display_name,
+      clientName: req.user.nickname,
+      focusArea: null,
+      message: req.body.message || null,
+    }).catch((err) => logWarn('Video booking therapist email failed', { err: err.message }));
+
+    emailService.sendConsultationBookingConfirmation({
+      recipientEmail: req.user.email || null,
+      clientName: req.user.nickname,
+      therapistName: t.display_name,
+    }).catch((err) => logWarn('Video booking confirmation email failed', { err: err.message }));
     res.status(201).json({
       success: true,
       message: '已建立預約，請完成付款以確認時段。',
