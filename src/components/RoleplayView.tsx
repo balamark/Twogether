@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow, LayoutGrid, List, Gamepad2, ChevronDown, ArrowUp } from 'lucide-react';
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -339,7 +339,22 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     setLightboxOpen(false);
   }, []);
 
-  const allScripts = [...defaultRoleplayScripts, ...customScripts];
+  // Custom (uploaded) scripts sorted by upload time, most recent first. The
+  // backend already returns them ORDER BY created_at DESC, but a script created
+  // in-session gets appended to the end of the array — sorting here keeps the
+  // newest upload at the top regardless of how the list was assembled. Scripts
+  // missing createdAt sink to the bottom rather than jumping around.
+  const sortedCustomScripts = useMemo(
+    () =>
+      [...customScripts].sort((a, b) => {
+        const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return tb - ta;
+      }),
+    [customScripts]
+  );
+
+  const allScripts = [...defaultRoleplayScripts, ...sortedCustomScripts];
   const filteredScripts = roleplayFilter === 'all'
     ? allScripts
     : allScripts.filter(script => script.category === roleplayFilter);
@@ -676,7 +691,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           {customScripts.length > 0 ? (
             customView === 'grid' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {customScripts.map((script) => (
+                {sortedCustomScripts.map((script) => (
                   <div key={script.id} data-testid={`script-card-custom-${script.id}`} className="bg-white border border-petal-rule rounded-md p-4 hover:border-petal-rose transition-colors">
                     <div className="flex items-start gap-3 mb-2">
                       <div className="w-14 h-14 rounded-md flex-shrink-0 overflow-hidden border border-petal-rule">
@@ -738,7 +753,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               </div>
             ) : (
               <div className="flex flex-col gap-1.5">
-                {customScripts.map((script) =>
+                {sortedCustomScripts.map((script) =>
                   renderScriptListRow({
                     key: script.id,
                     testId: `script-card-custom-${script.id}`,
