@@ -5,11 +5,11 @@ const TEST_USER = {
   password: 'test123456',
 };
 
-// 1x1 PNGs (distinct bytes so the two photos aren't identical files).
-const PNG_A =
+// Known-good 1x1 red PNG (the same fixture used by custom-script-api.spec.ts).
+// We upload it twice — the two photos don't need distinct pixels, only distinct
+// rows. A hand-fabricated second PNG tripped CI's stricter libspng decoder.
+const ONE_PX_PNG =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
-const PNG_B =
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVR4nGNgYAAAAAQAAa6P4G4AAAAASUVORK5CYII=';
 
 async function loginIfNeeded(page: Page) {
   await page.addInitScript(() => localStorage.setItem('pairingPromptDismissed', 'true'));
@@ -61,8 +61,8 @@ test.describe('Roleplay custom script — multi-photo upload + lightbox nav', ()
 
     // Attach two photos; the grid should reflect both, first marked 封面.
     await page.getByTestId('script-photos-input').setInputFiles([
-      { name: 'a.png', mimeType: 'image/png', buffer: Buffer.from(PNG_A, 'base64') },
-      { name: 'b.png', mimeType: 'image/png', buffer: Buffer.from(PNG_B, 'base64') },
+      { name: 'a.png', mimeType: 'image/png', buffer: Buffer.from(ONE_PX_PNG, 'base64') },
+      { name: 'b.png', mimeType: 'image/png', buffer: Buffer.from(ONE_PX_PNG, 'base64') },
     ]);
     await expect(page.locator('[data-testid="script-photos-grid"] img')).toHaveCount(2, { timeout: 5000 });
 
