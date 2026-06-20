@@ -191,6 +191,39 @@ interface IntimacyTemplate {
   suggestionLevel: string;
 }
 
+// AI-generated roleplay invitation messages for a chosen script.
+type RoleplayMessageLevel = 'normal' | 'mild' | 'moderate' | 'explicit' | 'intense';
+
+interface RoleplayMessageSuggestion {
+  level: RoleplayMessageLevel;
+  label: string;
+  text: string;
+}
+
+interface GenerateRoleplayMessagesInput {
+  scriptId?: string;
+  scriptTitle: string;
+  scriptScenario?: string;
+  scriptBody?: string;
+  category?: string;
+  regenerate?: boolean;
+}
+
+interface RoleplayMessagesResult {
+  summary: string;
+  messages: RoleplayMessageSuggestion[];
+  cached?: boolean;
+}
+
+interface RoleplayMessageFeedbackInput {
+  scriptId?: string;
+  scriptTitle?: string;
+  level?: string;
+  messageText?: string;
+  rating: 'up' | 'down';
+  feedbackText?: string;
+}
+
 interface AlternativeIntimacyOption {
   id: string;
   category: string;
@@ -1777,6 +1810,41 @@ class ApiService {
     }
   }
 
+  // Ask the AI to summarize a roleplay script and produce 5 escalating opening
+  // invitation messages. 429 (AI_DAILY_LIMIT_REACHED) is surfaced by the shared
+  // response interceptor as a billing:limit-reached event — let it propagate.
+  async generateRoleplayMessages(input: GenerateRoleplayMessagesInput): Promise<RoleplayMessagesResult> {
+    try {
+      const response = await apiClient.post('/intimacy-requests/script-messages', {
+        scriptId: input.scriptId,
+        scriptTitle: input.scriptTitle,
+        scriptScenario: input.scriptScenario,
+        scriptBody: input.scriptBody,
+        category: input.category,
+        regenerate: input.regenerate,
+      });
+      return {
+        summary: response.data.summary || '',
+        messages: (response.data.messages || []) as RoleplayMessageSuggestion[],
+        cached: !!response.data.cached,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to generate roleplay messages:', error);
+      // Preserve error_code/message from the interceptor so the UI can branch.
+      throw error;
+    }
+  }
+
+  // Thumb up/down (+ optional text) on a generated roleplay message. Best-effort
+  // analytics — callers fire-and-forget; failures never block the user.
+  async submitRoleplayMessageFeedback(input: RoleplayMessageFeedbackInput): Promise<void> {
+    try {
+      await apiClient.post('/intimacy-requests/script-messages/feedback', input);
+    } catch (error: unknown) {
+      console.error('Failed to submit roleplay message feedback:', error);
+    }
+  }
+
   async getAlternativeIntimacyOptions(): Promise<AlternativeIntimacyOptionsGrouped> {
     try {
       const response = await apiClient.get('/intimacy-requests/alternative-intimacy-options');
@@ -1873,11 +1941,12 @@ class ApiService {
     content: string;
     tags?: string[];
     duration?: string;
-    thumbnail?: File;
+    photos?: File[];
     isPublic?: boolean;
   }): Promise<unknown> {
     try {
-      if (script.thumbnail) {
+      // Multipart path when any photos are attached; the first is the cover.
+      if (script.photos && script.photos.length > 0) {
         const fd = new FormData();
         fd.append('title', script.title);
         fd.append('category', script.category);
@@ -1885,15 +1954,16 @@ class ApiService {
         fd.append('content', script.content);
         fd.append('duration', script.duration ?? '15-30分鐘');
         fd.append('tags', JSON.stringify(script.tags ?? []));
-        fd.append('thumbnail', script.thumbnail);
+        for (const p of script.photos) fd.append('photos', p);
         if (script.isPublic !== undefined) fd.append('isPublic', String(script.isPublic));
         const response = await apiClient.post('/custom-scripts', fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
         return response.data.custom_script;
       }
-      const { thumbnail: _unused, ...payload } = script;
-      const response = await apiClient.post('/custom-scripts', payload);
+      // No files → plain JSON. An empty/undefined `photos` serializes harmlessly
+      // (the server only reads photos from multipart) so no need to strip it.
+      const response = await apiClient.post('/custom-scripts', script);
       return response.data.custom_script;
     } catch (error) {
       console.error('Failed to create custom script:', error);
@@ -1908,12 +1978,17 @@ class ApiService {
     content?: string;
     tags?: string[];
     duration?: string;
-    thumbnail?: File;
+    photos?: File[];
+    // URLs of existing photos to keep, in order. Presence of this field (even
+    // empty) tells the server to rebuild the photo set; absence leaves it as-is.
+    existingPhotos?: string[];
     isPublic?: boolean;
   }): Promise<unknown> {
     try {
-      // Multipart path when a new thumbnail is provided — mirrors createCustomScript.
-      if (updates.thumbnail) {
+      const hasPhotoChange =
+        (updates.photos && updates.photos.length > 0) || updates.existingPhotos !== undefined;
+      // Multipart path when the photo series changed — mirrors createCustomScript.
+      if (hasPhotoChange) {
         const fd = new FormData();
         if (updates.title !== undefined) fd.append('title', updates.title);
         if (updates.category !== undefined) fd.append('category', updates.category);
@@ -1922,14 +1997,19 @@ class ApiService {
         if (updates.duration !== undefined) fd.append('duration', updates.duration);
         if (updates.tags !== undefined) fd.append('tags', JSON.stringify(updates.tags));
         if (updates.isPublic !== undefined) fd.append('isPublic', String(updates.isPublic));
-        fd.append('thumbnail', updates.thumbnail);
+        if (updates.existingPhotos !== undefined) {
+          fd.append('existingPhotos', JSON.stringify(updates.existingPhotos));
+        }
+        for (const p of updates.photos ?? []) fd.append('photos', p);
         const response = await apiClient.put(`/custom-scripts/${id}`, fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
         return response.data.custom_script;
       }
-      const { thumbnail: _unused, ...payload } = updates;
-      const response = await apiClient.put(`/custom-scripts/${id}`, payload);
+      // Metadata-only edit → plain JSON. photos is empty and existingPhotos is
+      // undefined here (otherwise hasPhotoChange routed to multipart above), so
+      // sending `updates` as-is leaves the photo series untouched server-side.
+      const response = await apiClient.put(`/custom-scripts/${id}`, updates);
       return response.data.custom_script;
     } catch (error) {
       console.error('Failed to update custom script:', error);
@@ -2879,6 +2959,11 @@ export type {
   CreateIntimacyRequestRequest,
   RespondToIntimacyRequestRequest,
   IntimacyTemplate,
+  RoleplayMessageLevel,
+  RoleplayMessageSuggestion,
+  GenerateRoleplayMessagesInput,
+  RoleplayMessagesResult,
+  RoleplayMessageFeedbackInput,
   AlternativeIntimacyOption,
   AlternativeIntimacyOptionsGrouped,
   Notification,

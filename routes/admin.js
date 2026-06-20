@@ -473,6 +473,64 @@ adminApiRouter.get('/recent-users', async (req, res) => {
   }
 });
 
+// Roleplay invitation insights: per-script generation cache + thumb feedback,
+// plus a recent-feedback feed. Resilient to a not-yet-migrated DB (returns
+// empty rather than 500 if the tables don't exist).
+adminApiRouter.get('/roleplay-invitations', async (req, res) => {
+  try {
+    const rawLimit = parseInt(req.query.limit, 10);
+    const limit = Math.min(Math.max(1, Number.isFinite(rawLimit) ? rawLimit : 50), 200);
+
+    // Per-script roll-up: cached generation + up/down feedback counts. FULL OUTER
+    // JOIN so scripts that only have feedback (no cache row) still appear.
+    const scriptsQ = await db.query(
+      `WITH fb AS (
+         SELECT script_id,
+                MAX(script_title) AS script_title,
+                COUNT(*) FILTER (WHERE rating = 'up')::int   AS ups,
+                COUNT(*) FILTER (WHERE rating = 'down')::int AS downs,
+                COUNT(*) FILTER (WHERE feedback_text IS NOT NULL AND feedback_text <> '')::int AS comments,
+                MAX(created_at) AS last_feedback_at
+           FROM roleplay_message_feedback
+          GROUP BY script_id
+       )
+       SELECT
+         COALESCE(c.script_id, fb.script_id)        AS script_id,
+         COALESCE(c.script_title, fb.script_title)  AS script_title,
+         c.category                                 AS category,
+         COALESCE(c.gen_count, 0)::int              AS gen_count,
+         c.updated_at                               AS generated_at,
+         COALESCE(fb.ups, 0)::int                   AS ups,
+         COALESCE(fb.downs, 0)::int                 AS downs,
+         COALESCE(fb.comments, 0)::int              AS comments,
+         fb.last_feedback_at                        AS last_feedback_at,
+         c.summary                                  AS summary,
+         c.messages                                 AS messages
+       FROM roleplay_message_cache c
+       FULL OUTER JOIN fb ON fb.script_id = c.script_id
+       ORDER BY COALESCE(c.updated_at, fb.last_feedback_at) DESC NULLS LAST
+       LIMIT $1`,
+      [limit]
+    );
+
+    const feedbackQ = await db.query(
+      `SELECT f.script_id, f.script_title, f.level, f.message_text, f.rating,
+              f.feedback_text, f.created_at, u.nickname, u.email
+         FROM roleplay_message_feedback f
+         LEFT JOIN users u ON u.id = f.user_id
+        ORDER BY f.created_at DESC
+        LIMIT $1`,
+      [limit]
+    );
+
+    res.json({ scripts: scriptsQ.rows, feedback: feedbackQ.rows });
+  } catch (err) {
+    // Tables may not exist yet on a fresh DB — surface as empty, not an error.
+    logWarn('Admin roleplay-invitations query failed', { err: err.message });
+    res.json({ scripts: [], feedback: [] });
+  }
+});
+
 // ──────────────────────────────────────────────────────────────────────────
 // Admin: HTML dashboard.
 // ──────────────────────────────────────────────────────────────────────────
@@ -566,6 +624,7 @@ const ADMIN_HTML = `<!doctype html>
       <button class="tab" data-panel="therapists">諮商師</button>
       <button class="tab" data-panel="reviews">評價</button>
       <button class="tab" data-panel="pool">分潤</button>
+      <button class="tab" data-panel="roleplay">邀請劇本</button>
     </div>
 
     <!-- Panel: Funnel (default) -->
@@ -717,6 +776,46 @@ const ADMIN_HTML = `<!doctype html>
             <tbody></tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- Panel: Roleplay invitations -->
+    <div class="panel" id="panel-roleplay">
+      <p class="sub">每個劇本被 AI 生成幾次邀請訊息、收到多少 👍 / 👎，以及最近的訊息回饋。</p>
+      <div style="overflow-x:auto">
+        <table id="roleplayScriptsTable">
+          <thead>
+            <tr>
+              <th>劇本</th>
+              <th>分類</th>
+              <th class="num">生成次數</th>
+              <th class="num">👍</th>
+              <th class="num">👎</th>
+              <th class="num">文字回饋</th>
+              <th>最後更新</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <h3 style="margin:20px 0 6px;font-weight:500;font-size:14px">最近訊息回饋</h3>
+      <p class="sub">使用者對單一 AI 訊息的 👍 / 👎 與文字回饋（最新在前）。</p>
+      <div style="overflow-x:auto">
+        <table id="roleplayFeedbackTable">
+          <thead>
+            <tr>
+              <th>時間</th>
+              <th>劇本</th>
+              <th>強度</th>
+              <th>評價</th>
+              <th>訊息</th>
+              <th>文字回饋</th>
+              <th>使用者</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
       </div>
     </div>
   </div>
@@ -1233,12 +1332,74 @@ const ADMIN_HTML = `<!doctype html>
     }
     $('poolCreate').addEventListener('click', createPool);
 
-    // Lazy-load the reviews + pool tabs the first time they're opened.
-    var reviewsLoaded = false, poolLoaded = false;
+    // ── Roleplay invitations ────────────────────────────────────────────────
+    var ROLEPLAY_LEVEL_LABEL = {
+      normal: '普通', mild: '輕微', moderate: '中等', explicit: '露骨', intense: '最強烈'
+    };
+    var ROLEPLAY_CAT_LABEL = {
+      romantic: '浪漫', adventurous: '冒險', school: '校園', bold: '大膽'
+    };
+
+    async function loadRoleplay() {
+      try {
+        var res = await fetch('/api/admin/roleplay-invitations?limit=100');
+        if (!res.ok) throw new Error('roleplay ' + res.status);
+        var body = await res.json();
+        renderRoleplayScripts(body.scripts || []);
+        renderRoleplayFeedback(body.feedback || []);
+      } catch (e) {
+        var tb = document.querySelector('#roleplayScriptsTable tbody');
+        tb.innerHTML = '<tr><td colspan="7" class="error">載入失敗: ' + esc(e.message) + '</td></tr>';
+      }
+    }
+
+    function renderRoleplayScripts(rows) {
+      var tbody = document.querySelector('#roleplayScriptsTable tbody');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="muted">尚無資料 — 等使用者開始生成劇本邀請後再回來看。</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(function (r) {
+        return '<tr>' +
+          '<td>' + esc(r.script_title || r.script_id || '—') + '</td>' +
+          '<td>' + esc(ROLEPLAY_CAT_LABEL[r.category] || r.category || '—') + '</td>' +
+          '<td class="num">' + (r.gen_count || 0) + '</td>' +
+          '<td class="num">' + (r.ups || 0) + '</td>' +
+          '<td class="num">' + (r.downs || 0) + '</td>' +
+          '<td class="num">' + (r.comments || 0) + '</td>' +
+          '<td>' + fmtDate(r.generated_at || r.last_feedback_at) + '</td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    function renderRoleplayFeedback(rows) {
+      var tbody = document.querySelector('#roleplayFeedbackTable tbody');
+      if (!rows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="muted">尚無訊息回饋。</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(function (r) {
+        var rating = r.rating === 'up' ? '👍' : (r.rating === 'down' ? '👎' : '—');
+        var who = esc(r.nickname || r.email || '—');
+        return '<tr>' +
+          '<td>' + fmtDate(r.created_at) + '</td>' +
+          '<td>' + esc(r.script_title || r.script_id || '—') + '</td>' +
+          '<td>' + esc(ROLEPLAY_LEVEL_LABEL[r.level] || r.level || '—') + '</td>' +
+          '<td>' + rating + '</td>' +
+          '<td>' + esc(r.message_text || '—') + '</td>' +
+          '<td>' + esc(r.feedback_text || '—') + '</td>' +
+          '<td>' + who + '</td>' +
+        '</tr>';
+      }).join('');
+    }
+
+    // Lazy-load the reviews + pool + roleplay tabs the first time they're opened.
+    var reviewsLoaded = false, poolLoaded = false, roleplayLoaded = false;
     document.querySelectorAll('.tab').forEach(function (btn) {
       var panel = btn.getAttribute('data-panel');
       if (panel === 'reviews') btn.addEventListener('click', function () { if (!reviewsLoaded) { reviewsLoaded = true; loadReviews(); } });
       if (panel === 'pool') btn.addEventListener('click', function () { if (!poolLoaded) { poolLoaded = true; loadPools(); } });
+      if (panel === 'roleplay') btn.addEventListener('click', function () { if (!roleplayLoaded) { roleplayLoaded = true; loadRoleplay(); } });
     });
 
     $('apply').addEventListener('click', load);

@@ -18,5 +18,6 @@ try {
 module.exports = {
   generateIcebreaker: provider.generateIcebreaker,
   rewriteReply: provider.rewriteReply,
+  generateRoleplayMessages: provider.generateRoleplayMessages,
   providerName: PROVIDER_NAME,
 };

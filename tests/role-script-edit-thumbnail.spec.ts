@@ -47,7 +47,11 @@ async function loginIfNeeded(page: Page) {
   await page.waitForTimeout(2000);
 }
 
-async function createCustomScript(page: Page, title: string) {
+// Creates a custom script and returns its server-assigned id (captured from the
+// POST response). Returning the id lets the test edit *its own* script rather
+// than `.first()`, which under parallel load could be a script another spec is
+// concurrently deleting/editing — the original source of flakiness.
+async function createCustomScript(page: Page, title: string): Promise<string> {
   await page.getByTestId('script-upload-button').click();
   await page.waitForTimeout(1000);
 
@@ -67,13 +71,22 @@ async function createCustomScript(page: Page, title: string) {
 
   const submit = page.getByTestId('script-upload-submit-button');
   await submit.scrollIntoViewIfNeeded();
+
+  const createResp = page.waitForResponse(
+    (r) => /\/api\/custom-scripts$/.test(r.url()) && r.request().method() === 'POST',
+    { timeout: 20000 }
+  );
   await submit.click();
+  const body = await (await createResp).json();
+  const id = body?.custom_script?.id;
+  expect(id, 'create custom script should return an id').toBeTruthy();
 
   // Wait for the success toast (text is the contract).
   await expect(
     page.locator('text=劇本上傳成功').or(page.locator('text=已加入你的劇本庫')).first()
   ).toBeVisible({ timeout: 10000 });
-  await page.waitForTimeout(2000);
+  await page.waitForTimeout(1000);
+  return id as string;
 }
 
 test.describe('Role script edit — thumbnail upload', () => {
@@ -88,22 +101,19 @@ test.describe('Role script edit — thumbnail upload', () => {
   });
 
   test('edit an existing custom script and upload a new thumbnail', async ({ page }) => {
-    // 1. Make sure we have a custom script to edit. Always create a fresh one so
-    //    the test is independent of seed data.
+    // Create + edit + a thumbnail-upload save round-trip, all under 4-worker
+    // parallel load — comfortably more than the default 30s budget. Triple it.
+    test.slow();
+
+    // 1. Create a fresh script so the test owns its target — independent of seed
+    //    data AND of other specs mutating the shared user's other scripts.
     const title = `Edit Thumb Test ${Date.now()}`;
-    await createCustomScript(page, title);
+    const scriptId = await createCustomScript(page, title);
 
-    // 2. Find the just-created card and locate its edit button. The card view
-    //    button carries `script-card-custom-view-button-{id}`; the edit button
-    //    we just added uses `script-edit-button-{id}`.
-    const viewBtn = page.locator('[data-testid^="script-card-custom-view-button-"]').first();
-    await expect(viewBtn).toBeVisible({ timeout: 5000 });
-    const viewTestId = await viewBtn.getAttribute('data-testid');
-    expect(viewTestId).toBeTruthy();
-    const scriptId = viewTestId!.replace('script-card-custom-view-button-', '');
-
+    // 2. Edit the script we just created (by its id), not `.first()`.
     const editBtn = page.getByTestId(`script-edit-button-${scriptId}`);
-    await expect(editBtn).toBeVisible({ timeout: 3000 });
+    await editBtn.scrollIntoViewIfNeeded();
+    await expect(editBtn).toBeVisible({ timeout: 5000 });
     await editBtn.click();
 
     // 3. The edit modal opens. Heading text is the contract for "edit" mode.
@@ -130,10 +140,22 @@ test.describe('Role script edit — thumbnail upload', () => {
     const submit = page.getByTestId('script-upload-submit-button');
     await submit.scrollIntoViewIfNeeded();
     await expect(submit).toHaveText(/保存修改/);
-    await submit.click();
 
-    // 7. The edit modal closes on success. We also expect no "更新失敗" toast.
-    await expect(page.locator('#script-thumbnail')).toBeHidden({ timeout: 10000 });
+    // 7. Save. Wait for the PUT to resolve (the slow part under parallel load),
+    //    then assert the modal closed. The modal only closes App-side after the
+    //    PUT *and* a follow-up script refetch, so we still give it generous time.
+    const savePromise = page
+      .waitForResponse(
+        (r) => /\/api\/custom-scripts\//.test(r.url()) && r.request().method() === 'PUT',
+        { timeout: 30000 }
+      )
+      .catch(() => null);
+    await submit.click();
+    const saveResp = await savePromise;
+    if (saveResp) expect(saveResp.ok(), 'thumbnail save PUT should succeed').toBeTruthy();
+
+    // The edit modal closes on success. We also expect no "更新失敗" toast.
+    await expect(page.locator('#script-thumbnail')).toBeHidden({ timeout: 30000 });
     await expect(page.locator('text=更新失敗')).toHaveCount(0);
 
     // 8. Sanity check: the script card is still present after the edit.

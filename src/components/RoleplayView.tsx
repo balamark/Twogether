@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow, LayoutGrid, List, Gamepad2, ChevronDown, ArrowUp } from 'lucide-react';
+import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow, LayoutGrid, List, Gamepad2, ChevronDown, ArrowUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { apiService } from '../services/api';
@@ -23,6 +23,7 @@ interface RoleplayScript {
   createdAt?: string;
   tags?: string[];
   duration?: string;
+  photos?: string[];
 }
 
 interface RoleplayViewProps {
@@ -172,6 +173,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   const [selectedScript, setSelectedScript] = useState<RoleplayScript | null>(null);
   const [showScriptModal, setShowScriptModal] = useState(false);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
   // Tracks whether the current modal viewing has been "begun" — i.e. user
   // explicitly clicked "開始扮演" and we recorded an intimacy moment. View
   // alone does NOT record; only this transition does.
@@ -264,12 +266,32 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
 
   useScrollLock(showScriptModal && !!selectedScript);
 
+  // Photos available for the open script's lightbox: the full series when set,
+  // else the single cover image (legacy scripts / built-ins).
+  const lightboxPhotos: string[] = selectedScript
+    ? (selectedScript.photos && selectedScript.photos.length > 0
+        ? selectedScript.photos
+        : selectedScript.image
+        ? [selectedScript.image]
+        : [])
+    : [];
+
+  const showLightboxAt = useCallback((index: number) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  }, []);
+
   useEffect(() => {
     if (!lightboxOpen) return;
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightboxOpen(false); };
+    const count = lightboxPhotos.length;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxOpen(false);
+      else if (e.key === 'ArrowRight' && count > 1) setLightboxIndex((i) => (i + 1) % count);
+      else if (e.key === 'ArrowLeft' && count > 1) setLightboxIndex((i) => (i - 1 + count) % count);
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [lightboxOpen]);
+  }, [lightboxOpen, lightboxPhotos.length]);
 
   const handleViewScript = useCallback((script: RoleplayScript) => {
     const parsedScript = parseScriptContent(script.script);
@@ -1212,11 +1234,19 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             <div
-              className={`relative aspect-video w-full bg-petal-cream-2 overflow-hidden border-b border-petal-rule ${selectedScript.image ? 'cursor-zoom-in' : ''}`}
-              onClick={() => { if (selectedScript.image) setLightboxOpen(true); }}
+              className={`relative aspect-video w-full bg-petal-cream-2 overflow-hidden border-b border-petal-rule ${lightboxPhotos.length > 0 ? 'cursor-zoom-in' : ''}`}
+              onClick={() => { if (lightboxPhotos.length > 0) showLightboxAt(0); }}
               data-testid="roleplay-modal-thumb"
             >
               {renderThumb(selectedScript, 'w-full h-full', 'contain')}
+              {lightboxPhotos.length > 1 && (
+                <span
+                  className="absolute bottom-3 right-3 px-2 py-0.5 rounded-full bg-petal-ink/70 text-petal-cream text-xs font-body"
+                  data-testid="roleplay-modal-photo-count"
+                >
+                  {lightboxPhotos.length} 張照片
+                </span>
+              )}
               <button
                 onClick={(e) => { e.stopPropagation(); closeModal(); }}
                 data-testid="roleplay-modal-close-button"
@@ -1301,27 +1331,57 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             </div>
           </div>
         </div>
-        {lightboxOpen && selectedScript.image && (
+        {lightboxOpen && lightboxPhotos.length > 0 && (
           <div
             data-testid="roleplay-modal-lightbox"
             className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center overflow-auto overscroll-contain p-4 sm:p-8"
             onClick={() => setLightboxOpen(false)}
             role="dialog"
             aria-modal="true"
-            aria-label="放大查看劇本縮圖"
+            aria-label="放大查看劇本照片"
           >
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setLightboxOpen(false); }}
               data-testid="roleplay-modal-lightbox-close"
               aria-label="關閉放大檢視"
-              className="fixed top-4 right-4 w-10 h-10 inline-flex items-center justify-center rounded-full bg-white/90 text-petal-ink hover:bg-white shadow-sm"
+              className="fixed top-4 right-4 w-10 h-10 inline-flex items-center justify-center rounded-full bg-white/90 text-petal-ink hover:bg-white shadow-sm z-10"
             >
               <X className="w-5 h-5" strokeWidth={1.5} />
             </button>
+
+            {lightboxPhotos.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i - 1 + lightboxPhotos.length) % lightboxPhotos.length); }}
+                  data-testid="roleplay-modal-lightbox-prev"
+                  aria-label="上一張"
+                  className="fixed left-3 sm:left-6 top-1/2 -translate-y-1/2 w-11 h-11 inline-flex items-center justify-center rounded-full bg-white/90 text-petal-ink hover:bg-white shadow-sm z-10"
+                >
+                  <ChevronLeft className="w-6 h-6" strokeWidth={1.5} />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i + 1) % lightboxPhotos.length); }}
+                  data-testid="roleplay-modal-lightbox-next"
+                  aria-label="下一張"
+                  className="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 w-11 h-11 inline-flex items-center justify-center rounded-full bg-white/90 text-petal-ink hover:bg-white shadow-sm z-10"
+                >
+                  <ChevronRight className="w-6 h-6" strokeWidth={1.5} />
+                </button>
+                <span
+                  data-testid="roleplay-modal-lightbox-counter"
+                  className="fixed bottom-5 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-white/90 text-petal-ink text-sm font-body z-10"
+                >
+                  {lightboxIndex + 1} / {lightboxPhotos.length}
+                </span>
+              </>
+            )}
+
             <img
-              src={selectedScript.image}
-              alt={selectedScript.title}
+              src={lightboxPhotos[lightboxIndex]}
+              alt={`${selectedScript.title} ${lightboxIndex + 1}`}
               onClick={(e) => e.stopPropagation()}
               className="block max-w-none cursor-default"
               data-testid="roleplay-modal-lightbox-image"

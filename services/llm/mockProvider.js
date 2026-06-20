@@ -154,4 +154,40 @@ async function rewriteReply({ rawReply /* , eventSummary, recentMessages, create
   };
 }
 
-module.exports = { generateIcebreaker, rewriteReply };
+const ROLEPLAY_LEVELS = [
+  { key: 'normal', label: '普通暗示' },
+  { key: 'mild', label: '輕微性暗示' },
+  { key: 'moderate', label: '中等性暗示' },
+  { key: 'explicit', label: '露骨性暗示' },
+  { key: 'intense', label: '最強烈' },
+];
+
+async function generateRoleplayMessages({ title, scenario /* , scriptBody, category */ }) {
+  if (typeof title !== 'string' || title.trim().length === 0) {
+    throw new Error('title is required');
+  }
+  const startedAt = Date.now();
+  const t = title.trim();
+  const summary = `${t}：${(scenario || '一段專屬你們的角色扮演').toString().trim()}。一起入戲，今晚就從這裡開始。`;
+  const lines = [
+    `今晚想和你玩《${t}》，先當作我們剛在場景裡相遇，好嗎？`,
+    `想到等下要和你演《${t}》，我心跳有點快…你準備好入戲了嗎？`,
+    `《${t}》的氣氛我已經想像好了，今晚我想離你近一點，再近一點。`,
+    `我已經忍不住了，今晚就照《${t}》來，我想要你，現在就開始。`,
+    `別等了——今晚的《${t}》，我要你完全屬於我，一刻都不放過。`,
+  ];
+  const messages = ROLEPLAY_LEVELS.map(({ key, label }, i) => ({ level: key, label, text: lines[i] }));
+  return {
+    summary,
+    messages,
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+    },
+  };
+}
+
+module.exports = { generateIcebreaker, rewriteReply, generateRoleplayMessages };

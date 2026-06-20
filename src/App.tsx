@@ -92,6 +92,8 @@ export interface RoleplayScript {
   createdAt?: string;
   tags?: string[];
   duration?: string;
+  /** Full ordered photo series for the lightbox (cover first). */
+  photos?: string[];
 }
 
 interface ApiCustomScript {
@@ -104,6 +106,7 @@ interface ApiCustomScript {
   tags?: string[];
   duration?: string;
   thumbnailUrl?: string;
+  photos?: string[];
   isCustom?: boolean;
   isPublic?: boolean;
   createdBy?: string;
@@ -518,7 +521,7 @@ const LoveTimeApp = () => {
     content: string;
     tags: string;
     isPublic: boolean;
-    thumbnail: File | null;
+    photos: File[];
   } | null>(null);
   const [showIntimacyRequestForm, setShowIntimacyRequestForm] = useState(false);
   const [showNotificationInbox, setShowNotificationInbox] = useState(false);
@@ -1201,6 +1204,7 @@ const LoveTimeApp = () => {
             tags: script.tags || [],
             duration: script.duration,
             image: script.thumbnailUrl,
+            photos: script.photos ?? (script.thumbnailUrl ? [script.thumbnailUrl] : []),
             isCustom: script.isCustom ?? true,
             isPublic: script.isPublic,
             createdBy: script.createdBy,
@@ -1545,7 +1549,7 @@ const LoveTimeApp = () => {
     scenario: string,
     content: string,
     tags: string[] = [],
-    thumbnail?: File,
+    photos?: File[],
     isPublic: boolean = true,
   ) => {
     try {
@@ -1557,7 +1561,7 @@ const LoveTimeApp = () => {
         content: parseScriptContent(content),
         tags,
         duration: '15-30分鐘',
-        thumbnail,
+        photos,
         isPublic,
       });
 
@@ -1572,6 +1576,7 @@ const LoveTimeApp = () => {
         tags: typedScript.tags || tags,
         duration: typedScript.duration || '15-30分鐘',
         image: typedScript.thumbnailUrl,
+        photos: typedScript.photos ?? (typedScript.thumbnailUrl ? [typedScript.thumbnailUrl] : []),
         isCustom: true,
         isPublic: typedScript.isPublic ?? isPublic,
         createdBy: typedScript.createdBy,
@@ -1617,7 +1622,7 @@ const LoveTimeApp = () => {
           content,
           tags: tags.join(', '),
           isPublic,
-          thumbnail: thumbnail ?? null,
+          photos: photos ?? [],
         });
         setShowScriptUploadModal(false);
         setEditingScript(null);
@@ -1654,7 +1659,8 @@ const LoveTimeApp = () => {
       scenario: string;
       content: string;
       tags: string[];
-      thumbnail?: File;
+      photos?: File[];
+      existingPhotos?: string[];
       isPublic?: boolean;
     }
   ) => {
@@ -1665,7 +1671,8 @@ const LoveTimeApp = () => {
         scenario: updates.scenario,
         content: updates.content,
         tags: updates.tags,
-        thumbnail: updates.thumbnail,
+        photos: updates.photos,
+        existingPhotos: updates.existingPhotos,
         isPublic: updates.isPublic,
       });
 
@@ -1680,9 +1687,10 @@ const LoveTimeApp = () => {
                 scenario: typedScript.scenario || updates.scenario,
                 script: typedScript.script || typedScript.content || updates.content,
                 tags: typedScript.tags || updates.tags,
-                // Server may have updated the thumbnail URL; fall back to
-                // the existing image if no new one was uploaded.
+                // Server returns canonical photos + cover; fall back to existing
+                // values when this edit didn't touch the photo series.
                 image: typedScript.thumbnailUrl ?? s.image,
+                photos: typedScript.photos ?? s.photos,
                 isPublic: typedScript.isPublic ?? updates.isPublic ?? s.isPublic,
               }
             : s
@@ -2332,6 +2340,7 @@ const LoveTimeApp = () => {
       <IntimacyRequestForm
         isOpen={showIntimacyRequestForm}
         onClose={() => setShowIntimacyRequestForm(false)}
+        scripts={[...defaultRoleplayScripts, ...customScripts]}
         onSuccess={() => {
           showNotification({
             type: 'success',
