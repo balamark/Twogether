@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow, LayoutGrid, List, Gamepad2, ChevronDown, ArrowUp, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow, LayoutGrid, List, Gamepad2, ChevronDown, ArrowUp, ChevronLeft, ChevronRight, Share2 } from 'lucide-react';
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { apiService } from '../services/api';
@@ -8,7 +8,7 @@ import StarRating from './StarRating';
 import MarketplaceScriptDetail from './MarketplaceScriptDetail';
 import PetalSelect from './PetalSelect';
 import { useTimezone } from '../contexts/TimezoneContext';
-import { formatYmdInTz } from '../utils/datetime';
+import { formatYmdInTz, formatDate } from '../utils/datetime';
 
 interface RoleplayScript {
   id: string;
@@ -172,6 +172,9 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   const tz = useTimezone();
   const [selectedScript, setSelectedScript] = useState<RoleplayScript | null>(null);
   const [showScriptModal, setShowScriptModal] = useState(false);
+  // Id of the script currently being shared to the partner's email (disables
+  // that card's share button while the request is in flight).
+  const [sharingId, setSharingId] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   // Tracks whether the current modal viewing has been "begun" — i.e. user
@@ -360,6 +363,41 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     setHasBegun(false);
     setLightboxOpen(false);
   }, []);
+
+  // Email the script to the partner to spark their interest. The backend
+  // returns a clear message for every outcome (shared / unpaired / opted out),
+  // so we surface it directly and pick the toast tone from `success`.
+  const handleShareScript = useCallback(async (script: RoleplayScript) => {
+    if (sharingId) return;
+    setSharingId(script.id);
+    try {
+      const result = await apiService.shareCustomScript(script.id);
+      showNotification({
+        type: result?.success ? 'success' : 'info',
+        title: result?.success ? '已分享給伴侶' : '尚未分享',
+        message: result?.message || '已將劇本分享到伴侶的信箱。',
+        duration: 5000,
+      });
+    } catch (error) {
+      showNotification({
+        type: 'error',
+        title: '分享失敗',
+        message: (error as Error)?.message || '無法分享劇本，請稍後再試。',
+        duration: 5000,
+      });
+    } finally {
+      setSharingId(null);
+    }
+  }, [sharingId, showNotification]);
+
+  // A custom script counts as "new" for 7 days after creation, so the couple
+  // notices freshly added scripts at a glance.
+  const isRecentlyCreated = (createdAt?: string) => {
+    if (!createdAt) return false;
+    const t = new Date(createdAt).getTime();
+    if (Number.isNaN(t)) return false;
+    return Date.now() - t < 7 * 24 * 60 * 60 * 1000;
+  };
 
   const allScripts = [...defaultRoleplayScripts, ...customScripts];
   const filteredScripts = roleplayFilter === 'all'
@@ -706,7 +744,14 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
-                          <h4 className="font-display text-base font-medium tracking-tight text-petal-ink truncate">{script.title}</h4>
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <h4 className="font-display text-base font-medium tracking-tight text-petal-ink truncate">{script.title}</h4>
+                            {isRecentlyCreated(script.createdAt) && (
+                              <span data-testid={`script-new-badge-${script.id}`} className="flex-shrink-0 px-1.5 py-0.5 font-body text-[10px] font-medium uppercase tracking-[0.1em] rounded-full bg-petal-rose-deep text-petal-cream">
+                                New
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-1.5 flex-shrink-0">
                             <span data-testid="script-card-custom-badge" className="px-2 py-0.5 font-body text-[10px] uppercase tracking-[0.1em] rounded-full border border-petal-rule text-petal-muted">
                               自訂
@@ -715,6 +760,11 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                           </div>
                         </div>
                         <p className="font-body text-sm text-petal-ink-soft mt-1 leading-relaxed">{script.scenario}</p>
+                        {script.createdAt && (
+                          <p data-testid={`script-created-date-${script.id}`} className="font-body text-[11px] text-petal-muted mt-1">
+                            建立於 {formatDate(script.createdAt, tz, { year: 'numeric', month: 'numeric', day: 'numeric', withWeekday: false })}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center justify-between mt-3">
@@ -737,6 +787,16 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                             編輯
                           </button>
                         )}
+                        <button
+                          onClick={() => handleShareScript(script)}
+                          disabled={sharingId === script.id}
+                          data-testid={`script-card-custom-share-button-${script.id}`}
+                          className="border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors disabled:opacity-50"
+                          aria-label={`分享 ${script.title} 給伴侶`}
+                        >
+                          <Share2 className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                          {sharingId === script.id ? '分享中' : '分享'}
+                        </button>
                         <button
                           onClick={() => handleViewScript(script)}
                           data-testid={`script-card-custom-view-button-${script.id}`}
@@ -766,10 +826,22 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                     testId: `script-card-custom-${script.id}`,
                     script,
                     badge: (
-                      <span data-testid="script-card-custom-badge" className="px-2 py-0.5 font-body text-[10px] uppercase tracking-[0.1em] rounded-full border border-petal-rule text-petal-muted flex-shrink-0">
-                        自訂
-                      </span>
+                      <>
+                        {isRecentlyCreated(script.createdAt) && (
+                          <span data-testid={`script-new-badge-${script.id}`} className="px-1.5 py-0.5 font-body text-[10px] font-medium uppercase tracking-[0.1em] rounded-full bg-petal-rose-deep text-petal-cream flex-shrink-0">
+                            New
+                          </span>
+                        )}
+                        <span data-testid="script-card-custom-badge" className="px-2 py-0.5 font-body text-[10px] uppercase tracking-[0.1em] rounded-full border border-petal-rule text-petal-muted flex-shrink-0">
+                          自訂
+                        </span>
+                      </>
                     ),
+                    metaLine: script.createdAt ? (
+                      <p data-testid={`script-created-date-${script.id}`} className="font-body text-[11px] text-petal-muted mt-0.5">
+                        建立於 {formatDate(script.createdAt, tz, { year: 'numeric', month: 'numeric', day: 'numeric', withWeekday: false })}
+                      </p>
+                    ) : undefined,
                     actions: (
                       <>
                         <span className="hidden sm:inline-flex">
@@ -786,6 +858,16 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                             編輯
                           </button>
                         )}
+                        <button
+                          onClick={() => handleShareScript(script)}
+                          disabled={sharingId === script.id}
+                          data-testid={`script-card-custom-share-button-${script.id}`}
+                          className="hidden sm:inline-flex border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors disabled:opacity-50"
+                          aria-label={`分享 ${script.title} 給伴侶`}
+                        >
+                          <Share2 className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                          {sharingId === script.id ? '分享中' : '分享'}
+                        </button>
                         <button
                           onClick={() => handleViewScript(script)}
                           data-testid={`script-card-custom-view-button-${script.id}`}
