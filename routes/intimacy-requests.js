@@ -161,11 +161,22 @@ async function ensureRoleplaySuggestionTables() {
 
 // Stable fingerprint of a script's content so an edited script regenerates while
 // identical content is reused (and shared across couples).
-function roleplayContentHash({ title, scenario, scriptBody, category }) {
+function roleplayContentHash({ title, scenario, scriptBody, category, senderGender }) {
   return crypto
     .createHash('sha256')
-    .update([title || '', scenario || '', scriptBody || '', category || ''].join(''))
+    .update([title || '', scenario || '', scriptBody || '', category || '', senderGender || ''].join(''))
     .digest('hex');
+}
+
+// The sender's gender drives which role in the script the invitation speaks from.
+async function getUserGender(userId) {
+  try {
+    const r = await db.query('SELECT gender FROM users WHERE id = $1', [userId]);
+    return r.rows[0]?.gender || null;
+  } catch (err) {
+    logWarn('getUserGender failed', { err: err.message });
+    return null;
+  }
 }
 
 const normalizeCount = (value) => {
@@ -400,10 +411,14 @@ router.post('/script-messages', [
 
   const userId = req.user.id;
   const { scriptId, scriptTitle, scriptScenario, scriptBody, category, regenerate } = req.body;
-  const contentHash = roleplayContentHash({ title: scriptTitle, scenario: scriptScenario, scriptBody, category });
 
   try {
     await ensureRoleplaySuggestionTables();
+
+    // The sender's gender selects which role in the script the messages speak
+    // from; it's part of the cache key so different-gender senders don't share.
+    const senderGender = await getUserGender(userId);
+    const contentHash = roleplayContentHash({ title: scriptTitle, scenario: scriptScenario, scriptBody, category, senderGender });
 
     // Cache hit (only when we have a scriptId and aren't forcing a regenerate).
     if (scriptId && !regenerate) {
@@ -433,13 +448,14 @@ router.post('/script-messages', [
       return res.status(limitCheck.status).json(limitCheck.body);
     }
 
-    logInfo('intimacy.script_messages.input', { userId, scriptId, scriptTitle, category, regenerate: !!regenerate, hasBody: !!scriptBody });
+    logInfo('intimacy.script_messages.input', { userId, scriptId, scriptTitle, category, senderGender, regenerate: !!regenerate, hasBody: !!scriptBody });
 
     const result = await llmService.generateRoleplayMessages({
       title: scriptTitle,
       scenario: scriptScenario,
       scriptBody,
       category,
+      senderGender,
     });
     const meta = result._meta;
     delete result._meta;

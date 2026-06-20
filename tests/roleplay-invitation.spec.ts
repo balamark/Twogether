@@ -39,6 +39,9 @@ async function ensurePaired() {
   const ctxA = await request.newContext({ extraHTTPHeaders: { Authorization: `Bearer ${tokenA}` } });
   const ctxB = await request.newContext({ extraHTTPHeaders: { Authorization: `Bearer ${tokenB}` } });
   try {
+    // Sender is male — the AI invitation should speak from the male role.
+    await ctxA.put(`${API}/auth/user/gender`, { data: { gender: 'male' } });
+
     if (await isComplete(ctxA)) return;
 
     const codeRes = await ctxA.post(`${API}/couples/pairing-code`, { data: {} });
@@ -117,7 +120,10 @@ test.describe('Roleplay AI invitation flow', () => {
     await firstScript.click();
     await genResp;
 
-    // Step 3: exactly the 5 escalating levels, low → high.
+    // Step 3: exactly the 5 escalating levels, low → high. The sender's gender
+    // (set to male in beforeAll) flows into generation server-side; we don't
+    // assert on the model's natural-language output here since the test server
+    // uses the real LLM (non-deterministic).
     for (const lvl of LEVELS) {
       await expect(page.getByTestId(`roleplay-msg-${lvl}`)).toBeVisible({ timeout: 15000 });
     }
