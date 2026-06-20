@@ -14,8 +14,11 @@ export interface PendingScriptDraft {
   content: string;
   tags: string;
   isPublic: boolean;
-  thumbnail: File | null;
+  photos: File[];
 }
+
+// Per-script photo cap — mirrors MAX_SCRIPT_PHOTOS in routes/custom-scripts.js.
+export const MAX_SCRIPT_PHOTOS = 30;
 
 interface ScriptUploadModalProps {
   /** When set, the form opens in edit mode and pre-fills from this script. */
@@ -30,7 +33,7 @@ interface ScriptUploadModalProps {
     scenario: string,
     content: string,
     tags?: string[],
-    thumbnail?: File,
+    photos?: File[],
     isPublic?: boolean,
   ) => void;
   updateCustomScript: (
@@ -41,7 +44,8 @@ interface ScriptUploadModalProps {
       scenario: string;
       content: string;
       tags: string[];
-      thumbnail?: File;
+      photos?: File[];
+      existingPhotos?: string[];
       isPublic?: boolean;
     },
   ) => void;
@@ -78,42 +82,73 @@ const ScriptUploadModal = ({
   const [isPublic, setIsPublic] = useState<boolean>(
     isEditMode ? (editingScript?.isPublic ?? false) : (draft?.isPublic ?? true)
   );
-  const [thumbnail, setThumbnail] = useState<File | null>(draft?.thumbnail ?? null);
-  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  // Photo series: URLs already saved (edit mode) the user can keep/remove, plus
+  // newly-picked File objects. Combined they form the ordered series (cover
+  // first), capped at MAX_SCRIPT_PHOTOS.
+  const [existingPhotos, setExistingPhotos] = useState<string[]>(
+    isEditMode
+      ? (editingScript?.photos && editingScript.photos.length > 0
+          ? editingScript.photos
+          : editingScript?.image
+          ? [editingScript.image]
+          : [])
+      : [],
+  );
+  const [newPhotos, setNewPhotos] = useState<File[]>(draft?.photos ?? []);
+  const [newPhotoPreviews, setNewPhotoPreviews] = useState<string[]>([]);
+  const photoCount = existingPhotos.length + newPhotos.length;
   useScrollLock(true);
 
   useEffect(() => {
-    if (!thumbnail) {
-      setThumbnailPreview(null);
-      return;
-    }
-    const url = URL.createObjectURL(thumbnail);
-    setThumbnailPreview(url);
-    return () => URL.revokeObjectURL(url);
-  }, [thumbnail]);
+    const urls = newPhotos.map((f) => URL.createObjectURL(f));
+    setNewPhotoPreviews(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, [newPhotos]);
 
-  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
-    if (file && file.size > 5 * 1024 * 1024) {
-      alert('縮圖大小不能超過 5MB');
-      e.target.value = '';
+  const handleAddPhotos = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files ?? []);
+    e.target.value = ''; // allow re-picking the same file
+    if (picked.length === 0) return;
+    const oversize = picked.find((f) => f.size > 5 * 1024 * 1024);
+    if (oversize) {
+      alert('每張照片大小不能超過 5MB');
       return;
     }
-    setThumbnail(file);
+    const room = MAX_SCRIPT_PHOTOS - photoCount;
+    if (room <= 0) {
+      alert(`每個劇本最多只能上傳 ${MAX_SCRIPT_PHOTOS} 張照片`);
+      return;
+    }
+    if (picked.length > room) {
+      alert(`最多再加 ${room} 張（每個劇本上限 ${MAX_SCRIPT_PHOTOS} 張），已自動取前 ${room} 張`);
+    }
+    setNewPhotos((prev) => [...prev, ...picked.slice(0, room)]);
   };
+
+  const removeExistingPhoto = (idx: number) =>
+    setExistingPhotos((prev) => prev.filter((_, i) => i !== idx));
+  const removeNewPhoto = (idx: number) =>
+    setNewPhotos((prev) => prev.filter((_, i) => i !== idx));
 
   // Has the user entered/changed anything worth protecting? For new scripts
   // any non-empty field (or a chosen thumbnail / opted-out sharing) counts;
   // for edits we compare against the script being edited.
   const isDirty = () => {
-    if (thumbnail !== null) return true;
+    if (newPhotos.length > 0) return true;
     if (isEditMode && editingScript) {
+      const originalPhotos =
+        editingScript.photos && editingScript.photos.length > 0
+          ? editingScript.photos
+          : editingScript.image
+          ? [editingScript.image]
+          : [];
       return (
         scriptData.title !== (editingScript.title ?? '') ||
         scriptData.category !== (editingScript.category ?? 'romantic') ||
         scriptData.scenario !== (editingScript.scenario ?? '') ||
         scriptData.content !== (editingScript.script ?? '') ||
         scriptData.tags !== (editingScript.tags ? editingScript.tags.join(', ') : '') ||
+        existingPhotos.length !== originalPhotos.length ||
         isPublic !== (editingScript.isPublic ?? false)
       );
     }
@@ -147,7 +182,9 @@ const ScriptUploadModal = ({
         scenario: scriptData.scenario,
         content: scriptData.content,
         tags,
-        thumbnail: thumbnail ?? undefined,
+        photos: newPhotos.length > 0 ? newPhotos : undefined,
+        // Always send the kept set so removals take effect server-side.
+        existingPhotos,
         isPublic,
       });
     } else {
@@ -157,7 +194,7 @@ const ScriptUploadModal = ({
         scriptData.scenario,
         scriptData.content,
         tags,
-        thumbnail ?? undefined,
+        newPhotos.length > 0 ? newPhotos : undefined,
         isPublic,
       );
     }
@@ -292,40 +329,69 @@ const ScriptUploadModal = ({
 
           <div>
             <label htmlFor="script-thumbnail" className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
-              縮圖（選填，最大 5MB）{isEditMode && editingScript?.image ? ' · 上傳新圖以替換' : ''}
+              劇本照片（選填，最多 {MAX_SCRIPT_PHOTOS} 張，每張最大 5MB）
+              <span className="ml-1 normal-case tracking-normal text-petal-muted/80">· 第一張為封面</span>
             </label>
             <input
               id="script-thumbnail"
-              name="script-thumbnail"
+              name="photos"
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              onChange={handleThumbnailChange}
-              className="w-full text-sm text-petal-ink-soft file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:font-body file:text-xs file:bg-petal-cream-2 file:text-petal-ink hover:file:bg-petal-rose-soft hover:file:text-petal-rose-deep"
+              multiple
+              onChange={handleAddPhotos}
+              disabled={photoCount >= MAX_SCRIPT_PHOTOS}
+              data-testid="script-photos-input"
+              className="w-full text-sm text-petal-ink-soft file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:font-body file:text-xs file:bg-petal-cream-2 file:text-petal-ink hover:file:bg-petal-rose-soft hover:file:text-petal-rose-deep disabled:opacity-50"
             />
-            {/* Preview: new file beats existing image, else show existing image in edit mode. */}
-            {thumbnailPreview ? (
-              <img
-                src={thumbnailPreview}
-                alt="thumbnail preview"
-                className="mt-3 w-24 h-24 object-cover rounded-md border border-petal-rule"
-              />
-            ) : isEditMode && editingScript?.image ? (
-              <div className="mt-3 flex items-center gap-3">
-                <img
-                  src={editingScript.image}
-                  alt="current thumbnail"
-                  className="w-24 h-24 object-cover rounded-md border border-petal-rule"
-                />
-                <span className="font-display italic font-light text-xs text-petal-muted">
-                  目前的縮圖
-                </span>
+
+            {(existingPhotos.length > 0 || newPhotos.length > 0) && (
+              <div className="mt-3 grid grid-cols-4 sm:grid-cols-5 gap-2" data-testid="script-photos-grid">
+                {existingPhotos.map((url, idx) => {
+                  const isCover = idx === 0;
+                  return (
+                    <div key={`ex-${url}-${idx}`} className="relative aspect-square rounded-md overflow-hidden border border-petal-rule bg-petal-cream-2">
+                      <img src={url} alt={`photo ${idx + 1}`} className="w-full h-full object-cover" />
+                      {isCover && (
+                        <span className="absolute bottom-0 inset-x-0 bg-petal-ink/70 text-petal-cream text-[10px] text-center py-0.5">封面</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeExistingPhoto(idx)}
+                        aria-label="移除照片"
+                        className="absolute top-1 right-1 w-5 h-5 inline-flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                      >
+                        <X className="w-3 h-3" strokeWidth={2} />
+                      </button>
+                    </div>
+                  );
+                })}
+                {newPhotoPreviews.map((url, idx) => {
+                  const isCover = existingPhotos.length === 0 && idx === 0;
+                  return (
+                    <div key={`new-${idx}`} className="relative aspect-square rounded-md overflow-hidden border border-petal-rule bg-petal-cream-2">
+                      <img src={url} alt={existingPhotos.length === 0 && idx === 0 ? 'thumbnail preview' : `new photo ${idx + 1}`} className="w-full h-full object-cover" />
+                      {isCover && (
+                        <span className="absolute bottom-0 inset-x-0 bg-petal-ink/70 text-petal-cream text-[10px] text-center py-0.5">封面</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeNewPhoto(idx)}
+                        aria-label="移除照片"
+                        className="absolute top-1 right-1 w-5 h-5 inline-flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                      >
+                        <X className="w-3 h-3" strokeWidth={2} />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-            ) : null}
-            {!isEditMode && (
-              <p className="mt-2 font-display italic font-light text-xs text-petal-muted">
-                未上傳縮圖時，會使用編輯式預設圖。
-              </p>
             )}
+
+            <p className="mt-2 font-display italic font-light text-xs text-petal-muted">
+              {photoCount > 0
+                ? `已選 ${photoCount} / ${MAX_SCRIPT_PHOTOS} 張 · 點開劇本可左右滑看全部照片`
+                : '未上傳照片時，會使用編輯式預設圖。'}
+            </p>
           </div>
 
           <div className="p-4 bg-petal-cream-2/40 border border-petal-rule-soft rounded-md">
