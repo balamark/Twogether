@@ -162,13 +162,14 @@ const ROLEPLAY_LEVELS = [
   { key: 'intense', label: '最強烈' },
 ];
 
-async function generateRoleplayMessages({ title, scenario /* , scriptBody, category */ }) {
+async function generateRoleplayMessages({ title, scenario, senderGender /* , scriptBody, category */ }) {
   if (typeof title !== 'string' || title.trim().length === 0) {
     throw new Error('title is required');
   }
   const startedAt = Date.now();
   const t = title.trim();
-  const summary = `${t}：${(scenario || '一段專屬你們的角色扮演').toString().trim()}。一起入戲，今晚就從這裡開始。`;
+  const genderTag = senderGender === 'male' ? '（男性視角）' : senderGender === 'female' ? '（女性視角）' : '';
+  const summary = `${t}${genderTag}：${(scenario || '一段專屬你們的角色扮演').toString().trim()}。一起入戲，今晚就從這裡開始。`;
   const lines = [
     `今晚想和你玩《${t}》，先當作我們剛在場景裡相遇，好嗎？`,
     `想到等下要和你演《${t}》，我心跳有點快…你準備好入戲了嗎？`,

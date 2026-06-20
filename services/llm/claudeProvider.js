@@ -232,10 +232,18 @@ const ROLEPLAY_SYSTEM_PROMPT = `你是一個專為「成熟情侶」設計的角
 守則：
 - 所有訊息都是傳給「同意的伴侶」、用來開啟雙方都期待的角色扮演，語氣是邀請與渴望，而不是命令或施壓。
 - 緊扣使用者提供的劇本情境與角色身分，不要編造與劇本無關的全新設定。
+- 性別與視角（重要）：訊息是由「傳送者」發出的。請依「傳送者性別」判斷傳送者在劇本中對應的角色，並以該角色的視角撰寫。例如劇本女主角是小香，但傳送者是男性，就要以劇本中的男性角色視角發出邀請（把女主角當成被邀請的對象），絕不能用女主角的視角自稱。若性別為「未指定」，則用中性、不限定自身性別的傳送者視角撰寫。
 - 即使某一級你判斷不適合產生，也務必回傳其餘等級，並為該級填入較收斂的替代文字 — 不可整批拒答或回傳少於 5 則。
 - 使用繁體中文，自然口語，像真的在傳訊息。
 
 回應請只呼叫 emit_roleplay_messages tool，不要輸出其他文字。`;
+
+// Maps the stored gender enum to a Chinese label used in the prompt.
+function genderLabel(g) {
+  if (g === 'male') return '男性';
+  if (g === 'female') return '女性';
+  return '未指定';
+}
 
 const ROLEPLAY_TOOL_SCHEMA = {
   name: 'emit_roleplay_messages',
@@ -262,12 +270,13 @@ const ROLEPLAY_TOOL_SCHEMA = {
   },
 };
 
-async function generateRoleplayMessages({ title, scenario, scriptBody, category }) {
+async function generateRoleplayMessages({ title, scenario, scriptBody, category, senderGender }) {
   if (typeof title !== 'string' || title.trim().length === 0) {
     throw new Error('title is required');
   }
 
   const userContent = [
+    `傳送者性別：${genderLabel(senderGender)}`,
     `劇本標題：${title.trim()}`,
     category ? `分類：${String(category).trim()}` : null,
     scenario ? `情境：${String(scenario).trim()}` : null,
