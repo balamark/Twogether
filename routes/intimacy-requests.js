@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
@@ -105,6 +106,66 @@ async function recordAiUsage(userId, kind, rawInput, meta) {
   } catch (err) {
     logWarn('recordAiUsage failed', { kind, err: err.message });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Roleplay message cache + feedback. Schema lives in migration 050; this lazy
+// ensure is a safety net for envs that haven't migrated (mirrors the
+// event_ai_usage pattern above).
+// ---------------------------------------------------------------------------
+
+async function ensureRoleplaySuggestionTables() {
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS roleplay_message_cache (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        script_id VARCHAR(128) NOT NULL,
+        content_hash VARCHAR(64) NOT NULL,
+        script_title VARCHAR(200),
+        category VARCHAR(50),
+        summary TEXT,
+        messages JSONB NOT NULL,
+        provider VARCHAR(32),
+        model VARCHAR(64),
+        gen_count INTEGER NOT NULL DEFAULT 1,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        UNIQUE (script_id, content_hash)
+      );
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_roleplay_cache_script
+        ON roleplay_message_cache(script_id, updated_at DESC)
+    `);
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS roleplay_message_feedback (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        script_id VARCHAR(128),
+        script_title VARCHAR(200),
+        level VARCHAR(16),
+        message_text TEXT,
+        rating VARCHAR(8) NOT NULL,
+        feedback_text TEXT,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+      );
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_roleplay_feedback_script
+        ON roleplay_message_feedback(script_id, created_at DESC)
+    `);
+  } catch (err) {
+    logWarn('ensureRoleplaySuggestionTables failed', { err: err.message });
+  }
+}
+
+// Stable fingerprint of a script's content so an edited script regenerates while
+// identical content is reused (and shared across couples).
+function roleplayContentHash({ title, scenario, scriptBody, category }) {
+  return crypto
+    .createHash('sha256')
+    .update([title || '', scenario || '', scriptBody || '', category || ''].join(''))
+    .digest('hex');
 }
 
 const normalizeCount = (value) => {
@@ -317,13 +378,19 @@ router.post('/', [
 // Generate AI roleplay invitation messages for a chosen script.
 // Returns a short setup summary + 5 escalating in-character opening messages so
 // the sender can pick one (and edit it) before sending an intimacy invitation.
+//
+// Results are cached by (scriptId, contentHash): a cache hit returns instantly
+// with no LLM call, no cost, and no daily-budget consumption. `regenerate: true`
+// bypasses the cache, re-generates, and refreshes the shared cache entry.
 router.post('/script-messages', [
   body('scriptTitle')
     .isString().trim().isLength({ min: 1, max: 200 })
     .withMessage('劇本標題為必填'),
+  body('scriptId').optional({ nullable: true }).isLength({ max: 128 }),
   body('scriptScenario').optional({ nullable: true }).isLength({ max: 500 }),
   body('scriptBody').optional({ nullable: true }).isLength({ max: 8000 }),
   body('category').optional({ nullable: true }).isLength({ max: 50 }),
+  body('regenerate').optional().isBoolean(),
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -332,10 +399,32 @@ router.post('/script-messages', [
   }
 
   const userId = req.user.id;
-  const { scriptTitle, scriptScenario, scriptBody, category } = req.body;
+  const { scriptId, scriptTitle, scriptScenario, scriptBody, category, regenerate } = req.body;
+  const contentHash = roleplayContentHash({ title: scriptTitle, scenario: scriptScenario, scriptBody, category });
 
   try {
-    // Tier-aware daily AI budget — shared with the events icebreaker.
+    await ensureRoleplaySuggestionTables();
+
+    // Cache hit (only when we have a scriptId and aren't forcing a regenerate).
+    if (scriptId && !regenerate) {
+      try {
+        const cached = await db.query(
+          `SELECT summary, messages FROM roleplay_message_cache
+            WHERE script_id = $1 AND content_hash = $2 LIMIT 1`,
+          [scriptId, contentHash]
+        );
+        if (cached.rows.length > 0) {
+          const row = cached.rows[0];
+          logInfo('intimacy.script_messages.cache_hit', { userId, scriptId, scriptTitle });
+          return res.json({ success: true, summary: row.summary || '', messages: row.messages || [], cached: true });
+        }
+      } catch (cacheErr) {
+        // Non-fatal — fall through to a fresh generation.
+        logWarn('roleplay cache lookup failed', { err: cacheErr.message });
+      }
+    }
+
+    // Cache miss / forced regenerate → bill against the daily AI budget.
     const { tier, limit } = await resolveAiLimit(userId);
     const usedToday = await countTodayAiUsage(userId);
     const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
@@ -344,7 +433,7 @@ router.post('/script-messages', [
       return res.status(limitCheck.status).json(limitCheck.body);
     }
 
-    logInfo('intimacy.script_messages.input', { userId, scriptTitle, category, hasBody: !!scriptBody });
+    logInfo('intimacy.script_messages.input', { userId, scriptId, scriptTitle, category, regenerate: !!regenerate, hasBody: !!scriptBody });
 
     const result = await llmService.generateRoleplayMessages({
       title: scriptTitle,
@@ -379,7 +468,36 @@ router.post('/script-messages', [
 
     await recordAiUsage(userId, 'roleplay_messages', scriptTitle, meta);
 
-    res.json({ success: true, summary: result.summary, messages: result.messages });
+    // Persist to the shared cache so future selections of this script are instant
+    // and free. Keyed by (scriptId, contentHash) so edited scripts regenerate.
+    if (scriptId) {
+      try {
+        await db.query(
+          `INSERT INTO roleplay_message_cache
+             (script_id, content_hash, script_title, category, summary, messages, provider, model, gen_count)
+           VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, 1)
+           ON CONFLICT (script_id, content_hash) DO UPDATE SET
+             script_title = EXCLUDED.script_title,
+             category = EXCLUDED.category,
+             summary = EXCLUDED.summary,
+             messages = EXCLUDED.messages,
+             provider = EXCLUDED.provider,
+             model = EXCLUDED.model,
+             gen_count = roleplay_message_cache.gen_count + 1,
+             updated_at = NOW()`,
+          [
+            scriptId, contentHash, scriptTitle, category || null,
+            result.summary || '', JSON.stringify(result.messages),
+            meta?.provider || null, meta?.model || null,
+          ]
+        );
+      } catch (saveErr) {
+        // Non-fatal — the user still gets their freshly generated messages.
+        logWarn('roleplay cache save failed', { err: saveErr.message });
+      }
+    }
+
+    res.json({ success: true, summary: result.summary, messages: result.messages, cached: false });
   } catch (error) {
     logError('Generate roleplay messages failed', { err: error.message, stack: error.stack });
     res.status(500).json({
@@ -387,6 +505,38 @@ router.post('/script-messages', [
       message: 'AI 暫時無法生成建議訊息，請稍後再試，或直接自行輸入邀請內容',
       error_code: 'ROLEPLAY_MESSAGES_FAILED',
     });
+  }
+});
+
+// Thumb up/down (+ optional text) feedback on a generated roleplay message.
+// Best-effort analytics for the admin dashboard; never blocks the user flow.
+router.post('/script-messages/feedback', [
+  body('rating').isIn(['up', 'down']).withMessage('rating 必須為 up 或 down'),
+  body('scriptId').optional({ nullable: true }).isLength({ max: 128 }),
+  body('scriptTitle').optional({ nullable: true }).isLength({ max: 200 }),
+  body('level').optional({ nullable: true }).isLength({ max: 16 }),
+  body('messageText').optional({ nullable: true }).isLength({ max: 1000 }),
+  body('feedbackText').optional({ nullable: true }).isLength({ max: 1000 }),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, message: '回饋資料無效', errors: errors.array() });
+  }
+  const userId = req.user.id;
+  const { scriptId, scriptTitle, level, messageText, rating, feedbackText } = req.body;
+  try {
+    await ensureRoleplaySuggestionTables();
+    await db.query(
+      `INSERT INTO roleplay_message_feedback
+         (user_id, script_id, script_title, level, message_text, rating, feedback_text)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [userId, scriptId || null, scriptTitle || null, level || null, messageText || null, rating, feedbackText || null]
+    );
+    logInfo('intimacy.script_messages.feedback', { userId, scriptId, level, rating, hasText: !!feedbackText });
+    res.json({ success: true });
+  } catch (error) {
+    logError('Roleplay message feedback failed', { err: error.message });
+    res.status(500).json({ success: false, message: '回饋送出失敗，請稍後再試' });
   }
 });
 

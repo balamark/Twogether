@@ -201,15 +201,27 @@ interface RoleplayMessageSuggestion {
 }
 
 interface GenerateRoleplayMessagesInput {
+  scriptId?: string;
   scriptTitle: string;
   scriptScenario?: string;
   scriptBody?: string;
   category?: string;
+  regenerate?: boolean;
 }
 
 interface RoleplayMessagesResult {
   summary: string;
   messages: RoleplayMessageSuggestion[];
+  cached?: boolean;
+}
+
+interface RoleplayMessageFeedbackInput {
+  scriptId?: string;
+  scriptTitle?: string;
+  level?: string;
+  messageText?: string;
+  rating: 'up' | 'down';
+  feedbackText?: string;
 }
 
 interface AlternativeIntimacyOption {
@@ -1804,19 +1816,32 @@ class ApiService {
   async generateRoleplayMessages(input: GenerateRoleplayMessagesInput): Promise<RoleplayMessagesResult> {
     try {
       const response = await apiClient.post('/intimacy-requests/script-messages', {
+        scriptId: input.scriptId,
         scriptTitle: input.scriptTitle,
         scriptScenario: input.scriptScenario,
         scriptBody: input.scriptBody,
         category: input.category,
+        regenerate: input.regenerate,
       });
       return {
         summary: response.data.summary || '',
         messages: (response.data.messages || []) as RoleplayMessageSuggestion[],
+        cached: !!response.data.cached,
       };
     } catch (error: unknown) {
       console.error('Failed to generate roleplay messages:', error);
       // Preserve error_code/message from the interceptor so the UI can branch.
       throw error;
+    }
+  }
+
+  // Thumb up/down (+ optional text) on a generated roleplay message. Best-effort
+  // analytics — callers fire-and-forget; failures never block the user.
+  async submitRoleplayMessageFeedback(input: RoleplayMessageFeedbackInput): Promise<void> {
+    try {
+      await apiClient.post('/intimacy-requests/script-messages/feedback', input);
+    } catch (error: unknown) {
+      console.error('Failed to submit roleplay message feedback:', error);
     }
   }
 
@@ -2926,6 +2951,7 @@ export type {
   RoleplayMessageSuggestion,
   GenerateRoleplayMessagesInput,
   RoleplayMessagesResult,
+  RoleplayMessageFeedbackInput,
   AlternativeIntimacyOption,
   AlternativeIntimacyOptionsGrouped,
   Notification,

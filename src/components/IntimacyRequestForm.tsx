@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Heart, Clock, Send, Sparkles, X, RefreshCw, Wand2 } from 'lucide-react';
+import { Heart, Clock, Send, Sparkles, X, RefreshCw, Wand2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { IntimacyTemplate, RoleplayMessageSuggestion } from '../services/api';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -73,6 +73,9 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
   const [aiMessages, setAiMessages] = useState<RoleplayMessageSuggestion[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
   const [selectedAiLevel, setSelectedAiLevel] = useState<string | null>(null);
+  const [feedbackGiven, setFeedbackGiven] = useState<Record<string, 'up' | 'down'>>({});
+  const [downOpenLevel, setDownOpenLevel] = useState<string | null>(null);
+  const [downText, setDownText] = useState('');
 
   const tz = useTimezone();
 
@@ -184,18 +187,23 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
     setCurrentStep('customize');
   };
 
-  const generateMessages = useCallback(async (script: FormScript) => {
+  const generateMessages = useCallback(async (script: FormScript, regenerate = false) => {
     setAiLoading(true);
     setError(null);
     setAiSummary('');
     setAiMessages([]);
     setSelectedAiLevel(null);
+    setFeedbackGiven({});
+    setDownOpenLevel(null);
+    setDownText('');
     try {
       const res = await apiService.generateRoleplayMessages({
+        scriptId: script.id,
         scriptTitle: script.title,
         scriptScenario: script.scenario,
         scriptBody: script.script,
         category: script.category,
+        regenerate,
       });
       setAiSummary(res.summary);
       setAiMessages(res.messages.filter((m) => m.text && m.text.trim()));
@@ -222,6 +230,36 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
     setCustomMessage(m.text);
     setSelectedAiLevel(m.level);
     setCurrentStep('customize');
+  };
+
+  // Thumb up posts immediately. Thumb down opens an optional reason box and
+  // posts once on 送出 (so a down is one row, optionally carrying the text).
+  const sendFeedback = function (m: RoleplayMessageSuggestion, rating: 'up' | 'down', feedbackText?: string) {
+    setFeedbackGiven((prev) => ({ ...prev, [m.level]: rating }));
+    apiService.submitRoleplayMessageFeedback({
+      scriptId: selectedScript?.id,
+      scriptTitle: selectedScript?.title,
+      level: m.level,
+      messageText: m.text,
+      rating,
+      feedbackText,
+    });
+  };
+
+  const handleThumbUp = function (m: RoleplayMessageSuggestion) {
+    setDownOpenLevel((cur) => (cur === m.level ? null : cur));
+    sendFeedback(m, 'up');
+  };
+
+  const handleThumbDown = function (m: RoleplayMessageSuggestion) {
+    setDownText('');
+    setDownOpenLevel((cur) => (cur === m.level ? null : m.level));
+  };
+
+  const submitDownFeedback = function (m: RoleplayMessageSuggestion) {
+    sendFeedback(m, 'down', downText.trim() || undefined);
+    setDownOpenLevel(null);
+    setDownText('');
   };
 
   const handleSendRequest = async function () {
@@ -273,6 +311,9 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
     setAiMessages([]);
     setAiLoading(false);
     setSelectedAiLevel(null);
+    setFeedbackGiven({});
+    setDownOpenLevel(null);
+    setDownText('');
   };
 
   const handleClose = function () {
@@ -480,32 +521,90 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                       <p className="text-sm text-gray-700">{aiSummary}</p>
                     </div>
                   )}
-                  <p className="text-xs text-gray-500">暗示強度由弱到強，挑一句你喜歡的，下一步還能編輯。</p>
+                  <p className="text-xs text-gray-500">暗示強度由弱到強，挑一句你喜歡的；選好後下一步可自由編輯。</p>
                   {aiMessages.map((m) => {
                     const style = LEVEL_STYLE[m.level] || LEVEL_STYLE.normal;
+                    const rated = feedbackGiven[m.level];
                     return (
-                      <button
+                      <div
                         key={m.level}
-                        data-testid={`roleplay-msg-${m.level}`}
-                        onClick={() => handleSelectAiMessage(m)}
-                        className="w-full p-4 border border-gray-200 rounded-lg hover:border-pink-300 hover:bg-pink-50 transition-colors text-left"
+                        className="border border-gray-200 rounded-lg overflow-hidden hover:border-pink-300 transition-colors"
                       >
-                        <div className="flex items-start gap-3">
-                          <div className={`w-3 h-3 rounded-full mt-1.5 ${style.dot}`}></div>
-                          <div className="flex-1">
-                            <span className={`inline-block text-xs px-2 py-0.5 rounded-full border mb-1.5 ${style.chip}`}>
-                              {m.label}
-                            </span>
-                            <p className="text-gray-800 text-sm whitespace-pre-wrap">{m.text}</p>
+                        <button
+                          data-testid={`roleplay-msg-${m.level}`}
+                          onClick={() => handleSelectAiMessage(m)}
+                          className="w-full p-4 text-left hover:bg-pink-50 transition-colors"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`w-3 h-3 rounded-full mt-1.5 ${style.dot}`}></div>
+                            <div className="flex-1">
+                              <span className={`inline-block text-xs px-2 py-0.5 rounded-full border mb-1.5 ${style.chip}`}>
+                                {m.label}
+                              </span>
+                              <p className="text-gray-800 text-sm whitespace-pre-wrap">{m.text}</p>
+                            </div>
                           </div>
+                        </button>
+                        {/* Feedback footer (siblings of the select button — no nested buttons) */}
+                        <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border-t border-gray-100">
+                          <span className="text-xs text-gray-400">這句如何？</span>
+                          <button
+                            data-testid={`roleplay-thumbup-${m.level}`}
+                            onClick={() => handleThumbUp(m)}
+                            className={`p-1.5 rounded-md transition-colors ${
+                              rated === 'up' ? 'bg-green-100 text-green-600' : 'text-gray-400 hover:bg-gray-100'
+                            }`}
+                            aria-label="讚"
+                          >
+                            <ThumbsUp className="w-4 h-4" />
+                          </button>
+                          <button
+                            data-testid={`roleplay-thumbdown-${m.level}`}
+                            onClick={() => handleThumbDown(m)}
+                            className={`p-1.5 rounded-md transition-colors ${
+                              rated === 'down' ? 'bg-rose-100 text-rose-600' : 'text-gray-400 hover:bg-gray-100'
+                            }`}
+                            aria-label="不喜歡"
+                          >
+                            <ThumbsDown className="w-4 h-4" />
+                          </button>
+                          {rated && <span className="text-xs text-gray-400 ml-1">已回饋，謝謝！</span>}
                         </div>
-                      </button>
+                        {downOpenLevel === m.level && (
+                          <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 space-y-2">
+                            <textarea
+                              value={downText}
+                              onChange={(e) => setDownText(e.target.value)}
+                              placeholder="想告訴我們哪裡不喜歡嗎？（選填）"
+                              rows={2}
+                              className="w-full p-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-pink-400 resize-none"
+                            />
+                            <div className="flex justify-end gap-2">
+                              <button
+                                onClick={() => {
+                                  setDownOpenLevel(null);
+                                  setDownText('');
+                                }}
+                                className="px-3 py-1 text-xs text-gray-500 hover:text-gray-700"
+                              >
+                                取消
+                              </button>
+                              <button
+                                onClick={() => submitDownFeedback(m)}
+                                className="px-3 py-1 text-xs bg-gray-800 text-white rounded-md hover:bg-gray-700"
+                              >
+                                送出回饋
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     );
                   })}
 
                   <div className="flex flex-wrap justify-between gap-3 pt-1">
                     <button
-                      onClick={() => selectedScript && generateMessages(selectedScript)}
+                      onClick={() => selectedScript && generateMessages(selectedScript, true)}
                       data-testid="roleplay-regenerate"
                       className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm"
                     >
@@ -528,7 +627,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                   <p>AI 暫時無法生成這個劇本的建議訊息。</p>
                   <div className="flex justify-center gap-3">
                     <button
-                      onClick={() => selectedScript && generateMessages(selectedScript)}
+                      onClick={() => selectedScript && generateMessages(selectedScript, true)}
                       className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
                     >
                       <RefreshCw className="w-4 h-4" /> 重新生成
