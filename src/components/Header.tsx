@@ -101,6 +101,7 @@ const Header: React.FC<HeaderProps> = ({
             {authState.isAuthenticated && authState.partnerConnected && (
               <button
                 onClick={onShowIntimacyRequest}
+                data-testid="header-intimacy-button"
                 className="flex items-center space-x-2 bg-pink-500 text-white p-2 sm:px-4 sm:py-2 rounded-full hover:bg-pink-600 transition-colors min-h-[40px] min-w-[40px] justify-center"
                 title="發送親密邀請"
               >

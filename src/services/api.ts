@@ -191,6 +191,27 @@ interface IntimacyTemplate {
   suggestionLevel: string;
 }
 
+// AI-generated roleplay invitation messages for a chosen script.
+type RoleplayMessageLevel = 'normal' | 'mild' | 'moderate' | 'explicit' | 'intense';
+
+interface RoleplayMessageSuggestion {
+  level: RoleplayMessageLevel;
+  label: string;
+  text: string;
+}
+
+interface GenerateRoleplayMessagesInput {
+  scriptTitle: string;
+  scriptScenario?: string;
+  scriptBody?: string;
+  category?: string;
+}
+
+interface RoleplayMessagesResult {
+  summary: string;
+  messages: RoleplayMessageSuggestion[];
+}
+
 interface AlternativeIntimacyOption {
   id: string;
   category: string;
@@ -1777,6 +1798,28 @@ class ApiService {
     }
   }
 
+  // Ask the AI to summarize a roleplay script and produce 5 escalating opening
+  // invitation messages. 429 (AI_DAILY_LIMIT_REACHED) is surfaced by the shared
+  // response interceptor as a billing:limit-reached event — let it propagate.
+  async generateRoleplayMessages(input: GenerateRoleplayMessagesInput): Promise<RoleplayMessagesResult> {
+    try {
+      const response = await apiClient.post('/intimacy-requests/script-messages', {
+        scriptTitle: input.scriptTitle,
+        scriptScenario: input.scriptScenario,
+        scriptBody: input.scriptBody,
+        category: input.category,
+      });
+      return {
+        summary: response.data.summary || '',
+        messages: (response.data.messages || []) as RoleplayMessageSuggestion[],
+      };
+    } catch (error: unknown) {
+      console.error('Failed to generate roleplay messages:', error);
+      // Preserve error_code/message from the interceptor so the UI can branch.
+      throw error;
+    }
+  }
+
   async getAlternativeIntimacyOptions(): Promise<AlternativeIntimacyOptionsGrouped> {
     try {
       const response = await apiClient.get('/intimacy-requests/alternative-intimacy-options');
@@ -2879,6 +2922,10 @@ export type {
   CreateIntimacyRequestRequest,
   RespondToIntimacyRequestRequest,
   IntimacyTemplate,
+  RoleplayMessageLevel,
+  RoleplayMessageSuggestion,
+  GenerateRoleplayMessagesInput,
+  RoleplayMessagesResult,
   AlternativeIntimacyOption,
   AlternativeIntimacyOptionsGrouped,
   Notification,

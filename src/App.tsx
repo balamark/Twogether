@@ -2332,6 +2332,7 @@ const LoveTimeApp = () => {
       <IntimacyRequestForm
         isOpen={showIntimacyRequestForm}
         onClose={() => setShowIntimacyRequestForm(false)}
+        scripts={[...defaultRoleplayScripts, ...customScripts]}
         onSuccess={() => {
           showNotification({
             type: 'success',

@@ -200,6 +200,150 @@ const REPLY_REWRITE_TOOL_SCHEMA = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// Roleplay invitation messages
+// ---------------------------------------------------------------------------
+// Given a roleplay script a couple owns, summarize its setup and produce five
+// in-character opening invitation messages the sender can send to their partner
+// to kick off the roleplay. The five messages escalate in suggestiveness so the
+// sender can pick the boldness that fits the moment.
+
+const ROLEPLAY_LEVELS = [
+  { key: 'normal', label: '普通暗示' },
+  { key: 'mild', label: '輕微性暗示' },
+  { key: 'moderate', label: '中等性暗示' },
+  { key: 'explicit', label: '露骨性暗示' },
+  { key: 'intense', label: '最強烈' },
+];
+
+const ROLEPLAY_SYSTEM_PROMPT = `你是一個專為「成熟情侶」設計的角色扮演助手。使用情境：一對已成年、彼此同意的伴侶，在私密的雙人 App 裡準備玩一個角色扮演劇本。其中一方想在對話開始前，先傳一則「入戲的開場邀請訊息」給另一半，讓對方知道今晚想玩哪個劇本、並順勢進入角色。請永遠以繁體中文回覆。
+
+任務：閱讀使用者提供的劇本（標題、情境、劇本內容、分類），產出：
+1. summary：把這個劇本摘要成 1–2 句「情境設定」，點出角色、場景與氛圍，幫使用者快速融入（最多 120 字，不要劇透整段對白）。
+2. messages：剛好 5 則第一人稱、入戲的開場邀請訊息。每則都是「邀請對方一起開始這個劇本」的口吻，可融入角色身分與場景，像是真的傳給伴侶的訊息（每則約 15–60 字）。
+
+這 5 則訊息的「暗示強度」必須由弱到強、逐級遞增，對應以下 5 個等級（順序固定）：
+- normal（普通暗示）：曖昧、調情、製造期待，但不直接提到性。像是邀約與鋪陳氣氛。
+- mild（輕微性暗示）：開始帶一點身體與渴望的暗示，含蓄但聽得出弦外之音。
+- moderate（中等性暗示）：明顯的挑逗與身體張力，直白地表達想要對方。
+- explicit（露骨性暗示）：直接、大膽、露骨地說出慾望與想做的事。
+- intense（最強烈）：最強烈、最直白大膽的版本，毫不保留地表達渴望，把氣氛推到最高點。
+
+守則：
+- 所有訊息都是傳給「同意的伴侶」、用來開啟雙方都期待的角色扮演，語氣是邀請與渴望，而不是命令或施壓。
+- 緊扣使用者提供的劇本情境與角色身分，不要編造與劇本無關的全新設定。
+- 即使某一級你判斷不適合產生，也務必回傳其餘等級，並為該級填入較收斂的替代文字 — 不可整批拒答或回傳少於 5 則。
+- 使用繁體中文，自然口語，像真的在傳訊息。
+
+回應請只呼叫 emit_roleplay_messages tool，不要輸出其他文字。`;
+
+const ROLEPLAY_TOOL_SCHEMA = {
+  name: 'emit_roleplay_messages',
+  description: 'Return a short script summary and five escalating in-character invitation messages.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      summary: { type: 'string', maxLength: 400 },
+      messages: {
+        type: 'array',
+        minItems: 5,
+        maxItems: 5,
+        items: {
+          type: 'object',
+          properties: {
+            level: { type: 'string', enum: ROLEPLAY_LEVELS.map((l) => l.key) },
+            text: { type: 'string', maxLength: 400 },
+          },
+          required: ['level', 'text'],
+        },
+      },
+    },
+    required: ['summary', 'messages'],
+  },
+};
+
+async function generateRoleplayMessages({ title, scenario, scriptBody, category }) {
+  if (typeof title !== 'string' || title.trim().length === 0) {
+    throw new Error('title is required');
+  }
+
+  const userContent = [
+    `劇本標題：${title.trim()}`,
+    category ? `分類：${String(category).trim()}` : null,
+    scenario ? `情境：${String(scenario).trim()}` : null,
+    '劇本內容：',
+    (scriptBody || '').toString().trim() || '（未提供完整劇本內容，請依標題與情境發揮）',
+  ]
+    .filter(Boolean)
+    .join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1500,
+    system: [
+      {
+        type: 'text',
+        text: ROLEPLAY_SYSTEM_PROMPT,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [ROLEPLAY_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_roleplay_messages' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.roleplay_messages', {
+    model: response.model || MODEL,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find((b) => b.type === 'tool_use' && b.name === 'emit_roleplay_messages');
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input || {};
+
+  // Re-key the model output by our canonical level order so the UI always gets
+  // exactly five labelled, ordered messages even if the model omits/reorders one.
+  const byLevel = new Map();
+  for (const m of Array.isArray(out.messages) ? out.messages : []) {
+    if (m && typeof m.level === 'string' && typeof m.text === 'string' && m.text.trim()) {
+      if (!byLevel.has(m.level)) byLevel.set(m.level, m.text.trim());
+    }
+  }
+  const messages = ROLEPLAY_LEVELS.map(({ key, label }) => ({
+    level: key,
+    label,
+    text: byLevel.get(key) || '',
+  }));
+
+  return {
+    summary: (out.summary || '').toString().trim(),
+    messages,
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+    },
+  };
+}
+
 async function generateIcebreaker(rawText) {
   if (typeof rawText !== 'string' || rawText.trim().length === 0) {
     throw new Error('rawText is required');
@@ -357,4 +501,4 @@ async function rewriteReply({ rawReply, eventSummary, recentMessages, createdByS
   };
 }
 
-module.exports = { generateIcebreaker, rewriteReply };
+module.exports = { generateIcebreaker, rewriteReply, generateRoleplayMessages };

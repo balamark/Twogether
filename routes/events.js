@@ -67,7 +67,7 @@ async function countTodayAiUsage(userId) {
       `SELECT COUNT(*)::int AS c
          FROM event_ai_usage
         WHERE user_id = $1
-          AND kind IN ('icebreaker', 'reply_rewrite')
+          AND kind IN ('icebreaker', 'reply_rewrite', 'roleplay_messages')
           AND created_at >= DATE_TRUNC('day', NOW())`,
       [userId]
     );

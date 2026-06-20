@@ -5,6 +5,8 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const emailService = require('../services/emailService');
 const characterMappingService = require('../services/characterMappingService');
+const llmService = require('../services/llmService');
+const { getCoupleIdForUser, getCoupleTier, getLimit, checkLimit } = require('../lib/entitlements');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 
 const router = express.Router();
@@ -13,6 +15,97 @@ const router = express.Router();
 router.use(authenticateToken);
 
 const NUDGE_THRESHOLD = 3;
+
+// ---------------------------------------------------------------------------
+// AI usage gating — the roleplay invitation generator hits the paid LLM, so it
+// shares the tier-aware daily AI budget with the events icebreaker/reply-rewrite
+// (same event_ai_usage table; see routes/events.js). Helpers are duplicated here
+// the same way ensureNotificationsTable is, to keep the routers self-contained.
+// ---------------------------------------------------------------------------
+
+async function ensureEventAiUsageTable() {
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS event_ai_usage (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        kind VARCHAR(32) NOT NULL,
+        provider VARCHAR(32),
+        model VARCHAR(64),
+        duration_ms INTEGER,
+        input_tokens INTEGER,
+        output_tokens INTEGER,
+        cache_create_tokens INTEGER,
+        cache_read_tokens INTEGER,
+        cost_usd NUMERIC(12, 8),
+        raw_input TEXT,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+      );
+    `);
+    await db.query(`
+      CREATE INDEX IF NOT EXISTS idx_event_ai_usage_user_day
+        ON event_ai_usage (user_id, kind, created_at DESC)
+    `);
+  } catch (err) {
+    logWarn('ensureEventAiUsageTable failed', { err: err.message });
+  }
+}
+
+// All paid AI calls share one daily budget — keep this kind list in sync with
+// countTodayAiUsage in routes/events.js.
+async function countTodayAiUsage(userId) {
+  try {
+    await ensureEventAiUsageTable();
+    const result = await db.query(
+      `SELECT COUNT(*)::int AS c
+         FROM event_ai_usage
+        WHERE user_id = $1
+          AND kind IN ('icebreaker', 'reply_rewrite', 'roleplay_messages')
+          AND created_at >= DATE_TRUNC('day', NOW())`,
+      [userId]
+    );
+    return result.rows[0]?.c || 0;
+  } catch (err) {
+    // Fail open — serve the user rather than block on a count failure.
+    logWarn('countTodayAiUsage failed', { err: err.message });
+    return 0;
+  }
+}
+
+async function resolveAiLimit(userId) {
+  const coupleId = await getCoupleIdForUser(userId);
+  const tier = await getCoupleTier(coupleId);
+  return { tier, limit: getLimit(tier, 'icebreaker_per_day') };
+}
+
+async function recordAiUsage(userId, kind, rawInput, meta) {
+  try {
+    await ensureEventAiUsageTable();
+    const usage = meta?.usage || {};
+    await db.query(
+      `INSERT INTO event_ai_usage (
+         user_id, kind, provider, model, duration_ms,
+         input_tokens, output_tokens, cache_create_tokens, cache_read_tokens,
+         cost_usd, raw_input
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+      [
+        userId,
+        kind,
+        meta?.provider || null,
+        meta?.model || null,
+        meta?.durationMs ?? null,
+        usage.inputTokens ?? null,
+        usage.outputTokens ?? null,
+        usage.cacheCreateTokens ?? null,
+        usage.cacheReadTokens ?? null,
+        meta?.costUsd ?? null,
+        rawInput,
+      ]
+    );
+  } catch (err) {
+    logWarn('recordAiUsage failed', { kind, err: err.message });
+  }
+}
 
 const normalizeCount = (value) => {
   const parsed = Number(value);
@@ -217,6 +310,82 @@ router.post('/', [
     res.status(500).json({
       success: false,
       message: '發送親密請求失敗'
+    });
+  }
+});
+
+// Generate AI roleplay invitation messages for a chosen script.
+// Returns a short setup summary + 5 escalating in-character opening messages so
+// the sender can pick one (and edit it) before sending an intimacy invitation.
+router.post('/script-messages', [
+  body('scriptTitle')
+    .isString().trim().isLength({ min: 1, max: 200 })
+    .withMessage('劇本標題為必填'),
+  body('scriptScenario').optional({ nullable: true }).isLength({ max: 500 }),
+  body('scriptBody').optional({ nullable: true }).isLength({ max: 8000 }),
+  body('category').optional({ nullable: true }).isLength({ max: 50 }),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    logWarn('Roleplay messages validation failed', { userId: req.user?.id, errors: errors.array() });
+    return res.status(400).json({ success: false, message: '劇本資料不完整，請重新選擇劇本', errors: errors.array() });
+  }
+
+  const userId = req.user.id;
+  const { scriptTitle, scriptScenario, scriptBody, category } = req.body;
+
+  try {
+    // Tier-aware daily AI budget — shared with the events icebreaker.
+    const { tier, limit } = await resolveAiLimit(userId);
+    const usedToday = await countTodayAiUsage(userId);
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    if (!limitCheck.ok) {
+      logInfo('intimacy.script_messages.limit', { userId, used: usedToday, limit, tier, blocked: true });
+      return res.status(limitCheck.status).json(limitCheck.body);
+    }
+
+    logInfo('intimacy.script_messages.input', { userId, scriptTitle, category, hasBody: !!scriptBody });
+
+    const result = await llmService.generateRoleplayMessages({
+      title: scriptTitle,
+      scenario: scriptScenario,
+      scriptBody,
+      category,
+    });
+    const meta = result._meta;
+    delete result._meta;
+
+    const usableCount = (result.messages || []).filter((m) => m.text && m.text.trim()).length;
+    if (usableCount === 0) {
+      logWarn('intimacy.script_messages.empty', { userId, scriptTitle });
+      return res.status(502).json({
+        success: false,
+        message: 'AI 暫時無法生成這個劇本的建議訊息，請稍後再試，或直接自行輸入邀請內容',
+        error_code: 'ROLEPLAY_MESSAGES_EMPTY',
+      });
+    }
+
+    logInfo('intimacy.script_messages.cost', {
+      userId,
+      provider: meta?.provider,
+      model: meta?.model,
+      costUsd: meta?.costUsd,
+      durationMs: meta?.durationMs,
+      usableCount,
+      usedToday: usedToday + 1,
+      limit,
+      tier,
+    });
+
+    await recordAiUsage(userId, 'roleplay_messages', scriptTitle, meta);
+
+    res.json({ success: true, summary: result.summary, messages: result.messages });
+  } catch (error) {
+    logError('Generate roleplay messages failed', { err: error.message, stack: error.stack });
+    res.status(500).json({
+      success: false,
+      message: 'AI 暫時無法生成建議訊息，請稍後再試，或直接自行輸入邀請內容',
+      error_code: 'ROLEPLAY_MESSAGES_FAILED',
     });
   }
 });
