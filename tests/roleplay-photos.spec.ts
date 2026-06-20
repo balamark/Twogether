@@ -103,6 +103,28 @@ test.describe('Roleplay custom script — multi-photo upload + lightbox nav', ()
     await page.getByTestId('roleplay-modal-lightbox-prev').click();
     await expect(page.getByTestId('roleplay-modal-lightbox-counter')).toHaveText('1 / 2');
 
+    // A large, off-aspect image must fit entirely within the (mobile) viewport —
+    // never overflow it. Swap in a 2400x1600 image and measure the rendered box.
+    const fit = await page.evaluate(async () => {
+      const img = document.querySelector(
+        '[data-testid="roleplay-modal-lightbox-image"]',
+      ) as HTMLImageElement | null;
+      if (!img) return null;
+      const c = document.createElement('canvas');
+      c.width = 2400;
+      c.height = 1600;
+      const ctx = c.getContext('2d')!;
+      ctx.fillStyle = '#c33';
+      ctx.fillRect(0, 0, c.width, c.height);
+      img.src = c.toDataURL('image/png');
+      await img.decode();
+      const r = img.getBoundingClientRect();
+      return { w: r.width, h: r.height, vw: window.innerWidth, vh: window.innerHeight };
+    });
+    expect(fit, 'lightbox image present').not.toBeNull();
+    expect(fit!.w).toBeLessThanOrEqual(fit!.vw + 1);
+    expect(fit!.h).toBeLessThanOrEqual(fit!.vh + 1);
+
     await page.getByTestId('roleplay-modal-lightbox-close').click();
     await expect(page.getByTestId('roleplay-modal-lightbox')).toBeHidden({ timeout: 5000 });
   });
