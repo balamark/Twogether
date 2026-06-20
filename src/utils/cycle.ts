@@ -86,14 +86,31 @@ export function periodDateSet(records: CycleRecord[]): Set<string> {
   return out;
 }
 
-export function fertileDateSet(records: CycleRecord[]): Set<string> {
-  const w = ovulationWindow(records);
-  if (!w) return new Set();
-  const out = new Set<string>();
-  const span = daysBetween(w.fertileStart, w.fertileEnd);
-  for (let i = 0; i <= span; i++) {
-    out.add(addDays(w.fertileStart, i));
+// 危險期 / fertile window. The most fertile ("適合備孕的危險期") days fall a few
+// days after the bleeding ends, so we anchor the window to the END of each
+// logged period rather than to a single far-off predicted ovulation. Because
+// it is derived per logged cycle from start_date + length_days, the green dots
+// move whenever a period is added, removed, or has its start or length edited.
+const FERTILE_GAP_AFTER_PERIOD = 4; // window opens ~4 days after bleeding ends
+const FERTILE_WINDOW_DAYS = 7;      // spans ~1 week, covering ovulation
+
+function addFertileWindow(out: Set<string>, startDate: string, lengthDays: number): void {
+  const periodEnd = addDays(startDate, Math.max(1, lengthDays) - 1);
+  const fertileStart = addDays(periodEnd, FERTILE_GAP_AFTER_PERIOD);
+  for (let i = 0; i < FERTILE_WINDOW_DAYS; i++) {
+    out.add(addDays(fertileStart, i));
   }
+}
+
+export function fertileDateSet(records: CycleRecord[], assumedLengthDays = 5): Set<string> {
+  const out = new Set<string>();
+  for (const r of records) {
+    addFertileWindow(out, r.startDate, r.lengthDays);
+  }
+  // Forward-looking window for the predicted next period, so a fertile estimate
+  // is also shown ahead of the next expected cycle.
+  const nextStart = predictNextPeriodStart(records);
+  if (nextStart) addFertileWindow(out, nextStart, assumedLengthDays);
   return out;
 }
 
