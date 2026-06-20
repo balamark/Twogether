@@ -1334,7 +1334,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
         {lightboxOpen && lightboxPhotos.length > 0 && (
           <div
             data-testid="roleplay-modal-lightbox"
-            className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center overflow-auto overscroll-contain p-4 sm:p-8"
+            className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center overflow-hidden overscroll-contain p-3 sm:p-8"
             onClick={() => setLightboxOpen(false)}
             role="dialog"
             aria-modal="true"
@@ -1383,7 +1383,9 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               src={lightboxPhotos[lightboxIndex]}
               alt={`${selectedScript.title} ${lightboxIndex + 1}`}
               onClick={(e) => e.stopPropagation()}
-              className="block max-w-none cursor-default"
+              // Fit the whole image within the viewport on any screen — never
+              // crop or overflow. max-h/max-w + object-contain letterboxes it.
+              className="block max-h-full max-w-full w-auto h-auto object-contain cursor-default"
               data-testid="roleplay-modal-lightbox-image"
             />
           </div>
