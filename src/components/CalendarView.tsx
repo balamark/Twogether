@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Camera, MapPin, Play, Clock, Trash2 } from 'lucide-react';
 import CalendarDatePicker from './CalendarDatePicker';
 import { AchievementsView, IntimacyStatsCards, CalendarHeatmap } from './AchievementsView';
-import { periodDateSet, fertileDateSet, predictedPeriodDateSet } from '../utils/cycle';
+import { periodDateSet, fertileDateSet, predictedPeriodDateSet, addDays } from '../utils/cycle';
 import { apiService } from '../services/api';
 import type { CycleRecord } from '../services/api';
 import type { IntimateRecord, AuthState, Notification } from '../App';
@@ -192,12 +192,49 @@ const CalendarView = ({
   }, [intimateRecords]);
 
   const [recordType, setRecordType] = useState<'intimacy' | 'period'>('intimacy');
-  const [periodLengthDays, setPeriodLengthDays] = useState<number>(5);
+  // Kept as a raw string so the field can be cleared mid-edit; clamped to 1–14
+  // only on blur / submit. A controlled number value made the box impossible to
+  // empty and silently clamped every keystroke to a minimum of 1.
+  const [periodLengthInput, setPeriodLengthInput] = useState<string>('5');
+
+  // Period-day management: tapping a calendar day that falls inside a logged
+  // period opens this lightweight modal so the entry can be reviewed and undone.
+  const [periodDayDate, setPeriodDayDate] = useState<string | null>(null);
+  const [periodDayRecord, setPeriodDayRecord] = useState<CycleRecord | null>(null);
+  const [deletingPeriod, setDeletingPeriod] = useState(false);
 
   const cycleEnabled = !!authState.user?.cycle_tracking_enabled;
   const periodDates = React.useMemo(() => cycleEnabled ? periodDateSet(cycleRecords) : undefined, [cycleEnabled, cycleRecords]);
   const fertileDates = React.useMemo(() => cycleEnabled ? fertileDateSet(cycleRecords) : undefined, [cycleEnabled, cycleRecords]);
   const predictedPeriodDates = React.useMemo(() => cycleEnabled ? predictedPeriodDateSet(cycleRecords) : undefined, [cycleEnabled, cycleRecords]);
+
+  // Maps every YYYY-MM-DD covered by a logged period to its CycleRecord, so a
+  // tap on the calendar can find (and offer to undo) the period that owns it.
+  const cycleRecordByDate = React.useMemo(() => {
+    const map = new Map<string, CycleRecord>();
+    for (const r of cycleRecords) {
+      for (let i = 0; i < r.lengthDays; i++) {
+        map.set(addDays(r.startDate, i), r);
+      }
+    }
+    return map;
+  }, [cycleRecords]);
+
+  const handleDeletePeriod = async () => {
+    if (!periodDayRecord) return;
+    setDeletingPeriod(true);
+    try {
+      await apiService.deleteCycleRecord(periodDayRecord.id);
+      setCycleRecords(prev => prev.filter(r => r.id !== periodDayRecord.id));
+      showNotification({ type: 'success', title: '已取消', message: '月經紀錄已移除', duration: 3000 });
+      setPeriodDayRecord(null);
+      setPeriodDayDate(null);
+    } catch (error: unknown) {
+      showNotification({ type: 'error', title: '移除失敗', message: (error as Error)?.message || '無法移除月經紀錄，請稍後再試', duration: 5000 });
+    } finally {
+      setDeletingPeriod(false);
+    }
+  };
 
   const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -224,10 +261,12 @@ const CalendarView = ({
     }
 
     if (recordType === 'period') {
+      const parsedLen = parseInt(periodLengthInput, 10);
+      const lengthDays = Number.isNaN(parsedLen) ? 5 : Math.min(14, Math.max(1, parsedLen));
       try {
         const created = await apiService.createCycleRecord({
           startDate: recordForm.date,
-          lengthDays: periodLengthDays,
+          lengthDays,
           notes: recordForm.notes || undefined,
         });
         setCycleRecords(prev => [created, ...prev]);
@@ -239,6 +278,7 @@ const CalendarView = ({
       setShowRecordModal(false);
       setEditingRecord(null);
       setRecordType('intimacy');
+      setPeriodLengthInput('5');
       return;
     }
 
@@ -338,6 +378,7 @@ const CalendarView = ({
             onClick={() => {
               setEditingRecord(null);
               setRecordForm({date: selectedDate, time: getCurrentTime(), mood: '💕', notes: '', description: '', duration: '', location: '', photo: '', roleplayScript: ''});
+              setPeriodLengthInput('5');
               setShowRecordModal(true);
             }}
             className="px-6 py-2.5 bg-petal-ink text-petal-cream rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
@@ -413,13 +454,18 @@ const CalendarView = ({
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">月經天數</label>
                       <input
-                        type="number"
-                        min={1}
-                        max={14}
-                        value={periodLengthDays}
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={periodLengthInput}
                         onChange={(e) => {
-                          const v = parseInt(e.target.value, 10);
-                          if (!Number.isNaN(v)) setPeriodLengthDays(Math.min(14, Math.max(1, v)));
+                          // Accept only digits, keep it as a free string (incl. empty)
+                          // so the field can be fully cleared; clamp on blur instead.
+                          setPeriodLengthInput(e.target.value.replace(/[^0-9]/g, '').slice(0, 2));
+                        }}
+                        onBlur={() => {
+                          const v = parseInt(periodLengthInput, 10);
+                          setPeriodLengthInput(String(Number.isNaN(v) ? 5 : Math.min(14, Math.max(1, v))));
                         }}
                         data-testid="record-period-length-input"
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
@@ -557,6 +603,74 @@ const CalendarView = ({
         </div>
       )}
 
+      {/* Period-day management modal — review & undo a logged period */}
+      {periodDayRecord && (
+        <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-petal-cream rounded-md shadow-petal max-w-md w-full border border-petal-rule" data-testid="period-day-modal">
+            <div className="p-5 sm:p-6">
+              <div className="flex justify-between items-end mb-5 pb-4 border-b border-petal-rule">
+                <div>
+                  <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
+                    — 月經紀錄
+                  </div>
+                  <h3 className="font-display text-3xl font-light tracking-tight text-petal-ink">
+                    這一天的<em className="not-italic font-light italic text-red-500">月經</em>
+                  </h3>
+                </div>
+                <button
+                  onClick={() => { setPeriodDayRecord(null); setPeriodDayDate(null); }}
+                  data-testid="period-day-close-button"
+                  className="text-petal-muted hover:text-petal-ink text-2xl font-light transition-colors leading-none"
+                >
+                  ×
+                </button>
+              </div>
+
+              <dl className="space-y-2 font-body text-sm text-petal-ink">
+                <div className="flex justify-between gap-4">
+                  <dt className="text-petal-muted">所選日期</dt>
+                  <dd>{periodDayDate}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-petal-muted">週期開始日</dt>
+                  <dd>{periodDayRecord.startDate}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-petal-muted">天數</dt>
+                  <dd>{periodDayRecord.lengthDays} 天</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="text-petal-muted">涵蓋區間</dt>
+                  <dd>{periodDayRecord.startDate} ～ {addDays(periodDayRecord.startDate, periodDayRecord.lengthDays - 1)}</dd>
+                </div>
+              </dl>
+
+              <p className="font-display italic font-light text-sm text-petal-muted mt-4">
+                標記錯了嗎？可以取消這次的月經紀錄。
+              </p>
+
+              <div className="flex space-x-3 mt-6 pt-4 border-t border-petal-rule">
+                <button
+                  onClick={() => { setPeriodDayRecord(null); setPeriodDayDate(null); }}
+                  data-testid="period-day-dismiss-button"
+                  className="flex-1 px-4 py-3 border border-petal-rule text-petal-ink rounded-md hover:bg-petal-cream-2 transition-colors font-body text-sm"
+                >
+                  關閉
+                </button>
+                <button
+                  onClick={handleDeletePeriod}
+                  disabled={deletingPeriod}
+                  data-testid="period-day-delete-button"
+                  className="flex-1 px-4 py-3 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-display italic text-base disabled:opacity-60"
+                >
+                  {deletingPeriod ? '移除中…' : '取消這次月經'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Monthly Calendar Distribution */}
       <div>
         <div className="flex items-baseline justify-between mb-6">
@@ -576,10 +690,22 @@ const CalendarView = ({
             fertileDates={fertileDates}
             onNavigate={(y, m) => setCalendarMonth(new Date(y, m, 1))}
             onDaySelect={(day) => {
+              // A day inside a logged period opens the period-management modal
+              // so it can be reviewed and undone if it was marked by mistake.
+              const periodRec = cycleRecordByDate.get(day);
+              if (periodRec) {
+                setPeriodDayDate(day);
+                setPeriodDayRecord(periodRec);
+                return;
+              }
               const dayRecords = recordsByDate.get(day) || [];
               if (dayRecords.length === 0) {
                 setEditingRecord(null);
                 setSelectedDate(day);
+                // Pre-select the tapped day in the modal's calendar so there's
+                // no need to re-pick it.
+                setRecordForm(f => ({ ...f, date: day }));
+                setPeriodLengthInput('5');
                 setShowRecordModal(true);
               } else if (dayRecords.length === 1) {
                 setSelectedRecord(dayRecords[0]);
