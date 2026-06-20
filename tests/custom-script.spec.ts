@@ -323,4 +323,49 @@ test.describe('Custom Script Upload and Persistence', () => {
       }, { timeout: 5000 })
       .toBe(initialCoins + 200);
   });
+
+  test('a freshly created script shows created date, NEW tag, and a working share button', async ({ page }) => {
+    const roleplayTab = page.getByTestId('nav-tab-roleplay');
+    await expect(roleplayTab).toBeVisible({ timeout: 5000 });
+    await roleplayTab.click();
+    await page.waitForTimeout(1500);
+
+    // Upload a fresh script (created_at = now → should be tagged NEW).
+    await page.getByTestId('script-upload-button').click();
+    await expect(page.locator('h3:has-text("上傳自訂劇本")')).toBeVisible({ timeout: 5000 });
+    const title = `Share Script ${Date.now()}`;
+    await page.locator('input#script-title').fill(title);
+    await page.locator('select#script-category').selectOption('romantic');
+    await page.locator('input#script-scenario').fill('Sharing test scenario');
+    await page.locator('textarea#script-content').fill('[男]: 哈囉\n[女]: 嗨');
+    const submitButton = page.getByTestId('script-upload-submit-button');
+    await submitButton.scrollIntoViewIfNeeded();
+    await submitButton.click();
+
+    await expect(page.locator('text=劇本上傳成功').or(page.locator('text=已加入你的劇本庫')).first())
+      .toBeVisible({ timeout: 10000 });
+    await page.waitForTimeout(1500);
+
+    // Created date + NEW tag render on the new card (newest sorts first).
+    await expect(page.locator('[data-testid^="script-created-date-"]').first())
+      .toBeVisible({ timeout: 5000 });
+    await expect(page.locator('[data-testid^="script-new-badge-"]').first())
+      .toBeVisible({ timeout: 5000 });
+
+    // Share button is present; clicking it surfaces a toast. The E2E user is
+    // unpaired, so the backend replies with the "no partner" message — either
+    // way a toast appears, proving the round-trip works.
+    const shareButton = page.locator('[data-testid^="script-card-custom-share-button-"]').first();
+    await expect(shareButton).toBeVisible({ timeout: 5000 });
+    await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/share') && r.request().method() === 'POST', { timeout: 15000 }),
+      shareButton.click(),
+    ]);
+    await expect(
+      page.locator('text=已分享給伴侶')
+        .or(page.locator('text=尚未分享'))
+        .or(page.locator('text=還沒有配對伴侶'))
+        .first()
+    ).toBeVisible({ timeout: 10000 });
+  });
 });

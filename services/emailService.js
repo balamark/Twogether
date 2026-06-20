@@ -1058,6 +1058,54 @@ ${acceptUrl}
       logError('Failed to send consultation confirmation email', { kind: 'consultation_confirm', ...smtpErrorFields(error) });
     }
   }
+
+  // A user shares one of their custom role scripts with their partner to spark
+  // interest. Deliberately light on detail — the point is to nudge the partner
+  // to log in and take a look, not to reproduce the script in the email.
+  async sendScriptShareEmail({ recipientEmail, sharerName, scriptTitle, scenario }) {
+    if (!this.isConfigured() || !recipientEmail) return;
+
+    const safeSharer = this._escape(sharerName || '你的伴侶');
+    const safeTitle = this._escape(scriptTitle || '一個劇本');
+    const safeScenario = this._escape(scenario || '').slice(0, 300);
+
+    const bodyHtml = `
+      <p><strong>${safeSharer}</strong> 想和你一起試試這個角色扮演劇本 💕</p>
+      <div class="quote">
+        <div style="font-weight:600;font-size:16px;">${safeTitle}</div>
+        ${safeScenario ? `<div style="color:#636e72;margin-top:6px;">${safeScenario}</div>` : ''}
+      </div>
+      <p style="color:#636e72;font-size:14px;">登入 Twogether 看看完整劇本，準備好給對方一個驚喜。</p>
+    `;
+    const html = this._activityEmailHtml({
+      headerEmoji: '💌',
+      headerTitle: `${safeSharer} 想和你試試一個劇本`,
+      headerSubtitle: safeTitle,
+      bodyHtml,
+      ctaLabel: '💕 登入查看劇本',
+    });
+
+    const text = [
+      `${sharerName || '你的伴侶'} 想和你一起試試這個角色扮演劇本：`,
+      `「${scriptTitle || '一個劇本'}」`,
+      scenario ? `\n${scenario}` : '',
+      '',
+      '登入 Twogether 看看完整劇本。',
+    ].join('\n');
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+        to: recipientEmail,
+        subject: `💌 ${sharerName || '你的伴侶'} 想和你試試「${scriptTitle || '一個劇本'}」`,
+        text,
+        html,
+      });
+      logInfo('Script share email sent', { kind: 'script_share' });
+    } catch (error) {
+      logError('Failed to send script share email', { kind: 'script_share', ...smtpErrorFields(error) });
+    }
+  }
 }
 
 module.exports = new EmailService();

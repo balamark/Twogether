@@ -2026,6 +2026,14 @@ class ApiService {
     }
   }
 
+  // Email a custom script to the paired partner to spark their interest. The
+  // backend resolves the partner and returns a clear message for each outcome
+  // (shared / unpaired / opted out), so surface response.message either way.
+  async shareCustomScript(id: string): Promise<{ success: boolean; message: string }> {
+    const response = await apiClient.post(`/custom-scripts/${id}/share`, {});
+    return response.data;
+  }
+
   // Script Favorites API — couple-scoped list of favorited script ids
   // (both built-in default ids and custom UUIDs).
   async getScriptFavorites(): Promise<string[]> {

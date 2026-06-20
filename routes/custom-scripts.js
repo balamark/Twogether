@@ -8,7 +8,8 @@ const { authenticateToken } = require('../middleware/auth');
 const { uploadToSupabase } = require('../lib/supabase-storage');
 const { getCoupleTier, getLimit, checkLimit } = require('../lib/entitlements');
 const { logDbError, errorResponseBody } = require('../lib/db-errors');
-const { logError, logInfo } = require('../lib/logger');
+const { logError, logInfo, logWarn } = require('../lib/logger');
+const emailService = require('../services/emailService');
 
 const router = express.Router();
 
@@ -559,6 +560,65 @@ router.delete('/:id', async (req, res) => {
       success: false,
       message: '刪除劇本失敗'
     });
+  }
+});
+
+// POST /:id/share — email the requester's partner about this script to spark
+// interest ("come log in and take a look"). Deliberate user action, so it
+// reports clear feedback (unpaired / no email / opted out) rather than failing
+// silently. Honors the partner's "Email 通知" switch.
+router.post('/:id/share', async (req, res) => {
+  try {
+    const scriptId = req.params.id;
+    const userId = req.user.id;
+
+    // The script must exist and belong to the user (or their couple).
+    const scriptResult = await db.query(`
+      SELECT cs.id, cs.title, cs.scenario
+      FROM custom_scripts cs
+      LEFT JOIN couples c ON cs.couple_id = c.id
+      WHERE cs.id = $1 AND (cs.created_by = $2 OR c.user1_id = $2 OR c.user2_id = $2)
+    `, [scriptId, userId]);
+
+    if (scriptResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '找不到劇本或無權限分享' });
+    }
+    const script = scriptResult.rows[0];
+
+    // Resolve the partner with clear, distinct feedback per failure mode.
+    const partnerResult = await db.query(`
+      SELECT u.email, u.nickname, u.email_notifications_enabled
+        FROM couples c
+        JOIN users u ON u.id = CASE WHEN c.user1_id = $1 THEN c.user2_id ELSE c.user1_id END
+       WHERE (c.user1_id = $1 OR c.user2_id = $1) AND c.user2_id IS NOT NULL
+    `, [userId]);
+    const partner = partnerResult.rows[0];
+
+    if (!partner) {
+      return res.json({ success: false, message: '你還沒有配對伴侶，無法分享。' });
+    }
+    if (!partner.email) {
+      return res.json({ success: false, message: '找不到伴侶的電子郵件地址，請請伴侶更新資訊。' });
+    }
+    if (partner.email_notifications_enabled === false) {
+      return res.json({ success: false, message: '你的伴侶已關閉 Email 通知，目前無法分享。' });
+    }
+    if (!emailService.isConfigured()) {
+      return res.json({ success: false, message: '信件服務尚未設定，因此暫時無法分享。' });
+    }
+
+    await emailService.sendScriptShareEmail({
+      recipientEmail: partner.email,
+      sharerName: req.user.nickname || '你的伴侶',
+      scriptTitle: script.title,
+      scenario: script.scenario,
+    });
+    logInfo('Custom script shared with partner', { scriptId });
+
+    res.json({ success: true, message: `已將「${script.title}」分享到伴侶的信箱。` });
+  } catch (error) {
+    logWarn('Share custom script failed', { id: req.params.id, err: error.message });
+    res.status(500).json({ success: false, message: '分享失敗，請稍後再試。' });
   }
 });
 
