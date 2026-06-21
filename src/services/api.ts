@@ -1706,6 +1706,22 @@ class ApiService {
     }
   }
 
+  // Request a login-email change. The new address only takes effect after the
+  // user clicks the confirmation link we email to it. Preserves error_code so
+  // the UI can branch on the specific reason (bad password, taken, etc.).
+  async changeUserEmail(newEmail: string, password: string): Promise<{ message: string }> {
+    try {
+      const response = await apiClient.put('/auth/user/email', {
+        new_email: newEmail,
+        password,
+      });
+      return { message: response.data?.message || '我們已寄出確認信到新的 Email，請點擊信中連結完成變更。' };
+    } catch (error: unknown) {
+      console.error('Failed to change user email:', error);
+      throw error;
+    }
+  }
+
   async updateCycleTrackingEnabled(enabled: boolean): Promise<void> {
     try {
       await apiClient.put('/auth/user/cycle-tracking', {

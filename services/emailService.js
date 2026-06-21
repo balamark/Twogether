@@ -903,6 +903,114 @@ ${acceptUrl}
     }
   }
 
+  // Confirmation link sent to the NEW address when a user changes their login
+  // email. Clicking it is what actually swaps users.email (see
+  // GET /api/auth/confirm-email-change). Caller guarantees the token is stored.
+  async sendEmailChangeVerification({ recipientEmail, nickname, token }) {
+    if (!this.isConfigured()) {
+      logWarn('Email service not configured; skipping email-change verification', { kind: 'email_change_verify' });
+      return;
+    }
+    if (!recipientEmail || !token) return;
+
+    const safeName = this._escape(nickname || '你好');
+    const confirmUrl = `${this._appBaseUrl()}/api/auth/confirm-email-change?token=${encodeURIComponent(token)}`;
+
+    const bodyHtml = `
+      <p>${safeName}，</p>
+      <p>我們收到把這個信箱設為你 Twogether 登入 Email 的請求。點下方按鈕完成變更：</p>
+      <p style="color:#636e72;font-size:14px;">在你點擊確認前，原本的 Email 仍可正常登入。如果這不是你本人操作，請忽略這封信，登入 Email 不會變更。</p>
+      <p style="color:#636e72;font-size:14px;">按鈕無法點擊時，請複製連結：<br>
+        <code style="background:#f8f9fa;padding:4px 6px;border-radius:4px;word-break:break-all;">${confirmUrl}</code>
+      </p>
+    `;
+    const html = this._activityEmailHtml({
+      headerEmoji: '✉️',
+      headerTitle: '確認你的新登入 Email',
+      headerSubtitle: 'Twogether 帳號安全',
+      bodyHtml,
+      ctaLabel: '✓ 確認變更 Email',
+      ctaUrl: confirmUrl,
+    });
+
+    const text = [
+      `${nickname || '你好'}，`,
+      '',
+      '我們收到把這個信箱設為你 Twogether 登入 Email 的請求。',
+      '請點擊以下連結完成變更：',
+      confirmUrl,
+      '',
+      '在你點擊確認前，原本的 Email 仍可正常登入。如果這不是你本人操作，請忽略這封信。',
+      '',
+      '— Twogether',
+    ].join('\n');
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+        to: recipientEmail,
+        subject: '✉️ 確認你的新 Twogether 登入 Email',
+        text,
+        html,
+      });
+      logInfo('Email-change verification sent', { kind: 'email_change_verify' });
+    } catch (error) {
+      logError('Failed to send email-change verification', { kind: 'email_change_verify', ...smtpErrorFields(error) });
+    }
+  }
+
+  // Heads-up to the OLD address when an email change is requested, so a user
+  // notices (and can reset their password) if someone else triggered it.
+  async sendEmailChangeRequestedNotice({ recipientEmail, nickname, newEmail }) {
+    if (!this.isConfigured()) {
+      logWarn('Email service not configured; skipping email-change notice', { kind: 'email_change_notice' });
+      return;
+    }
+    if (!recipientEmail) return;
+
+    const safeName = this._escape(nickname || '你好');
+    const safeNewEmail = this._escape(newEmail || '');
+
+    const bodyHtml = `
+      <p>${safeName}，</p>
+      <p>我們收到把你 Twogether 登入 Email 變更為 <strong>${safeNewEmail}</strong> 的請求。</p>
+      <p>變更需要在新信箱點擊確認連結後才會生效。在那之前，這個信箱仍然是你的登入 Email。</p>
+      <p style="color:#636e72;font-size:14px;">如果這不是你本人操作，請立即<strong>重設你的密碼</strong>以保護帳號安全。</p>
+    `;
+    const html = this._activityEmailHtml({
+      headerEmoji: '🔔',
+      headerTitle: '有人要求變更你的登入 Email',
+      headerSubtitle: 'Twogether 帳號安全',
+      bodyHtml,
+      ctaLabel: '🔑 前往 Twogether',
+      ctaUrl: this._appBaseUrl(),
+    });
+
+    const text = [
+      `${nickname || '你好'}，`,
+      '',
+      `我們收到把你 Twogether 登入 Email 變更為 ${newEmail} 的請求。`,
+      '變更需要在新信箱點擊確認連結後才會生效。',
+      '',
+      '如果這不是你本人操作，請立即重設你的密碼以保護帳號安全。',
+      '',
+      '— Twogether',
+    ].join('\n');
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+        to: recipientEmail,
+        subject: '🔔 有人要求變更你的 Twogether 登入 Email',
+        text,
+        html,
+      });
+      logInfo('Email-change notice sent to old address', { kind: 'email_change_notice' });
+    } catch (error) {
+      logError('Failed to send email-change notice', { kind: 'email_change_notice', ...smtpErrorFields(error) });
+    }
+  }
+
   // Purchase receipt after a successful Premium payment. Sent to the buyer.
   async sendPaymentReceiptEmail({ recipientEmail, nickname, planLabel, amountTwd, days, orderNo, paidAt, expiresAt }) {
     if (!this.isConfigured()) {

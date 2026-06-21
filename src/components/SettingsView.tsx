@@ -28,6 +28,7 @@ interface User {
   nickname: string;
   gender?: 'male' | 'female' | 'other';
   birth_date?: string | null;
+  email_verified?: boolean;
   email_notifications_enabled?: boolean;
   cycle_tracking_enabled?: boolean;
   timezone?: string | null;
@@ -160,6 +161,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   // Email notifications opt-out state
   const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState<boolean>(true);
   const [isSavingEmailPref, setIsSavingEmailPref] = useState<boolean>(false);
+
+  // Login-email change state
+  const [showEmailChangeForm, setShowEmailChangeForm] = useState<boolean>(false);
+  const [newEmail, setNewEmail] = useState<string>('');
+  const [emailChangePassword, setEmailChangePassword] = useState<string>('');
+  const [isChangingEmail, setIsChangingEmail] = useState<boolean>(false);
 
   // Cycle tracking opt-in state
   const [cycleTrackingEnabled, setCycleTrackingEnabled] = useState<boolean>(false);
@@ -383,6 +390,49 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       });
     } finally {
       setIsSavingEmailPref(false);
+    }
+  };
+
+  // Request a login-email change. The address only switches after the user
+  // clicks the link we email to the new inbox, so on success we tell them to
+  // go check it — we don't update authState.user.email here.
+  const handleChangeEmail = async () => {
+    const trimmed = newEmail.trim();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmed)) {
+      showNotification({ type: 'warning', title: '請檢查 Email', message: '請輸入有效的電子郵件地址', duration: 4000 });
+      return;
+    }
+    if (!emailChangePassword) {
+      showNotification({ type: 'warning', title: '需要密碼', message: '請輸入目前的密碼以確認變更', duration: 4000 });
+      return;
+    }
+    setIsChangingEmail(true);
+    try {
+      const { message } = await apiService.changeUserEmail(trimmed, emailChangePassword);
+      showNotification({ type: 'info', title: '確認信已寄出', message, duration: 7000 });
+      setShowEmailChangeForm(false);
+      setNewEmail('');
+      setEmailChangePassword('');
+    } catch (err) {
+      // Branch on error_code so each case gets its own actionable message
+      // rather than collapsing into a generic failure.
+      const e = err as { error_code?: string; message?: string };
+      const byCode: Record<string, string> = {
+        EMAIL_CHANGE_BAD_PASSWORD: '目前密碼不正確，請重新輸入後再變更 Email',
+        EMAIL_CHANGE_TAKEN: '此電子郵件已被其他帳號使用，請改用別的信箱',
+        EMAIL_CHANGE_SAME: '這已經是你目前的 Email 了',
+        EMAIL_CHANGE_RATE_LIMITED: '剛剛才寄出確認信，請稍候一分鐘再試',
+        EMAIL_CHANGE_INVALID_INPUT: '請輸入有效的電子郵件地址與目前的密碼',
+      };
+      showNotification({
+        type: 'error',
+        title: '無法變更 Email',
+        message: (e.error_code && byCode[e.error_code]) || e.message || '變更 Email 失敗，請稍後再試',
+        duration: 5000,
+      });
+    } finally {
+      setIsChangingEmail(false);
     }
   };
 
@@ -883,6 +933,105 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Account Email (login email) */}
+      {authState.isAuthenticated && authState.user && (
+        <div className="bg-white rounded-2xl shadow-lg p-6">
+          <h3 className="text-lg font-bold text-gray-800 mb-4">帳號 Email</h3>
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className="text-sm font-medium text-gray-700 break-all">
+                {authState.user.email}
+              </div>
+              <div className="mt-1">
+                {authState.user.email_verified ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-green-600">
+                    <CheckCircle className="w-3.5 h-3.5" /> 已驗證
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+                    尚未驗證
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                這是你用來登入的 Email，也是接收通知的信箱。
+              </p>
+            </div>
+            {!showEmailChangeForm && (
+              <button
+                type="button"
+                data-testid="change-email-button"
+                onClick={() => setShowEmailChangeForm(true)}
+                className="shrink-0 px-4 py-2 text-sm font-medium text-pink-600 border border-pink-300 rounded-lg hover:bg-pink-50"
+              >
+                變更
+              </button>
+            )}
+          </div>
+
+          {showEmailChangeForm && (
+            <div className="mt-4 space-y-3 border-t border-gray-100 pt-4">
+              <div>
+                <label htmlFor="new-email" className="block text-sm font-medium text-gray-700 mb-1">
+                  新的 Email
+                </label>
+                <input
+                  id="new-email"
+                  data-testid="new-email-input"
+                  type="email"
+                  autoComplete="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="new@example.com"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-400 focus:border-pink-400"
+                />
+              </div>
+              <div>
+                <label htmlFor="email-change-password" className="block text-sm font-medium text-gray-700 mb-1">
+                  目前的密碼
+                </label>
+                <input
+                  id="email-change-password"
+                  data-testid="email-change-password-input"
+                  type="password"
+                  autoComplete="current-password"
+                  value={emailChangePassword}
+                  onChange={(e) => setEmailChangePassword(e.target.value)}
+                  placeholder="輸入目前的密碼以確認"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-400 focus:border-pink-400"
+                />
+              </div>
+              <p className="text-xs text-gray-500">
+                我們會寄一封確認信到新的 Email。點擊信中的連結後，變更才會生效；在那之前請繼續使用目前的 Email 登入。
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  data-testid="submit-email-change"
+                  onClick={handleChangeEmail}
+                  disabled={isChangingEmail || !newEmail.trim() || !emailChangePassword}
+                  className="px-4 py-2 text-sm font-medium text-white bg-pink-500 rounded-lg hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isChangingEmail ? '寄送中…' : '寄送確認信'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEmailChangeForm(false);
+                    setNewEmail('');
+                    setEmailChangePassword('');
+                  }}
+                  disabled={isChangingEmail}
+                  className="px-4 py-2 text-sm font-medium text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  取消
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
