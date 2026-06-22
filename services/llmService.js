@@ -20,5 +20,6 @@ module.exports = {
   rewriteReply: provider.rewriteReply,
   generateRoleplayMessages: provider.generateRoleplayMessages,
   generateWallCounselorComment: provider.generateWallCounselorComment,
+  generateReconciliationOpeners: provider.generateReconciliationOpeners,
   providerName: PROVIDER_NAME,
 };

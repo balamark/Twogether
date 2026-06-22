@@ -1014,6 +1014,7 @@ const ADMIN_HTML = `<!doctype html>
       reply_rewrite: '回覆改寫',
       roleplay_messages: '邀請劇本',
       wall_counselor: '牆 · AI 諮商',
+      reconciliation_opener: '和解開場白',
     };
     function kindLabel(k) { return AI_KIND_LABELS[k] || (k || '—'); }
     function todayStr() { return new Date().toISOString().slice(0, 10); }
