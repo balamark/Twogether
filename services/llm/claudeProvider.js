@@ -510,4 +510,136 @@ async function rewriteReply({ rawReply, eventSummary, recentMessages, createdByS
   };
 }
 
-module.exports = { generateIcebreaker, rewriteReply, generateRoleplayMessages };
+// ---------------------------------------------------------------------------
+// Wall counselor comment
+// ---------------------------------------------------------------------------
+// Given a wall post and its full reply thread between a couple, produce ONE
+// gentle, even-handed comment from an "AI 諮商師" (couples counselor). The
+// comment validates both partners' feelings and, when a message uses blaming /
+// absolute / contemptuous language, names the pattern softly and offers a
+// kinder rephrase. It is posted into the thread visible to both partners.
+
+const WALL_COUNSELOR_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴侶諮商師，正在閱讀一對伴侶在「我們的牆」上的一則貼文與底下的對話串。請永遠以繁體中文回覆。
+
+任務：寫出「一段」諮商師留言，會被貼進對話串、兩個人都看得到。你的目標是幫雙方降溫、被理解，而不是評斷對錯。
+
+留言守則：
+- 絕對中立，不選邊站。先同理「兩個人」的感受（可用他們的暱稱稱呼）。
+- 如果某句話帶有指責、絕對化用語（總是／從來／每次）、輕蔑或人身攻擊，請溫和地指出那是一種「說法」帶來的影響（例如「這句話可能讓對方覺得被責怪」），不要說某個人「錯了」或「不對」。
+- 接著提供「一個」更靠近彼此的替代說法，用「也許可以這樣說：…」帶出，把指責改寫成「我訊息」或共同面對的語氣。
+- 語氣溫暖、具體、不說教；像一個在旁邊輕聲提醒的第三者。
+- 長度約 2 到 4 句，務必精簡（遠少於 1000 字）。
+- 只使用繁體中文；不要編造對話裡沒有的事實。
+
+回應請只呼叫 emit_wall_counselor_comment tool，不要輸出其他文字。`;
+
+const WALL_COUNSELOR_TOOL_SCHEMA = {
+  name: 'emit_wall_counselor_comment',
+  description: 'Return one gentle counselor comment for a couple\'s wall thread.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      comment: { type: 'string' },
+      toxicityFlags: {
+        type: 'array',
+        items: {
+          type: 'string',
+          enum: [
+            'absolute_language',
+            'name_calling',
+            'verbal_aggression',
+            'contempt',
+            'threats',
+            'blame_shifting',
+            'emotional_blackmail',
+            'sarcasm',
+            'catastrophizing',
+            'comparison',
+            'stonewalling',
+            'dismissiveness',
+          ],
+        },
+      },
+    },
+    required: ['comment', 'toxicityFlags'],
+  },
+};
+
+async function generateWallCounselorComment({ postContent, postAuthorName, moodTag, replies }) {
+  if (typeof postContent !== 'string' || postContent.trim().length === 0) {
+    throw new Error('postContent is required');
+  }
+
+  const lines = [];
+  const author = (postAuthorName || '對方').toString().trim() || '對方';
+  lines.push(`原始貼文（由 ${author} 發佈${moodTag ? `，心情：${moodTag}` : ''}）：`);
+  lines.push(postContent.trim());
+  lines.push('');
+  if (Array.isArray(replies) && replies.length > 0) {
+    lines.push('對話串（最舊在前，每行已標註發話者）：');
+    for (const r of replies) {
+      const name = r.isAi ? 'AI 諮商師' : (r.authorName || '某人').toString().trim() || '某人';
+      lines.push(`${name}：${(r.content || '').toString().trim()}`);
+    }
+  } else {
+    lines.push('（目前還沒有任何回覆。）');
+  }
+  const userContent = lines.join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system: [
+      {
+        type: 'text',
+        text: WALL_COUNSELOR_SYSTEM_PROMPT,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [WALL_COUNSELOR_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_wall_counselor_comment' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.wall_counselor', {
+    model: response.model || MODEL,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_wall_counselor_comment'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input;
+
+  return {
+    comment: out.comment || '',
+    toxicityFlags: out.toxicityFlags || [],
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+      assembledPrompt: userContent,
+    },
+  };
+}
+
+module.exports = { generateIcebreaker, rewriteReply, generateRoleplayMessages, generateWallCounselorComment };

@@ -4,7 +4,10 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { logDbError, errorResponseBody } = require('../lib/db-errors');
 const emailService = require('../services/emailService');
-const { logWarn } = require('../lib/logger');
+const { logInfo, logWarn, logError } = require('../lib/logger');
+const llmService = require('../services/llmService');
+const { checkLimit } = require('../lib/entitlements');
+const { resolveAiLimit, countTodayAiUsage, recordAiUsage } = require('../lib/aiUsage');
 
 const router = express.Router();
 
@@ -84,6 +87,7 @@ function mapReply(row) {
     content: row.content,
     author_id: row.author_id,
     author_nickname: row.author_nickname,
+    is_ai: row.is_ai === true,
     created_at: row.created_at,
   };
 }
@@ -355,7 +359,7 @@ router.get('/:id/replies', async (req, res) => {
     }
 
     const result = await db.query(
-      `SELECT r.id, r.post_id, r.content, r.author_id, r.created_at,
+      `SELECT r.id, r.post_id, r.content, r.author_id, r.is_ai, r.created_at,
               u.nickname AS author_nickname
        FROM wall_post_replies r
        JOIN users u ON u.id = r.author_id
@@ -457,6 +461,168 @@ router.post(
         post_id: req.params.id,
       });
       res.status(500).json(errorResponseBody('發送回覆失敗', error));
+    }
+  }
+);
+
+// Preview an AI 諮商師 (counselor) comment for a thread. Generates but does NOT
+// persist — the requester reviews it and then calls POST /:id/ai-comment to
+// share it. Counts against the shared daily AI budget.
+router.post('/:id/ai-comment/preview', async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const userId = req.user.id;
+    const couple = await findCoupleForUser(userId);
+
+    if (!couple) {
+      return res.status(404).json({ success: false, message: '找不到貼文' });
+    }
+
+    const postResult = await db.query(
+      `SELECT p.id, p.content, p.mood_tag, p.author_id, u.nickname AS author_nickname
+         FROM wall_posts p
+         JOIN users u ON u.id = p.author_id
+        WHERE p.id = $1 AND p.couple_id = $2`,
+      [postId, couple.id]
+    );
+
+    if (postResult.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '找不到貼文' });
+    }
+    const post = postResult.rows[0];
+
+    // Shared daily AI budget (same pool as the icebreaker / reply-rewrite).
+    const { tier, limit } = await resolveAiLimit(userId);
+    const usedToday = await countTodayAiUsage(userId);
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    if (!limitCheck.ok) {
+      logInfo('wall.ai_comment.limit', { userId, postId, used: usedToday, limit, tier, blocked: true });
+      return res.status(limitCheck.status).json(limitCheck.body);
+    }
+
+    const repliesResult = await db.query(
+      `SELECT r.content, r.is_ai, u.nickname AS author_nickname
+         FROM wall_post_replies r
+         JOIN users u ON u.id = r.author_id
+        WHERE r.post_id = $1
+        ORDER BY r.created_at ASC`,
+      [postId]
+    );
+    const replies = repliesResult.rows.map((r) => ({
+      authorName: r.author_nickname,
+      content: r.content,
+      isAi: r.is_ai === true,
+    }));
+
+    logInfo('wall.ai_comment.preview', { userId, postId, replyCount: replies.length });
+
+    const result = await llmService.generateWallCounselorComment({
+      postContent: post.content,
+      postAuthorName: post.author_nickname,
+      moodTag: post.mood_tag,
+      replies,
+    });
+    const meta = result._meta;
+    delete result._meta;
+
+    logInfo('wall.ai_comment.cost', {
+      userId,
+      postId,
+      provider: meta?.provider,
+      model: meta?.model,
+      costUsd: meta?.costUsd,
+      durationMs: meta?.durationMs,
+    });
+
+    await recordAiUsage(userId, 'wall_counselor', post.content, meta);
+
+    res.json({ success: true, comment: result.comment });
+  } catch (error) {
+    logError('Wall AI comment preview failed', {
+      err: error.message,
+      stack: error.stack,
+      user_id: req.user?.id,
+      post_id: req.params.id,
+    });
+    res.status(500).json({ success: false, message: 'AI 諮商師暫時無法回應，請稍後再試' });
+  }
+});
+
+// Post a previewed AI 諮商師 comment into the thread, visible to both partners.
+router.post(
+  '/:id/ai-comment',
+  [
+    body('content')
+      .isString()
+      .isLength({ min: 1, max: 1000 })
+      .withMessage('AI 留言內容必須在 1-1000 字之間'),
+  ],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ success: false, message: '驗證失敗', errors: errors.array() });
+      }
+
+      const postId = req.params.id;
+      const userId = req.user.id;
+      const couple = await findCoupleForUser(userId);
+
+      if (!couple) {
+        return res.status(404).json({ success: false, message: '找不到貼文' });
+      }
+
+      const postResult = await db.query(
+        `SELECT id, author_id FROM wall_posts WHERE id = $1 AND couple_id = $2`,
+        [postId, couple.id]
+      );
+      if (postResult.rows.length === 0) {
+        return res.status(404).json({ success: false, message: '找不到貼文' });
+      }
+      const post = postResult.rows[0];
+      const content = req.body.content;
+
+      // author_id = the inviting partner so the existing JOIN users / own-reply
+      // delete rules keep working; is_ai flags it as a counselor comment.
+      const inserted = await db.query(
+        `INSERT INTO wall_post_replies (post_id, author_id, content, is_ai)
+         VALUES ($1, $2, $3, TRUE)
+         RETURNING id, post_id, content, author_id, is_ai, created_at`,
+        [postId, userId, content]
+      );
+      const reply = inserted.rows[0];
+      const enriched = await db.query(
+        `SELECT nickname AS author_nickname FROM users WHERE id = $1`,
+        [userId]
+      );
+
+      logInfo('wall.ai_comment.posted', { userId, postId, replyId: reply.id });
+
+      const recipientId =
+        post.author_id === userId ? partnerOf(couple, userId) : post.author_id;
+      await notifyPartner(
+        recipientId,
+        'wall_ai_comment',
+        'AI 諮商師在你們的牆上留言',
+        content,
+        userId,
+        { senderName: 'AI 諮商師' }
+      );
+
+      res.json({
+        success: true,
+        message: 'AI 留言已貼到對話串',
+        reply: mapReply({
+          ...reply,
+          author_nickname: enriched.rows[0]?.author_nickname || null,
+        }),
+      });
+    } catch (error) {
+      logDbError('Post wall AI comment error:', error, {
+        user_id: req.user?.id,
+        post_id: req.params.id,
+      });
+      res.status(500).json(errorResponseBody('貼上 AI 留言失敗', error));
     }
   }
 );

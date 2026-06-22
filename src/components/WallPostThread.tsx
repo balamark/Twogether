@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Send, Trash2 } from 'lucide-react';
+import { Send, Trash2, Sparkles, X } from 'lucide-react';
 import { apiService, type WallReply } from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatRelativeOrDate } from '../utils/datetime';
@@ -9,6 +9,7 @@ interface WallPostThreadProps {
   currentUserId: string | undefined;
   onReplyCountChange?: (newCount: number) => void;
   onError?: (message: string) => void;
+  onNotify?: (n: { type: 'success' | 'error' | 'warning' | 'info'; title: string; message: string }) => void;
 }
 
 const formatTime = (iso: string, tz: string) =>
@@ -19,11 +20,15 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
   currentUserId,
   onReplyCountChange,
   onError,
+  onNotify,
 }) => {
   const [replies, setReplies] = useState<WallReply[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [aiPreview, setAiPreview] = useState<string | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiPosting, setAiPosting] = useState(false);
   const tz = useTimezone();
 
   useEffect(() => {
@@ -84,6 +89,44 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
     }
   };
 
+  const handleAiPreview = async () => {
+    setAiLoading(true);
+    try {
+      const comment = await apiService.previewWallAiComment(postId);
+      setAiPreview(comment);
+    } catch (err) {
+      const code = (err as { error_code?: string })?.error_code;
+      const message = err instanceof Error ? err.message : 'AI 諮商師暫時無法回應';
+      // A reached quota is an expected state with a next step (upgrade), not a
+      // failure — surface it as a warning rather than a red error toast.
+      if (code === 'AI_DAILY_LIMIT_REACHED') {
+        onNotify?.({ type: 'warning', title: 'AI 額度已用完', message });
+      } else {
+        onError?.(message);
+      }
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handlePostAi = async () => {
+    if (!aiPreview) return;
+    setAiPosting(true);
+    try {
+      const reply = await apiService.postWallAiComment(postId, aiPreview);
+      setReplies((prev) => {
+        const next = [...prev, reply];
+        onReplyCountChange?.(next.length);
+        return next;
+      });
+      setAiPreview(null);
+    } catch (err) {
+      onError?.(err instanceof Error ? err.message : '貼上 AI 留言失敗');
+    } finally {
+      setAiPosting(false);
+    }
+  };
+
   return (
     <div
       className="mt-4 pt-4 border-t border-petal-rule space-y-3"
@@ -101,16 +144,34 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
 
       {replies.map((reply) => {
         const isOwn = reply.author_id === currentUserId;
+        const isAi = reply.is_ai === true;
         return (
           <div
             key={reply.id}
-            className="pl-4 border-l-2 border-petal-rule"
+            className={
+              isAi
+                ? 'pl-4 border-l-2 border-petal-rose-deep/40 bg-petal-cream-2 rounded-r-md py-2 pr-2'
+                : 'pl-4 border-l-2 border-petal-rule'
+            }
             data-testid={`wall-reply-${reply.id}`}
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-baseline gap-2">
-                <span className="font-display text-sm font-medium text-petal-ink">
-                  {reply.author_nickname || (isOwn ? '我' : '對方')}
+                <span
+                  className={
+                    isAi
+                      ? 'font-display text-sm font-medium text-petal-rose-deep flex items-center gap-1'
+                      : 'font-display text-sm font-medium text-petal-ink'
+                  }
+                >
+                  {isAi ? (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
+                      AI 諮商師
+                    </>
+                  ) : (
+                    reply.author_nickname || (isOwn ? '我' : '對方')
+                  )}
                 </span>
                 <span className="font-body text-[11px] text-petal-muted">
                   {formatTime(reply.created_at, tz)}
@@ -133,6 +194,58 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
           </div>
         );
       })}
+
+      {/* Invite an AI 諮商師 to read the thread and post a gentle, even-handed
+          comment. Preview-then-post: nothing reaches the partner until shared. */}
+      <div className="pt-1">
+        {!aiPreview ? (
+          <button
+            type="button"
+            onClick={handleAiPreview}
+            disabled={aiLoading}
+            className="inline-flex items-center gap-1.5 text-petal-rose-deep border border-petal-rose-deep/40 rounded-full px-3 py-1.5 font-body text-xs hover:bg-petal-cream-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid={`wall-ai-comment-btn-${postId}`}
+          >
+            <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
+            {aiLoading ? 'AI 諮商師思考中⋯' : '請 AI 諮商師看看'}
+          </button>
+        ) : (
+          <div
+            className="border border-petal-rose-deep/30 bg-petal-cream-2 rounded-md p-3 space-y-2"
+            data-testid={`wall-ai-preview-${postId}`}
+          >
+            <div className="flex items-center gap-1.5 text-petal-rose-deep font-display text-sm font-medium">
+              <Sparkles className="w-4 h-4" strokeWidth={1.5} />
+              AI 諮商師的建議（僅你看得到，貼出後對方才會看到）
+            </div>
+            <div className="font-body text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">
+              {aiPreview}
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handlePostAi}
+                disabled={aiPosting}
+                className="inline-flex items-center gap-1.5 bg-petal-rose-deep text-petal-cream px-3 py-1.5 rounded-md font-body text-xs hover:bg-pink-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid={`wall-ai-post-${postId}`}
+              >
+                <Send className="w-3.5 h-3.5" strokeWidth={1.5} />
+                {aiPosting ? '貼上中⋯' : '貼到對話串'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAiPreview(null)}
+                disabled={aiPosting}
+                className="inline-flex items-center gap-1.5 text-petal-muted hover:text-petal-ink px-2 py-1.5 font-body text-xs transition-colors disabled:opacity-50"
+                data-testid={`wall-ai-cancel-${postId}`}
+              >
+                <X className="w-3.5 h-3.5" strokeWidth={1.5} />
+                取消
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       <div className="flex items-start gap-2 pt-2">
         <textarea

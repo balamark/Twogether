@@ -531,6 +531,107 @@ adminApiRouter.get('/roleplay-invitations', async (req, res) => {
   }
 });
 
+// AI/LLM usage + estimated cost across ALL scenarios (icebreaker, reply
+// rewrite, roleplay messages, wall counselor, and any future kind). Aggregated
+// from event_ai_usage; cost_usd is the estimated cost computed at call time.
+adminApiRouter.get('/ai-usage', async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const thirtyAgo = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+    const from = parseDateOr(req.query.from, thirtyAgo);
+    const to = parseDateOr(req.query.to, today);
+
+    if (from === null || to === null) {
+      return res.status(400).json({ error: 'invalid date; expected YYYY-MM-DD calendar date' });
+    }
+    if (from > to) {
+      return res.status(400).json({ error: 'from must be <= to' });
+    }
+
+    // Shared range filter: created_at in [from, to] inclusive. The aliased
+    // variant is for the topUsers query, which joins users (also has a
+    // created_at column) so the bare name would be ambiguous.
+    const range = `created_at >= $1::date AND created_at < ($2::date + INTERVAL '1 day')`;
+    const rangeE = `e.created_at >= $1::date AND e.created_at < ($2::date + INTERVAL '1 day')`;
+    const params = [from, to];
+
+    const [totalsQ, byKindQ, byModelQ, dailyQ, topUsersQ] = await Promise.all([
+      db.query(
+        `SELECT
+           COUNT(*)::int                       AS calls,
+           COALESCE(SUM(cost_usd), 0)::float8  AS total_cost_usd,
+           COALESCE(SUM(input_tokens), 0)::int  AS input_tokens,
+           COALESCE(SUM(output_tokens), 0)::int AS output_tokens,
+           COUNT(DISTINCT user_id)::int         AS unique_users
+         FROM event_ai_usage WHERE ${range}`,
+        params
+      ),
+      db.query(
+        `SELECT
+           kind,
+           COUNT(*)::int                        AS calls,
+           COALESCE(SUM(cost_usd), 0)::float8   AS total_cost_usd,
+           COALESCE(SUM(input_tokens), 0)::int  AS input_tokens,
+           COALESCE(SUM(output_tokens), 0)::int AS output_tokens,
+           COALESCE(AVG(duration_ms), 0)::int   AS avg_duration_ms,
+           COUNT(DISTINCT user_id)::int         AS unique_users
+         FROM event_ai_usage WHERE ${range}
+         GROUP BY kind
+         ORDER BY total_cost_usd DESC, calls DESC`,
+        params
+      ),
+      db.query(
+        `SELECT
+           COALESCE(provider, '—')             AS provider,
+           COALESCE(model, '—')                AS model,
+           COUNT(*)::int                        AS calls,
+           COALESCE(SUM(cost_usd), 0)::float8   AS total_cost_usd
+         FROM event_ai_usage WHERE ${range}
+         GROUP BY provider, model
+         ORDER BY total_cost_usd DESC, calls DESC`,
+        params
+      ),
+      db.query(
+        `SELECT
+           (created_at AT TIME ZONE 'UTC')::date AS day,
+           COUNT(*)::int                          AS calls,
+           COALESCE(SUM(cost_usd), 0)::float8     AS daily_cost_usd
+         FROM event_ai_usage WHERE ${range}
+         GROUP BY day
+         ORDER BY day DESC`,
+        params
+      ),
+      db.query(
+        `SELECT
+           u.email, u.nickname,
+           COUNT(*)::int                        AS calls,
+           COALESCE(SUM(e.cost_usd), 0)::float8 AS total_cost_usd,
+           MAX(e.created_at)                    AS last_call
+         FROM event_ai_usage e
+         JOIN users u ON u.id = e.user_id
+         WHERE ${rangeE}
+         GROUP BY u.id, u.email, u.nickname
+         ORDER BY total_cost_usd DESC, calls DESC
+         LIMIT 20`,
+        params
+      ),
+    ]);
+
+    res.json({
+      window: { from, to },
+      totals: totalsQ.rows[0] || {},
+      byKind: byKindQ.rows,
+      byModel: byModelQ.rows,
+      daily: dailyQ.rows,
+      topUsers: topUsersQ.rows,
+    });
+  } catch (err) {
+    // Table may not exist on a fresh DB — surface as empty, not an error.
+    logWarn('Admin ai-usage query failed', { err: err.message });
+    res.json({ window: {}, totals: {}, byKind: [], byModel: [], daily: [], topUsers: [] });
+  }
+});
+
 // ──────────────────────────────────────────────────────────────────────────
 // Admin: HTML dashboard.
 // ──────────────────────────────────────────────────────────────────────────
@@ -625,6 +726,7 @@ const ADMIN_HTML = `<!doctype html>
       <button class="tab" data-panel="reviews">評價</button>
       <button class="tab" data-panel="pool">分潤</button>
       <button class="tab" data-panel="roleplay">邀請劇本</button>
+      <button class="tab" data-panel="ai-usage">AI 用量</button>
     </div>
 
     <!-- Panel: Funnel (default) -->
@@ -818,6 +920,74 @@ const ADMIN_HTML = `<!doctype html>
         </table>
       </div>
     </div>
+
+    <!-- Panel: AI usage (estimated cost, all scenarios) -->
+    <div class="panel" id="panel-ai-usage">
+      <p class="sub">所有 AI 場景的呼叫量與<strong>估算成本</strong>（USD）。估算成本依各模型定價於呼叫當下計算；mock 供應商為 $0。套用上方日期區間後重新整理。</p>
+      <div class="funnel" id="aiUsageCards"></div>
+
+      <h3 style="margin:24px 0 6px;font-weight:500;font-size:14px">各場景用量</h3>
+      <div style="overflow-x:auto">
+        <table id="aiUsageKindTable">
+          <thead>
+            <tr>
+              <th>場景</th>
+              <th class="num">呼叫次數</th>
+              <th class="num">估算成本</th>
+              <th class="num">輸入 tokens</th>
+              <th class="num">輸出 tokens</th>
+              <th class="num">平均耗時</th>
+              <th class="num">不重複使用者</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <h3 style="margin:20px 0 6px;font-weight:500;font-size:14px">供應商 / 模型</h3>
+      <div style="overflow-x:auto">
+        <table id="aiUsageModelTable">
+          <thead>
+            <tr>
+              <th>供應商</th>
+              <th>模型</th>
+              <th class="num">呼叫次數</th>
+              <th class="num">估算成本</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <h3 style="margin:20px 0 6px;font-weight:500;font-size:14px">每日趨勢</h3>
+      <div style="overflow-x:auto">
+        <table id="aiUsageDailyTable">
+          <thead>
+            <tr>
+              <th>日期</th>
+              <th class="num">呼叫次數</th>
+              <th class="num">估算成本</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <h3 style="margin:20px 0 6px;font-weight:500;font-size:14px">用量最高的使用者（前 20）</h3>
+      <div style="overflow-x:auto">
+        <table id="aiUsageUsersTable">
+          <thead>
+            <tr>
+              <th>Email / 暱稱</th>
+              <th class="num">呼叫次數</th>
+              <th class="num">估算成本</th>
+              <th>最後呼叫</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -832,6 +1002,20 @@ const ADMIN_HTML = `<!doctype html>
       if (x === null || x === undefined) return '—';
       return (x * 100).toFixed(1) + '%';
     }
+    function fmtUsd(x) {
+      if (x === null || x === undefined) return '—';
+      var n = Number(x);
+      if (!isFinite(n)) return '—';
+      // Sub-cent costs are common with Haiku — show 4 dp so they don't vanish.
+      return '$' + n.toFixed(4);
+    }
+    var AI_KIND_LABELS = {
+      icebreaker: '破冰整理',
+      reply_rewrite: '回覆改寫',
+      roleplay_messages: '邀請劇本',
+      wall_counselor: '牆 · AI 諮商',
+    };
+    function kindLabel(k) { return AI_KIND_LABELS[k] || (k || '—'); }
     function todayStr() { return new Date().toISOString().slice(0, 10); }
     function daysAgoStr(n) {
       return new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
@@ -1393,16 +1577,99 @@ const ADMIN_HTML = `<!doctype html>
       }).join('');
     }
 
-    // Lazy-load the reviews + pool + roleplay tabs the first time they're opened.
-    var reviewsLoaded = false, poolLoaded = false, roleplayLoaded = false;
+    async function loadAiUsage() {
+      try {
+        var qs = new URLSearchParams({ from: $('from').value, to: $('to').value });
+        var res = await fetch('/api/admin/ai-usage?' + qs.toString());
+        if (!res.ok) throw new Error('ai-usage ' + res.status);
+        renderAiUsage(await res.json());
+      } catch (e) {
+        $('error').hidden = false;
+        $('error').textContent = '載入失敗: ' + e.message;
+      }
+    }
+
+    function renderAiUsage(d) {
+      var t = d.totals || {};
+      $('aiUsageCards').innerHTML = [
+        ['總估算成本', fmtUsd(t.total_cost_usd)],
+        ['AI 呼叫次數', (t.calls || 0).toLocaleString()],
+        ['輸入 / 輸出 tokens', (t.input_tokens || 0).toLocaleString() + ' / ' + (t.output_tokens || 0).toLocaleString()],
+        ['不重複使用者', (t.unique_users || 0).toLocaleString()],
+      ].map(function (pair) {
+        return '<div class="card"><div class="label">' + pair[0] + '</div>' +
+          '<div class="value">' + pair[1] + '</div></div>';
+      }).join('');
+
+      var kindBody = document.querySelector('#aiUsageKindTable tbody');
+      kindBody.innerHTML = (d.byKind || []).length === 0
+        ? '<tr><td colspan="7" class="muted">沒有資料</td></tr>'
+        : d.byKind.map(function (r) {
+          return '<tr>' +
+            '<td>' + esc(kindLabel(r.kind)) + '</td>' +
+            '<td class="num">' + (r.calls || 0).toLocaleString() + '</td>' +
+            '<td class="num">' + fmtUsd(r.total_cost_usd) + '</td>' +
+            '<td class="num">' + (r.input_tokens || 0).toLocaleString() + '</td>' +
+            '<td class="num">' + (r.output_tokens || 0).toLocaleString() + '</td>' +
+            '<td class="num">' + (r.avg_duration_ms || 0).toLocaleString() + ' ms</td>' +
+            '<td class="num">' + (r.unique_users || 0).toLocaleString() + '</td>' +
+          '</tr>';
+        }).join('');
+
+      var modelBody = document.querySelector('#aiUsageModelTable tbody');
+      modelBody.innerHTML = (d.byModel || []).length === 0
+        ? '<tr><td colspan="4" class="muted">沒有資料</td></tr>'
+        : d.byModel.map(function (r) {
+          return '<tr>' +
+            '<td>' + esc(r.provider || '—') + '</td>' +
+            '<td>' + esc(r.model || '—') + '</td>' +
+            '<td class="num">' + (r.calls || 0).toLocaleString() + '</td>' +
+            '<td class="num">' + fmtUsd(r.total_cost_usd) + '</td>' +
+          '</tr>';
+        }).join('');
+
+      var dailyBody = document.querySelector('#aiUsageDailyTable tbody');
+      dailyBody.innerHTML = (d.daily || []).length === 0
+        ? '<tr><td colspan="3" class="muted">沒有資料</td></tr>'
+        : d.daily.map(function (r) {
+          return '<tr>' +
+            '<td>' + esc(String(r.day || '').slice(0, 10)) + '</td>' +
+            '<td class="num">' + (r.calls || 0).toLocaleString() + '</td>' +
+            '<td class="num">' + fmtUsd(r.daily_cost_usd) + '</td>' +
+          '</tr>';
+        }).join('');
+
+      var usersBody = document.querySelector('#aiUsageUsersTable tbody');
+      usersBody.innerHTML = (d.topUsers || []).length === 0
+        ? '<tr><td colspan="4" class="muted">沒有資料</td></tr>'
+        : d.topUsers.map(function (r) {
+          return '<tr>' +
+            '<td><div>' + esc(r.email || '—') + '</div>' +
+              '<div class="muted" style="font-size:11px">' + esc(r.nickname || '') + '</div></td>' +
+            '<td class="num">' + (r.calls || 0).toLocaleString() + '</td>' +
+            '<td class="num">' + fmtUsd(r.total_cost_usd) + '</td>' +
+            '<td>' + fmtDate(r.last_call) + '</td>' +
+          '</tr>';
+        }).join('');
+    }
+
+    // Lazy-load the reviews + pool + roleplay + ai-usage tabs the first time
+    // they're opened.
+    var reviewsLoaded = false, poolLoaded = false, roleplayLoaded = false, aiUsageLoaded = false;
     document.querySelectorAll('.tab').forEach(function (btn) {
       var panel = btn.getAttribute('data-panel');
       if (panel === 'reviews') btn.addEventListener('click', function () { if (!reviewsLoaded) { reviewsLoaded = true; loadReviews(); } });
       if (panel === 'pool') btn.addEventListener('click', function () { if (!poolLoaded) { poolLoaded = true; loadPools(); } });
       if (panel === 'roleplay') btn.addEventListener('click', function () { if (!roleplayLoaded) { roleplayLoaded = true; loadRoleplay(); } });
+      if (panel === 'ai-usage') btn.addEventListener('click', function () { if (!aiUsageLoaded) { aiUsageLoaded = true; loadAiUsage(); } });
     });
 
-    $('apply').addEventListener('click', load);
+    $('apply').addEventListener('click', function () {
+      load();
+      // Refresh the AI usage tab too if it's already been opened, so changing
+      // the date range updates its numbers.
+      if (aiUsageLoaded) loadAiUsage();
+    });
     load();
   </script>
 </body>
