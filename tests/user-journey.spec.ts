@@ -1,4 +1,4 @@
-import { test, expect, request, Page, APIRequestContext } from '@playwright/test';
+import { test, expect, request, Page } from '@playwright/test';
 import path from 'path';
 import dotenv from 'dotenv';
 import { Client } from 'pg';

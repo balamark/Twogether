@@ -61,15 +61,18 @@ test.describe('Custom Script Upload and Persistence', () => {
         recordButton.waitFor({ timeout: 15000 }),
       ]).catch(() => {});
 
-      // Close modal if still open
+      // Close modal if still open. On a successful login the auth modal
+      // auto-closes, so the close button can detach between the isVisible
+      // check and the click — a check-then-act race that flaked under
+      // parallel workers (login is slower, widening the window). Tolerate the
+      // element vanishing: either path just needs the modal gone.
       const closeButton = page.getByTestId('auth-modal-close-button');
       if (await closeButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await closeButton.click();
-        await page.waitForTimeout(1000);
+        await closeButton.click({ timeout: 2000 }).catch(() => {});
       } else {
-        await page.keyboard.press('Escape');
-        await page.waitForTimeout(1000);
+        await page.keyboard.press('Escape').catch(() => {});
       }
+      await page.waitForTimeout(1000);
 
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(2000);
