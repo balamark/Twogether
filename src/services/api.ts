@@ -380,6 +380,7 @@ export interface WallReply {
   content: string;
   author_id: string;
   author_nickname: string | null;
+  is_ai?: boolean;
   created_at: string;
 }
 
@@ -2202,6 +2203,29 @@ class ApiService {
       await apiClient.delete(`/wall/replies/${replyId}`);
     } catch (error) {
       console.error('Failed to delete wall reply:', error);
+      throw error;
+    }
+  }
+
+  // Generate (but don't post) an AI 諮商師 comment for a wall thread. The
+  // requester previews it before choosing to share it with their partner.
+  async previewWallAiComment(postId: string): Promise<string> {
+    try {
+      const response = await apiClient.post(`/wall/${postId}/ai-comment/preview`, {});
+      return response.data.comment as string;
+    } catch (error) {
+      console.error('Failed to preview wall AI comment:', error);
+      throw error;
+    }
+  }
+
+  // Post a previewed AI 諮商師 comment into the thread (visible to both partners).
+  async postWallAiComment(postId: string, content: string): Promise<WallReply> {
+    try {
+      const response = await apiClient.post(`/wall/${postId}/ai-comment`, { content });
+      return response.data.reply as WallReply;
+    } catch (error) {
+      console.error('Failed to post wall AI comment:', error);
       throw error;
     }
   }

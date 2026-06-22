@@ -256,6 +256,7 @@ const WallView: React.FC<WallViewProps> = ({
             onError={(message) =>
               showNotification({ type: 'error', title: '發生錯誤', message })
             }
+            onNotify={(n) => showNotification(n)}
           />
         )}
       </div>

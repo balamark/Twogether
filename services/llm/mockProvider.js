@@ -191,4 +191,50 @@ async function generateRoleplayMessages({ title, scenario, senderGender /* , scr
   };
 }
 
-module.exports = { generateIcebreaker, rewriteReply, generateRoleplayMessages };
+// Deterministic counselor comment for a wall thread. Detects toxic phrasing in
+// the most recent reply (or the post) and, when found, appends a softer
+// rephrase suggestion. No randomness or timestamps — same input, same output.
+async function generateWallCounselorComment({ postContent, postAuthorName, replies /* , moodTag */ }) {
+  if (typeof postContent !== 'string' || postContent.trim().length === 0) {
+    throw new Error('postContent is required');
+  }
+  const startedAt = Date.now();
+
+  const author = (postAuthorName || '對方').toString().trim() || '對方';
+  const list = Array.isArray(replies) ? replies.filter((r) => !r.isAi) : [];
+  const last = list.length > 0 ? list[list.length - 1] : null;
+  const lastName = last ? ((last.authorName || '另一位').toString().trim() || '另一位') : null;
+  const focus = last ? (last.content || '') : postContent;
+  const toxicityFlags = detectToxicity(focus);
+
+  let comment;
+  if (toxicityFlags.length > 0 && lastName) {
+    comment =
+      `我感覺到 ${author} 想被理解，也聽見 ${lastName} 的在意。` +
+      `「${maskToxicWords((last.content || '').trim()).slice(0, 30)}」這樣的說法，可能讓對方覺得被責怪。` +
+      `也許可以這樣說：「我希望我們一起想辦法面對這件事」，會更靠近彼此。`;
+  } else if (lastName) {
+    comment =
+      `謝謝 ${author} 和 ${lastName} 都願意把話說出來。` +
+      `你們其實都在乎彼此，試著先聽懂對方的感受，再說出自己的需要，會更靠近一些。`;
+  } else {
+    comment =
+      `謝謝 ${author} 願意把心情寫下來。` +
+      `等對方回應時，試著先說出自己的感受與需要，會更容易被聽懂。`;
+  }
+
+  return {
+    comment,
+    toxicityFlags,
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+      assembledPrompt: `[mock] post=${postContent.trim()} replies=${list.length}`,
+    },
+  };
+}
+
+module.exports = { generateIcebreaker, rewriteReply, generateRoleplayMessages, generateWallCounselorComment };

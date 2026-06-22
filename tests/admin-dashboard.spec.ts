@@ -77,4 +77,23 @@ test.describe('Admin dashboard', () => {
     await expect(page.locator('#reviewsTable')).toBeVisible();
     expect(errors, `uncaught page errors: ${errors.join(' | ')}`).toEqual([]);
   });
+
+  test('AI usage tab loads its aggregates', async ({ page }) => {
+    const errors = trackPageErrors(page);
+    await page.goto(`${BACKEND_BASE}/admin`);
+    // The AI usage tab is the last tab; on narrow viewports the wrapped tab row
+    // can overlap, so force the click (it still fires the lazy-load handler).
+    await Promise.all([
+      page.waitForResponse(
+        (r) => r.url().includes('/api/admin/ai-usage') && r.request().method() === 'GET',
+        { timeout: 15000 }
+      ),
+      page.locator('.tab[data-panel="ai-usage"]').click({ force: true }),
+    ]);
+    await expect(page.locator('#panel-ai-usage')).toHaveClass(/active/);
+    // The summary cards and per-scenario table render (even with zero rows).
+    await expect(page.locator('#aiUsageCards .card').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('#aiUsageKindTable')).toBeVisible();
+    expect(errors, `uncaught page errors: ${errors.join(' | ')}`).toEqual([]);
+  });
 });
