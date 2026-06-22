@@ -642,4 +642,154 @@ async function generateWallCounselorComment({ postContent, postAuthorName, moodT
   };
 }
 
-module.exports = { generateIcebreaker, rewriteReply, generateRoleplayMessages, generateWallCounselorComment };
+// ---------------------------------------------------------------------------
+// Reconciliation openers
+// ---------------------------------------------------------------------------
+// After a fight / cold war, the user often can't bring themselves to apologize
+// or send sweet love-notes. They need a NEUTRAL, face-saving opening line that
+// tests whether the partner is willing to reopen the conversation — a "step
+// down" rather than an admission of fault. Given a chosen intensity and an
+// optional past-event context, produce THREE short, ready-to-send openers.
+
+const RECONCILIATION_INTENSITY_GUIDE = {
+  goodwill:
+    '「先釋出善意」：使用者還沒準備好談這件事，只想先破冰、釋出善意。完全不要提爭執本身、不要道歉、不要認錯，' +
+    '用輕鬆日常的問候或小關心讓氣氛軟化（例如關心對方吃飯了沒、分享一件小事）。',
+  reflect:
+    '「各退一步」：使用者願意承認自己也有可以調整的地方，想各退一步。語氣溫和、對等，' +
+    '可以用「我們」的角度、表達不想繼續僵著，但不要卑微、不要把所有錯都攬在自己身上。',
+  talk:
+    '「想好好談談」：使用者真心想化解、好好溝通。可以帶一點歉意與在乎，主動邀請找時間談，' +
+    '但仍保有尊嚴、不卑微、不逼迫對方一定要馬上回應。',
+};
+
+const RECONCILIATION_SYSTEM_PROMPT = `你是一位溫柔、中立的伴侶溝通教練。一方在和另一半冷戰或吵架後，想傳出「第一句」破冰開場白，但拉不下臉、還不想認錯。請永遠以繁體中文回覆。
+
+任務：依使用者選的「強度」與（可選的）事件脈絡，寫出「三則」可以直接傳給伴侶的破冰開場白候選。
+
+核心守則：
+- 絕對不要逼使用者認錯或低頭。開場白的目的是「給對方台階、表達想連結的意願」，並溫和地邀請（而非要求）對方開啟對話。
+- 三則語氣要略有不同（例如：輕鬆問候／表達想念／主動邀約聊聊），讓使用者有得挑。
+- 每則都要簡短（建議 1～2 句、口語、像真的會在訊息裡傳的話），溫暖但不肉麻、不卑微、不說教。
+- 如果有提供事件脈絡，語氣可以貼合該主題的氛圍，但「絕對不要複述爭吵細節、不要翻舊帳、不要指責」，也不得編造事件裡沒有的事。
+- 只使用繁體中文。
+
+回應請只呼叫 emit_reconciliation_openers tool，不要輸出其他文字。`;
+
+const RECONCILIATION_TOOL_SCHEMA = {
+  name: 'emit_reconciliation_openers',
+  description: 'Return three short, ready-to-send ice-breaking openers for a couple after a fight.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      openers: {
+        type: 'array',
+        minItems: 3,
+        maxItems: 3,
+        items: {
+          type: 'object',
+          properties: {
+            label: { type: 'string', description: '一個 4～8 字的短標題，例如「輕鬆問候」「表達想念」' },
+            text: { type: 'string', description: '可直接傳出的開場白，1～2 句' },
+          },
+          required: ['label', 'text'],
+        },
+      },
+      toxicityFlags: {
+        type: 'array',
+        items: { type: 'string' },
+      },
+    },
+    required: ['openers', 'toxicityFlags'],
+  },
+};
+
+async function generateReconciliationOpeners({ intensity, eventContext }) {
+  const guide = RECONCILIATION_INTENSITY_GUIDE[intensity];
+  if (!guide) {
+    throw new Error(`unknown reconciliation intensity: ${intensity}`);
+  }
+
+  const lines = [];
+  lines.push(`使用者選擇的和解強度：${guide}`);
+  lines.push('');
+  if (eventContext && (eventContext.title || eventContext.summary)) {
+    lines.push('相關事件脈絡（僅供你掌握氛圍，請勿複述細節或翻舊帳）：');
+    if (eventContext.title) lines.push(`主題：${eventContext.title}`);
+    if (eventContext.summary) lines.push(`摘要：${eventContext.summary}`);
+    if (Array.isArray(eventContext.emotions) && eventContext.emotions.length) {
+      lines.push(`涉及情緒：${eventContext.emotions.join('、')}`);
+    }
+    if (Array.isArray(eventContext.tags) && eventContext.tags.length) {
+      lines.push(`相關主題標籤：${eventContext.tags.join('、')}`);
+    }
+  } else {
+    lines.push('（沒有提供特定事件，請產生通用的破冰開場白。）');
+  }
+  const userContent = lines.join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system: [
+      {
+        type: 'text',
+        text: RECONCILIATION_SYSTEM_PROMPT,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [RECONCILIATION_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_reconciliation_openers' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.reconciliation', {
+    model: response.model || MODEL,
+    intensity,
+    hasEvent: Boolean(eventContext && (eventContext.title || eventContext.summary)),
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_reconciliation_openers'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input;
+
+  return {
+    openers: Array.isArray(out.openers) ? out.openers : [],
+    toxicityFlags: out.toxicityFlags || [],
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+      assembledPrompt: userContent,
+    },
+  };
+}
+
+module.exports = {
+  generateIcebreaker,
+  rewriteReply,
+  generateRoleplayMessages,
+  generateWallCounselorComment,
+  generateReconciliationOpeners,
+};

@@ -215,6 +215,15 @@ interface RoleplayMessagesResult {
   cached?: boolean;
 }
 
+// Reconciliation openers — neutral, face-saving ice-breaker lines generated
+// for the "真心和解" flow at a chosen intensity (low → high).
+export type ReconciliationIntensity = 'goodwill' | 'reflect' | 'talk';
+
+export interface ReconciliationOpener {
+  label: string;
+  text: string;
+}
+
 interface RoleplayMessageFeedbackInput {
   scriptId?: string;
   scriptTitle?: string;
@@ -1843,6 +1852,26 @@ class ApiService {
       await apiClient.post('/intimacy-requests/script-messages/feedback', input);
     } catch (error: unknown) {
       console.error('Failed to submit roleplay message feedback:', error);
+    }
+  }
+
+  // Generate three neutral, face-saving reconciliation openers for the chosen
+  // intensity, optionally grounded in a past event. 429 (AI_DAILY_LIMIT_REACHED)
+  // propagates via the shared interceptor; error_code is preserved for the UI.
+  async generateReconciliationOpeners(
+    intensity: ReconciliationIntensity,
+    eventId?: string | null,
+  ): Promise<ReconciliationOpener[]> {
+    try {
+      const response = await apiClient.post('/intimacy-requests/reconciliation-openers', {
+        intensity,
+        eventId: eventId || undefined,
+      });
+      return (response.data.openers || []) as ReconciliationOpener[];
+    } catch (error: unknown) {
+      console.error('Failed to generate reconciliation openers:', error);
+      // Preserve error_code/message from the interceptor so the UI can branch.
+      throw error;
     }
   }
 

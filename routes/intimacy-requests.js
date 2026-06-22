@@ -61,7 +61,7 @@ async function countTodayAiUsage(userId) {
       `SELECT COUNT(*)::int AS c
          FROM event_ai_usage
         WHERE user_id = $1
-          AND kind IN ('icebreaker', 'reply_rewrite', 'roleplay_messages')
+          AND kind IN ('icebreaker', 'reply_rewrite', 'roleplay_messages', 'reconciliation_opener')
           AND created_at >= DATE_TRUNC('day', NOW())`,
       [userId]
     );
@@ -553,6 +553,106 @@ router.post('/script-messages/feedback', [
   } catch (error) {
     logError('Roleplay message feedback failed', { err: error.message });
     res.status(500).json({ success: false, message: '回饋送出失敗，請稍後再試' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Reconciliation openers — after a fight, generate THREE neutral, face-saving
+// ice-breaking openers at a chosen intensity. Optionally grounded in a past
+// "event" so the tone fits, but never replaying the argument. Preview only:
+// the chosen opener flows into the normal intimacy-request send pipeline.
+// ---------------------------------------------------------------------------
+const RECONCILIATION_INTENSITIES = ['goodwill', 'reflect', 'talk'];
+
+router.post('/reconciliation-openers', [
+  body('intensity').isIn(RECONCILIATION_INTENSITIES).withMessage('請選擇和解強度'),
+  body('eventId').optional({ nullable: true }).isUUID().withMessage('事件 ID 格式錯誤'),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, message: '請先選擇和解強度再產生開場白', errors: errors.array() });
+  }
+
+  const userId = req.user.id;
+  const { intensity, eventId = null } = req.body;
+
+  try {
+    // Optional event context — only what helps set the tone; scoped to the
+    // caller's couple so one partner can't pull another couple's events.
+    let eventContext = null;
+    if (eventId) {
+      const ev = await db.query(
+        `SELECT e.title, e.summary, e.emotions, e.tags
+           FROM events e
+           JOIN couples c ON c.id = e.couple_id
+          WHERE e.id = $1 AND (c.user1_id = $2 OR c.user2_id = $2)
+            AND (e.is_private = FALSE OR e.created_by = $2)
+          LIMIT 1`,
+        [eventId, userId]
+      );
+      if (ev.rows.length === 0) {
+        logWarn('intimacy.reconciliation.event_not_found', { userId, eventId });
+        return res.status(404).json({
+          success: false,
+          message: '找不到這個事件，可能已被刪除。你可以改選其他事件，或不選事件直接產生開場白。',
+          error_code: 'EVENT_NOT_FOUND',
+        });
+      }
+      const row = ev.rows[0];
+      eventContext = {
+        title: row.title,
+        summary: row.summary,
+        emotions: row.emotions || [],
+        tags: row.tags || [],
+      };
+    }
+
+    const { tier, limit } = await resolveAiLimit(userId);
+    const usedToday = await countTodayAiUsage(userId);
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    if (!limitCheck.ok) {
+      logInfo('intimacy.reconciliation.limit', { userId, used: usedToday, limit, tier, blocked: true });
+      return res.status(limitCheck.status).json(limitCheck.body);
+    }
+
+    logInfo('intimacy.reconciliation.input', { userId, intensity, eventId, hasEvent: !!eventContext });
+
+    const result = await llmService.generateReconciliationOpeners({ intensity, eventContext });
+    const meta = result._meta;
+    delete result._meta;
+
+    const openers = (result.openers || []).filter((o) => o && o.text && o.text.trim());
+    if (openers.length === 0) {
+      logWarn('intimacy.reconciliation.empty', { userId, intensity });
+      return res.status(502).json({
+        success: false,
+        message: 'AI 暫時想不出合適的開場白，請稍後再試，或直接自行輸入和解內容。',
+        error_code: 'RECONCILIATION_OPENERS_EMPTY',
+      });
+    }
+
+    logInfo('intimacy.reconciliation.cost', {
+      userId,
+      provider: meta?.provider,
+      model: meta?.model,
+      costUsd: meta?.costUsd,
+      durationMs: meta?.durationMs,
+      count: openers.length,
+      usedToday: usedToday + 1,
+      limit,
+      tier,
+    });
+
+    await recordAiUsage(userId, 'reconciliation_opener', JSON.stringify({ intensity, eventId }), meta);
+
+    res.json({ success: true, openers });
+  } catch (error) {
+    logError('Generate reconciliation openers failed', { err: error.message, stack: error.stack });
+    res.status(500).json({
+      success: false,
+      message: 'AI 暫時無法產生開場白，請稍後再試，或直接自行輸入和解內容。',
+      error_code: 'RECONCILIATION_OPENERS_FAILED',
+    });
   }
 });
 
