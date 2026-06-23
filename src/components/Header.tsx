@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown, HeartHandshake, MessageSquarePlus } from 'lucide-react';
+import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown, MessageSquarePlus } from 'lucide-react';
 import { apiService } from '../services/api';
 
 interface User {
@@ -28,7 +28,6 @@ interface HeaderProps {
   onShowSettings: () => void;
   onShowJourney: () => void;
   onShowIntimacyHistory: () => void;
-  onShowTherapists: () => void;
   onShowUpgrade: () => void;
   onShowFeedback: () => void;
 }
@@ -44,7 +43,6 @@ const Header: React.FC<HeaderProps> = ({
   onShowSettings,
   onShowJourney,
   onShowIntimacyHistory,
-  onShowTherapists,
   onShowUpgrade,
   onShowFeedback,
 }) => {
@@ -200,17 +198,6 @@ const Header: React.FC<HeaderProps> = ({
                       >
                         <Inbox className="w-3.5 h-3.5" strokeWidth={1.5} />
                         <span>訊息紀錄</span>
-                      </button>
-                      <button
-                        onClick={() => {
-                          onShowTherapists();
-                          setShowUserMenu(false);
-                        }}
-                        data-testid="user-menu-therapists"
-                        className="w-full flex items-center space-x-2 px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
-                      >
-                        <HeartHandshake className="w-3.5 h-3.5" strokeWidth={1.5} />
-                        <span>心理諮商</span>
                       </button>
                       <button
                         onClick={() => {

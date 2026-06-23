@@ -8,6 +8,7 @@ import {
   Loader2,
   Lock,
   Sparkles,
+  HeartHandshake,
   X,
 } from 'lucide-react';
 import apiService, {
@@ -74,6 +75,9 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
   const [resolving, setResolving] = useState(false);
   const [rewriting, setRewriting] = useState(false);
   const [rewritePreview, setRewritePreview] = useState<ReplyRewritePreview | null>(null);
+  const [aiInviting, setAiInviting] = useState(false);
+  const [aiPosting, setAiPosting] = useState(false);
+  const [aiPreview, setAiPreview] = useState<string | null>(null);
   const tz = useTimezone();
 
   const insertPhrase = (phrase: string) => {
@@ -139,6 +143,40 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
       });
     } finally {
       setSending(false);
+    }
+  };
+
+  const inviteAiCounselor = async () => {
+    setAiInviting(true);
+    try {
+      const comment = await apiService.previewEventAiComment(eventId);
+      setAiPreview(comment);
+    } catch (err) {
+      showNotification({
+        type: 'error',
+        title: 'AI 諮商師暫時無法回應',
+        message: err instanceof Error ? err.message : '請稍後再試',
+      });
+    } finally {
+      setAiInviting(false);
+    }
+  };
+
+  const postAiCounselor = async () => {
+    if (!aiPreview) return;
+    setAiPosting(true);
+    try {
+      await apiService.postEventAiComment(eventId, aiPreview);
+      setAiPreview(null);
+      await refresh();
+    } catch (err) {
+      showNotification({
+        type: 'error',
+        title: '貼上失敗',
+        message: err instanceof Error ? err.message : '請稍後再試',
+      });
+    } finally {
+      setAiPosting(false);
     }
   };
 
@@ -242,6 +280,20 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
             <p className="text-sm text-petal-ink-soft text-center py-4">尚無訊息</p>
           )}
           {event.messages.map((m) => {
+            if (m.isAi) {
+              return (
+                <div key={m.id} className="flex justify-center">
+                  <div className="max-w-[92%] w-full rounded-2xl px-4 py-3 bg-petal-sage/15 border border-petal-sage/40">
+                    <div className="flex items-center gap-1.5 mb-1 text-petal-sage-deep">
+                      <HeartHandshake className="w-3.5 h-3.5" />
+                      <span className="text-xs font-medium">AI 諮商師</span>
+                    </div>
+                    <p className="text-sm text-petal-ink whitespace-pre-wrap leading-relaxed">{m.content}</p>
+                    <p className="text-[10px] text-petal-muted mt-1.5">{formatTime(m.createdAt, tz)}</p>
+                  </div>
+                </div>
+              );
+            }
             const mine = m.senderId === currentUserId;
             return (
               <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
@@ -277,6 +329,17 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
           <div className="flex flex-wrap justify-end gap-2 mt-2">
             <button
               type="button"
+              data-testid="event-ai-counselor-button"
+              onClick={inviteAiCounselor}
+              disabled={aiInviting}
+              className="px-3 py-2 rounded-full border border-petal-sage-deep text-petal-sage-deep inline-flex items-center gap-2 disabled:opacity-50 hover:bg-petal-sage/20 mr-auto"
+              title="請 AI 諮商師讀過你們的對話，給一段中立的建議"
+            >
+              {aiInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
+              <span>請 AI 諮商師加入</span>
+            </button>
+            <button
+              type="button"
               data-testid="event-reply-rewrite-button"
               onClick={requestRewrite}
               disabled={rewriting || reply.trim().length === 0}
@@ -305,6 +368,15 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
           preview={rewritePreview}
           onApply={applyRewriteVersion}
           onCancel={() => setRewritePreview(null)}
+        />
+      )}
+
+      {aiPreview !== null && (
+        <AiCounselorPreview
+          comment={aiPreview}
+          posting={aiPosting}
+          onPost={postAiCounselor}
+          onCancel={() => setAiPreview(null)}
         />
       )}
 
@@ -373,6 +445,65 @@ function ResolveControls({
     );
   }
   return null;
+}
+
+function AiCounselorPreview({
+  comment,
+  posting,
+  onPost,
+  onCancel,
+}: {
+  comment: string;
+  posting: boolean;
+  onPost: () => void;
+  onCancel: () => void;
+}) {
+  useScrollLock(true);
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      data-testid="event-ai-counselor-modal"
+    >
+      <div className="bg-petal-cream rounded-2xl max-w-lg w-full max-h-[min(85vh,calc(100dvh-80px))] overflow-y-auto overscroll-contain p-4 sm:p-5">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <HeartHandshake className="w-5 h-5 text-petal-sage-deep" />
+            <div>
+              <h3 className="text-lg font-serif text-petal-ink">AI 諮商師的建議</h3>
+              <p className="text-xs text-petal-ink-soft mt-1">看看這段建議，貼到對話串後雙方都看得到。</p>
+            </div>
+          </div>
+          <button type="button" onClick={onCancel} className="text-petal-ink-soft hover:text-petal-ink" aria-label="取消">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="bg-white border border-petal-sage/40 rounded-xl p-4 mb-4">
+          <p className="text-sm text-petal-ink whitespace-pre-wrap leading-relaxed">{comment}</p>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-sm px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20"
+          >
+            先不要
+          </button>
+          <button
+            type="button"
+            data-testid="event-ai-counselor-post"
+            onClick={onPost}
+            disabled={posting}
+            className="text-sm px-4 py-2 rounded-full bg-petal-sage-deep text-petal-cream inline-flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
+          >
+            {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            貼到對話串
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function BackButton({ onBack }: { onBack: () => void }) {

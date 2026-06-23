@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, StickyNote, MessageSquareHeart, Trash2, Pencil } from 'lucide-react';
+import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, StickyNote, MessageSquareHeart, Trash2, Pencil, HeartHandshake } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import UpgradeView, { BillingResultView } from './components/UpgradeView';
 import { BookingResultView } from './components/BookingResultView';
@@ -1867,6 +1867,7 @@ const LoveTimeApp = () => {
     { id: 'events', label: '衝突事件', icon: MessageSquareHeart },
     { id: 'roleplay', label: '角色扮演', icon: Play },
     { id: 'wall', label: '我們的牆', icon: StickyNote },
+    { id: 'therapists', label: '心理諮商', icon: HeartHandshake },
   ];
 
   const renderView = () => {
@@ -2103,7 +2104,6 @@ const LoveTimeApp = () => {
         onShowSettings={() => setCurrentView('settings')}
         onShowJourney={() => setCurrentView('journey')}
         onShowIntimacyHistory={() => setCurrentView('intimacy-history')}
-        onShowTherapists={() => setCurrentView('therapists')}
         onShowFeedback={() => setCurrentView('feedback')}
         onShowUpgrade={() => { setUpgradeReason(null); setCurrentView('upgrade'); }}
       />

@@ -315,6 +315,7 @@ export interface EventMessage {
   eventId: string;
   senderId: string;
   content: string;
+  isAi: boolean;
   createdAt: string;
   readAt: string | null;
 }
@@ -2574,6 +2575,28 @@ class ApiService {
     }
   }
 
+  // Preview an AI 諮商師 comment for an event (not persisted until posted).
+  async previewEventAiComment(eventId: string): Promise<string> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/ai-comment/preview`);
+      return response.data.comment || '';
+    } catch (error: unknown) {
+      console.error('Failed to preview event AI comment:', error);
+      this.throwApiError(error, 'AI 諮商師暫時無法回應，請稍後再試');
+    }
+  }
+
+  // Post a previewed AI 諮商師 comment into the event thread.
+  async postEventAiComment(eventId: string, content: string): Promise<EventMessage> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/ai-comment`, { content });
+      return this.transformEventMessage(response.data.message);
+    } catch (error: unknown) {
+      console.error('Failed to post event AI comment:', error);
+      this.throwApiError(error, '無法新增 AI 留言，請稍後再試');
+    }
+  }
+
   async markEventMessageRead(eventId: string, msgId: string): Promise<void> {
     try {
       await apiClient.put(`/events/${eventId}/messages/${msgId}/read`);
@@ -2681,6 +2704,7 @@ class ApiService {
       event_id?: string;
       sender_id?: string;
       content?: string;
+      is_ai?: boolean;
       created_at?: string;
       read_at?: string | null;
     };
@@ -2689,6 +2713,7 @@ class ApiService {
       eventId: r.event_id || '',
       senderId: r.sender_id || '',
       content: r.content || '',
+      isAi: r.is_ai === true,
       createdAt: r.created_at || '',
       readAt: r.read_at ?? null,
     };
