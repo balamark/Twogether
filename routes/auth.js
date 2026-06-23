@@ -137,7 +137,7 @@ router.post('/login', [
 
     // Find user
     const userResult = await db.query(
-      'SELECT id, nickname, email, gender, birth_date, timezone, email_notifications_enabled, cycle_tracking_enabled, email_verified, password_hash, created_at FROM users WHERE email = $1',
+      'SELECT id, nickname, email, gender, birth_date, timezone, email_notifications_enabled, cycle_tracking_enabled, public_share_show_nickname, email_verified, password_hash, created_at FROM users WHERE email = $1',
       [email]
     );
 
@@ -193,6 +193,7 @@ router.post('/login', [
         timezone: user.timezone,
         email_notifications_enabled: user.email_notifications_enabled !== false,
         cycle_tracking_enabled: user.cycle_tracking_enabled === true,
+        public_share_show_nickname: user.public_share_show_nickname !== false,
         email_verified: user.email_verified === true,
         created_at: user.created_at
       }
@@ -216,6 +217,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         u.id, u.nickname, u.email, u.gender, u.birth_date, u.timezone,
         u.email_notifications_enabled,
         u.cycle_tracking_enabled,
+        u.public_share_show_nickname,
         u.email_verified,
         u.created_at, u.last_login,
         c.id as couple_id, c.couple_name, c.anniversary_date, c.primary_timezone,
@@ -260,6 +262,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         timezone: userData.timezone,
         email_notifications_enabled: userData.email_notifications_enabled !== false,
         cycle_tracking_enabled: userData.cycle_tracking_enabled === true,
+        public_share_show_nickname: userData.public_share_show_nickname !== false,
         email_verified: userData.email_verified === true,
         created_at: userData.created_at,
         last_login: userData.last_login,
@@ -517,6 +520,33 @@ router.put('/user/email-notifications', authenticateToken, [
       success: false,
       message: '更新電子郵件通知設定失敗'
     });
+  }
+});
+
+// Toggle per-user preference: show nickname (vs anonymise) in public 公開問答 shares.
+router.put('/user/public-share-nickname', authenticateToken, [
+  body('public_share_show_nickname')
+    .isBoolean()
+    .withMessage('public_share_show_nickname 必須為布林值')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, message: '驗證失敗', errors: errors.array() });
+    }
+    const enabled = !!req.body.public_share_show_nickname;
+    await db.query(
+      `UPDATE users SET public_share_show_nickname = $1 WHERE id = $2`,
+      [enabled, req.user.id]
+    );
+    res.json({
+      success: true,
+      message: '公開分享顯示設定已更新',
+      public_share_show_nickname: enabled,
+    });
+  } catch (error) {
+    logError('Update public-share nickname pref failed', { err: error.message, stack: error.stack });
+    res.status(500).json({ success: false, message: '更新公開分享設定失敗' });
   }
 });
 

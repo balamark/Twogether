@@ -30,6 +30,7 @@ interface User {
   birth_date?: string | null;
   email_notifications_enabled?: boolean;
   cycle_tracking_enabled?: boolean;
+  public_share_show_nickname?: boolean;
   timezone?: string | null;
   couplePrimaryTimezone?: string | null;
   partnerTimezone?: string | null;
@@ -165,6 +166,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [cycleTrackingEnabled, setCycleTrackingEnabled] = useState<boolean>(false);
   const [isSavingCyclePref, setIsSavingCyclePref] = useState<boolean>(false);
 
+  // Public-share nickname preference (default true = show nickname)
+  const [shareShowNickname, setShareShowNickname] = useState<boolean>(true);
+  const [isSavingSharePref, setIsSavingSharePref] = useState<boolean>(false);
+
   // Timezone settings — per-user and couple-level primary
   const browserTz = (() => {
     try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch { return ''; }
@@ -203,6 +208,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       setEmailNotificationsEnabled(pref);
     }
   }, [authState.user?.email_notifications_enabled]);
+
+  useEffect(() => {
+    const pref = authState.user?.public_share_show_nickname;
+    // Default to true (show nickname) when unset.
+    setShareShowNickname(pref !== false);
+  }, [authState.user?.public_share_show_nickname]);
 
   useEffect(() => {
     const pref = authState.user?.cycle_tracking_enabled;
@@ -383,6 +394,42 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       });
     } finally {
       setIsSavingEmailPref(false);
+    }
+  };
+
+  const handleToggleShareNickname = async (next: boolean) => {
+    const previous = shareShowNickname;
+    setShareShowNickname(next);
+    setIsSavingSharePref(true);
+    try {
+      await apiService.updatePublicShareNickname(next);
+      if (authState.user && onAuthStateUpdate) {
+        const updated = {
+          ...authState,
+          user: { ...authState.user, public_share_show_nickname: next },
+        };
+        onAuthStateUpdate(updated);
+        localStorage.setItem('authState', JSON.stringify(updated));
+        localStorage.setItem('authUser', JSON.stringify(updated.user));
+      }
+      showNotification({
+        type: 'success',
+        title: '已更新',
+        message: next
+          ? '公開分享時會顯示你的暱稱'
+          : '公開分享時會以「匿名」顯示你',
+        duration: 4000,
+      });
+    } catch (err) {
+      setShareShowNickname(previous);
+      showNotification({
+        type: 'error',
+        title: '更新失敗',
+        message: (err as Error)?.message || '無法更新公開分享設定',
+        duration: 5000,
+      });
+    } finally {
+      setIsSavingSharePref(false);
     }
   };
 
@@ -904,6 +951,30 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             checked={emailNotificationsEnabled}
             disabled={isSavingEmailPref}
             onChange={(e) => handleToggleEmailNotifications(e.target.checked)}
+            className="w-5 h-5 mt-1 accent-pink-500"
+          />
+        </label>
+      </div>
+
+      {/* Public share display preference */}
+      <div className="bg-white rounded-2xl shadow-lg p-6">
+        <h3 className="text-lg font-bold text-gray-800 mb-4">公開分享顯示方式</h3>
+        <label className="flex items-start justify-between gap-4 cursor-pointer">
+          <div className="flex-1">
+            <div className="text-sm font-medium text-gray-700">
+              公開分享時顯示我的暱稱
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              當你把「衝突事件」或「我們的牆」分享到公開問答時，會顯示你的暱稱（非真實姓名）。
+              關閉後，你在公開內容中會以「匿名」顯示。對方有各自的設定。
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            data-testid="public-share-nickname-toggle"
+            checked={shareShowNickname}
+            disabled={isSavingSharePref}
+            onChange={(e) => handleToggleShareNickname(e.target.checked)}
             className="w-5 h-5 mt-1 accent-pink-500"
           />
         </label>

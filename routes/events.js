@@ -903,5 +903,46 @@ router.post('/:id/resolve-confirm', [param('id').isUUID()], async (req, res) => 
   }
 });
 
+// Re-open a resolved event so the couple can keep discussing it.
+router.post('/:id/reopen', [param('id').isUUID()], async (req, res) => {
+  if (sendValidationError(req, res)) return;
+  try {
+    const access = await assertEventAccess(req.params.id, req.user.id);
+    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (access.event.is_private) {
+      return res.status(400).json({ success: false, message: '私人事件無法重新開啟' });
+    }
+    if (access.event.status !== 'resolved') {
+      return res.status(400).json({ success: false, message: '只有已解決的事件可以重新開啟' });
+    }
+
+    const result = await db.query(
+      `UPDATE events
+         SET status = 'open',
+             resolved_at = NULL,
+             resolve_requested_by = NULL,
+             resolve_requested_at = NULL,
+             updated_at = NOW()
+       WHERE id = $1 RETURNING *`,
+      [req.params.id]
+    );
+
+    await notify(
+      access.partnerId,
+      'event_reopened',
+      '伴侶重新開啟了一個事件',
+      access.event.title,
+      req.params.id,
+      req.user.id
+    );
+
+    logInfo('events.reopened', { userId: req.user.id, eventId: req.params.id });
+    res.json({ success: true, event: serializeEvent(result.rows[0]) });
+  } catch (err) {
+    logError('Reopen event failed', { err: err.message, stack: err.stack });
+    res.status(500).json({ success: false, message: '無法重新開啟事件' });
+  }
+});
+
 module.exports = router;
 module.exports.TAG_VOCAB = TAG_VOCAB;

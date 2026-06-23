@@ -1727,6 +1727,17 @@ class ApiService {
     }
   }
 
+  async updatePublicShareNickname(enabled: boolean): Promise<void> {
+    try {
+      await apiClient.put('/auth/user/public-share-nickname', {
+        public_share_show_nickname: enabled,
+      });
+    } catch (error: unknown) {
+      console.error('Failed to update public-share nickname pref:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '更新公開分享設定失敗');
+    }
+  }
+
   async updateCycleTrackingEnabled(enabled: boolean): Promise<void> {
     try {
       await apiClient.put('/auth/user/cycle-tracking', {
@@ -2633,6 +2644,17 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to confirm event resolve:', error);
       this.throwApiError(error, '無法確認解決');
+    }
+  }
+
+  // Re-open a resolved event so the couple can keep discussing.
+  async reopenEvent(id: string): Promise<EventRecord> {
+    try {
+      const response = await apiClient.post(`/events/${id}/reopen`);
+      return this.transformEvent(response.data.event);
+    } catch (error: unknown) {
+      console.error('Failed to reopen event:', error);
+      this.throwApiError(error, '無法重新開啟事件');
     }
   }
 

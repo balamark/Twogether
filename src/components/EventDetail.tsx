@@ -10,6 +10,7 @@ import {
   Sparkles,
   HeartHandshake,
   Globe,
+  RotateCcw,
   X,
 } from 'lucide-react';
 import apiService, {
@@ -252,6 +253,23 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
     }
   };
 
+  const handleReopen = async () => {
+    setResolving(true);
+    try {
+      await apiService.reopenEvent(eventId);
+      await refresh();
+      showNotification({ type: 'success', title: '已重新開啟', message: '可以繼續討論這個事件了' });
+    } catch (err) {
+      showNotification({
+        type: 'error',
+        title: '操作失敗',
+        message: err instanceof Error ? err.message : '請稍後再試',
+      });
+    } finally {
+      setResolving(false);
+    }
+  };
+
   if (loading) {
     return <div className="p-8 text-center text-petal-ink-soft">載入中…</div>;
   }
@@ -463,6 +481,25 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
           onRequest={handleResolveRequest}
           onConfirm={handleResolveConfirm}
         />
+      )}
+
+      {!event.isPrivate && event.status === 'resolved' && (
+        <div className="flex flex-col items-center gap-2 text-center bg-petal-sage/15 border border-petal-sage/40 rounded-2xl p-4">
+          <p className="text-sm text-petal-ink-soft inline-flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-petal-sage-deep" />
+            這個事件已解決。如果還想再聊聊，可以重新開啟。
+          </p>
+          <button
+            type="button"
+            data-testid="event-reopen-button"
+            disabled={resolving}
+            onClick={handleReopen}
+            className="px-4 py-2 rounded-full border border-petal-sage text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2 disabled:opacity-50"
+          >
+            {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+            重新開啟討論
+          </button>
+        </div>
       )}
     </div>
   );

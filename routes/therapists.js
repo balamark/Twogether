@@ -1058,8 +1058,11 @@ router.get('/qa/:id', optionalAuth, async (req, res) => {
 
     if (source === 'event') {
       const ev = await db.query(
-        `SELECT id, public_title, published_at, summary
-           FROM events WHERE id = $1 AND public_status = 'published'`,
+        `SELECT e.id, e.public_title, e.published_at, e.summary, e.created_by,
+                cu.nickname AS creator_nickname, cu.public_share_show_nickname AS creator_show
+           FROM events e
+           JOIN users cu ON cu.id = e.created_by
+          WHERE e.id = $1 AND e.public_status = 'published'`,
         [req.params.id]
       );
       if (ev.rows.length === 0) {
@@ -1067,20 +1070,30 @@ router.get('/qa/:id', optionalAuth, async (req, res) => {
       }
       const e = ev.rows[0];
       const msgs = await db.query(
-        `SELECT id, sender_id, content, is_ai, created_at
-           FROM event_messages WHERE event_id = $1 ORDER BY created_at ASC`,
+        `SELECT m.id, m.sender_id, m.content, m.is_ai, m.created_at,
+                u.nickname, u.public_share_show_nickname AS show_nickname
+           FROM event_messages m
+           JOIN users u ON u.id = m.sender_id
+          WHERE m.event_id = $1 ORDER BY m.created_at ASC`,
         [req.params.id]
       );
       const label = makeAnonLabeler();
+      // Each participant shows their nickname only if they opted in; otherwise
+      // 匿名 A / 匿名 B. AI counselor is always labelled.
+      const nameFor = (senderId, show, nickname) =>
+        show !== false && nickname ? nickname : label(senderId);
       const messages = [
-        { id: `${e.id}-summary`, body: e.summary, createdAt: e.published_at, isTherapist: false, isAi: false, senderName: '匿名 A' },
+        {
+          id: `${e.id}-summary`, body: e.summary, createdAt: e.published_at, isTherapist: false, isAi: false,
+          senderName: nameFor(e.created_by, e.creator_show, e.creator_nickname),
+        },
         ...msgs.rows.map((m) => ({
           id: m.id,
           body: m.content,
           createdAt: m.created_at,
           isTherapist: false,
           isAi: m.is_ai === true,
-          senderName: m.is_ai ? 'AI 諮商師' : label(m.sender_id),
+          senderName: m.is_ai ? 'AI 諮商師' : nameFor(m.sender_id, m.show_nickname, m.nickname),
         })),
       ];
       return res.json({
@@ -1094,8 +1107,11 @@ router.get('/qa/:id', optionalAuth, async (req, res) => {
 
     if (source === 'wall') {
       const wp = await db.query(
-        `SELECT id, public_title, published_at, content, author_id
-           FROM wall_posts WHERE id = $1 AND public_status = 'published'`,
+        `SELECT p.id, p.public_title, p.published_at, p.content, p.author_id,
+                au.nickname AS author_nickname, au.public_share_show_nickname AS author_show
+           FROM wall_posts p
+           JOIN users au ON au.id = p.author_id
+          WHERE p.id = $1 AND p.public_status = 'published'`,
         [req.params.id]
       );
       if (wp.rows.length === 0) {
@@ -1103,21 +1119,28 @@ router.get('/qa/:id', optionalAuth, async (req, res) => {
       }
       const p = wp.rows[0];
       const replies = await db.query(
-        `SELECT id, author_id, content, is_ai, created_at
-           FROM wall_post_replies WHERE post_id = $1 ORDER BY created_at ASC`,
+        `SELECT r.id, r.author_id, r.content, r.is_ai, r.created_at,
+                u.nickname, u.public_share_show_nickname AS show_nickname
+           FROM wall_post_replies r
+           JOIN users u ON u.id = r.author_id
+          WHERE r.post_id = $1 ORDER BY r.created_at ASC`,
         [req.params.id]
       );
       const label = makeAnonLabeler();
-      label(p.author_id); // post author becomes 匿名 A
+      const nameFor = (senderId, show, nickname) =>
+        show !== false && nickname ? nickname : label(senderId);
       const messages = [
-        { id: `${p.id}-post`, body: p.content, createdAt: p.published_at, isTherapist: false, isAi: false, senderName: '匿名 A' },
+        {
+          id: `${p.id}-post`, body: p.content, createdAt: p.published_at, isTherapist: false, isAi: false,
+          senderName: nameFor(p.author_id, p.author_show, p.author_nickname),
+        },
         ...replies.rows.map((r) => ({
           id: r.id,
           body: r.content,
           createdAt: r.created_at,
           isTherapist: false,
           isAi: r.is_ai === true,
-          senderName: r.is_ai ? 'AI 諮商師' : label(r.author_id),
+          senderName: r.is_ai ? 'AI 諮商師' : nameFor(r.author_id, r.show_nickname, r.nickname),
         })),
       ];
       return res.json({
