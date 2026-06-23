@@ -23,7 +23,7 @@ interface PublicQaViewProps {
   onFindTherapist?: () => void;
 }
 
-const TherapistMini: React.FC<{ therapist: PublicQaThreadSummary['therapist'] }> = ({ therapist }) => (
+const TherapistMini: React.FC<{ therapist: NonNullable<PublicQaThreadSummary['therapist']> }> = ({ therapist }) => (
   <div className="flex items-center gap-2 min-w-0">
     <div className="w-7 h-7 shrink-0 rounded-full overflow-hidden bg-petal-cream-2 border border-petal-rule flex items-center justify-center">
       {therapist.photoUrl ? (
