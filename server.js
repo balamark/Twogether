@@ -30,6 +30,7 @@ const scriptFavoritesRoutes = require('./routes/script-favorites');
 const marketplaceRoutes = require('./routes/marketplace');
 const billingRoutes = require('./routes/billing');
 const therapistRoutes = require('./routes/therapists');
+const feedbackRoutes = require('./routes/feedback');
 const adminRoutes = require('./routes/admin');
 
 // Import database and middleware
@@ -152,6 +153,7 @@ app.use('/api/intimacy', intimacyRequestRoutes);
 // of /api/admin/*.
 app.use('/api/therapists', therapistRoutes.router);
 app.use('/api/admin/therapists', adminAuth, therapistRoutes.adminRouter);
+app.use('/api/feedback', feedbackRoutes);
 
 // Admin funnel dashboard. The public router (POST /api/track/landing) is the
 // anonymous beacon fired from the frontend on the logged-out landing render.

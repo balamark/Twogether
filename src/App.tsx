@@ -15,6 +15,8 @@ import WallView from './components/WallView';
 import EventsView from './components/EventsView';
 import TherapistsView from './components/TherapistsView';
 import LoggedOutPreview from './components/LoggedOutPreview';
+import Testimonials from './components/Testimonials';
+import FeedbackView from './components/FeedbackView';
 import type { WallExample } from './components/WallPostComposer';
 import Header from './components/Header';
 import { NotificationContainer } from './components/ErrorNotification';
@@ -1862,7 +1864,7 @@ const LoveTimeApp = () => {
   const navItems = [
     { id: 'record', label: '記錄時光', icon: Calendar },
     { id: 'conflict', label: '和諧相處', icon: MessageCircle },
-    { id: 'events', label: '事件', icon: MessageSquareHeart },
+    { id: 'events', label: '衝突事件', icon: MessageSquareHeart },
     { id: 'roleplay', label: '角色扮演', icon: Play },
     { id: 'wall', label: '我們的牆', icon: StickyNote },
   ];
@@ -1890,7 +1892,7 @@ const LoveTimeApp = () => {
         case 'therapists': return <TherapistsView authState={authState} showNotification={showNotification} onLogin={() => setShowAuthModal(true)} />;
         // Each nav tab previews its own feature (read-only) instead of all
         // falling through to one generic login wall. See LoggedOutPreview.
-        default: return <LoggedOutPreview view={currentView} onSignUp={() => setShowAuthModal(true)} />;
+        default: return <LoggedOutPreview view={currentView} onSignUp={() => setShowAuthModal(true)} scripts={defaultRoleplayScripts} />;
       }
     }
 
@@ -2037,6 +2039,7 @@ const LoveTimeApp = () => {
         }}
       />;
       case 'therapists': return <TherapistsView authState={authState} showNotification={showNotification} />;
+      case 'feedback': return <FeedbackView authState={authState} showNotification={showNotification} setShowAuthModal={setShowAuthModal} />;
       default: return <GamesView
         totalCoins={totalCoins}
         customMemoryQuestions={customMemoryQuestions}
@@ -2101,6 +2104,7 @@ const LoveTimeApp = () => {
         onShowJourney={() => setCurrentView('journey')}
         onShowIntimacyHistory={() => setCurrentView('intimacy-history')}
         onShowTherapists={() => setCurrentView('therapists')}
+        onShowFeedback={() => setCurrentView('feedback')}
         onShowUpgrade={() => { setUpgradeReason(null); setCurrentView('upgrade'); }}
       />
       
@@ -2287,6 +2291,12 @@ const LoveTimeApp = () => {
           {renderView()}
         </div>
 
+        {/* Logged-out social proof — real approved reviews, or 3 defaults until
+            any exist. Hidden on the therapists sub-page (its own context). */}
+        {!authState.isAuthenticated && currentView !== 'therapists' && (
+          <Testimonials />
+        )}
+
         {/* Therapist entry — low-key footer link, kept out of the way of
             regular couples but discoverable for practitioners. */}
         {!authState.isAuthenticated && currentView !== 'therapists' && (
@@ -2296,10 +2306,18 @@ const LoveTimeApp = () => {
               <button
                 onClick={() => setCurrentView('therapists')}
                 data-testid="therapist-footer-link"
-                className="text-pink-600 hover:text-pink-700 underline underline-offset-2 ml-1"
+                className="text-pink-600 hover:text-pink-700 underline underline-offset-2"
               >
-                登入 / 申請入駐
+                登入
               </button>
+              <span className="mx-1.5 text-petal-rule">·</span>
+              <a
+                href="/therapist-signup"
+                data-testid="therapist-signup-link"
+                className="text-pink-600 hover:text-pink-700 underline underline-offset-2"
+              >
+                申請入駐
+              </a>
             </p>
           </footer>
         )}

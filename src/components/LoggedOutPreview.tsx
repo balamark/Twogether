@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Calendar,
   MessageCircle,
@@ -6,14 +6,26 @@ import {
   Play,
   StickyNote,
   Heart,
+  X,
   type LucideIcon,
 } from 'lucide-react';
+
+interface PreviewScript {
+  id: string;
+  title: string;
+  scenario: string;
+  image?: string;
+  script: string;
+  duration?: string;
+}
 
 interface LoggedOutPreviewProps {
   /** Current nav view id (record | conflict | events | roleplay | wall). */
   view: string;
   /** Opens the auth modal. */
   onSignUp: () => void;
+  /** Default (public) roleplay scripts, shown read-only on the roleplay tab. */
+  scripts?: PreviewScript[];
 }
 
 interface PreviewConfig {
@@ -100,57 +112,31 @@ const PREVIEWS: Record<string, PreviewConfig> = {
   },
   events: {
     icon: MessageSquareHeart,
-    eyebrow: '事件',
+    eyebrow: '衝突事件',
     title: (
       <>
-        把重要時刻變成<em className="not-italic font-light italic text-pink-600">專屬事件</em>
+        把委屈<em className="not-italic font-light italic text-pink-600">好好說出口</em>
       </>
     ),
-    description: '約會、紀念日、第一次旅行 —— 把你們的重要時刻收進事件牆，一起期待、一起回味。',
+    description: '把這次的衝突與心裡的委屈寫下來，AI 幫你改寫成不指責、不示弱的中性語氣，再決定要不要送給對方。',
     sample: (
       <div className="space-y-2.5">
         <div className="flex items-center justify-between">
-          <span className="font-body text-xs text-petal-muted">即將到來</span>
+          <span className="font-body text-xs text-petal-muted">把感受寫下來 → AI 改寫</span>
           <SampleTag />
         </div>
-        {[
-          { title: '交往一週年', date: '7 月 2 日', emoji: '🎉' },
-          { title: '宜蘭小旅行', date: '7 月 19 日', emoji: '🧳' },
-        ].map((e) => (
-          <SampleCard key={e.title}>
-            <div className="flex items-center justify-between gap-3">
-              <div className="font-body text-sm text-petal-ink">
-                {e.emoji} {e.title}
-              </div>
-              <div className="font-body text-xs text-petal-muted shrink-0">{e.date}</div>
-            </div>
-          </SampleCard>
-        ))}
-      </div>
-    ),
-  },
-  roleplay: {
-    icon: Play,
-    eyebrow: '角色扮演',
-    title: (
-      <>
-        為你們的夜晚<em className="not-italic font-light italic text-pink-600">增添新鮮感</em>
-      </>
-    ),
-    description: '精選情境劇本，照著演、自由發揮都好。也能自訂專屬你們的劇本。',
-    sample: (
-      <div className="grid grid-cols-2 gap-2.5">
-        {[
-          { title: '久別重逢', tag: '甜蜜' },
-          { title: '雨夜的陌生人', tag: '微醺' },
-          { title: '老師與學生', tag: '經典' },
-          { title: '婚禮前夕', tag: '浪漫' },
-        ].map((s) => (
-          <SampleCard key={s.title}>
-            <div className="font-body text-sm text-petal-ink">{s.title}</div>
-            <div className="font-body text-[11px] text-petal-muted mt-0.5">#{s.tag}</div>
-          </SampleCard>
-        ))}
+        <SampleCard>
+          <p className="font-body text-xs text-petal-muted mb-1">你寫的</p>
+          <p className="font-body text-sm text-petal-ink leading-relaxed">
+            今天他又忘記回我訊息，我覺得自己根本不被重視。
+          </p>
+        </SampleCard>
+        <SampleCard>
+          <p className="font-body text-xs text-petal-rose-deep mb-1">AI 改寫（堅定不攻擊版）</p>
+          <p className="font-display italic font-light text-sm text-petal-ink leading-relaxed">
+            「今天訊息沒有回覆讓我有點失落。對我來說，及時的回應會讓我更安心，我們可以聊聊怎麼配合嗎？」
+          </p>
+        </SampleCard>
       </div>
     ),
   },
@@ -178,12 +164,138 @@ const PREVIEWS: Record<string, PreviewConfig> = {
   },
 };
 
+// Roleplay scripts mix [partner1]/[partner2] and [男]/[女] role tags. For the
+// read-only preview we render them as readable role labels.
+const prettyScript = (raw: string): string =>
+  raw
+    .replace(/\[partner1\]/g, '🅐')
+    .replace(/\[partner2\]/g, '🅑')
+    .replace(/\[男\]/g, '🅐')
+    .replace(/\[女\]/g, '🅑');
+
+const SignUpCta: React.FC<{ onSignUp: () => void; compact?: boolean }> = ({ onSignUp, compact }) => (
+  <div className="text-center">
+    <button
+      onClick={onSignUp}
+      data-testid="preview-signup-cta"
+      className="inline-flex items-center gap-2 bg-petal-ink text-petal-cream px-7 py-3 rounded-md hover:bg-pink-700 transition-colors font-display italic text-base"
+    >
+      <Heart className="w-4 h-4" strokeWidth={1.5} />
+      註冊免費開始 →
+    </button>
+    {!compact && (
+      <p className="font-body text-xs text-petal-muted mt-3">
+        已有帳號？
+        <button
+          onClick={onSignUp}
+          className="text-pink-600 hover:text-pink-700 underline underline-offset-2 ml-1"
+        >
+          登入
+        </button>
+      </p>
+    )}
+  </div>
+);
+
 /**
  * Logged-out "showroom" content. Instead of every nav tab falling through to a
  * single generic login wall, each tab previews its own feature (read-only) so a
  * visitor understands the product, then funnels to sign-up.
  */
-const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp }) => {
+const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scripts = [] }) => {
+  const [openScript, setOpenScript] = useState<PreviewScript | null>(null);
+
+  // Roleplay gets a dedicated layout: real public scripts the visitor can open.
+  if (view === 'roleplay') {
+    const previewScripts = scripts.slice(0, 4);
+    return (
+      <div className="max-w-md mx-auto py-6" data-testid="logged-out-preview-roleplay">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-petal-cream-2 text-pink-600 mb-4">
+            <Play className="w-5 h-5" strokeWidth={1.5} />
+          </div>
+          <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+            — 角色扮演
+          </div>
+          <h2 className="font-display text-3xl md:text-4xl font-light tracking-tight text-petal-ink leading-[1.1] mb-3">
+            為你們的夜晚<em className="not-italic font-light italic text-pink-600">增添新鮮感</em>
+          </h2>
+          <p className="font-body text-sm text-petal-ink-soft leading-relaxed max-w-sm mx-auto">
+            精選情境劇本，點開看看內容。登入後可以照著演、自由發揮，也能自訂專屬你們的劇本。
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 mb-8">
+          {previewScripts.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => setOpenScript(s)}
+              data-testid={`preview-script-${s.id}`}
+              className="text-left bg-petal-cream border border-petal-rule rounded-md overflow-hidden hover:border-petal-ink transition-colors"
+            >
+              <div className="aspect-video bg-petal-cream-2 flex items-center justify-center">
+                {s.image ? (
+                  <img src={s.image} alt={s.title} className="w-full h-full object-contain" />
+                ) : (
+                  <Play className="w-6 h-6 text-petal-muted" strokeWidth={1.5} />
+                )}
+              </div>
+              <div className="p-3">
+                <div className="font-body text-sm font-medium text-petal-ink leading-snug line-clamp-2">
+                  {s.title}
+                </div>
+                <div className="font-body text-[11px] text-petal-muted mt-1 line-clamp-2">{s.scenario}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <SignUpCta onSignUp={onSignUp} />
+
+        {/* Read-only script viewer */}
+        {openScript && (
+          <div
+            className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4"
+            onClick={() => setOpenScript(null)}
+          >
+            <div
+              className="bg-petal-cream w-full sm:max-w-md max-h-[85vh] rounded-t-2xl sm:rounded-md shadow-petal flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+              data-testid="preview-script-modal"
+            >
+              <div className="flex items-start justify-between gap-3 p-4 border-b border-petal-rule">
+                <div className="min-w-0">
+                  <h3 className="font-display text-lg text-petal-ink leading-snug">{openScript.title}</h3>
+                  <p className="font-body text-xs text-petal-muted mt-0.5">{openScript.scenario}</p>
+                </div>
+                <button
+                  onClick={() => setOpenScript(null)}
+                  className="shrink-0 p-1.5 text-petal-muted hover:text-petal-ink rounded-full hover:bg-petal-cream-2"
+                  aria-label="關閉"
+                >
+                  <X className="w-4 h-4" strokeWidth={1.5} />
+                </button>
+              </div>
+              <div className="overflow-y-auto p-4">
+                {openScript.image && (
+                  <div className="aspect-video bg-petal-cream-2 rounded-md overflow-hidden mb-3">
+                    <img src={openScript.image} alt={openScript.title} className="w-full h-full object-contain" />
+                  </div>
+                )}
+                <pre className="font-body text-sm text-petal-ink whitespace-pre-wrap leading-relaxed">
+                  {prettyScript(openScript.script)}
+                </pre>
+              </div>
+              <div className="p-4 border-t border-petal-rule">
+                <SignUpCta onSignUp={onSignUp} compact />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   const config = PREVIEWS[view];
 
   // Unknown view → friendly generic welcome (keeps old behaviour as a fallback).
@@ -236,25 +348,7 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp }) =
       <div className="mb-8">{config.sample}</div>
 
       {/* Sign-up CTA */}
-      <div className="text-center">
-        <button
-          onClick={onSignUp}
-          data-testid="preview-signup-cta"
-          className="inline-flex items-center gap-2 bg-petal-ink text-petal-cream px-7 py-3 rounded-md hover:bg-pink-700 transition-colors font-display italic text-base"
-        >
-          <Heart className="w-4 h-4" strokeWidth={1.5} />
-          註冊免費開始 →
-        </button>
-        <p className="font-body text-xs text-petal-muted mt-3">
-          已有帳號？
-          <button
-            onClick={onSignUp}
-            className="text-pink-600 hover:text-pink-700 underline underline-offset-2 ml-1"
-          >
-            登入
-          </button>
-        </p>
-      </div>
+      <SignUpCta onSignUp={onSignUp} />
     </div>
   );
 };

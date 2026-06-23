@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown, HeartHandshake } from 'lucide-react';
+import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown, HeartHandshake, MessageSquarePlus } from 'lucide-react';
 import { apiService } from '../services/api';
 
 interface User {
@@ -30,6 +30,7 @@ interface HeaderProps {
   onShowIntimacyHistory: () => void;
   onShowTherapists: () => void;
   onShowUpgrade: () => void;
+  onShowFeedback: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -45,6 +46,7 @@ const Header: React.FC<HeaderProps> = ({
   onShowIntimacyHistory,
   onShowTherapists,
   onShowUpgrade,
+  onShowFeedback,
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -220,6 +222,17 @@ const Header: React.FC<HeaderProps> = ({
                       >
                         <Crown className="w-3.5 h-3.5" strokeWidth={1.5} />
                         <span>升級 Premium</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          onShowFeedback();
+                          setShowUserMenu(false);
+                        }}
+                        data-testid="user-menu-feedback"
+                        className="w-full flex items-center space-x-2 px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
+                      >
+                        <MessageSquarePlus className="w-3.5 h-3.5" strokeWidth={1.5} />
+                        <span>意見回饋</span>
                       </button>
                       <button
                         onClick={() => {

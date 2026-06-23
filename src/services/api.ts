@@ -1926,6 +1926,40 @@ class ApiService {
     }
   }
 
+  // User feedback / 用戶心得
+  async getApprovedFeedback(): Promise<
+    Array<{ id: string; name: string; rating: number; content: string }>
+  > {
+    try {
+      const response = await apiClient.get('/feedback/approved');
+      return response.data?.reviews || [];
+    } catch (error: unknown) {
+      console.error('Failed to fetch approved feedback:', error);
+      return [];
+    }
+  }
+
+  async getMyFeedback(): Promise<
+    Array<{ id: string; name: string; rating: number; content: string; status: string }>
+  > {
+    try {
+      const response = await apiClient.get('/feedback/mine');
+      return response.data?.feedback || [];
+    } catch (error: unknown) {
+      console.error('Failed to fetch my feedback:', error);
+      return [];
+    }
+  }
+
+  async submitFeedback(input: {
+    rating: number;
+    body: string;
+    displayName?: string;
+  }): Promise<{ success: boolean; message: string }> {
+    const response = await apiClient.post('/feedback', input);
+    return response.data;
+  }
+
   // Custom Scripts API
   // Extract the most specific server-side error message from an axios failure.
   // Validation errors come back as { errors: [{ path, msg }] } — surfacing
