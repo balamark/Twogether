@@ -278,13 +278,24 @@ test.describe('Custom Script Upload and Persistence', () => {
   });
 
   test('should award coins for uploading custom script', async ({ page }) => {
-    // Header coin display is rendered by src/components/Header.tsx with
-    // data-testid="coin-balance" and shows the running totalCoins value.
-    const coinDisplay = page.getByTestId('coin-balance');
+    // The coin balance moved into the Profile dropdown (src/components/Header.tsx);
+    // the balance span still carries data-testid="coin-balance" but is only in the
+    // DOM while the dropdown is open. Open the menu, read totalCoins, then close.
+    const menuToggle = page.getByTestId('user-menu-toggle');
 
-    await expect(coinDisplay).toBeVisible({ timeout: 5000 });
-    const initialCoinsText = await coinDisplay.textContent();
-    const initialCoins = parseInt(initialCoinsText?.match(/\d+/)?.[0] || '0');
+    const readCoins = async (): Promise<number> => {
+      await menuToggle.click(); // open dropdown
+      const coinDisplay = page.getByTestId('coin-balance');
+      await expect(coinDisplay).toBeVisible({ timeout: 5000 });
+      const text = await coinDisplay.textContent();
+      // The open dropdown renders a full-screen overlay (fixed inset-0) that
+      // closes the menu on click; tap a top corner to dismiss it.
+      await page.mouse.click(5, 5);
+      await expect(coinDisplay).toBeHidden({ timeout: 5000 });
+      return parseInt(text?.match(/\d+/)?.[0] || '0');
+    };
+
+    const initialCoins = await readCoins();
 
     // Navigate to roleplay and upload a script
     await page.getByTestId('nav-tab-roleplay').click();
@@ -317,10 +328,7 @@ test.describe('Custom Script Upload and Persistence', () => {
     // increases either way. Coin persistence for paired couples is covered
     // separately by the coins API tests.
     await expect
-      .poll(async () => {
-        const text = await coinDisplay.textContent();
-        return parseInt(text?.match(/\d+/)?.[0] || '0');
-      }, { timeout: 5000 })
+      .poll(async () => readCoins(), { timeout: 10000 })
       .toBe(initialCoins + 200);
   });
 

@@ -175,7 +175,7 @@ const Header: React.FC<HeaderProps> = ({
                           <Coins className="w-3.5 h-3.5 text-pink-600" strokeWidth={1.5} />
                           <span>金幣商店</span>
                         </span>
-                        <span className="font-display italic text-sm text-petal-ink">{totalCoins}</span>
+                        <span data-testid="coin-balance" className="font-display italic text-sm text-petal-ink">{totalCoins}</span>
                       </button>
                       <button
                         onClick={() => {
