@@ -126,19 +126,6 @@ const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Coins Display */}
-            {authState.isAuthenticated && (
-              <button
-                onClick={onShowCoinShop}
-                data-testid="coin-balance"
-                title="前往金幣商店"
-                className="flex items-center space-x-1 sm:space-x-1.5 border border-petal-rule hover:border-petal-ink px-2 sm:px-3 py-1.5 rounded-full transition-colors min-h-[40px]"
-              >
-                <Coins className="w-3.5 h-3.5 text-pink-600" strokeWidth={1.5} />
-                <span className="font-display italic text-sm text-petal-ink">{totalCoins}</span>
-              </button>
-            )}
-
             {/* User Section */}
             {authState.isAuthenticated ? (
               <div className="relative">
@@ -176,6 +163,20 @@ const Header: React.FC<HeaderProps> = ({
                       )}
                     </div>
                     <div className="p-2">
+                      <button
+                        onClick={() => {
+                          onShowCoinShop();
+                          setShowUserMenu(false);
+                        }}
+                        data-testid="user-menu-coin-shop"
+                        className="w-full flex items-center justify-between px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
+                      >
+                        <span className="flex items-center space-x-2">
+                          <Coins className="w-3.5 h-3.5 text-pink-600" strokeWidth={1.5} />
+                          <span>金幣商店</span>
+                        </span>
+                        <span className="font-display italic text-sm text-petal-ink">{totalCoins}</span>
+                      </button>
                       <button
                         onClick={() => {
                           onShowJourney();
