@@ -7,6 +7,10 @@ import {
   StickyNote,
   Heart,
   X,
+  Pencil,
+  TrendingUp,
+  Sparkles,
+  HeartHandshake,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -51,6 +55,133 @@ const SampleCard: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   </div>
 );
 
+// A read-only month calendar mockup for the 記錄時光 preview — closer to what a
+// real signed-in user sees than a plain list. Static "範例" data.
+const MARKED: Record<number, string> = {
+  3: 'sage', // 心情
+  9: 'rose', // 生理期
+  10: 'rose',
+  14: 'pink', // 親密時光
+  18: 'sage',
+  21: 'pink',
+  26: 'rose',
+};
+const DOT_CLS: Record<string, string> = {
+  pink: 'bg-pink-500',
+  rose: 'bg-petal-rose-deep',
+  sage: 'bg-petal-sage-deep',
+};
+
+const CalendarMock: React.FC = () => {
+  // June-like month: starts on Wednesday (3 leading blanks), 30 days.
+  const leading = 3;
+  const days = 30;
+  const cells: (number | null)[] = [
+    ...Array(leading).fill(null),
+    ...Array.from({ length: days }, (_, i) => i + 1),
+  ];
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return (
+    <div className="bg-petal-cream border border-petal-rule rounded-md p-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className="font-display italic text-base text-petal-ink">六月</span>
+        <SampleTag />
+      </div>
+      <div className="grid grid-cols-7 gap-y-1.5 text-center">
+        {['日', '一', '二', '三', '四', '五', '六'].map((d) => (
+          <div key={d} className="font-body text-[10px] text-petal-muted">
+            {d}
+          </div>
+        ))}
+        {cells.map((day, i) => (
+          <div key={i} className="flex flex-col items-center justify-start h-8">
+            {day !== null && (
+              <>
+                <span className="font-body text-xs text-petal-ink leading-none">{day}</span>
+                {MARKED[day] && (
+                  <span className={`mt-1 w-1.5 h-1.5 rounded-full ${DOT_CLS[MARKED[day]]}`} />
+                )}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center justify-center gap-3 mt-3 pt-3 border-t border-petal-rule">
+        <span className="flex items-center gap-1 font-body text-[11px] text-petal-muted">
+          <span className="w-1.5 h-1.5 rounded-full bg-pink-500" /> 親密時光
+        </span>
+        <span className="flex items-center gap-1 font-body text-[11px] text-petal-muted">
+          <span className="w-1.5 h-1.5 rounded-full bg-petal-rose-deep" /> 生理期
+        </span>
+        <span className="flex items-center gap-1 font-body text-[11px] text-petal-muted">
+          <span className="w-1.5 h-1.5 rounded-full bg-petal-sage-deep" /> 心情
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// The 衝突事件 "repair flywheel" — the heart of the product. Four connected
+// steps, escalating to an AI / human counselor when the couple gets stuck.
+const FLYWHEEL: { icon: LucideIcon; step: string; title: string; desc: string }[] = [
+  { icon: Pencil, step: '1', title: '記錄衝突', desc: '把這次的經過與委屈寫下來，當下不必急著送出。' },
+  { icon: TrendingUp, step: '2', title: '分析走勢', desc: '看見過往衝突大多來自哪些原因，掌握你們的相處模式。' },
+  { icon: Sparkles, step: '3', title: '學習開口', desc: 'AI 幫你把話說得更中性、更容易和好。' },
+  { icon: HeartHandshake, step: '4', title: '請諮商師協助', desc: '真的卡住了，AI 諮商師陪你聊，或預約真人諮商師。' },
+];
+
+// Sample "過往衝突主因" mini-analysis shown read-only in the preview.
+const CAUSE_BARS: { label: string; pct: number }[] = [
+  { label: '家務分配', pct: 45 },
+  { label: '溝通方式', pct: 30 },
+  { label: '作息差異', pct: 25 },
+];
+
+const ConflictFlywheelSample: React.FC = () => (
+  <div className="space-y-4">
+    {/* Mini trend analysis */}
+    <SampleCard>
+      <div className="flex items-center justify-between mb-3">
+        <span className="font-body text-xs text-petal-muted">過往衝突主因（近 90 天）</span>
+        <SampleTag />
+      </div>
+      <div className="space-y-2">
+        {CAUSE_BARS.map((c) => (
+          <div key={c.label} className="flex items-center gap-2">
+            <span className="font-body text-xs text-petal-ink w-16 shrink-0">{c.label}</span>
+            <div className="flex-1 h-2 rounded-full bg-petal-cream-2 overflow-hidden">
+              <div className="h-full rounded-full bg-petal-rose-deep" style={{ width: `${c.pct}%` }} />
+            </div>
+            <span className="font-body text-[11px] text-petal-muted w-8 text-right">{c.pct}%</span>
+          </div>
+        ))}
+      </div>
+    </SampleCard>
+
+    {/* The four-step repair flywheel */}
+    <div className="space-y-2.5">
+      {FLYWHEEL.map((s) => {
+        const Icon = s.icon;
+        return (
+          <div key={s.step} className="flex items-start gap-3 text-left">
+            <div className="shrink-0 w-9 h-9 rounded-full bg-petal-cream-2 text-pink-600 flex items-center justify-center">
+              <Icon className="w-4 h-4" strokeWidth={1.5} />
+            </div>
+            <div className="min-w-0">
+              <div className="font-body text-sm font-medium text-petal-ink">
+                <span className="text-petal-muted mr-1">{s.step}.</span>
+                {s.title}
+              </div>
+              <div className="font-body text-xs text-petal-muted leading-relaxed">{s.desc}</div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+);
+
 const PREVIEWS: Record<string, PreviewConfig> = {
   record: {
     icon: Calendar,
@@ -61,31 +192,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       </>
     ),
     description: '親密時光、生理期與心情，一張月曆全部看得見。回顧你們走過的每一天。',
-    sample: (
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between">
-          <span className="font-body text-xs text-petal-muted">六月</span>
-          <SampleTag />
-        </div>
-        {[
-          { day: '14', emoji: '💗', label: '親密時光', note: '在家的安靜夜晚' },
-          { day: '09', emoji: '🌙', label: '生理期', note: '第 2 天' },
-          { day: '03', emoji: '☺️', label: '好心情', note: '一起看了場電影' },
-        ].map((e) => (
-          <SampleCard key={e.day}>
-            <div className="flex items-center gap-3">
-              <div className="font-display italic text-lg text-petal-ink w-7 shrink-0">{e.day}</div>
-              <div className="min-w-0">
-                <div className="font-body text-sm text-petal-ink">
-                  {e.emoji} {e.label}
-                </div>
-                <div className="font-body text-xs text-petal-muted truncate">{e.note}</div>
-              </div>
-            </div>
-          </SampleCard>
-        ))}
-      </div>
-    ),
+    sample: <CalendarMock />,
   },
   conflict: {
     icon: MessageCircle,
@@ -112,33 +219,15 @@ const PREVIEWS: Record<string, PreviewConfig> = {
   },
   events: {
     icon: MessageSquareHeart,
-    eyebrow: '衝突事件',
+    eyebrow: '衝突事件 · 關係修復的核心',
     title: (
       <>
-        把委屈<em className="not-italic font-light italic text-pink-600">好好說出口</em>
+        讓每次衝突，成為<em className="not-italic font-light italic text-pink-600">修復的起點</em>
       </>
     ),
-    description: '把這次的衝突與心裡的委屈寫下來，AI 幫你改寫成不指責、不示弱的中性語氣，再決定要不要送給對方。',
-    sample: (
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between">
-          <span className="font-body text-xs text-petal-muted">把感受寫下來 → AI 改寫</span>
-          <SampleTag />
-        </div>
-        <SampleCard>
-          <p className="font-body text-xs text-petal-muted mb-1">你寫的</p>
-          <p className="font-body text-sm text-petal-ink leading-relaxed">
-            今天他又忘記回我訊息，我覺得自己根本不被重視。
-          </p>
-        </SampleCard>
-        <SampleCard>
-          <p className="font-body text-xs text-petal-rose-deep mb-1">AI 改寫（堅定不攻擊版）</p>
-          <p className="font-display italic font-light text-sm text-petal-ink leading-relaxed">
-            「今天訊息沒有回覆讓我有點失落。對我來說，及時的回應會讓我更安心，我們可以聊聊怎麼配合嗎？」
-          </p>
-        </SampleCard>
-      </div>
-    ),
+    description:
+      '這是 Twogether 的核心。記錄衝突、看見走勢、學會怎麼說，真的卡住了，就請 AI 諮商師陪你們聊，或預約真人諮商師。',
+    sample: <ConflictFlywheelSample />,
   },
   wall: {
     icon: StickyNote,
