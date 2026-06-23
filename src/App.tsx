@@ -14,6 +14,7 @@ import ConflictView from './components/ConflictView';
 import WallView from './components/WallView';
 import EventsView from './components/EventsView';
 import TherapistsView from './components/TherapistsView';
+import LoggedOutPreview from './components/LoggedOutPreview';
 import type { WallExample } from './components/WallPostComposer';
 import Header from './components/Header';
 import { NotificationContainer } from './components/ErrorNotification';
@@ -1886,29 +1887,10 @@ const LoveTimeApp = () => {
         />;
         // Therapist directory is browseable (and applicable) while logged out;
         // booking a consultation prompts for login inside the modal.
-        case 'therapists': return <TherapistsView authState={authState} showNotification={showNotification} />;
-        default: return (
-          <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="text-center max-w-md">
-              <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-4">
-                — 歡迎
-              </div>
-              <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-4">
-                歡迎使用 <em className="not-italic font-light italic text-pink-600">Twogether</em>
-              </h2>
-              <p className="font-display italic font-light text-base text-petal-muted mb-8">
-                登入以開始記錄你們的愛情時光。
-              </p>
-              <button
-                onClick={() => setShowAuthModal(true)}
-                className="bg-petal-ink text-petal-cream px-8 py-3 rounded-md hover:bg-pink-700 transition-colors font-display italic text-lg"
-                data-testid="login-button"
-              >
-                立即登入 →
-              </button>
-            </div>
-          </div>
-        );
+        case 'therapists': return <TherapistsView authState={authState} showNotification={showNotification} onLogin={() => setShowAuthModal(true)} />;
+        // Each nav tab previews its own feature (read-only) instead of all
+        // falling through to one generic login wall. See LoggedOutPreview.
+        default: return <LoggedOutPreview view={currentView} onSignUp={() => setShowAuthModal(true)} />;
       }
     }
 
@@ -2304,8 +2286,25 @@ const LoveTimeApp = () => {
         <div className="max-w-6xl mx-auto">
           {renderView()}
         </div>
+
+        {/* Therapist entry — low-key footer link, kept out of the way of
+            regular couples but discoverable for practitioners. */}
+        {!authState.isAuthenticated && currentView !== 'therapists' && (
+          <footer className="max-w-6xl mx-auto mt-16 pt-6 border-t border-petal-rule text-center safe-pb">
+            <p className="font-body text-xs text-petal-muted">
+              你是諮商師？
+              <button
+                onClick={() => setCurrentView('therapists')}
+                data-testid="therapist-footer-link"
+                className="text-pink-600 hover:text-pink-700 underline underline-offset-2 ml-1"
+              >
+                登入 / 申請入駐
+              </button>
+            </p>
+          </footer>
+        )}
       </div>
-      
+
       {/* Modals */}
       {showAuthModal && (
         <AuthModal
