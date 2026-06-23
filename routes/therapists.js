@@ -939,14 +939,19 @@ router.get('/qa', optionalAuth, [
   try {
     const page = Math.max(1, Number(req.query.page) || 1);
     const offset = (page - 1) * PUBLIC_QA_PAGE_SIZE;
-    const params = [];
-    let where = `tc.public_status = 'published'`;
+    const fetchCap = offset + PUBLIC_QA_PAGE_SIZE + 1; // enough to paginate the merged set
+    const preview = (s) =>
+      s ? s.slice(0, QA_PREVIEW_LEN) + (s.length > QA_PREVIEW_LEN ? '…' : '') : '';
+
+    // 1) Published therapist consultations (the asker is anonymised, therapist shown).
+    const consultParams = [];
+    let consultWhere = `tc.public_status = 'published'`;
     if (req.query.focus) {
-      params.push(req.query.focus);
-      where += ` AND tc.focus_area = $${params.length}`;
+      consultParams.push(req.query.focus);
+      consultWhere += ` AND tc.focus_area = $${consultParams.length}`;
     }
-    params.push(PUBLIC_QA_PAGE_SIZE + 1, offset); // fetch one extra to detect "hasMore"
-    const result = await db.query(`
+    consultParams.push(fetchCap);
+    const consultations = await db.query(`
       SELECT tc.id, tc.public_title, tc.focus_area, tc.published_at,
              t.id AS therapist_id, t.display_name AS therapist_name,
              t.title AS therapist_title, t.photo_url,
@@ -956,44 +961,174 @@ router.get('/qa', optionalAuth, [
                WHERE cm.consultation_id = tc.id ORDER BY cm.created_at ASC LIMIT 1) AS first_message
         FROM therapist_consultations tc
         JOIN therapists t ON t.id = tc.therapist_id
-       WHERE ${where}
+       WHERE ${consultWhere}
        ORDER BY tc.published_at DESC
-       LIMIT $${params.length - 1} OFFSET $${params.length}
-    `, params);
+       LIMIT $${consultParams.length}
+    `, consultParams);
 
-    const rows = result.rows.slice(0, PUBLIC_QA_PAGE_SIZE);
-    const hasMore = result.rows.length > PUBLIC_QA_PAGE_SIZE;
-    res.json({
-      success: true,
-      page,
-      hasMore,
-      threads: rows.map((r) => ({
-        id: r.id,
-        title: r.public_title,
-        focusArea: r.focus_area,
-        publishedAt: r.published_at,
-        therapist: {
-          id: r.therapist_id,
-          displayName: r.therapist_name,
-          title: r.therapist_title,
-          photoUrl: r.photo_url,
-        },
-        preview: r.first_message
-          ? r.first_message.slice(0, QA_PREVIEW_LEN) + (r.first_message.length > QA_PREVIEW_LEN ? '…' : '')
-          : '',
-        messageCount: Number(r.message_count) || 0,
-        helpfulCount: Number(r.helpful_count) || 0,
-      })),
-    });
+    let merged = consultations.rows.map((r) => ({
+      id: r.id,
+      source: 'consultation',
+      title: r.public_title,
+      focusArea: r.focus_area,
+      publishedAt: r.published_at,
+      therapist: {
+        id: r.therapist_id,
+        displayName: r.therapist_name,
+        title: r.therapist_title,
+        photoUrl: r.photo_url,
+      },
+      preview: preview(r.first_message),
+      messageCount: Number(r.message_count) || 0,
+      helpfulCount: Number(r.helpful_count) || 0,
+    }));
+
+    // 2) Couple-shared conflict events + wall threads (no focus area, so they only
+    // appear in the unfiltered "全部" view). Both parties are anonymised.
+    if (!req.query.focus) {
+      const [events, walls] = await Promise.all([
+        db.query(`
+          SELECT e.id, e.public_title, e.published_at, e.summary,
+                 (SELECT COUNT(*) FROM event_messages m WHERE m.event_id = e.id) AS message_count
+            FROM events e
+           WHERE e.public_status = 'published'
+           ORDER BY e.published_at DESC
+           LIMIT $1`, [fetchCap]),
+        db.query(`
+          SELECT p.id, p.public_title, p.published_at, p.content,
+                 (SELECT COUNT(*) FROM wall_post_replies r WHERE r.post_id = p.id) AS reply_count
+            FROM wall_posts p
+           WHERE p.public_status = 'published'
+           ORDER BY p.published_at DESC
+           LIMIT $1`, [fetchCap]),
+      ]);
+      merged = merged.concat(
+        events.rows.map((r) => ({
+          id: r.id,
+          source: 'event',
+          title: r.public_title,
+          focusArea: null,
+          publishedAt: r.published_at,
+          therapist: null,
+          preview: preview(r.summary),
+          messageCount: Number(r.message_count) || 0,
+          helpfulCount: 0,
+        })),
+        walls.rows.map((r) => ({
+          id: r.id,
+          source: 'wall',
+          title: r.public_title,
+          focusArea: null,
+          publishedAt: r.published_at,
+          therapist: null,
+          preview: preview(r.content),
+          messageCount: Number(r.reply_count) + 1 || 1,
+          helpfulCount: 0,
+        }))
+      );
+    }
+
+    // Merge-sort by published_at desc, then paginate the combined set.
+    merged.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+    const pageRows = merged.slice(offset, offset + PUBLIC_QA_PAGE_SIZE);
+    const hasMore = merged.length > offset + PUBLIC_QA_PAGE_SIZE;
+    res.json({ success: true, page, hasMore, threads: pageRows });
   } catch (error) {
     logError('Failed to list public Q&A', { err: error.message });
     res.status(500).json({ success: false, message: '無法取得公開問答列表' });
   }
 });
 
-// GET /api/therapists/qa/:id — a single published thread, read-only + anonymised.
+// Anonymise a couple's two participants as 匿名 A / 匿名 B (stable per thread),
+// with AI counselor messages always labelled "AI 諮商師".
+function makeAnonLabeler() {
+  const seen = new Map();
+  const names = ['匿名 A', '匿名 B', '匿名 C'];
+  return (senderId) => {
+    if (!seen.has(senderId)) seen.set(senderId, names[seen.size] || '匿名');
+    return seen.get(senderId);
+  };
+}
+
+// GET /api/therapists/qa/:id?source=event|wall — published couple thread,
+// read-only + fully anonymised (no names, no ids leaked).
 router.get('/qa/:id', optionalAuth, async (req, res) => {
   try {
+    const source = req.query.source;
+
+    if (source === 'event') {
+      const ev = await db.query(
+        `SELECT id, public_title, published_at, summary
+           FROM events WHERE id = $1 AND public_status = 'published'`,
+        [req.params.id]
+      );
+      if (ev.rows.length === 0) {
+        return res.status(404).json({ success: false, message: '找不到這則公開問答，或它已被取消公開' });
+      }
+      const e = ev.rows[0];
+      const msgs = await db.query(
+        `SELECT id, sender_id, content, is_ai, created_at
+           FROM event_messages WHERE event_id = $1 ORDER BY created_at ASC`,
+        [req.params.id]
+      );
+      const label = makeAnonLabeler();
+      const messages = [
+        { id: `${e.id}-summary`, body: e.summary, createdAt: e.published_at, isTherapist: false, isAi: false, senderName: '匿名 A' },
+        ...msgs.rows.map((m) => ({
+          id: m.id,
+          body: m.content,
+          createdAt: m.created_at,
+          isTherapist: false,
+          isAi: m.is_ai === true,
+          senderName: m.is_ai ? 'AI 諮商師' : label(m.sender_id),
+        })),
+      ];
+      return res.json({
+        success: true,
+        thread: {
+          id: e.id, source: 'event', title: e.public_title, focusArea: null,
+          publishedAt: e.published_at, helpfulCount: 0, hasVoted: false, therapist: null, messages,
+        },
+      });
+    }
+
+    if (source === 'wall') {
+      const wp = await db.query(
+        `SELECT id, public_title, published_at, content, author_id
+           FROM wall_posts WHERE id = $1 AND public_status = 'published'`,
+        [req.params.id]
+      );
+      if (wp.rows.length === 0) {
+        return res.status(404).json({ success: false, message: '找不到這則公開問答，或它已被取消公開' });
+      }
+      const p = wp.rows[0];
+      const replies = await db.query(
+        `SELECT id, author_id, content, is_ai, created_at
+           FROM wall_post_replies WHERE post_id = $1 ORDER BY created_at ASC`,
+        [req.params.id]
+      );
+      const label = makeAnonLabeler();
+      label(p.author_id); // post author becomes 匿名 A
+      const messages = [
+        { id: `${p.id}-post`, body: p.content, createdAt: p.published_at, isTherapist: false, isAi: false, senderName: '匿名 A' },
+        ...replies.rows.map((r) => ({
+          id: r.id,
+          body: r.content,
+          createdAt: r.created_at,
+          isTherapist: false,
+          isAi: r.is_ai === true,
+          senderName: r.is_ai ? 'AI 諮商師' : label(r.author_id),
+        })),
+      ];
+      return res.json({
+        success: true,
+        thread: {
+          id: p.id, source: 'wall', title: p.public_title, focusArea: null,
+          publishedAt: p.published_at, helpfulCount: 0, hasVoted: false, therapist: null, messages,
+        },
+      });
+    }
+
     const meta = await db.query(`
       SELECT tc.id, tc.public_title, tc.focus_area, tc.published_at,
              t.id AS therapist_id, t.user_id AS therapist_user_id,
@@ -1028,6 +1163,7 @@ router.get('/qa/:id', optionalAuth, async (req, res) => {
       success: true,
       thread: {
         id: m.id,
+        source: 'consultation',
         title: m.public_title,
         focusArea: m.focus_area,
         publishedAt: m.published_at,

@@ -333,6 +333,8 @@ export interface EventRecord {
   selectedVersion: EventVersionKey | null;
   status: EventStatus;
   isPrivate: boolean;
+  publicStatus: 'private' | 'published';
+  publicTitle: string | null;
   resolveRequestedBy: string | null;
   resolveRequestedAt: string | null;
   resolvedAt: string | null;
@@ -380,6 +382,8 @@ export interface WallPost {
   author_id: string;
   author_nickname: string | null;
   reply_count: number;
+  public_status?: 'private' | 'published';
+  public_title?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -909,12 +913,16 @@ export interface ConsultationThread {
 
 // --- 公開問答 (Public Q&A) read-only browse types ---
 
+export type PublicQaSource = 'consultation' | 'event' | 'wall';
+
 export interface PublicQaThreadSummary {
   id: string;
+  source: PublicQaSource;
   title: string;
   focusArea?: TherapistFocusArea | null;
   publishedAt: string;
-  therapist: { id: string; displayName: string; title?: string | null; photoUrl?: string | null };
+  // null for couple-shared (event/wall) threads, which have no therapist.
+  therapist: { id: string; displayName: string; title?: string | null; photoUrl?: string | null } | null;
   preview: string;
   messageCount: number;
   helpfulCount: number;
@@ -925,17 +933,19 @@ export interface PublicQaMessage {
   body: string;
   createdAt: string;
   isTherapist: boolean;
-  senderName: string; // therapist name, or "匿名個案"
+  isAi?: boolean;
+  senderName: string; // therapist name, "匿名個案", "匿名 A/B", or "AI 諮商師"
 }
 
 export interface PublicQaThread {
   id: string;
+  source: PublicQaSource;
   title: string;
   focusArea?: TherapistFocusArea | null;
   publishedAt: string;
   helpfulCount: number;
   hasVoted: boolean;
-  therapist: { id: string; displayName: string; title?: string | null; photoUrl?: string | null };
+  therapist: { id: string; displayName: string; title?: string | null; photoUrl?: string | null } | null;
   messages: PublicQaMessage[];
 }
 
@@ -2661,6 +2671,8 @@ class ApiService {
       selected_version?: EventVersionKey | null;
       status?: EventStatus;
       is_private?: boolean;
+      public_status?: 'private' | 'published';
+      public_title?: string | null;
       resolve_requested_by?: string | null;
       resolve_requested_at?: string | null;
       resolved_at?: string | null;
@@ -2687,6 +2699,8 @@ class ApiService {
       selectedVersion: r.selected_version ?? null,
       status: (r.status as EventStatus) || 'open',
       isPrivate: Boolean(r.is_private),
+      publicStatus: r.public_status === 'published' ? 'published' : 'private',
+      publicTitle: r.public_title ?? null,
       resolveRequestedBy: r.resolve_requested_by ?? null,
       resolveRequestedAt: r.resolve_requested_at ?? null,
       resolvedAt: r.resolved_at ?? null,
@@ -2953,13 +2967,55 @@ class ApiService {
     }
   }
 
-  async getPublicQaThread(id: string): Promise<PublicQaThread> {
+  async getPublicQaThread(id: string, source: PublicQaSource = 'consultation'): Promise<PublicQaThread> {
     try {
-      const response = await apiClient.get(`/therapists/qa/${id}`);
+      const response = await apiClient.get(`/therapists/qa/${id}`, {
+        params: source === 'consultation' ? {} : { source },
+      });
       return response.data?.thread as PublicQaThread;
     } catch (error: unknown) {
       console.error('Failed to fetch public Q&A thread:', error);
       this.throwApiError(error, '無法載入公開問答');
+    }
+  }
+
+  // Share / un-share a conflict event into 公開問答.
+  async publishEvent(eventId: string, title?: string): Promise<EventRecord> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/publish`, title ? { title } : {});
+      return this.transformEvent(response.data.event);
+    } catch (error: unknown) {
+      console.error('Failed to publish event:', error);
+      this.throwApiError(error, '公開失敗，請稍後再試');
+    }
+  }
+
+  async unpublishEvent(eventId: string): Promise<EventRecord> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/unpublish`);
+      return this.transformEvent(response.data.event);
+    } catch (error: unknown) {
+      console.error('Failed to unpublish event:', error);
+      this.throwApiError(error, '取消公開失敗，請稍後再試');
+    }
+  }
+
+  // Share / un-share a wall thread into 公開問答.
+  async publishWallPost(postId: string, title?: string): Promise<void> {
+    try {
+      await apiClient.post(`/wall/${postId}/publish`, title ? { title } : {});
+    } catch (error: unknown) {
+      console.error('Failed to publish wall post:', error);
+      this.throwApiError(error, '公開失敗，請稍後再試');
+    }
+  }
+
+  async unpublishWallPost(postId: string): Promise<void> {
+    try {
+      await apiClient.post(`/wall/${postId}/unpublish`);
+    } catch (error: unknown) {
+      console.error('Failed to unpublish wall post:', error);
+      this.throwApiError(error, '取消公開失敗，請稍後再試');
     }
   }
 

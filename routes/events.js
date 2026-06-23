@@ -139,6 +139,8 @@ function serializeEvent(row, extras = {}) {
     },
     selected_version: row.selected_version,
     is_private: row.is_private,
+    public_status: row.public_status || 'private',
+    public_title: row.public_title || null,
     status: row.status,
     resolve_requested_by: row.resolve_requested_by,
     resolve_requested_at: row.resolve_requested_at,
@@ -765,6 +767,67 @@ router.put(
     }
   }
 );
+
+// Share an event thread into the public 公開問答 (anonymised, read-only). Either
+// partner can publish their couple's event; a single-party toggle with an
+// in-app warning on the client. Private events can't be shared (no shared thread).
+router.post(
+  '/:id/publish',
+  [param('id').isUUID(), body('title').optional().isString().isLength({ max: 200 })],
+  async (req, res) => {
+    if (sendValidationError(req, res)) return;
+    try {
+      const access = await assertEventAccess(req.params.id, req.user.id);
+      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (access.event.is_private) {
+        return res.status(400).json({ success: false, message: '私人事件無法公開分享' });
+      }
+      const title = (req.body.title && req.body.title.trim()) || access.event.title;
+      const result = await db.query(
+        `UPDATE events
+            SET public_status = 'published', public_title = $2,
+                published_at = NOW(), published_by = $3
+          WHERE id = $1
+          RETURNING *`,
+        [req.params.id, title, req.user.id]
+      );
+      logInfo('events.published', { userId: req.user.id, eventId: req.params.id });
+      res.json({
+        success: true,
+        message: '已匿名公開到公開問答，謝謝你願意幫助其他人。',
+        event: serializeEvent(result.rows[0]),
+      });
+    } catch (err) {
+      logError('Publish event failed', { err: err.message, stack: err.stack, eventId: req.params.id });
+      res.status(500).json({ success: false, message: '公開失敗，請稍後再試' });
+    }
+  }
+);
+
+// Un-share a previously published event.
+router.post('/:id/unpublish', [param('id').isUUID()], async (req, res) => {
+  if (sendValidationError(req, res)) return;
+  try {
+    const access = await assertEventAccess(req.params.id, req.user.id);
+    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    const result = await db.query(
+      `UPDATE events
+          SET public_status = 'private', published_at = NULL
+        WHERE id = $1
+        RETURNING *`,
+      [req.params.id]
+    );
+    logInfo('events.unpublished', { userId: req.user.id, eventId: req.params.id });
+    res.json({
+      success: true,
+      message: '已取消公開，這個對話不再顯示於公開問答。',
+      event: serializeEvent(result.rows[0]),
+    });
+  } catch (err) {
+    logError('Unpublish event failed', { err: err.message, stack: err.stack, eventId: req.params.id });
+    res.status(500).json({ success: false, message: '取消公開失敗，請稍後再試' });
+  }
+});
 
 // One side requests "mark as resolved"
 router.post('/:id/resolve-request', [param('id').isUUID()], async (req, res) => {
