@@ -955,6 +955,33 @@ export interface PublicQaListResult {
   threads: PublicQaThreadSummary[];
 }
 
+export interface RelationshipSummary {
+  paired: boolean;
+  partnerNickname?: string | null;
+  daysSinceIntimacy?: number | null;
+  daysSinceAppreciation?: number | null;
+  positive14?: number;
+  negative14?: number;
+  openConflicts?: number;
+  checkin?: {
+    myLastDays: number | null;
+    coupleLastDays: number | null;
+    periodDays: number;
+    overdue: boolean;
+  };
+}
+
+export interface RelationshipCheckin {
+  id: string;
+  nickname: string;
+  isMine: boolean;
+  trust: number;
+  commitment: number;
+  connection: number;
+  note: string | null;
+  createdAt: string;
+}
+
 // API Service Class
 class ApiService {
   private throwApiError(error: unknown, fallbackMessage: string): never {
@@ -2022,6 +2049,36 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to save assessment:', error);
       this.throwApiError(error, '儲存測驗結果失敗，請稍後再試');
+    }
+  }
+
+  // Relationship cultivation ("關係之屋") dashboard + check-ins.
+  async getRelationshipSummary(): Promise<RelationshipSummary> {
+    try {
+      const response = await apiClient.get('/relationship/summary');
+      return response.data as RelationshipSummary;
+    } catch (error: unknown) {
+      console.error('Failed to fetch relationship summary:', error);
+      return { paired: false };
+    }
+  }
+
+  async submitCheckin(input: { trust: number; commitment: number; connection: number; note?: string }): Promise<void> {
+    try {
+      await apiClient.post('/relationship/checkin', input);
+    } catch (error: unknown) {
+      console.error('Failed to submit check-in:', error);
+      this.throwApiError(error, '儲存關係檢視失敗，請稍後再試');
+    }
+  }
+
+  async getCheckins(): Promise<RelationshipCheckin[]> {
+    try {
+      const response = await apiClient.get('/relationship/checkins');
+      return (response.data?.checkins || []) as RelationshipCheckin[];
+    } catch (error: unknown) {
+      console.error('Failed to fetch check-ins:', error);
+      return [];
     }
   }
 
