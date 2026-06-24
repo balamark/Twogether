@@ -8,6 +8,9 @@ import {
   Loader2,
   Lock,
   Sparkles,
+  HeartHandshake,
+  Globe,
+  RotateCcw,
   X,
 } from 'lucide-react';
 import apiService, {
@@ -74,6 +77,11 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
   const [resolving, setResolving] = useState(false);
   const [rewriting, setRewriting] = useState(false);
   const [rewritePreview, setRewritePreview] = useState<ReplyRewritePreview | null>(null);
+  const [aiInviting, setAiInviting] = useState(false);
+  const [aiPosting, setAiPosting] = useState(false);
+  const [aiPreview, setAiPreview] = useState<string | null>(null);
+  const [shareWarnOpen, setShareWarnOpen] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const tz = useTimezone();
 
   const insertPhrase = (phrase: string) => {
@@ -142,6 +150,71 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
     }
   };
 
+  const inviteAiCounselor = async () => {
+    setAiInviting(true);
+    try {
+      const comment = await apiService.previewEventAiComment(eventId);
+      setAiPreview(comment);
+    } catch (err) {
+      showNotification({
+        type: 'error',
+        title: 'AI 諮商師暫時無法回應',
+        message: err instanceof Error ? err.message : '請稍後再試',
+      });
+    } finally {
+      setAiInviting(false);
+    }
+  };
+
+  const postAiCounselor = async () => {
+    if (!aiPreview) return;
+    setAiPosting(true);
+    try {
+      await apiService.postEventAiComment(eventId, aiPreview);
+      setAiPreview(null);
+      await refresh();
+    } catch (err) {
+      showNotification({
+        type: 'error',
+        title: '貼上失敗',
+        message: err instanceof Error ? err.message : '請稍後再試',
+      });
+    } finally {
+      setAiPosting(false);
+    }
+  };
+
+  const confirmShare = async () => {
+    setSharing(true);
+    try {
+      const updated = await apiService.publishEvent(eventId);
+      setEvent((prev) => (prev ? { ...prev, publicStatus: updated.publicStatus } : prev));
+      setShareWarnOpen(false);
+      showNotification({
+        type: 'success',
+        title: '已匿名公開',
+        message: '這段對話會以匿名方式顯示在「公開問答」，謝謝你願意幫助別人。',
+      });
+    } catch (err) {
+      showNotification({ type: 'error', title: '公開失敗', message: err instanceof Error ? err.message : '請稍後再試' });
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const unshare = async () => {
+    setSharing(true);
+    try {
+      const updated = await apiService.unpublishEvent(eventId);
+      setEvent((prev) => (prev ? { ...prev, publicStatus: updated.publicStatus } : prev));
+      showNotification({ type: 'info', title: '已取消公開', message: '這段對話不再顯示於公開問答。' });
+    } catch (err) {
+      showNotification({ type: 'error', title: '操作失敗', message: err instanceof Error ? err.message : '請稍後再試' });
+    } finally {
+      setSharing(false);
+    }
+  };
+
   const handleResolveRequest = async () => {
     setResolving(true);
     try {
@@ -169,6 +242,23 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
       await apiService.confirmEventResolve(eventId);
       await refresh();
       showNotification({ type: 'success', title: '事件已解決', message: '雙方確認完成' });
+    } catch (err) {
+      showNotification({
+        type: 'error',
+        title: '操作失敗',
+        message: err instanceof Error ? err.message : '請稍後再試',
+      });
+    } finally {
+      setResolving(false);
+    }
+  };
+
+  const handleReopen = async () => {
+    setResolving(true);
+    try {
+      await apiService.reopenEvent(eventId);
+      await refresh();
+      showNotification({ type: 'success', title: '已重新開啟', message: '可以繼續討論這個事件了' });
     } catch (err) {
       showNotification({
         type: 'error',
@@ -234,6 +324,39 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
             </span>
           ))}
         </div>
+
+        {/* Share to 公開問答 (anonymised, single-party toggle with warning) */}
+        {!event.isPrivate && (
+          <div className="mt-4 pt-3 border-t border-petal-rule">
+            {event.publicStatus === 'published' ? (
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs text-petal-sage-deep inline-flex items-center gap-1.5">
+                  <Globe className="w-3.5 h-3.5" />
+                  已匿名公開到公開問答
+                </span>
+                <button
+                  type="button"
+                  data-testid="event-unshare-button"
+                  onClick={unshare}
+                  disabled={sharing}
+                  className="text-xs px-3 py-1.5 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink disabled:opacity-50"
+                >
+                  取消公開
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                data-testid="event-share-button"
+                onClick={() => setShareWarnOpen(true)}
+                className="text-xs px-3 py-1.5 rounded-full border border-petal-sage text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink inline-flex items-center gap-1.5"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                匿名公開到公開問答
+              </button>
+            )}
+          </div>
+        )}
       </header>
 
       {!event.isPrivate && (
@@ -242,6 +365,20 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
             <p className="text-sm text-petal-ink-soft text-center py-4">尚無訊息</p>
           )}
           {event.messages.map((m) => {
+            if (m.isAi) {
+              return (
+                <div key={m.id} className="flex justify-center">
+                  <div className="max-w-[92%] w-full rounded-2xl px-4 py-3 bg-petal-sage/15 border border-petal-sage/40">
+                    <div className="flex items-center gap-1.5 mb-1 text-petal-sage-deep">
+                      <HeartHandshake className="w-3.5 h-3.5" />
+                      <span className="text-xs font-medium">AI 諮商師</span>
+                    </div>
+                    <p className="text-sm text-petal-ink whitespace-pre-wrap leading-relaxed">{m.content}</p>
+                    <p className="text-[10px] text-petal-muted mt-1.5">{formatTime(m.createdAt, tz)}</p>
+                  </div>
+                </div>
+              );
+            }
             const mine = m.senderId === currentUserId;
             return (
               <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
@@ -277,6 +414,17 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
           <div className="flex flex-wrap justify-end gap-2 mt-2">
             <button
               type="button"
+              data-testid="event-ai-counselor-button"
+              onClick={inviteAiCounselor}
+              disabled={aiInviting}
+              className="px-3 py-2 rounded-full border border-petal-sage-deep text-petal-sage-deep inline-flex items-center gap-2 disabled:opacity-50 hover:bg-petal-sage/20 mr-auto"
+              title="請 AI 諮商師讀過你們的對話，給一段中立的建議"
+            >
+              {aiInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
+              <span>請 AI 諮商師加入</span>
+            </button>
+            <button
+              type="button"
               data-testid="event-reply-rewrite-button"
               onClick={requestRewrite}
               disabled={rewriting || reply.trim().length === 0}
@@ -308,6 +456,23 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
         />
       )}
 
+      {aiPreview !== null && (
+        <AiCounselorPreview
+          comment={aiPreview}
+          posting={aiPosting}
+          onPost={postAiCounselor}
+          onCancel={() => setAiPreview(null)}
+        />
+      )}
+
+      {shareWarnOpen && (
+        <ShareWarning
+          busy={sharing}
+          onConfirm={confirmShare}
+          onCancel={() => setShareWarnOpen(false)}
+        />
+      )}
+
       {!event.isPrivate && event.status !== 'resolved' && (
         <ResolveControls
           event={event}
@@ -316,6 +481,25 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
           onRequest={handleResolveRequest}
           onConfirm={handleResolveConfirm}
         />
+      )}
+
+      {!event.isPrivate && event.status === 'resolved' && (
+        <div className="flex flex-col items-center gap-2 text-center bg-petal-sage/15 border border-petal-sage/40 rounded-2xl p-4">
+          <p className="text-sm text-petal-ink-soft inline-flex items-center gap-1.5">
+            <CheckCircle2 className="w-4 h-4 text-petal-sage-deep" />
+            這個事件已解決。如果還想再聊聊，可以重新開啟。
+          </p>
+          <button
+            type="button"
+            data-testid="event-reopen-button"
+            disabled={resolving}
+            onClick={handleReopen}
+            className="px-4 py-2 rounded-full border border-petal-sage text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2 disabled:opacity-50"
+          >
+            {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+            重新開啟討論
+          </button>
+        </div>
       )}
     </div>
   );
@@ -373,6 +557,113 @@ function ResolveControls({
     );
   }
   return null;
+}
+
+function AiCounselorPreview({
+  comment,
+  posting,
+  onPost,
+  onCancel,
+}: {
+  comment: string;
+  posting: boolean;
+  onPost: () => void;
+  onCancel: () => void;
+}) {
+  useScrollLock(true);
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      data-testid="event-ai-counselor-modal"
+    >
+      <div className="bg-petal-cream rounded-2xl max-w-lg w-full max-h-[min(85vh,calc(100dvh-80px))] overflow-y-auto overscroll-contain p-4 sm:p-5">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <HeartHandshake className="w-5 h-5 text-petal-sage-deep" />
+            <div>
+              <h3 className="text-lg font-serif text-petal-ink">AI 諮商師的建議</h3>
+              <p className="text-xs text-petal-ink-soft mt-1">看看這段建議，貼到對話串後雙方都看得到。</p>
+            </div>
+          </div>
+          <button type="button" onClick={onCancel} className="text-petal-ink-soft hover:text-petal-ink" aria-label="取消">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="bg-white border border-petal-sage/40 rounded-xl p-4 mb-4">
+          <p className="text-sm text-petal-ink whitespace-pre-wrap leading-relaxed">{comment}</p>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-sm px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20"
+          >
+            先不要
+          </button>
+          <button
+            type="button"
+            data-testid="event-ai-counselor-post"
+            onClick={onPost}
+            disabled={posting}
+            className="text-sm px-4 py-2 rounded-full bg-petal-sage-deep text-petal-cream inline-flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
+          >
+            {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            貼到對話串
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ShareWarning({
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  busy: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  useScrollLock(true);
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-testid="event-share-warning">
+      <div className="bg-petal-cream rounded-2xl max-w-md w-full p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Globe className="w-5 h-5 text-petal-rose-deep" />
+          <h3 className="text-lg font-serif text-petal-ink">公開到「公開問答」</h3>
+        </div>
+        <p className="text-sm text-petal-ink-soft leading-relaxed mb-2">
+          公開後，這段對話會<span className="text-petal-ink font-medium">匿名</span>顯示在「公開問答」，
+          <span className="text-petal-ink font-medium">所有人（包含未登入的訪客）都看得到</span>。
+        </p>
+        <p className="text-sm text-petal-ink-soft leading-relaxed mb-4">
+          你們會顯示為「匿名 A / 匿名 B」，不會出現名字。你隨時可以取消公開。
+        </p>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-sm px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20"
+          >
+            取消
+          </button>
+          <button
+            type="button"
+            data-testid="event-share-confirm"
+            onClick={onConfirm}
+            disabled={busy}
+            className="text-sm px-4 py-2 rounded-full bg-petal-ink text-petal-cream inline-flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+            確定公開
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function BackButton({ onBack }: { onBack: () => void }) {

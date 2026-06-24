@@ -198,4 +198,68 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
     await expect(page.getByTestId('event-reply-rewrite-modal')).toHaveCount(0);
     await expect(replyInput).toHaveValue(/中性版：我這邊看到家事分配/);
   });
+
+  test('invite the AI 諮商師 into the event thread', async ({ page }) => {
+    const AI_TEXT = '我聽見你們都在意彼此的感受。各自說出一個具體期待，會更容易找到平衡。';
+    let aiPosted = false;
+    const aiMessage = {
+      id: 'ai-msg-1',
+      event_id: FAKE_EVENT_ID,
+      sender_id: FAKE_USER.id,
+      content: AI_TEXT,
+      is_ai: true,
+      created_at: new Date().toISOString(),
+      read_at: null,
+    };
+
+    // Preview + post stubs (registered in the test so they take precedence
+    // over the beforeEach catch-alls).
+    await page.route('**/api/events/*/ai-comment/preview', async (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, comment: AI_TEXT }),
+      })
+    );
+    await page.route('**/api/events/*/ai-comment', async (route) => {
+      if (route.request().method() === 'POST') {
+        aiPosted = true;
+        return route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({ success: true, message: aiMessage }),
+        });
+      }
+      return route.fallback();
+    });
+    // The event GET starts empty, then includes the AI message after posting.
+    await page.route(`**/api/events/${FAKE_EVENT_ID}`, async (route) => {
+      if (route.request().method() === 'GET') {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            event: { ...FAKE_EVENT, messages: aiPosted ? [aiMessage] : [] },
+          }),
+        });
+      }
+      return route.fallback();
+    });
+
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+    await page.locator('button:has-text("事件")').first().click();
+    await page.locator('text=今晚的家事').first().click();
+
+    // Invite the AI counselor → preview modal appears.
+    await page.getByTestId('event-ai-counselor-button').click();
+    await expect(page.getByTestId('event-ai-counselor-modal')).toBeVisible({ timeout: 10000 });
+
+    // Post it into the thread → modal closes and the AI message renders.
+    await page.getByTestId('event-ai-counselor-post').click();
+    await expect(page.getByTestId('event-ai-counselor-modal')).toHaveCount(0);
+    await expect(page.locator('text=AI 諮商師').first()).toBeVisible();
+    await expect(page.locator(`text=${AI_TEXT.slice(0, 12)}`).first()).toBeVisible();
+  });
 });

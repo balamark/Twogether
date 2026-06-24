@@ -237,4 +237,49 @@ async function generateWallCounselorComment({ postContent, postAuthorName, repli
   };
 }
 
-module.exports = { generateIcebreaker, rewriteReply, generateRoleplayMessages, generateWallCounselorComment };
+// Deterministic reconciliation openers. Same intensity (+ optional event) →
+// same three openers. No randomness or timestamps. Real provider can replace.
+const RECONCILIATION_OPENERS = {
+  goodwill: [
+    { label: '輕鬆問候', text: '欸，今天吃飯了嗎？想到就問一下。' },
+    { label: '小小關心', text: '剛剛看到一個你會喜歡的東西，先傳給你看看 🙂' },
+    { label: '釋出善意', text: '今天天氣不錯，突然有點想你。' },
+  ],
+  reflect: [
+    { label: '各退一步', text: '我想了想，這件事我也有需要調整的地方，不想一直這樣僵著。' },
+    { label: '一起面對', text: '我們是不是都有點累了？我也有我可以做得更好的部分。' },
+    { label: '放下對錯', text: '比起爭誰對誰錯，我更在乎我們之間。我也願意退一步。' },
+  ],
+  talk: [
+    { label: '想好好談', text: '我真的很在乎你，想找個時間好好聊聊，可以嗎？' },
+    { label: '主動邀約', text: '剛剛的事我也有不對的地方，等你方便的時候，我們談談好嗎？' },
+    { label: '帶點歉意', text: '對不起讓你不開心了，我想和你把話講開，不想就這樣放著。' },
+  ],
+};
+
+async function generateReconciliationOpeners({ intensity /* , eventContext */ }) {
+  const openers = RECONCILIATION_OPENERS[intensity];
+  if (!openers) {
+    throw new Error(`unknown reconciliation intensity: ${intensity}`);
+  }
+  const startedAt = Date.now();
+  return {
+    openers: openers.map((o) => ({ ...o })),
+    toxicityFlags: [],
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+    },
+  };
+}
+
+module.exports = {
+  generateIcebreaker,
+  rewriteReply,
+  generateRoleplayMessages,
+  generateWallCounselorComment,
+  generateReconciliationOpeners,
+};

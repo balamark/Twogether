@@ -632,6 +632,56 @@ adminApiRouter.get('/ai-usage', async (req, res) => {
   }
 });
 
+// ── User feedback ("用戶心得") moderation ────────────────────────────────────
+// GET /api/admin/feedback?status=pending — moderation queue.
+adminApiRouter.get('/feedback', async (req, res) => {
+  const status = ['pending', 'approved', 'hidden'].includes(req.query.status)
+    ? req.query.status
+    : 'pending';
+  try {
+    const result = await db.query(
+      `SELECT f.id, f.display_name, f.rating, f.body, f.status, f.created_at,
+              u.email AS user_email
+         FROM user_feedback f
+         LEFT JOIN users u ON u.id = f.user_id
+        WHERE f.status = $1
+        ORDER BY f.created_at DESC
+        LIMIT 200`,
+      [status]
+    );
+    res.json({ feedback: result.rows });
+  } catch (err) {
+    // Table may not exist yet on a fresh DB — surface as empty, not an error.
+    logWarn('Admin feedback query failed', { err: err.message });
+    res.json({ feedback: [] });
+  }
+});
+
+// POST /api/admin/feedback/:id/moderate { action: 'approve' | 'hide' }
+adminApiRouter.post('/feedback/:id/moderate', express.json(), async (req, res) => {
+  const { action } = req.body || {};
+  const nextStatus = action === 'approve' ? 'approved' : action === 'hide' ? 'hidden' : null;
+  if (!nextStatus) {
+    return res.status(400).json({ error: "action must be 'approve' or 'hide'" });
+  }
+  try {
+    const result = await db.query(
+      `UPDATE user_feedback
+          SET status = $1, reviewed_at = NOW()
+        WHERE id = $2
+        RETURNING id, status`,
+      [nextStatus, req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'feedback not found' });
+    }
+    res.json({ success: true, feedback: result.rows[0] });
+  } catch (err) {
+    logError('Admin feedback moderate failed', { err: err.message, id: req.params.id });
+    res.status(500).json({ error: 'moderate failed' });
+  }
+});
+
 // ──────────────────────────────────────────────────────────────────────────
 // Admin: HTML dashboard.
 // ──────────────────────────────────────────────────────────────────────────
@@ -687,7 +737,7 @@ const ADMIN_HTML = `<!doctype html>
     .badge.no  { background: #f6eceb; color: #8a4640; }
     .error { color: #b7635a; margin: 12px 0; }
     .muted { color: #b6ada8; }
-    .tabs { display: flex; gap: 4px; border-bottom: 1px solid #ece6e1; margin: 20px 0 16px; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid #ece6e1; margin: 20px 0 16px; }
     .tab {
       padding: 8px 16px; border: 0; background: transparent; cursor: pointer;
       font: inherit; color: #8a807c; border-bottom: 2px solid transparent;
@@ -724,6 +774,7 @@ const ADMIN_HTML = `<!doctype html>
       <button class="tab" data-panel="retention">回訪</button>
       <button class="tab" data-panel="therapists">諮商師</button>
       <button class="tab" data-panel="reviews">評價</button>
+      <button class="tab" data-panel="feedback">用戶心得</button>
       <button class="tab" data-panel="pool">分潤</button>
       <button class="tab" data-panel="roleplay">邀請劇本</button>
       <button class="tab" data-panel="ai-usage">AI 用量</button>
@@ -838,6 +889,30 @@ const ADMIN_HTML = `<!doctype html>
         <table id="reviewsTable">
           <thead>
             <tr><th>諮商師</th><th>評價者</th><th class="num">評分</th><th>內容</th><th>時間</th><th>操作</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Panel: User feedback ("用戶心得") -->
+    <div class="panel" id="panel-feedback">
+      <p class="sub">使用者意見回饋審核。通過後才會顯示在未登入首頁「聽聽其他用戶怎麼說」區塊。</p>
+      <div class="controls">
+        <label>狀態
+          <select id="feedbackStatus">
+            <option value="pending">待審核</option>
+            <option value="approved">已通過</option>
+            <option value="hidden">已隱藏</option>
+          </select>
+        </label>
+        <button id="feedbackRefresh">重新整理</button>
+        <span class="muted" id="feedbackStatusMsg"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="feedbackTable">
+          <thead>
+            <tr><th>顯示名稱</th><th>帳號</th><th class="num">評分</th><th>內容</th><th>時間</th><th>操作</th></tr>
           </thead>
           <tbody></tbody>
         </table>
@@ -1014,6 +1089,7 @@ const ADMIN_HTML = `<!doctype html>
       reply_rewrite: '回覆改寫',
       roleplay_messages: '邀請劇本',
       wall_counselor: '牆 · AI 諮商',
+      reconciliation_opener: '和解開場白',
     };
     function kindLabel(k) { return AI_KIND_LABELS[k] || (k || '—'); }
     function todayStr() { return new Date().toISOString().slice(0, 10); }
@@ -1404,6 +1480,52 @@ const ADMIN_HTML = `<!doctype html>
     $('reviewRefresh').addEventListener('click', loadReviews);
     $('reviewStatus').addEventListener('change', loadReviews);
 
+    // ── User feedback ("用戶心得") moderation ───────────────────────────────
+    async function loadFeedback() {
+      var status = $('feedbackStatus').value;
+      $('feedbackStatusMsg').textContent = '載入中…';
+      try {
+        var res = await fetch('/api/admin/feedback?status=' + encodeURIComponent(status));
+        if (!res.ok) throw new Error('feedback ' + res.status);
+        var body = await res.json();
+        renderFeedback(body.feedback || [], status);
+        $('feedbackStatusMsg').textContent = '更新於 ' + new Date().toLocaleTimeString('zh-TW');
+      } catch (e) { $('feedbackStatusMsg').textContent = '載入失敗: ' + e.message; }
+    }
+    function renderFeedback(rows, status) {
+      var tbody = document.querySelector('#feedbackTable tbody');
+      if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="muted">沒有資料</td></tr>'; return; }
+      tbody.innerHTML = rows.map(function (r) {
+        var actions = status === 'approved'
+          ? '<button data-fb="hide" data-id="' + r.id + '">隱藏</button>'
+          : '<button data-fb="approve" data-id="' + r.id + '">通過</button>' +
+            (status === 'pending' ? ' <button data-fb="hide" data-id="' + r.id + '">隱藏</button>' : '');
+        return '<tr>' +
+          '<td>' + esc(r.display_name) + '</td>' +
+          '<td>' + esc(r.user_email || '—') + '</td>' +
+          '<td class="num">' + (r.rating != null ? r.rating + ' ★' : '—') + '</td>' +
+          '<td style="max-width:340px">' + esc(r.body) + '</td>' +
+          '<td>' + fmtDate(r.created_at) + '</td>' +
+          '<td>' + actions + '</td>' +
+          '</tr>';
+      }).join('');
+      tbody.querySelectorAll('button[data-fb]').forEach(function (btn) {
+        btn.addEventListener('click', function () { moderateFeedback(btn.getAttribute('data-id'), btn.getAttribute('data-fb'), btn); });
+      });
+    }
+    async function moderateFeedback(id, action, btn) {
+      btn.disabled = true;
+      try {
+        var res = await fetch('/api/admin/feedback/' + id + '/moderate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: action })
+        });
+        if (!res.ok) throw new Error('moderate ' + res.status);
+        await loadFeedback();
+      } catch (e) { btn.disabled = false; $('feedbackStatusMsg').textContent = '操作失敗: ' + e.message; }
+    }
+    $('feedbackRefresh').addEventListener('click', loadFeedback);
+    $('feedbackStatus').addEventListener('change', loadFeedback);
+
     // ── Q&A revenue pool ───────────────────────────────────────────────────
     var POOL_STRATEGY = { even: '平均分配', volume: '依回覆量', engagement: '依參與度' };
     var POOL_STATUS = { draft: '草稿', computed: '已計算', finalized: '已結算', paid_out: '已撥款' };
@@ -1655,10 +1777,11 @@ const ADMIN_HTML = `<!doctype html>
 
     // Lazy-load the reviews + pool + roleplay + ai-usage tabs the first time
     // they're opened.
-    var reviewsLoaded = false, poolLoaded = false, roleplayLoaded = false, aiUsageLoaded = false;
+    var reviewsLoaded = false, feedbackLoaded = false, poolLoaded = false, roleplayLoaded = false, aiUsageLoaded = false;
     document.querySelectorAll('.tab').forEach(function (btn) {
       var panel = btn.getAttribute('data-panel');
       if (panel === 'reviews') btn.addEventListener('click', function () { if (!reviewsLoaded) { reviewsLoaded = true; loadReviews(); } });
+      if (panel === 'feedback') btn.addEventListener('click', function () { if (!feedbackLoaded) { feedbackLoaded = true; loadFeedback(); } });
       if (panel === 'pool') btn.addEventListener('click', function () { if (!poolLoaded) { poolLoaded = true; loadPools(); } });
       if (panel === 'roleplay') btn.addEventListener('click', function () { if (!roleplayLoaded) { roleplayLoaded = true; loadRoleplay(); } });
       if (panel === 'ai-usage') btn.addEventListener('click', function () { if (!aiUsageLoaded) { aiUsageLoaded = true; loadAiUsage(); } });

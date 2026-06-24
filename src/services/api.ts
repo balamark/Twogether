@@ -215,6 +215,15 @@ interface RoleplayMessagesResult {
   cached?: boolean;
 }
 
+// Reconciliation openers — neutral, face-saving ice-breaker lines generated
+// for the "真心和解" flow at a chosen intensity (low → high).
+export type ReconciliationIntensity = 'goodwill' | 'reflect' | 'talk';
+
+export interface ReconciliationOpener {
+  label: string;
+  text: string;
+}
+
 interface RoleplayMessageFeedbackInput {
   scriptId?: string;
   scriptTitle?: string;
@@ -306,6 +315,7 @@ export interface EventMessage {
   eventId: string;
   senderId: string;
   content: string;
+  isAi: boolean;
   createdAt: string;
   readAt: string | null;
 }
@@ -323,6 +333,8 @@ export interface EventRecord {
   selectedVersion: EventVersionKey | null;
   status: EventStatus;
   isPrivate: boolean;
+  publicStatus: 'private' | 'published';
+  publicTitle: string | null;
   resolveRequestedBy: string | null;
   resolveRequestedAt: string | null;
   resolvedAt: string | null;
@@ -370,6 +382,8 @@ export interface WallPost {
   author_id: string;
   author_nickname: string | null;
   reply_count: number;
+  public_status?: 'private' | 'published';
+  public_title?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -899,12 +913,16 @@ export interface ConsultationThread {
 
 // --- 公開問答 (Public Q&A) read-only browse types ---
 
+export type PublicQaSource = 'consultation' | 'event' | 'wall';
+
 export interface PublicQaThreadSummary {
   id: string;
+  source: PublicQaSource;
   title: string;
   focusArea?: TherapistFocusArea | null;
   publishedAt: string;
-  therapist: { id: string; displayName: string; title?: string | null; photoUrl?: string | null };
+  // null for couple-shared (event/wall) threads, which have no therapist.
+  therapist: { id: string; displayName: string; title?: string | null; photoUrl?: string | null } | null;
   preview: string;
   messageCount: number;
   helpfulCount: number;
@@ -915,17 +933,19 @@ export interface PublicQaMessage {
   body: string;
   createdAt: string;
   isTherapist: boolean;
-  senderName: string; // therapist name, or "匿名個案"
+  isAi?: boolean;
+  senderName: string; // therapist name, "匿名個案", "匿名 A/B", or "AI 諮商師"
 }
 
 export interface PublicQaThread {
   id: string;
+  source: PublicQaSource;
   title: string;
   focusArea?: TherapistFocusArea | null;
   publishedAt: string;
   helpfulCount: number;
   hasVoted: boolean;
-  therapist: { id: string; displayName: string; title?: string | null; photoUrl?: string | null };
+  therapist: { id: string; displayName: string; title?: string | null; photoUrl?: string | null } | null;
   messages: PublicQaMessage[];
 }
 
@@ -933,6 +953,33 @@ export interface PublicQaListResult {
   page: number;
   hasMore: boolean;
   threads: PublicQaThreadSummary[];
+}
+
+export interface RelationshipSummary {
+  paired: boolean;
+  partnerNickname?: string | null;
+  daysSinceIntimacy?: number | null;
+  daysSinceAppreciation?: number | null;
+  positive14?: number;
+  negative14?: number;
+  openConflicts?: number;
+  checkin?: {
+    myLastDays: number | null;
+    coupleLastDays: number | null;
+    periodDays: number;
+    overdue: boolean;
+  };
+}
+
+export interface RelationshipCheckin {
+  id: string;
+  nickname: string;
+  isMine: boolean;
+  trust: number;
+  commitment: number;
+  connection: number;
+  note: string | null;
+  createdAt: string;
 }
 
 // API Service Class
@@ -1723,6 +1770,17 @@ class ApiService {
     }
   }
 
+  async updatePublicShareNickname(enabled: boolean): Promise<void> {
+    try {
+      await apiClient.put('/auth/user/public-share-nickname', {
+        public_share_show_nickname: enabled,
+      });
+    } catch (error: unknown) {
+      console.error('Failed to update public-share nickname pref:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '更新公開分享設定失敗');
+    }
+  }
+
   async updateCycleTrackingEnabled(enabled: boolean): Promise<void> {
     try {
       await apiClient.put('/auth/user/cycle-tracking', {
@@ -1862,6 +1920,26 @@ class ApiService {
     }
   }
 
+  // Generate three neutral, face-saving reconciliation openers for the chosen
+  // intensity, optionally grounded in a past event. 429 (AI_DAILY_LIMIT_REACHED)
+  // propagates via the shared interceptor; error_code is preserved for the UI.
+  async generateReconciliationOpeners(
+    intensity: ReconciliationIntensity,
+    eventId?: string | null,
+  ): Promise<ReconciliationOpener[]> {
+    try {
+      const response = await apiClient.post('/intimacy-requests/reconciliation-openers', {
+        intensity,
+        eventId: eventId || undefined,
+      });
+      return (response.data.openers || []) as ReconciliationOpener[];
+    } catch (error: unknown) {
+      console.error('Failed to generate reconciliation openers:', error);
+      // Preserve error_code/message from the interceptor so the UI can branch.
+      throw error;
+    }
+  }
+
   async getAlternativeIntimacyOptions(): Promise<AlternativeIntimacyOptionsGrouped> {
     try {
       const response = await apiClient.get('/intimacy-requests/alternative-intimacy-options');
@@ -1910,6 +1988,113 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to fetch unread notification count:', error);
       return 0;
+    }
+  }
+
+  // User feedback / 用戶心得
+  async getApprovedFeedback(): Promise<
+    Array<{ id: string; name: string; rating: number; content: string }>
+  > {
+    try {
+      const response = await apiClient.get('/feedback/approved');
+      return response.data?.reviews || [];
+    } catch (error: unknown) {
+      console.error('Failed to fetch approved feedback:', error);
+      return [];
+    }
+  }
+
+  async getMyFeedback(): Promise<
+    Array<{ id: string; name: string; rating: number; content: string; status: string }>
+  > {
+    try {
+      const response = await apiClient.get('/feedback/mine');
+      return response.data?.feedback || [];
+    } catch (error: unknown) {
+      console.error('Failed to fetch my feedback:', error);
+      return [];
+    }
+  }
+
+  async submitFeedback(input: {
+    rating: number;
+    body: string;
+    displayName?: string;
+  }): Promise<{ success: boolean; message: string }> {
+    const response = await apiClient.post('/feedback', input);
+    return response.data;
+  }
+
+  // Assessments (愛的語言 love languages, future: MBTI / 星座)
+  async getAssessments(): Promise<
+    Array<{ type: string; result: string; scores: Record<string, number>; updatedAt: string }>
+  > {
+    try {
+      const response = await apiClient.get('/assessments');
+      return response.data?.assessments || [];
+    } catch (error: unknown) {
+      console.error('Failed to fetch assessments:', error);
+      return [];
+    }
+  }
+
+  async getPartnerAssessments(): Promise<{
+    partner: { nickname: string } | null;
+    assessments: Array<{ type: string; result: string; updatedAt: string }>;
+  }> {
+    try {
+      const response = await apiClient.get('/assessments/partner');
+      return {
+        partner: response.data?.partner ?? null,
+        assessments: response.data?.assessments || [],
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch partner assessments:', error);
+      return { partner: null, assessments: [] };
+    }
+  }
+
+  async saveAssessment(
+    type: string,
+    result: string,
+    scores: Record<string, number>
+  ): Promise<{ type: string; result: string; scores: Record<string, number>; updatedAt: string }> {
+    try {
+      const response = await apiClient.put(`/assessments/${type}`, { result, scores });
+      return response.data.assessment;
+    } catch (error: unknown) {
+      console.error('Failed to save assessment:', error);
+      this.throwApiError(error, '儲存測驗結果失敗，請稍後再試');
+    }
+  }
+
+  // Relationship cultivation ("關係之屋") dashboard + check-ins.
+  async getRelationshipSummary(): Promise<RelationshipSummary> {
+    try {
+      const response = await apiClient.get('/relationship/summary');
+      return response.data as RelationshipSummary;
+    } catch (error: unknown) {
+      console.error('Failed to fetch relationship summary:', error);
+      return { paired: false };
+    }
+  }
+
+  async submitCheckin(input: { trust: number; commitment: number; connection: number; note?: string }): Promise<void> {
+    try {
+      await apiClient.post('/relationship/checkin', input);
+    } catch (error: unknown) {
+      console.error('Failed to submit check-in:', error);
+      this.throwApiError(error, '儲存關係檢視失敗，請稍後再試');
+    }
+  }
+
+  async getCheckins(): Promise<RelationshipCheckin[]> {
+    try {
+      const response = await apiClient.get('/relationship/checkins');
+      return (response.data?.checkins || []) as RelationshipCheckin[];
+    } catch (error: unknown) {
+      console.error('Failed to fetch check-ins:', error);
+      return [];
     }
   }
 
@@ -2527,6 +2712,28 @@ class ApiService {
     }
   }
 
+  // Preview an AI 諮商師 comment for an event (not persisted until posted).
+  async previewEventAiComment(eventId: string): Promise<string> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/ai-comment/preview`);
+      return response.data.comment || '';
+    } catch (error: unknown) {
+      console.error('Failed to preview event AI comment:', error);
+      this.throwApiError(error, 'AI 諮商師暫時無法回應，請稍後再試');
+    }
+  }
+
+  // Post a previewed AI 諮商師 comment into the event thread.
+  async postEventAiComment(eventId: string, content: string): Promise<EventMessage> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/ai-comment`, { content });
+      return this.transformEventMessage(response.data.message);
+    } catch (error: unknown) {
+      console.error('Failed to post event AI comment:', error);
+      this.throwApiError(error, '無法新增 AI 留言，請稍後再試');
+    }
+  }
+
   async markEventMessageRead(eventId: string, msgId: string): Promise<void> {
     try {
       await apiClient.put(`/events/${eventId}/messages/${msgId}/read`);
@@ -2553,6 +2760,17 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to confirm event resolve:', error);
       this.throwApiError(error, '無法確認解決');
+    }
+  }
+
+  // Re-open a resolved event so the couple can keep discussing.
+  async reopenEvent(id: string): Promise<EventRecord> {
+    try {
+      const response = await apiClient.post(`/events/${id}/reopen`);
+      return this.transformEvent(response.data.event);
+    } catch (error: unknown) {
+      console.error('Failed to reopen event:', error);
+      this.throwApiError(error, '無法重新開啟事件');
     }
   }
 
@@ -2591,6 +2809,8 @@ class ApiService {
       selected_version?: EventVersionKey | null;
       status?: EventStatus;
       is_private?: boolean;
+      public_status?: 'private' | 'published';
+      public_title?: string | null;
       resolve_requested_by?: string | null;
       resolve_requested_at?: string | null;
       resolved_at?: string | null;
@@ -2617,6 +2837,8 @@ class ApiService {
       selectedVersion: r.selected_version ?? null,
       status: (r.status as EventStatus) || 'open',
       isPrivate: Boolean(r.is_private),
+      publicStatus: r.public_status === 'published' ? 'published' : 'private',
+      publicTitle: r.public_title ?? null,
       resolveRequestedBy: r.resolve_requested_by ?? null,
       resolveRequestedAt: r.resolve_requested_at ?? null,
       resolvedAt: r.resolved_at ?? null,
@@ -2634,6 +2856,7 @@ class ApiService {
       event_id?: string;
       sender_id?: string;
       content?: string;
+      is_ai?: boolean;
       created_at?: string;
       read_at?: string | null;
     };
@@ -2642,6 +2865,7 @@ class ApiService {
       eventId: r.event_id || '',
       senderId: r.sender_id || '',
       content: r.content || '',
+      isAi: r.is_ai === true,
       createdAt: r.created_at || '',
       readAt: r.read_at ?? null,
     };
@@ -2881,13 +3105,55 @@ class ApiService {
     }
   }
 
-  async getPublicQaThread(id: string): Promise<PublicQaThread> {
+  async getPublicQaThread(id: string, source: PublicQaSource = 'consultation'): Promise<PublicQaThread> {
     try {
-      const response = await apiClient.get(`/therapists/qa/${id}`);
+      const response = await apiClient.get(`/therapists/qa/${id}`, {
+        params: source === 'consultation' ? {} : { source },
+      });
       return response.data?.thread as PublicQaThread;
     } catch (error: unknown) {
       console.error('Failed to fetch public Q&A thread:', error);
       this.throwApiError(error, '無法載入公開問答');
+    }
+  }
+
+  // Share / un-share a conflict event into 公開問答.
+  async publishEvent(eventId: string, title?: string): Promise<EventRecord> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/publish`, title ? { title } : {});
+      return this.transformEvent(response.data.event);
+    } catch (error: unknown) {
+      console.error('Failed to publish event:', error);
+      this.throwApiError(error, '公開失敗，請稍後再試');
+    }
+  }
+
+  async unpublishEvent(eventId: string): Promise<EventRecord> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/unpublish`);
+      return this.transformEvent(response.data.event);
+    } catch (error: unknown) {
+      console.error('Failed to unpublish event:', error);
+      this.throwApiError(error, '取消公開失敗，請稍後再試');
+    }
+  }
+
+  // Share / un-share a wall thread into 公開問答.
+  async publishWallPost(postId: string, title?: string): Promise<void> {
+    try {
+      await apiClient.post(`/wall/${postId}/publish`, title ? { title } : {});
+    } catch (error: unknown) {
+      console.error('Failed to publish wall post:', error);
+      this.throwApiError(error, '公開失敗，請稍後再試');
+    }
+  }
+
+  async unpublishWallPost(postId: string): Promise<void> {
+    try {
+      await apiClient.post(`/wall/${postId}/unpublish`);
+    } catch (error: unknown) {
+      console.error('Failed to unpublish wall post:', error);
+      this.throwApiError(error, '取消公開失敗，請稍後再試');
     }
   }
 

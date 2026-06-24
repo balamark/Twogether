@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { Send } from 'lucide-react';
 import apiService from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDate, formatYmdInTz } from '../utils/datetime';
@@ -627,6 +628,56 @@ interface IntimacyStatsCardsProps {
   records: IntimateRecord[];
   birthDate?: string | null;
   onOpenSettings?: () => void;
+  // Opens the 親密邀請 flow; shown as a CTA when the gap gets long. Only pass
+  // when a partner is connected.
+  onNudgePartner?: () => void;
+}
+
+// Progressive escalation for the「已經幾天沒有親密了」card. Because intimate
+// records are couple-shared, both partners see this — so growing the number +
+// a light caring nudge is how the partner learns the gap is getting long.
+export interface DaysSinceLastNudge {
+  tier: 0 | 1 | 2 | 3 | 4;
+  numberClass: string;
+  hint: string | null;
+  showInvite: boolean;
+}
+
+export function daysSinceLastNudge(days: number | null): DaysSinceLastNudge {
+  if (days === null || days < 7) {
+    return { tier: 0, numberClass: 'text-3xl text-petal-ink', hint: null, showInvite: false };
+  }
+  if (days >= 15) {
+    return {
+      tier: 4,
+      numberClass: 'text-6xl font-semibold text-petal-rose-deep',
+      hint: `已經 ${days} 天囉～真的該關心一下另一半了 💗`,
+      showInvite: true,
+    };
+  }
+  if (days >= 12) {
+    return {
+      tier: 3,
+      numberClass: 'text-5xl font-semibold text-petal-rose-deep',
+      hint: `${days} 天了，別讓距離越來越遠 👀`,
+      showInvite: true,
+    };
+  }
+  if (days >= 10) {
+    return {
+      tier: 2,
+      numberClass: 'text-5xl text-petal-rose-deep',
+      hint: `${days} 天了…該主動關心另一半囉！`,
+      showInvite: false,
+    };
+  }
+  // 7–9 days
+  return {
+    tier: 1,
+    numberClass: 'text-4xl text-petal-rose-deep',
+    hint: '一週沒親密囉～找個時間靠近一下吧 🙂',
+    showInvite: false,
+  };
 }
 
 function ageFromBirthDate(birthDate: string | null | undefined): number | null {
@@ -649,7 +700,7 @@ function weeklyRecommendationForAge(age: number): string | null {
   return '約 1';
 }
 
-export function IntimacyStatsCards({ records, birthDate, onOpenSettings }: IntimacyStatsCardsProps) {
+export function IntimacyStatsCards({ records, birthDate, onOpenSettings, onNudgePartner }: IntimacyStatsCardsProps) {
   const derived = useMemo(() => {
     if (!records || records.length === 0) {
       return { total: 0, monthlyAvg: 0, weeklyAvg: 0, thisWeek: 0, thisMonth: 0, daysSinceLast: null as number | null };
@@ -687,6 +738,7 @@ export function IntimacyStatsCards({ records, birthDate, onOpenSettings }: Intim
   const age = ageFromBirthDate(birthDate);
   const recommendation = age !== null ? weeklyRecommendationForAge(age) : null;
   const hasRecords = derived.total > 0;
+  const nudge = daysSinceLastNudge(hasRecords ? derived.daysSinceLast : null);
 
   return (
     <div className="space-y-3">
@@ -738,13 +790,40 @@ export function IntimacyStatsCards({ records, birthDate, onOpenSettings }: Intim
           <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-sage-deep mb-1.5">本月次數</div>
           <div className="font-display italic font-light text-3xl text-petal-sage-deep">{derived.thisMonth}</div>
         </div>
-        <div className="bg-white rounded-md p-5 border border-petal-rule">
+        <div
+          className={`rounded-md p-5 border transition-colors ${
+            nudge.tier >= 3
+              ? 'bg-petal-rose-soft/40 border-petal-rose-soft'
+              : nudge.tier >= 1
+                ? 'bg-petal-rose-soft/20 border-petal-rose-soft'
+                : 'bg-white border-petal-rule'
+          }`}
+          data-testid="days-since-last-card"
+        >
           <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1.5">已經幾天沒有親密了</div>
-          <div className="font-display italic font-light text-3xl text-petal-ink">
+          <div className={`font-display italic font-light leading-none transition-all ${nudge.numberClass}`}>
             {derived.daysSinceLast === null ? '—' : derived.daysSinceLast}
           </div>
+          {nudge.hint && (
+            <p className="mt-2 font-body text-xs text-petal-rose-deep leading-snug" data-testid="days-since-last-hint">
+              {nudge.hint}
+            </p>
+          )}
         </div>
       </div>
+
+      {/* When the gap is long, offer a one-tap way to reach out. */}
+      {nudge.showInvite && onNudgePartner && (
+        <button
+          type="button"
+          onClick={onNudgePartner}
+          data-testid="days-since-last-nudge-cta"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-pink-500 text-white hover:bg-pink-600 transition-colors font-body text-sm font-medium"
+        >
+          <Send className="w-4 h-4" strokeWidth={1.5} />
+          發送親密邀請給另一半
+        </button>
+      )}
 
       {/* All-time totals — kept small */}
       <div className="font-body text-xs text-petal-muted">

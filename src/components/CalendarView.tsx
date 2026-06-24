@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Camera, MapPin, Play, Clock, Trash2 } from 'lucide-react';
 import CalendarDatePicker from './CalendarDatePicker';
 import { AchievementsView, IntimacyStatsCards, CalendarHeatmap } from './AchievementsView';
+import RelationshipDashboard from './RelationshipDashboard';
 import { periodDateSet, fertileDateSet, predictedPeriodDateSet, addDays } from '../utils/cycle';
 import { apiService } from '../services/api';
 import type { CycleRecord } from '../services/api';
@@ -95,6 +96,7 @@ interface CalendarViewProps {
   togetherSince: Date | null;
   daysTogether: number;
   primaryTimezone: string;
+  onNudgePartner?: () => void;
 }
 
 // Calendar / record-keeping view. Defined at module scope (not inside App) so
@@ -128,6 +130,7 @@ const CalendarView = ({
   togetherSince,
   daysTogether,
   primaryTimezone,
+  onNudgePartner,
 }: CalendarViewProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -340,6 +343,12 @@ const CalendarView = ({
 
   return (
     <div className="space-y-10">
+      <RelationshipDashboard
+        partnerConnected={authState.partnerConnected}
+        showNotification={showNotification}
+        onNudgePartner={onNudgePartner}
+        onGoToWall={() => setCurrentView('wall')}
+      />
       <div className="border-b border-petal-rule pb-7">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
           <div>
@@ -393,6 +402,7 @@ const CalendarView = ({
         records={intimateRecords}
         birthDate={authState.user?.birth_date}
         onOpenSettings={() => setCurrentView('settings')}
+        onNudgePartner={onNudgePartner}
       />
 
       {/* Enhanced Record Modal */}

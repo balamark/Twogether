@@ -10,6 +10,8 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  Globe,
+  Loader2,
 } from 'lucide-react';
 import {
   apiService,
@@ -168,6 +170,41 @@ const WallView: React.FC<WallViewProps> = ({
     );
   };
 
+  // Share to 公開問答 (anonymised). Single-party toggle with a warning dialog.
+  const [shareWarnPost, setShareWarnPost] = useState<WallPost | null>(null);
+  const [sharingId, setSharingId] = useState<string | null>(null);
+
+  const confirmShare = async (post: WallPost) => {
+    setSharingId(post.id);
+    try {
+      await apiService.publishWallPost(post.id);
+      setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, public_status: 'published' } : p)));
+      setShareWarnPost(null);
+      showNotification({
+        type: 'success',
+        title: '已匿名公開',
+        message: '這段對話會以匿名方式顯示在「公開問答」，謝謝你願意幫助別人。',
+      });
+    } catch (err) {
+      showNotification({ type: 'error', title: '公開失敗', message: err instanceof Error ? err.message : '請稍後再試' });
+    } finally {
+      setSharingId(null);
+    }
+  };
+
+  const unshare = async (post: WallPost) => {
+    setSharingId(post.id);
+    try {
+      await apiService.unpublishWallPost(post.id);
+      setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, public_status: 'private' } : p)));
+      showNotification({ type: 'info', title: '已取消公開', message: '這段對話不再顯示於公開問答。' });
+    } catch (err) {
+      showNotification({ type: 'error', title: '操作失敗', message: err instanceof Error ? err.message : '請稍後再試' });
+    } finally {
+      setSharingId(null);
+    }
+  };
+
   const renderPostCard = (post: WallPost) => {
     const isOwn = post.author_id === userId;
     const isExpanded = expandedPostId === post.id;
@@ -233,20 +270,46 @@ const WallView: React.FC<WallViewProps> = ({
           {post.content}
         </div>
 
-        <button
-          type="button"
-          onClick={() => setExpandedPostId(isExpanded ? null : post.id)}
-          className="mt-3 flex items-center gap-1.5 text-petal-ink-soft hover:text-petal-ink font-body text-xs"
-          data-testid={`wall-post-thread-toggle-${post.id}`}
-        >
-          <MessageCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
-          {post.reply_count > 0 ? `${post.reply_count} 則回覆` : '回覆'}
-          {isExpanded ? (
-            <ChevronUp className="w-3.5 h-3.5" strokeWidth={1.5} />
+        <div className="mt-3 flex items-center gap-4">
+          <button
+            type="button"
+            onClick={() => setExpandedPostId(isExpanded ? null : post.id)}
+            className="flex items-center gap-1.5 text-petal-ink-soft hover:text-petal-ink font-body text-xs"
+            data-testid={`wall-post-thread-toggle-${post.id}`}
+          >
+            <MessageCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
+            {post.reply_count > 0 ? `${post.reply_count} 則回覆` : '回覆'}
+            {isExpanded ? (
+              <ChevronUp className="w-3.5 h-3.5" strokeWidth={1.5} />
+            ) : (
+              <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.5} />
+            )}
+          </button>
+
+          {/* Share to 公開問答 (anonymised) */}
+          {post.public_status === 'published' ? (
+            <button
+              type="button"
+              onClick={() => unshare(post)}
+              disabled={sharingId === post.id}
+              data-testid={`wall-unshare-${post.id}`}
+              className="flex items-center gap-1.5 text-petal-sage-deep hover:text-petal-ink font-body text-xs disabled:opacity-50"
+            >
+              {sharingId === post.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" strokeWidth={1.5} />}
+              已公開・取消
+            </button>
           ) : (
-            <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.5} />
+            <button
+              type="button"
+              onClick={() => setShareWarnPost(post)}
+              data-testid={`wall-share-${post.id}`}
+              className="flex items-center gap-1.5 text-petal-ink-soft hover:text-petal-ink font-body text-xs"
+            >
+              <Globe className="w-3.5 h-3.5" strokeWidth={1.5} />
+              匿名公開
+            </button>
           )}
-        </button>
+        </div>
 
         {isExpanded && (
           <WallPostThread
@@ -447,6 +510,43 @@ const WallView: React.FC<WallViewProps> = ({
         editingPost={editingPost}
         initialTemplate={initialTemplate}
       />
+
+      {shareWarnPost && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-testid="wall-share-warning">
+          <div className="bg-petal-cream rounded-2xl max-w-md w-full p-5">
+            <div className="flex items-center gap-2 mb-3">
+              <Globe className="w-5 h-5 text-petal-rose-deep" />
+              <h3 className="text-lg font-serif text-petal-ink">公開到「公開問答」</h3>
+            </div>
+            <p className="text-sm text-petal-ink-soft leading-relaxed mb-2">
+              公開後，這則貼文與底下的回覆會<span className="text-petal-ink font-medium">匿名</span>顯示在「公開問答」，
+              <span className="text-petal-ink font-medium">所有人（包含未登入的訪客）都看得到</span>。
+            </p>
+            <p className="text-sm text-petal-ink-soft leading-relaxed mb-4">
+              你們會顯示為「匿名 A / 匿名 B」，不會出現名字。你隨時可以取消公開。
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShareWarnPost(null)}
+                className="text-sm px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                data-testid="wall-share-confirm"
+                onClick={() => confirmShare(shareWarnPost)}
+                disabled={sharingId === shareWarnPost.id}
+                className="text-sm px-4 py-2 rounded-full bg-petal-ink text-petal-cream inline-flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
+              >
+                {sharingId === shareWarnPost.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
+                確定公開
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

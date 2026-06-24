@@ -1,7 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Heart, Clock, Send, Sparkles, X, RefreshCw, Wand2, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { apiService } from '../services/api';
-import type { IntimacyTemplate, RoleplayMessageSuggestion } from '../services/api';
+import type {
+  IntimacyTemplate,
+  RoleplayMessageSuggestion,
+  EventRecord,
+  ReconciliationIntensity,
+  ReconciliationOpener,
+} from '../services/api';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime, localInputToIsoInTz } from '../utils/datetime';
@@ -29,7 +35,21 @@ interface IntimacyRequestFormProps {
   scripts?: FormScript[];
 }
 
-type Step = 'category' | 'script' | 'aimsg' | 'template' | 'customize' | 'confirm';
+type Step = 'category' | 'script' | 'aimsg' | 'reconcile' | 'template' | 'customize' | 'confirm';
+
+// Reconciliation intensity levels (low → high). The goal is a neutral, face-
+// saving opener for someone who can't yet bring themselves to apologize.
+const RECONCILE_INTENSITIES: {
+  key: ReconciliationIntensity;
+  label: string;
+  emoji: string;
+  desc: string;
+  dot: string;
+}[] = [
+  { key: 'goodwill', label: '先釋出善意', emoji: '🌱', desc: '還沒準備好談，但想先破冰', dot: 'bg-green-400' },
+  { key: 'reflect', label: '各退一步', emoji: '🤝', desc: '我也有需要調整的地方', dot: 'bg-amber-400' },
+  { key: 'talk', label: '想好好談談', emoji: '💬', desc: '真心想化解、好好溝通', dot: 'bg-rose-500' },
+];
 
 const SCRIPT_CATEGORY_TABS: { id: 'all' | FormScript['category']; label: string; icon: string }[] = [
   { id: 'all', label: '全部', icon: '🌟' },
@@ -77,19 +97,31 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
   const [downOpenLevel, setDownOpenLevel] = useState<string | null>(null);
   const [downText, setDownText] = useState('');
 
+  // Reconciliation branch state
+  const [reconcileEvents, setReconcileEvents] = useState<EventRecord[]>([]);
+  const [reconcileEventsLoading, setReconcileEventsLoading] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  const [reconcileIntensity, setReconcileIntensity] = useState<ReconciliationIntensity | null>(null);
+  const [reconcileOpeners, setReconcileOpeners] = useState<ReconciliationOpener[]>([]);
+  const [reconcileLoading, setReconcileLoading] = useState(false);
+
   const tz = useTimezone();
 
   const categories = [
     { id: 'compliment', name: '甜蜜讚美', emoji: '💕', description: '發送溫馨的讚美和愛意給伴侶' },
-    { id: 'reconciliation', name: '真心和解', emoji: '🤝', description: '吵架後的真誠道歉和溫柔挽回' },
+    { id: 'reconciliation', name: '真心和解', emoji: '🤝', description: '冷戰／吵架後，AI 幫你想一句中性、給台階的破冰開場白' },
     { id: 'roleplay', name: '角色扮演', emoji: '🎭', description: '選擇你們的劇本，AI 幫你想 5 句入戲開場邀請' },
     { id: 'custom', name: '自訂訊息', emoji: '✨', description: '完全客製化你的親密邀請' },
   ];
 
   const isRoleplay = selectedCategory === 'roleplay';
 
+  const isReconciliation = selectedCategory === 'reconciliation';
+
   const flowSteps: Step[] = isRoleplay
     ? ['category', 'script', 'aimsg', 'customize', 'confirm']
+    : isReconciliation
+    ? ['category', 'reconcile', 'customize', 'confirm']
     : selectedCategory === 'custom'
     ? ['category', 'customize', 'confirm']
     : ['category', 'template', 'customize', 'confirm'];
@@ -134,10 +166,38 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
   }, [selectedCategory]);
 
   useEffect(() => {
-    if (selectedCategory && selectedCategory !== 'custom' && selectedCategory !== 'roleplay') {
+    if (
+      selectedCategory &&
+      selectedCategory !== 'custom' &&
+      selectedCategory !== 'roleplay' &&
+      selectedCategory !== 'reconciliation'
+    ) {
       fetchTemplatesByCategory();
     }
   }, [selectedCategory, fetchTemplatesByCategory]);
+
+  // Load recent events the first time the reconciliation branch opens, so the
+  // user can (optionally) ground the opener in a real incident. Non-fatal: the
+  // flow still works with no events (a generic ice-breaker).
+  useEffect(() => {
+    if (currentStep !== 'reconcile' || reconcileEvents.length > 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        setReconcileEventsLoading(true);
+        const { events } = await apiService.listEvents({ limit: 8 });
+        if (!cancelled) setReconcileEvents(events);
+      } catch (err) {
+        // Non-fatal — the user can still pick an intensity without an event.
+        console.error('Failed to load events for reconciliation:', err);
+      } finally {
+        if (!cancelled) setReconcileEventsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentStep, reconcileEvents.length]);
 
   // Lazily load marketplace favorites the first time the roleplay branch opens.
   useEffect(() => {
@@ -176,6 +236,8 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
       setCurrentStep('customize');
     } else if (categoryId === 'roleplay') {
       setCurrentStep('script');
+    } else if (categoryId === 'reconciliation') {
+      setCurrentStep('reconcile');
     } else {
       setCurrentStep('template');
     }
@@ -262,6 +324,32 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
     setDownText('');
   };
 
+  const generateOpeners = useCallback(async (intensity: ReconciliationIntensity, eventId: string | null) => {
+    setReconcileLoading(true);
+    setError(null);
+    setReconcileOpeners([]);
+    setReconcileIntensity(intensity);
+    try {
+      const openers = await apiService.generateReconciliationOpeners(intensity, eventId);
+      setReconcileOpeners(openers);
+    } catch (err) {
+      // 429/AI_DAILY_LIMIT_REACHED is also dispatched globally by the api
+      // interceptor; we still show the specific message inline here.
+      setError(
+        err instanceof Error
+          ? err.message
+          : 'AI 暫時無法產生開場白，請稍後再試，或直接自行輸入和解內容。',
+      );
+    } finally {
+      setReconcileLoading(false);
+    }
+  }, []);
+
+  const handleSelectOpener = function (opener: ReconciliationOpener) {
+    setCustomMessage(opener.text);
+    setCurrentStep('customize');
+  };
+
   const handleSendRequest = async function () {
     try {
       setLoading(true);
@@ -314,6 +402,12 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
     setFeedbackGiven({});
     setDownOpenLevel(null);
     setDownText('');
+    setReconcileEvents([]);
+    setReconcileEventsLoading(false);
+    setSelectedEventId(null);
+    setReconcileIntensity(null);
+    setReconcileOpeners([]);
+    setReconcileLoading(false);
   };
 
   const handleClose = function () {
@@ -322,7 +416,13 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
   };
 
   // Where the customize step's "返回" goes, depending on the active branch.
-  const customizeBackStep: Step = isRoleplay ? 'aimsg' : selectedCategory === 'custom' ? 'category' : 'template';
+  const customizeBackStep: Step = isRoleplay
+    ? 'aimsg'
+    : isReconciliation
+    ? 'reconcile'
+    : selectedCategory === 'custom'
+    ? 'category'
+    : 'template';
 
   useScrollLock(isOpen);
 
@@ -647,7 +747,147 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
             </div>
           )}
 
-          {/* Step 2 (compliment/reconciliation): Template Selection */}
+          {/* Step 2 (reconciliation): pick an event + intensity → AI openers */}
+          {currentStep === 'reconcile' && (
+            <div className="space-y-5">
+              <div className="flex items-center justify-between">
+                <h4 className="text-lg font-medium text-gray-900 flex items-center gap-2">
+                  <Wand2 className="w-5 h-5 text-pink-500" /> AI 破冰開場白
+                </h4>
+                <button onClick={() => setCurrentStep('category')} className="text-sm text-pink-600 hover:text-pink-700">
+                  返回選擇類型
+                </button>
+              </div>
+
+              <p className="text-sm text-gray-500">
+                吵架後拉不下臉？挑一個強度，AI 幫你想一句中性、給對方台階的第一句話，試試對方願不願意開啟對話。
+              </p>
+
+              {/* (Optional) pick a related event for context */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-700">
+                  選一個相關事件 <span className="text-gray-400 font-normal">（可略過）</span>
+                </p>
+                {reconcileEventsLoading ? (
+                  <p className="text-sm text-gray-400">載入事件中…</p>
+                ) : reconcileEvents.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      data-testid="reconcile-event-none"
+                      onClick={() => setSelectedEventId(null)}
+                      className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                        selectedEventId === null
+                          ? 'bg-gray-800 text-white border-gray-800'
+                          : 'bg-white text-gray-500 border-gray-200 hover:border-pink-300'
+                      }`}
+                    >
+                      不選，直接想開場白
+                    </button>
+                    {reconcileEvents.map((ev) => (
+                      <button
+                        key={ev.id}
+                        data-testid={`reconcile-event-${ev.id}`}
+                        onClick={() => setSelectedEventId((cur) => (cur === ev.id ? null : ev.id))}
+                        className={`px-3 py-1.5 rounded-full text-sm border transition-colors max-w-[16rem] truncate ${
+                          selectedEventId === ev.id
+                            ? 'bg-pink-500 text-white border-pink-500'
+                            : 'bg-white text-gray-600 border-gray-200 hover:border-pink-300'
+                        }`}
+                        title={ev.title}
+                      >
+                        {ev.title}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400">
+                    目前沒有可參考的事件，沒關係，直接挑一個強度就能產生通用的破冰開場白。
+                  </p>
+                )}
+              </div>
+
+              {/* Pick an intensity */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-700">選擇強度</p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {RECONCILE_INTENSITIES.map((lvl) => (
+                    <button
+                      key={lvl.key}
+                      data-testid={`reconcile-intensity-${lvl.key}`}
+                      onClick={() => setReconcileIntensity(lvl.key)}
+                      className={`p-3 border rounded-lg text-left transition-colors ${
+                        reconcileIntensity === lvl.key
+                          ? 'border-pink-400 bg-pink-50'
+                          : 'border-gray-200 hover:border-pink-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`w-2.5 h-2.5 rounded-full ${lvl.dot}`}></span>
+                        <span className="font-medium text-gray-900 text-sm">
+                          {lvl.emoji} {lvl.label}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500">{lvl.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Generate / results */}
+              {reconcileLoading ? (
+                <div className="text-center py-10">
+                  <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
+                  <p className="mt-2 text-gray-600">AI 正在想幾句適合的破冰開場白…</p>
+                </div>
+              ) : reconcileOpeners.length > 0 ? (
+                <div className="space-y-3">
+                  <p className="text-xs text-gray-500">挑一句你喜歡的，下一步可自由編輯後再送出。</p>
+                  {reconcileOpeners.map((o, i) => (
+                    <button
+                      key={i}
+                      data-testid={`reconcile-opener-${i}`}
+                      onClick={() => handleSelectOpener(o)}
+                      className="w-full p-4 text-left border border-gray-200 rounded-lg hover:border-pink-300 hover:bg-pink-50 transition-colors"
+                    >
+                      <span className="inline-block text-xs px-2 py-0.5 rounded-full border border-pink-200 bg-pink-50 text-pink-600 mb-1.5">
+                        {o.label}
+                      </span>
+                      <p className="text-gray-800 text-sm whitespace-pre-wrap">{o.text}</p>
+                    </button>
+                  ))}
+                  <div className="flex flex-wrap justify-between gap-3 pt-1">
+                    <button
+                      onClick={() => reconcileIntensity && generateOpeners(reconcileIntensity, selectedEventId)}
+                      data-testid="reconcile-regenerate"
+                      className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm"
+                    >
+                      <RefreshCw className="w-4 h-4" /> 重新生成
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCustomMessage('');
+                        setCurrentStep('customize');
+                      }}
+                      className="px-4 py-2 text-pink-600 hover:text-pink-700 transition-colors flex items-center gap-2 text-sm"
+                    >
+                      <Sparkles className="w-4 h-4" /> 自行輸入
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  data-testid="reconcile-generate"
+                  onClick={() => reconcileIntensity && generateOpeners(reconcileIntensity, selectedEventId)}
+                  disabled={!reconcileIntensity}
+                  className="w-full px-6 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                >
+                  <Wand2 className="w-5 h-5" /> 讓 AI 想開場白
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Step 2 (compliment): Template Selection */}
           {currentStep === 'template' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">

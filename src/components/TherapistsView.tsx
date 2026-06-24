@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, X, UserPlus, Clock, Languages, Award, CalendarCheck, MessageCircle, Send, StickyNote, UserCog, Upload, CheckCircle2, AlertCircle, Globe, Users, Video, Wallet } from 'lucide-react';
+import { Heart, X, UserPlus, LogIn, Clock, Languages, Award, CalendarCheck, MessageCircle, Send, StickyNote, UserCog, Upload, CheckCircle2, AlertCircle, Globe, Users, Video, Wallet } from 'lucide-react';
 import {
   apiService,
   type Therapist,
@@ -27,6 +27,8 @@ interface TherapistsViewProps {
     partnerConnected: boolean;
   };
   showNotification: (notification: Omit<Notification, 'id'>) => void;
+  /** Opens the auth modal — therapists log in with a normal Twogether account. */
+  onLogin?: () => void;
 }
 
 const LANGUAGE_LABEL: Record<string, string> = {
@@ -55,7 +57,7 @@ const PUBLIC_STATUS_LABEL: Record<ConsultationPublicStatus, string> = {
   withdrawn: '已取消公開',
 };
 
-const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotification }) => {
+const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotification, onLogin }) => {
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -190,6 +192,18 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
           <UserPlus className="w-3.5 h-3.5" strokeWidth={1.5} />
           成為諮商師
         </a>
+        {/* Therapists sign in with a normal Twogether account (created at
+            sign-up), then manage their profile under「我的諮商師檔案」. */}
+        {!authState.isAuthenticated && onLogin && (
+          <button
+            onClick={onLogin}
+            data-testid="therapist-login-button"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors font-body text-[13px] font-medium"
+          >
+            <LogIn className="w-3.5 h-3.5" strokeWidth={1.5} />
+            諮商師登入
+          </button>
+        )}
         {authState.isAuthenticated && (
           <button
             onClick={openMine}

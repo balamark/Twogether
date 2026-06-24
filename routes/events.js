@@ -139,6 +139,8 @@ function serializeEvent(row, extras = {}) {
     },
     selected_version: row.selected_version,
     is_private: row.is_private,
+    public_status: row.public_status || 'private',
+    public_title: row.public_title || null,
     status: row.status,
     resolve_requested_by: row.resolve_requested_by,
     resolve_requested_at: row.resolve_requested_at,
@@ -155,6 +157,7 @@ function serializeMessage(row) {
     event_id: row.event_id,
     sender_id: row.sender_id,
     content: row.content,
+    is_ai: row.is_ai === true,
     created_at: row.created_at,
     read_at: row.read_at,
   };
@@ -632,6 +635,113 @@ router.post(
   }
 );
 
+// Preview an AI 諮商師 (counselor) comment for an event thread. Generates but
+// does NOT persist — the inviter reviews it, then POSTs it into the thread.
+// Counts against the shared daily AI budget. Mirrors the wall counselor.
+router.post('/:id/ai-comment/preview', [param('id').isUUID()], async (req, res) => {
+  if (sendValidationError(req, res)) return;
+  try {
+    const access = await assertEventAccess(req.params.id, req.user.id);
+    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (access.event.is_private) {
+      return res.status(403).json({ success: false, message: '私人事件無法邀請 AI 諮商師' });
+    }
+
+    const userId = req.user.id;
+    const { tier, limit } = await resolveAiLimit(userId);
+    const usedToday = await countTodayAiUsage(userId);
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    if (!limitCheck.ok) {
+      logInfo('events.ai_comment.limit', { userId, eventId: req.params.id, used: usedToday, limit, tier, blocked: true });
+      return res.status(limitCheck.status).json(limitCheck.body);
+    }
+
+    const msgs = await db.query(
+      `SELECT m.content, m.is_ai, u.nickname AS author_nickname
+         FROM event_messages m
+         JOIN users u ON u.id = m.sender_id
+        WHERE m.event_id = $1
+        ORDER BY m.created_at ASC`,
+      [req.params.id]
+    );
+    const replies = msgs.rows.map((r) => ({
+      authorName: r.author_nickname,
+      content: r.content,
+      isAi: r.is_ai === true,
+    }));
+
+    logInfo('events.ai_comment.preview', { userId, eventId: req.params.id, replyCount: replies.length });
+
+    const result = await llmService.generateWallCounselorComment({
+      postContent: access.event.summary,
+      postAuthorName: '發起人',
+      moodTag: (access.event.emotions || []).join('、') || null,
+      replies,
+    });
+    const meta = result._meta;
+    delete result._meta;
+
+    logInfo('events.ai_comment.cost', {
+      userId,
+      eventId: req.params.id,
+      provider: meta?.provider,
+      model: meta?.model,
+      costUsd: meta?.costUsd,
+      durationMs: meta?.durationMs,
+    });
+
+    await recordAiUsage(userId, 'event_counselor', access.event.summary, meta);
+
+    res.json({ success: true, comment: result.comment });
+  } catch (err) {
+    logError('Event AI comment preview failed', { err: err.message, stack: err.stack, eventId: req.params.id });
+    res.status(500).json({ success: false, message: 'AI 諮商師暫時無法回應，請稍後再試' });
+  }
+});
+
+// Post a previewed AI 諮商師 comment into the event thread, visible to both
+// partners. author_id = the inviting partner; is_ai flags it as a counselor msg.
+router.post(
+  '/:id/ai-comment',
+  [param('id').isUUID(), body('content').isString().isLength({ min: 1, max: 2000 })],
+  async (req, res) => {
+    if (sendValidationError(req, res)) return;
+    try {
+      const access = await assertEventAccess(req.params.id, req.user.id);
+      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (access.event.is_private) {
+        return res.status(403).json({ success: false, message: '私人事件無法新增訊息' });
+      }
+      if (access.event.status === 'resolved') {
+        return res.status(400).json({ success: false, message: '此事件已解決，無法新增訊息' });
+      }
+
+      const msgResult = await db.query(
+        `INSERT INTO event_messages (event_id, sender_id, content, is_ai)
+         VALUES ($1, $2, $3, TRUE) RETURNING *`,
+        [req.params.id, req.user.id, req.body.content]
+      );
+      await db.query(`UPDATE events SET updated_at = NOW() WHERE id = $1`, [req.params.id]);
+
+      logInfo('events.ai_comment.posted', { userId: req.user.id, eventId: req.params.id, messageId: msgResult.rows[0].id });
+
+      await notify(
+        access.partnerId,
+        'event_ai_comment',
+        'AI 諮商師在事件中留言',
+        access.event.title,
+        req.params.id,
+        req.user.id
+      );
+
+      res.status(201).json({ success: true, message: serializeMessage(msgResult.rows[0]) });
+    } catch (err) {
+      logError('Post event AI comment failed', { err: err.message, stack: err.stack, eventId: req.params.id });
+      res.status(500).json({ success: false, message: '無法新增 AI 留言' });
+    }
+  }
+);
+
 // Mark an inbound message as read
 router.put(
   '/:id/messages/:msgId/read',
@@ -657,6 +767,67 @@ router.put(
     }
   }
 );
+
+// Share an event thread into the public 公開問答 (anonymised, read-only). Either
+// partner can publish their couple's event; a single-party toggle with an
+// in-app warning on the client. Private events can't be shared (no shared thread).
+router.post(
+  '/:id/publish',
+  [param('id').isUUID(), body('title').optional().isString().isLength({ max: 200 })],
+  async (req, res) => {
+    if (sendValidationError(req, res)) return;
+    try {
+      const access = await assertEventAccess(req.params.id, req.user.id);
+      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (access.event.is_private) {
+        return res.status(400).json({ success: false, message: '私人事件無法公開分享' });
+      }
+      const title = (req.body.title && req.body.title.trim()) || access.event.title;
+      const result = await db.query(
+        `UPDATE events
+            SET public_status = 'published', public_title = $2,
+                published_at = NOW(), published_by = $3
+          WHERE id = $1
+          RETURNING *`,
+        [req.params.id, title, req.user.id]
+      );
+      logInfo('events.published', { userId: req.user.id, eventId: req.params.id });
+      res.json({
+        success: true,
+        message: '已匿名公開到公開問答，謝謝你願意幫助其他人。',
+        event: serializeEvent(result.rows[0]),
+      });
+    } catch (err) {
+      logError('Publish event failed', { err: err.message, stack: err.stack, eventId: req.params.id });
+      res.status(500).json({ success: false, message: '公開失敗，請稍後再試' });
+    }
+  }
+);
+
+// Un-share a previously published event.
+router.post('/:id/unpublish', [param('id').isUUID()], async (req, res) => {
+  if (sendValidationError(req, res)) return;
+  try {
+    const access = await assertEventAccess(req.params.id, req.user.id);
+    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    const result = await db.query(
+      `UPDATE events
+          SET public_status = 'private', published_at = NULL
+        WHERE id = $1
+        RETURNING *`,
+      [req.params.id]
+    );
+    logInfo('events.unpublished', { userId: req.user.id, eventId: req.params.id });
+    res.json({
+      success: true,
+      message: '已取消公開，這個對話不再顯示於公開問答。',
+      event: serializeEvent(result.rows[0]),
+    });
+  } catch (err) {
+    logError('Unpublish event failed', { err: err.message, stack: err.stack, eventId: req.params.id });
+    res.status(500).json({ success: false, message: '取消公開失敗，請稍後再試' });
+  }
+});
 
 // One side requests "mark as resolved"
 router.post('/:id/resolve-request', [param('id').isUUID()], async (req, res) => {
@@ -729,6 +900,47 @@ router.post('/:id/resolve-confirm', [param('id').isUUID()], async (req, res) => 
   } catch (err) {
     logError('Resolve-confirm failed', { err: err.message, stack: err.stack });
     res.status(500).json({ success: false, message: '無法確認解決' });
+  }
+});
+
+// Re-open a resolved event so the couple can keep discussing it.
+router.post('/:id/reopen', [param('id').isUUID()], async (req, res) => {
+  if (sendValidationError(req, res)) return;
+  try {
+    const access = await assertEventAccess(req.params.id, req.user.id);
+    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (access.event.is_private) {
+      return res.status(400).json({ success: false, message: '私人事件無法重新開啟' });
+    }
+    if (access.event.status !== 'resolved') {
+      return res.status(400).json({ success: false, message: '只有已解決的事件可以重新開啟' });
+    }
+
+    const result = await db.query(
+      `UPDATE events
+         SET status = 'open',
+             resolved_at = NULL,
+             resolve_requested_by = NULL,
+             resolve_requested_at = NULL,
+             updated_at = NOW()
+       WHERE id = $1 RETURNING *`,
+      [req.params.id]
+    );
+
+    await notify(
+      access.partnerId,
+      'event_reopened',
+      '伴侶重新開啟了一個事件',
+      access.event.title,
+      req.params.id,
+      req.user.id
+    );
+
+    logInfo('events.reopened', { userId: req.user.id, eventId: req.params.id });
+    res.json({ success: true, event: serializeEvent(result.rows[0]) });
+  } catch (err) {
+    logError('Reopen event failed', { err: err.message, stack: err.stack });
+    res.status(500).json({ success: false, message: '無法重新開啟事件' });
   }
 });
 

@@ -47,8 +47,8 @@ async function login(page: Page) {
 }
 
 async function openTherapists(page: Page) {
-  await page.getByTestId('user-menu-toggle').click();
-  await page.getByTestId('user-menu-therapists').click();
+  // 心理諮商 moved from the Profile dropdown to a top-level nav tab.
+  await page.getByTestId('nav-tab-therapists').click();
   await expect(page.getByTestId('therapists-view')).toBeVisible({ timeout: 10000 });
 }
 

@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Heart, MessageCircle, ThumbsUp, ChevronLeft, Sparkles } from 'lucide-react';
+import { Heart, MessageCircle, ThumbsUp, ChevronLeft, Sparkles, MessageSquareHeart, StickyNote } from 'lucide-react';
 import {
   apiService,
   type TherapistFocusArea,
   type PublicQaThreadSummary,
   type PublicQaThread,
+  type PublicQaSource,
 } from '../services/api';
 import type { Notification } from './ErrorNotification';
 import { FOCUS_AREAS, focusLabel } from './therapistShared';
@@ -22,7 +23,7 @@ interface PublicQaViewProps {
   onFindTherapist?: () => void;
 }
 
-const TherapistMini: React.FC<{ therapist: PublicQaThreadSummary['therapist'] }> = ({ therapist }) => (
+const TherapistMini: React.FC<{ therapist: NonNullable<PublicQaThreadSummary['therapist']> }> = ({ therapist }) => (
   <div className="flex items-center gap-2 min-w-0">
     <div className="w-7 h-7 shrink-0 rounded-full overflow-hidden bg-petal-cream-2 border border-petal-rule flex items-center justify-center">
       {therapist.photoUrl ? (
@@ -38,6 +39,24 @@ const TherapistMini: React.FC<{ therapist: PublicQaThreadSummary['therapist'] }>
   </div>
 );
 
+// Couple-shared (non-therapist) threads show a source chip instead of a therapist.
+const SOURCE_META: Record<Exclude<PublicQaSource, 'consultation'>, { label: string; icon: typeof MessageSquareHeart }> = {
+  event: { label: '衝突事件 · 匿名分享', icon: MessageSquareHeart },
+  wall: { label: '我們的牆 · 匿名分享', icon: StickyNote },
+};
+
+const SourceMini: React.FC<{ source: PublicQaSource }> = ({ source }) => {
+  if (source === 'consultation') return null;
+  const meta = SOURCE_META[source];
+  const Icon = meta.icon;
+  return (
+    <span className="flex items-center gap-1.5 min-w-0 font-body text-xs text-petal-ink-soft">
+      <Icon className="w-3.5 h-3.5 text-petal-sage-deep shrink-0" strokeWidth={1.5} />
+      <span className="truncate">{meta.label}</span>
+    </span>
+  );
+};
+
 const PublicQaView: React.FC<PublicQaViewProps> = ({ isAuthenticated, showNotification, onFindTherapist }) => {
   const [focus, setFocus] = useState<TherapistFocusArea | 'all'>('all');
   const [threads, setThreads] = useState<PublicQaThreadSummary[]>([]);
@@ -46,7 +65,7 @@ const PublicQaView: React.FC<PublicQaViewProps> = ({ isAuthenticated, showNotifi
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [open, setOpen] = useState<{ id: string; source: PublicQaSource } | null>(null);
 
   const load = useCallback(async (nextPage: number, replace: boolean) => {
     try {
@@ -65,13 +84,14 @@ const PublicQaView: React.FC<PublicQaViewProps> = ({ isAuthenticated, showNotifi
 
   useEffect(() => { load(1, true); }, [load]);
 
-  if (openId) {
+  if (open) {
     return (
       <PublicQaDetail
-        id={openId}
+        id={open.id}
+        source={open.source}
         isAuthenticated={isAuthenticated}
         showNotification={showNotification}
-        onBack={() => setOpenId(null)}
+        onBack={() => setOpen(null)}
         onFindTherapist={onFindTherapist}
       />
     );
@@ -112,8 +132,8 @@ const PublicQaView: React.FC<PublicQaViewProps> = ({ isAuthenticated, showNotifi
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4" data-testid="public-qa-list">
             {threads.map((t) => (
               <button
-                key={t.id}
-                onClick={() => setOpenId(t.id)}
+                key={`${t.source}-${t.id}`}
+                onClick={() => setOpen({ id: t.id, source: t.source })}
                 data-testid="public-qa-card"
                 className="text-left flex flex-col bg-petal-cream rounded-lg border border-petal-rule shadow-petal p-5 hover:border-petal-ink transition-colors"
               >
@@ -129,7 +149,7 @@ const PublicQaView: React.FC<PublicQaViewProps> = ({ isAuthenticated, showNotifi
                   <p className="mt-2 font-body text-sm text-petal-ink-soft line-clamp-3">{t.preview}</p>
                 )}
                 <div className="mt-3 pt-3 border-t border-petal-rule flex items-center justify-between gap-3">
-                  <TherapistMini therapist={t.therapist} />
+                  {t.therapist ? <TherapistMini therapist={t.therapist} /> : <SourceMini source={t.source} />}
                   <div className="flex items-center gap-3 font-body text-[11px] text-petal-muted shrink-0">
                     <span className="inline-flex items-center gap-1"><ThumbsUp className="w-3 h-3" strokeWidth={1.5} /> {t.helpfulCount}</span>
                     <span className="inline-flex items-center gap-1"><MessageCircle className="w-3 h-3" strokeWidth={1.5} /> {t.messageCount}</span>
@@ -159,22 +179,23 @@ const PublicQaView: React.FC<PublicQaViewProps> = ({ isAuthenticated, showNotifi
 
 const PublicQaDetail: React.FC<{
   id: string;
+  source: PublicQaSource;
   isAuthenticated: boolean;
   showNotification: (n: Omit<Notification, 'id'>) => void;
   onBack: () => void;
   onFindTherapist?: () => void;
-}> = ({ id, isAuthenticated, showNotification, onBack, onFindTherapist }) => {
+}> = ({ id, source, isAuthenticated, showNotification, onBack, onFindTherapist }) => {
   const [thread, setThread] = useState<PublicQaThread | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [voting, setVoting] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    apiService.getPublicQaThread(id)
+    apiService.getPublicQaThread(id, source)
       .then((t) => { if (alive) setThread(t); })
       .catch((err) => { if (alive) setError(err instanceof Error ? err.message : '無法載入公開問答'); });
     return () => { alive = false; };
-  }, [id]);
+  }, [id, source]);
 
   const toggleVote = async () => {
     if (!isAuthenticated) {
@@ -215,48 +236,64 @@ const PublicQaDetail: React.FC<{
               )}
             </div>
             <div className="mt-2 flex items-center gap-2">
-              <TherapistMini therapist={thread.therapist} />
-              <span className="font-body text-[11px] text-petal-muted">回答</span>
+              {thread.therapist ? (
+                <>
+                  <TherapistMini therapist={thread.therapist} />
+                  <span className="font-body text-[11px] text-petal-muted">回答</span>
+                </>
+              ) : (
+                <SourceMini source={thread.source} />
+              )}
             </div>
           </div>
 
-          {/* Anonymised transcript */}
+          {/* Anonymised transcript. AI 諮商師 messages render distinctly; the
+              two partners are 匿名 A / 匿名 B. */}
           <div className="px-4 py-4 space-y-3">
-            {thread.messages.map((m) => (
-              <div key={m.id} className={`flex ${m.isTherapist ? 'justify-start' : 'justify-end'}`}>
-                <div className={`max-w-[82%] flex flex-col ${m.isTherapist ? 'items-start' : 'items-end'}`}>
-                  <div className="font-body text-[11px] text-petal-muted mb-0.5 px-1">
-                    {m.isTherapist ? `🩺 ${m.senderName}（諮商師）` : m.senderName}
-                  </div>
-                  <div
-                    className={`px-3.5 py-2 rounded-2xl font-body text-sm ${
-                      m.isTherapist
-                        ? 'bg-pink-100 text-petal-ink rounded-bl-sm'
-                        : 'bg-petal-cream-2 text-petal-ink rounded-br-sm'
-                    }`}
-                  >
-                    {m.body}
+            {thread.messages.map((m) => {
+              const highlighted = m.isTherapist || m.isAi; // left-aligned, accented
+              return (
+                <div key={m.id} className={`flex ${highlighted ? 'justify-start' : 'justify-end'}`}>
+                  <div className={`max-w-[82%] flex flex-col ${highlighted ? 'items-start' : 'items-end'}`}>
+                    <div className="font-body text-[11px] text-petal-muted mb-0.5 px-1">
+                      {m.isTherapist ? `🩺 ${m.senderName}（諮商師）` : m.isAi ? '💛 AI 諮商師' : m.senderName}
+                    </div>
+                    <div
+                      className={`px-3.5 py-2 rounded-2xl font-body text-sm ${
+                        m.isTherapist
+                          ? 'bg-pink-100 text-petal-ink rounded-bl-sm'
+                          : m.isAi
+                            ? 'bg-petal-sage/20 text-petal-ink rounded-bl-sm'
+                            : 'bg-petal-cream-2 text-petal-ink rounded-br-sm'
+                      }`}
+                    >
+                      {m.body}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Footer: helpful vote + CTA to find a therapist */}
           <div className="px-5 py-4 border-t border-petal-rule flex items-center justify-between gap-3">
-            <button
-              onClick={toggleVote}
-              disabled={voting}
-              data-testid="public-qa-vote"
-              className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border font-body text-[13px] font-medium transition-colors disabled:opacity-50 ${
-                thread.hasVoted
-                  ? 'bg-pink-500 text-white border-pink-500'
-                  : 'border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink'
-              }`}
-            >
-              <ThumbsUp className="w-3.5 h-3.5" strokeWidth={1.5} />
-              有幫助 {thread.helpfulCount > 0 ? thread.helpfulCount : ''}
-            </button>
+            {thread.source === 'consultation' ? (
+              <button
+                onClick={toggleVote}
+                disabled={voting}
+                data-testid="public-qa-vote"
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border font-body text-[13px] font-medium transition-colors disabled:opacity-50 ${
+                  thread.hasVoted
+                    ? 'bg-pink-500 text-white border-pink-500'
+                    : 'border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink'
+                }`}
+              >
+                <ThumbsUp className="w-3.5 h-3.5" strokeWidth={1.5} />
+                有幫助 {thread.helpfulCount > 0 ? thread.helpfulCount : ''}
+              </button>
+            ) : (
+              <span className="font-body text-[11px] text-petal-muted">由用戶匿名分享</span>
+            )}
             {onFindTherapist && (
               <button
                 onClick={onFindTherapist}

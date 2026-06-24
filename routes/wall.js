@@ -75,6 +75,8 @@ function mapPost(row) {
     author_id: row.author_id,
     author_nickname: row.author_nickname,
     reply_count: Number(row.reply_count || 0),
+    public_status: row.public_status || 'private',
+    public_title: row.public_title || null,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -105,6 +107,7 @@ router.get('/', async (req, res) => {
     const result = await db.query(
       `SELECT
          p.id, p.content, p.mood_tag, p.category, p.author_id,
+         p.public_status, p.public_title,
          p.created_at, p.updated_at,
          u.nickname AS author_nickname,
          (SELECT COUNT(*) FROM wall_post_replies r WHERE r.post_id = p.id) AS reply_count
@@ -654,6 +657,78 @@ router.delete('/replies/:replyId', async (req, res) => {
       reply_id: req.params.replyId,
     });
     res.status(500).json(errorResponseBody('刪除回覆失敗', error));
+  }
+});
+
+// Share a wall thread into the public 公開問答 (anonymised, read-only). Either
+// partner can publish their couple's post; single-party toggle with an in-app
+// warning on the client.
+router.post(
+  '/:id/publish',
+  [body('title').optional().isString().isLength({ max: 200 })],
+  async (req, res) => {
+    try {
+      const userId = req.user.id;
+      const couple = await findCoupleForUser(userId);
+      if (!couple) return res.status(404).json({ success: false, message: '找不到貼文' });
+
+      const postResult = await db.query(
+        `SELECT id, content FROM wall_posts WHERE id = $1 AND couple_id = $2`,
+        [req.params.id, couple.id]
+      );
+      if (postResult.rows.length === 0) {
+        return res.status(404).json({ success: false, message: '找不到貼文' });
+      }
+      const fallback = (postResult.rows[0].content || '').slice(0, 60);
+      const title = (req.body.title && req.body.title.trim()) || fallback || '我們的牆分享';
+
+      const result = await db.query(
+        `UPDATE wall_posts
+            SET public_status = 'published', public_title = $2,
+                published_at = NOW(), published_by = $3
+          WHERE id = $1
+          RETURNING *`,
+        [req.params.id, title, userId]
+      );
+      logInfo('wall.published', { userId, postId: req.params.id });
+      res.json({
+        success: true,
+        message: '已匿名公開到公開問答，謝謝你願意幫助其他人。',
+        post: mapPost({ ...result.rows[0], author_nickname: null }),
+      });
+    } catch (error) {
+      logError('Publish wall post failed', { err: error.message, postId: req.params.id });
+      res.status(500).json(errorResponseBody('公開失敗，請稍後再試', error));
+    }
+  }
+);
+
+// Un-share a previously published wall thread.
+router.post('/:id/unpublish', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const couple = await findCoupleForUser(userId);
+    if (!couple) return res.status(404).json({ success: false, message: '找不到貼文' });
+
+    const result = await db.query(
+      `UPDATE wall_posts
+          SET public_status = 'private', published_at = NULL
+        WHERE id = $1 AND couple_id = $2
+        RETURNING *`,
+      [req.params.id, couple.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, message: '找不到貼文' });
+    }
+    logInfo('wall.unpublished', { userId, postId: req.params.id });
+    res.json({
+      success: true,
+      message: '已取消公開，這個對話不再顯示於公開問答。',
+      post: mapPost({ ...result.rows[0], author_nickname: null }),
+    });
+  } catch (error) {
+    logError('Unpublish wall post failed', { err: error.message, postId: req.params.id });
+    res.status(500).json(errorResponseBody('取消公開失敗，請稍後再試', error));
   }
 });
 

@@ -536,6 +536,47 @@ ${acceptUrl}
     }
   }
 
+  // Relationship-cultivation reminder (check-in due / intimacy gap / appreciation
+  // gap). Fired from GET /api/relationship/summary when a signal is overdue and
+  // past its cooldown. Respects the email opt-in (caller uses getUserEmailIfOptedIn).
+  async sendRelationshipReminder({ recipientEmail, recipientName, kind, days }) {
+    if (!this.isConfigured() || !recipientEmail) return;
+    const name = this._escape(recipientName || '');
+    const map = {
+      checkin_due: {
+        emoji: '🏡', title: '本週的關係檢視', subtitle: '花兩分鐘，照顧你們的關係之屋',
+        body: `<p>嗨 ${name}，</p><p>已經一陣子沒做<strong>關係檢視</strong>了。花兩分鐘為「信賴」「奉獻」「連結」打個分數，能幫你們及早看見需要照顧的地方。</p>`,
+        cta: '🏡 開始本週檢視',
+      },
+      intimacy_gap: {
+        emoji: '💗', title: '好久沒有親密了', subtitle: '給彼此一點靠近的時間',
+        body: `<p>嗨 ${name}，</p><p>你們已經 <strong>${days} 天</strong>沒有記錄親密時光了。主動關心一下另一半，傳個親密邀請吧。</p>`,
+        cta: '💗 傳個邀請',
+      },
+      appreciation_gap: {
+        emoji: '🌱', title: '存一筆好感吧', subtitle: '正向的話語，是關係的存款',
+        body: `<p>嗨 ${name}，</p><p>這陣子還沒對 TA 說一句欣賞的話。一句真誠的稱讚，就是替你們的關係「存好感」，讓日後的衝突更容易化解。</p>`,
+        cta: '🌱 寫一句稱讚',
+      },
+    };
+    const m = map[kind] || map.checkin_due;
+    const html = this._activityEmailHtml({
+      headerEmoji: m.emoji, headerTitle: m.title, headerSubtitle: m.subtitle,
+      bodyHtml: m.body, ctaLabel: m.cta,
+    });
+    try {
+      await this.transporter.sendMail({
+        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+        to: recipientEmail,
+        subject: `${m.emoji} ${m.title}`,
+        html,
+        text: `${m.title}\n\n登入 Twogether 查看。`,
+      });
+    } catch (err) {
+      logWarn('sendRelationshipReminder failed', { err: err.message, kind });
+    }
+  }
+
   // Shared lightweight HTML wrapper used by the partner-activity emails so
   // we don't repeat 100 lines of CSS per template.
   _activityEmailHtml({ headerEmoji, headerTitle, headerSubtitle, bodyHtml, ctaLabel = '💕 打開 Twogether 查看', ctaUrl }) {

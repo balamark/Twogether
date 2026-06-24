@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown, HeartHandshake } from 'lucide-react';
+import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown, MessageSquarePlus } from 'lucide-react';
 import { apiService } from '../services/api';
 
 interface User {
@@ -28,8 +28,9 @@ interface HeaderProps {
   onShowSettings: () => void;
   onShowJourney: () => void;
   onShowIntimacyHistory: () => void;
-  onShowTherapists: () => void;
   onShowUpgrade: () => void;
+  onShowFeedback: () => void;
+  onShowLoveLanguage: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -43,8 +44,9 @@ const Header: React.FC<HeaderProps> = ({
   onShowSettings,
   onShowJourney,
   onShowIntimacyHistory,
-  onShowTherapists,
   onShowUpgrade,
+  onShowFeedback,
+  onShowLoveLanguage,
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -126,19 +128,6 @@ const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* Coins Display */}
-            {authState.isAuthenticated && (
-              <button
-                onClick={onShowCoinShop}
-                data-testid="coin-balance"
-                title="前往金幣商店"
-                className="flex items-center space-x-1 sm:space-x-1.5 border border-petal-rule hover:border-petal-ink px-2 sm:px-3 py-1.5 rounded-full transition-colors min-h-[40px]"
-              >
-                <Coins className="w-3.5 h-3.5 text-pink-600" strokeWidth={1.5} />
-                <span className="font-display italic text-sm text-petal-ink">{totalCoins}</span>
-              </button>
-            )}
-
             {/* User Section */}
             {authState.isAuthenticated ? (
               <div className="relative">
@@ -178,6 +167,20 @@ const Header: React.FC<HeaderProps> = ({
                     <div className="p-2">
                       <button
                         onClick={() => {
+                          onShowCoinShop();
+                          setShowUserMenu(false);
+                        }}
+                        data-testid="user-menu-coin-shop"
+                        className="w-full flex items-center justify-between px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
+                      >
+                        <span className="flex items-center space-x-2">
+                          <Coins className="w-3.5 h-3.5 text-pink-600" strokeWidth={1.5} />
+                          <span>金幣商店</span>
+                        </span>
+                        <span data-testid="coin-balance" className="font-display italic text-sm text-petal-ink">{totalCoins}</span>
+                      </button>
+                      <button
+                        onClick={() => {
                           onShowJourney();
                           setShowUserMenu(false);
                         }}
@@ -200,14 +203,14 @@ const Header: React.FC<HeaderProps> = ({
                       </button>
                       <button
                         onClick={() => {
-                          onShowTherapists();
+                          onShowLoveLanguage();
                           setShowUserMenu(false);
                         }}
-                        data-testid="user-menu-therapists"
+                        data-testid="user-menu-love-language"
                         className="w-full flex items-center space-x-2 px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
                       >
-                        <HeartHandshake className="w-3.5 h-3.5" strokeWidth={1.5} />
-                        <span>心理諮商</span>
+                        <Heart className="w-3.5 h-3.5" strokeWidth={1.5} />
+                        <span>愛的語言</span>
                       </button>
                       <button
                         onClick={() => {
@@ -219,6 +222,17 @@ const Header: React.FC<HeaderProps> = ({
                       >
                         <Crown className="w-3.5 h-3.5" strokeWidth={1.5} />
                         <span>升級 Premium</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          onShowFeedback();
+                          setShowUserMenu(false);
+                        }}
+                        data-testid="user-menu-feedback"
+                        className="w-full flex items-center space-x-2 px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
+                      >
+                        <MessageSquarePlus className="w-3.5 h-3.5" strokeWidth={1.5} />
+                        <span>意見回饋</span>
                       </button>
                       <button
                         onClick={() => {
