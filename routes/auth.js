@@ -326,6 +326,58 @@ router.get('/verify-email', async (req, res) => {
   }
 });
 
+// GET /api/auth/confirm-email-change?token=... — complete a pending login-email
+// change. The new address is only written to users.email here, once the user
+// proves they own it by clicking this link.
+router.get('/confirm-email-change', async (req, res) => {
+  try {
+    const token = typeof req.query.token === 'string' ? req.query.token : '';
+    if (!token) {
+      return authPage(res, { ok: false, status: 400, title: '變更失敗', message: '連結無效，缺少驗證碼。', body: '<a class="btn" href="/">回到 Twogether</a>' });
+    }
+    const found = await db.query(
+      'SELECT id, pending_email FROM users WHERE pending_email_token = $1',
+      [token]
+    );
+    const row = found.rows[0];
+    if (!row || !row.pending_email) {
+      return authPage(res, { ok: false, status: 400, title: '變更失敗', message: '這個連結已失效或已使用過。如果你已完成變更，直接用新的 Email 登入即可。', body: '<a class="btn" href="/">回到 Twogether</a>' });
+    }
+
+    // Re-check uniqueness at confirm time: someone else could have registered
+    // this address (or started their own change to it) between request and
+    // confirm. If so, abandon the change and keep the original email intact.
+    const taken = await db.query(
+      'SELECT id FROM users WHERE LOWER(email) = $1 AND id <> $2',
+      [row.pending_email, row.id]
+    );
+    if (taken.rows.length > 0) {
+      await db.query(
+        'UPDATE users SET pending_email = NULL, pending_email_token = NULL, pending_email_sent_at = NULL WHERE id = $1',
+        [row.id]
+      );
+      logWarn('Email change confirm aborted; address taken meanwhile', { userId: row.id });
+      return authPage(res, { ok: false, status: 409, title: '變更失敗', message: '這個 Email 在你確認前已被其他帳號使用，變更已取消。你的原本 Email 仍然有效，請改用別的信箱再試一次。', body: '<a class="btn" href="/">回到 Twogether</a>' });
+    }
+
+    await db.query(
+      `UPDATE users
+          SET email = pending_email,
+              email_verified = true,
+              pending_email = NULL,
+              pending_email_token = NULL,
+              pending_email_sent_at = NULL
+        WHERE id = $1`,
+      [row.id]
+    );
+    logInfo('Email change confirmed', { userId: row.id });
+    return authPage(res, { ok: true, title: 'Email 已更新', message: '你的登入 Email 已成功變更。請使用新的 Email 重新登入。', body: '<a class="btn" href="/">回到 Twogether 登入</a>' });
+  } catch (error) {
+    logError('Email change confirmation failed', { err: error.message });
+    return authPage(res, { ok: false, status: 500, title: '變更失敗', message: '變更 Email 時發生錯誤，請稍後再試。', body: '<a class="btn" href="/">回到 Twogether</a>' });
+  }
+});
+
 // POST /api/auth/resend-verification — re-send the verification email. Soft
 // rate-limit: at most once per minute. No-op (still 200) if already verified.
 router.post('/resend-verification', authenticateToken, async (req, res) => {
@@ -519,6 +571,131 @@ router.put('/user/email-notifications', authenticateToken, [
     res.status(500).json({
       success: false,
       message: '更新電子郵件通知設定失敗'
+    });
+  }
+});
+
+// Change the user's login email. The new address must be confirmed via a link
+// we send to it before users.email actually changes (see GET
+// /confirm-email-change). Requires the current password to re-auth.
+router.put('/user/email', authenticateToken, [
+  body('new_email')
+    .isEmail()
+    .withMessage('請輸入有效的電子郵件地址'),
+  body('password')
+    .notEmpty()
+    .withMessage('請輸入目前的密碼')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: '請輸入有效的電子郵件地址與目前的密碼',
+        error_code: 'EMAIL_CHANGE_INVALID_INPUT',
+        errors: errors.array()
+      });
+    }
+
+
+    const userId = req.user.id;
+    const newEmail = String(req.body.new_email).trim().toLowerCase();
+    const password = String(req.body.password);
+
+    const me = await db.query(
+      'SELECT email, nickname, password_hash, pending_email_sent_at FROM users WHERE id = $1',
+      [userId]
+    );
+    const user = me.rows[0];
+    if (!user) {
+      return res.status(404).json({ success: false, message: '用戶不存在', error_code: 'USER_NOT_FOUND' });
+    }
+
+    // Re-auth: changing the login identifier is sensitive, so require the
+    // current password even though the request is already authenticated.
+    const passwordOk = await bcrypt.compare(password, user.password_hash);
+    if (!passwordOk) {
+      logWarn('Email change rejected: bad password', { userId });
+      // Deliberately 400, not 401: the request is authenticated, only the
+      // confirmation password is wrong. A 401 would trip the frontend's
+      // session-expiry handler and log the user out.
+      return res.status(400).json({
+        success: false,
+        message: '目前密碼不正確，請重新輸入後再變更 Email',
+        error_code: 'EMAIL_CHANGE_BAD_PASSWORD'
+      });
+    }
+
+    if (newEmail === String(user.email).trim().toLowerCase()) {
+      return res.status(400).json({
+        success: false,
+        message: '這已經是你目前的 Email 了',
+        error_code: 'EMAIL_CHANGE_SAME'
+      });
+    }
+
+    // Uniqueness: the address can't already belong to another account, nor be
+    // parked as another account's pending change.
+    const taken = await db.query(
+      `SELECT id FROM users
+        WHERE (LOWER(email) = $1 OR LOWER(pending_email) = $1) AND id <> $2
+        LIMIT 1`,
+      [newEmail, userId]
+    );
+    if (taken.rows.length > 0) {
+      return res.status(409).json({
+        success: false,
+        message: '此電子郵件已被其他帳號使用，請改用別的信箱',
+        error_code: 'EMAIL_CHANGE_TAKEN'
+      });
+    }
+
+    // Soft rate-limit: at most one confirmation email per minute (mirrors
+    // /resend-verification) so the button can't be used to spam an inbox.
+    if (user.pending_email_sent_at && Date.now() - new Date(user.pending_email_sent_at).getTime() < 60_000) {
+      return res.status(429).json({
+        success: false,
+        message: '剛剛才寄出確認信，請稍候一分鐘再試。',
+        error_code: 'EMAIL_CHANGE_RATE_LIMITED'
+      });
+    }
+
+    const changeToken = makeToken();
+    await db.query(
+      `UPDATE users
+          SET pending_email = $1, pending_email_token = $2, pending_email_sent_at = NOW()
+        WHERE id = $3`,
+      [newEmail, changeToken, userId]
+    );
+
+    // Confirmation link to the NEW address. Best-effort: the request still
+    // succeeds if SMTP is down (the user can resubmit). Also give the OLD
+    // address a heads-up that a change was requested.
+    emailService.sendEmailChangeVerification({
+      recipientEmail: newEmail,
+      nickname: user.nickname,
+      token: changeToken,
+    }).catch((err) => logWarn('Email-change verification email failed', { err: err.message }));
+    emailService.sendEmailChangeRequestedNotice({
+      recipientEmail: user.email,
+      nickname: user.nickname,
+      newEmail,
+    }).catch((err) => logWarn('Email-change notice to old address failed', { err: err.message }));
+
+    logInfo('Email change requested', { userId });
+
+    res.json({
+      success: true,
+      level: 'info',
+      message: '我們已寄出確認信到新的 Email，請點擊信中連結完成變更。在你確認之前，請繼續使用目前的 Email 登入。',
+      pending_email: newEmail
+    });
+  } catch (error) {
+    logError('Update user email failed', { err: error.message, stack: error.stack });
+    res.status(500).json({
+      success: false,
+      message: '變更 Email 失敗，請稍後再試',
+      error_code: 'EMAIL_CHANGE_FAILED'
     });
   }
 });
