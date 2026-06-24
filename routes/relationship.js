@@ -76,7 +76,7 @@ router.get('/summary', async (req, res) => {
     const coupleId = couple.id;
     const partnerId = couple.user1_id === userId ? couple.user2_id : couple.user1_id;
 
-    const [intimacy, appreciation, pos, neg, openConf, myCheckin, coupleCheckin, partner] = await Promise.all([
+    const [intimacy, appreciation, pos, neg, openConf, myCheckin, coupleCheckin, partnerCheckin, partner] = await Promise.all([
       db.query(`SELECT MAX(moment_date) AS last FROM love_moments WHERE couple_id = $1`, [coupleId]),
       db.query(`SELECT MAX(created_at) AS last FROM wall_posts WHERE couple_id = $1`, [coupleId]),
       db.query(
@@ -90,6 +90,9 @@ router.get('/summary', async (req, res) => {
       db.query(`SELECT COUNT(*) AS n FROM events WHERE couple_id = $1 AND status <> 'resolved' AND is_private = FALSE`, [coupleId]),
       db.query(`SELECT MAX(created_at) AS last FROM relationship_checkins WHERE user_id = $1`, [userId]),
       db.query(`SELECT MAX(created_at) AS last FROM relationship_checkins WHERE couple_id = $1`, [coupleId]),
+      partnerId
+        ? db.query(`SELECT MAX(created_at) AS last FROM relationship_checkins WHERE user_id = $1`, [partnerId])
+        : Promise.resolve({ rows: [{ last: null }] }),
       partnerId ? db.query(`SELECT nickname FROM users WHERE id = $1`, [partnerId]) : Promise.resolve({ rows: [] }),
     ]);
 
@@ -98,8 +101,12 @@ router.get('/summary', async (req, res) => {
     const positive14 = Number(pos.rows[0].n) || 0;
     const negative14 = Number(neg.rows[0].n) || 0;
     const myCheckinDays = daysBetween(myCheckin.rows[0].last);
+    const partnerCheckinDays = daysBetween(partnerCheckin.rows[0].last);
     const coupleAgeDays = daysBetween(couple.created_at) || 0;
-    const checkinOverdue = (myCheckinDays === null || myCheckinDays >= CHECKIN_PERIOD_DAYS) && coupleAgeDays >= CHECKIN_PERIOD_DAYS;
+    const isCheckinOverdue = (days) =>
+      (days === null || days >= CHECKIN_PERIOD_DAYS) && coupleAgeDays >= CHECKIN_PERIOD_DAYS;
+    const checkinOverdue = isCheckinOverdue(myCheckinDays);
+    const partnerCheckinOverdue = isCheckinOverdue(partnerCheckinDays);
 
     const summary = {
       paired: true,
@@ -118,24 +125,30 @@ router.get('/summary', async (req, res) => {
     };
     res.json(summary);
 
-    // After responding, evaluate reminders (deduped). Fire-and-forget emails.
-    void (async () => {
+    // After responding, evaluate reminders for BOTH partners (deduped per
+    // user/kind via the cooldown). Intimacy/appreciation are couple-shared so
+    // both are due together; the check-in is per-user, so each is evaluated on
+    // their own overdue status — this way one active partner opening the app
+    // still nudges a passive partner who hasn't checked in. Emails fire-and-forget.
+    const REMINDER_META = {
+      checkin_due: { title: '本週的關係檢視', content: '花兩分鐘檢視你們的「信賴」與「奉獻」，照顧關係之屋。' },
+      intimacy_gap: { title: '好久沒有親密了', content: `已經 ${daysSinceIntimacy} 天了，主動關心一下另一半吧。` },
+      appreciation_gap: { title: '存一筆好感吧', content: '對 TA 說一句欣賞的話，替你們的關係存好感。' },
+    };
+    const fireRemindersFor = async (targetUserId, checkinDueForTarget) => {
+      if (!targetUserId) return;
       const dueKinds = [];
-      if (checkinOverdue) dueKinds.push('checkin_due');
+      if (checkinDueForTarget) dueKinds.push('checkin_due');
       if (daysSinceIntimacy !== null && daysSinceIntimacy >= INTIMACY_EMAIL_TIER_DAYS) dueKinds.push('intimacy_gap');
       if (daysSinceAppreciation !== null && daysSinceAppreciation >= APPRECIATION_GAP_DAYS) dueKinds.push('appreciation_gap');
       if (dueKinds.length === 0) return;
 
-      const recipient = await emailService.getUserEmailIfOptedIn(db, userId);
+      const recipient = await emailService.getUserEmailIfOptedIn(db, targetUserId);
       for (const kind of dueKinds) {
-        const claimed = await claimReminder(userId, kind);
+        const claimed = await claimReminder(targetUserId, kind);
         if (!claimed) continue;
-        const meta = {
-          checkin_due: { title: '本週的關係檢視', content: '花兩分鐘檢視你們的「信賴」與「奉獻」，照顧關係之屋。' },
-          intimacy_gap: { title: '好久沒有親密了', content: `已經 ${daysSinceIntimacy} 天了，主動關心一下另一半吧。` },
-          appreciation_gap: { title: '存一筆好感吧', content: '對 TA 說一句欣賞的話，替你們的關係存好感。' },
-        }[kind];
-        await notifyReminder(userId, `relationship_${kind}`, meta.title, meta.content);
+        const meta = REMINDER_META[kind];
+        await notifyReminder(targetUserId, `relationship_${kind}`, meta.title, meta.content);
         if (recipient) {
           emailService.sendRelationshipReminder({
             recipientEmail: recipient.email,
@@ -144,9 +157,14 @@ router.get('/summary', async (req, res) => {
             days: daysSinceIntimacy,
           });
         }
-        logInfo('relationship.reminder.sent', { userId, kind, emailed: !!recipient });
+        logInfo('relationship.reminder.sent', { userId: targetUserId, kind, emailed: !!recipient });
       }
-    })().catch((err) => logWarn('relationship reminder eval failed', { err: err.message }));
+    };
+
+    void Promise.all([
+      fireRemindersFor(userId, checkinOverdue),
+      fireRemindersFor(partnerId, partnerCheckinOverdue),
+    ]).catch((err) => logWarn('relationship reminder eval failed', { err: err.message }));
   } catch (error) {
     logDbError('relationship.summary', error, { userId: req.user.id });
     res.status(500).json(errorResponseBody('無法載入關係概況，請稍後再試。', error));
