@@ -1930,6 +1930,7 @@ const LoveTimeApp = () => {
             togetherSince={togetherSince}
             daysTogether={daysTogether}
             primaryTimezone={primaryTimezone}
+            onNudgePartner={partnerConnected ? () => setShowIntimacyRequestForm(true) : undefined}
           />
         );
       case 'shop': return (

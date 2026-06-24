@@ -95,6 +95,7 @@ interface CalendarViewProps {
   togetherSince: Date | null;
   daysTogether: number;
   primaryTimezone: string;
+  onNudgePartner?: () => void;
 }
 
 // Calendar / record-keeping view. Defined at module scope (not inside App) so
@@ -128,6 +129,7 @@ const CalendarView = ({
   togetherSince,
   daysTogether,
   primaryTimezone,
+  onNudgePartner,
 }: CalendarViewProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -393,6 +395,7 @@ const CalendarView = ({
         records={intimateRecords}
         birthDate={authState.user?.birth_date}
         onOpenSettings={() => setCurrentView('settings')}
+        onNudgePartner={onNudgePartner}
       />
 
       {/* Enhanced Record Modal */}

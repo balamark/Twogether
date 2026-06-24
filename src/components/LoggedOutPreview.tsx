@@ -13,6 +13,7 @@ import {
   HeartHandshake,
   type LucideIcon,
 } from 'lucide-react';
+import { daysSinceLastNudge } from './AchievementsView';
 
 interface PreviewScript {
   id: string;
@@ -70,6 +71,40 @@ const DOT_CLS: Record<string, string> = {
   pink: 'bg-pink-500',
   rose: 'bg-petal-rose-deep',
   sage: 'bg-petal-sage-deep',
+};
+
+// Sample of the real intimacy-stats cards, leading with the「已經幾天沒有親密了」
+// hook (16 days, escalated) — reuses the same tier styling as the live view.
+const SampleStats: React.FC = () => {
+  const nudge = daysSinceLastNudge(16);
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-end mb-2">
+        <SampleTag />
+      </div>
+      <div className="grid grid-cols-2 gap-2.5">
+        <div className="bg-petal-cream border border-petal-rule rounded-md p-3">
+          <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-1">周平均</div>
+          <div className="font-display italic font-light text-2xl text-petal-ink">0.5</div>
+        </div>
+        <div className="bg-petal-cream border border-petal-rule rounded-md p-3">
+          <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep mb-1">本週次數</div>
+          <div className="font-display italic font-light text-2xl text-petal-rose-deep">0</div>
+        </div>
+        <div className="bg-petal-cream border border-petal-rule rounded-md p-3">
+          <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-1">本月次數</div>
+          <div className="font-display italic font-light text-2xl text-petal-sage-deep">1</div>
+        </div>
+        <div className="bg-petal-rose-soft/40 border border-petal-rose-soft rounded-md p-3">
+          <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-1">已經幾天沒有親密了</div>
+          <div className={`font-display italic font-light leading-none ${nudge.numberClass}`}>16</div>
+        </div>
+      </div>
+      {nudge.hint && (
+        <p className="mt-2 font-body text-xs text-petal-rose-deep text-center leading-snug">{nudge.hint}</p>
+      )}
+    </div>
+  );
 };
 
 const CalendarMock: React.FC = () => {
@@ -191,8 +226,14 @@ const PREVIEWS: Record<string, PreviewConfig> = {
         記下你們的<em className="not-italic font-light italic text-pink-600">每一段時光</em>
       </>
     ),
-    description: '親密時光、生理期與心情，一張月曆全部看得見。回顧你們走過的每一天。',
-    sample: <CalendarMock />,
+    description:
+      '看見你們的節奏：親密時光、生理期與心情都在一張月曆上。太久沒親密時，App 會溫柔提醒另一半多關心你。',
+    sample: (
+      <>
+        <SampleStats />
+        <CalendarMock />
+      </>
+    ),
   },
   conflict: {
     icon: MessageCircle,
