@@ -17,6 +17,7 @@ import TherapistsView from './components/TherapistsView';
 import LoggedOutPreview from './components/LoggedOutPreview';
 import Testimonials from './components/Testimonials';
 import FeedbackView from './components/FeedbackView';
+import LoveLanguageView from './components/LoveLanguageView';
 import type { WallExample } from './components/WallPostComposer';
 import Header from './components/Header';
 import { NotificationContainer } from './components/ErrorNotification';
@@ -2042,6 +2043,7 @@ const LoveTimeApp = () => {
       />;
       case 'therapists': return <TherapistsView authState={authState} showNotification={showNotification} />;
       case 'feedback': return <FeedbackView authState={authState} showNotification={showNotification} setShowAuthModal={setShowAuthModal} />;
+      case 'love-language': return <LoveLanguageView authState={authState} showNotification={showNotification} setShowAuthModal={setShowAuthModal} />;
       default: return <GamesView
         totalCoins={totalCoins}
         customMemoryQuestions={customMemoryQuestions}
@@ -2106,6 +2108,7 @@ const LoveTimeApp = () => {
         onShowJourney={() => setCurrentView('journey')}
         onShowIntimacyHistory={() => setCurrentView('intimacy-history')}
         onShowFeedback={() => setCurrentView('feedback')}
+        onShowLoveLanguage={() => setCurrentView('love-language')}
         onShowUpgrade={() => { setUpgradeReason(null); setCurrentView('upgrade'); }}
       />
       

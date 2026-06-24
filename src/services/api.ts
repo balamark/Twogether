@@ -1982,6 +1982,49 @@ class ApiService {
     return response.data;
   }
 
+  // Assessments (愛的語言 love languages, future: MBTI / 星座)
+  async getAssessments(): Promise<
+    Array<{ type: string; result: string; scores: Record<string, number>; updatedAt: string }>
+  > {
+    try {
+      const response = await apiClient.get('/assessments');
+      return response.data?.assessments || [];
+    } catch (error: unknown) {
+      console.error('Failed to fetch assessments:', error);
+      return [];
+    }
+  }
+
+  async getPartnerAssessments(): Promise<{
+    partner: { nickname: string } | null;
+    assessments: Array<{ type: string; result: string; updatedAt: string }>;
+  }> {
+    try {
+      const response = await apiClient.get('/assessments/partner');
+      return {
+        partner: response.data?.partner ?? null,
+        assessments: response.data?.assessments || [],
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch partner assessments:', error);
+      return { partner: null, assessments: [] };
+    }
+  }
+
+  async saveAssessment(
+    type: string,
+    result: string,
+    scores: Record<string, number>
+  ): Promise<{ type: string; result: string; scores: Record<string, number>; updatedAt: string }> {
+    try {
+      const response = await apiClient.put(`/assessments/${type}`, { result, scores });
+      return response.data.assessment;
+    } catch (error: unknown) {
+      console.error('Failed to save assessment:', error);
+      this.throwApiError(error, '儲存測驗結果失敗，請稍後再試');
+    }
+  }
+
   // Custom Scripts API
   // Extract the most specific server-side error message from an axios failure.
   // Validation errors come back as { errors: [{ path, msg }] } — surfacing

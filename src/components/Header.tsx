@@ -30,6 +30,7 @@ interface HeaderProps {
   onShowIntimacyHistory: () => void;
   onShowUpgrade: () => void;
   onShowFeedback: () => void;
+  onShowLoveLanguage: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -45,6 +46,7 @@ const Header: React.FC<HeaderProps> = ({
   onShowIntimacyHistory,
   onShowUpgrade,
   onShowFeedback,
+  onShowLoveLanguage,
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -198,6 +200,17 @@ const Header: React.FC<HeaderProps> = ({
                       >
                         <Inbox className="w-3.5 h-3.5" strokeWidth={1.5} />
                         <span>訊息紀錄</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          onShowLoveLanguage();
+                          setShowUserMenu(false);
+                        }}
+                        data-testid="user-menu-love-language"
+                        className="w-full flex items-center space-x-2 px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
+                      >
+                        <Heart className="w-3.5 h-3.5" strokeWidth={1.5} />
+                        <span>愛的語言</span>
                       </button>
                       <button
                         onClick={() => {
