@@ -59,6 +59,47 @@ export const LOVE_LANGUAGES: Record<LoveLanguageCode, LoveLanguageMeta> = {
 
 export const LOVE_LANGUAGE_ORDER: LoveLanguageCode[] = ['words', 'time', 'gifts', 'service', 'touch'];
 
+// Five default suggested actions per love language — concrete things one partner
+// can do to make the other (whose top language is this) feel loved. Shown on top
+// of the user's own custom 愛的行動 wishlist (coin-store style).
+export const LOVE_ACTIONS: Record<LoveLanguageCode, string[]> = {
+  words: [
+    '每天對 TA 說一句具體的稱讚',
+    '寫一張小紙條表達感謝',
+    '傳訊息說一句「我以你為傲」',
+    '當面肯定 TA 做得好的地方',
+    '睡前說一句「謝謝你今天的陪伴」',
+  ],
+  time: [
+    '安排一次不滑手機的兩人約會',
+    '每天留 15 分鐘專心聊聊彼此的一天',
+    '一起做一件 TA 喜歡的事',
+    '週末安排一個小旅行或散步',
+    '認真聽 TA 說話，不打斷、不分心',
+  ],
+  gifts: [
+    '帶一份 TA 隨口提過想要的小東西',
+    '在平凡的日子準備一個小驚喜',
+    '手寫一張卡片，附上小禮物',
+    '記得 TA 愛吃的，下班帶回家',
+    '為紀念日準備用心挑選的禮物',
+  ],
+  service: [
+    '主動分擔一項 TA 不喜歡的家事',
+    '幫 TA 處理一件拖很久的雜事',
+    '早起幫 TA 準備早餐',
+    '在 TA 累的時候說「交給我」',
+    '接送 TA，省去奔波的麻煩',
+  ],
+  touch: [
+    '出門前給 TA 一個擁抱',
+    '看電視時靠著 TA、手牽手',
+    '經過時拍拍肩、摸摸頭',
+    '睡前抱一下再入睡',
+    '走在路上自然地牽起 TA 的手',
+  ],
+};
+
 export interface QuizOption {
   code: LoveLanguageCode;
   text: string;

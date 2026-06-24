@@ -102,4 +102,71 @@ router.put(
   }
 );
 
+// ── 愛的行動 wishlist ────────────────────────────────────────────────────────
+const MAX_WISHES = 20;
+
+async function partnerIdOf(userId) {
+  const r = await db.query(
+    `SELECT CASE WHEN user1_id = $1 THEN user2_id ELSE user1_id END AS partner_id
+       FROM couples WHERE user1_id = $1 OR user2_id = $1`,
+    [userId]
+  );
+  return r.rows[0]?.partner_id || null;
+}
+
+// GET /api/assessments/love-wishes — the caller's own wishes + the partner's.
+router.get('/love-wishes', async (req, res) => {
+  try {
+    const partnerId = await partnerIdOf(req.user.id);
+    const [mine, partner] = await Promise.all([
+      db.query(`SELECT id, content FROM love_wishes WHERE user_id = $1 ORDER BY created_at DESC`, [req.user.id]),
+      partnerId
+        ? db.query(`SELECT id, content FROM love_wishes WHERE user_id = $1 ORDER BY created_at DESC`, [partnerId])
+        : Promise.resolve({ rows: [] }),
+    ]);
+    res.json({ mine: mine.rows, partner: partner.rows });
+  } catch (error) {
+    logDbError('assessments.love_wishes.list', error, { userId: req.user.id });
+    res.status(500).json(errorResponseBody('無法載入愛的行動清單，請稍後再試。', error));
+  }
+});
+
+// POST /api/assessments/love-wishes — propose a new wish for yourself.
+router.post(
+  '/love-wishes',
+  [body('content').isString().trim().isLength({ min: 1, max: 200 }).withMessage('請輸入 1–200 字')],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ error: errors.array()[0].msg, error_code: 'WISH_INVALID' });
+    }
+    try {
+      const count = await db.query(`SELECT COUNT(*) AS n FROM love_wishes WHERE user_id = $1`, [req.user.id]);
+      if (Number(count.rows[0].n) >= MAX_WISHES) {
+        return res.status(400).json({ error: `最多只能新增 ${MAX_WISHES} 項`, error_code: 'WISH_LIMIT' });
+      }
+      const result = await db.query(
+        `INSERT INTO love_wishes (user_id, content) VALUES ($1, $2) RETURNING id, content`,
+        [req.user.id, req.body.content.trim()]
+      );
+      logInfo('assessments.love_wish.added', { userId: req.user.id });
+      res.status(201).json({ success: true, wish: result.rows[0] });
+    } catch (error) {
+      logDbError('assessments.love_wishes.add', error, { userId: req.user.id });
+      res.status(500).json(errorResponseBody('新增失敗，請稍後再試。', error));
+    }
+  }
+);
+
+// DELETE /api/assessments/love-wishes/:id — remove one of your own wishes.
+router.delete('/love-wishes/:id', [param('id').isUUID()], async (req, res) => {
+  try {
+    await db.query(`DELETE FROM love_wishes WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
+    res.json({ success: true });
+  } catch (error) {
+    logDbError('assessments.love_wishes.delete', error, { userId: req.user.id });
+    res.status(500).json(errorResponseBody('刪除失敗，請稍後再試。', error));
+  }
+});
+
 module.exports = router;

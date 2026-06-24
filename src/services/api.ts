@@ -955,6 +955,11 @@ export interface PublicQaListResult {
   threads: PublicQaThreadSummary[];
 }
 
+export interface LoveWish {
+  id: string;
+  content: string;
+}
+
 export interface RelationshipSummary {
   paired: boolean;
   partnerNickname?: string | null;
@@ -980,6 +985,14 @@ export interface RelationshipCheckin {
   connection: number;
   note: string | null;
   createdAt: string;
+}
+
+export interface GoodwillGroup {
+  kind: string;
+  label: string;
+  why: string;
+  count: number;
+  items: { text: string; who?: string; at: string; resolved?: boolean }[];
 }
 
 // API Service Class
@@ -2068,6 +2081,36 @@ class ApiService {
     }
   }
 
+  // 愛的行動 wishlist (custom items each partner proposes for themselves).
+  async getLoveWishes(): Promise<{ mine: LoveWish[]; partner: LoveWish[] }> {
+    try {
+      const response = await apiClient.get('/assessments/love-wishes');
+      return { mine: response.data?.mine || [], partner: response.data?.partner || [] };
+    } catch (error: unknown) {
+      console.error('Failed to fetch love wishes:', error);
+      return { mine: [], partner: [] };
+    }
+  }
+
+  async addLoveWish(content: string): Promise<LoveWish> {
+    try {
+      const response = await apiClient.post('/assessments/love-wishes', { content });
+      return response.data.wish;
+    } catch (error: unknown) {
+      console.error('Failed to add love wish:', error);
+      this.throwApiError(error, '新增失敗，請稍後再試');
+    }
+  }
+
+  async deleteLoveWish(id: string): Promise<void> {
+    try {
+      await apiClient.delete(`/assessments/love-wishes/${id}`);
+    } catch (error: unknown) {
+      console.error('Failed to delete love wish:', error);
+      this.throwApiError(error, '刪除失敗，請稍後再試');
+    }
+  }
+
   // Relationship cultivation ("關係之屋") dashboard + check-ins.
   async getRelationshipSummary(): Promise<RelationshipSummary> {
     try {
@@ -2095,6 +2138,16 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to fetch check-ins:', error);
       return [];
+    }
+  }
+
+  async getGoodwillBreakdown(): Promise<{ positive: GoodwillGroup[]; negative: GoodwillGroup[] }> {
+    try {
+      const response = await apiClient.get('/relationship/goodwill');
+      return { positive: response.data?.positive || [], negative: response.data?.negative || [] };
+    } catch (error: unknown) {
+      console.error('Failed to fetch goodwill breakdown:', error);
+      return { positive: [], negative: [] };
     }
   }
 

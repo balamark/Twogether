@@ -1,10 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Heart, ArrowLeft, RotateCcw, Sparkles } from 'lucide-react';
-import { apiService } from '../services/api';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { Heart, ArrowLeft, RotateCcw, Sparkles, Plus, Trash2 } from 'lucide-react';
+import { apiService, type LoveWish } from '../services/api';
 import {
   LOVE_LANGUAGES,
   LOVE_LANGUAGE_ORDER,
   LOVE_LANGUAGE_QUIZ,
+  LOVE_ACTIONS,
   emptyScores,
   topLanguage,
   type LoveLanguageCode,
@@ -125,13 +126,21 @@ const LoveLanguageView: React.FC<LoveLanguageViewProps> = ({ authState, showNoti
         <Quiz step={step} onChoose={choose} onBack={() => step > 0 && setStep(step - 1)} />
       )}
       {phase === 'result' && result && (
-        <Result
-          result={result}
-          scores={scores}
-          partner={partner}
-          saving={saving}
-          onRetake={startQuiz}
-        />
+        <>
+          <Result
+            result={result}
+            scores={scores}
+            partner={partner}
+            saving={saving}
+            onRetake={startQuiz}
+          />
+          <LoveActions
+            partner={partner}
+            isAuthenticated={authState.isAuthenticated}
+            partnerConnected={authState.partnerConnected}
+            showNotification={showNotification}
+          />
+        </>
       )}
     </div>
   );
@@ -290,6 +299,149 @@ const Result: React.FC<{
           <RotateCcw className="w-4 h-4" strokeWidth={1.5} />
           重新測驗
         </button>
+      </div>
+    </div>
+  );
+};
+
+// Suggested actions (5 defaults for the partner's love language) + each person's
+// own custom 愛的行動 wishlist — coin-store style: defaults you can do, plus
+// custom items either partner proposes for themselves.
+const LoveActions: React.FC<{
+  partner: { nickname: string; result: LoveLanguageCode } | null;
+  isAuthenticated: boolean;
+  partnerConnected: boolean;
+  showNotification: (n: NotificationInput) => void;
+}> = ({ partner, isAuthenticated, partnerConnected, showNotification }) => {
+  const [mine, setMine] = useState<LoveWish[]>([]);
+  const [partnerWishes, setPartnerWishes] = useState<LoveWish[]>([]);
+  const [draft, setDraft] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(() => {
+    if (!isAuthenticated) return;
+    apiService
+      .getLoveWishes()
+      .then(({ mine, partner }) => {
+        setMine(mine);
+        setPartnerWishes(partner);
+      })
+      .catch(() => {});
+  }, [isAuthenticated]);
+  useEffect(load, [load]);
+
+  const add = async () => {
+    const content = draft.trim();
+    if (!content) return;
+    setBusy(true);
+    try {
+      const wish = await apiService.addLoveWish(content);
+      setMine((p) => [wish, ...p]);
+      setDraft('');
+    } catch (err) {
+      showNotification({ type: 'error', title: '新增失敗', message: err instanceof Error ? err.message : '請稍後再試' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (id: string) => {
+    setMine((p) => p.filter((w) => w.id !== id));
+    try {
+      await apiService.deleteLoveWish(id);
+    } catch {
+      load();
+    }
+  };
+
+  if (!isAuthenticated) return null;
+
+  const partnerName = partner?.nickname || 'TA';
+  const partnerActions = partner ? LOVE_ACTIONS[partner.result] : [];
+
+  return (
+    <div className="space-y-4 mt-4" data-testid="love-actions">
+      {/* How to make the partner feel loved */}
+      {partnerConnected && (
+        <div className="bg-petal-rose-soft/20 border border-petal-rose-soft rounded-md p-5">
+          <h3 className="font-display text-base text-petal-ink mb-1">💞 怎麼讓 {partnerName} 感受到愛</h3>
+          {partner ? (
+            <>
+              <p className="font-body text-xs text-petal-muted mb-3">
+                {partnerName} 的愛之語是 {LOVE_LANGUAGES[partner.result].emoji}{' '}
+                {LOVE_LANGUAGES[partner.result].label}。做這些，幫你「賺」到 TA 的好感：
+              </p>
+              <ul className="space-y-2">
+                {partnerActions.map((a) => (
+                  <li key={a} className="flex items-start gap-2 font-body text-sm text-petal-ink">
+                    <Heart className="w-3.5 h-3.5 text-pink-500 mt-0.5 shrink-0" strokeWidth={1.5} />
+                    {a}
+                  </li>
+                ))}
+                {partnerWishes.map((w) => (
+                  <li key={w.id} className="flex items-start gap-2 font-body text-sm text-petal-ink">
+                    <Sparkles className="w-3.5 h-3.5 text-petal-rose-deep mt-0.5 shrink-0" strokeWidth={1.5} />
+                    {w.content}
+                    <span className="font-body text-[10px] text-petal-muted border border-petal-rule rounded-full px-1.5 py-0.5 shrink-0">
+                      {partnerName} 提出
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : (
+            <p className="font-body text-sm text-petal-ink-soft">
+              邀請 {partnerName} 一起做測驗，就能看到專屬 TA 的「愛的行動」建議。
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* My own wishlist — propose what makes you feel loved */}
+      <div className="bg-petal-cream border border-petal-rule rounded-md p-5">
+        <h3 className="font-display text-base text-petal-ink mb-1">🌟 我希望的方式</h3>
+        <p className="font-body text-xs text-petal-muted mb-3">
+          提出能讓你感受到愛的小事，{partnerConnected ? '另一半會看到。' : '配對後另一半會看到。'}
+        </p>
+        <div className="flex gap-2 mb-3">
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value.slice(0, 200))}
+            onKeyDown={(e) => e.key === 'Enter' && add()}
+            placeholder="例如：忙的時候傳一句「我想你」"
+            data-testid="love-wish-input"
+            className="flex-1 p-2.5 rounded-md border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep text-sm"
+          />
+          <button
+            type="button"
+            onClick={add}
+            disabled={busy || draft.trim().length === 0}
+            data-testid="love-wish-add"
+            className="px-3 rounded-md bg-petal-ink text-petal-cream hover:bg-pink-700 transition-colors disabled:opacity-50 inline-flex items-center"
+          >
+            <Plus className="w-4 h-4" strokeWidth={1.5} />
+          </button>
+        </div>
+        {mine.length === 0 ? (
+          <p className="font-body text-xs text-petal-muted">還沒有項目。新增幾項，讓 TA 知道怎麼愛你最有感。</p>
+        ) : (
+          <ul className="space-y-2">
+            {mine.map((w) => (
+              <li key={w.id} className="flex items-center justify-between gap-2 bg-white border border-petal-rule rounded-md px-3 py-2">
+                <span className="font-body text-sm text-petal-ink">{w.content}</span>
+                <button
+                  type="button"
+                  onClick={() => remove(w.id)}
+                  aria-label="刪除"
+                  className="text-petal-muted hover:text-petal-rose-deep shrink-0"
+                >
+                  <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );

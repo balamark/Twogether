@@ -242,4 +242,73 @@ router.get('/checkins', async (req, res) => {
   }
 });
 
+// GET /api/relationship/goodwill — itemised 14-day breakdown behind the meter:
+// what counts as + (wall notes, intimacy, resolved conflicts) and - (conflicts),
+// with the actual recent items + a one-line "why" so the number is explainable.
+router.get('/goodwill', async (req, res) => {
+  try {
+    const couple = await findCouple(req.user.id);
+    if (!couple) return res.json({ positive: [], negative: [] });
+    const coupleId = couple.id;
+
+    const [walls, moments, resolved, conflicts] = await Promise.all([
+      db.query(
+        `SELECT p.content, p.created_at, u.nickname FROM wall_posts p JOIN users u ON u.id = p.author_id
+          WHERE p.couple_id = $1 AND p.created_at >= NOW() - INTERVAL '14 days'
+          ORDER BY p.created_at DESC LIMIT 5`,
+        [coupleId]
+      ),
+      db.query(
+        `SELECT moment_date FROM love_moments
+          WHERE couple_id = $1 AND moment_date >= NOW() - INTERVAL '14 days'
+          ORDER BY moment_date DESC LIMIT 5`,
+        [coupleId]
+      ),
+      db.query(
+        `SELECT title, resolved_at FROM events
+          WHERE couple_id = $1 AND status = 'resolved' AND resolved_at >= NOW() - INTERVAL '14 days'
+          ORDER BY resolved_at DESC LIMIT 5`,
+        [coupleId]
+      ),
+      db.query(
+        `SELECT title, created_at, status FROM events
+          WHERE couple_id = $1 AND created_at >= NOW() - INTERVAL '14 days'
+          ORDER BY created_at DESC LIMIT 5`,
+        [coupleId]
+      ),
+    ]);
+    const trim = (s) => (s || '').slice(0, 40);
+
+    res.json({
+      positive: [
+        {
+          kind: 'wall', label: '牆上的話', why: '正向的分享與留言，是關係的存款。',
+          count: walls.rows.length,
+          items: walls.rows.map((r) => ({ text: trim(r.content), who: r.nickname, at: r.created_at })),
+        },
+        {
+          kind: 'intimacy', label: '親密時光', why: '身體與情感的連結加深親密感。',
+          count: moments.rows.length,
+          items: moments.rows.map((r) => ({ text: '記錄了一次親密時光', at: r.moment_date })),
+        },
+        {
+          kind: 'resolved', label: '化解的衝突', why: '一起把問題解決，修復了關係。',
+          count: resolved.rows.length,
+          items: resolved.rows.map((r) => ({ text: r.title, at: r.resolved_at })),
+        },
+      ],
+      negative: [
+        {
+          kind: 'conflict', label: '衝突事件', why: '未化解的摩擦會慢慢消耗好感。',
+          count: conflicts.rows.length,
+          items: conflicts.rows.map((r) => ({ text: r.title, at: r.created_at, resolved: r.status === 'resolved' })),
+        },
+      ],
+    });
+  } catch (error) {
+    logDbError('relationship.goodwill', error, { userId: req.user.id });
+    res.status(500).json(errorResponseBody('無法載入好感存款明細，請稍後再試。', error));
+  }
+});
+
 module.exports = router;

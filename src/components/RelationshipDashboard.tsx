@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Home, Heart, Sparkles, ShieldCheck, Send, StickyNote, TrendingUp, X, Loader2 } from 'lucide-react';
-import { apiService, type RelationshipSummary } from '../services/api';
+import { Home, Heart, Sparkles, ShieldCheck, Send, StickyNote, TrendingUp, X, Loader2, HelpCircle, History } from 'lucide-react';
+import { apiService, type RelationshipSummary, type GoodwillGroup, type RelationshipCheckin } from '../services/api';
 import { daysSinceLastNudge } from './AchievementsView';
 
 interface NotificationInput {
@@ -99,6 +99,9 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
 }) => {
   const [summary, setSummary] = useState<RelationshipSummary | null>(null);
   const [checkinOpen, setCheckinOpen] = useState(false);
+  const [goodwillOpen, setGoodwillOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [ratioHint, setRatioHint] = useState(false);
 
   const loadSummary = React.useCallback(() => {
     apiService.getRelationshipSummary().then(setSummary).catch(() => {});
@@ -167,9 +170,15 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
       {/* Goodwill meter */}
       <div className="mb-3">
         <div className="flex items-center justify-between mb-1">
-          <span className="font-body text-[11px] text-petal-muted inline-flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setGoodwillOpen(true)}
+            data-testid="goodwill-details-button"
+            className="font-body text-[11px] text-petal-muted inline-flex items-center gap-1 hover:text-petal-ink"
+          >
             <TrendingUp className="w-3.5 h-3.5" /> 好感存款（近兩週）
-          </span>
+            <span className="underline underline-offset-2">明細</span>
+          </button>
           <span className="font-body text-[11px] text-petal-ink">
             正向 {pos} ＋ ／ 衝突 {neg} −
           </span>
@@ -180,7 +189,25 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
             style={{ width: `${Math.max(4, goodwillPct)}%` }}
           />
         </div>
-        <p className="font-body text-[10px] text-petal-muted mt-1">健康關係的正向：衝突約為 5：1</p>
+        <button
+          type="button"
+          onClick={() => setRatioHint((v) => !v)}
+          data-testid="goodwill-ratio-hint-toggle"
+          className="font-body text-[10px] text-petal-muted mt-1 inline-flex items-center gap-1 hover:text-petal-ink"
+        >
+          健康關係的正向：衝突約為 5：1
+          <HelpCircle className="w-3 h-3" strokeWidth={1.5} />
+        </button>
+        {ratioHint && (
+          <p
+            className="mt-1.5 font-body text-[11px] text-petal-ink-soft leading-relaxed bg-petal-cream-2 rounded-md p-2.5"
+            data-testid="goodwill-ratio-hint"
+          >
+            心理學家 Gottman 的研究發現：穩定幸福的伴侶，平常的<span className="text-petal-ink">正向互動</span>
+            （稱讚、陪伴、親密、體貼）大約是<span className="text-petal-ink">負向互動</span>（爭執、冷漠）的 5 倍。
+            平時多存一點好感，吵架時才有本錢化解。點上方「明細」看是哪些事加分或扣分。
+          </p>
+        )}
       </div>
 
       {/* Quick actions */}
@@ -193,6 +220,14 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
         >
           <ShieldCheck className="w-3.5 h-3.5" /> 關係檢視
           {summary.checkin?.overdue && <span className="w-1.5 h-1.5 rounded-full bg-petal-rose-deep" />}
+        </button>
+        <button
+          type="button"
+          onClick={() => setHistoryOpen(true)}
+          data-testid="relationship-history-button"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors font-body text-xs"
+        >
+          <History className="w-3.5 h-3.5" /> 檢視結果
         </button>
         <button
           type="button"
@@ -222,6 +257,130 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
           }}
         />
       )}
+
+      {goodwillOpen && <GoodwillModal onClose={() => setGoodwillOpen(false)} />}
+      {historyOpen && <CheckinHistoryModal onClose={() => setHistoryOpen(false)} />}
+    </div>
+  );
+};
+
+// Itemised breakdown behind the goodwill meter: what adds (+) / costs (−) and why.
+const GoodwillModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const [data, setData] = useState<{ positive: GoodwillGroup[]; negative: GoodwillGroup[] } | null>(null);
+  useEffect(() => {
+    apiService.getGoodwillBreakdown().then(setData).catch(() => setData({ positive: [], negative: [] }));
+  }, []);
+
+  const renderGroup = (g: GoodwillGroup, sign: '+' | '−') => (
+    <div key={g.kind} className="bg-white border border-petal-rule rounded-md p-3">
+      <div className="flex items-center justify-between">
+        <span className="font-body text-sm font-medium text-petal-ink">
+          <span className={sign === '+' ? 'text-petal-sage-deep' : 'text-petal-rose-deep'}>{sign}</span> {g.label}
+        </span>
+        <span className="font-body text-xs text-petal-muted">近兩週 {g.count}</span>
+      </div>
+      <p className="font-body text-[11px] text-petal-muted mt-0.5">{g.why}</p>
+      {g.items.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {g.items.map((it, i) => (
+            <li key={i} className="font-body text-xs text-petal-ink-soft flex items-baseline gap-1.5">
+              <span className="text-petal-muted">·</span>
+              <span className="truncate">{it.who ? `${it.who}：` : ''}{it.text}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-testid="goodwill-modal">
+      <div className="bg-petal-cream rounded-2xl max-w-md w-full max-h-[min(85vh,calc(100dvh-60px))] overflow-y-auto p-5">
+        <div className="flex items-start justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-petal-rose-deep" />
+            <h3 className="text-lg font-serif text-petal-ink">好感存款明細</h3>
+          </div>
+          <button type="button" onClick={onClose} className="text-petal-ink-soft hover:text-petal-ink" aria-label="關閉">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <p className="font-body text-xs text-petal-muted mb-4">近兩週哪些事讓好感加分或扣分。</p>
+        {!data ? (
+          <p className="text-center font-body text-sm text-petal-muted py-6">載入中…</p>
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <div className="font-body text-xs font-medium text-petal-sage-deep">加分（＋）</div>
+              {data.positive.map((g) => renderGroup(g, '+'))}
+            </div>
+            <div className="space-y-2">
+              <div className="font-body text-xs font-medium text-petal-rose-deep">扣分（−）</div>
+              {data.negative.map((g) => renderGroup(g, '−'))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const PILLARS: { key: 'trust' | 'commitment' | 'connection'; label: string }[] = [
+  { key: 'trust', label: '信賴' },
+  { key: 'commitment', label: '奉獻' },
+  { key: 'connection', label: '連結' },
+];
+
+// View past 本週關係檢視 results — both partners' scores + notes over time.
+const CheckinHistoryModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const [items, setItems] = useState<RelationshipCheckin[] | null>(null);
+  useEffect(() => {
+    apiService.getCheckins().then(setItems).catch(() => setItems([]));
+  }, []);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-testid="checkin-history-modal">
+      <div className="bg-petal-cream rounded-2xl max-w-md w-full max-h-[min(85vh,calc(100dvh-60px))] overflow-y-auto p-5">
+        <div className="flex items-start justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <History className="w-5 h-5 text-petal-rose-deep" />
+            <h3 className="text-lg font-serif text-petal-ink">關係檢視結果</h3>
+          </div>
+          <button type="button" onClick={onClose} className="text-petal-ink-soft hover:text-petal-ink" aria-label="關閉">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <p className="font-body text-xs text-petal-muted mb-4">你和另一半每次檢視的評分與留言（最近在前）。</p>
+        {!items ? (
+          <p className="text-center font-body text-sm text-petal-muted py-6">載入中…</p>
+        ) : items.length === 0 ? (
+          <p className="text-center font-body text-sm text-petal-muted py-6">還沒有檢視紀錄，做一次檢視就會出現在這裡。</p>
+        ) : (
+          <div className="space-y-3">
+            {items.map((c) => (
+              <div key={c.id} className="bg-white border border-petal-rule rounded-md p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-body text-sm font-medium text-petal-ink">
+                    {c.isMine ? '我' : c.nickname}
+                  </span>
+                  <span className="font-body text-[11px] text-petal-muted">
+                    {new Date(c.createdAt).toLocaleDateString('zh-TW')}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mb-1">
+                  {PILLARS.map((p) => (
+                    <div key={p.key} className="text-center bg-petal-cream-2 rounded-md py-1.5">
+                      <div className="font-body text-[10px] text-petal-muted">{p.label}</div>
+                      <div className="font-display italic text-lg text-petal-ink">{c[p.key]}</div>
+                    </div>
+                  ))}
+                </div>
+                {c.note && <p className="font-body text-xs text-petal-ink-soft mt-1.5">「{c.note}」</p>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

@@ -56,7 +56,25 @@ test.describe('關係之屋 dashboard', () => {
       })
     );
     await page.route('**/api/relationship/checkins', (route) =>
-      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ checkins: [] }) })
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          checkins: [
+            { id: 'c1', nickname: 'A', isMine: true, trust: 4, commitment: 5, connection: 4, note: '還不錯', createdAt: new Date().toISOString() },
+          ],
+        }),
+      })
+    );
+    await page.route('**/api/relationship/goodwill', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          positive: [{ kind: 'wall', label: '牆上的話', why: '正向分享', count: 1, items: [{ text: '謝謝你', who: 'A', at: new Date().toISOString() }] }],
+          negative: [{ kind: 'conflict', label: '衝突事件', why: '摩擦', count: 1, items: [{ text: '家事', at: new Date().toISOString() }] }],
+        }),
+      })
     );
   });
 
@@ -87,5 +105,20 @@ test.describe('關係之屋 dashboard', () => {
 
     await expect(page.getByTestId('relationship-checkin-modal')).toHaveCount(0, { timeout: 10000 });
     expect(posted.trust, 'a check-in was POSTed').toBe(4);
+
+    // Goodwill breakdown modal explains the + / − items.
+    await page.getByTestId('goodwill-details-button').click();
+    await expect(page.getByTestId('goodwill-modal')).toBeVisible();
+    await expect(page.getByTestId('goodwill-modal')).toContainText('牆上的話');
+    await page.getByTestId('goodwill-modal').getByLabel('關閉').click();
+
+    // 5:1 ratio hint toggles open.
+    await page.getByTestId('goodwill-ratio-hint-toggle').click();
+    await expect(page.getByTestId('goodwill-ratio-hint')).toBeVisible();
+
+    // Past check-in results are viewable.
+    await page.getByTestId('relationship-history-button').click();
+    await expect(page.getByTestId('checkin-history-modal')).toBeVisible();
+    await expect(page.getByTestId('checkin-history-modal')).toContainText('還不錯');
   });
 });

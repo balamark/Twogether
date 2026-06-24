@@ -34,6 +34,11 @@ test.describe('愛的語言 quiz', () => {
     await page.route('**/api/assessments/partner', (route) =>
       route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ partner: null, assessments: [] }) })
     );
+    await page.route('**/api/assessments/love-wishes', (route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ mine: [], partner: [] }) })
+        : route.fallback()
+    );
   });
 
   test('open from menu, take the quiz, see a result', async ({ page }) => {
@@ -72,5 +77,19 @@ test.describe('愛的語言 quiz', () => {
     await expect(page.getByTestId('love-language-result')).toBeVisible({ timeout: 10000 });
     // The result was sent to the server for persistence.
     expect(saved.result, 'a result code was PUT to /assessments/love_language').toBeTruthy();
+
+    // The 愛的行動 section appears, and a custom wish can be added.
+    await expect(page.getByTestId('love-actions')).toBeVisible();
+    let wishPosted = false;
+    await page.route('**/api/assessments/love-wishes', (route) => {
+      if (route.request().method() === 'POST') {
+        wishPosted = true;
+        return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ success: true, wish: { id: 'w1', content: '抱抱我' } }) });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ mine: [], partner: [] }) });
+    });
+    await page.getByTestId('love-wish-input').fill('抱抱我');
+    await page.getByTestId('love-wish-add').click();
+    await expect.poll(() => wishPosted).toBe(true);
   });
 });
