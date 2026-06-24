@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, X, UserPlus, LogIn, Clock, Languages, Award, CalendarCheck, MessageCircle, Send, StickyNote, UserCog, Upload, CheckCircle2, AlertCircle, Globe, Users, Video, Wallet } from 'lucide-react';
+import { Heart, X, UserPlus, Clock, Languages, Award, CalendarCheck, MessageCircle, Send, StickyNote, UserCog, Upload, CheckCircle2, AlertCircle, Globe, Users, Video, Wallet } from 'lucide-react';
 import {
   apiService,
   type Therapist,
@@ -16,7 +16,7 @@ import {
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { FOCUS_AREAS, focusLabel, formatNtd } from './therapistShared';
-import { FilterChip } from './FilterChip';
+import { FocusFilter } from './FocusFilter';
 import PublicQaView from './PublicQaView';
 import TherapistProfileModal from './TherapistProfileModal';
 
@@ -27,8 +27,6 @@ interface TherapistsViewProps {
     partnerConnected: boolean;
   };
   showNotification: (notification: Omit<Notification, 'id'>) => void;
-  /** Opens the auth modal — therapists log in with a normal Twogether account. */
-  onLogin?: () => void;
 }
 
 const LANGUAGE_LABEL: Record<string, string> = {
@@ -57,7 +55,7 @@ const PUBLIC_STATUS_LABEL: Record<ConsultationPublicStatus, string> = {
   withdrawn: '已取消公開',
 };
 
-const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotification, onLogin }) => {
+const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotification }) => {
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -180,30 +178,9 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
 
       {tab === 'directory' && (
       <>
-      {/* Actions row */}
+      {/* Actions row. 成為諮商師 lives in the page footer now (therapists sign
+          in with a normal account, so there's no separate login button here). */}
       <div className="flex flex-wrap items-center justify-center gap-2">
-        {/* Sign-up is a public, no-login page (served by the backend at
-            /therapist-signup) so therapists can apply without an account. */}
-        <a
-          href="/therapist-signup"
-          data-testid="therapist-apply-button"
-          className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-petal-ink text-petal-cream hover:bg-pink-700 transition-colors font-body text-[13px] font-medium"
-        >
-          <UserPlus className="w-3.5 h-3.5" strokeWidth={1.5} />
-          成為諮商師
-        </a>
-        {/* Therapists sign in with a normal Twogether account (created at
-            sign-up), then manage their profile under「我的諮商師檔案」. */}
-        {!authState.isAuthenticated && onLogin && (
-          <button
-            onClick={onLogin}
-            data-testid="therapist-login-button"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors font-body text-[13px] font-medium"
-          >
-            <LogIn className="w-3.5 h-3.5" strokeWidth={1.5} />
-            諮商師登入
-          </button>
-        )}
         {authState.isAuthenticated && (
           <button
             onClick={openMine}
@@ -236,24 +213,8 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
         )}
       </div>
 
-      {/* Focus filter */}
-      <div className="flex flex-wrap justify-center gap-1.5">
-        <FilterChip
-          active={focusFilter === 'all'}
-          onClick={() => setFocusFilter('all')}
-          label="全部"
-          emoji="✨"
-        />
-        {FOCUS_AREAS.map((f) => (
-          <FilterChip
-            key={f.id}
-            active={focusFilter === f.id}
-            onClick={() => setFocusFilter(f.id)}
-            label={f.label}
-            emoji={f.emoji}
-          />
-        ))}
-      </div>
+      {/* Focus filter — a few common tags, the rest behind 更多 */}
+      <FocusFilter value={focusFilter} onChange={setFocusFilter} />
 
       {/* List */}
       {loading ? (
@@ -351,6 +312,22 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
           showNotification={showNotification}
         />
       )}
+
+      {/* Page footer — becoming a therapist is a low-key entry (public sign-up
+          page). Therapists sign in with a normal Twogether account. */}
+      <footer className="mt-12 pt-6 border-t border-petal-rule text-center">
+        <p className="font-body text-xs text-petal-muted">
+          你是諮商師，想加入 Twogether？
+          <a
+            href="/therapist-signup"
+            data-testid="therapist-apply-button"
+            className="text-pink-600 hover:text-pink-700 underline underline-offset-2 ml-1 inline-flex items-center gap-1"
+          >
+            <UserPlus className="w-3 h-3" strokeWidth={1.5} />
+            成為諮商師
+          </a>
+        </p>
+      </footer>
     </div>
   );
 };

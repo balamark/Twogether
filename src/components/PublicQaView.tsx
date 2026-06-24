@@ -8,8 +8,8 @@ import {
   type PublicQaSource,
 } from '../services/api';
 import type { Notification } from './ErrorNotification';
-import { FOCUS_AREAS, focusLabel } from './therapistShared';
-import { FilterChip } from './FilterChip';
+import { focusLabel } from './therapistShared';
+import { FocusFilter } from './FocusFilter';
 
 // 公開問答 (Public Q&A): a read-only, anonymised browse of consultation chats
 // that both the client and therapist agreed to publish. Helps people with
@@ -106,13 +106,8 @@ const PublicQaView: React.FC<PublicQaViewProps> = ({ isAuthenticated, showNotifi
         </p>
       </div>
 
-      {/* Focus filter */}
-      <div className="flex flex-wrap justify-center gap-1.5">
-        <FilterChip active={focus === 'all'} onClick={() => setFocus('all')} label="全部" emoji="✨" />
-        {FOCUS_AREAS.map((f) => (
-          <FilterChip key={f.id} active={focus === f.id} onClick={() => setFocus(f.id)} label={f.label} emoji={f.emoji} />
-        ))}
-      </div>
+      {/* Focus filter — a few common tags, the rest behind 更多 */}
+      <FocusFilter value={focus} onChange={setFocus} />
 
       {loading && threads.length === 0 ? (
         <p className="text-center font-body text-sm text-petal-muted py-12">載入中…</p>

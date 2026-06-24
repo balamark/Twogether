@@ -1891,7 +1891,7 @@ const LoveTimeApp = () => {
         />;
         // Therapist directory is browseable (and applicable) while logged out;
         // booking a consultation prompts for login inside the modal.
-        case 'therapists': return <TherapistsView authState={authState} showNotification={showNotification} onLogin={() => setShowAuthModal(true)} />;
+        case 'therapists': return <TherapistsView authState={authState} showNotification={showNotification} />;
         // Each nav tab previews its own feature (read-only) instead of all
         // falling through to one generic login wall. See LoggedOutPreview.
         default: return <LoggedOutPreview view={currentView} onSignUp={() => setShowAuthModal(true)} scripts={defaultRoleplayScripts} />;
