@@ -33,6 +33,41 @@ Then visit: http://localhost:8080
 - **統計分析**: Weekly/monthly intimacy statistics
 - **隱私保護**: Secure authentication and data storage
 
+## 📝 Changelog
+
+User-facing feature changes, newest first. (Convention: every UI feature change
+adds a dated entry here; see `CLAUDE.md`.)
+
+### 2026-06-25
+- **愛的行動 & 好感存款明細**: The 愛的語言 result page now suggests 5 actions for
+  your partner's love language and lets each partner keep a custom "what makes me
+  feel loved" wishlist. The 關係之屋 好感存款 meter is now explainable — a 明細 view
+  of what adds/costs goodwill (with the actual items + why), a (?) hint on the 5:1
+  ratio, and a 檢視結果 view of past 關係檢視 scores for both partners.
+- **心理諮商頁精簡**: 成為諮商師 moved to a low-key page footer, the separate
+  therapist-login button was removed (therapists use the normal login), and the
+  focus-area tags collapse to a few common ones behind a 更多 toggle.
+
+### 2026-06-24
+- **關係之屋 智能提醒儀表板**: A relationship-cultivation dashboard at the top of
+  記錄時光 — one ranked nudge (intimacy gap / check-in due / goodwill / appreciation),
+  a weekly 關係檢視 rating 信賴 / 奉獻 / 連結, and a 好感存款 (5:1) meter. In-app +
+  email reminders go to both partners.
+- **愛的語言測驗**: A 15-question quiz that finds your primary love language and
+  saves it to your profile; you can see your partner's result too.
+
+### 2026-06-23
+- **未登入體驗改版**: Each nav tab now previews its own feature when logged out
+  (sample calendar, the conflict-repair flywheel, real roleplay scripts), plus a
+  「聽聽其他用戶怎麼說」testimonials section and a stats hook (周平均 / 已經幾天沒有親密了).
+- **衝突事件 AI 諮商師 + 公開問答分享**: A「請 AI 諮商師加入」button brings an AI
+  counselor into the conflict thread; conflict and wall threads can be shared
+  anonymously to the public 公開問答.
+- **親密提醒升級**: The「已經幾天沒有親密了」stat escalates (font + colour + a one-tap
+  親密邀請) as the gap passes 7 / 10 / 12 / 15 days.
+- **金幣商店移入 Profile**: Coin shop moved into the Profile menu so the Two*gether*
+  logo renders fully on mobile.
+
 ## 📧 Email 通知
 
 Email 由 `services/emailService.js` 統一寄送，所有信件共用 `_activityEmailHtml`

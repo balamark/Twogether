@@ -3,6 +3,17 @@
 Notes for anyone (human or AI) working in this repo. Keep this file short and
 current.
 
+## Changelog & promo (every UI feature change)
+
+When you ship a user-facing UI feature change:
+
+1. **Add a dated entry to the `## 📝 Changelog` section in `README.md`** (newest
+   first, grouped by date). Keep it user-facing and concise — what changed and
+   why it matters, not implementation detail.
+2. **Write a short thread/social post** promoting the feature (a few punchy lines,
+   plain language, emoji ok) and give it to the user to share publicly. The thread
+   post goes in the chat reply, not the repo (unless asked).
+
 ## Image handling
 
 **Never crop images.** Always show the full image.
