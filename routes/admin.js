@@ -682,6 +682,27 @@ adminApiRouter.post('/feedback/:id/moderate', express.json(), async (req, res) =
   }
 });
 
+// DELETE /api/admin/users/:id — permanently delete an account (e.g. a stray test
+// account) so it stops polluting the dashboard. Cascades to the user's couple +
+// all couple-scoped data via the ON DELETE CASCADE foreign keys. Irreversible.
+adminApiRouter.delete('/users/:id', async (req, res) => {
+  const id = req.params.id;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return res.status(400).json({ error: 'invalid user id' });
+  }
+  try {
+    const result = await db.query(`DELETE FROM users WHERE id = $1 RETURNING email`, [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'user not found' });
+    }
+    logInfo('admin.user.deleted', { id, email: result.rows[0].email });
+    res.json({ success: true, email: result.rows[0].email });
+  } catch (err) {
+    logError('Admin delete user failed', { err: err.message, id });
+    res.status(500).json({ error: 'delete failed' });
+  }
+});
+
 // ──────────────────────────────────────────────────────────────────────────
 // Admin: HTML dashboard.
 // ──────────────────────────────────────────────────────────────────────────
@@ -718,6 +739,12 @@ const ADMIN_HTML = `<!doctype html>
       background: #2a2422; color: #faf7f4; cursor: pointer;
     }
     .controls button:hover { background: #4a3f3b; }
+    button.danger {
+      font: inherit; padding: 4px 10px; border: 0; border-radius: 6px;
+      background: #b7635a; color: #fff; cursor: pointer;
+    }
+    button.danger:hover { background: #9c5049; }
+    button.danger:disabled { opacity: .5; cursor: default; }
     .funnel { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 32px; }
     .card {
       background: #fff; border: 1px solid #ece6e1; border-radius: 10px; padding: 16px;
@@ -798,6 +825,7 @@ const ADMIN_HTML = `<!doctype html>
             <th class="num">登入天數</th>
             <th class="num">紀錄</th>
             <th class="num">照片</th>
+            <th>操作</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -1248,7 +1276,7 @@ const ADMIN_HTML = `<!doctype html>
     function renderUsers(rows) {
       const tbody = document.querySelector('#usersTable tbody');
       if (rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" class="muted">沒有資料</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="8" class="muted">沒有資料</td></tr>';
         return;
       }
       tbody.innerHTML = rows.map((u) => {
@@ -1266,8 +1294,29 @@ const ADMIN_HTML = `<!doctype html>
           '<td class="num">' + u.login_days + '</td>' +
           '<td class="num">' + u.moments_count + '</td>' +
           '<td class="num">' + u.photos_count + '</td>' +
+          '<td><button class="danger" data-del-user data-id="' + u.id + '" data-email="' + email + '">刪除</button></td>' +
           '</tr>';
       }).join('');
+      tbody.querySelectorAll('button[data-del-user]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          deleteUser(btn.getAttribute('data-id'), btn.getAttribute('data-email'), btn);
+        });
+      });
+    }
+
+    async function deleteUser(id, email, btn) {
+      if (!confirm('永久刪除帳號「' + email + '」？\\n\\n會一併刪除其配對、紀錄、訊息等所有資料，且無法復原。')) return;
+      btn.disabled = true;
+      btn.textContent = '刪除中…';
+      try {
+        const res = await fetch('/api/admin/users/' + id, { method: 'DELETE' });
+        if (!res.ok) throw new Error('delete ' + res.status);
+        load(); // refresh funnel + the recent-users table
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = '刪除';
+        alert('刪除失敗：' + e.message);
+      }
     }
 
     // ── Therapists approval queue ──────────────────────────────────────────

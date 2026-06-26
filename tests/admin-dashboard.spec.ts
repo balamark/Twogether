@@ -96,4 +96,28 @@ test.describe('Admin dashboard', () => {
     await expect(page.locator('#aiUsageKindTable')).toBeVisible();
     expect(errors, `uncaught page errors: ${errors.join(' | ')}`).toEqual([]);
   });
+
+  test('can delete an account from the recent-users table', async ({ page, request }) => {
+    // Register a throwaway account via the API so it appears in the funnel table.
+    const email = `admindel-${Date.now()}@example.com`;
+    const reg = await request.post(`${BACKEND_BASE}/api/auth/register`, {
+      data: { email, nickname: 'AdminDelMe', password: 'test123456' },
+    });
+    expect(reg.ok()).toBeTruthy();
+
+    await page.goto(`${BACKEND_BASE}/admin`);
+    const sel = `#usersTable button[data-del-user][data-email="${email}"]`;
+    await expect(page.locator(sel)).toBeVisible({ timeout: 15000 });
+
+    // The delete button confirms via window.confirm — accept it.
+    page.once('dialog', (d) => d.accept());
+    const [resp] = await Promise.all([
+      page.waitForResponse((r) => r.url().includes('/api/admin/users/') && r.request().method() === 'DELETE'),
+      page.locator(sel).click(),
+    ]);
+    expect(resp.status()).toBe(200);
+
+    // Row is gone after the table reloads.
+    await expect(page.locator(sel)).toHaveCount(0, { timeout: 10000 });
+  });
 });
