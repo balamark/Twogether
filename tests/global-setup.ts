@@ -29,6 +29,29 @@ async function waitForBackend(timeoutMs = 60_000) {
   throw new Error(`Backend not reachable at ${BACKEND_BASE}/health within ${timeoutMs}ms: ${String(lastError)}`);
 }
 
+// HARD GUARD: refuse to run the suite unless the backend is connected to a
+// LOCAL database. Without this, `reuseExistingServer` (non-CI) can silently
+// reuse a prod/staging server left running on :8080 and the tests would register
+// test users straight into production. This catches that before any write.
+async function assertLocalDatabase() {
+  const ctx = await request.newContext();
+  try {
+    const res = await ctx.get(`${BACKEND_BASE}/health`);
+    const body = (await res.json().catch(() => ({}))) as { dbIsLocal?: boolean };
+    if (body.dbIsLocal !== true) {
+      throw new Error(
+        `\n\n[global-setup] REFUSING TO RUN: the backend at ${BACKEND_BASE} is NOT on a local test database ` +
+        `(/health dbIsLocal=${body.dbIsLocal}).\n` +
+        `A prod/staging server is probably running on port 8080 and Playwright reused it ` +
+        `(reuseExistingServer). Stop it (e.g. \`pkill -f "node server.js"\`) and re-run so tests start a ` +
+        `fresh server on the local test DB.\n`
+      );
+    }
+  } finally {
+    await ctx.dispose();
+  }
+}
+
 async function ensureTestUser() {
   const ctx = await request.newContext();
   try {
@@ -54,5 +77,6 @@ async function ensureTestUser() {
 
 export default async function globalSetup() {
   await waitForBackend();
+  await assertLocalDatabase();
   await ensureTestUser();
 }

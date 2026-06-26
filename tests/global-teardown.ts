@@ -4,7 +4,12 @@ import { Client } from 'pg';
 
 dotenv.config({ path: path.resolve(__dirname, '..', '.env.test'), override: true });
 
+// Truncating `users` with CASCADE wipes every user-scoped table (couples,
+// assessments, love_wishes, relationship_checkins, wall_posts, events, …) so a
+// run never leaves test accounts behind. The rest are listed for clarity;
+// CASCADE makes order irrelevant. Guarded to localhost only (see below).
 const TEST_TABLES = [
+  'users',
   'intimacy_requests',
   'pairing_requests',
   'pairing_codes',

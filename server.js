@@ -117,10 +117,18 @@ app.use(requestLogger);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
+  // dbIsLocal lets the e2e test harness verify it isn't pointed at a remote
+  // (prod/staging) database before it starts registering test users. We expose
+  // only a boolean, never the host or credentials.
+  let dbIsLocal = false;
+  try {
+    dbIsLocal = ['localhost', '127.0.0.1', '::1'].includes(new URL(process.env.DATABASE_URL).hostname);
+  } catch { /* no/!valid DATABASE_URL → treat as not-local */ }
   res.status(200).json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development',
+    dbIsLocal,
     version: require('./package.json').version
   });
 });
