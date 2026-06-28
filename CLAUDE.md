@@ -14,6 +14,20 @@ When you ship a user-facing UI feature change:
    plain language, emoji ok) and give it to the user to share publicly. The thread
    post goes in the chat reply, not the repo (unless asked).
 
+## Logged-out preview sync (every UI feature change)
+
+When you add or change a user-facing UI feature or a core flow, **also surface it
+on the logged-out showroom** (`src/components/LoggedOutPreview.tsx`). Every nav
+tab there previews its feature read-only to funnel unregistered visitors into
+sign-up — a feature that only exists behind the login wall can't attract anyone.
+
+- Add or update the matching tab's `PREVIEWS[...]` entry (or a dedicated layout)
+  with a read-only sample of the new flow.
+- Always mark samples with the shared `<SampleTag />` ("範例") so visitors know
+  it's an illustration, not their own data.
+- Keep samples static (no auth'd data fetches) and follow the image rule below
+  (`object-contain`, never crop).
+
 ## Image handling
 
 **Never crop images.** Always show the full image.

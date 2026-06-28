@@ -276,10 +276,45 @@ async function generateReconciliationOpeners({ intensity /* , eventContext */ })
   };
 }
 
+// Deterministic emotion-acceptance coaching for the receiver. Detects the
+// partner's dominant emotion from the latest [對方] message (or the event
+// summary) and returns a short empathy note + three validating responses. Same
+// input → same output. Real provider replaces this.
+async function generateEmotionAcceptance({ eventSummary, recentMessages /* , createdBySelf */ }) {
+  const startedAt = Date.now();
+  const partnerLast = Array.isArray(recentMessages)
+    ? [...recentMessages].reverse().find((m) => !m.fromSelf)
+    : null;
+  const focusText = (partnerLast?.content || eventSummary || '').toString();
+  const emotion = pickEmotions(focusText)[0] || '複雜情緒';
+
+  const empathy = `對方現在可能正感受到「${emotion}」。先讓對方覺得這份情緒被你看見、被接住，比急著解釋或解決更重要。`;
+  const acceptances = [
+    { label: '單純承接', text: `我聽到了，你現在覺得很${emotion}，這很重要，我有放在心上。` },
+    { label: '溫柔安撫', text: '你先別急，我在這裡。你的感受我想好好接住，不急著講道理。' },
+    { label: '表達同在', text: '謝謝你願意告訴我。不管怎樣我都和你站在一起，我們慢慢來。' },
+  ];
+
+  return {
+    empathy,
+    acceptances,
+    toxicityFlags: [],
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+      assembledPrompt: `[mock] focus=${focusText.trim().slice(0, 80)}`,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
   generateRoleplayMessages,
   generateWallCounselorComment,
   generateReconciliationOpeners,
+  generateEmotionAcceptance,
 };

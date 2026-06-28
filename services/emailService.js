@@ -286,7 +286,8 @@ ${acceptUrl}
       surprise: '驚喜時刻',
       compliment: '甜蜜讚美',
       intimate: '親密時光',
-      reconciliation: '真心和解'
+      reconciliation: '真心和解',
+      guidance: '情緒指引'
     };
     const typeLabel = typeTranslations[requestType] || '';
 

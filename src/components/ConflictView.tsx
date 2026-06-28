@@ -1,28 +1,21 @@
 import { useState, useEffect } from 'react';
-import { Check, ChevronDown, ChevronUp, MessageCircle, Pause, Plus, Send } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, HandHeart, Pause, Plus, Send } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { apiService } from '../services/api';
-import { conflictPhraseTiers } from '../data/conflictSteps';
 import type { Notification } from '../App';
-
-const conflictResolutions = [
-  { title: '傾聽練習', desc: '給對方5分鐘不被打斷的表達時間' },
-  { title: '愛的語言', desc: '用"我感覺"而不是"你總是"來表達' },
-  { title: '擁抱和解', desc: '爭吵後先給對方一個溫暖的擁抱' },
-  { title: '寫信溝通', desc: '將想說的話寫成信，避免激烈爭吵' },
-  { title: '約定時間', desc: '設定專門的溝通時間，心平氣和討論' }
-];
 
 interface ConflictViewProps {
   showNotification: (notification: Omit<Notification, 'id'>) => void;
   partnerConnected: boolean;
+  // Navigate to another top-level view (e.g. the 衝突事件 emotion flow).
+  onNavigate?: (view: string) => void;
 }
 
 // Conflict / harmony view with the multi-step "pause mode" flow. Defined at
 // module scope (not inside App) so its identity is stable across App re-renders
 // — a nested definition would remount on every render and reset the pause-mode
 // step, timer, and per-phrase send state mid-flow. See issue #41.
-const ConflictView = ({ showNotification, partnerConnected }: ConflictViewProps) => {
+const ConflictView = ({ showNotification, partnerConnected, onNavigate }: ConflictViewProps) => {
   const ArticleDivider = () => (
     <div aria-hidden className="flex justify-center py-2">
       <span className="font-display italic text-petal-muted/60 text-sm tracking-[0.5em]">· · ·</span>
@@ -337,11 +330,10 @@ const ConflictView = ({ showNotification, partnerConnected }: ConflictViewProps)
   };
 
   const sectionNav: { id: string; label: string }[] = [
+    { id: 'conflict-lead', label: '先接住情緒' },
     { id: 'conflict-pause', label: '正在爭吵中' },
     { id: 'conflict-toolkit', label: '應對工具' },
     { id: 'conflict-article', label: '閱讀' },
-    { id: 'conflict-practice', label: '相處練習' },
-    { id: 'conflict-phrases', label: '給TA指引' },
   ];
 
   // Tick timer while on Step 3
@@ -441,6 +433,39 @@ const ConflictView = ({ showNotification, partnerConnected }: ConflictViewProps)
         ))}
       </div>
     </nav>
+
+    {/* Acceptance-first lead — the heart of the feature: receive the feeling
+        before trying to fix anything. Routes into the 衝突事件 emotion flow. */}
+    <div
+      id="conflict-lead"
+      className="bg-petal-rose/10 border-2 border-petal-rose/30 rounded-md p-5 md:p-6 scroll-mt-20"
+    >
+      <div className="flex items-start gap-4">
+        <div className="hidden sm:flex w-12 h-12 flex-shrink-0 rounded-full bg-white border border-petal-rose/40 items-center justify-center">
+          <HandHeart className="w-5 h-5 text-petal-rose-deep" strokeWidth={1.5} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-2">
+            — 先接住情緒，溝通才開始
+          </div>
+          <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-2">
+            被接住的那一刻，<em className="not-italic font-light italic text-pink-600">修復才開始</em>
+          </h3>
+          <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-4">
+            當情緒沒有被接納，人會覺得自己被否定。所以在講道理、找解法之前，先讓彼此的感受被看見、被接住。
+            把心裡的情緒寫下來，AI 幫你說得不傷人；對方收到後，AI 也會教他怎麼接住你的情緒。
+          </p>
+          <button
+            type="button"
+            onClick={() => onNavigate?.('events')}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-petal-ink text-petal-cream font-body text-sm font-medium hover:bg-pink-700 transition-colors"
+          >
+            <HandHeart className="w-4 h-4" strokeWidth={1.75} />
+            寫下我的情緒，讓對方接住
+          </button>
+        </div>
+      </div>
+    </div>
 
     {/* Emergency Pause — entry card for couples in active conflict */}
     <div id="conflict-pause" className="bg-amber-50 border-2 border-amber-300 rounded-md p-5 md:p-6 scroll-mt-20">
@@ -1095,140 +1120,6 @@ const ConflictView = ({ showNotification, partnerConnected }: ConflictViewProps)
       </div>
       )}
     </article>
-
-    <div id="conflict-practice" className="scroll-mt-20">
-      <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-6">
-        相處<em className="not-italic font-light italic text-pink-600">練習</em>
-      </h3>
-      <div className="space-y-4">
-        {conflictResolutions.map((solution, index) => (
-          <div key={index} className="bg-white rounded-md border border-petal-rule p-6">
-            <div className="flex items-start space-x-4">
-              <div className="w-10 h-10 border border-petal-sage/60 bg-petal-sage/10 rounded-full flex items-center justify-center">
-                <MessageCircle className="w-4 h-4 text-petal-sage-deep" strokeWidth={1.5} />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-display text-lg font-medium tracking-tight text-petal-ink mb-1.5">{solution.title}</h3>
-                <p className="font-body text-sm text-petal-ink-soft leading-relaxed">{solution.desc}</p>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-
-    {/* Partner-facing guide — what TA can do when I'm upset, with sendable phrases per step */}
-    <section id="conflict-phrases" className="scroll-mt-20">
-      <header className="mb-6">
-        <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-          — 給TA的對話指引
-        </div>
-        <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-2">
-          當我生氣時，你可以<em className="not-italic font-light italic text-pink-600">這樣做</em>
-        </h3>
-        <p className="font-body text-sm text-petal-ink-soft leading-relaxed">
-          八個小步驟，不是要你道歉或認錯 — 而是希望我們在情緒裡也能靠近。你越溫柔，我越能下台階。
-          {partnerConnected && (
-            <span className="block mt-1.5 text-petal-muted text-xs">
-              點每一句後面的「傳給TA」，就能把這句話直接送到對方的邀請紀錄。
-            </span>
-          )}
-        </p>
-      </header>
-
-      <div className="space-y-5">
-        {conflictPhraseTiers.map((tier) => (
-          <article
-            key={tier.key}
-            className={`rounded-md border-2 ${tier.cardClass} p-5 md:p-7`}
-          >
-            <header className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-2">
-              <span
-                className={`inline-flex items-center gap-1.5 font-body text-[11px] font-semibold uppercase tracking-[0.16em] ${tier.badgeClass} px-2.5 py-1 rounded`}
-              >
-                <span aria-hidden>{tier.dot}</span>
-                {tier.badge}
-              </span>
-              <h4 className="font-display text-lg md:text-xl font-medium text-petal-ink leading-snug">
-                {tier.title}
-              </h4>
-            </header>
-
-            <p className="font-body text-[13px] text-petal-ink-soft mb-5 leading-relaxed">
-              {tier.why}
-            </p>
-
-            <ol className="space-y-3 mb-5">
-              {tier.phrases.map((phrase, i) => {
-                const phraseKey = `${tier.key}-${i}`;
-                const status = phraseStatus[phraseKey] || 'idle';
-                return (
-                  <li
-                    key={i}
-                    className="flex flex-col sm:flex-row sm:items-start gap-3 bg-white/70 rounded-md p-3.5 md:p-4 border border-white"
-                  >
-                    <div className="flex gap-3 flex-1 min-w-0">
-                      <span className="font-display italic text-petal-rose-deep text-sm leading-relaxed flex-shrink-0 mt-0.5 w-5">
-                        {i + 1}.
-                      </span>
-                      <blockquote className="font-display text-[15px] md:text-base leading-relaxed text-petal-ink flex-1">
-                        「{phrase}」
-                      </blockquote>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleSendPhrase(phrase, phraseKey)}
-                      disabled={status === 'sending' || status === 'sent'}
-                      title={partnerConnected ? '直接傳送這句話給TA' : '需要先配對伴侶'}
-                      className={`flex-shrink-0 self-end sm:self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-body text-xs font-medium tracking-tight border transition-colors ${
-                        status === 'sent'
-                          ? 'border-petal-sage bg-petal-sage/15 text-petal-sage-deep cursor-default'
-                          : status === 'sending'
-                            ? 'border-petal-rule bg-white text-petal-muted cursor-wait'
-                            : partnerConnected
-                              ? 'border-petal-rose bg-white text-petal-rose-deep hover:bg-petal-rose hover:text-white hover:border-petal-rose'
-                              : 'border-petal-rule bg-white text-petal-muted opacity-60'
-                      }`}
-                    >
-                      {status === 'sent' ? (
-                        <>
-                          <Check className="w-3.5 h-3.5" strokeWidth={2} />
-                          已送出
-                        </>
-                      ) : status === 'sending' ? (
-                        <>
-                          <span className="w-3.5 h-3.5 border-2 border-petal-muted border-t-transparent rounded-full animate-spin" />
-                          傳送中
-                        </>
-                      ) : (
-                        <>
-                          <Send className="w-3.5 h-3.5" strokeWidth={1.75} />
-                          傳給TA
-                        </>
-                      )}
-                    </button>
-                  </li>
-                );
-              })}
-            </ol>
-
-            <div className="mb-5">
-              {renderCustomComposer(`${tier.key}-custom`, `這一步想自己說一句話？寫給TA…`)}
-            </div>
-
-            {tier.note && (
-              <p className="font-body text-xs md:text-sm text-petal-ink-soft leading-relaxed border-t border-petal-rule-soft pt-3">
-                {tier.note}
-              </p>
-            )}
-          </article>
-        ))}
-      </div>
-
-      <p className="font-display italic text-center text-sm text-petal-muted mt-6 leading-relaxed">
-        你越溫柔，我越能回來 — 不是輸贏，是回到彼此身邊。
-      </p>
-    </section>
 
     {/* Pause Mode — full-screen guided flow */}
     {pauseStep !== null && (

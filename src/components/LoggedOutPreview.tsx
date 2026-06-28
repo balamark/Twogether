@@ -11,6 +11,7 @@ import {
   TrendingUp,
   Sparkles,
   HeartHandshake,
+  HandHeart,
   Crown,
   Check,
   type LucideIcon,
@@ -175,8 +176,39 @@ const CAUSE_BARS: { label: string; pct: number }[] = [
   { label: '作息差異', pct: 25 },
 ];
 
+// The new "情緒接住" lead — a three-beat example of the emotion-acceptance flow:
+// one partner writes a feeling, AI softens it, the other receives an AI-suggested
+// way to "catch" it. Shown read-only to logged-out visitors.
+const EmotionAcceptanceSample: React.FC = () => (
+  <SampleCard>
+    <div className="flex items-center justify-between mb-3">
+      <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
+        <HandHeart className="w-3.5 h-3.5 text-petal-rose-deep" />
+        先接住情緒，溝通才開始
+      </span>
+      <SampleTag />
+    </div>
+    <div className="space-y-2.5">
+      <div className="rounded-md bg-petal-cream-2 px-3 py-2">
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-1">① 小晴寫下情緒</div>
+        <p className="font-body text-sm text-petal-ink">「你又忘記了，我覺得自己一點都不重要。」</p>
+      </div>
+      <div className="rounded-md bg-white border border-petal-rule px-3 py-2">
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-1">② AI 翻成不傷人的話</div>
+        <p className="font-body text-sm text-petal-ink">「當約定被忘記時，我會覺得失落，因為我很在乎我們的相處。」</p>
+      </div>
+      <div className="rounded-md bg-petal-rose-soft/30 border border-petal-rose-soft px-3 py-2">
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep mb-1">③ AI 教阿哲怎麼接住</div>
+        <p className="font-body text-sm text-petal-ink">「我聽到你很失落，這對你來說很重要，謝謝你願意告訴我。」</p>
+      </div>
+    </div>
+  </SampleCard>
+);
+
 const ConflictFlywheelSample: React.FC = () => (
   <div className="space-y-4">
+    <EmotionAcceptanceSample />
+
     {/* Mini trend analysis */}
     <SampleCard>
       <div className="flex items-center justify-between mb-3">
@@ -287,7 +319,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       </>
     ),
     description:
-      '這是 Twogether 的核心。記錄衝突、看見走勢、學會怎麼說，真的卡住了，就請 AI 諮商師陪你們聊，或預約真人諮商師。',
+      '這是 Twogether 的核心。先讓情緒被接住——一方寫下感受，AI 幫你說得不傷人，另一方收到後 AI 也教他怎麼接住你。被接住了，再一起看走勢、學會怎麼說，真的卡住就請 AI 或真人諮商師陪你們。',
     sample: <ConflictFlywheelSample />,
   },
   wall: {

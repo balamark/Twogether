@@ -310,6 +310,20 @@ export interface ReplyRewritePreview {
   toxicityFlags: string[];
 }
 
+// One ready-to-send "接住情緒" (receive/validate the partner's emotion) response.
+export interface EmotionAcceptance {
+  label: string;
+  text: string;
+}
+
+// AI coaching for the receiver: a short empathy note (help them SEE the feeling)
+// plus three validating responses they can send.
+export interface EmotionAcceptancePreview {
+  empathy: string;
+  acceptances: EmotionAcceptance[];
+  toxicityFlags: string[];
+}
+
 export interface EventMessage {
   id: string;
   eventId: string;
@@ -368,6 +382,7 @@ export interface EventAnalyticsData {
   resolutionRate: number;
   avgResolutionHours: number | null;
   tagDistribution: { tag: string; count: number }[];
+  emotionDistribution: { emotion: string; count: number }[];
   dailyTrend: { date: string; count: number }[];
   hotspotHours: { hour: number; count: number }[];
 }
@@ -1687,13 +1702,12 @@ class ApiService {
   // Intimacy Requests
   async createIntimacyRequest(request: CreateIntimacyRequestRequest): Promise<IntimacyRequest> {
     try {
-      // Map request types to server-accepted values
+      // Map request types to server-accepted values. A few categories carry a
+      // distinct meaning end-to-end (compliment / reconciliation / guidance);
+      // everything else (incl. scheduled) is stored as a generic intimate request.
       let requestType = request.requestType;
-      if (requestType === 'scheduled') {
-        requestType = 'intimate'; // scheduled requests are intimate requests with a time
-      }
-      if (requestType !== 'compliment') {
-        requestType = 'intimate'; // default to intimate for non-compliment requests
+      if (!['compliment', 'reconciliation', 'guidance'].includes(requestType)) {
+        requestType = 'intimate';
       }
 
       const response = await apiClient.post('/intimacy-requests', {
@@ -2768,6 +2782,27 @@ class ApiService {
     }
   }
 
+  // Preview AI "接住情緒" coaching for the receiver — an empathy note plus three
+  // validating responses. Not persisted; the user picks one to insert/send.
+  async previewEmotionAcceptance(eventId: string): Promise<EmotionAcceptancePreview> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/messages/preview-acceptance`);
+      const p = response.data.preview ?? {};
+      return {
+        empathy: p.empathy || '',
+        acceptances: Array.isArray(p.acceptances)
+          ? p.acceptances
+              .filter((a: unknown): a is EmotionAcceptance => !!a && typeof (a as EmotionAcceptance).text === 'string')
+              .map((a: EmotionAcceptance) => ({ label: a.label || '', text: a.text }))
+          : [],
+        toxicityFlags: Array.isArray(p.toxicityFlags) ? p.toxicityFlags : [],
+      };
+    } catch (error: unknown) {
+      console.error('Failed to preview emotion acceptance:', error);
+      this.throwApiError(error, 'AI 接住情緒建議暫時無法產生，請稍後再試');
+    }
+  }
+
   // Preview an AI 諮商師 comment for an event (not persisted until posted).
   async previewEventAiComment(eventId: string): Promise<string> {
     try {
@@ -2842,6 +2877,7 @@ class ApiService {
         resolutionRate: Number(a.resolution_rate) || 0,
         avgResolutionHours: a.avg_resolution_hours == null ? null : Number(a.avg_resolution_hours),
         tagDistribution: Array.isArray(a.tag_distribution) ? a.tag_distribution : [],
+        emotionDistribution: Array.isArray(a.emotion_distribution) ? a.emotion_distribution : [],
         dailyTrend: Array.isArray(a.daily_trend) ? a.daily_trend : [],
         hotspotHours: Array.isArray(a.hotspot_hours) ? a.hotspot_hours : [],
       };

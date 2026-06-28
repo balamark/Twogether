@@ -786,10 +786,153 @@ async function generateReconciliationOpeners({ intensity, eventContext }) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Emotion acceptance ("接住情緒")
+// ---------------------------------------------------------------------------
+// The repair starts only once a feeling is *received* — not solved. The partner
+// who opened the event has already had their raw feeling softened by the
+// icebreaker; this helper coaches the *receiver*. Given the event summary and
+// recent thread, it returns a short empathy note (help the receiver SEE the
+// feeling) plus three ready-to-send "I receive you" responses that validate the
+// emotion without explaining, debating, or self-erasing apology.
+
+const EMOTION_ACCEPTANCE_SYSTEM_PROMPT = `你是一位溫柔、專業的伴侶情緒教練。情境：一方（[對方]）剛剛表達了情緒，正在寫回覆的人（[你]）想學會先「接住」這份情緒——讓對方覺得被看見、被肯定，而不是急著解釋、講道理、辯駁或自責到失去自己。請永遠以繁體中文回覆。
+
+核心理念：當一個人的情緒沒有被接納，會覺得自己被否定；反覆發生就築起心牆。被同理、被接納的那一刻，療癒才開始，真正的溝通才打開。所以這個任務「不是要解決問題」，是要先把情緒接住。
+
+任務：閱讀事件背景與最近對話，產出：
+1. empathy：一句話，幫 [你] 先看見 [對方] 此刻可能的情緒、以及這份情緒為什麼重要（像一位教練在你耳邊提醒，不是要傳出去的話）。
+2. acceptances：三句 [你] 可以直接傳給 [對方] 的「接住式」回應，語氣略有不同（例如：單純承接情緒／溫柔安撫／表達我和你同在）。每句都要：
+   - 肯定、承接對方的情緒（讓對方覺得「你有看見我」）。
+   - 不辯解、不講道理、不急著解決、不否定對方的感受。
+   - 不逼自己認錯到失去立場、也不卑微討好；是「我接住你的感受」，不是「都是我的錯」。
+   - 簡短、口語、像真的會傳出去的訊息（1～2 句）。
+3. toxicityFlags：偵測到的問題語言（同其他任務的清單，通常為空）。
+
+身分守則：[你] = 正在寫回覆、要去接住情緒的人；[對方] = 表達了情緒的伴侶。不要把 [對方] 的經驗說成 [你] 的經驗；可以同理地 acknowledge 那是 [對方] 的感受。只使用繁體中文。
+
+回應請只呼叫 emit_emotion_acceptance tool，不要輸出其他文字。`;
+
+const EMOTION_ACCEPTANCE_TOOL_SCHEMA = {
+  name: 'emit_emotion_acceptance',
+  description: "Return a short empathy note plus three ready-to-send responses that receive/validate the partner's emotion.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      empathy: {
+        type: 'string',
+        description: '一句話，幫接收方先看見對方此刻的情緒與它為何重要（給接收方看的提醒，不是要傳出去的話）',
+      },
+      acceptances: {
+        type: 'array',
+        minItems: 3,
+        maxItems: 3,
+        items: {
+          type: 'object',
+          properties: {
+            label: { type: 'string', description: '一個 4～8 字的短標題，例如「單純承接」「溫柔安撫」「表達同在」' },
+            text: { type: 'string', description: '可直接傳給對方的接住式回應，1～2 句' },
+          },
+          required: ['label', 'text'],
+        },
+      },
+      toxicityFlags: {
+        type: 'array',
+        items: { type: 'string' },
+      },
+    },
+    required: ['empathy', 'acceptances', 'toxicityFlags'],
+  },
+};
+
+async function generateEmotionAcceptance({ eventSummary, recentMessages, createdBySelf }) {
+  const summaryOwner = createdBySelf ? '你' : '對方';
+  const contextLines = [
+    '角色說明：',
+    '- [你] = 正在寫回覆、想要接住情緒的人',
+    '- [對方] = 表達了情緒的伴侶',
+    '',
+  ];
+  if (eventSummary && typeof eventSummary === 'string') {
+    contextLines.push(
+      `事件背景摘要（由 [${summaryOwner}] 開啟；以下文中的「我」= [${summaryOwner}]）：`,
+      eventSummary.trim(),
+      ''
+    );
+  }
+  if (Array.isArray(recentMessages) && recentMessages.length > 0) {
+    contextLines.push('最近對話（最舊在前，每行已標註發話者）：');
+    for (const m of recentMessages) {
+      const tag = m.fromSelf ? '[你]' : '[對方]';
+      contextLines.push(`${tag}：${(m.content || '').trim()}`);
+    }
+    contextLines.push('');
+  }
+  contextLines.push('請幫 [你] 先接住 [對方] 的情緒。');
+  const userContent = contextLines.join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system: [
+      {
+        type: 'text',
+        text: EMOTION_ACCEPTANCE_SYSTEM_PROMPT,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [EMOTION_ACCEPTANCE_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_emotion_acceptance' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.emotion_acceptance', {
+    model: response.model || MODEL,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_emotion_acceptance'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input;
+
+  return {
+    empathy: out.empathy || '',
+    acceptances: Array.isArray(out.acceptances) ? out.acceptances : [],
+    toxicityFlags: out.toxicityFlags || [],
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+      assembledPrompt: userContent,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
   generateRoleplayMessages,
   generateWallCounselorComment,
   generateReconciliationOpeners,
+  generateEmotionAcceptance,
 };

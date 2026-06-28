@@ -21,5 +21,6 @@ module.exports = {
   generateRoleplayMessages: provider.generateRoleplayMessages,
   generateWallCounselorComment: provider.generateWallCounselorComment,
   generateReconciliationOpeners: provider.generateReconciliationOpeners,
+  generateEmotionAcceptance: provider.generateEmotionAcceptance,
   providerName: PROVIDER_NAME,
 };
