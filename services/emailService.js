@@ -61,7 +61,7 @@ class EmailService {
       throw new Error('Email service is not configured');
     }
 
-    const frontendUrl = process.env.FRONTEND_URL || 'https://twogether-couples-app.de.r.appspot.com';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://twogether.fun';
     const acceptUrl = `${frontendUrl}/pairing/accept?token=${token}`;
 
     const htmlContent = `
@@ -204,7 +204,7 @@ ${acceptUrl}
       throw new Error('Email service is not configured');
     }
 
-    const frontendUrl = process.env.FRONTEND_URL || 'https://twogether-couples-app.de.r.appspot.com';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://twogether.fun';
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -447,7 +447,7 @@ ${acceptUrl}
             <p style="line-height: 1.7; color: #475569;">試著找個舒服的時刻，與 ${safeSender} 分享你的想法或目前的狀態。坦誠的交流能讓你們的親密關係更穩固，也讓彼此更安心。</p>
 
             <div class="cta">
-                <a href="${process.env.FRONTEND_URL || 'https://twogether-couples-app.de.r.appspot.com'}">一起展開一次溫柔的對話</a>
+                <a href="${process.env.FRONTEND_URL || 'https://twogether.fun'}">一起展開一次溫柔的對話</a>
             </div>
         </div>
         <div class="footer">
@@ -580,7 +580,7 @@ ${acceptUrl}
   // Shared lightweight HTML wrapper used by the partner-activity emails so
   // we don't repeat 100 lines of CSS per template.
   _activityEmailHtml({ headerEmoji, headerTitle, headerSubtitle, bodyHtml, ctaLabel = '💕 打開 Twogether 查看', ctaUrl }) {
-    const frontendUrl = ctaUrl || process.env.FRONTEND_URL || 'https://twogether-couples-app.de.r.appspot.com';
+    const frontendUrl = ctaUrl || process.env.FRONTEND_URL || 'https://twogether.fun';
     return `
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -736,7 +736,7 @@ ${acceptUrl}
     }
     if (!recipientEmail || !token) return;
 
-    const frontendUrl = process.env.FRONTEND_URL || 'https://twogether-couples-app.de.r.appspot.com';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://twogether.fun';
     const verifyUrl = `${frontendUrl}/api/therapists/verify-email?token=${encodeURIComponent(token)}`;
     const safeName = this._escape(displayName || '諮商師');
 
@@ -754,7 +754,7 @@ ${acceptUrl}
       bodyHtml,
       ctaLabel: '✓ 驗證我的 Email',
     }).replace(
-      process.env.FRONTEND_URL || 'https://twogether-couples-app.de.r.appspot.com',
+      process.env.FRONTEND_URL || 'https://twogether.fun',
       verifyUrl
     );
 
@@ -833,7 +833,7 @@ ${acceptUrl}
   }
 
   _appBaseUrl() {
-    return (process.env.FRONTEND_URL || 'https://twogether-couples-app.de.r.appspot.com').replace(/\/$/, '');
+    return (process.env.FRONTEND_URL || 'https://twogether.fun').replace(/\/$/, '');
   }
 
   // Welcome + email verification, sent on sign-up. One email, not two: it
