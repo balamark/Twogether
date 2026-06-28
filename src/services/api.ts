@@ -501,9 +501,12 @@ export interface BillingStatus {
   plans: BillingPlan[];
 }
 
-// Builds a hidden form and POSTs it to ECPay's hosted checkout — a full-page
-// navigation, exactly how ECPay expects the redirect to happen.
-export const submitEcpayForm = (actionUrl: string, params: Record<string, string>): void => {
+// Which Taiwanese payment gateway to route a checkout through.
+export type PaymentProvider = 'ecpay' | 'newebpay';
+
+// Builds a hidden form and POSTs it to the gateway's hosted checkout — a
+// full-page navigation, exactly how both ECPay and NewebPay expect the redirect.
+export const submitGatewayForm = (actionUrl: string, params: Record<string, string>): void => {
   const form = document.createElement('form');
   form.method = 'POST';
   form.action = actionUrl;
@@ -2958,17 +2961,17 @@ class ApiService {
     }
   }
 
-  // Creates an order and redirects the browser to ECPay's hosted checkout.
-  // Resolves only if the redirect could not be initiated (otherwise the page
-  // navigates away).
-  async startCheckout(plan: BillingPlan['id']): Promise<void> {
+  // Creates an order and redirects the browser to the chosen gateway's hosted
+  // checkout (ECPay or NewebPay). Resolves only if the redirect could not be
+  // initiated (otherwise the page navigates away).
+  async startCheckout(plan: BillingPlan['id'], provider: PaymentProvider = 'ecpay'): Promise<void> {
     try {
-      const response = await apiClient.post('/billing/checkout', { plan });
+      const response = await apiClient.post('/billing/checkout', { plan, provider });
       const { action_url, params } = response.data || {};
       if (!action_url || !params) {
         throw new Error('付款資料異常，請稍後再試');
       }
-      submitEcpayForm(action_url, params);
+      submitGatewayForm(action_url, params);
     } catch (error: unknown) {
       console.error('Failed to start checkout:', error);
       this.throwApiError(error, '無法建立付款，請稍後再試');
@@ -3269,13 +3272,13 @@ class ApiService {
     }
   }
 
-  // Start ECPay checkout for a booked session; redirects the browser on success.
-  async paySession(consultationId: string): Promise<void> {
+  // Start checkout for a booked session; redirects the browser on success.
+  async paySession(consultationId: string, provider: PaymentProvider = 'ecpay'): Promise<void> {
     try {
-      const response = await apiClient.post(`/therapists/consultations/${consultationId}/pay`);
+      const response = await apiClient.post(`/therapists/consultations/${consultationId}/pay`, { provider });
       const { action_url, params } = response.data || {};
       if (!action_url || !params) throw new Error('付款資料異常，請稍後再試');
-      submitEcpayForm(action_url, params);
+      submitGatewayForm(action_url, params);
     } catch (error: unknown) {
       console.error('Failed to start session payment:', error);
       this.throwApiError(error, '無法建立付款，請稍後再試');

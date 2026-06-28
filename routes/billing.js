@@ -5,6 +5,7 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { getCoupleIdForUser, getCoupleTier, getActiveExpiry } = require('../lib/entitlements');
 const ecpay = require('../lib/ecpay');
+const newebpay = require('../lib/newebpay');
 const emailService = require('../services/emailService');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 
@@ -170,14 +171,27 @@ router.post(
 router.post(
   '/checkout',
   authenticateToken,
-  [body('plan').isIn(Object.keys(PLANS)).withMessage('無效的方案')],
+  [
+    body('plan').isIn(Object.keys(PLANS)).withMessage('無效的方案'),
+    body('provider').optional().isIn(['ecpay', 'newebpay']).withMessage('無效的付款方式'),
+  ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ success: false, message: '驗證失敗', errors: errors.array() });
     }
 
+    const provider = req.body.provider === 'newebpay' ? 'newebpay' : 'ecpay';
+
     try {
+      if (provider === 'newebpay' && !newebpay.isConfigured()) {
+        return res.status(503).json({
+          success: false,
+          message: '藍新金流暫時無法使用，請改用綠界 ECPay 付款',
+          error_code: 'NEWEBPAY_UNAVAILABLE',
+        });
+      }
+
       const coupleId = await getCoupleIdForUser(req.user.id);
       if (!coupleId) {
         return res.status(404).json({
@@ -191,21 +205,32 @@ router.post(
       const merchantTradeNo = genMerchantTradeNo();
 
       await db.query(
-        `INSERT INTO payment_orders (couple_id, created_by, merchant_trade_no, plan, amount, status)
-         VALUES ($1, $2, $3, $4, $5, 'pending')`,
-        [coupleId, req.user.id, merchantTradeNo, req.body.plan, plan.amount]
+        `INSERT INTO payment_orders (couple_id, created_by, merchant_trade_no, plan, amount, status, provider)
+         VALUES ($1, $2, $3, $4, $5, 'pending', $6)`,
+        [coupleId, req.user.id, merchantTradeNo, req.body.plan, plan.amount, provider]
       );
 
       const base = appBaseUrl();
-      const { actionUrl, params } = ecpay.buildCheckoutParams({
-        merchantTradeNo,
-        amount: plan.amount,
-        itemName: plan.label,
-        tradeDesc: 'Twogether Premium',
-        returnUrl: `${base}/api/billing/ecpay/callback`,
-        orderResultUrl: `${base}/api/billing/ecpay/return`,
-        clientBackUrl: `${base}/billing/result`,
-      });
+      const { actionUrl, params } =
+        provider === 'newebpay'
+          ? newebpay.buildCheckoutParams({
+              merchantTradeNo,
+              amount: plan.amount,
+              itemName: plan.label,
+              email: req.user.email || '',
+              returnUrl: `${base}/api/billing/newebpay/callback`,
+              orderResultUrl: `${base}/api/billing/newebpay/return`,
+              clientBackUrl: `${base}/billing/result`,
+            })
+          : ecpay.buildCheckoutParams({
+              merchantTradeNo,
+              amount: plan.amount,
+              itemName: plan.label,
+              tradeDesc: 'Twogether Premium',
+              returnUrl: `${base}/api/billing/ecpay/callback`,
+              orderResultUrl: `${base}/api/billing/ecpay/return`,
+              clientBackUrl: `${base}/billing/result`,
+            });
 
       logInfo('billing.checkout.created', {
         coupleId,
@@ -213,6 +238,7 @@ router.post(
         plan: req.body.plan,
         amount: plan.amount,
         merchantTradeNo,
+        provider,
       });
 
       res.json({ success: true, action_url: actionUrl, params });
@@ -222,6 +248,86 @@ router.post(
     }
   }
 );
+
+// ---------------------------------------------------------------------------
+// Grant a paid order: insert the entitlement (passes STACK so paid time is never
+// lost) + mark the order paid, atomically, then fire the receipt email. Shared
+// by both gateway callbacks once they've verified the signature, matched the
+// order, confirmed it isn't already paid, and confirmed the amount. Idempotent
+// at the caller level (callers bail when order.status === 'paid').
+//   gatewayTradeNo → the gateway's own trade id (ECPay TradeNo / NewebPay TradeNo)
+// Returns true on success, false if the plan is unknown.
+// ---------------------------------------------------------------------------
+async function grantPaidOrder(order, { gatewayTradeNo, paymentMethod, rawPayload }) {
+  const plan = PLANS[order.plan];
+  if (!plan) {
+    logError('billing.callback.unknown_plan', { merchantTradeNo: order.merchant_trade_no, plan: order.plan });
+    return false;
+  }
+
+  // All values are bound parameters; the GREATEST/COALESCE handles the "no
+  // active pass" case ($4 = NULL → starts now).
+  await db.transaction(async (client) => {
+    const expiryRow = await client.query(
+      `SELECT MAX(expires_at) AS max_exp FROM couple_entitlements
+        WHERE couple_id = $1 AND expires_at > NOW()`,
+      [order.couple_id]
+    );
+    const currentMax = expiryRow.rows[0]?.max_exp || null;
+
+    await client.query(
+      `INSERT INTO couple_entitlements (couple_id, plan, starts_at, expires_at, order_id)
+       SELECT $1, $2, s, s + make_interval(days => $3), $5
+         FROM (SELECT GREATEST(NOW(), COALESCE($4::timestamptz, NOW())) AS s) t`,
+      [order.couple_id, order.plan, plan.days, currentMax, order.id]
+    );
+
+    await client.query(
+      `UPDATE payment_orders
+          SET status = 'paid', paid_at = NOW(),
+              ecpay_trade_no = $2, payment_method = $3, raw_callback = $4
+        WHERE id = $1`,
+      [order.id, gatewayTradeNo || null, paymentMethod || null, rawPayload]
+    );
+  });
+
+  logInfo('billing.callback.granted', {
+    merchantTradeNo: order.merchant_trade_no,
+    coupleId: order.couple_id,
+    plan: order.plan,
+    days: plan.days,
+    provider: order.provider,
+  });
+
+  // Fire-and-forget purchase receipt to the buyer. Must never affect the
+  // idempotent ack the gateway needs, so it's fully wrapped and awaited-free.
+  (async () => {
+    try {
+      if (!order.created_by) return;
+      const buyer = await db.query('SELECT email, nickname FROM users WHERE id = $1', [order.created_by]);
+      const b = buyer.rows[0];
+      if (!b?.email) return;
+      const entRow = await db.query(
+        'SELECT expires_at FROM couple_entitlements WHERE order_id = $1 ORDER BY expires_at DESC LIMIT 1',
+        [order.id]
+      );
+      await emailService.sendPaymentReceiptEmail({
+        recipientEmail: b.email,
+        nickname: b.nickname,
+        planLabel: plan.label,
+        amountTwd: order.amount,
+        days: plan.days,
+        orderNo: order.merchant_trade_no,
+        paidAt: new Date(),
+        expiresAt: entRow.rows[0]?.expires_at || null,
+      });
+    } catch (err) {
+      logWarn('Payment receipt email failed', { merchantTradeNo: order.merchant_trade_no, err: err.message });
+    }
+  })();
+
+  return true;
+}
 
 // ---------------------------------------------------------------------------
 // ECPay server-to-server callback (PUBLIC — no JWT). This is the authoritative
@@ -271,73 +377,11 @@ router.post('/ecpay/callback', async (req, res) => {
       return res.send('1|OK');
     }
 
-    const plan = PLANS[order.plan];
-    if (!plan) {
-      logError('billing.callback.unknown_plan', { merchantTradeNo, plan: order.plan });
-      return res.send('1|OK');
-    }
-
-    // Grant + mark paid atomically. Passes STACK: start at the later of now or
-    // the couple's current furthest expiry so paid time is never lost. All
-    // values are bound parameters; the GREATEST/COALESCE handles the "no active
-    // pass" case ($4 = NULL → starts now).
-    await db.transaction(async (client) => {
-      const expiryRow = await client.query(
-        `SELECT MAX(expires_at) AS max_exp FROM couple_entitlements
-          WHERE couple_id = $1 AND expires_at > NOW()`,
-        [order.couple_id]
-      );
-      const currentMax = expiryRow.rows[0]?.max_exp || null;
-
-      await client.query(
-        `INSERT INTO couple_entitlements (couple_id, plan, starts_at, expires_at, order_id)
-         SELECT $1, $2, s, s + make_interval(days => $3), $5
-           FROM (SELECT GREATEST(NOW(), COALESCE($4::timestamptz, NOW())) AS s) t`,
-        [order.couple_id, order.plan, plan.days, currentMax, order.id]
-      );
-
-      await client.query(
-        `UPDATE payment_orders
-            SET status = 'paid', paid_at = NOW(),
-                ecpay_trade_no = $2, payment_method = $3, raw_callback = $4
-          WHERE id = $1`,
-        [order.id, payload.TradeNo || null, payload.PaymentType || null, payload]
-      );
+    await grantPaidOrder(order, {
+      gatewayTradeNo: payload.TradeNo,
+      paymentMethod: payload.PaymentType,
+      rawPayload: payload,
     });
-
-    logInfo('billing.callback.granted', {
-      merchantTradeNo,
-      coupleId: order.couple_id,
-      plan: order.plan,
-      days: plan.days,
-    });
-
-    // Fire-and-forget purchase receipt to the buyer. Must never affect the
-    // idempotent ack ECPay needs, so it's fully wrapped and awaited-free.
-    (async () => {
-      try {
-        if (!order.created_by) return;
-        const buyer = await db.query('SELECT email, nickname FROM users WHERE id = $1', [order.created_by]);
-        const b = buyer.rows[0];
-        if (!b?.email) return;
-        const entRow = await db.query(
-          'SELECT expires_at FROM couple_entitlements WHERE order_id = $1 ORDER BY expires_at DESC LIMIT 1',
-          [order.id]
-        );
-        await emailService.sendPaymentReceiptEmail({
-          recipientEmail: b.email,
-          nickname: b.nickname,
-          planLabel: plan.label,
-          amountTwd: order.amount,
-          days: plan.days,
-          orderNo: merchantTradeNo,
-          paidAt: new Date(),
-          expiresAt: entRow.rows[0]?.expires_at || null,
-        });
-      } catch (err) {
-        logWarn('Payment receipt email failed', { merchantTradeNo, err: err.message });
-      }
-    })();
 
     res.send('1|OK');
   } catch (err) {
@@ -354,6 +398,81 @@ router.post('/ecpay/callback', async (req, res) => {
 // ---------------------------------------------------------------------------
 router.post('/ecpay/return', (req, res) => {
   const ok = String(req.body?.RtnCode) === '1';
+  res.redirect(302, `/billing/result?status=${ok ? 'success' : 'failed'}`);
+});
+
+// ---------------------------------------------------------------------------
+// NewebPay server-to-server callback (NotifyURL, PUBLIC — no JWT). Authoritative
+// grant, mirroring the ECPay callback. NewebPay only needs an HTTP 200 ack.
+// ---------------------------------------------------------------------------
+router.post('/newebpay/callback', async (req, res) => {
+  const payload = req.body || {};
+  try {
+    if (!newebpay.verifyCallback(payload)) {
+      logWarn('billing.callback.bad_mac', { provider: 'newebpay' });
+      return res.status(400).send('0|TradeSha Error');
+    }
+
+    const parsed = newebpay.parseCallback(payload);
+    if (!parsed || !parsed.merchantOrderNo) {
+      logWarn('billing.callback.unparsable', { provider: 'newebpay' });
+      return res.status(400).send('0|Parse Error');
+    }
+
+    const merchantTradeNo = parsed.merchantOrderNo;
+    const orderResult = await db.query(
+      `SELECT * FROM payment_orders WHERE merchant_trade_no = $1`,
+      [merchantTradeNo]
+    );
+    const order = orderResult.rows[0];
+    if (!order) {
+      logWarn('billing.callback.unknown_order', { merchantTradeNo, provider: 'newebpay' });
+      return res.send('1|OK');
+    }
+
+    // Already granted — idempotent ack.
+    if (order.status === 'paid') return res.send('1|OK');
+
+    // Guard against amount tampering.
+    if (Number(parsed.amount) !== Number(order.amount)) {
+      logWarn('billing.callback.amount_mismatch', {
+        merchantTradeNo,
+        expected: order.amount,
+        got: parsed.amount,
+        provider: 'newebpay',
+      });
+      return res.status(400).send('0|Amount Mismatch');
+    }
+
+    if (!parsed.success) {
+      await db.query(
+        `UPDATE payment_orders SET status = 'failed', raw_callback = $2 WHERE id = $1`,
+        [order.id, parsed.raw]
+      );
+      logInfo('billing.callback.failed', { merchantTradeNo, status: parsed.status, provider: 'newebpay' });
+      return res.send('1|OK');
+    }
+
+    await grantPaidOrder(order, {
+      gatewayTradeNo: parsed.tradeNo,
+      paymentMethod: parsed.paymentType,
+      rawPayload: parsed.raw,
+    });
+
+    res.send('1|OK');
+  } catch (err) {
+    logError('Billing callback failed', { err: err.message, stack: err.stack, provider: 'newebpay' });
+    res.status(500).send('0|Error');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// NewebPay browser POST-back (ReturnURL, PUBLIC). Same role as ecpay/return:
+// 302 to the SPA result route; the grant already happened via NotifyURL.
+// ---------------------------------------------------------------------------
+router.post('/newebpay/return', (req, res) => {
+  const parsed = newebpay.parseCallback(req.body || {});
+  const ok = parsed ? parsed.success : false;
   res.redirect(302, `/billing/result?status=${ok ? 'success' : 'failed'}`);
 });
 

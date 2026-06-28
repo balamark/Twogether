@@ -56,3 +56,6 @@ debug-*.png
 *-debug.png
 .gstack/
 .claude/
+
+# Supabase CLI local cache (not project config)
+supabase/.temp/
