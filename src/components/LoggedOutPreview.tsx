@@ -11,6 +11,8 @@ import {
   TrendingUp,
   Sparkles,
   HeartHandshake,
+  HandHeart,
+  ClipboardCheck,
   Crown,
   Check,
   type LucideIcon,
@@ -175,8 +177,82 @@ const CAUSE_BARS: { label: string; pct: number }[] = [
   { label: '作息差異', pct: 25 },
 ];
 
+// The new "情緒接住" lead — a three-beat example of the emotion-acceptance flow:
+// one partner writes a feeling, AI softens it, the other receives an AI-suggested
+// way to "catch" it. Shown read-only to logged-out visitors.
+const EmotionAcceptanceSample: React.FC = () => (
+  <SampleCard>
+    <div className="flex items-center justify-between mb-3">
+      <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
+        <HandHeart className="w-3.5 h-3.5 text-petal-rose-deep" />
+        先接住情緒，溝通才開始
+      </span>
+      <SampleTag />
+    </div>
+    <div className="space-y-2.5">
+      <div className="rounded-md bg-petal-cream-2 px-3 py-2">
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-1">① 小晴寫下情緒</div>
+        <p className="font-body text-sm text-petal-ink">「你又忘記了，我覺得自己一點都不重要。」</p>
+      </div>
+      <div className="rounded-md bg-white border border-petal-rule px-3 py-2">
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-1">② AI 翻成不傷人的話</div>
+        <p className="font-body text-sm text-petal-ink">「當約定被忘記時，我會覺得失落，因為我很在乎我們的相處。」</p>
+      </div>
+      <div className="rounded-md bg-petal-rose-soft/30 border border-petal-rose-soft px-3 py-2">
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep mb-1">③ AI 教阿哲怎麼接住</div>
+        <p className="font-body text-sm text-petal-ink">「我聽到你很失落，這對你來說很重要，謝謝你願意告訴我。」</p>
+      </div>
+    </div>
+  </SampleCard>
+);
+
+// "婚姻檢查" read-only sample — each partner rates a few dimensions, then both
+// reveal side-by-side with an AI neutral summary.
+const CHECKUP_ROWS: { label: string; a: number; b: number }[] = [
+  { label: '💬 溝通', a: 4, b: 4 },
+  { label: '💗 親密', a: 2, b: 4 },
+  { label: '🏠 家務分工', a: 3, b: 2 },
+];
+
+const MarriageCheckupSample: React.FC = () => (
+  <SampleCard>
+    <div className="flex items-center justify-between mb-3">
+      <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
+        <ClipboardCheck className="w-3.5 h-3.5 text-petal-rose-deep" />
+        婚姻檢查・各自打分後一起揭曉
+      </span>
+      <SampleTag />
+    </div>
+    <div className="rounded-md border border-petal-rule overflow-hidden mb-2.5">
+      <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 px-3 py-1.5 bg-petal-cream-2 text-[10px] font-body text-petal-muted uppercase tracking-wide">
+        <span>面向</span>
+        <span className="w-8 text-center">你</span>
+        <span className="w-8 text-center">對方</span>
+      </div>
+      {CHECKUP_ROWS.map((r) => (
+        <div
+          key={r.label}
+          className={`grid grid-cols-[1fr_auto_auto] gap-x-3 items-center px-3 py-1.5 border-t border-petal-rule ${
+            Math.abs(r.a - r.b) >= 2 ? 'bg-amber-50/60' : ''
+          }`}
+        >
+          <span className="font-body text-sm text-petal-ink">{r.label}</span>
+          <span className="w-8 text-center font-display text-base text-petal-ink">{r.a}</span>
+          <span className="w-8 text-center font-display text-base text-petal-rose-deep">{r.b}</span>
+        </div>
+      ))}
+    </div>
+    <p className="font-body text-xs text-petal-ink-soft leading-relaxed">
+      <span className="text-petal-sage-deep font-medium">AI 中立總結：</span>
+      你們在「溝通」上感受一致，是你們的基礎；「親密」的落差比較大，這通常就是最值得一起聊的地方。
+    </p>
+  </SampleCard>
+);
+
 const ConflictFlywheelSample: React.FC = () => (
   <div className="space-y-4">
+    <EmotionAcceptanceSample />
+
     {/* Mini trend analysis */}
     <SampleCard>
       <div className="flex items-center justify-between mb-3">
@@ -263,18 +339,22 @@ const PREVIEWS: Record<string, PreviewConfig> = {
         吵架了？AI 幫你<em className="not-italic font-light italic text-pink-600">先開口</em>
       </>
     ),
-    description: '說不出口的時候，AI 諮商師幫你寫出不傷和氣、保留面子的和解開場白，先跨出第一步。',
+    description:
+      '說不出口的時候，AI 諮商師幫你寫出不傷和氣的和解開場白；也能定期做「婚姻檢查」，各自打分後一起揭曉，AI 當中立第三方幫你們把話攤開來看。',
     sample: (
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between">
-          <span className="font-body text-xs text-petal-muted">AI 和解開場白</span>
-          <SampleTag />
+      <div className="space-y-4">
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="font-body text-xs text-petal-muted">AI 和解開場白</span>
+            <SampleTag />
+          </div>
+          <SampleCard>
+            <p className="font-display italic font-light text-sm text-petal-ink leading-relaxed">
+              「剛剛那樣讓你不舒服，我很抱歉。我其實很在乎你的感受，可以等你願意的時候，我們再好好聊聊嗎？」
+            </p>
+          </SampleCard>
         </div>
-        <SampleCard>
-          <p className="font-display italic font-light text-sm text-petal-ink leading-relaxed">
-            「剛剛那樣讓你不舒服，我很抱歉。我其實很在乎你的感受，可以等你願意的時候，我們再好好聊聊嗎？」
-          </p>
-        </SampleCard>
+        <MarriageCheckupSample />
       </div>
     ),
   },
@@ -287,7 +367,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       </>
     ),
     description:
-      '這是 Twogether 的核心。記錄衝突、看見走勢、學會怎麼說，真的卡住了，就請 AI 諮商師陪你們聊，或預約真人諮商師。',
+      '這是 Twogether 的核心。先讓情緒被接住——一方寫下感受，AI 幫你說得不傷人，另一方收到後 AI 也教他怎麼接住你。被接住了，再一起看走勢、學會怎麼說，真的卡住就請 AI 或真人諮商師陪你們。',
     sample: <ConflictFlywheelSample />,
   },
   wall: {

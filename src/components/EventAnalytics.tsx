@@ -10,8 +10,10 @@ import {
   CartesianGrid,
   ResponsiveContainer,
 } from 'recharts';
-import { BarChart3, TrendingUp, CheckCircle2, Clock3 } from 'lucide-react';
+import { BarChart3, TrendingUp, CheckCircle2, Clock3, HandHeart, X } from 'lucide-react';
 import apiService, { type EventAnalyticsData } from '../services/api';
+import { getEmotionAcceptance } from '../data/emotionAcceptance';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 const PETAL_LINE = '#b86b6b';
 const PETAL_BAR = '#7a8d6f';
@@ -21,6 +23,8 @@ export default function EventAnalytics() {
   const [data, setData] = useState<EventAnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Which emotion's "如何接住" hint panel is open (null = closed).
+  const [openEmotion, setOpenEmotion] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -46,7 +50,12 @@ export default function EventAnalytics() {
   if (!data) return null;
 
   const hasAnyData =
-    data.counts.last30 > 0 || data.tagDistribution.length > 0 || data.dailyTrend.some((d) => d.count > 0);
+    data.counts.last30 > 0 ||
+    data.tagDistribution.length > 0 ||
+    data.emotionDistribution.length > 0 ||
+    data.dailyTrend.some((d) => d.count > 0);
+
+  const topEmotions = data.emotionDistribution.slice(0, 8);
 
   return (
     <div className="space-y-5">
@@ -91,6 +100,32 @@ export default function EventAnalytics() {
             </ResponsiveContainer>
           </ChartCard>
 
+          {topEmotions.length > 0 && (
+            <div className="bg-petal-cream border border-petal-rule rounded-2xl p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <HandHeart className="w-4 h-4 text-petal-rose-deep" />
+                <h3 className="text-sm text-petal-ink">你最常出現的情緒</h3>
+              </div>
+              <p className="text-xs text-petal-ink-soft mb-3">
+                點一個情緒，看看下次可以怎麼接住它——先被接住，溝通才開始。
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {topEmotions.map((e) => (
+                  <button
+                    key={e.emotion}
+                    type="button"
+                    data-testid={`analytics-emotion-${e.emotion}`}
+                    onClick={() => setOpenEmotion(e.emotion)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-petal-rose/40 bg-white text-petal-ink text-sm hover:border-petal-rose hover:bg-petal-rose/10 transition-colors"
+                  >
+                    <span>{e.emotion}</span>
+                    <span className="text-xs text-petal-rose-deep">{e.count}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {data.hotspotHours.length > 0 && (
             <ChartCard title="容易起衝突的時間">
               <ResponsiveContainer width="100%" height={180}>
@@ -110,6 +145,70 @@ export default function EventAnalytics() {
           )}
         </>
       )}
+
+      {openEmotion && (
+        <EmotionAcceptancePanel emotion={openEmotion} onClose={() => setOpenEmotion(null)} />
+      )}
+    </div>
+  );
+}
+
+function EmotionAcceptancePanel({ emotion, onClose }: { emotion: string; onClose: () => void }) {
+  useScrollLock(true);
+  const guide = getEmotionAcceptance(emotion);
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      data-testid="analytics-emotion-modal"
+    >
+      <div className="bg-petal-cream rounded-2xl max-w-md w-full max-h-[min(85vh,calc(100dvh-80px))] overflow-y-auto overscroll-contain p-4 sm:p-5">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <HandHeart className="w-5 h-5 text-petal-rose-deep" />
+            <div>
+              <h3 className="text-lg font-serif text-petal-ink">怎麼接住「{emotion}」</h3>
+              <p className="text-xs text-petal-ink-soft mt-1">先接住，再溝通。</p>
+            </div>
+          </div>
+          <button type="button" onClick={onClose} className="text-petal-ink-soft hover:text-petal-ink" aria-label="關閉">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <div className="text-xs font-medium text-petal-rose-deep mb-1">這份情緒在說什麼</div>
+            <p className="text-sm text-petal-ink leading-relaxed">{guide.meaning}</p>
+          </div>
+          <div>
+            <div className="text-xs font-medium text-petal-rose-deep mb-1">你可以怎麼接住</div>
+            <p className="text-sm text-petal-ink leading-relaxed">{guide.howToReceive}</p>
+          </div>
+          <div>
+            <div className="text-xs font-medium text-petal-rose-deep mb-1">可以這樣說</div>
+            <div className="space-y-2">
+              {guide.sampleLines.map((line, i) => (
+                <p
+                  key={i}
+                  className="text-sm text-petal-ink bg-white border border-petal-rule rounded-xl px-3 py-2 leading-relaxed"
+                >
+                  {line}
+                </p>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end mt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-sm px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20"
+          >
+            知道了
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

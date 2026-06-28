@@ -786,10 +786,280 @@ async function generateReconciliationOpeners({ intensity, eventContext }) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Emotion acceptance ("接住情緒")
+// ---------------------------------------------------------------------------
+// The repair starts only once a feeling is *received* — not solved. The partner
+// who opened the event has already had their raw feeling softened by the
+// icebreaker; this helper coaches the *receiver*. Given the event summary and
+// recent thread, it returns a short empathy note (help the receiver SEE the
+// feeling) plus three ready-to-send "I receive you" responses that validate the
+// emotion without explaining, debating, or self-erasing apology.
+
+const EMOTION_ACCEPTANCE_SYSTEM_PROMPT = `你是一位溫柔、專業的伴侶情緒教練。情境：一方（[對方]）剛剛表達了情緒，正在寫回覆的人（[你]）想學會先「接住」這份情緒——讓對方覺得被看見、被肯定，而不是急著解釋、講道理、辯駁或自責到失去自己。請永遠以繁體中文回覆。
+
+核心理念：當一個人的情緒沒有被接納，會覺得自己被否定；反覆發生就築起心牆。被同理、被接納的那一刻，療癒才開始，真正的溝通才打開。所以這個任務「不是要解決問題」，是要先把情緒接住。
+
+任務：閱讀事件背景與最近對話，產出：
+1. empathy：一句話，幫 [你] 先看見 [對方] 此刻可能的情緒、以及這份情緒為什麼重要（像一位教練在你耳邊提醒，不是要傳出去的話）。
+2. acceptances：三句 [你] 可以直接傳給 [對方] 的「接住式」回應，語氣略有不同（例如：單純承接情緒／溫柔安撫／表達我和你同在）。每句都要：
+   - 肯定、承接對方的情緒（讓對方覺得「你有看見我」）。
+   - 不辯解、不講道理、不急著解決、不否定對方的感受。
+   - 不逼自己認錯到失去立場、也不卑微討好；是「我接住你的感受」，不是「都是我的錯」。
+   - 簡短、口語、像真的會傳出去的訊息（1～2 句）。
+3. toxicityFlags：偵測到的問題語言（同其他任務的清單，通常為空）。
+
+身分守則：[你] = 正在寫回覆、要去接住情緒的人；[對方] = 表達了情緒的伴侶。不要把 [對方] 的經驗說成 [你] 的經驗；可以同理地 acknowledge 那是 [對方] 的感受。只使用繁體中文。
+
+回應請只呼叫 emit_emotion_acceptance tool，不要輸出其他文字。`;
+
+const EMOTION_ACCEPTANCE_TOOL_SCHEMA = {
+  name: 'emit_emotion_acceptance',
+  description: "Return a short empathy note plus three ready-to-send responses that receive/validate the partner's emotion.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      empathy: {
+        type: 'string',
+        description: '一句話，幫接收方先看見對方此刻的情緒與它為何重要（給接收方看的提醒，不是要傳出去的話）',
+      },
+      acceptances: {
+        type: 'array',
+        minItems: 3,
+        maxItems: 3,
+        items: {
+          type: 'object',
+          properties: {
+            label: { type: 'string', description: '一個 4～8 字的短標題，例如「單純承接」「溫柔安撫」「表達同在」' },
+            text: { type: 'string', description: '可直接傳給對方的接住式回應，1～2 句' },
+          },
+          required: ['label', 'text'],
+        },
+      },
+      toxicityFlags: {
+        type: 'array',
+        items: { type: 'string' },
+      },
+    },
+    required: ['empathy', 'acceptances', 'toxicityFlags'],
+  },
+};
+
+async function generateEmotionAcceptance({ eventSummary, recentMessages, createdBySelf }) {
+  const summaryOwner = createdBySelf ? '你' : '對方';
+  const contextLines = [
+    '角色說明：',
+    '- [你] = 正在寫回覆、想要接住情緒的人',
+    '- [對方] = 表達了情緒的伴侶',
+    '',
+  ];
+  if (eventSummary && typeof eventSummary === 'string') {
+    contextLines.push(
+      `事件背景摘要（由 [${summaryOwner}] 開啟；以下文中的「我」= [${summaryOwner}]）：`,
+      eventSummary.trim(),
+      ''
+    );
+  }
+  if (Array.isArray(recentMessages) && recentMessages.length > 0) {
+    contextLines.push('最近對話（最舊在前，每行已標註發話者）：');
+    for (const m of recentMessages) {
+      const tag = m.fromSelf ? '[你]' : '[對方]';
+      contextLines.push(`${tag}：${(m.content || '').trim()}`);
+    }
+    contextLines.push('');
+  }
+  contextLines.push('請幫 [你] 先接住 [對方] 的情緒。');
+  const userContent = contextLines.join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system: [
+      {
+        type: 'text',
+        text: EMOTION_ACCEPTANCE_SYSTEM_PROMPT,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [EMOTION_ACCEPTANCE_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_emotion_acceptance' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.emotion_acceptance', {
+    model: response.model || MODEL,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_emotion_acceptance'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input;
+
+  return {
+    empathy: out.empathy || '',
+    acceptances: Array.isArray(out.acceptances) ? out.acceptances : [],
+    toxicityFlags: out.toxicityFlags || [],
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+      assembledPrompt: userContent,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Marriage check-up summary ("婚姻檢查" neutral third party)
+// ---------------------------------------------------------------------------
+// Both partners independently rated a few relationship dimensions (1–5) with
+// optional notes, said thank-you for things the other does, and named one thing
+// to work on. Acting as a warm, neutral couples' counselor, read BOTH sets of
+// answers and produce a short, even-handed summary plus a few concrete talking
+// points for them to discuss together.
+
+const CHECKUP_SYSTEM_PROMPT = `你是一位溫柔、中立、專業的伴侶諮商師，正在主持一對伴侶的「婚姻檢查」。雙方各自誠實地為幾個關係面向打了分數（1～5）並留下想法，也寫下想感謝對方的事，和最想一起改善的一件事。請永遠以繁體中文回覆。
+
+你的任務：扮演「公正的第三方」，讀完雙方的答案後，幫他們把事情有系統地攤開來看清楚，產出：
+1. summary：2～4 句中立、溫暖的總結。先肯定雙方願意誠實面對，點出你看見的「共同優點／共識」，再溫和地指出「最需要一起關注的落差」。不偏袒任何一方、不評斷對錯。
+2. points：3 個具體、好開口的對話方向（每個 1～2 句，像是可以直接坐下來聊的問題或提議）。聚焦在彼此理解與正向解決，而不是翻舊帳或追究誰的錯。
+3. toxicityFlags：若答案中有明顯攻擊／貶低性語言才標記，通常為空。
+
+重要守則：
+- 緊扣雙方實際寫下的內容，不要編造他們沒提到的事。
+- 特別留意「感謝對方」的部分，幫他們看見彼此的付出。
+- 如果某個面向雙方分數落差很大，那通常就是最值得談的地方。
+- 溫暖但不說教，不要長篇大論。只使用繁體中文。
+
+回應請只呼叫 emit_checkup_summary tool，不要輸出其他文字。`;
+
+const CHECKUP_TOOL_SCHEMA = {
+  name: 'emit_checkup_summary',
+  description: 'Return a neutral summary and three concrete talking points for a couple after a marriage check-up.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      summary: { type: 'string', description: '2～4 句中立、溫暖的總結' },
+      points: {
+        type: 'array',
+        minItems: 3,
+        maxItems: 3,
+        items: { type: 'string', description: '一個具體、好開口的對話方向，1～2 句' },
+      },
+      toxicityFlags: { type: 'array', items: { type: 'string' } },
+    },
+    required: ['summary', 'points', 'toxicityFlags'],
+  },
+};
+
+function formatCheckupSide(name, answers, dimensions) {
+  const lines = [`【${name} 的答案】`];
+  const scores = (answers && answers.scores) || {};
+  const notes = (answers && answers.notes) || {};
+  for (const d of dimensions) {
+    const score = scores[d.id];
+    const note = (notes[d.id] || '').toString().trim();
+    lines.push(`- ${d.label}：${score != null ? `${score}/5` : '未填'}${note ? `（${note}）` : ''}`);
+  }
+  const gratitude = (answers && answers.gratitude ? answers.gratitude : '').toString().trim();
+  const attention = (answers && answers.attention ? answers.attention : '').toString().trim();
+  lines.push(`- 想感謝對方：${gratitude || '（未填）'}`);
+  lines.push(`- 最想一起改善：${attention || '（未填）'}`);
+  return lines.join('\n');
+}
+
+async function generateCheckupSummary({ dimensions, responseA, responseB }) {
+  if (!Array.isArray(dimensions) || dimensions.length === 0) {
+    throw new Error('dimensions is required');
+  }
+  const userContent = [
+    formatCheckupSide(responseA?.name || '伴侶 A', responseA?.answers, dimensions),
+    '',
+    formatCheckupSide(responseB?.name || '伴侶 B', responseB?.answers, dimensions),
+  ].join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system: [
+      {
+        type: 'text',
+        text: CHECKUP_SYSTEM_PROMPT,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [CHECKUP_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_checkup_summary' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.marriage_checkup', {
+    model: response.model || MODEL,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_checkup_summary'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input;
+
+  return {
+    summary: out.summary || '',
+    points: Array.isArray(out.points) ? out.points : [],
+    toxicityFlags: out.toxicityFlags || [],
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+      assembledPrompt: userContent,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
   generateRoleplayMessages,
   generateWallCounselorComment,
   generateReconciliationOpeners,
+  generateEmotionAcceptance,
+  generateCheckupSummary,
 };

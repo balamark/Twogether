@@ -345,6 +345,7 @@ router.get('/analytics', async (req, res) => {
           resolution_rate: 0,
           avg_resolution_hours: null,
           tag_distribution: [],
+          emotion_distribution: [],
           daily_trend: [],
           hotspot_hours: [],
         },
@@ -381,6 +382,16 @@ router.get('/analytics', async (req, res) => {
       [coupleId]
     );
 
+    // Which emotions show up most across this couple's events — so the user can
+    // recognise their recurring feelings and learn how to "接住" each one.
+    const emotionResult = await db.query(
+      `SELECT emotion, COUNT(*)::int AS count
+       FROM (SELECT UNNEST(emotions) AS emotion FROM events WHERE couple_id = $1) e
+       GROUP BY emotion
+       ORDER BY count DESC`,
+      [coupleId]
+    );
+
     const dailyResult = await db.query(
       `SELECT TO_CHAR(d::date, 'YYYY-MM-DD') AS date,
               COALESCE(cnt, 0)::int AS count
@@ -409,6 +420,7 @@ router.get('/analytics', async (req, res) => {
         resolution_rate: total30 > 0 ? Math.round((resolved30 / total30) * 100) : 0,
         avg_resolution_hours: avgHours != null ? Number(Number(avgHours).toFixed(1)) : null,
         tag_distribution: tagResult.rows,
+        emotion_distribution: emotionResult.rows,
         daily_trend: dailyResult.rows,
         hotspot_hours: hotspotResult.rows,
       },
@@ -631,6 +643,75 @@ router.post(
     } catch (err) {
       logError('Reply rewrite preview failed', { err: err.message, stack: err.stack });
       res.status(500).json({ success: false, message: 'AI 改寫失敗，請稍後再試' });
+    }
+  }
+);
+
+// Preview-only AI "接住情緒" coaching for the receiver. Stateless — no DB write.
+// Loads the event summary + recent messages so the LLM can coach the user on how
+// to RECEIVE their partner's emotion (validate first, not solve). Mirrors the
+// reply-rewrite route and shares the same daily AI budget.
+router.post(
+  '/:id/messages/preview-acceptance',
+  [param('id').isUUID()],
+  async (req, res) => {
+    if (sendValidationError(req, res)) return;
+    try {
+      const access = await assertEventAccess(req.params.id, req.user.id);
+      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (access.event.is_private) {
+        return res.status(403).json({ success: false, message: '私人事件不支援 AI 接住情緒建議' });
+      }
+
+      const userId = req.user.id;
+      logInfo('events.emotion_acceptance.input', { userId, eventId: req.params.id });
+
+      // Shares the daily AI budget with the icebreaker (both hit the paid LLM).
+      const { tier, limit } = await resolveAiLimit(userId);
+      const usedToday = await countTodayAiUsage(userId);
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      if (!limitCheck.ok) {
+        logInfo('events.emotion_acceptance.limit', { userId, used: usedToday, limit, tier, blocked: true });
+        return res.status(limitCheck.status).json(limitCheck.body);
+      }
+
+      const recent = await db.query(
+        `SELECT sender_id, content
+           FROM event_messages
+          WHERE event_id = $1
+          ORDER BY created_at DESC
+          LIMIT 10`,
+        [req.params.id]
+      );
+      const recentMessages = recent.rows.reverse().map((m) => ({
+        fromSelf: m.sender_id === userId,
+        content: m.content,
+      }));
+
+      const createdBySelf = access.event.created_by === userId;
+
+      const preview = await llmService.generateEmotionAcceptance({
+        eventSummary: access.event.summary,
+        recentMessages,
+        createdBySelf,
+      });
+      const meta = preview._meta;
+      delete preview._meta;
+
+      logInfo('events.emotion_acceptance.cost', {
+        userId,
+        provider: meta?.provider,
+        model: meta?.model,
+        costUsd: meta?.costUsd,
+        durationMs: meta?.durationMs,
+        createdBySelf,
+      });
+
+      await recordAiUsage(userId, 'emotion_acceptance', access.event.summary, meta);
+      res.json({ success: true, preview });
+    } catch (err) {
+      logError('Emotion acceptance preview failed', { err: err.message, stack: err.stack });
+      res.status(500).json({ success: false, message: 'AI 接住情緒建議暫時無法產生，請稍後再試' });
     }
   }
 );

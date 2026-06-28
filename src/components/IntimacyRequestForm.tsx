@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Heart, Clock, Send, Sparkles, X, RefreshCw, Wand2, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Heart, Clock, Send, Sparkles, X, RefreshCw, Wand2, ThumbsUp, ThumbsDown, Check } from 'lucide-react';
 import { apiService } from '../services/api';
 import type {
   IntimacyTemplate,
@@ -8,6 +8,7 @@ import type {
   ReconciliationIntensity,
   ReconciliationOpener,
 } from '../services/api';
+import { conflictPhraseTiers } from '../data/conflictSteps';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime, localInputToIsoInTz } from '../utils/datetime';
@@ -35,7 +36,7 @@ interface IntimacyRequestFormProps {
   scripts?: FormScript[];
 }
 
-type Step = 'category' | 'script' | 'aimsg' | 'reconcile' | 'template' | 'customize' | 'confirm';
+type Step = 'category' | 'script' | 'aimsg' | 'reconcile' | 'guidance' | 'template' | 'customize' | 'confirm';
 
 // Reconciliation intensity levels (low → high). The goal is a neutral, face-
 // saving opener for someone who can't yet bring themselves to apologize.
@@ -105,11 +106,16 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
   const [reconcileOpeners, setReconcileOpeners] = useState<ReconciliationOpener[]>([]);
   const [reconcileLoading, setReconcileLoading] = useState(false);
 
+  // Guidance branch state — set of selected phrase keys (`${tier.key}-${i}`)
+  // from the 8-step "當我情緒上來時，你可以這樣接住我" guide.
+  const [guidanceSelected, setGuidanceSelected] = useState<Set<string>>(new Set());
+
   const tz = useTimezone();
 
   const categories = [
     { id: 'compliment', name: '甜蜜讚美', emoji: '💕', description: '發送溫馨的讚美和愛意給伴侶' },
     { id: 'reconciliation', name: '真心和解', emoji: '🤝', description: '冷戰／吵架後，AI 幫你想一句中性、給台階的破冰開場白' },
+    { id: 'guidance', name: '情緒指引', emoji: '🧭', description: '把「當我情緒上來時，你可以這樣接住我」的指引挑幾句傳給對方' },
     { id: 'roleplay', name: '角色扮演', emoji: '🎭', description: '選擇你們的劇本，AI 幫你想 5 句入戲開場邀請' },
     { id: 'custom', name: '自訂訊息', emoji: '✨', description: '完全客製化你的親密邀請' },
   ];
@@ -118,10 +124,14 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
 
   const isReconciliation = selectedCategory === 'reconciliation';
 
+  const isGuidance = selectedCategory === 'guidance';
+
   const flowSteps: Step[] = isRoleplay
     ? ['category', 'script', 'aimsg', 'customize', 'confirm']
     : isReconciliation
     ? ['category', 'reconcile', 'customize', 'confirm']
+    : isGuidance
+    ? ['category', 'guidance', 'customize', 'confirm']
     : selectedCategory === 'custom'
     ? ['category', 'customize', 'confirm']
     : ['category', 'template', 'customize', 'confirm'];
@@ -238,9 +248,35 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
       setCurrentStep('script');
     } else if (categoryId === 'reconciliation') {
       setCurrentStep('reconcile');
+    } else if (categoryId === 'guidance') {
+      setGuidanceSelected(new Set());
+      setCurrentStep('guidance');
     } else {
       setCurrentStep('template');
     }
+  };
+
+  const toggleGuidancePhrase = function (phraseKey: string) {
+    setGuidanceSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(phraseKey)) next.delete(phraseKey);
+      else next.add(phraseKey);
+      return next;
+    });
+  };
+
+  // Compose the selected guide phrases into one message, in the guide's
+  // canonical order (not click order), then continue to the customize step.
+  const handleGuidanceContinue = function () {
+    const lines: string[] = [];
+    for (const tier of conflictPhraseTiers) {
+      tier.phrases.forEach((phrase, i) => {
+        if (guidanceSelected.has(`${tier.key}-${i}`)) lines.push(`・${phrase}`);
+      });
+    }
+    if (lines.length === 0) return;
+    setCustomMessage(`想讓你知道，當我情緒上來時，你可以這樣接住我：\n\n${lines.join('\n')}`);
+    setCurrentStep('customize');
   };
 
   const handleTemplateSelect = function (template: IntimacyTemplate) {
@@ -368,6 +404,8 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
             ? 'compliment'
             : selectedCategory === 'reconciliation'
             ? 'reconciliation'
+            : selectedCategory === 'guidance'
+            ? 'guidance'
             : requestType,
         roleplayCategory: isRoleplay ? selectedScript?.category : undefined,
         scheduledTime:
@@ -408,6 +446,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
     setReconcileIntensity(null);
     setReconcileOpeners([]);
     setReconcileLoading(false);
+    setGuidanceSelected(new Set());
   };
 
   const handleClose = function () {
@@ -420,6 +459,8 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
     ? 'aimsg'
     : isReconciliation
     ? 'reconcile'
+    : isGuidance
+    ? 'guidance'
     : selectedCategory === 'custom'
     ? 'category'
     : 'template';
@@ -884,6 +925,75 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                   <Wand2 className="w-5 h-5" /> 讓 AI 想開場白
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Step 2 (guidance): pick steps/phrases from the 8-step guide */}
+          {currentStep === 'guidance' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-lg font-medium text-gray-900">情緒指引</h4>
+                <button onClick={() => setCurrentStep('category')} className="text-sm text-pink-600 hover:text-pink-700">
+                  返回選擇類型
+                </button>
+              </div>
+              <p className="text-sm text-gray-600">
+                這不是要對方道歉或認錯，而是讓 TA 知道：當你情緒上來時，怎麼做能讓你比較好受。挑幾句你最想說的，傳給對方。
+              </p>
+
+              <div className="space-y-4">
+                {conflictPhraseTiers.map((tier) => (
+                  <div key={tier.key} className={`rounded-lg border p-4 ${tier.cardClass}`}>
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 mb-2">
+                      <span
+                        className={`inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide ${tier.badgeClass} px-2 py-0.5 rounded`}
+                      >
+                        <span aria-hidden>{tier.dot}</span>
+                        {tier.badge}
+                      </span>
+                      <span className="text-sm font-medium text-gray-800">{tier.title}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {tier.phrases.map((phrase, i) => {
+                        const phraseKey = `${tier.key}-${i}`;
+                        const checked = guidanceSelected.has(phraseKey);
+                        return (
+                          <button
+                            key={phraseKey}
+                            type="button"
+                            data-testid={`guidance-phrase-${phraseKey}`}
+                            onClick={() => toggleGuidancePhrase(phraseKey)}
+                            className={`w-full text-left flex items-start gap-2 rounded-md border p-2.5 transition-colors ${
+                              checked
+                                ? 'border-pink-400 bg-pink-50'
+                                : 'border-white bg-white/70 hover:border-pink-200'
+                            }`}
+                          >
+                            <span
+                              className={`mt-0.5 flex-shrink-0 w-4 h-4 rounded border flex items-center justify-center ${
+                                checked ? 'bg-pink-500 border-pink-500 text-white' : 'border-gray-300 bg-white'
+                              }`}
+                            >
+                              {checked && <Check className="w-3 h-3" strokeWidth={3} />}
+                            </span>
+                            <span className="text-sm text-gray-800 leading-relaxed">{phrase}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button
+                data-testid="guidance-continue"
+                onClick={handleGuidanceContinue}
+                disabled={guidanceSelected.size === 0}
+                className="w-full px-6 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              >
+                <Send className="w-5 h-5" />
+                已選 {guidanceSelected.size} 句，繼續
+              </button>
             </div>
           )}
 

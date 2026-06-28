@@ -1959,6 +1959,7 @@ const LoveTimeApp = () => {
         <ConflictView
           showNotification={showNotification}
           partnerConnected={partnerConnected}
+          onNavigate={setCurrentView}
         />
       );
       case 'events': return (

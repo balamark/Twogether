@@ -9,6 +9,7 @@ import {
   Lock,
   Sparkles,
   HeartHandshake,
+  HandHeart,
   Globe,
   RotateCcw,
   X,
@@ -17,6 +18,7 @@ import apiService, {
   type EventRecord,
   type EventStatus,
   type ReplyRewritePreview,
+  type EmotionAcceptancePreview,
   type EventVersionKey,
 } from '../services/api';
 import ReplyStepBar from './ReplyStepBar';
@@ -77,6 +79,8 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
   const [resolving, setResolving] = useState(false);
   const [rewriting, setRewriting] = useState(false);
   const [rewritePreview, setRewritePreview] = useState<ReplyRewritePreview | null>(null);
+  const [accepting, setAccepting] = useState(false);
+  const [acceptancePreview, setAcceptancePreview] = useState<EmotionAcceptancePreview | null>(null);
   const [aiInviting, setAiInviting] = useState(false);
   const [aiPosting, setAiPosting] = useState(false);
   const [aiPreview, setAiPreview] = useState<string | null>(null);
@@ -110,6 +114,38 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
     if (!rewritePreview) return;
     setReply(rewritePreview.versions[key]);
     setRewritePreview(null);
+  };
+
+  const requestAcceptance = async () => {
+    setAccepting(true);
+    try {
+      const preview = await apiService.previewEmotionAcceptance(eventId);
+      setAcceptancePreview(preview);
+    } catch (err) {
+      // A reached daily quota is an expected state (the global paywall already
+      // surfaces it) — show it as a gentle warning, not a red failure.
+      const code = (err as { error_code?: string })?.error_code;
+      if (code === 'AI_DAILY_LIMIT_REACHED') {
+        showNotification({
+          type: 'warning',
+          title: '今日 AI 次數已用完',
+          message: '今天的 AI 接住建議次數已達上限，升級 Premium 可提高每日上限，或先用下方的步驟提示自己回應。',
+        });
+      } else {
+        showNotification({
+          type: 'error',
+          title: 'AI 接住建議失敗',
+          message: err instanceof Error ? err.message : '請稍後再試',
+        });
+      }
+    } finally {
+      setAccepting(false);
+    }
+  };
+
+  const insertAcceptance = (text: string) => {
+    insertPhrase(text);
+    setAcceptancePreview(null);
   };
 
   const refresh = async () => {
@@ -425,6 +461,17 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
             </button>
             <button
               type="button"
+              data-testid="event-acceptance-button"
+              onClick={requestAcceptance}
+              disabled={accepting}
+              className="px-3 py-2 rounded-full border border-petal-rose text-petal-ink inline-flex items-center gap-2 disabled:opacity-50 hover:bg-petal-rose/15"
+              title="先別急著解決——讓 AI 教你怎麼接住TA的情緒"
+            >
+              {accepting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HandHeart className="w-4 h-4" />}
+              <span>如何接住TA的情緒</span>
+            </button>
+            <button
+              type="button"
               data-testid="event-reply-rewrite-button"
               onClick={requestRewrite}
               disabled={rewriting || reply.trim().length === 0}
@@ -453,6 +500,14 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
           preview={rewritePreview}
           onApply={applyRewriteVersion}
           onCancel={() => setRewritePreview(null)}
+        />
+      )}
+
+      {acceptancePreview && (
+        <AcceptancePicker
+          preview={acceptancePreview}
+          onInsert={insertAcceptance}
+          onCancel={() => setAcceptancePreview(null)}
         />
       )}
 
@@ -659,6 +714,78 @@ function ShareWarning({
           >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
             確定公開
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AcceptancePicker({
+  preview,
+  onInsert,
+  onCancel,
+}: {
+  preview: EmotionAcceptancePreview;
+  onInsert: (text: string) => void;
+  onCancel: () => void;
+}) {
+  useScrollLock(true);
+  return (
+    <div
+      className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+      data-testid="event-acceptance-modal"
+    >
+      <div className="bg-petal-cream rounded-2xl max-w-lg w-full max-h-[min(85vh,calc(100dvh-80px))] overflow-y-auto overscroll-contain p-4 sm:p-5">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <HandHeart className="w-5 h-5 text-petal-rose-deep" />
+            <div>
+              <h3 className="text-lg font-serif text-petal-ink">先接住TA的情緒</h3>
+              <p className="text-xs text-petal-ink-soft mt-1">真正的修復，從情緒被接住開始——先別急著解釋或解決。</p>
+            </div>
+          </div>
+          <button type="button" onClick={onCancel} className="text-petal-ink-soft hover:text-petal-ink" aria-label="取消">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {preview.empathy && (
+          <div className="bg-petal-rose/10 border border-petal-rose/30 rounded-xl p-3 mb-4">
+            <p className="text-sm text-petal-ink leading-relaxed">{preview.empathy}</p>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          {preview.acceptances.map((a, i) => (
+            <div
+              key={`${a.label}-${i}`}
+              className="bg-white border border-petal-rule rounded-xl p-3"
+              data-testid={`event-acceptance-card-${i}`}
+            >
+              {a.label && <div className="text-xs text-petal-rose-deep mb-1">{a.label}</div>}
+              <p className="text-sm text-petal-ink whitespace-pre-wrap mb-2">{a.text}</p>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  data-testid={`event-acceptance-insert-${i}`}
+                  onClick={() => onInsert(a.text)}
+                  className="text-sm px-3 py-1.5 rounded-full bg-petal-ink text-petal-cream hover:opacity-90"
+                >
+                  放進回覆
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex justify-end mt-4">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-sm px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20"
+          >
+            先不用
           </button>
         </div>
       </div>

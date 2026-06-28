@@ -310,6 +310,20 @@ export interface ReplyRewritePreview {
   toxicityFlags: string[];
 }
 
+// One ready-to-send "接住情緒" (receive/validate the partner's emotion) response.
+export interface EmotionAcceptance {
+  label: string;
+  text: string;
+}
+
+// AI coaching for the receiver: a short empathy note (help them SEE the feeling)
+// plus three validating responses they can send.
+export interface EmotionAcceptancePreview {
+  empathy: string;
+  acceptances: EmotionAcceptance[];
+  toxicityFlags: string[];
+}
+
 export interface EventMessage {
   id: string;
   eventId: string;
@@ -318,6 +332,36 @@ export interface EventMessage {
   isAi: boolean;
   createdAt: string;
   readAt: string | null;
+}
+
+// 婚姻檢查 (Marriage Check-up)
+export interface MarriageCheckupAnswers {
+  scores: Record<string, number>;
+  notes: Record<string, string>;
+  gratitude: string;
+  attention: string;
+}
+
+export interface MarriageCheckup {
+  id: string;
+  status: 'collecting' | 'revealed';
+  createdBy: string;
+  createdAt: string;
+  revealedAt: string | null;
+  mySubmitted: boolean;
+  partnerSubmitted: boolean;
+  myAnswers: MarriageCheckupAnswers | null;
+  partnerAnswers: MarriageCheckupAnswers | null;
+  aiSummary: string;
+  aiPoints: string[];
+}
+
+export interface MarriageCheckupHistoryItem {
+  id: string;
+  status: string;
+  createdAt: string;
+  revealedAt: string | null;
+  aiSummary: string;
 }
 
 export interface EventRecord {
@@ -368,6 +412,7 @@ export interface EventAnalyticsData {
   resolutionRate: number;
   avgResolutionHours: number | null;
   tagDistribution: { tag: string; count: number }[];
+  emotionDistribution: { emotion: string; count: number }[];
   dailyTrend: { date: string; count: number }[];
   hotspotHours: { hour: number; count: number }[];
 }
@@ -1687,13 +1732,12 @@ class ApiService {
   // Intimacy Requests
   async createIntimacyRequest(request: CreateIntimacyRequestRequest): Promise<IntimacyRequest> {
     try {
-      // Map request types to server-accepted values
+      // Map request types to server-accepted values. A few categories carry a
+      // distinct meaning end-to-end (compliment / reconciliation / guidance);
+      // everything else (incl. scheduled) is stored as a generic intimate request.
       let requestType = request.requestType;
-      if (requestType === 'scheduled') {
-        requestType = 'intimate'; // scheduled requests are intimate requests with a time
-      }
-      if (requestType !== 'compliment') {
-        requestType = 'intimate'; // default to intimate for non-compliment requests
+      if (!['compliment', 'reconciliation', 'guidance'].includes(requestType)) {
+        requestType = 'intimate';
       }
 
       const response = await apiClient.post('/intimacy-requests', {
@@ -2768,6 +2812,27 @@ class ApiService {
     }
   }
 
+  // Preview AI "接住情緒" coaching for the receiver — an empathy note plus three
+  // validating responses. Not persisted; the user picks one to insert/send.
+  async previewEmotionAcceptance(eventId: string): Promise<EmotionAcceptancePreview> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/messages/preview-acceptance`);
+      const p = response.data.preview ?? {};
+      return {
+        empathy: p.empathy || '',
+        acceptances: Array.isArray(p.acceptances)
+          ? p.acceptances
+              .filter((a: unknown): a is EmotionAcceptance => !!a && typeof (a as EmotionAcceptance).text === 'string')
+              .map((a: EmotionAcceptance) => ({ label: a.label || '', text: a.text }))
+          : [],
+        toxicityFlags: Array.isArray(p.toxicityFlags) ? p.toxicityFlags : [],
+      };
+    } catch (error: unknown) {
+      console.error('Failed to preview emotion acceptance:', error);
+      this.throwApiError(error, 'AI 接住情緒建議暫時無法產生，請稍後再試');
+    }
+  }
+
   // Preview an AI 諮商師 comment for an event (not persisted until posted).
   async previewEventAiComment(eventId: string): Promise<string> {
     try {
@@ -2842,12 +2907,68 @@ class ApiService {
         resolutionRate: Number(a.resolution_rate) || 0,
         avgResolutionHours: a.avg_resolution_hours == null ? null : Number(a.avg_resolution_hours),
         tagDistribution: Array.isArray(a.tag_distribution) ? a.tag_distribution : [],
+        emotionDistribution: Array.isArray(a.emotion_distribution) ? a.emotion_distribution : [],
         dailyTrend: Array.isArray(a.daily_trend) ? a.daily_trend : [],
         hotspotHours: Array.isArray(a.hotspot_hours) ? a.hotspot_hours : [],
       };
     } catch (error: unknown) {
       console.error('Failed to fetch event analytics:', error);
       this.throwApiError(error, '無法取得分析資料');
+    }
+  }
+
+  // ----- 婚姻檢查 (Marriage Check-up) -----
+
+  async getMarriageCheckup(): Promise<MarriageCheckup | null> {
+    try {
+      const response = await apiClient.get('/marriage-checkups');
+      return (response.data.checkup as MarriageCheckup) ?? null;
+    } catch (error: unknown) {
+      console.error('Failed to load marriage checkup:', error);
+      this.throwApiError(error, '無法載入婚姻檢查，請稍後再試');
+    }
+  }
+
+  async startMarriageCheckup(): Promise<MarriageCheckup> {
+    try {
+      const response = await apiClient.post('/marriage-checkups');
+      return response.data.checkup as MarriageCheckup;
+    } catch (error: unknown) {
+      console.error('Failed to start marriage checkup:', error);
+      this.throwApiError(error, '無法開始婚姻檢查，請稍後再試');
+    }
+  }
+
+  async submitMarriageCheckupResponse(
+    id: string,
+    answers: MarriageCheckupAnswers,
+  ): Promise<MarriageCheckup> {
+    try {
+      const response = await apiClient.post(`/marriage-checkups/${id}/response`, { answers });
+      return response.data.checkup as MarriageCheckup;
+    } catch (error: unknown) {
+      console.error('Failed to submit marriage checkup response:', error);
+      this.throwApiError(error, '無法送出答案，請稍後再試');
+    }
+  }
+
+  async getMarriageCheckupHistory(): Promise<MarriageCheckupHistoryItem[]> {
+    try {
+      const response = await apiClient.get('/marriage-checkups/history');
+      return Array.isArray(response.data.checkups) ? response.data.checkups : [];
+    } catch (error: unknown) {
+      console.error('Failed to load marriage checkup history:', error);
+      this.throwApiError(error, '無法載入歷史紀錄，請稍後再試');
+    }
+  }
+
+  async getMarriageCheckupById(id: string): Promise<MarriageCheckup> {
+    try {
+      const response = await apiClient.get(`/marriage-checkups/${id}`);
+      return response.data.checkup as MarriageCheckup;
+    } catch (error: unknown) {
+      console.error('Failed to load marriage checkup:', error);
+      this.throwApiError(error, '無法載入婚姻檢查，請稍後再試');
     }
   }
 
