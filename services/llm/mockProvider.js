@@ -310,6 +310,61 @@ async function generateEmotionAcceptance({ eventSummary, recentMessages /* , cre
   };
 }
 
+// Deterministic marriage check-up summary. Finds the dimension with the biggest
+// score gap (the most worth talking about) and builds a neutral summary + three
+// talking points. Same input → same output.
+async function generateCheckupSummary({ dimensions, responseA, responseB }) {
+  if (!Array.isArray(dimensions) || dimensions.length === 0) {
+    throw new Error('dimensions is required');
+  }
+  const startedAt = Date.now();
+  const nameA = (responseA?.name || '一方').toString();
+  const nameB = (responseB?.name || '另一方').toString();
+  const scoresA = (responseA?.answers && responseA.answers.scores) || {};
+  const scoresB = (responseB?.answers && responseB.answers.scores) || {};
+
+  let gapDim = dimensions[0];
+  let maxGap = -1;
+  let bestDim = dimensions[0];
+  let bestSum = -1;
+  for (const d of dimensions) {
+    const a = Number(scoresA[d.id]) || 0;
+    const b = Number(scoresB[d.id]) || 0;
+    const gap = Math.abs(a - b);
+    if (gap > maxGap) {
+      maxGap = gap;
+      gapDim = d;
+    }
+    if (a + b > bestSum) {
+      bestSum = a + b;
+      bestDim = d;
+    }
+  }
+
+  const summary =
+    `謝謝 ${nameA} 和 ${nameB} 都願意誠實面對這段關係。看得出來你們在「${bestDim.label}」上都有不錯的感受，這是你們的基礎；` +
+    `而在「${gapDim.label}」上，兩個人的感受比較不一樣，這通常就是最值得好好聊聊的地方。先彼此理解，再一起想辦法。`;
+  const points = [
+    `聊聊「${gapDim.label}」：各自說說看，這部分對你來說理想的樣子是什麼？`,
+    `把各自寫的「想感謝對方」唸給彼此聽，讓對方知道他的付出被看見了。`,
+    `從「最想一起改善」裡挑一件，約定這段時間先一起試試看怎麼調整。`,
+  ];
+
+  return {
+    summary,
+    points,
+    toxicityFlags: [],
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+      assembledPrompt: `[mock] checkup gapDim=${gapDim.id} bestDim=${bestDim.id}`,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -317,4 +372,5 @@ module.exports = {
   generateWallCounselorComment,
   generateReconciliationOpeners,
   generateEmotionAcceptance,
+  generateCheckupSummary,
 };

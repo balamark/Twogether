@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Check, ChevronDown, ChevronUp, HandHeart, Pause, Plus, Send } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { apiService } from '../services/api';
+import MarriageCheckup from './MarriageCheckup';
 import type { Notification } from '../App';
 
 interface ConflictViewProps {
@@ -334,6 +335,7 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate }: Confli
     { id: 'conflict-pause', label: '正在爭吵中' },
     { id: 'conflict-toolkit', label: '應對工具' },
     { id: 'conflict-article', label: '閱讀' },
+    { id: 'conflict-checkup', label: '婚姻檢查' },
   ];
 
   // Tick timer while on Step 3
@@ -1120,6 +1122,9 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate }: Confli
       </div>
       )}
     </article>
+
+    {/* 婚姻檢查 — periodic structured relationship review */}
+    <MarriageCheckup showNotification={showNotification} partnerConnected={partnerConnected} />
 
     {/* Pause Mode — full-screen guided flow */}
     {pauseStep !== null && (

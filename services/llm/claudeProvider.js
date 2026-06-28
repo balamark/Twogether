@@ -928,6 +928,132 @@ async function generateEmotionAcceptance({ eventSummary, recentMessages, created
   };
 }
 
+// ---------------------------------------------------------------------------
+// Marriage check-up summary ("婚姻檢查" neutral third party)
+// ---------------------------------------------------------------------------
+// Both partners independently rated a few relationship dimensions (1–5) with
+// optional notes, said thank-you for things the other does, and named one thing
+// to work on. Acting as a warm, neutral couples' counselor, read BOTH sets of
+// answers and produce a short, even-handed summary plus a few concrete talking
+// points for them to discuss together.
+
+const CHECKUP_SYSTEM_PROMPT = `你是一位溫柔、中立、專業的伴侶諮商師，正在主持一對伴侶的「婚姻檢查」。雙方各自誠實地為幾個關係面向打了分數（1～5）並留下想法，也寫下想感謝對方的事，和最想一起改善的一件事。請永遠以繁體中文回覆。
+
+你的任務：扮演「公正的第三方」，讀完雙方的答案後，幫他們把事情有系統地攤開來看清楚，產出：
+1. summary：2～4 句中立、溫暖的總結。先肯定雙方願意誠實面對，點出你看見的「共同優點／共識」，再溫和地指出「最需要一起關注的落差」。不偏袒任何一方、不評斷對錯。
+2. points：3 個具體、好開口的對話方向（每個 1～2 句，像是可以直接坐下來聊的問題或提議）。聚焦在彼此理解與正向解決，而不是翻舊帳或追究誰的錯。
+3. toxicityFlags：若答案中有明顯攻擊／貶低性語言才標記，通常為空。
+
+重要守則：
+- 緊扣雙方實際寫下的內容，不要編造他們沒提到的事。
+- 特別留意「感謝對方」的部分，幫他們看見彼此的付出。
+- 如果某個面向雙方分數落差很大，那通常就是最值得談的地方。
+- 溫暖但不說教，不要長篇大論。只使用繁體中文。
+
+回應請只呼叫 emit_checkup_summary tool，不要輸出其他文字。`;
+
+const CHECKUP_TOOL_SCHEMA = {
+  name: 'emit_checkup_summary',
+  description: 'Return a neutral summary and three concrete talking points for a couple after a marriage check-up.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      summary: { type: 'string', description: '2～4 句中立、溫暖的總結' },
+      points: {
+        type: 'array',
+        minItems: 3,
+        maxItems: 3,
+        items: { type: 'string', description: '一個具體、好開口的對話方向，1～2 句' },
+      },
+      toxicityFlags: { type: 'array', items: { type: 'string' } },
+    },
+    required: ['summary', 'points', 'toxicityFlags'],
+  },
+};
+
+function formatCheckupSide(name, answers, dimensions) {
+  const lines = [`【${name} 的答案】`];
+  const scores = (answers && answers.scores) || {};
+  const notes = (answers && answers.notes) || {};
+  for (const d of dimensions) {
+    const score = scores[d.id];
+    const note = (notes[d.id] || '').toString().trim();
+    lines.push(`- ${d.label}：${score != null ? `${score}/5` : '未填'}${note ? `（${note}）` : ''}`);
+  }
+  const gratitude = (answers && answers.gratitude ? answers.gratitude : '').toString().trim();
+  const attention = (answers && answers.attention ? answers.attention : '').toString().trim();
+  lines.push(`- 想感謝對方：${gratitude || '（未填）'}`);
+  lines.push(`- 最想一起改善：${attention || '（未填）'}`);
+  return lines.join('\n');
+}
+
+async function generateCheckupSummary({ dimensions, responseA, responseB }) {
+  if (!Array.isArray(dimensions) || dimensions.length === 0) {
+    throw new Error('dimensions is required');
+  }
+  const userContent = [
+    formatCheckupSide(responseA?.name || '伴侶 A', responseA?.answers, dimensions),
+    '',
+    formatCheckupSide(responseB?.name || '伴侶 B', responseB?.answers, dimensions),
+  ].join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system: [
+      {
+        type: 'text',
+        text: CHECKUP_SYSTEM_PROMPT,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [CHECKUP_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_checkup_summary' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.marriage_checkup', {
+    model: response.model || MODEL,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_checkup_summary'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input;
+
+  return {
+    summary: out.summary || '',
+    points: Array.isArray(out.points) ? out.points : [],
+    toxicityFlags: out.toxicityFlags || [],
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+      assembledPrompt: userContent,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -935,4 +1061,5 @@ module.exports = {
   generateWallCounselorComment,
   generateReconciliationOpeners,
   generateEmotionAcceptance,
+  generateCheckupSummary,
 };

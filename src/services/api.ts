@@ -334,6 +334,36 @@ export interface EventMessage {
   readAt: string | null;
 }
 
+// 婚姻檢查 (Marriage Check-up)
+export interface MarriageCheckupAnswers {
+  scores: Record<string, number>;
+  notes: Record<string, string>;
+  gratitude: string;
+  attention: string;
+}
+
+export interface MarriageCheckup {
+  id: string;
+  status: 'collecting' | 'revealed';
+  createdBy: string;
+  createdAt: string;
+  revealedAt: string | null;
+  mySubmitted: boolean;
+  partnerSubmitted: boolean;
+  myAnswers: MarriageCheckupAnswers | null;
+  partnerAnswers: MarriageCheckupAnswers | null;
+  aiSummary: string;
+  aiPoints: string[];
+}
+
+export interface MarriageCheckupHistoryItem {
+  id: string;
+  status: string;
+  createdAt: string;
+  revealedAt: string | null;
+  aiSummary: string;
+}
+
 export interface EventRecord {
   id: string;
   coupleId: string;
@@ -2884,6 +2914,61 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to fetch event analytics:', error);
       this.throwApiError(error, '無法取得分析資料');
+    }
+  }
+
+  // ----- 婚姻檢查 (Marriage Check-up) -----
+
+  async getMarriageCheckup(): Promise<MarriageCheckup | null> {
+    try {
+      const response = await apiClient.get('/marriage-checkups');
+      return (response.data.checkup as MarriageCheckup) ?? null;
+    } catch (error: unknown) {
+      console.error('Failed to load marriage checkup:', error);
+      this.throwApiError(error, '無法載入婚姻檢查，請稍後再試');
+    }
+  }
+
+  async startMarriageCheckup(): Promise<MarriageCheckup> {
+    try {
+      const response = await apiClient.post('/marriage-checkups');
+      return response.data.checkup as MarriageCheckup;
+    } catch (error: unknown) {
+      console.error('Failed to start marriage checkup:', error);
+      this.throwApiError(error, '無法開始婚姻檢查，請稍後再試');
+    }
+  }
+
+  async submitMarriageCheckupResponse(
+    id: string,
+    answers: MarriageCheckupAnswers,
+  ): Promise<MarriageCheckup> {
+    try {
+      const response = await apiClient.post(`/marriage-checkups/${id}/response`, { answers });
+      return response.data.checkup as MarriageCheckup;
+    } catch (error: unknown) {
+      console.error('Failed to submit marriage checkup response:', error);
+      this.throwApiError(error, '無法送出答案，請稍後再試');
+    }
+  }
+
+  async getMarriageCheckupHistory(): Promise<MarriageCheckupHistoryItem[]> {
+    try {
+      const response = await apiClient.get('/marriage-checkups/history');
+      return Array.isArray(response.data.checkups) ? response.data.checkups : [];
+    } catch (error: unknown) {
+      console.error('Failed to load marriage checkup history:', error);
+      this.throwApiError(error, '無法載入歷史紀錄，請稍後再試');
+    }
+  }
+
+  async getMarriageCheckupById(id: string): Promise<MarriageCheckup> {
+    try {
+      const response = await apiClient.get(`/marriage-checkups/${id}`);
+      return response.data.checkup as MarriageCheckup;
+    } catch (error: unknown) {
+      console.error('Failed to load marriage checkup:', error);
+      this.throwApiError(error, '無法載入婚姻檢查，請稍後再試');
     }
   }
 
