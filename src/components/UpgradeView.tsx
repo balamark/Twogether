@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Sparkles, Check, Crown, Ticket } from 'lucide-react';
-import { apiService, type BillingStatus, type BillingPlan } from '../services/api';
+import { apiService, type BillingStatus, type BillingPlan, type PaymentProvider } from '../services/api';
+import PaymentMethodPicker from './PaymentMethodPicker';
 
 type Notify = (n: { type: 'success' | 'error' | 'info' | 'warning'; title: string; message: string; duration?: number }) => void;
 
@@ -35,6 +36,7 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
   const [status, setStatus] = useState<BillingStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkoutPlan, setCheckoutPlan] = useState<string | null>(null);
+  const [provider, setProvider] = useState<PaymentProvider>('ecpay');
   const [couponCode, setCouponCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
 
@@ -64,8 +66,8 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
     }
     setCheckoutPlan(plan);
     try {
-      // On success the browser navigates to ECPay and this view unmounts.
-      await apiService.startCheckout(plan);
+      // On success the browser navigates to the gateway and this view unmounts.
+      await apiService.startCheckout(plan, provider);
     } catch (err) {
       setCheckoutPlan(null);
       showNotification?.({ type: 'error', title: '無法付款', message: (err as Error)?.message || '請稍後再試', duration: 6000 });
@@ -160,6 +162,14 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
         </ul>
       </div>
 
+      {/* Payment method */}
+      <div className="mb-4">
+        <div className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
+          付款方式
+        </div>
+        <PaymentMethodPicker value={provider} onChange={setProvider} disabled={checkoutPlan !== null} />
+      </div>
+
       {/* Plans */}
       {loading ? (
         <div className="text-center py-10 font-body text-sm text-petal-muted">載入中…</div>
@@ -237,7 +247,7 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
 
       <p className="mt-6 text-center font-body text-xs text-petal-muted flex items-center justify-center space-x-1.5">
         <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
-        <span>支援信用卡與 LINE Pay · 由綠界 ECPay 安全付款 · 一次性購買，不自動續約</span>
+        <span>支援信用卡、LINE Pay、ATM 與超商 · 由綠界 ECPay 或藍新金流安全付款 · 一次性購買，不自動續約</span>
       </p>
     </div>
   );

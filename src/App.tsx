@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, StickyNote, MessageSquareHeart, Trash2, Pencil, HeartHandshake } from 'lucide-react';
+import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, StickyNote, MessageSquareHeart, Trash2, Pencil, HeartHandshake, Crown } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import UpgradeView, { BillingResultView } from './components/UpgradeView';
 import { BookingResultView } from './components/BookingResultView';
@@ -1869,6 +1869,9 @@ const LoveTimeApp = () => {
     { id: 'roleplay', label: '角色扮演', icon: Play },
     { id: 'wall', label: '我們的牆', icon: StickyNote },
     { id: 'therapists', label: '心理諮商', icon: HeartHandshake },
+    // Pricing is a sales surface for visitors; signed-in users upgrade via the
+    // dedicated 'upgrade' view instead, so this tab is logged-out only.
+    ...(!authState.isAuthenticated ? [{ id: 'pricing', label: 'Premium', icon: Crown }] : []),
   ];
 
   const renderView = () => {
@@ -2028,6 +2031,9 @@ const LoveTimeApp = () => {
           partnerNickname={nicknames.partner2}
         />
       );
+      // 'pricing' is the logged-out Premium tab; once signed in it becomes the
+      // real upgrade flow rather than dropping to the default view.
+      case 'pricing':
       case 'upgrade': return <UpgradeView
         reason={upgradeReason}
         showNotification={showNotification}

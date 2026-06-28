@@ -4,6 +4,12 @@ runtime: nodejs22
 env_variables:
   NODE_ENV: "production"
   PORT: "8080"
+  # Public site origin used to build links in outgoing emails (confirm-email-
+  # change, password reset, pairing invite, welcome, therapist verify). Must be
+  # the custom domain — the *.appspot.com default trips Google Safe Browsing's
+  # "Deceptive site ahead" warning. Plain literal (public, not a secret), so
+  # envsubst leaves it untouched.
+  FRONTEND_URL: "https://twogether.fun"
   # Database connection
   DATABASE_URL: $_DATABASE_URL
   # JWT Secret

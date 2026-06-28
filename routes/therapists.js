@@ -22,6 +22,7 @@ const { authenticateToken, optionalAuth, generateToken } = require('../middlewar
 const { uploadToSupabase } = require('../lib/supabase-storage');
 const emailService = require('../services/emailService');
 const ecpay = require('../lib/ecpay');
+const newebpay = require('../lib/newebpay');
 const qaPool = require('../lib/qaPool');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 
@@ -1601,6 +1602,15 @@ router.post('/consultations/:id/meeting-link', authenticateToken, [
 // order, and returns the form params the frontend auto-submits.
 router.post('/consultations/:id/pay', authenticateToken, async (req, res) => {
   try {
+    const provider = req.body && req.body.provider === 'newebpay' ? 'newebpay' : 'ecpay';
+    if (provider === 'newebpay' && !newebpay.isConfigured()) {
+      return res.status(503).json({
+        success: false,
+        error_code: 'NEWEBPAY_UNAVAILABLE',
+        message: '藍新金流暫時無法使用，請改用綠界 ECPay 付款',
+      });
+    }
+
     const access = await loadConsultationAccess(req.params.id, req.user.id);
     if (!access) return res.status(404).json({ success: false, message: '找不到這個預約' });
     if (!access.isParticipant || access.isTherapist) {
@@ -1633,9 +1643,9 @@ router.post('/consultations/:id/pay', authenticateToken, async (req, res) => {
       await client.query(`
         INSERT INTO session_payment_orders
           (consultation_id, payer_id, therapist_id, merchant_trade_no, amount,
-           fee_rate, platform_fee, therapist_net, status)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending')
-      `, [c.id, req.user.id, c.therapist_id, merchantTradeNo, price, feeRate, platformFee, therapistNet]);
+           fee_rate, platform_fee, therapist_net, status, provider)
+        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'pending',$9)
+      `, [c.id, req.user.id, c.therapist_id, merchantTradeNo, price, feeRate, platformFee, therapistNet, provider]);
       await client.query(`
         UPDATE therapist_consultations
            SET payment_status = 'pending', fee_rate = $2, platform_fee_twd = $3, therapist_net_twd = $4
@@ -1644,23 +1654,68 @@ router.post('/consultations/:id/pay', authenticateToken, async (req, res) => {
     });
 
     const base = appBaseUrl();
-    const { actionUrl, params } = ecpay.buildCheckoutParams({
-      merchantTradeNo,
-      amount: price,
-      itemName: `視訊諮商 — ${c.therapist_name}`.slice(0, 200),
-      tradeDesc: 'Twogether 視訊諮商',
-      returnUrl: `${base}/api/therapists/sessions/ecpay/callback`,
-      orderResultUrl: `${base}/api/therapists/sessions/ecpay/return`,
-      clientBackUrl: `${base}/booking/result`,
-    });
+    const itemName = `視訊諮商 — ${c.therapist_name}`.slice(0, 200);
+    const { actionUrl, params } =
+      provider === 'newebpay'
+        ? newebpay.buildCheckoutParams({
+            merchantTradeNo,
+            amount: price,
+            itemName,
+            email: req.user.email || '',
+            returnUrl: `${base}/api/therapists/sessions/newebpay/callback`,
+            orderResultUrl: `${base}/api/therapists/sessions/newebpay/return`,
+            clientBackUrl: `${base}/booking/result`,
+          })
+        : ecpay.buildCheckoutParams({
+            merchantTradeNo,
+            amount: price,
+            itemName,
+            tradeDesc: 'Twogether 視訊諮商',
+            returnUrl: `${base}/api/therapists/sessions/ecpay/callback`,
+            orderResultUrl: `${base}/api/therapists/sessions/ecpay/return`,
+            clientBackUrl: `${base}/booking/result`,
+          });
 
-    logInfo('Session checkout created', { consultationId: c.id, userId: req.user.id, merchantTradeNo, amount: price, feeRate });
+    logInfo('Session checkout created', { consultationId: c.id, userId: req.user.id, merchantTradeNo, amount: price, feeRate, provider });
     res.json({ success: true, action_url: actionUrl, params });
   } catch (error) {
     logError('Failed to start session payment', { id: req.params.id, err: error.message });
     res.status(500).json({ success: false, message: '無法建立付款，請稍後再試' });
   }
 });
+
+// Mark a session order paid + snapshot the fee split onto the consultation,
+// atomically. Shared by both gateway callbacks once they've verified the
+// signature, matched the order, confirmed it isn't already paid, and confirmed
+// the amount. gatewayTradeNo = the gateway's own trade id.
+async function markSessionPaid(order, { gatewayTradeNo, paymentMethod, rawPayload }) {
+  await db.transaction(async (client) => {
+    await client.query(`
+      UPDATE session_payment_orders
+         SET status = 'paid', paid_at = NOW(), ecpay_trade_no = $2, payment_method = $3, raw_callback = $4
+       WHERE id = $1
+    `, [order.id, gatewayTradeNo || null, paymentMethod || null, rawPayload]);
+    await client.query(`
+      UPDATE therapist_consultations
+         SET payment_status = 'paid', paid_at = NOW(),
+             price_twd = $2, fee_rate = $3, platform_fee_twd = $4, therapist_net_twd = $5
+       WHERE id = $1
+    `, [order.consultation_id, order.amount, order.fee_rate, order.platform_fee, order.therapist_net]);
+  });
+  logInfo('session.callback.paid', {
+    merchantTradeNo: order.merchant_trade_no,
+    consultationId: order.consultation_id,
+    therapistNet: order.therapist_net,
+    provider: order.provider,
+  });
+}
+
+async function markSessionFailed(order, rawPayload) {
+  await db.transaction(async (client) => {
+    await client.query(`UPDATE session_payment_orders SET status = 'failed', raw_callback = $2 WHERE id = $1`, [order.id, rawPayload]);
+    await client.query(`UPDATE therapist_consultations SET payment_status = 'failed' WHERE id = $1`, [order.consultation_id]);
+  });
+}
 
 // POST /api/therapists/sessions/ecpay/callback — ECPay server-to-server callback
 // (PUBLIC, no JWT). Authoritative paid mark + fee-split record. Idempotent.
@@ -1688,29 +1743,16 @@ router.post('/sessions/ecpay/callback', async (req, res) => {
     }
 
     if (rtnCode !== '1') {
-      await db.transaction(async (client) => {
-        await client.query(`UPDATE session_payment_orders SET status = 'failed', raw_callback = $2 WHERE id = $1`, [order.id, payload]);
-        await client.query(`UPDATE therapist_consultations SET payment_status = 'failed' WHERE id = $1`, [order.consultation_id]);
-      });
+      await markSessionFailed(order, payload);
       logInfo('session.callback.failed', { merchantTradeNo, rtnCode, msg: payload.RtnMsg });
       return res.send('1|OK');
     }
 
-    await db.transaction(async (client) => {
-      await client.query(`
-        UPDATE session_payment_orders
-           SET status = 'paid', paid_at = NOW(), ecpay_trade_no = $2, payment_method = $3, raw_callback = $4
-         WHERE id = $1
-      `, [order.id, payload.TradeNo || null, payload.PaymentType || null, payload]);
-      await client.query(`
-        UPDATE therapist_consultations
-           SET payment_status = 'paid', paid_at = NOW(),
-               price_twd = $2, fee_rate = $3, platform_fee_twd = $4, therapist_net_twd = $5
-         WHERE id = $1
-      `, [order.consultation_id, order.amount, order.fee_rate, order.platform_fee, order.therapist_net]);
+    await markSessionPaid(order, {
+      gatewayTradeNo: payload.TradeNo,
+      paymentMethod: payload.PaymentType,
+      rawPayload: payload,
     });
-
-    logInfo('session.callback.paid', { merchantTradeNo, consultationId: order.consultation_id, therapistNet: order.therapist_net });
     res.send('1|OK');
   } catch (error) {
     logError('Session callback failed', { err: error.message });
@@ -1722,6 +1764,60 @@ router.post('/sessions/ecpay/callback', async (req, res) => {
 // grant already happened server-side; just 302 to the SPA result route.
 router.post('/sessions/ecpay/return', (req, res) => {
   const ok = String(req.body?.RtnCode) === '1';
+  res.redirect(302, `/booking/result?status=${ok ? 'success' : 'failed'}`);
+});
+
+// POST /api/therapists/sessions/newebpay/callback — NewebPay NotifyURL (PUBLIC).
+// Authoritative paid mark, mirroring the ECPay session callback. Idempotent.
+router.post('/sessions/newebpay/callback', async (req, res) => {
+  const payload = req.body || {};
+  try {
+    if (!newebpay.verifyCallback(payload)) {
+      logWarn('session.callback.bad_mac', { provider: 'newebpay' });
+      return res.status(400).send('0|TradeSha Error');
+    }
+    const parsed = newebpay.parseCallback(payload);
+    if (!parsed || !parsed.merchantOrderNo) {
+      logWarn('session.callback.unparsable', { provider: 'newebpay' });
+      return res.status(400).send('0|Parse Error');
+    }
+    const merchantTradeNo = parsed.merchantOrderNo;
+
+    const orderRes = await db.query(`SELECT * FROM session_payment_orders WHERE merchant_trade_no = $1`, [merchantTradeNo]);
+    const order = orderRes.rows[0];
+    if (!order) {
+      logWarn('session.callback.unknown_order', { merchantTradeNo, provider: 'newebpay' });
+      return res.send('1|OK');
+    }
+    if (order.status === 'paid') return res.send('1|OK'); // idempotent
+
+    if (Number(parsed.amount) !== Number(order.amount)) {
+      logWarn('session.callback.amount_mismatch', { merchantTradeNo, expected: order.amount, got: parsed.amount, provider: 'newebpay' });
+      return res.status(400).send('0|Amount Mismatch');
+    }
+
+    if (!parsed.success) {
+      await markSessionFailed(order, parsed.raw);
+      logInfo('session.callback.failed', { merchantTradeNo, status: parsed.status, provider: 'newebpay' });
+      return res.send('1|OK');
+    }
+
+    await markSessionPaid(order, {
+      gatewayTradeNo: parsed.tradeNo,
+      paymentMethod: parsed.paymentType,
+      rawPayload: parsed.raw,
+    });
+    res.send('1|OK');
+  } catch (error) {
+    logError('Session callback failed', { err: error.message, provider: 'newebpay' });
+    res.status(500).send('0|Error');
+  }
+});
+
+// POST /api/therapists/sessions/newebpay/return — browser POST-back (PUBLIC).
+router.post('/sessions/newebpay/return', (req, res) => {
+  const parsed = newebpay.parseCallback(req.body || {});
+  const ok = parsed ? parsed.success : false;
   res.redirect(302, `/booking/result?status=${ok ? 'success' : 'failed'}`);
 });
 

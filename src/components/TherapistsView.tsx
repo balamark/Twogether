@@ -12,10 +12,12 @@ import {
   type EventRecord,
   type OwnTherapistProfile,
   type TherapistProfileUpdate,
+  type PaymentProvider,
 } from '../services/api';
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { FOCUS_AREAS, focusLabel, formatNtd } from './therapistShared';
+import PaymentMethodPicker from './PaymentMethodPicker';
 import { FocusFilter } from './FocusFilter';
 import PublicQaView from './PublicQaView';
 import TherapistProfileModal from './TherapistProfileModal';
@@ -667,6 +669,7 @@ const ConsultationSessionActions: React.FC<{
 }> = ({ c, onChanged, showNotification }) => {
   const [busy, setBusy] = useState(false);
   const [provider, setProvider] = useState<MeetingProvider>('meet');
+  const [payProvider, setPayProvider] = useState<PaymentProvider>('ecpay');
   const [url, setUrl] = useState('');
 
   if (c.bookingType !== 'scheduled') return null;
@@ -675,7 +678,7 @@ const ConsultationSessionActions: React.FC<{
     showNotification({ type: 'error', title: '操作失敗', message: err instanceof Error ? err.message : '請稍後再試', duration: 4000 });
 
   const pay = async () => {
-    try { setBusy(true); await apiService.paySession(c.id); } catch (err) { notifyErr(err); setBusy(false); }
+    try { setBusy(true); await apiService.paySession(c.id, payProvider); } catch (err) { notifyErr(err); setBusy(false); }
   };
   const respond = async (action: 'accept' | 'decline' | 'complete' | 'no_show') => {
     try {
@@ -699,10 +702,15 @@ const ConsultationSessionActions: React.FC<{
   if (c.role === 'client') {
     if (c.paymentStatus === 'unpaid' || c.paymentStatus === 'failed') {
       return (
-        <button onClick={pay} disabled={busy} data-testid="pay-session-button"
-          className="mt-3 mr-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-pink-500 text-white hover:bg-pink-600 disabled:opacity-50 transition-colors font-body text-xs font-medium">
-          <Wallet className="w-3.5 h-3.5" strokeWidth={1.5} /> {busy ? '前往付款…' : `前往付款 ${c.priceTwd ? formatNtd(c.priceTwd) : ''}`}
-        </button>
+        <div className="mt-3">
+          <div className="mb-2 max-w-xs">
+            <PaymentMethodPicker value={payProvider} onChange={setPayProvider} disabled={busy} />
+          </div>
+          <button onClick={pay} disabled={busy} data-testid="pay-session-button"
+            className="mr-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-pink-500 text-white hover:bg-pink-600 disabled:opacity-50 transition-colors font-body text-xs font-medium">
+            <Wallet className="w-3.5 h-3.5" strokeWidth={1.5} /> {busy ? '前往付款…' : `前往付款 ${c.priceTwd ? formatNtd(c.priceTwd) : ''}`}
+          </button>
+        </div>
       );
     }
     if (c.paymentStatus === 'pending') {
@@ -792,6 +800,7 @@ const VideoBookingModal: React.FC<{
 }> = ({ therapistId, therapistName, priceTwd, sessionMinutes, sourceConsultationId, onClose, showNotification }) => {
   const [message, setMessage] = useState('');
   const [preferredTime, setPreferredTime] = useState('');
+  const [payProvider, setPayProvider] = useState<PaymentProvider>('ecpay');
   const [busy, setBusy] = useState(false);
 
   const proceed = async () => {
@@ -802,8 +811,8 @@ const VideoBookingModal: React.FC<{
         preferredTime: preferredTime ? new Date(preferredTime).toISOString() : undefined,
         sourceConsultationId,
       });
-      // Redirects the browser to ECPay (resolves only on failure to start).
-      await apiService.paySession(booking.id);
+      // Redirects the browser to the chosen gateway (resolves only on failure).
+      await apiService.paySession(booking.id, payProvider);
     } catch (err) {
       showNotification({ type: 'error', title: '預約失敗', message: err instanceof Error ? err.message : '請稍後再試', duration: 4000 });
       setBusy(false);
@@ -818,7 +827,7 @@ const VideoBookingModal: React.FC<{
           <span className="font-display text-lg text-pink-600">{formatNtd(priceTwd)}</span>
         </div>
         <p className="font-body text-xs text-petal-muted">
-          視訊以 Zoom / Google Meet 進行，諮商師接受預約後會提供會議連結。付款由綠界（ECPay）處理。
+          視訊以 Zoom / Google Meet 進行，諮商師接受預約後會提供會議連結。付款由綠界 ECPay 或藍新金流處理。
         </p>
         <div>
           <label className={fieldLabel}>希望的時段（選填）</label>
@@ -827,6 +836,10 @@ const VideoBookingModal: React.FC<{
         <div>
           <label className={fieldLabel}>想先讓諮商師知道的事（選填）</label>
           <textarea value={message} onChange={(e) => setMessage(e.target.value)} rows={3} maxLength={2000} className={`${fieldInput} resize-none`} />
+        </div>
+        <div>
+          <label className={fieldLabel}>付款方式</label>
+          <PaymentMethodPicker value={payProvider} onChange={setPayProvider} disabled={busy} />
         </div>
         <button
           onClick={proceed}

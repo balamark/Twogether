@@ -11,6 +11,8 @@ import {
   TrendingUp,
   Sparkles,
   HeartHandshake,
+  Crown,
+  Check,
   type LucideIcon,
 } from 'lucide-react';
 import { daysSinceLastNudge } from './AchievementsView';
@@ -217,6 +219,24 @@ const ConflictFlywheelSample: React.FC = () => (
   </div>
 );
 
+// Static Premium pricing shown to logged-out visitors. Kept in sync with the
+// server catalog (routes/billing.js PLANS) and public/pricing.html. Visitors
+// can't fetch /billing/status (no auth), so these are hardcoded; the live,
+// authoritative prices come from the server once signed in.
+const PRICING_PLANS: { days: number; amount: number; perDay: string; featured?: boolean }[] = [
+  { days: 30, amount: 90, perDay: '約每天 NT$3' },
+  { days: 90, amount: 240, perDay: '約每天 NT$2.7', featured: true },
+  { days: 365, amount: 790, perDay: '約每天 NT$2.2' },
+];
+
+const PRICING_PERKS = [
+  '每日 AI 整理／改寫次數大幅提升',
+  '無限建立自訂角色扮演劇本',
+  '無限上傳照片',
+  '購買天數可累加堆疊，已付費時間不流失',
+  '情侶雙方同步享有，無須各自付費',
+];
+
 const PREVIEWS: Record<string, PreviewConfig> = {
   record: {
     icon: Calendar,
@@ -422,6 +442,99 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scr
             </div>
           </div>
         )}
+      </div>
+    );
+  }
+
+  // Premium / pricing gets a dedicated layout: plan cards, perks and payment
+  // info, funneling to sign-up. Mirrors public/pricing.html for visitors who
+  // browse pricing inside the app before creating an account.
+  if (view === 'pricing') {
+    return (
+      <div className="max-w-2xl mx-auto py-6" data-testid="logged-out-preview-pricing">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-petal-cream-2 text-pink-600 mb-4">
+            <Crown className="w-5 h-5" strokeWidth={1.5} />
+          </div>
+          <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+            — Premium 方案
+          </div>
+          <h2 className="font-display text-3xl md:text-4xl font-light tracking-tight text-petal-ink leading-[1.1] mb-3">
+            解鎖 <em className="not-italic font-light italic text-pink-600">Twogether Premium</em>
+          </h2>
+          <p className="font-body text-sm text-petal-ink-soft leading-relaxed max-w-sm mx-auto">
+            免費方案即可使用核心功能。升級 Premium 一次付費、買斷天數，情侶雙方共享，無自動續扣。
+          </p>
+        </div>
+
+        {/* Plan cards */}
+        <div className="grid gap-3 sm:grid-cols-3 mb-8">
+          {PRICING_PLANS.map((p) => {
+            const monthly = Math.round(p.amount / (p.days / 30));
+            return (
+              <div
+                key={p.days}
+                data-testid={`pricing-plan-${p.days}`}
+                className={`relative rounded-md border bg-petal-cream p-5 flex flex-col text-center ${
+                  p.featured ? 'border-petal-rose-deep shadow-petal' : 'border-petal-rule'
+                }`}
+              >
+                {p.featured && (
+                  <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-petal-rose-deep text-petal-cream font-body text-[10px] font-medium tracking-wide px-3 py-0.5 rounded-full whitespace-nowrap">
+                    最受歡迎
+                  </span>
+                )}
+                <div className="font-display text-lg font-light text-petal-ink mb-1">{p.days} 天</div>
+                <div className="font-display text-3xl font-light text-petal-ink mb-1">NT${p.amount}</div>
+                <div className="font-body text-xs text-petal-muted mb-1">約 NT${monthly}／月</div>
+                <div className="font-body text-[11px] text-petal-sage-deep mb-5">{p.perDay}</div>
+                <button
+                  onClick={onSignUp}
+                  data-testid={`pricing-signup-${p.days}`}
+                  className={`mt-auto w-full py-2.5 rounded-md font-display italic text-base transition-colors ${
+                    p.featured
+                      ? 'bg-petal-ink text-petal-cream hover:bg-pink-700'
+                      : 'bg-petal-cream-2 text-petal-ink border border-petal-rule hover:border-petal-ink'
+                  }`}
+                >
+                  註冊解鎖
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Perks */}
+        <div className="mb-8 rounded-md border border-petal-rule bg-petal-cream p-5">
+          <div className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-3">
+            Premium 包含
+          </div>
+          <ul className="space-y-2">
+            {PRICING_PERKS.map((perk) => (
+              <li key={perk} className="flex items-start space-x-2">
+                <Check className="w-4 h-4 mt-0.5 text-petal-sage-deep shrink-0" strokeWidth={1.75} />
+                <span className="font-body text-sm text-petal-ink-soft">{perk}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <SignUpCta onSignUp={onSignUp} />
+
+        <p className="mt-6 text-center font-body text-xs text-petal-muted flex items-center justify-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <span>支援信用卡、LINE Pay、ATM 與超商 · 由綠界 ECPay 或藍新金流安全付款</span>
+        </p>
+        <p className="mt-3 text-center font-body text-xs text-petal-muted">
+          想了解更多？
+          <a
+            href="/pricing"
+            className="text-pink-600 hover:text-pink-700 underline underline-offset-2 ml-1"
+            data-testid="pricing-full-page-link"
+          >
+            查看完整方案與退費政策
+          </a>
+        </p>
       </div>
     );
   }

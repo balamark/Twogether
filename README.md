@@ -38,6 +38,14 @@ Then visit: http://localhost:8080
 User-facing feature changes, newest first. (Convention: every UI feature change
 adds a dated entry here; see `CLAUDE.md`.)
 
+### 2026-06-28
+- **藍新金流 (NewebPay) 雙金流**: 升級 Premium 與預約付費視訊諮商時，現在可以選擇
+  以「綠界 ECPay」或「藍新金流」付款，支援信用卡、LINE Pay、ATM 與超商代碼／條碼。
+  兩種金流走相同的開通邏輯、購買天數一樣會累加堆疊。
+- **未登入也能看方案**: 未登入首頁新增「Premium」分頁，直接呈現 30／90／365 天方案、
+  價格與包含的權益，並可一鍵註冊或前往完整方案頁 (`/pricing`)。完整方案頁同步更新
+  雙金流付款說明。
+
 ### 2026-06-25
 - **愛的行動 & 好感存款明細**: The 愛的語言 result page now suggests 5 actions for
   your partner's love language and lets each partner keep a custom "what makes me
