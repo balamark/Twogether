@@ -1,4 +1,5 @@
 import React from 'react';
+import { clientLog, getLastRequestId } from '../utils/telemetry';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -36,6 +37,19 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       `[ErrorBoundary${this.props.context ? `:${this.props.context}` : ''}] render crashed:`,
       error,
       info.componentStack,
+    );
+    // Ship the crash to Cloud Logging with the last backend request id, so a
+    // blank-screen report links to the exact backend trace that served it.
+    clientLog(
+      'render_crash',
+      {
+        context: this.props.context,
+        message: error.message,
+        stack: error.stack,
+        componentStack: info.componentStack,
+        requestId: getLastRequestId(),
+      },
+      'error',
     );
   }
 

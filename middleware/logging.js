@@ -3,6 +3,28 @@ const { logInfo, logError } = require('../lib/logger');
 
 const QUIET = process.env.NODE_ENV === 'test' && process.env.LOG_VERBOSE !== '1';
 
+// Free-text fields that can carry large (and sometimes explicit) user content —
+// e.g. a custom roleplay script. Always summarized regardless of length.
+const ALWAYS_SUMMARIZE = new Set(['content', 'scenario', 'script']);
+const MAX_STRING = 200;
+
+// Replace large/free-text string fields in a request body with a size
+// placeholder before logging, so Cloud Logging keeps the useful metadata
+// (title, category, ids) without storing whole script payloads. Shallow only —
+// request bodies here are flat objects.
+function summarizeBody(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return body;
+  const out = {};
+  for (const [key, value] of Object.entries(body)) {
+    if (typeof value === 'string' && (ALWAYS_SUMMARIZE.has(key) || value.length > MAX_STRING)) {
+      out[key] = `<${value.length} chars>`;
+    } else {
+      out[key] = value;
+    }
+  }
+  return out;
+}
+
 // Enhanced request/response logging middleware
 const requestLogger = (req, res, next) => {
   if (QUIET) return next();
@@ -17,7 +39,7 @@ const requestLogger = (req, res, next) => {
     path: req.path,
     ip: req.ip,
     userAgent: req.get('User-Agent'),
-    body: req.method !== 'GET' ? req.body : undefined,
+    body: req.method !== 'GET' ? summarizeBody(req.body) : undefined,
     query: Object.keys(req.query).length > 0 ? req.query : undefined,
     user: req.user ? { id: req.user.id, nickname: req.user.nickname } : undefined,
   });
@@ -63,7 +85,7 @@ const requestLogger = (req, res, next) => {
           path: req.path,
           status: res.statusCode,
           error: responseData,
-          requestBody: req.body,
+          requestBody: summarizeBody(req.body),
           user: req.user ? req.user.id : 'anonymous',
         });
       }
@@ -97,7 +119,7 @@ const requestLogger = (req, res, next) => {
           status: res.statusCode,
           error: obj,
           stack: obj && obj.stack ? obj.stack : undefined,
-          requestBody: req.body,
+          requestBody: summarizeBody(req.body),
           user: req.user ? req.user.id : 'anonymous',
         });
       }

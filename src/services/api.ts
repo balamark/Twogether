@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { formatYmdInTz, browserTz } from '../utils/datetime';
+import { setLastRequestId } from '../utils/telemetry';
 
 // API Configuration - Always use relative URLs for single server
 const API_BASE_URL = '/api';
@@ -44,6 +45,19 @@ export interface CycleRecord {
   lengthDays: number;
   notes?: string;
   createdAt: string;
+}
+
+export type ActivityType =
+  | 'love_moment' | 'custom_script' | 'wall_post' | 'event'
+  | 'achievement' | 'coins' | 'checkin';
+
+export interface ActivityItem {
+  id: string;
+  type: ActivityType;
+  actorNickname: string | null; // null for couple/system rows (coins, achievements)
+  isSelf: boolean;
+  description: string;
+  date: string;                 // ISO timestamp
 }
 
 interface ApiCycleRecord {
@@ -638,12 +652,14 @@ apiClient.interceptors.request.use(
 // Response interceptor for unified error handling
 apiClient.interceptors.response.use(
   (response) => {
+    setLastRequestId(response.headers?.['x-request-id']);
     console.log(`API Response: ${response.status} ${response.config.url}`, response.data);
     return response;
   },
   (error) => {
+    setLastRequestId(error.response?.headers?.['x-request-id']);
     console.error('API Error:', error);
-    
+
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;
@@ -1165,6 +1181,17 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to delete intimate record:', error);
       this.throwApiError(error, '無法刪除記錄');
+    }
+  }
+
+  // Recent activity feed (user + partner) for the profile 最近動態 section.
+  async getActivityFeed(): Promise<ActivityItem[]> {
+    try {
+      const response = await apiClient.get('/activity');
+      return (response.data?.activities || []) as ActivityItem[];
+    } catch (error: unknown) {
+      console.error('Failed to fetch activity feed:', error);
+      this.throwApiError(error, '無法獲取最近動態');
     }
   }
 

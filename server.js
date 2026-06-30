@@ -34,11 +34,13 @@ const feedbackRoutes = require('./routes/feedback');
 const assessmentRoutes = require('./routes/assessments');
 const relationshipRoutes = require('./routes/relationship');
 const marriageCheckupRoutes = require('./routes/marriage-checkups');
+const activityRoutes = require('./routes/activity');
 const adminRoutes = require('./routes/admin');
 
 // Import database and middleware
 const db = require('./database/db');
 const { requestLogger, errorHandler, asyncHandler } = require('./middleware/logging');
+const { requestContext } = require('./middleware/request-context');
 const { JWT_EXPIRES_IN, JWT_EXPIRES_IN_MS } = require('./middleware/auth');
 const { adminAuth } = require('./middleware/adminAuth');
 
@@ -113,6 +115,10 @@ if (['development', 'test'].includes(process.env.NODE_ENV)) {
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
+// Establish per-request context (request id + trace id) before any logging so
+// every log line for a request is correlated. Must run before requestLogger.
+app.use(requestContext);
+
 // Add comprehensive request/response logging
 app.use(requestLogger);
 
@@ -168,6 +174,7 @@ app.use('/api/feedback', feedbackRoutes);
 app.use('/api/assessments', assessmentRoutes);
 app.use('/api/relationship', relationshipRoutes);
 app.use('/api/marriage-checkups', marriageCheckupRoutes);
+app.use('/api/activity', activityRoutes);
 
 // Admin funnel dashboard. The public router (POST /api/track/landing) is the
 // anonymous beacon fired from the frontend on the logged-out landing render.

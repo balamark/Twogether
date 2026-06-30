@@ -171,6 +171,15 @@ router.get('/', async (req, res) => {
       };
     });
 
+    // Log how many scripts this user's list actually returned, so a
+    // "I uploaded it but can't see it" report can be diagnosed from Cloud
+    // Logging: compare this count with the client's `custom_scripts.loaded`.
+    logInfo('custom_scripts.list', {
+      userId,
+      coupleId,
+      count: scripts.length,
+    });
+
     res.json({
       success: true,
       custom_scripts: scripts

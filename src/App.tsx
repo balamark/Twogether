@@ -29,6 +29,7 @@ import PairingInvitationHandler from './components/PairingInvitationHandler';
 import { apiService, getTokenExpiry, clearAuthStorage } from './services/api';
 import type { CycleRecord } from './services/api';
 import { getPrimaryTimezone, formatYmdInTz, browserTz } from './utils/datetime';
+import { clientLog } from './utils/telemetry';
 import { TimezoneProvider } from './contexts/TimezoneContext';
 import { useScrollLock } from './hooks/useScrollLock';
 import { usePageTracking } from './hooks/usePageTracking';
@@ -1215,8 +1216,24 @@ const LoveTimeApp = () => {
             createdAt: script.createdAt
           }));
           setCustomScripts(transformedScripts);
+          // Evidence for "I uploaded it but can't see it" reports: pair this
+          // with the server's `custom_scripts.list {count}` to tell whether the
+          // backend returned the script or the client failed to render it.
+          clientLog('custom_scripts.loaded', { count: transformedScripts.length });
         } catch (scriptError) {
           console.error('Failed to load custom scripts:', scriptError);
+          clientLog('custom_scripts.load_error', {
+            message: scriptError instanceof Error ? scriptError.message : String(scriptError),
+          }, 'error');
+          // Don't fail silently — a swallowed load is exactly what made an
+          // uploaded script look "lost". Tell the user it's a load hiccup, not
+          // data loss, and how to recover.
+          showNotification({
+            type: 'warning',
+            title: '劇本載入失敗',
+            message: '無法載入你的自訂劇本，請下拉重新整理或稍後再試；已上傳的劇本不會遺失。',
+            duration: 6000,
+          });
         }
 
         // Load favorite scripts from backend

@@ -63,18 +63,16 @@ const SampleCard: React.FC<{ children: React.ReactNode }> = ({ children }) => (
 // A read-only month calendar mockup for the 記錄時光 preview — closer to what a
 // real signed-in user sees than a plain list. Static "範例" data.
 const MARKED: Record<number, string> = {
-  3: 'sage', // 心情
   9: 'rose', // 生理期
   10: 'rose',
   14: 'pink', // 親密時光
-  18: 'sage',
   21: 'pink',
   26: 'rose',
 };
+// 'pink' (親密時光) renders as a ♥ to match the real CalendarHeatmap; 'rose'
+// (生理期) renders as a dot.
 const DOT_CLS: Record<string, string> = {
-  pink: 'bg-pink-500',
   rose: 'bg-petal-rose-deep',
-  sage: 'bg-petal-sage-deep',
 };
 
 // Sample of the real intimacy-stats cards, leading with the「已經幾天沒有親密了」
@@ -138,9 +136,11 @@ const CalendarMock: React.FC = () => {
             {day !== null && (
               <>
                 <span className="font-body text-xs text-petal-ink leading-none">{day}</span>
-                {MARKED[day] && (
+                {MARKED[day] === 'pink' ? (
+                  <span className="mt-0.5 text-[10px] leading-none text-pink-500">♥</span>
+                ) : MARKED[day] ? (
                   <span className={`mt-1 w-1.5 h-1.5 rounded-full ${DOT_CLS[MARKED[day]]}`} />
-                )}
+                ) : null}
               </>
             )}
           </div>
@@ -148,13 +148,10 @@ const CalendarMock: React.FC = () => {
       </div>
       <div className="flex items-center justify-center gap-3 mt-3 pt-3 border-t border-petal-rule">
         <span className="flex items-center gap-1 font-body text-[11px] text-petal-muted">
-          <span className="w-1.5 h-1.5 rounded-full bg-pink-500" /> 親密時光
+          <span className="text-[11px] leading-none text-pink-500">♥</span> 親密時光
         </span>
         <span className="flex items-center gap-1 font-body text-[11px] text-petal-muted">
           <span className="w-1.5 h-1.5 rounded-full bg-petal-rose-deep" /> 生理期
-        </span>
-        <span className="flex items-center gap-1 font-body text-[11px] text-petal-muted">
-          <span className="w-1.5 h-1.5 rounded-full bg-petal-sage-deep" /> 心情
         </span>
       </div>
     </div>
@@ -323,7 +320,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       </>
     ),
     description:
-      '看見你們的節奏：親密時光、生理期與心情都在一張月曆上。太久沒親密時，App 會溫柔提醒另一半多關心你。',
+      '看見你們的節奏：親密時光與生理期都在一張月曆上。太久沒親密時，App 會溫柔提醒另一半多關心你。',
     sample: (
       <>
         <SampleStats />

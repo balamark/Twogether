@@ -134,6 +134,54 @@ publicRouter.post('/track/view', express.json({ type: '*/*' }), optionalAuth, (r
 });
 
 // ──────────────────────────────────────────────────────────────────────────
+// Public: client diagnostics beacon. The frontend posts structured events here
+// (render crashes, swallowed load failures, key successes) so they land in
+// Cloud Logging as `client.<event>` entries — making frontend issues
+// diagnosable with `gcloud logging read` instead of guesswork. optionalAuth
+// attributes the event to a logged-in user when a JWT is present. The client
+// echoes the backend `X-Request-Id` it last saw, so a UI failure links to the
+// exact backend trace that served it.
+// ──────────────────────────────────────────────────────────────────────────
+
+const RL_MAX_CLIENT_LOG = 60;
+const CLIENT_LOG_LEVELS = new Set(['info', 'warn', 'error']);
+
+publicRouter.post('/track/client-log', express.json({ type: '*/*' }), optionalAuth, (req, res) => {
+  const ip = req.ip || null;
+  if (rateLimitExceeded('client-log', ip, RL_MAX_CLIENT_LOG)) {
+    return res.status(204).end();
+  }
+
+  const body = req.body || {};
+  const event = typeof body.event === 'string' ? body.event.slice(0, 80) : null;
+  if (!event) return res.status(204).end();
+
+  const level = CLIENT_LOG_LEVELS.has(body.level) ? body.level : 'info';
+  const clientRequestId = typeof body.requestId === 'string' ? body.requestId.slice(0, 128) : null;
+
+  // Keep `data` small and string-bounded so a client can't bloat logs.
+  let data = {};
+  if (body.data && typeof body.data === 'object' && !Array.isArray(body.data)) {
+    for (const [k, v] of Object.entries(body.data).slice(0, 20)) {
+      data[String(k).slice(0, 40)] = typeof v === 'string' ? v.slice(0, 500) : v;
+    }
+  }
+
+  const fields = {
+    userId: (req.user && req.user.id) || null,
+    ip,
+    clientRequestId,
+    userAgent: req.get('User-Agent'),
+    ...data,
+  };
+
+  const log = level === 'error' ? logError : level === 'warn' ? logWarn : logInfo;
+  log(`client.${event}`, fields);
+
+  res.status(204).end();
+});
+
+// ──────────────────────────────────────────────────────────────────────────
 // Admin: funnel summary.
 // ──────────────────────────────────────────────────────────────────────────
 
