@@ -44,6 +44,16 @@ const compressImage = (file: File, maxWidth: number = 800, maxHeight: number = 6
   });
 };
 
+// Whole calendar days between two YYYY-MM-DD strings (a is the later date).
+// Returns null when either input can't be parsed. Used to show how long it had
+// been since the previous intimacy when each record was logged.
+const daysBetweenYmd = (laterYmd: string, earlierYmd: string): number | null => {
+  const a = new Date(laterYmd + 'T00:00:00');
+  const b = new Date(earlierYmd + 'T00:00:00');
+  if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return null;
+  return Math.round((a.getTime() - b.getTime()) / 86400000);
+};
+
 // Chinese-numeral date formatter for editorial meta lines. e.g. 二〇二五年九月七日
 const toChineseNum = (n: number): string => {
   const cn = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
@@ -748,7 +758,12 @@ const CalendarView = ({
             const filtered = intimateRecords
               .slice()
               .sort((a, b) => (b.date + 'T' + b.time).localeCompare(a.date + 'T' + a.time));
-            return filtered.length > 0 ? filtered.map((record, idx) => (
+            return filtered.length > 0 ? filtered.map((record, idx) => {
+              // filtered is sorted newest-first, so the previous intimacy is the
+              // next item. Show how many days apart it was from that one.
+              const prev = filtered[idx + 1];
+              const gapDays = prev ? daysBetweenYmd(record.date, prev.date) : null;
+              return (
               <article
                 key={record.id}
                 onClick={() => showRecordDetails(record.id)}
@@ -762,6 +777,11 @@ const CalendarView = ({
                 <div className="min-w-0">
                   <div className="font-display italic font-light text-sm text-petal-muted mb-1">
                     {record.date} · {record.time}
+                    {gapDays !== null && (
+                      <span className="text-petal-rose-deep" data-testid="intimacy-gap-days">
+                        {' '}· 距上次相隔 {gapDays} 天
+                      </span>
+                    )}
                   </div>
                   {record.description && (
                     <p className="font-body text-[15px] leading-relaxed text-petal-ink mb-1.5">
@@ -810,7 +830,8 @@ const CalendarView = ({
                   </button>
                 </div>
               </article>
-            )) : (
+              );
+            }) : (
               <div className="border border-dashed border-petal-rule rounded-md py-10 px-6 text-center">
                 <p className="font-display italic font-light text-base text-petal-muted">
                   還沒有記錄 — 開始你們的愛情之旅吧

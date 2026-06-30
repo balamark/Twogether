@@ -12,6 +12,7 @@ const express = require('express');
 const db = require('../database/db');
 const { logInfo, logError, logWarn } = require('../lib/logger');
 const { optionalAuth } = require('../middleware/auth');
+const featureFlags = require('../lib/featureFlags');
 
 const publicRouter = express.Router();
 const adminApiRouter = express.Router();
@@ -179,6 +180,25 @@ publicRouter.post('/track/client-log', express.json({ type: '*/*' }), optionalAu
   log(`client.${event}`, fields);
 
   res.status(204).end();
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Public: feature flags. The frontend reads this on load to decide which
+// admin-gated UI experiments to show. No auth — it only exposes on/off bits,
+// never anything sensitive. Cached server-side (lib/featureFlags) so frequent
+// polling is cheap.
+// ──────────────────────────────────────────────────────────────────────────
+publicRouter.get('/feature-flags', async (req, res) => {
+  try {
+    const flags = await featureFlags.getPublicFlags();
+    // Short cache so a flag flip propagates within ~30s without re-querying
+    // the DB on every page load.
+    res.set('Cache-Control', 'public, max-age=30');
+    res.json({ flags });
+  } catch (err) {
+    logWarn('public feature-flags read failed', { err: err.message });
+    res.json({ flags: {} });
+  }
 });
 
 // ──────────────────────────────────────────────────────────────────────────
@@ -730,6 +750,37 @@ adminApiRouter.post('/feedback/:id/moderate', express.json(), async (req, res) =
   }
 });
 
+// GET /api/admin/feature-flags — list every known flag with its label +
+// description + current on/off state for the dashboard toggles.
+adminApiRouter.get('/feature-flags', async (req, res) => {
+  try {
+    const flags = await featureFlags.listFlags();
+    res.json({ flags });
+  } catch (err) {
+    logError('Admin feature-flags list failed', { err: err.message });
+    res.status(500).json({ error: 'feature-flags list failed' });
+  }
+});
+
+// POST /api/admin/feature-flags/:key { enabled: boolean } — flip a flag.
+adminApiRouter.post('/feature-flags/:key', express.json(), async (req, res) => {
+  const key = req.params.key;
+  const { enabled } = req.body || {};
+  if (typeof enabled !== 'boolean') {
+    return res.status(400).json({ error: 'enabled (boolean) is required' });
+  }
+  try {
+    const next = await featureFlags.setFlag(key, enabled);
+    res.json({ success: true, key, enabled: next });
+  } catch (err) {
+    if (err.code === 'UNKNOWN_FLAG') {
+      return res.status(404).json({ error: 'unknown feature flag: ' + key });
+    }
+    logError('Admin feature-flag update failed', { err: err.message, key });
+    res.status(500).json({ error: 'feature-flag update failed' });
+  }
+});
+
 // DELETE /api/admin/users/:id — permanently delete an account (e.g. a stray test
 // account) so it stops polluting the dashboard. Cascades to the user's couple +
 // all couple-scoped data via the ON DELETE CASCADE foreign keys. Irreversible.
@@ -853,6 +904,7 @@ const ADMIN_HTML = `<!doctype html>
       <button class="tab" data-panel="pool">分潤</button>
       <button class="tab" data-panel="roleplay">邀請劇本</button>
       <button class="tab" data-panel="ai-usage">AI 用量</button>
+      <button class="tab" data-panel="flags">功能開關</button>
     </div>
 
     <!-- Panel: Funnel (default) -->
@@ -1133,6 +1185,23 @@ const ADMIN_HTML = `<!doctype html>
               <th class="num">呼叫次數</th>
               <th class="num">估算成本</th>
               <th>最後呼叫</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-flags">
+      <p class="sub">功能開關 — 把實驗性的 UI 藏在開關後面，在這裡即時開啟 / 關閉，不必重新部署。前端約 30 秒內生效。</p>
+      <div id="flagsStatusMsg" class="muted" style="font-size:12px;margin-bottom:10px"></div>
+      <div style="overflow-x:auto">
+        <table id="flagsTable">
+          <thead>
+            <tr>
+              <th>功能</th>
+              <th>說明</th>
+              <th class="num">狀態</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -1872,9 +1941,66 @@ const ADMIN_HTML = `<!doctype html>
         }).join('');
     }
 
-    // Lazy-load the reviews + pool + roleplay + ai-usage tabs the first time
-    // they're opened.
-    var reviewsLoaded = false, feedbackLoaded = false, poolLoaded = false, roleplayLoaded = false, aiUsageLoaded = false;
+    // ── Feature flags ──────────────────────────────────────────────────────
+    async function loadFlags() {
+      $('flagsStatusMsg').textContent = '載入中…';
+      try {
+        var res = await fetch('/api/admin/feature-flags');
+        if (!res.ok) throw new Error('flags ' + res.status);
+        var body = await res.json();
+        renderFlags(body.flags || []);
+        $('flagsStatusMsg').textContent = '更新於 ' + new Date().toLocaleTimeString('zh-TW');
+      } catch (e) {
+        $('flagsStatusMsg').textContent = '載入失敗: ' + e.message;
+      }
+    }
+    function renderFlags(rows) {
+      var tbody = document.querySelector('#flagsTable tbody');
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="3" class="muted">沒有可設定的功能開關</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(function (f) {
+        var badge = f.enabled
+          ? '<span class="badge yes">已開啟</span>'
+          : '<span class="badge no">已關閉</span>';
+        var btnLabel = f.enabled ? '關閉' : '開啟';
+        return '<tr>' +
+          '<td><div>' + esc(f.label || f.key) + '</div>' +
+            '<div class="muted" style="font-size:11px">' + esc(f.key) + '</div></td>' +
+          '<td class="muted" style="font-size:12px;max-width:340px">' + esc(f.description || '') + '</td>' +
+          '<td class="num">' + badge +
+            ' <button data-flag-toggle data-key="' + esc(f.key) + '" data-next="' + (f.enabled ? '0' : '1') + '">' +
+            btnLabel + '</button></td>' +
+          '</tr>';
+      }).join('');
+      tbody.querySelectorAll('button[data-flag-toggle]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          toggleFlag(btn.getAttribute('data-key'), btn.getAttribute('data-next') === '1', btn);
+        });
+      });
+    }
+    async function toggleFlag(key, enabled, btn) {
+      btn.disabled = true;
+      btn.textContent = '處理中…';
+      try {
+        var res = await fetch('/api/admin/feature-flags/' + encodeURIComponent(key), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: enabled }),
+        });
+        if (!res.ok) throw new Error('toggle ' + res.status);
+        loadFlags();
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = enabled ? '開啟' : '關閉';
+        alert('更新失敗：' + e.message);
+      }
+    }
+
+    // Lazy-load the reviews + pool + roleplay + ai-usage + flags tabs the first
+    // time they're opened.
+    var reviewsLoaded = false, feedbackLoaded = false, poolLoaded = false, roleplayLoaded = false, aiUsageLoaded = false, flagsLoaded = false;
     document.querySelectorAll('.tab').forEach(function (btn) {
       var panel = btn.getAttribute('data-panel');
       if (panel === 'reviews') btn.addEventListener('click', function () { if (!reviewsLoaded) { reviewsLoaded = true; loadReviews(); } });
@@ -1882,6 +2008,7 @@ const ADMIN_HTML = `<!doctype html>
       if (panel === 'pool') btn.addEventListener('click', function () { if (!poolLoaded) { poolLoaded = true; loadPools(); } });
       if (panel === 'roleplay') btn.addEventListener('click', function () { if (!roleplayLoaded) { roleplayLoaded = true; loadRoleplay(); } });
       if (panel === 'ai-usage') btn.addEventListener('click', function () { if (!aiUsageLoaded) { aiUsageLoaded = true; loadAiUsage(); } });
+      if (panel === 'flags') btn.addEventListener('click', function () { if (!flagsLoaded) { flagsLoaded = true; loadFlags(); } });
     });
 
     $('apply').addEventListener('click', function () {
