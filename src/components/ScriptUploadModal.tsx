@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Trash2 } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
 import type { RoleplayScript } from '../App';
 
@@ -49,6 +49,8 @@ interface ScriptUploadModalProps {
       isPublic?: boolean;
     },
   ) => void;
+  /** Deletes the script being edited (edit mode only). */
+  onDeleteScript: (id: string) => void;
 }
 
 // Script Upload Modal Component — supports create AND edit. When editingScript
@@ -63,8 +65,11 @@ const ScriptUploadModal = ({
   onClose,
   addCustomScript,
   updateCustomScript,
+  onDeleteScript,
 }: ScriptUploadModalProps) => {
   const isEditMode = editingScript !== null;
+  // Two-step delete confirm (no blocking window.confirm): first click arms it.
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   // In create mode, restore a draft preserved from a previous cap-blocked
   // upload (pendingScriptDraft) so the user resumes exactly where they left
   // off after going premium. Edit mode always wins from editingScript.
@@ -432,6 +437,42 @@ const ScriptUploadModal = ({
               {isEditMode ? '保存修改 →' : '上傳劇本 (+200 金幣)'}
             </button>
           </div>
+          {isEditMode && editingScript && (
+            <div className="pt-3 mt-2 border-t border-petal-rule">
+              {confirmingDelete ? (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-body text-sm text-red-700">確定要刪除這個劇本嗎？此動作無法復原。</span>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setConfirmingDelete(false)}
+                      className="px-4 py-2 border border-petal-rule text-petal-ink-soft rounded-md font-body text-sm hover:border-petal-ink transition-colors"
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="script-delete-confirm-button"
+                      onClick={() => onDeleteScript(editingScript.id)}
+                      className="px-4 py-2 bg-red-600 text-white rounded-md font-body text-sm hover:bg-red-700 transition-colors"
+                    >
+                      確認刪除
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  data-testid="script-delete-button"
+                  onClick={() => setConfirmingDelete(true)}
+                  className="flex items-center gap-1.5 text-red-600 hover:text-red-700 font-body text-sm transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" strokeWidth={1.5} />
+                  刪除這個劇本
+                </button>
+              )}
+            </div>
+          )}
         </form>
         </div>
       </div>

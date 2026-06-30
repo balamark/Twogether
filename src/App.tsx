@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, StickyNote, MessageSquareHeart, Trash2, Pencil, HeartHandshake, Crown } from 'lucide-react';
 import SettingsView from './components/SettingsView';
+import ActivityView from './components/ActivityView';
 import UpgradeView, { BillingResultView } from './components/UpgradeView';
 import { BookingResultView } from './components/BookingResultView';
 import RoleplayView from './components/RoleplayView';
@@ -415,8 +416,34 @@ export interface PositionSuggestion {
   benefits: string[];
 }
 
+// Active-tab persistence: restore the same view on refresh. Whitelisted so a
+// stale/unknown stored value can't drop the user on an unexpected page.
+const VIEW_STORAGE_KEY = 'tw:lastView';
+const PERSISTED_VIEWS = new Set([
+  'record', 'achievements', 'conflict', 'events', 'roleplay', 'wall',
+  'therapists', 'shop', 'journey', 'intimacy-history', 'settings', 'activity',
+  'feedback', 'love-language', 'upgrade', 'pricing', 'foreplay', 'games',
+]);
+
 const LoveTimeApp = () => {
-  const [currentView, setCurrentView] = useState('record');
+  // Persist the active tab across page refreshes so a reload keeps the user on
+  // the same page (e.g. 角色扮演) instead of bouncing back to 記錄時光. Only
+  // restore known navigable views; transient/result flows handle their own view.
+  const [currentView, setCurrentView] = useState(() => {
+    if (typeof window === 'undefined') return 'record';
+    const p = window.location.pathname;
+    if (p.startsWith('/billing/result') || p.startsWith('/booking/result')) return 'record';
+    try {
+      const saved = localStorage.getItem(VIEW_STORAGE_KEY);
+      if (saved && PERSISTED_VIEWS.has(saved)) return saved;
+    } catch { /* storage disabled — fall back to default */ }
+    return 'record';
+  });
+
+  // Remember the active tab (best-effort) so a refresh restores it.
+  useEffect(() => {
+    try { localStorage.setItem(VIEW_STORAGE_KEY, currentView); } catch { /* ignore */ }
+  }, [currentView]);
   // Message shown atop the Upgrade view when the user is sent there by hitting a
   // usage cap (set from the global `billing:limit-reached` event).
   const [upgradeReason, setUpgradeReason] = useState<string | null>(null);
@@ -817,25 +844,26 @@ const LoveTimeApp = () => {
   };
 
   const handleLogout = async () => {
+    // Logout must always clear local state, even if the server call hiccups —
+    // otherwise the user stays on an authenticated panel with a cleared token.
     try {
       await apiService.logout();
-      setAuthState({
-        user: null,
-        isAuthenticated: false,
-        partnerConnected: false
-      });
-      showNotification({
-        type: 'info',
-        title: '已登出',
-        message: '感謝使用 Twogether'
-      });
     } catch (error: unknown) {
-      showNotification({
-        type: 'error',
-        title: '登出失敗',
-        message: (error as Error)?.message || '登出過程中發生錯誤'
-      });
+      console.error('Logout request failed (clearing locally anyway):', error);
     }
+    setAuthState({
+      user: null,
+      isAuthenticated: false,
+      partnerConnected: false
+    });
+    // Reset the view so we land back on the logged-out home, not whatever
+    // authenticated panel (設定 / 金幣商店 / …) was open at logout time.
+    setCurrentView('record');
+    showNotification({
+      type: 'info',
+      title: '已登出',
+      message: '感謝使用 Twogether'
+    });
   };
 
   // Pairing invitation handlers
@@ -1738,6 +1766,32 @@ const LoveTimeApp = () => {
     }
   };
 
+  // Delete a custom script from the edit modal. Removes it server-side and from
+  // local state, then closes the modal.
+  const deleteCustomScript = async (id: string) => {
+    const removed = customScripts.find(s => s.id === id);
+    try {
+      await apiService.deleteCustomScript(id);
+      setCustomScripts(prev => prev.filter(s => s.id !== id));
+      setShowScriptUploadModal(false);
+      setEditingScript(null);
+      showNotification({
+        type: 'success',
+        title: '劇本已刪除',
+        message: removed ? `已刪除「${removed.title}」` : '自訂劇本已刪除',
+        duration: 4000,
+      });
+    } catch (error) {
+      console.error('Failed to delete custom script:', error);
+      showNotification({
+        type: 'error',
+        title: '刪除失敗',
+        message: (error as Error)?.message || '無法刪除劇本，請稍後再試',
+        duration: 6000,
+      });
+    }
+  };
+
   // Unpublish a custom script straight from the marketplace detail view, so the
   // author doesn't have to hunt down the matching script in 自訂劇本 to stop
   // sharing it. Flips is_public=false and reconciles local state.
@@ -2043,6 +2097,7 @@ const LoveTimeApp = () => {
         cycleRecords={cycleRecords}
         onCycleRecordsChange={setCycleRecords}
       />;
+      case 'activity': return <ActivityView showNotification={showNotification} />;
       case 'intimacy-history': return (
         <IntimacyRequestsHistory
           authState={authState}
@@ -2129,6 +2184,7 @@ const LoveTimeApp = () => {
         onShowNotifications={() => setShowNotificationInbox(true)}
         onShowCoinShop={() => setCurrentView('shop')}
         onShowSettings={() => setCurrentView('settings')}
+        onShowActivity={() => setCurrentView('activity')}
         onShowJourney={() => setCurrentView('journey')}
         onShowIntimacyHistory={() => setCurrentView('intimacy-history')}
         onShowFeedback={() => setCurrentView('feedback')}
@@ -2377,6 +2433,7 @@ const LoveTimeApp = () => {
             }}
             addCustomScript={addCustomScript}
             updateCustomScript={updateCustomScript}
+            onDeleteScript={deleteCustomScript}
           />
         </ErrorBoundary>
       )}

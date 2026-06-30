@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown, MessageSquarePlus } from 'lucide-react';
+import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown, MessageSquarePlus, Activity } from 'lucide-react';
 import { apiService } from '../services/api';
 
 interface User {
@@ -26,6 +26,7 @@ interface HeaderProps {
   onShowNotifications: () => void;
   onShowCoinShop: () => void;
   onShowSettings: () => void;
+  onShowActivity: () => void;
   onShowJourney: () => void;
   onShowIntimacyHistory: () => void;
   onShowUpgrade: () => void;
@@ -42,6 +43,7 @@ const Header: React.FC<HeaderProps> = ({
   onShowNotifications,
   onShowCoinShop,
   onShowSettings,
+  onShowActivity,
   onShowJourney,
   onShowIntimacyHistory,
   onShowUpgrade,
@@ -178,6 +180,17 @@ const Header: React.FC<HeaderProps> = ({
                           <span>金幣商店</span>
                         </span>
                         <span data-testid="coin-balance" className="font-display italic text-sm text-petal-ink">{totalCoins}</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          onShowActivity();
+                          setShowUserMenu(false);
+                        }}
+                        data-testid="user-menu-activity"
+                        className="w-full flex items-center space-x-2 px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
+                      >
+                        <Activity className="w-3.5 h-3.5" strokeWidth={1.5} />
+                        <span>最近動態</span>
                       </button>
                       <button
                         onClick={() => {

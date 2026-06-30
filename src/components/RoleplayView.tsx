@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow, LayoutGrid, List, Gamepad2, ChevronDown, ArrowUp, ChevronLeft, ChevronRight, Share2 } from 'lucide-react';
+import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow, LayoutGrid, List, Gamepad2, ChevronDown, ArrowUp, ChevronLeft, ChevronRight, Share2, Search } from 'lucide-react';
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { apiService } from '../services/api';
@@ -186,6 +186,9 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   // long 所有劇本 list can stay compact while favorites stays as thumbnails.
   const [favoritesView, setFavoritesView] = usePersistedViewMode('roleplayView:favorites', 'grid');
   const [customView, setCustomView] = usePersistedViewMode('roleplayView:custom', 'grid');
+  // Free-text search within 自訂劇本 — lets a couple with many scripts find one
+  // by title / scenario / tag instead of scrolling the whole list.
+  const [customQuery, setCustomQuery] = useState('');
   const [collectionView, setCollectionView] = usePersistedViewMode('roleplayView:collection', 'grid');
   const [allView, setAllView] = usePersistedViewMode('roleplayView:all', 'list');
   const [marketplaceView, setMarketplaceView] = usePersistedViewMode('roleplayView:marketplace', 'grid');
@@ -403,6 +406,15 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   const filteredScripts = roleplayFilter === 'all'
     ? allScripts
     : allScripts.filter(script => script.category === roleplayFilter);
+
+  // 自訂劇本 search — match title / scenario / tags, case-insensitive.
+  const customQ = customQuery.trim().toLowerCase();
+  const filteredCustomScripts = customQ
+    ? customScripts.filter((s) =>
+        s.title?.toLowerCase().includes(customQ) ||
+        s.scenario?.toLowerCase().includes(customQ) ||
+        (s.tags || []).some((t) => t.toLowerCase().includes(customQ)))
+    : customScripts;
 
   // Convert marketplace data shape into the RoleplayScript the play/view
   // handlers expect. Keeps recordRoleplay logic single-sourced.
@@ -716,7 +728,9 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             <h3 className="font-display text-xl font-medium tracking-tight text-petal-ink flex items-center min-w-0">
               <FileText className="w-4 h-4 mr-2 text-petal-ink-soft flex-shrink-0" strokeWidth={1.5} />
               <span className="truncate">自訂<em className="not-italic font-light italic text-pink-600 mx-1">劇本</em>
-              <span className="font-display italic font-light text-sm text-petal-muted ml-1">({customScripts.length})</span></span>
+              <span className="font-display italic font-light text-sm text-petal-muted ml-1">
+                ({customQ ? `${filteredCustomScripts.length}/${customScripts.length}` : customScripts.length})
+              </span></span>
             </h3>
             <div className="flex items-center gap-2 flex-shrink-0">
               {customScripts.length > 0 && (
@@ -733,10 +747,38 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             </div>
           </div>
 
-          {customScripts.length > 0 ? (
+          {customScripts.length > 0 && (
+            <div className="relative mb-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-petal-muted" strokeWidth={1.5} />
+              <input
+                type="text"
+                value={customQuery}
+                onChange={(e) => setCustomQuery(e.target.value)}
+                data-testid="custom-script-search"
+                placeholder="搜尋自訂劇本（標題、情境、標籤）"
+                className="w-full bg-white border border-petal-rule rounded-full pl-9 pr-9 py-2 font-body text-sm text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose"
+              />
+              {customQuery && (
+                <button
+                  onClick={() => setCustomQuery('')}
+                  data-testid="custom-script-search-clear"
+                  aria-label="清除搜尋"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-petal-muted hover:text-petal-ink"
+                >
+                  <X className="w-4 h-4" strokeWidth={1.5} />
+                </button>
+              )}
+            </div>
+          )}
+
+          {customScripts.length > 0 && filteredCustomScripts.length === 0 ? (
+            <p data-testid="custom-script-search-empty" className="font-body text-sm text-petal-muted py-6 text-center">
+              找不到符合「{customQuery}」的自訂劇本。
+            </p>
+          ) : customScripts.length > 0 ? (
             customView === 'grid' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {customScripts.map((script) => (
+                {filteredCustomScripts.map((script) => (
                   <div key={script.id} data-testid={`script-card-custom-${script.id}`} className="bg-white border border-petal-rule rounded-md p-4 hover:border-petal-rose transition-colors">
                     <div className="flex items-start gap-3 mb-2">
                       <div className="w-14 h-14 rounded-md flex-shrink-0 overflow-hidden border border-petal-rule">
@@ -820,7 +862,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               </div>
             ) : (
               <div className="flex flex-col gap-1.5">
-                {customScripts.map((script) =>
+                {filteredCustomScripts.map((script) =>
                   renderScriptListRow({
                     key: script.id,
                     testId: `script-card-custom-${script.id}`,

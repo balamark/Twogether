@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { User, Users, CheckCircle, Trash2 } from 'lucide-react';
-import { apiService, type CycleRecord, type ActivityItem } from '../services/api';
+import { apiService, type CycleRecord } from '../services/api';
 import { averageCycleLength, predictNextPeriodStart, ovulationWindow, computeCycleLengths } from '../utils/cycle';
 import { TIMEZONE_OPTIONS } from '../utils/timezone-options';
-import { formatYmdInTz, browserTz as getBrowserTz, formatDateTime } from '../utils/datetime';
-import { useTimezone } from '../contexts/TimezoneContext';
-import { clientLog } from '../utils/telemetry';
+import { formatYmdInTz, browserTz as getBrowserTz } from '../utils/datetime';
 
 interface Nicknames {
   partner1: string;
@@ -109,54 +107,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const [newMemoryQuestion, setNewMemoryQuestion] = useState('');
   const [newEmotion, setNewEmotion] = useState('');
-
-  // 最近動態 — recent activity from both partners.
-  const tz = useTimezone();
-  const [activities, setActivities] = useState<ActivityItem[]>([]);
-  const [activityLoading, setActivityLoading] = useState(true);
-  const [activityError, setActivityError] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setActivityLoading(true);
-    setActivityError(false);
-    apiService.getActivityFeed()
-      .then((items) => {
-        if (cancelled) return;
-        setActivities(items);
-        clientLog('activity.loaded', { count: items.length });
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setActivityError(true);
-        clientLog('activity.load_error', {
-          message: err instanceof Error ? err.message : String(err),
-        }, 'error');
-        showNotification({
-          type: 'warning',
-          title: '最近動態載入失敗',
-          message: '無法載入最近動態，請稍後再試。',
-          duration: 5000,
-        });
-      })
-      .finally(() => { if (!cancelled) setActivityLoading(false); });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Small dot color per activity type, mirroring the petal status-dot style.
-  const activityDotClass = (type: ActivityItem['type']) => {
-    switch (type) {
-      case 'love_moment': return 'bg-pink-500';
-      case 'custom_script': return 'bg-petal-rose-deep';
-      case 'wall_post': return 'bg-petal-sage-deep';
-      case 'event': return 'bg-amber-500';
-      case 'achievement': return 'bg-violet-500';
-      case 'coins': return 'bg-yellow-500';
-      case 'checkin': return 'bg-emerald-500';
-      default: return 'bg-petal-muted';
-    }
-  };
 
   const addMemoryQuestion = () => {
     const trimmed = newMemoryQuestion.trim();
@@ -852,41 +802,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             {isSavingSettings ? '保存中…' : '保存設定 →'}
           </button>
         </div>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6" data-testid="activity-feed">
-        <h3 className="text-lg font-bold text-gray-800 mb-4">最近動態</h3>
-        {activityLoading ? (
-          <div className="flex justify-center py-6">
-            <div className="animate-spin rounded-full h-6 w-6 border-2 border-petal-rule border-t-petal-rose-deep" />
-          </div>
-        ) : activityError ? (
-          <p className="font-body text-sm text-petal-muted py-4 text-center">
-            無法載入最近動態，請稍後再試。
-          </p>
-        ) : activities.length === 0 ? (
-          <p className="font-body text-sm text-petal-muted py-4 text-center">
-            還沒有最近動態，開始記錄你們的時光吧。
-          </p>
-        ) : (
-          <ul className="divide-y divide-petal-rule">
-            {activities.map((a) => (
-              <li key={a.id} data-testid="activity-item" className="flex items-start gap-3 py-2.5">
-                <span className={`mt-1.5 w-2.5 h-2.5 rounded-sm flex-shrink-0 ${activityDotClass(a.type)}`} />
-                <div className="min-w-0 flex-1">
-                  <p className="font-body text-sm text-petal-ink break-words">
-                    <span className="font-medium">{a.isSelf ? '你' : (a.actorNickname || '你們')}</span>
-                    {' '}
-                    {a.description}
-                  </p>
-                  <p className="font-body text-xs text-petal-muted mt-0.5">
-                    {formatDateTime(a.date, tz)}
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
       </div>
 
       <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
