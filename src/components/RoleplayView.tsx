@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Heart, Sparkles, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow, LayoutGrid, List, Gamepad2, ChevronDown, ArrowUp, ChevronLeft, ChevronRight, Share2, Search } from 'lucide-react';
+import { Heart, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow, LayoutGrid, List, Gamepad2, ChevronDown, ArrowUp, ChevronLeft, ChevronRight, Share2, Search } from 'lucide-react';
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { apiService } from '../services/api';
@@ -182,37 +182,19 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   // alone does NOT record; only this transition does.
   const [hasBegun, setHasBegun] = useState(false);
 
-  // Per-section view modes (grid/list), each persisted independently so e.g. the
-  // long 所有劇本 list can stay compact while favorites stays as thumbnails.
-  const [favoritesView, setFavoritesView] = usePersistedViewMode('roleplayView:favorites', 'grid');
-  const [customView, setCustomView] = usePersistedViewMode('roleplayView:custom', 'grid');
-  // Free-text search within 自訂劇本 — lets a couple with many scripts find one
-  // by title / scenario / tag instead of scrolling the whole list.
-  const [customQuery, setCustomQuery] = useState('');
+  // View mode (grid/list) for the unified 我的劇本 list and the 收藏 section.
+  const [mineView, setMineView] = usePersistedViewMode('roleplayView:mine', 'grid');
+  // Free-text search across 我的劇本 — title / scenario / tag, case-insensitive.
+  const [mineQuery, setMineQuery] = useState('');
   const [collectionView, setCollectionView] = usePersistedViewMode('roleplayView:collection', 'grid');
-  const [allView, setAllView] = usePersistedViewMode('roleplayView:all', 'list');
   const [marketplaceView, setMarketplaceView] = usePersistedViewMode('roleplayView:marketplace', 'grid');
 
-  // Collapsible sections. 收藏劇本 and 所有劇本 hold the most items and are
-  // collapsed by default so the page is short on mobile; the user can expand
-  // either and the choice sticks.
+  // 收藏劇本 (marketplace favorites) is collapsed by default so the page stays
+  // short on mobile; the choice sticks.
   const [collectionOpen, setCollectionOpen] = usePersistedBool('roleplayOpen:collection', false);
-  const [allOpen, setAllOpen] = usePersistedBool('roleplayOpen:all', false);
 
-  // Section anchors for the quick-jump nav. Jumping also expands a collapsed
-  // section so the target content is actually visible after the scroll.
-  const favoritesRef = useRef<HTMLDivElement>(null);
-  const customRef = useRef<HTMLDivElement>(null);
+  // Anchor for the 收藏 section's own layout.
   const collectionRef = useRef<HTMLDivElement>(null);
-  const allRef = useRef<HTMLDivElement>(null);
-
-  const scrollToSection = useCallback((ref: React.RefObject<HTMLDivElement | null>, expand?: () => void) => {
-    expand?.();
-    // Defer so an expanding section has rendered before we measure its top.
-    requestAnimationFrame(() => {
-      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    });
-  }, []);
 
   // Floating back-to-top button — shown once the user has scrolled past a screenful.
   const [showBackToTop, setShowBackToTop] = useState(false);
@@ -403,18 +385,21 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   };
 
   const allScripts = [...defaultRoleplayScripts, ...customScripts];
-  const filteredScripts = roleplayFilter === 'all'
-    ? allScripts
-    : allScripts.filter(script => script.category === roleplayFilter);
 
-  // 自訂劇本 search — match title / scenario / tags, case-insensitive.
-  const customQ = customQuery.trim().toLowerCase();
-  const filteredCustomScripts = customQ
-    ? customScripts.filter((s) =>
-        s.title?.toLowerCase().includes(customQ) ||
-        s.scenario?.toLowerCase().includes(customQ) ||
-        (s.tags || []).some((t) => t.toLowerCase().includes(customQ)))
-    : customScripts;
+  // Unified 我的劇本 list: one chip filter (all / category / 我的最愛 / 自訂)
+  // plus a free-text search over title / scenario / tags.
+  const mineBase =
+    roleplayFilter === 'all' ? allScripts
+    : roleplayFilter === 'favorites' ? allScripts.filter(s => favoriteScriptIds.has(s.id))
+    : roleplayFilter === 'custom' ? customScripts
+    : allScripts.filter(s => s.category === roleplayFilter);
+  const mineQ = mineQuery.trim().toLowerCase();
+  const mineList = mineQ
+    ? mineBase.filter((s) =>
+        s.title?.toLowerCase().includes(mineQ) ||
+        s.scenario?.toLowerCase().includes(mineQ) ||
+        (s.tags || []).some((t) => t.toLowerCase().includes(mineQ)))
+    : mineBase;
 
   // Convert marketplace data shape into the RoleplayScript the play/view
   // handlers expect. Keeps recordRoleplay logic single-sourced.
@@ -438,14 +423,6 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     setMarketplaceDetailId(null);
     handleQuickPlay(rp);
   }, [handleQuickPlay]);
-
-  // 我的最愛 — pulls from both default and custom scripts. Falls back to the
-  // original top-3 featured selection when the couple has no favorites yet,
-  // so the top section never goes empty.
-  const favoriteScripts = allScripts.filter(s => favoriteScriptIds.has(s.id));
-  const hasFavorites = favoriteScripts.length > 0;
-  const topScripts = hasFavorites ? favoriteScripts : defaultRoleplayScripts.slice(0, 3);
-  const topSectionTitle = hasFavorites ? '我的最愛' : '精選';
 
   const FavoriteButton: React.FC<{ scriptId: string; className?: string }> = ({ scriptId, className = '' }) => {
     const isFav = favoriteScriptIds.has(scriptId);
@@ -588,356 +565,233 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
 
       {mainTab === 'mine' && (
       <div>
-        {/* Category Filter Tabs */}
-        <div className="flex flex-wrap gap-1.5 mb-8">
+        {/* Top controls — upload (moved to the top), search, and view toggle. */}
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <button
+            onClick={() => setShowScriptUploadModal(true)}
+            data-testid="script-upload-button"
+            className="bg-petal-ink text-petal-cream px-4 py-2 rounded-full font-body text-sm hover:bg-pink-700 transition-colors flex items-center gap-1.5 flex-shrink-0"
+          >
+            <Plus className="w-4 h-4" strokeWidth={1.5} />
+            <span>上傳劇本</span>
+          </button>
+          <div className="relative flex-1 min-w-[160px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-petal-muted" strokeWidth={1.5} />
+            <input
+              type="text"
+              value={mineQuery}
+              onChange={(e) => setMineQuery(e.target.value)}
+              data-testid="custom-script-search"
+              placeholder="搜尋劇本（標題、情境、標籤）"
+              className="w-full bg-white border border-petal-rule rounded-full pl-9 pr-9 py-2 font-body text-sm text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose"
+            />
+            {mineQuery && (
+              <button
+                onClick={() => setMineQuery('')}
+                data-testid="custom-script-search-clear"
+                aria-label="清除搜尋"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-petal-muted hover:text-petal-ink"
+              >
+                <X className="w-4 h-4" strokeWidth={1.5} />
+              </button>
+            )}
+          </div>
+          <ViewToggle mode={mineView} setMode={setMineView} idPrefix="roleplay-mine" />
+        </div>
+
+        {/* Filter chips — all / categories / 我的最愛 / 自訂, all on one row. */}
+        <div className="flex flex-wrap gap-1.5 mb-6" data-testid="roleplay-filter-chips">
           {[
-            { id: 'all', label: '全部', icon: '🌟' },
+            { id: 'all', label: '所有', icon: '🌟' },
             { id: 'romantic', label: '浪漫', icon: '💕' },
             { id: 'adventurous', label: '冒險', icon: '🔥' },
             { id: 'school', label: '校園', icon: '🏫' },
-            { id: 'bold', label: '大膽', icon: '🧨' }
-          ].map(category => {
-            const isActive = roleplayFilter === category.id;
+            { id: 'bold', label: '大膽', icon: '🧨' },
+            { id: 'favorites', label: '我的最愛', icon: '♥' },
+            { id: 'custom', label: '自訂', icon: '📄' },
+          ].map(f => {
+            const isActive = roleplayFilter === f.id;
             return (
               <button
-                key={category.id}
-                onClick={() => setRoleplayFilter(category.id)}
+                key={f.id}
+                onClick={() => setRoleplayFilter(f.id)}
+                data-testid={`roleplay-filter-${f.id}`}
                 className={`flex items-center space-x-1.5 px-3 sm:px-3.5 py-1.5 rounded-full transition-colors border min-h-[36px] ${
                   isActive
                     ? 'bg-petal-ink text-petal-cream border-petal-ink'
                     : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
                 }`}
               >
-                <span className="text-xs opacity-75 saturate-75">{category.icon}</span>
-                <span className="font-body text-[13px] font-medium">{category.label}</span>
+                <span className="text-xs opacity-75 saturate-75">{f.icon}</span>
+                <span className="font-body text-[13px] font-medium">{f.label}</span>
               </button>
             );
           })}
         </div>
 
-        {/* Quick-jump nav — sticks under the tab bar so the user can hop
-            straight to a section instead of scrolling past long lists. */}
-        <div className="sticky top-0 z-20 -mx-1 px-1 py-2 mb-6 bg-petal-cream/95 backdrop-blur-sm border-b border-petal-rule-soft">
-          <div className="flex gap-1.5 overflow-x-auto" data-testid="roleplay-section-nav">
-            {[
-              { label: topSectionTitle, ref: favoritesRef, testId: 'jump-favorites' as const, expand: undefined },
-              { label: '自訂', ref: customRef, testId: 'jump-custom' as const, expand: undefined },
-              ...(favoritedMarketplace.length > 0
-                ? [{ label: '收藏', ref: collectionRef, testId: 'jump-collection' as const, expand: () => setCollectionOpen(true) }]
-                : []),
-              { label: '所有', ref: allRef, testId: 'jump-all' as const, expand: () => setAllOpen(true) },
-            ].map((s) => (
-              <button
-                key={s.testId}
-                type="button"
-                onClick={() => scrollToSection(s.ref, s.expand)}
-                data-testid={`roleplay-section-${s.testId}`}
-                className="flex-shrink-0 px-3 py-1.5 rounded-full border border-petal-rule bg-white text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink font-body text-[13px] font-medium transition-colors whitespace-nowrap"
+        {/* Unified script list — filtered by the active chip + search. Custom
+            scripts keep 編輯/分享/查看/開始; default scripts keep 查看/開始. Both
+            grid and list views are preserved. */}
+        {mineList.length === 0 ? (
+          <p data-testid="roleplay-empty" className="font-display italic font-light text-sm text-petal-muted text-center py-10">
+            {mineQuery
+              ? `找不到符合「${mineQuery}」的劇本。`
+              : roleplayFilter === 'custom'
+                ? '還沒有自訂劇本，點擊上方「上傳劇本」開始創作。'
+                : roleplayFilter === 'favorites'
+                  ? '還沒有最愛的劇本，點擊卡片上的愛心加入最愛。'
+                  : '沒有符合的劇本。'}
+          </p>
+        ) : mineView === 'grid' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {mineList.map((script, index) => (
+              <div
+                key={script.id ?? index}
+                data-testid={script.isCustom ? `script-card-custom-${script.id}` : undefined}
+                className="bg-white border border-petal-rule rounded-md p-4 hover:border-petal-rose transition-colors"
               >
-                {s.label}
-              </button>
+                <div className="flex items-start gap-3 mb-2">
+                  <div className="w-16 h-16 rounded-md flex-shrink-0 overflow-hidden border border-petal-rule">
+                    {renderThumb(script, 'w-full h-full')}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                        <h4 className="font-display text-base font-medium tracking-tight text-petal-ink truncate">{script.title}</h4>
+                        <span className="flex-shrink-0 font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rule text-petal-muted">
+                          {CATEGORY_META[script.category]?.label ?? script.category}
+                        </span>
+                        {script.isCustom && (
+                          <span data-testid="script-card-custom-badge" className="flex-shrink-0 font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rose-soft bg-petal-rose-soft/40 text-petal-rose-deep">自訂</span>
+                        )}
+                        {script.isCustom && isRecentlyCreated(script.createdAt) && (
+                          <span data-testid={`script-new-badge-${script.id}`} className="flex-shrink-0 px-1.5 py-0.5 font-body text-[10px] font-medium uppercase tracking-[0.1em] rounded-full bg-petal-rose-deep text-petal-cream">New</span>
+                        )}
+                      </div>
+                      <FavoriteButton scriptId={script.id} className="flex-shrink-0 w-7 h-7 hover:bg-petal-cream-2" />
+                    </div>
+                    <p className="font-body text-sm text-petal-ink-soft mt-1 leading-relaxed line-clamp-2">{script.scenario}</p>
+                    {script.isCustom && script.createdAt && (
+                      <p data-testid={`script-created-date-${script.id}`} className="font-body text-[11px] text-petal-muted mt-1">
+                        建立於 {formatDate(script.createdAt, tz, { year: 'numeric', month: 'numeric', day: 'numeric', withWeekday: false })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center justify-end flex-wrap gap-1.5 mt-3">
+                  {script.isCustom && onEditScript && (
+                    <button
+                      onClick={() => onEditScript(script)}
+                      data-testid={`script-edit-button-${script.id}`}
+                      className="border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors"
+                      aria-label={`編輯 ${script.title}`}
+                    >
+                      <Pencil className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                      編輯
+                    </button>
+                  )}
+                  {script.isCustom && (
+                    <button
+                      onClick={() => handleShareScript(script)}
+                      disabled={sharingId === script.id}
+                      data-testid={`script-card-custom-share-button-${script.id}`}
+                      className="border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors disabled:opacity-50"
+                      aria-label={`分享 ${script.title} 給伴侶`}
+                    >
+                      <Share2 className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                      {sharingId === script.id ? '分享中' : '分享'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => handleViewScript(script)}
+                    data-testid={script.isCustom ? `script-card-custom-view-button-${script.id}` : `script-list-view-button-${index}`}
+                    className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                  >
+                    <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                    查看
+                  </button>
+                  <button
+                    onClick={() => handleQuickPlay(script)}
+                    data-testid={script.isCustom ? `script-card-custom-play-button-${script.id}` : `script-list-play-button-${index}`}
+                    className="bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                  >
+                    <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                    開始
+                  </button>
+                </div>
+              </div>
             ))}
           </div>
-        </div>
-
-        {/* Top section — favorites if any, else fallback featured */}
-        <div ref={favoritesRef} className="mb-10 scroll-mt-20" data-testid={hasFavorites ? 'roleplay-favorites-section' : 'roleplay-featured-section'}>
-          <div className="flex items-center justify-between gap-2 mb-6">
-            <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink flex items-center min-w-0">
-              {hasFavorites ? (
-                <Heart className="w-4 h-4 mr-2 text-petal-rose-deep fill-petal-rose-deep flex-shrink-0" strokeWidth={1.5} />
-              ) : (
-                <Sparkles className="w-4 h-4 mr-2 text-petal-rose-deep flex-shrink-0" strokeWidth={1.5} />
-              )}
-              <span className="truncate">{topSectionTitle}<em className="not-italic font-light italic text-pink-600 ml-1">劇本</em></span>
-            </h3>
-            <ViewToggle mode={favoritesView} setMode={setFavoritesView} idPrefix="roleplay-favorites" />
-          </div>
-          {favoritesView === 'grid' ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {topScripts.map((script, index) => (
-                <div key={script.id ?? index} className="bg-white rounded-md p-4 border border-petal-rule hover:border-petal-rose transition-colors">
-                  <div className="relative aspect-video bg-petal-cream-2 rounded-md mb-3 overflow-hidden">
-                    {renderThumb(script, 'w-full h-full', 'contain')}
-                    <FavoriteButton
-                      scriptId={script.id}
-                      className="absolute top-2 right-2 w-8 h-8 bg-white/85 backdrop-blur-sm border border-petal-rule shadow-sm hover:bg-white"
-                    />
-                  </div>
-                  <h4 className="font-display text-base font-medium tracking-tight text-petal-ink mb-1.5">{script.title}</h4>
-                  <p className="font-body text-sm text-petal-ink-soft mb-3 line-clamp-2 leading-relaxed">{script.scenario}</p>
-                  <div className="grid grid-cols-2 gap-2">
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {mineList.map((script, index) =>
+              renderScriptListRow({
+                key: script.id ?? index,
+                testId: script.isCustom ? `script-card-custom-${script.id}` : undefined,
+                script,
+                badge: (
+                  <>
+                    <span className="font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rule text-petal-muted flex-shrink-0">
+                      {CATEGORY_META[script.category]?.label ?? script.category}
+                    </span>
+                    {script.isCustom && (
+                      <span data-testid="script-card-custom-badge" className="font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rose-soft bg-petal-rose-soft/40 text-petal-rose-deep flex-shrink-0">自訂</span>
+                    )}
+                    {script.isCustom && isRecentlyCreated(script.createdAt) && (
+                      <span data-testid={`script-new-badge-${script.id}`} className="px-1.5 py-0.5 font-body text-[10px] font-medium uppercase tracking-[0.1em] rounded-full bg-petal-rose-deep text-petal-cream flex-shrink-0">New</span>
+                    )}
+                  </>
+                ),
+                actions: (
+                  <>
+                    <span className="hidden sm:inline-flex">
+                      <FavoriteButton scriptId={script.id} className="w-7 h-7 hover:bg-petal-cream-2" />
+                    </span>
+                    {script.isCustom && onEditScript && (
+                      <button
+                        onClick={() => onEditScript(script)}
+                        data-testid={`script-edit-button-${script.id}`}
+                        className="hidden sm:inline-flex border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors"
+                        aria-label={`編輯 ${script.title}`}
+                      >
+                        <Pencil className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                        編輯
+                      </button>
+                    )}
+                    {script.isCustom && (
+                      <button
+                        onClick={() => handleShareScript(script)}
+                        disabled={sharingId === script.id}
+                        data-testid={`script-card-custom-share-button-${script.id}`}
+                        className="hidden sm:inline-flex border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors disabled:opacity-50"
+                        aria-label={`分享 ${script.title} 給伴侶`}
+                      >
+                        <Share2 className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                        {sharingId === script.id ? '分享中' : '分享'}
+                      </button>
+                    )}
                     <button
                       onClick={() => handleViewScript(script)}
-                      data-testid={`script-featured-view-button-${index}`}
-                      className="border border-petal-ink text-petal-ink py-2 rounded-md font-display italic text-sm hover:bg-petal-ink hover:text-petal-cream transition-colors"
+                      data-testid={script.isCustom ? `script-card-custom-view-button-${script.id}` : `script-list-view-button-${index}`}
+                      className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                     >
-                      <Eye className="w-3.5 h-3.5 inline mr-1.5" strokeWidth={1.5} />
+                      <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
                       查看
                     </button>
                     <button
                       onClick={() => handleQuickPlay(script)}
-                      data-testid={`script-featured-play-button-${index}`}
-                      className="bg-petal-ink text-petal-cream py-2 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors"
+                      data-testid={script.isCustom ? `script-card-custom-play-button-${script.id}` : `script-list-play-button-${index}`}
+                      className="hidden sm:inline-flex bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                     >
-                      <Play className="w-3.5 h-3.5 inline mr-1.5" strokeWidth={1.5} />
-                      開始扮演
+                      <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
+                      開始
                     </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-1.5">
-              {topScripts.map((script, index) =>
-                renderScriptListRow({
-                  key: script.id ?? index,
-                  script,
-                  actions: (
-                    <>
-                      <span className="hidden sm:inline-flex">
-                        <FavoriteButton scriptId={script.id} className="w-7 h-7 hover:bg-petal-cream-2" />
-                      </span>
-                      <button
-                        onClick={() => handleViewScript(script)}
-                        data-testid={`script-featured-view-button-${index}`}
-                        className="border border-petal-ink text-petal-ink px-3 py-1 rounded-full font-body text-xs hover:bg-petal-ink hover:text-petal-cream transition-colors"
-                      >
-                        <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                        查看
-                      </button>
-                      <button
-                        onClick={() => handleQuickPlay(script)}
-                        data-testid={`script-featured-play-button-${index}`}
-                        className="hidden sm:inline-flex bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
-                      >
-                        <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                        開始
-                      </button>
-                    </>
-                  ),
-                })
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Custom Scripts Upload */}
-        <div ref={customRef} className="mb-10 p-5 bg-petal-cream-2/40 rounded-md border border-petal-rule scroll-mt-20">
-          <div className="flex items-center justify-between gap-2 mb-5">
-            <h3 className="font-display text-xl font-medium tracking-tight text-petal-ink flex items-center min-w-0">
-              <FileText className="w-4 h-4 mr-2 text-petal-ink-soft flex-shrink-0" strokeWidth={1.5} />
-              <span className="truncate">自訂<em className="not-italic font-light italic text-pink-600 mx-1">劇本</em>
-              <span className="font-display italic font-light text-sm text-petal-muted ml-1">
-                ({customQ ? `${filteredCustomScripts.length}/${customScripts.length}` : customScripts.length})
-              </span></span>
-            </h3>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {customScripts.length > 0 && (
-                <ViewToggle mode={customView} setMode={setCustomView} idPrefix="roleplay-custom" />
-              )}
-              <button
-                onClick={() => setShowScriptUploadModal(true)}
-                data-testid="script-upload-button"
-                className="bg-petal-ink text-petal-cream px-4 py-1.5 rounded-full font-body text-xs hover:bg-pink-700 transition-colors flex items-center space-x-1.5"
-              >
-                <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
-                <span>上傳劇本</span>
-              </button>
-            </div>
+                  </>
+                ),
+              })
+            )}
           </div>
-
-          {customScripts.length > 0 && (
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-petal-muted" strokeWidth={1.5} />
-              <input
-                type="text"
-                value={customQuery}
-                onChange={(e) => setCustomQuery(e.target.value)}
-                data-testid="custom-script-search"
-                placeholder="搜尋自訂劇本（標題、情境、標籤）"
-                className="w-full bg-white border border-petal-rule rounded-full pl-9 pr-9 py-2 font-body text-sm text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose"
-              />
-              {customQuery && (
-                <button
-                  onClick={() => setCustomQuery('')}
-                  data-testid="custom-script-search-clear"
-                  aria-label="清除搜尋"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-petal-muted hover:text-petal-ink"
-                >
-                  <X className="w-4 h-4" strokeWidth={1.5} />
-                </button>
-              )}
-            </div>
-          )}
-
-          {customScripts.length > 0 && filteredCustomScripts.length === 0 ? (
-            <p data-testid="custom-script-search-empty" className="font-body text-sm text-petal-muted py-6 text-center">
-              找不到符合「{customQuery}」的自訂劇本。
-            </p>
-          ) : customScripts.length > 0 ? (
-            customView === 'grid' ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {filteredCustomScripts.map((script) => (
-                  <div key={script.id} data-testid={`script-card-custom-${script.id}`} className="bg-white border border-petal-rule rounded-md p-4 hover:border-petal-rose transition-colors">
-                    <div className="flex items-start gap-3 mb-2">
-                      <div className="w-14 h-14 rounded-md flex-shrink-0 overflow-hidden border border-petal-rule">
-                        {renderThumb(script, 'w-full h-full')}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <h4 className="font-display text-base font-medium tracking-tight text-petal-ink truncate">{script.title}</h4>
-                            {isRecentlyCreated(script.createdAt) && (
-                              <span data-testid={`script-new-badge-${script.id}`} className="flex-shrink-0 px-1.5 py-0.5 font-body text-[10px] font-medium uppercase tracking-[0.1em] rounded-full bg-petal-rose-deep text-petal-cream">
-                                New
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1.5 flex-shrink-0">
-                            <span data-testid="script-card-custom-badge" className="px-2 py-0.5 font-body text-[10px] uppercase tracking-[0.1em] rounded-full border border-petal-rule text-petal-muted">
-                              自訂
-                            </span>
-                            <FavoriteButton scriptId={script.id} className="w-7 h-7 hover:bg-petal-cream-2" />
-                          </div>
-                        </div>
-                        <p className="font-body text-sm text-petal-ink-soft mt-1 leading-relaxed">{script.scenario}</p>
-                        {script.createdAt && (
-                          <p data-testid={`script-created-date-${script.id}`} className="font-body text-[11px] text-petal-muted mt-1">
-                            建立於 {formatDate(script.createdAt, tz, { year: 'numeric', month: 'numeric', day: 'numeric', withWeekday: false })}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between mt-3">
-                      <div className="flex items-center gap-1.5 text-xs text-petal-muted flex-wrap">
-                        {script.tags?.map((tag, tagIndex) => (
-                          <span key={tagIndex} className="font-body bg-petal-cream-2 px-2 py-0.5 rounded-full">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        {onEditScript && (
-                          <button
-                            onClick={() => onEditScript(script)}
-                            data-testid={`script-edit-button-${script.id}`}
-                            className="border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors"
-                            aria-label={`編輯 ${script.title}`}
-                          >
-                            <Pencil className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                            編輯
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleShareScript(script)}
-                          disabled={sharingId === script.id}
-                          data-testid={`script-card-custom-share-button-${script.id}`}
-                          className="border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors disabled:opacity-50"
-                          aria-label={`分享 ${script.title} 給伴侶`}
-                        >
-                          <Share2 className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                          {sharingId === script.id ? '分享中' : '分享'}
-                        </button>
-                        <button
-                          onClick={() => handleViewScript(script)}
-                          data-testid={`script-card-custom-view-button-${script.id}`}
-                          className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
-                        >
-                          <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                          查看
-                        </button>
-                        <button
-                          onClick={() => handleQuickPlay(script)}
-                          data-testid={`script-card-custom-play-button-${script.id}`}
-                          className="bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
-                        >
-                          <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                          開始
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col gap-1.5">
-                {filteredCustomScripts.map((script) =>
-                  renderScriptListRow({
-                    key: script.id,
-                    testId: `script-card-custom-${script.id}`,
-                    script,
-                    badge: (
-                      <>
-                        {isRecentlyCreated(script.createdAt) && (
-                          <span data-testid={`script-new-badge-${script.id}`} className="px-1.5 py-0.5 font-body text-[10px] font-medium uppercase tracking-[0.1em] rounded-full bg-petal-rose-deep text-petal-cream flex-shrink-0">
-                            New
-                          </span>
-                        )}
-                        <span data-testid="script-card-custom-badge" className="px-2 py-0.5 font-body text-[10px] uppercase tracking-[0.1em] rounded-full border border-petal-rule text-petal-muted flex-shrink-0">
-                          自訂
-                        </span>
-                      </>
-                    ),
-                    metaLine: script.createdAt ? (
-                      <p data-testid={`script-created-date-${script.id}`} className="font-body text-[11px] text-petal-muted mt-0.5">
-                        建立於 {formatDate(script.createdAt, tz, { year: 'numeric', month: 'numeric', day: 'numeric', withWeekday: false })}
-                      </p>
-                    ) : undefined,
-                    actions: (
-                      <>
-                        <span className="hidden sm:inline-flex">
-                          <FavoriteButton scriptId={script.id} className="w-7 h-7 hover:bg-petal-cream-2" />
-                        </span>
-                        {onEditScript && (
-                          <button
-                            onClick={() => onEditScript(script)}
-                            data-testid={`script-edit-button-${script.id}`}
-                            className="hidden sm:inline-flex border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors"
-                            aria-label={`編輯 ${script.title}`}
-                          >
-                            <Pencil className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                            編輯
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleShareScript(script)}
-                          disabled={sharingId === script.id}
-                          data-testid={`script-card-custom-share-button-${script.id}`}
-                          className="hidden sm:inline-flex border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors disabled:opacity-50"
-                          aria-label={`分享 ${script.title} 給伴侶`}
-                        >
-                          <Share2 className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                          {sharingId === script.id ? '分享中' : '分享'}
-                        </button>
-                        <button
-                          onClick={() => handleViewScript(script)}
-                          data-testid={`script-card-custom-view-button-${script.id}`}
-                          className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
-                        >
-                          <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                          查看
-                        </button>
-                        <button
-                          onClick={() => handleQuickPlay(script)}
-                          data-testid={`script-card-custom-play-button-${script.id}`}
-                          className="hidden sm:inline-flex bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
-                        >
-                          <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                          開始
-                        </button>
-                      </>
-                    ),
-                  })
-                )}
-              </div>
-            )
-          ) : (
-            <p className="font-display italic font-light text-sm text-petal-muted text-center py-4">
-              還沒有自訂劇本，點擊上方按鈕開始創作。
-            </p>
-          )}
-        </div>
+        )}
 
         {/* Favorited from Marketplace — collapsed by default (can hold many). */}
         {favoritedMarketplace.length > 0 && (
@@ -1054,151 +908,6 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           </div>
         )}
 
-        {/* All Scripts — collapsed by default; this is the longest list so the
-            user opts in to expanding it. */}
-        <div ref={allRef} className="scroll-mt-20">
-          <div className="flex items-center justify-between gap-2 mb-6">
-            <button
-              type="button"
-              onClick={() => setAllOpen((o) => !o)}
-              data-testid="roleplay-all-toggle"
-              aria-expanded={allOpen}
-              className="flex items-center min-w-0 group"
-            >
-              <ChevronDown
-                className={`w-5 h-5 mr-1 text-petal-muted flex-shrink-0 transition-transform ${allOpen ? '' : '-rotate-90'}`}
-                strokeWidth={1.5}
-              />
-              <Filter className="w-4 h-4 mr-2 text-petal-ink-soft flex-shrink-0" strokeWidth={1.5} />
-              <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink truncate group-hover:text-petal-rose-deep transition-colors">
-                所有<em className="not-italic font-light italic text-pink-600 mx-1">劇本</em>
-                <span className="font-display italic font-light text-sm text-petal-muted ml-1">({filteredScripts.length})</span>
-              </h3>
-            </button>
-            {allOpen && (
-              <ViewToggle mode={allView} setMode={setAllView} idPrefix="roleplay-all" />
-            )}
-          </div>
-          {!allOpen ? (
-            <button
-              type="button"
-              onClick={() => setAllOpen(true)}
-              data-testid="roleplay-all-expand"
-              className="w-full py-3 rounded-md border border-dashed border-petal-rule text-petal-muted hover:text-petal-ink hover:border-petal-ink font-body text-sm transition-colors"
-            >
-              展開全部 {filteredScripts.length} 個劇本
-            </button>
-          ) : allView === 'grid' ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
-              {filteredScripts.map((script, index) => (
-                <div key={index} className="bg-white border border-petal-rule rounded-md p-4 sm:p-5 hover:border-petal-rose transition-colors">
-                  <div className="flex items-start gap-3 sm:gap-4">
-                    <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-md flex-shrink-0 overflow-hidden border border-petal-rule">
-                      {renderThumb(script, 'w-full h-full')}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h4 className="font-display text-base font-medium tracking-tight text-petal-ink">{script.title}</h4>
-                        <span className="font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rule text-petal-muted">
-                          {CATEGORY_META[script.category]?.label ?? script.category}
-                        </span>
-                        {script.isCustom && (
-                          <span className="font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rose-soft bg-petal-rose-soft/40 text-petal-rose-deep">
-                            自訂
-                          </span>
-                        )}
-                        <FavoriteButton scriptId={script.id} className="ml-auto w-7 h-7 hover:bg-petal-cream-2" />
-                      </div>
-                      <p className="font-body text-sm text-petal-ink-soft mb-3 leading-relaxed line-clamp-2 sm:line-clamp-none">{script.scenario}</p>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          onClick={() => handleViewScript(script)}
-                          data-testid={`script-list-view-button-${index}`}
-                          className="bg-petal-ink text-petal-cream px-4 py-2 sm:py-1.5 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors min-h-[40px] sm:min-h-0"
-                        >
-                          <Eye className="w-3.5 h-3.5 inline mr-1" strokeWidth={1.5} />
-                          查看劇本
-                        </button>
-                        <button
-                          onClick={() => handleQuickPlay(script)}
-                          data-testid={`script-list-play-button-${index}`}
-                          className="bg-petal-rose-deep text-petal-cream px-4 py-2 sm:py-1.5 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors min-h-[40px] sm:min-h-0"
-                        >
-                          <Play className="w-3.5 h-3.5 inline mr-1" strokeWidth={1.5} />
-                          開始扮演
-                        </button>
-                        {script.isCustom && onEditScript && (
-                          <button
-                            onClick={() => onEditScript(script)}
-                            data-testid={`script-list-edit-button-${script.id}`}
-                            className="border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-4 py-2 sm:py-1.5 rounded-md font-body text-sm transition-colors min-h-[40px] sm:min-h-0"
-                          >
-                            <Pencil className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                            編輯
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col gap-1.5">
-              {filteredScripts.map((script, index) =>
-                renderScriptListRow({
-                  key: script.id ?? index,
-                  script,
-                  badge: (
-                    <>
-                      <span className="font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rule text-petal-muted flex-shrink-0">
-                        {CATEGORY_META[script.category]?.label ?? script.category}
-                      </span>
-                      {script.isCustom && (
-                        <span className="font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rose-soft bg-petal-rose-soft/40 text-petal-rose-deep flex-shrink-0">
-                          自訂
-                        </span>
-                      )}
-                    </>
-                  ),
-                  actions: (
-                    <>
-                      <span className="hidden sm:inline-flex">
-                        <FavoriteButton scriptId={script.id} className="w-7 h-7 hover:bg-petal-cream-2" />
-                      </span>
-                      <button
-                        onClick={() => handleViewScript(script)}
-                        data-testid={`script-list-view-button-${index}`}
-                        className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
-                      >
-                        <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                        查看
-                      </button>
-                      <button
-                        onClick={() => handleQuickPlay(script)}
-                        data-testid={`script-list-play-button-${index}`}
-                        className="hidden sm:inline-flex bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
-                      >
-                        <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                        開始
-                      </button>
-                      {script.isCustom && onEditScript && (
-                        <button
-                          onClick={() => onEditScript(script)}
-                          data-testid={`script-list-edit-button-${script.id}`}
-                          className="hidden sm:inline-flex border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors"
-                        >
-                          <Pencil className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                          編輯
-                        </button>
-                      )}
-                    </>
-                  ),
-                })
-              )}
-            </div>
-          )}
-        </div>
       </div>
       )}
 

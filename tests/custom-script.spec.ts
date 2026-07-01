@@ -244,13 +244,17 @@ test.describe('Custom Script Upload and Persistence', () => {
     await roleplayTab.click();
     await page.waitForTimeout(2000);
 
-    // Check the custom scripts section — heading text is the contract
-    const customScriptsHeader = page.locator('h3:has-text("自訂劇本")');
-    await expect(customScriptsHeader).toBeVisible({ timeout: 5000 });
+    // Under 所有, a built-in script's view button is present.
+    await expect(page.getByTestId('script-list-view-button-0')).toBeVisible({ timeout: 5000 });
 
-    // Verify the count is displayed
-    const scriptCount = await customScriptsHeader.textContent();
-    expect(scriptCount).toMatch(/自訂劇本\s*\(\d+\)/);
+    // Click the 自訂 filter chip → the unified list filters to custom-only, so
+    // the built-in script buttons disappear (deterministic regardless of how
+    // many custom scripts the account currently has).
+    const customChip = page.getByTestId('roleplay-filter-custom');
+    await expect(customChip).toBeVisible({ timeout: 5000 });
+    await customChip.click();
+    await page.waitForTimeout(500);
+    await expect(page.getByTestId('script-list-view-button-0')).toHaveCount(0);
   });
 
   test('should validate custom script form fields', async ({ page }) => {

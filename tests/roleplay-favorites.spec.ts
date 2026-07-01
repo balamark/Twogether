@@ -60,45 +60,37 @@ test.describe('Roleplay favorites — couple-shared 我的最愛劇本', () => {
     await page.waitForTimeout(2000);
   });
 
-  test('favoriting a script promotes it to the top section; unfavoriting falls back to featured', async ({ page }) => {
-    // 1. With no favorites, the top section is the fallback featured section.
-    await expect(page.getByTestId('roleplay-featured-section')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByTestId('roleplay-favorites-section')).toHaveCount(0);
-
-    // 2. Click the heart toggle on a known built-in script. The same script
-    //    appears in both the featured top section and the all-scripts list,
-    //    so multiple matching buttons can exist — use the all-scripts one to
-    //    keep the test independent from the top-section presentation.
-    const toggleAll = page.getByTestId(`script-favorite-toggle-${KNOWN_SCRIPT_ID}`);
-    await expect(toggleAll.first()).toBeVisible({ timeout: 5000 });
-
-    // Wait for the POST round-trip so the optimistic state is confirmed.
+  test('favoriting a script shows it under the 我的最愛 filter; unfavoriting removes it', async ({ page }) => {
+    // 1. Favorite a known built-in script via its heart toggle in the list.
+    const toggle = page.getByTestId(`script-favorite-toggle-${KNOWN_SCRIPT_ID}`).first();
+    await expect(toggle).toBeVisible({ timeout: 5000 });
     await Promise.all([
       page.waitForResponse(
         (r) => r.url().includes('/api/script-favorites') && r.request().method() === 'POST',
         { timeout: 10000 }
       ),
-      toggleAll.first().click(),
+      toggle.click(),
     ]);
 
-    // 3. Top section flips to "我的最愛".
-    await expect(page.getByTestId('roleplay-favorites-section')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByTestId('roleplay-featured-section')).toHaveCount(0);
+    // 2. The 我的最愛 filter chip now lists the favorited script.
+    await page.getByTestId('roleplay-filter-favorites').click();
+    await page.waitForTimeout(500);
+    await expect(page.getByTestId(`script-favorite-toggle-${KNOWN_SCRIPT_ID}`).first()).toBeVisible({ timeout: 5000 });
 
-    // 4. Reload — favorite persists from the backend.
+    // 3. Reload — favorite persists from the backend, still under 我的最愛.
     await page.reload();
     await page.waitForLoadState('networkidle');
     await page.getByTestId('nav-tab-roleplay').click();
     await page.waitForTimeout(1500);
-    await expect(page.getByTestId('roleplay-favorites-section')).toBeVisible({ timeout: 5000 });
+    await page.getByTestId('roleplay-filter-favorites').click();
+    await page.waitForTimeout(500);
+    const favToggle = page.getByTestId(`script-favorite-toggle-${KNOWN_SCRIPT_ID}`).first();
+    await expect(favToggle).toBeVisible({ timeout: 5000 });
 
-    // 5. Unfavorite — top section flips back to the fallback featured. We
-    //    assert on the UI transition rather than the DELETE response to keep
-    //    the test resilient to parallel-suite network timing.
-    const toggleAfter = page.getByTestId(`script-favorite-toggle-${KNOWN_SCRIPT_ID}`).first();
-    await toggleAfter.click();
-    await expect(page.getByTestId('roleplay-featured-section')).toBeVisible({ timeout: 10000 });
-    await expect(page.getByTestId('roleplay-favorites-section')).toHaveCount(0);
+    // 4. Unfavorite — it drops out of the 我的最愛 list. It was the only
+    //    favorite, so the list falls to its empty state.
+    await favToggle.click();
+    await expect(page.getByTestId('roleplay-empty')).toBeVisible({ timeout: 10000 });
   });
 
   test('script modal renders thumbnail and a working favorite toggle', async ({ page }) => {
@@ -128,12 +120,11 @@ test.describe('Roleplay favorites — couple-shared 我的最愛劇本', () => {
     // the all-scripts card so subsequent runs start clean.
     await page.getByTestId('roleplay-modal-close-button').click();
     await page.waitForTimeout(500);
-    if (await page.getByTestId('roleplay-favorites-section').isVisible({ timeout: 1000 }).catch(() => false)) {
-      const filledHeart = page.locator('button[aria-pressed="true"][data-testid^="script-favorite-toggle-"]').last();
-      if (await filledHeart.isVisible({ timeout: 1000 }).catch(() => false)) {
-        await filledHeart.click();
-        await page.waitForTimeout(800);
-      }
+    // Clean up: unfavorite via any filled heart so subsequent runs start clean.
+    const filledHeart = page.locator('button[aria-pressed="true"][data-testid^="script-favorite-toggle-"]').first();
+    if (await filledHeart.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await filledHeart.click();
+      await page.waitForTimeout(800);
     }
   });
 });
