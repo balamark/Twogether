@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Send } from 'lucide-react';
 import apiService from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
+import { useFeatureFlag } from '../contexts/FeatureFlagsContext';
 import { formatDate, formatYmdInTz } from '../utils/datetime';
 
 interface IntimateRecord {
@@ -743,6 +744,9 @@ export function IntimacyStatsCards({ records, birthDate, onOpenSettings, onNudge
   const recommendation = age !== null ? weeklyRecommendationForAge(age) : null;
   const hasRecords = derived.total > 0;
   const nudge = daysSinceLastNudge(hasRecords ? derived.daysSinceLast : null);
+  // 周平均 is an admin-gated experiment — hidden by default, toggled on from
+  // the /admin 功能開關 panel (feature flag `show_weekly_average`).
+  const showWeeklyAvg = useFeatureFlag('show_weekly_average');
 
   return (
     <div className="space-y-3">
@@ -779,13 +783,15 @@ export function IntimacyStatsCards({ records, birthDate, onOpenSettings, onNudge
       )}
 
       {/* Recent / actionable metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-        <div className="bg-white rounded-md p-5 border border-petal-rule">
-          <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1.5">周平均</div>
-          <div className="font-display italic font-light text-3xl text-petal-ink">
-            {hasRecords ? derived.weeklyAvg.toFixed(1) : '—'}
+      <div className={`grid grid-cols-2 ${showWeeklyAvg ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-3 sm:gap-4`}>
+        {showWeeklyAvg && (
+          <div className="bg-white rounded-md p-5 border border-petal-rule" data-testid="weekly-avg-card">
+            <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1.5">周平均</div>
+            <div className="font-display italic font-light text-3xl text-petal-ink">
+              {hasRecords ? derived.weeklyAvg.toFixed(1) : '—'}
+            </div>
           </div>
-        </div>
+        )}
         <div className="bg-petal-rose-soft/30 rounded-md p-5 border border-petal-rose-soft">
           <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-rose-deep mb-1.5">本週次數</div>
           <div className="font-display italic font-light text-3xl text-petal-rose-deep">{derived.thisWeek}</div>

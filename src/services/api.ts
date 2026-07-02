@@ -2079,6 +2079,20 @@ class ApiService {
   }
 
   // User feedback / 用戶心得
+  // Public feature flags — admin-controlled on/off bits for gated UI. Reads the
+  // unauthenticated endpoint; on any failure returns {} so callers fall back to
+  // each flag's default (off) rather than breaking the page.
+  async getFeatureFlags(): Promise<Record<string, boolean>> {
+    try {
+      const response = await apiClient.get('/feature-flags');
+      const flags = response.data?.flags;
+      return flags && typeof flags === 'object' ? flags : {};
+    } catch (error: unknown) {
+      console.error('Failed to fetch feature flags:', error);
+      return {};
+    }
+  }
+
   async getApprovedFeedback(): Promise<
     Array<{ id: string; name: string; rating: number; content: string }>
   > {

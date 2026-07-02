@@ -32,6 +32,7 @@ import type { CycleRecord } from './services/api';
 import { getPrimaryTimezone, formatYmdInTz, browserTz } from './utils/datetime';
 import { clientLog } from './utils/telemetry';
 import { TimezoneProvider } from './contexts/TimezoneContext';
+import { FeatureFlagsProvider } from './contexts/FeatureFlagsProvider';
 import { useScrollLock } from './hooks/useScrollLock';
 import { usePageTracking } from './hooks/usePageTracking';
 
@@ -2172,6 +2173,7 @@ const LoveTimeApp = () => {
   }
 
   return (
+    <FeatureFlagsProvider>
     <TimezoneProvider value={primaryTimezone}>
     <div className="min-h-screen bg-petal-cream">
       {/* Header */}
@@ -2678,6 +2680,7 @@ const LoveTimeApp = () => {
       )}
     </div>
     </TimezoneProvider>
+    </FeatureFlagsProvider>
   );
 };
 

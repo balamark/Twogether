@@ -86,10 +86,6 @@ const SampleStats: React.FC = () => {
       </div>
       <div className="grid grid-cols-2 gap-2.5">
         <div className="bg-petal-cream border border-petal-rule rounded-md p-3">
-          <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-1">周平均</div>
-          <div className="font-display italic font-light text-2xl text-petal-ink">0.5</div>
-        </div>
-        <div className="bg-petal-cream border border-petal-rule rounded-md p-3">
           <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep mb-1">本週次數</div>
           <div className="font-display italic font-light text-2xl text-petal-rose-deep">0</div>
         </div>
@@ -97,7 +93,7 @@ const SampleStats: React.FC = () => {
           <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-1">本月次數</div>
           <div className="font-display italic font-light text-2xl text-petal-sage-deep">1</div>
         </div>
-        <div className="bg-petal-rose-soft/40 border border-petal-rose-soft rounded-md p-3">
+        <div className="bg-petal-rose-soft/40 border border-petal-rose-soft rounded-md p-3 col-span-2">
           <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-1">已經幾天沒有親密了</div>
           <div className={`font-display italic font-light leading-none ${nudge.numberClass}`}>16</div>
         </div>
@@ -105,6 +101,42 @@ const SampleStats: React.FC = () => {
       {nudge.hint && (
         <p className="mt-2 font-body text-xs text-petal-rose-deep text-center leading-snug">{nudge.hint}</p>
       )}
+    </div>
+  );
+};
+
+// Sample of the 親密記錄 history list, showing the new「距上次相隔 N 天」gap
+// badge that now sits beside each record's date in the real view.
+const SampleRecordList: React.FC = () => {
+  const rows = [
+    { date: '6月28日', mood: '😊', note: '一起看了場電影', gap: 5 },
+    { date: '6月23日', mood: '🥰', note: '週末小旅行', gap: 12 },
+    { date: '6月11日', mood: '😌', note: null as string | null, gap: null as number | null },
+  ];
+  return (
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="font-display italic text-base text-petal-ink">親密記錄</span>
+        <SampleTag />
+      </div>
+      <div className="bg-petal-cream border border-petal-rule rounded-md divide-y divide-petal-rule-soft">
+        {rows.map((r, i) => (
+          <div key={i} className="flex items-start gap-3 p-3">
+            <span className="text-base leading-none opacity-70 mt-0.5">{r.mood}</span>
+            <div className="min-w-0">
+              <div className="font-display italic font-light text-xs text-petal-muted">
+                {r.date}
+                {r.gap !== null && (
+                  <span className="text-petal-rose-deep"> · 距上次相隔 {r.gap} 天</span>
+                )}
+              </div>
+              {r.note && (
+                <p className="font-body text-[13px] text-petal-ink leading-snug mt-0.5">{r.note}</p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
@@ -324,6 +356,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
     sample: (
       <>
         <SampleStats />
+        <SampleRecordList />
         <CalendarMock />
       </>
     ),
