@@ -14,7 +14,8 @@ interface IntimateRecord {
   mood: string;
   notes?: string;
   timestamp: string;
-  photo?: string;
+  photo?: string;      // display URL
+  photoId?: string;    // photos.id, persisted so the record keeps its photo
   description?: string;
   duration?: string;
   location?: string;
@@ -1137,7 +1138,7 @@ class ApiService {
         location: record.location?.trim(),
         roleplay_script: record.roleplayScript?.trim(),
         activity_type: record.activityType || 'regular',
-        photo_id: null, // Will be set after photo upload
+        photo_id: record.photoId ?? null, // link the uploaded photo, if any
       };
 
       const response = await apiClient.post('/love-moments', apiPayload);
@@ -1285,18 +1286,20 @@ class ApiService {
       }
       formData.append('memory_date', new Date().toISOString());
 
-      const response = await apiClient.post('/photos', formData, {
+      const response = await apiClient.post('/photos/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
         timeout: 30000, // Extended timeout for file upload
       });
 
-      if (!response.data?.url) {
-        throw new Error('上傳成功但未獲取到照片URL');
+      // Backend returns { success, photo: { id, file_path, ... } }.
+      const photo = response.data?.photo;
+      if (!photo?.id || !photo?.file_path) {
+        throw new Error('上傳成功但未獲取到照片資訊');
       }
 
-      return response.data;
+      return { id: photo.id, url: photo.file_path };
     } catch (error: unknown) {
       console.error('Failed to upload photo:', error);
       this.throwApiError(error, '照片上傳失敗');

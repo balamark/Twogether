@@ -84,13 +84,23 @@ router.post('/', [
 
     const moment = result.rows[0];
 
-    logInfo('Love moment created', { momentId, coupleId });
+    // Resolve the photo's display URL so the just-created record shows its
+    // photo immediately (the client also has it locally, but keep the response
+    // self-consistent with GET).
+    let photoUrl = null;
+    if (moment.photo_id) {
+      const pr = await db.query('SELECT file_path FROM photos WHERE id = $1', [moment.photo_id]);
+      photoUrl = pr.rows[0]?.file_path || null;
+    }
+
+    logInfo('Love moment created', { momentId, coupleId, hasPhoto: !!moment.photo_id });
 
     res.status(201).json({
       success: true,
       message: '愛情時刻記錄成功',
       love_moment: {
         ...moment,
+        photo_url: photoUrl,
         recorded_by: {
           id: userId,
           nickname: req.user.nickname
@@ -155,12 +165,14 @@ router.get('/', async (req, res) => {
     queryParams.push(parseInt(limit), offset);
     
     const result = await db.query(`
-      SELECT 
+      SELECT
         lm.id, lm.moment_date, lm.notes, lm.description, lm.duration,
         lm.location, lm.roleplay_script, lm.photo_id, lm.created_at,
+        p.file_path AS photo_url,
         u.id as recorded_by_id, u.nickname as recorded_by_nickname
       FROM love_moments lm
       JOIN users u ON lm.recorded_by = u.id
+      LEFT JOIN photos p ON p.id = lm.photo_id
       ${whereClause}
       ORDER BY lm.moment_date DESC
       LIMIT $${paramIndex++} OFFSET $${paramIndex++}
@@ -175,6 +187,7 @@ router.get('/', async (req, res) => {
       location: row.location,
       roleplay_script: row.roleplay_script,
       photo_id: row.photo_id,
+      photo_url: row.photo_url,
       created_at: row.created_at,
       recorded_by: {
         id: row.recorded_by_id,
@@ -209,10 +222,12 @@ router.get('/:id', async (req, res) => {
       SELECT
         lm.id, lm.moment_date, lm.notes, lm.description, lm.duration,
         lm.location, lm.roleplay_script, lm.photo_id, lm.created_at,
+        p.file_path AS photo_url,
         u.id as recorded_by_id, u.nickname as recorded_by_nickname,
         c.id as couple_id
       FROM love_moments lm
       JOIN users u ON lm.recorded_by = u.id
+      LEFT JOIN photos p ON p.id = lm.photo_id
       LEFT JOIN couples c ON lm.couple_id = c.id
       WHERE lm.id = $1 AND (
         lm.recorded_by = $2 OR
@@ -240,6 +255,7 @@ router.get('/:id', async (req, res) => {
         location: moment.location,
         roleplay_script: moment.roleplay_script,
         photo_id: moment.photo_id,
+        photo_url: moment.photo_url,
         created_at: moment.created_at,
         recorded_by: {
           id: moment.recorded_by_id,

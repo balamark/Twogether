@@ -1433,7 +1433,8 @@ const LoveTimeApp = () => {
       const coinsEarned = calculateCoins(activityType, duration, isNewScript);
       
       let photoId: string | null = null;
-      
+      let photoUrl: string | null = null;
+
       // Upload photo if provided
       if (photo) {
         try {
@@ -1451,6 +1452,7 @@ const LoveTimeApp = () => {
           
           const photoResponse = await apiService.uploadPhoto(file, description);
           photoId = photoResponse.id;
+          photoUrl = photoResponse.url;
         } catch (photoError) {
           console.error('Photo upload failed:', photoError);
           showNotification({
@@ -1468,7 +1470,8 @@ const LoveTimeApp = () => {
         time,
         mood,
         notes,
-        photo: photoId ? `/api/photos/${photoId}/file` : undefined,
+        photo: photoUrl || undefined,        // display URL (from Supabase)
+        photoId: photoId || undefined,       // persisted so it survives reload
         description,
         duration,
         location,
