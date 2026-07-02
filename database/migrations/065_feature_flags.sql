@@ -12,6 +12,11 @@ CREATE TABLE IF NOT EXISTS feature_flags (
   updated_at  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
+-- Lock the table to the app's bypass role only (the app reads/writes via the
+-- Node backend, never the public PostgREST/anon API). Matches migration 063's
+-- policy; done here because this table is created after 063.
+ALTER TABLE feature_flags ENABLE ROW LEVEL SECURITY;
+
 INSERT INTO feature_flags (key, enabled, label, description)
 VALUES (
   'show_weekly_average',

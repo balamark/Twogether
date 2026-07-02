@@ -33,7 +33,7 @@ class Migrator {
   async getMigrationFiles() {
     try {
       const files = await fs.readdir(this.migrationsPath);
-      return files
+      const migrations = files
         .filter(file => file.endsWith('.sql'))
         .map(file => {
           const match = file.match(/^(\d+)_(.+)\.sql$/);
@@ -47,6 +47,24 @@ class Migrator {
         })
         .filter(Boolean)
         .sort((a, b) => a.version - b.version);
+
+      // Guard against version collisions. The migrator keys applied migrations
+      // by integer version (PRIMARY KEY on _sqlx_migrations.version): once one
+      // file's version is recorded, another file with the same version is treated
+      // as already-applied and silently skipped — its SQL never runs. Fail loudly
+      // instead. (Exactly what hid the feature_flags table behind a duplicate 063.)
+      const seenByVersion = new Map();
+      for (const m of migrations) {
+        if (seenByVersion.has(m.version)) {
+          throw new Error(
+            `Duplicate migration version ${m.version}: "${seenByVersion.get(m.version)}" and ` +
+            `"${m.filename}". Migration versions must be unique — renumber one of them.`
+          );
+        }
+        seenByVersion.set(m.version, m.filename);
+      }
+
+      return migrations;
     } catch (error) {
       if (error.code === 'ENOENT') {
         console.info('Creating migrations directory...');

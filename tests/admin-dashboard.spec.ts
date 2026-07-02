@@ -22,6 +22,32 @@ function trackPageErrors(page: Page): string[] {
 }
 
 test.describe('Admin dashboard', () => {
+  // Guards the reported "更新失敗: toggle 500" — the feature_flags table was
+  // missing because a duplicate migration version silently skipped it.
+  test('feature flags: list + toggle show_weekly_average works', async ({ page }) => {
+    const listRes = await page.request.get(`${BACKEND_BASE}/api/admin/feature-flags`);
+    expect(listRes.ok(), await listRes.text()).toBeTruthy();
+    const list = await listRes.json();
+    const flag = (list.flags || []).find((f: { key: string }) => f.key === 'show_weekly_average');
+    expect(flag, 'show_weekly_average flag is listed').toBeTruthy();
+
+    // Toggle ON — this is the call that returned 500 when the table was absent.
+    const onRes = await page.request.post(
+      `${BACKEND_BASE}/api/admin/feature-flags/show_weekly_average`,
+      { data: { enabled: true } },
+    );
+    expect(onRes.status(), await onRes.text()).toBe(200);
+    expect((await onRes.json()).enabled).toBe(true);
+
+    // Toggle back OFF to leave a clean state.
+    const offRes = await page.request.post(
+      `${BACKEND_BASE}/api/admin/feature-flags/show_weekly_average`,
+      { data: { enabled: false } },
+    );
+    expect(offRes.status()).toBe(200);
+    expect((await offRes.json()).enabled).toBe(false);
+  });
+
   test('loads with no script errors and every tab switches', async ({ page }) => {
     const errors = trackPageErrors(page);
     await page.goto(`${BACKEND_BASE}/admin`);
