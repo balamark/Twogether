@@ -90,10 +90,15 @@ test.describe('Roleplay custom script — multi-photo upload + lightbox nav', ()
     await viewBtn.click();
 
     await expect(page.getByTestId('roleplay-modal')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByTestId('roleplay-modal-photo-count')).toHaveText(/2 張照片/);
+    // In-modal preview shows an index counter and pages without the lightbox.
+    await expect(page.getByTestId('roleplay-modal-photo-count')).toHaveText('1 / 2');
+    await page.getByTestId('roleplay-modal-photo-next').click();
+    await expect(page.getByTestId('roleplay-modal-photo-count')).toHaveText('2 / 2');
+    await page.getByTestId('roleplay-modal-photo-prev').click();
+    await expect(page.getByTestId('roleplay-modal-photo-count')).toHaveText('1 / 2');
 
-    // Open the lightbox and page left/right through the series.
-    await page.getByTestId('roleplay-modal-thumb').click();
+    // Tapping the preview opens the fullscreen lightbox; page left/right there.
+    await page.getByTestId('roleplay-modal-photo').click();
     await expect(page.getByTestId('roleplay-modal-lightbox')).toBeVisible({ timeout: 5000 });
     await expect(page.getByTestId('roleplay-modal-lightbox-counter')).toHaveText('1 / 2');
 

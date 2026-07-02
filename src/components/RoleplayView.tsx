@@ -177,6 +177,10 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   const [sharingId, setSharingId] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  // In-modal photo paging for the preview image (arrows / swipe) so users can
+  // browse the photo series without opening the fullscreen lightbox.
+  const [modalPhotoIndex, setModalPhotoIndex] = useState(0);
+  const photoTouchX = useRef<number | null>(null);
   // Tracks whether the current modal viewing has been "begun" — i.e. user
   // explicitly clicked "開始扮演" and we recorded an intimacy moment. View
   // alone does NOT record; only this transition does.
@@ -186,6 +190,10 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   const [mineView, setMineView] = usePersistedViewMode('roleplayView:mine', 'grid');
   // Free-text search across 我的劇本 — title / scenario / tag, case-insensitive.
   const [mineQuery, setMineQuery] = useState('');
+  // Tag filter — user-defined script tags can be many, so they're hidden behind
+  // a 「查看所有標籤」 toggle and act as an extra filter on top of the chip.
+  const [showAllTags, setShowAllTags] = useState(false);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
   const [collectionView, setCollectionView] = usePersistedViewMode('roleplayView:collection', 'grid');
   const [marketplaceView, setMarketplaceView] = usePersistedViewMode('roleplayView:marketplace', 'grid');
 
@@ -280,6 +288,27 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [lightboxOpen, lightboxPhotos.length]);
+
+  // Reset the in-modal photo index when a different script's modal opens, and
+  // keep it in sync while the lightbox is open so closing returns to the same
+  // photo in the preview.
+  useEffect(() => { setModalPhotoIndex(0); }, [selectedScript?.id, showScriptModal]);
+  useEffect(() => { if (lightboxOpen) setModalPhotoIndex(lightboxIndex); }, [lightboxOpen, lightboxIndex]);
+
+  const onPhotoTouchStart = (e: React.TouchEvent) => { photoTouchX.current = e.changedTouches[0].clientX; };
+  // Swipe left → next, right → prev. `apply` gets the direction (+1/-1).
+  const onPhotoSwipeEnd = (e: React.TouchEvent, apply: (dir: 1 | -1) => void) => {
+    const start = photoTouchX.current;
+    photoTouchX.current = null;
+    if (start == null || lightboxPhotos.length < 2) return;
+    const dx = e.changedTouches[0].clientX - start;
+    if (dx <= -40) apply(1);
+    else if (dx >= 40) apply(-1);
+  };
+  const stepModalPhoto = (dir: 1 | -1) =>
+    setModalPhotoIndex((i) => (i + dir + lightboxPhotos.length) % lightboxPhotos.length);
+  const stepLightbox = (dir: 1 | -1) =>
+    setLightboxIndex((i) => (i + dir + lightboxPhotos.length) % lightboxPhotos.length);
 
   const handleViewScript = useCallback((script: RoleplayScript) => {
     const parsedScript = parseScriptContent(script.script);
@@ -394,12 +423,20 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     : roleplayFilter === 'custom' ? customScripts
     : allScripts.filter(s => s.category === roleplayFilter);
   const mineQ = mineQuery.trim().toLowerCase();
-  const mineList = mineQ
+  const mineSearched = mineQ
     ? mineBase.filter((s) =>
         s.title?.toLowerCase().includes(mineQ) ||
         s.scenario?.toLowerCase().includes(mineQ) ||
         (s.tags || []).some((t) => t.toLowerCase().includes(mineQ)))
     : mineBase;
+  const mineList = activeTag
+    ? mineSearched.filter((s) => (s.tags || []).includes(activeTag))
+    : mineSearched;
+
+  // Distinct tags across all scripts (for the 查看所有標籤 filter panel).
+  const allTags = [...new Set(allScripts.flatMap((s) => s.tags || []))]
+    .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
 
   // Convert marketplace data shape into the RoleplayScript the play/view
   // handlers expect. Keeps recordRoleplay logic single-sourced.
@@ -599,34 +636,89 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           <ViewToggle mode={mineView} setMode={setMineView} idPrefix="roleplay-mine" />
         </div>
 
-        {/* Filter chips — all / categories / 我的最愛 / 自訂, all on one row. */}
-        <div className="flex flex-wrap gap-1.5 mb-6" data-testid="roleplay-filter-chips">
-          {[
-            { id: 'all', label: '所有', icon: '🌟' },
-            { id: 'romantic', label: '浪漫', icon: '💕' },
-            { id: 'adventurous', label: '冒險', icon: '🔥' },
-            { id: 'school', label: '校園', icon: '🏫' },
-            { id: 'bold', label: '大膽', icon: '🧨' },
-            { id: 'favorites', label: '我的最愛', icon: '♥' },
-            { id: 'custom', label: '自訂', icon: '📄' },
-          ].map(f => {
-            const isActive = roleplayFilter === f.id;
-            return (
+        {/* Filter chips — all / categories / 我的最愛 / 自訂, plus a 查看所有標籤
+            toggle that reveals user tags as extra filters (they can be many). */}
+        <div className="mb-6">
+          <div className="flex flex-wrap gap-1.5" data-testid="roleplay-filter-chips">
+            {[
+              { id: 'all', label: '所有', icon: '🌟' },
+              { id: 'romantic', label: '浪漫', icon: '💕' },
+              { id: 'adventurous', label: '冒險', icon: '🔥' },
+              { id: 'school', label: '校園', icon: '🏫' },
+              { id: 'bold', label: '大膽', icon: '🧨' },
+              { id: 'favorites', label: '我的最愛', icon: '♥' },
+              { id: 'custom', label: '自訂', icon: '📄' },
+            ].map(f => {
+              const isActive = roleplayFilter === f.id;
+              return (
+                <button
+                  key={f.id}
+                  onClick={() => setRoleplayFilter(f.id)}
+                  data-testid={`roleplay-filter-${f.id}`}
+                  className={`flex items-center space-x-1.5 px-3 sm:px-3.5 py-1.5 rounded-full transition-colors border min-h-[36px] ${
+                    isActive
+                      ? 'bg-petal-ink text-petal-cream border-petal-ink'
+                      : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
+                  }`}
+                >
+                  <span className="text-xs opacity-75 saturate-75">{f.icon}</span>
+                  <span className="font-body text-[13px] font-medium">{f.label}</span>
+                </button>
+              );
+            })}
+            {allTags.length > 0 && (
               <button
-                key={f.id}
-                onClick={() => setRoleplayFilter(f.id)}
-                data-testid={`roleplay-filter-${f.id}`}
-                className={`flex items-center space-x-1.5 px-3 sm:px-3.5 py-1.5 rounded-full transition-colors border min-h-[36px] ${
-                  isActive
-                    ? 'bg-petal-ink text-petal-cream border-petal-ink'
+                onClick={() => setShowAllTags((v) => !v)}
+                data-testid="roleplay-tags-toggle"
+                aria-expanded={showAllTags}
+                className={`flex items-center gap-1 px-3 sm:px-3.5 py-1.5 rounded-full transition-colors border min-h-[36px] font-body text-[13px] font-medium ${
+                  activeTag
+                    ? 'bg-petal-rose-deep text-petal-cream border-petal-rose-deep'
                     : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
                 }`}
               >
-                <span className="text-xs opacity-75 saturate-75">{f.icon}</span>
-                <span className="font-body text-[13px] font-medium">{f.label}</span>
+                {activeTag ? `#${activeTag}` : '查看所有標籤'}
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAllTags ? '' : '-rotate-90'}`} strokeWidth={1.5} />
               </button>
-            );
-          })}
+            )}
+          </div>
+
+          {/* Active tag pill (when the panel is collapsed) — quick clear. */}
+          {activeTag && !showAllTags && (
+            <div className="mt-2">
+              <button
+                onClick={() => setActiveTag(null)}
+                data-testid="roleplay-tag-clear"
+                className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-petal-rose-deep text-petal-cream text-xs font-body"
+              >
+                #{activeTag}
+                <X className="w-3 h-3" strokeWidth={1.5} />
+              </button>
+            </div>
+          )}
+
+          {/* Expandable tag panel — click a tag to filter; click again to clear. */}
+          {showAllTags && (
+            <div className="mt-3 flex flex-wrap gap-1.5 p-3 rounded-md border border-petal-rule bg-petal-cream-2/40" data-testid="roleplay-tags-panel">
+              {allTags.map((tag) => {
+                const active = activeTag === tag;
+                return (
+                  <button
+                    key={tag}
+                    onClick={() => setActiveTag(active ? null : tag)}
+                    data-testid="roleplay-tag-chip"
+                    className={`px-2.5 py-1 rounded-full border text-xs font-body transition-colors ${
+                      active
+                        ? 'bg-petal-ink text-petal-cream border-petal-ink'
+                        : 'bg-white text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
+                    }`}
+                  >
+                    #{tag}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Unified script list — filtered by the active chip + search. Custom
@@ -650,8 +742,8 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                 data-testid={script.isCustom ? `script-card-custom-${script.id}` : undefined}
                 className="bg-white border border-petal-rule rounded-md p-4 hover:border-petal-rose transition-colors"
               >
-                <div className="flex items-start gap-3 mb-2">
-                  <div className="w-16 h-16 rounded-md flex-shrink-0 overflow-hidden border border-petal-rule">
+                <div className="flex items-start gap-3 sm:gap-4 mb-2">
+                  <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-36 md:h-36 rounded-md flex-shrink-0 overflow-hidden border border-petal-rule bg-petal-cream-2">
                     {renderThumb(script, 'w-full h-full')}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -1067,18 +1159,49 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             onClick={(e) => e.stopPropagation()}
           >
             <div
-              className={`relative aspect-video w-full bg-petal-cream-2 overflow-hidden border-b border-petal-rule ${lightboxPhotos.length > 0 ? 'cursor-zoom-in' : ''}`}
-              onClick={() => { if (lightboxPhotos.length > 0) showLightboxAt(0); }}
+              className="relative aspect-video w-full bg-petal-cream-2 overflow-hidden border-b border-petal-rule"
               data-testid="roleplay-modal-thumb"
+              onTouchStart={onPhotoTouchStart}
+              onTouchEnd={(e) => onPhotoSwipeEnd(e, stepModalPhoto)}
             >
-              {renderThumb(selectedScript, 'w-full h-full', 'contain')}
+              {lightboxPhotos.length > 0 ? (
+                <img
+                  src={lightboxPhotos[modalPhotoIndex]}
+                  alt={`${selectedScript.title} ${modalPhotoIndex + 1}`}
+                  onClick={() => showLightboxAt(modalPhotoIndex)}
+                  className="w-full h-full object-contain cursor-zoom-in"
+                  data-testid="roleplay-modal-photo"
+                />
+              ) : (
+                renderThumb(selectedScript, 'w-full h-full', 'contain')
+              )}
               {lightboxPhotos.length > 1 && (
-                <span
-                  className="absolute bottom-3 right-3 px-2 py-0.5 rounded-full bg-petal-ink/70 text-petal-cream text-xs font-body"
-                  data-testid="roleplay-modal-photo-count"
-                >
-                  {lightboxPhotos.length} 張照片
-                </span>
+                <>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); stepModalPhoto(-1); }}
+                    data-testid="roleplay-modal-photo-prev"
+                    aria-label="上一張"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 inline-flex items-center justify-center rounded-full bg-white/80 backdrop-blur-sm border border-petal-rule shadow-sm text-petal-ink hover:bg-white transition-colors"
+                  >
+                    <ChevronLeft className="w-5 h-5" strokeWidth={1.5} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); stepModalPhoto(1); }}
+                    data-testid="roleplay-modal-photo-next"
+                    aria-label="下一張"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 inline-flex items-center justify-center rounded-full bg-white/80 backdrop-blur-sm border border-petal-rule shadow-sm text-petal-ink hover:bg-white transition-colors"
+                  >
+                    <ChevronRight className="w-5 h-5" strokeWidth={1.5} />
+                  </button>
+                  <span
+                    className="absolute bottom-3 right-3 px-2 py-0.5 rounded-full bg-petal-ink/70 text-petal-cream text-xs font-body"
+                    data-testid="roleplay-modal-photo-count"
+                  >
+                    {modalPhotoIndex + 1} / {lightboxPhotos.length}
+                  </span>
+                </>
               )}
               <button
                 onClick={(e) => { e.stopPropagation(); closeModal(); }}
@@ -1169,6 +1292,8 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             data-testid="roleplay-modal-lightbox"
             className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center overflow-hidden overscroll-contain p-3 sm:p-8"
             onClick={() => setLightboxOpen(false)}
+            onTouchStart={onPhotoTouchStart}
+            onTouchEnd={(e) => onPhotoSwipeEnd(e, stepLightbox)}
             role="dialog"
             aria-modal="true"
             aria-label="放大查看劇本照片"

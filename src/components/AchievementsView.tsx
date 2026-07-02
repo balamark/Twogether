@@ -425,30 +425,33 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
     const startDayOfWeek = firstDay.getDay();
     const pad = (n: number) => String(n).padStart(2, '0');
 
-    // Create array of days with counts
-    const days = [];
-
-    // Add empty cells for days before the month starts
-    for (let i = 0; i < startDayOfWeek; i++) {
-      days.push({ date: null, count: 0, isEmpty: true });
-    }
-
-    // Add all days of the month
-    for (let day = 1; day <= daysInMonth; day++) {
-      const currentDate = new Date(targetYear, targetMonth, day);
-      // Key cells by their calendar date directly. toISOString() would shift
-      // to UTC and mis-key cells by the tz offset.
-      const dateStr = `${targetYear}-${pad(targetMonth + 1)}-${pad(day)}`;
-
+    // Build a cell for any calendar date, keyed by its local YYYY-MM-DD (never
+    // toISOString() — that shifts to UTC and mis-keys by the tz offset).
+    const makeCell = (d: Date, isAdjacent: boolean) => {
+      const dateStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
       // record.date is a YYYY-MM-DD string from the API — compare as-is.
       const count = data.filter(record => record.date === dateStr).length;
+      return { date: d, count, isEmpty: false, isAdjacent, dateStr };
+    };
 
-      days.push({
-        date: currentDate,
-        count,
-        isEmpty: false,
-        dateStr
-      });
+    const days = [];
+
+    // Leading cells: the PREVIOUS month's trailing days, so records right
+    // before the 1st (e.g. 6/30 when 7/1 is a Wednesday) stay visible instead
+    // of being hidden behind blank padding. `1 - i` rolls into the prior month.
+    for (let i = startDayOfWeek; i > 0; i--) {
+      days.push(makeCell(new Date(targetYear, targetMonth, 1 - i), true));
+    }
+
+    // The target month.
+    for (let day = 1; day <= daysInMonth; day++) {
+      days.push(makeCell(new Date(targetYear, targetMonth, day), false));
+    }
+
+    // Trailing cells: the NEXT month's leading days, to complete the last week
+    // (Date normalizes the month/year overflow).
+    for (let nextDay = 1; days.length % 7 !== 0; nextDay++) {
+      days.push(makeCell(new Date(targetYear, targetMonth + 1, nextDay), true));
     }
 
     return days;
@@ -467,7 +470,7 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
   const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
   const monthNames = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
 
-  const maxCount = Math.max(...calendarData.map(d => d.count));
+  const maxCount = Math.max(0, ...calendarData.filter(d => !d.isAdjacent).map(d => d.count));
   const todayStr = formatYmdInTz(new Date(), tz);
 
   const navigateMonth = (direction: number) => {
@@ -532,7 +535,7 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
       </div>
 
       {/* Calendar grid */}
-      <div className="grid grid-cols-7 gap-1 mb-4">
+      <div className="grid grid-cols-7 gap-1 mb-4" data-testid="calendar-grid">
         {calendarData.map((day, index) => {
           if (day.isEmpty || !day.date) {
             return <div key={index} className="aspect-square invisible" />;
@@ -551,6 +554,7 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
               className={`
                 aspect-square rounded-sm border transition-all duration-200 hover:scale-110 hover:z-10 relative group cursor-pointer
                 ${getIntensityClass(day.count)}
+                ${day.isAdjacent ? 'opacity-45 hover:opacity-100' : ''}
                 ${isToday && !isSelected ? 'ring-2 ring-petal-ink ring-offset-1 z-10' : ''}
                 ${isSelected ? 'ring-2 ring-petal-rose-deep ring-offset-1 z-10' : ''}
               `}
