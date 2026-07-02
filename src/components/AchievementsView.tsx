@@ -577,11 +577,11 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
               {day.count > 0 && (
                 <span
                   data-testid="intimacy-heart"
-                  className={`absolute top-0.5 right-0.5 flex items-center gap-px text-[9px] leading-none font-semibold ${day.count >= 3 ? 'text-white' : 'text-rose-500'}`}
+                  className={`absolute top-0.5 right-0.5 flex items-center gap-px sm:gap-0.5 text-[10px] sm:text-lg md:text-xl leading-none font-semibold ${day.count >= 3 ? 'text-white' : 'text-rose-500'}`}
                   title={`${day.count} 次記錄`}
                 >
                   <span aria-hidden="true">♥</span>
-                  {day.count}
+                  <span className="text-[9px] sm:text-xs md:text-sm font-bold">{day.count}</span>
                 </span>
               )}
               <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-20 whitespace-nowrap pointer-events-none">
