@@ -30,6 +30,7 @@ import PairingInvitationHandler from './components/PairingInvitationHandler';
 import { apiService, getTokenExpiry, clearAuthStorage } from './services/api';
 import type { CycleRecord } from './services/api';
 import { getPrimaryTimezone, formatYmdInTz, browserTz } from './utils/datetime';
+import { parseScript } from './utils/script';
 import { clientLog } from './utils/telemetry';
 import { TimezoneProvider } from './contexts/TimezoneContext';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsProvider';
@@ -57,6 +58,9 @@ export interface IntimateRecord {
 interface Nicknames {
   partner1: string;
   partner2: string;
+  // Genders let script parsing map [男]/[女] roles to the right partner.
+  partner1Gender?: string;
+  partner2Gender?: string;
 }
 
 export interface JourneyMilestone {
@@ -1578,23 +1582,14 @@ const LoveTimeApp = () => {
 
   // Script management functions
   const parseScriptContent = (content: string): string => {
-    // Clean and format script content
-    const lines = content.split('\n').filter(line => line.trim());
-    const formattedLines = lines.map(line => {
-      // Replace placeholder names with actual nicknames
-      line = line.replace(/\[男\]|\[他\]|\[partner1\]/gi, nicknames.partner1);
-      line = line.replace(/\[女\]|\[她\]|\[partner2\]/gi, nicknames.partner2);
-      
-      // Format dialogue
-      if (line.includes(':')) {
-        const [speaker, dialogue] = line.split(':');
-        return `${speaker.trim()}: "${dialogue.trim()}"`;
-      }
-      
-      return line;
+    // Gender-aware display-time parsing: [男]/[他] → the male partner's
+    // nickname, [女]/[她] → the female partner's, [partner1]/[partner2] stay
+    // viewer-relative. Falls back to the auth user's own gender when the
+    // couple payload hasn't loaded it yet (e.g. just changed in Settings).
+    return parseScript(content, {
+      ...nicknames,
+      partner1Gender: nicknames.partner1Gender || authState.user?.gender,
     });
-    
-    return formattedLines.join('\n\n');
   };
 
   const addCustomScript = async (
@@ -1607,12 +1602,14 @@ const LoveTimeApp = () => {
     isPublic: boolean = true,
   ) => {
     try {
-      // Create script via backend API
+      // Create script via backend API. Content is stored raw (placeholder
+      // tokens intact) — parsing happens at display time so nickname/gender
+      // changes propagate and both partners see the gender-correct mapping.
       const rawScript = await apiService.createCustomScript({
         title,
         category,
         scenario,
-        content: parseScriptContent(content),
+        content,
         tags,
         duration: '15-30分鐘',
         photos,
@@ -1626,7 +1623,7 @@ const LoveTimeApp = () => {
         title: typedScript.title || title,
         category: typedScript.category || category,
         scenario: typedScript.scenario || scenario,
-        script: typedScript.script || typedScript.content || parseScriptContent(content),
+        script: typedScript.script || typedScript.content || content,
         tags: typedScript.tags || tags,
         duration: typedScript.duration || '15-30分鐘',
         image: typedScript.thumbnailUrl,
@@ -1702,9 +1699,8 @@ const LoveTimeApp = () => {
   // Edit an existing custom script. Accepts an optional new thumbnail; when
   // provided the request goes multipart (api.ts handles the switch) and the
   // backend PUT route uploads it to Supabase storage.
-  // NOTE: content is NOT re-run through parseScriptContent here — the form
-  // is initialized from script.content (already parsed at creation), and
-  // re-parsing would double-format dialogue.
+  // NOTE: content is stored raw (placeholder tokens intact) and parsed at
+  // display time by parseScriptContent — never bake nicknames in here.
   const updateCustomScript = async (
     id: string,
     updates: {

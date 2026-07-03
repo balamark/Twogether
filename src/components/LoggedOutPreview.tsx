@@ -424,14 +424,15 @@ const PREVIEWS: Record<string, PreviewConfig> = {
   },
 };
 
-// Roleplay scripts mix [partner1]/[partner2] and [男]/[女] role tags. For the
-// read-only preview we render them as readable role labels.
+// Roleplay scripts mix [partner1]/[partner2] and [男]/[女]/[他]/[她] role
+// tags. The preview substitutes sample nicknames the same way the app swaps
+// in the couple's real nicknames by gender after login.
+const SAMPLE_MALE_NICKNAME = '小宇';
+const SAMPLE_FEMALE_NICKNAME = '小甜';
 const prettyScript = (raw: string): string =>
   raw
-    .replace(/\[partner1\]/g, '🅐')
-    .replace(/\[partner2\]/g, '🅑')
-    .replace(/\[男\]/g, '🅐')
-    .replace(/\[女\]/g, '🅑');
+    .replace(/\[partner1\]|\[男\]|\[他\]/g, SAMPLE_MALE_NICKNAME)
+    .replace(/\[partner2\]|\[女\]|\[她\]/g, SAMPLE_FEMALE_NICKNAME);
 
 const SignUpCta: React.FC<{ onSignUp: () => void; compact?: boolean }> = ({ onSignUp, compact }) => (
   <div className="text-center">
@@ -481,7 +482,7 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scr
             為你們的夜晚<em className="not-italic font-light italic text-pink-600">增添新鮮感</em>
           </h2>
           <p className="font-body text-sm text-petal-ink-soft leading-relaxed max-w-sm mx-auto">
-            精選情境劇本，點開看看內容。登入後可以照著演、自由發揮，也能自訂專屬你們的劇本。
+            精選情境劇本，點開看看內容。登入後劇本會依你們的性別自動帶入雙方暱稱，也能自訂、匯入專屬你們的劇本。
           </p>
         </div>
 
@@ -542,6 +543,12 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scr
                     <img src={openScript.image} alt={openScript.title} className="w-full h-full object-contain" />
                   </div>
                 )}
+                <div className="flex items-center gap-2 mb-2">
+                  <SampleTag />
+                  <span className="font-body text-[11px] text-petal-muted">
+                    「{SAMPLE_MALE_NICKNAME}」「{SAMPLE_FEMALE_NICKNAME}」為範例暱稱 — 登入後會依性別自動帶入你們的暱稱
+                  </span>
+                </div>
                 <pre className="font-body text-sm text-petal-ink whitespace-pre-wrap leading-relaxed">
                   {prettyScript(openScript.script)}
                 </pre>

@@ -69,8 +69,8 @@ router.post('/', [
       const coupleResult = await db.query(`
         SELECT 
           c.id, c.couple_name, c.anniversary_date, c.created_at, c.pending_conflicts,
-          u1.id as user1_id, u1.nickname as user1_nickname,
-          u2.id as user2_id, u2.nickname as user2_nickname
+          u1.id as user1_id, u1.nickname as user1_nickname, u1.gender as user1_gender,
+          u2.id as user2_id, u2.nickname as user2_nickname, u2.gender as user2_gender
         FROM couples c
         JOIN users u1 ON c.user1_id = u1.id
         LEFT JOIN users u2 ON c.user2_id = u2.id
@@ -109,8 +109,8 @@ router.post('/', [
         const draftResult = await db.query(`
           SELECT 
             c.id, c.couple_name, c.anniversary_date, c.created_at,
-            u1.id as user1_id, u1.nickname as user1_nickname,
-            u2.id as user2_id, u2.nickname as user2_nickname
+            u1.id as user1_id, u1.nickname as user1_nickname, u1.gender as user1_gender,
+            u2.id as user2_id, u2.nickname as user2_nickname, u2.gender as user2_gender
           FROM couples c
           JOIN users u1 ON c.user1_id = u1.id
           LEFT JOIN users u2 ON c.user2_id = u2.id
@@ -209,8 +209,8 @@ router.get('/', async (req, res) => {
         c.id, c.couple_name, c.anniversary_date, c.created_at, c.pending_conflicts,
         c.first_meet_date, c.first_date, c.first_kiss_date, c.first_kiss_place, c.first_intimacy_date, c.first_intimacy_place,
         c.primary_timezone,
-        u1.id as user1_id, u1.nickname as user1_nickname, u1.timezone as user1_timezone,
-        u2.id as user2_id, u2.nickname as user2_nickname, u2.timezone as user2_timezone
+        u1.id as user1_id, u1.nickname as user1_nickname, u1.timezone as user1_timezone, u1.gender as user1_gender,
+        u2.id as user2_id, u2.nickname as user2_nickname, u2.timezone as user2_timezone, u2.gender as user2_gender
       FROM couples c
       JOIN users u1 ON c.user1_id = u1.id
       LEFT JOIN users u2 ON c.user2_id = u2.id

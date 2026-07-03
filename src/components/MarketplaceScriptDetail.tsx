@@ -19,6 +19,9 @@ interface Props {
   // unpublish action is hidden.
   onUnpublish?: (scriptId: string) => Promise<void> | void;
   showNotification: (n: Omit<Notification, 'id'>) => void;
+  // Display-time parsing (placeholder → nickname substitution). When omitted,
+  // the raw content is shown.
+  parseContent?: (content: string) => string;
 }
 
 const REPORT_REASONS: { value: ScriptReportReason; label: string }[] = [
@@ -35,6 +38,7 @@ export default function MarketplaceScriptDetail({
   onToggleFavorite,
   onUnpublish,
   showNotification,
+  parseContent,
 }: Props) {
   const [script, setScript] = useState<MarketplaceScriptDetailType | null>(null);
   const [ratings, setRatings] = useState<ScriptRatingEntry[]>([]);
@@ -247,7 +251,7 @@ export default function MarketplaceScriptDetail({
                   劇本對話
                 </h4>
                 <div className="whitespace-pre-line font-body text-petal-ink leading-relaxed text-base">
-                  {script.script}
+                  {parseContent ? parseContent(script.script) : script.script}
                 </div>
               </div>
 

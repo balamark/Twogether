@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { X, Trash2 } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { detectScriptSpeakers, applySpeakerAssignments } from '../utils/script';
 import type { RoleplayScript } from '../App';
 
 type ScriptCategory = 'romantic' | 'adventurous' | 'school' | 'bold';
@@ -102,6 +103,14 @@ const ScriptUploadModal = ({
   const [newPhotos, setNewPhotos] = useState<File[]>(draft?.photos ?? []);
   const [newPhotoPreviews, setNewPhotoPreviews] = useState<string[]>([]);
   const photoCount = existingPhotos.length + newPhotos.length;
+  // Speaker names detected in the pasted content (e.g.「小明：對白」). The
+  // user can map each one to 男/女 — mapped names become [男]/[女] tokens on
+  // submit so display-time parsing swaps in the couple's nicknames by gender.
+  const detectedSpeakers = useMemo(
+    () => detectScriptSpeakers(scriptData.content),
+    [scriptData.content]
+  );
+  const [speakerAssignments, setSpeakerAssignments] = useState<Record<string, 'male' | 'female' | 'keep'>>({});
   useScrollLock(true);
 
   useEffect(() => {
@@ -180,12 +189,20 @@ const ScriptUploadModal = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const tags = scriptData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
+    // Rewrite gender-assigned speaker names to [男]/[女] tokens; names left
+    // as「保留原名」(or unassigned) are stored verbatim.
+    const genderAssignments: Record<string, 'male' | 'female'> = {};
+    for (const speaker of detectedSpeakers) {
+      const assigned = speakerAssignments[speaker];
+      if (assigned === 'male' || assigned === 'female') genderAssignments[speaker] = assigned;
+    }
+    const content = applySpeakerAssignments(scriptData.content, genderAssignments);
     if (isEditMode && editingScript) {
       updateCustomScript(editingScript.id, {
         title: scriptData.title,
         category: scriptData.category,
         scenario: scriptData.scenario,
-        content: scriptData.content,
+        content,
         tags,
         photos: newPhotos.length > 0 ? newPhotos : undefined,
         // Always send the kept set so removals take effect server-side.
@@ -197,7 +214,7 @@ const ScriptUploadModal = ({
         scriptData.title,
         scriptData.category,
         scriptData.scenario,
-        scriptData.content,
+        content,
         tags,
         newPhotos.length > 0 ? newPhotos : undefined,
         isPublic,
@@ -236,10 +253,10 @@ const ScriptUploadModal = ({
           <div className="mb-5 p-4 bg-petal-cream-2/50 border border-petal-rule-soft rounded-md">
             <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">劇本格式說明</h4>
             <ul className="font-body text-sm text-petal-ink-soft space-y-1 leading-relaxed">
-              <li>• 使用 [男] 或 [partner1] 代表第一個伴侶</li>
-              <li>• 使用 [女] 或 [partner2] 代表第二個伴侶</li>
+              <li>• 使用 [男]／[女]（或 [他]／[她]）代表男女角色，會依你們在「設定」中的性別自動帶入暱稱</li>
+              <li>• 使用 [partner1] 代表自己、[partner2] 代表另一半</li>
               <li>• 每行對話格式：角色名: 對話內容</li>
-              <li>• 系統會自動替換為你們的暱稱</li>
+              <li>• 貼上含角色名的劇本時，可在下方將每個角色指定為男／女</li>
             </ul>
           </div>
 
@@ -316,6 +333,49 @@ const ScriptUploadModal = ({
               {scriptData.content.length > 50000 && ` · 超出 ${(scriptData.content.length - 50000).toLocaleString()} 字`}
             </div>
           </div>
+
+          {detectedSpeakers.length > 0 && (
+            <div className="p-4 bg-petal-cream-2/40 border border-petal-rule-soft rounded-md" data-testid="speaker-assignment-panel">
+              <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-1">
+                角色對應
+              </h4>
+              <p className="font-display italic font-light text-xs text-petal-muted mb-3 leading-relaxed">
+                偵測到以下角色。指定男／女後，劇本會依你們的性別自動帶入暱稱；「保留原名」則照原文顯示。
+              </p>
+              <div className="space-y-2">
+                {detectedSpeakers.map((speaker, idx) => {
+                  const current = speakerAssignments[speaker] ?? 'keep';
+                  const options = [
+                    { value: 'male' as const, label: '男' },
+                    { value: 'female' as const, label: '女' },
+                    { value: 'keep' as const, label: '保留原名' },
+                  ];
+                  return (
+                    <div key={speaker} className="flex items-center justify-between gap-3" data-testid={`speaker-row-${idx}`}>
+                      <span className="font-body text-sm text-petal-ink truncate" title={speaker}>{speaker}</span>
+                      <div className="flex gap-1 flex-shrink-0">
+                        {options.map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            data-testid={`speaker-${idx}-${opt.value}`}
+                            onClick={() => setSpeakerAssignments((prev) => ({ ...prev, [speaker]: opt.value }))}
+                            className={`px-3 py-1.5 rounded-md font-body text-xs border transition-colors ${
+                              current === opt.value
+                                ? 'bg-petal-ink text-petal-cream border-petal-ink'
+                                : 'bg-white text-petal-ink-soft border-petal-rule hover:border-petal-ink'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div>
             <label htmlFor="script-tags" className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">

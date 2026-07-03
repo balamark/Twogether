@@ -9,6 +9,7 @@ import MarketplaceScriptDetail from './MarketplaceScriptDetail';
 import PetalSelect from './PetalSelect';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatYmdInTz, formatDate } from '../utils/datetime';
+import { scriptHasUnresolvedGenderTokens } from '../utils/script';
 
 interface RoleplayScript {
   id: string;
@@ -1143,6 +1144,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             await loadFavoritedMarketplace();
           } : undefined}
           showNotification={showNotification}
+          parseContent={parseScriptContent}
         />
       )}
 
@@ -1242,6 +1244,17 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                 </div>
               </div>
 
+              {scriptHasUnresolvedGenderTokens(selectedScript.script || '') && (
+                <div
+                  data-testid="script-gender-hint"
+                  className="mt-4 p-3 bg-petal-cream-2/60 border border-petal-rule rounded-md"
+                >
+                  <p className="font-body text-sm text-petal-ink-soft">
+                    此劇本包含男女角色（[男]／[女]）。請你和另一半先到「設定」選擇性別，劇本就會自動帶入你們的暱稱。
+                  </p>
+                </div>
+              )}
+
               {hasBegun && (
                 <div className="mt-5 p-4 bg-petal-sage/10 border border-petal-sage/40 rounded-md">
                   <p className="font-body text-sm text-petal-sage-deep flex items-center">
@@ -1256,7 +1269,10 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               {selectedScript.isCustom && onEditScript && !hasBegun && (
                 <button
                   onClick={() => {
-                    onEditScript(selectedScript);
+                    // selectedScript.script holds the parsed display text —
+                    // edit the stored original so placeholder tokens survive.
+                    const original = customScripts.find((s) => s.id === selectedScript.id) ?? selectedScript;
+                    onEditScript(original);
                     closeModal();
                   }}
                   data-testid="roleplay-modal-edit-button"

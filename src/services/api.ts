@@ -90,6 +90,8 @@ interface CoupleResponse {
   firstIntimacyPlace?: string;
   user1Nickname: string;
   user2Nickname?: string;
+  user1Gender?: string;
+  user2Gender?: string;
   user1Timezone?: string;
   user2Timezone?: string;
   primaryTimezone?: string;
@@ -1322,7 +1324,12 @@ class ApiService {
   }
 
   // Nicknames
-  async getNicknames(coupleData?: CoupleResponse): Promise<{ partner1: string; partner2: string }> {
+  async getNicknames(coupleData?: CoupleResponse): Promise<{
+    partner1: string;
+    partner2: string;
+    partner1Gender?: string;
+    partner2Gender?: string;
+  }> {
     try {
       // Use provided couple data if available, otherwise fetch from backend
       const couple = coupleData || await this.getCouple();
@@ -1333,21 +1340,29 @@ class ApiService {
 
       let currentUserNickname = '親愛的';
       let partnerNickname = '寶貝';
+      let currentUserGender: string | undefined;
+      let partnerGender: string | undefined;
 
       if (currentUserId && couple) {
         // Determine which user in the couple is the current user
         if (couple.user1Id === currentUserId) {
           currentUserNickname = couple.user1Nickname || '親愛的';
           partnerNickname = couple.user2Nickname || '寶貝';
+          currentUserGender = couple.user1Gender;
+          partnerGender = couple.user2Gender;
         } else if (couple.user2Id === currentUserId) {
           currentUserNickname = couple.user2Nickname || '親愛的';
           partnerNickname = couple.user1Nickname || '寶貝';
+          currentUserGender = couple.user2Gender;
+          partnerGender = couple.user1Gender;
         }
       }
 
       return {
         partner1: currentUserNickname, // partner1 always represents current user
-        partner2: partnerNickname      // partner2 always represents partner
+        partner2: partnerNickname,     // partner2 always represents partner
+        partner1Gender: currentUserGender,
+        partner2Gender: partnerGender
       };
     } catch {
       // Not paired yet or error — backend is the only source of truth, so
@@ -1741,9 +1756,11 @@ class ApiService {
       first_intimacy_place?: string;
       user1_id?: string;
       user1_nickname?: string;
+      user1_gender?: string;
       user1_timezone?: string;
       user2_id?: string;
       user2_nickname?: string;
+      user2_gender?: string;
       user2_timezone?: string;
       primary_timezone?: string;
       created_at?: string;
@@ -1759,9 +1776,11 @@ class ApiService {
       firstDate: typedData?.first_date,
       user1Id: typedData?.user1_id,
       user1Nickname: typedData?.user1_nickname || '',
+      user1Gender: typedData?.user1_gender,
       user1Timezone: typedData?.user1_timezone,
       user2Id: typedData?.user2_id,
       user2Nickname: typedData?.user2_nickname,
+      user2Gender: typedData?.user2_gender,
       user2Timezone: typedData?.user2_timezone,
       primaryTimezone: typedData?.primary_timezone,
       firstKissDate: typedData?.first_kiss_date,
