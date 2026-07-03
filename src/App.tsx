@@ -44,7 +44,8 @@ export interface IntimateRecord {
   mood: string;
   notes?: string;
   timestamp: string;
-  photo?: string;
+  photo?: string;      // display URL
+  photoId?: string;    // photos.id — links/clears the record's photo on save
   description?: string;
   duration?: string;
   location?: string;

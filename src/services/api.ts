@@ -1167,6 +1167,8 @@ class ApiService {
       if (record.duration !== undefined) apiPayload.duration = record.duration?.trim() || null;
       if (record.location !== undefined) apiPayload.location = record.location?.trim() || null;
       if (record.roleplayScript !== undefined) apiPayload.roleplay_script = record.roleplayScript?.trim() || null;
+      // photoId '' clears the photo; a real id links a (newly uploaded) photo.
+      if (record.photoId !== undefined) apiPayload.photo_id = record.photoId || null;
 
       await apiClient.put(`/love-moments/${id}`, apiPayload);
     } catch (error: unknown) {
@@ -1304,6 +1306,19 @@ class ApiService {
       console.error('Failed to upload photo:', error);
       this.throwApiError(error, '照片上傳失敗');
     }
+  }
+
+  // Upload a base64 data URL (e.g. a canvas-compressed image) by converting it
+  // to a File first, then reusing uploadPhoto. Used by the record create + edit
+  // flows so both share one upload path.
+  async uploadPhotoDataUrl(dataUrl: string, caption?: string): Promise<{ id: string; url: string }> {
+    const base64 = dataUrl.split(',')[1];
+    const mime = dataUrl.split(';')[0].split(':')[1] || 'image/jpeg';
+    const bytes = atob(base64);
+    const arr = new Uint8Array(bytes.length);
+    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+    const file = new File([new Blob([arr], { type: mime })], 'photo.jpg', { type: mime });
+    return this.uploadPhoto(file, caption);
   }
 
   // Nicknames

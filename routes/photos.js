@@ -99,17 +99,21 @@ router.post('/upload', upload.single('photo'), async (req, res) => {
     // Upload to Supabase
     const photoUrl = await uploadToSupabase(processedBuffer, fileName, mimeType);
 
-    // Save photo record to database
+    // Save photo record to database. Columns match the actual `photos` schema
+    // (migrations 001/003/004): file_path holds the Supabase URL, file_name is
+    // the original name, memory_date/upload_date are timestamps. NOTE: there is
+    // no `uploaded_by`/`original_name`/`created_at` column on this table.
     const photoId = uuidv4();
     const now = new Date().toISOString();
+    const memoryDate = req.body?.memory_date || now;
 
     const result = await db.query(`
-      INSERT INTO photos (id, couple_id, uploaded_by, file_path, original_name, file_size, created_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING id, file_path, original_name, file_size, created_at
+      INSERT INTO photos (id, couple_id, file_path, storage_url, file_name, file_size, mime_type, caption, memory_date, upload_date)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING id, file_path, file_name, file_size, upload_date
     `, [
-      photoId, coupleId, userId, photoUrl, req.file.originalname,
-      processedBuffer.length, now
+      photoId, coupleId, photoUrl, photoUrl, req.file.originalname,
+      processedBuffer.length, mimeType, req.body?.caption || null, memoryDate, now
     ]);
 
     const photo = result.rows[0];
@@ -170,28 +174,23 @@ router.get('/', async (req, res) => {
     );
     const total = parseInt(countResult.rows[0].total);
 
-    // Get photos with user info
+    // Get photos (columns match the actual `photos` schema).
     const result = await db.query(`
-      SELECT 
-        p.id, p.file_path, p.original_name, p.file_size, p.created_at,
-        u.id as uploaded_by_id, u.nickname as uploaded_by_nickname
+      SELECT p.id, p.file_path, p.file_name, p.file_size, p.caption, p.upload_date, p.memory_date
       FROM photos p
-      JOIN users u ON p.uploaded_by = u.id
       WHERE p.couple_id = $1
-      ORDER BY p.created_at DESC
+      ORDER BY COALESCE(p.upload_date, p.memory_date) DESC
       LIMIT $2 OFFSET $3
     `, [coupleId, parseInt(limit), offset]);
 
     const photos = result.rows.map(row => ({
       id: row.id,
       file_path: row.file_path,
-      original_name: row.original_name,
+      file_name: row.file_name,
       file_size: row.file_size,
-      created_at: row.created_at,
-      uploaded_by: {
-        id: row.uploaded_by_id,
-        nickname: row.uploaded_by_nickname
-      }
+      caption: row.caption,
+      upload_date: row.upload_date,
+      memory_date: row.memory_date
     }));
 
     res.json({

@@ -312,6 +312,28 @@ const CalendarView = ({
           location: recordForm.location || undefined,
           roleplayScript: recordForm.roleplayScript || undefined,
         };
+
+        // Photo change: a newly-picked photo is a base64 `data:` URL — upload it
+        // and link it; an emptied field clears the photo; an unchanged URL is
+        // left alone. (Previously the edit path ignored the photo entirely, so
+        // "更換照片" did nothing.)
+        const prevPhoto = editingRecord.photo || '';
+        if (recordForm.photo !== prevPhoto) {
+          if (recordForm.photo.startsWith('data:')) {
+            try {
+              const up = await apiService.uploadPhotoDataUrl(recordForm.photo, recordForm.description || undefined);
+              updates.photo = up.url;
+              updates.photoId = up.id;
+            } catch (photoErr) {
+              console.error('Photo upload failed:', photoErr);
+              showNotification({ type: 'warning', title: '照片上傳失敗', message: '記錄已更新，但照片未能上傳，請稍後再試。', duration: 6000 });
+            }
+          } else if (recordForm.photo === '') {
+            updates.photo = '';
+            updates.photoId = ''; // '' → NULL server-side, clearing the photo
+          }
+        }
+
         await apiService.updateIntimateRecord(editingRecord.apiId!, updates);
         setIntimateRecords(prev => prev.map(r =>
           r.id === editingRecord.id ? { ...r, ...updates } : r
