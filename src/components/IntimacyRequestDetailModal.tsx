@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, X, MessageSquareHeart, Sparkles } from 'lucide-react';
+import { Calendar, X, MessageSquareHeart, Sparkles, Play } from 'lucide-react';
 import type { IntimacyRequest } from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
@@ -11,6 +11,8 @@ interface IntimacyRequestDetailModalProps {
   direction: 'sent' | 'received';
   onClose: () => void;
   onResponded: () => void;
+  /** Navigate to the roleplay view and open the named script. */
+  onViewScript?: (title: string) => void;
 }
 
 const ALTERNATIVE_CATEGORY_LABEL: Record<string, string> = {
@@ -40,6 +42,7 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
   direction,
   onClose,
   onResponded,
+  onViewScript,
 }) => {
   const tz = useTimezone();
   useScrollLock(!!request);
@@ -95,6 +98,37 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
             <p className="text-petal-ink text-sm leading-relaxed whitespace-pre-wrap break-words">
               {request.messageContent}
             </p>
+
+            {/* Which script this in-character invitation belongs to — without
+                this the recipient may have no idea what the message refers to. */}
+            {request.scriptTitle && (
+              <div
+                className="mt-3 rounded-lg border border-petal-rule-soft bg-petal-rose-soft/30 p-3 space-y-1.5"
+                data-testid="request-script-context"
+              >
+                <div className="text-sm text-petal-ink">
+                  🎭 這是劇本 <span className="font-medium">《{request.scriptTitle}》</span> 的入戲邀請
+                </div>
+                {request.scriptScenario && (
+                  <p className="text-xs text-petal-muted leading-relaxed">{request.scriptScenario}</p>
+                )}
+                {onViewScript && (
+                  <button
+                    type="button"
+                    data-testid="request-view-script-button"
+                    onClick={() => {
+                      onClose();
+                      onViewScript(request.scriptTitle!);
+                    }}
+                    className="inline-flex items-center gap-1.5 text-sm text-petal-rose-deep hover:text-pink-700 underline underline-offset-2"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    查看劇本內容
+                  </button>
+                )}
+              </div>
+            )}
+
             <div className="text-xs text-petal-muted mt-2">
               發送於 {formatDateTime(request.createdAt, tz)}
               {request.expiresAt && (

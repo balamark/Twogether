@@ -39,6 +39,10 @@ User-facing feature changes, newest first. (Convention: every UI feature change
 adds a dated entry here; see `CLAUDE.md`.)
 
 ### 2026-07-04
+- **親密邀請帶上劇本資訊**: 由劇本發出的入戲邀請，現在會清楚標示是哪一部劇本——收邀請的一方
+  在「親密邀請紀錄」列表與詳情中都會看到 🎭 劇本名稱與情境簡介，並可一鍵「查看劇本內容」直接
+  跳到該劇本；Email 通知同樣附上劇本名稱、簡介與快速連結，另一半不再看到一句入戲台詞卻摸不著
+  頭緒。
 - **頁尾顯示版本資訊**: 網頁最下方新增一行版本列——版本號、環境、建置時間與 commit hash
   （例如 `v1.0.0 | production | 2026/7/4 上午10:19:51 | 5da817b`），每次部署自動更新，
   回報問題時附上這行即可精準對應到程式版本。

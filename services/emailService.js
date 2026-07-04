@@ -268,7 +268,11 @@ ${acceptUrl}
     }
   }
 
-  async sendIntimacyRequestNotification(senderName, recipientEmail, requestType, message = '') {
+  // scriptInfo: { scriptTitle, scriptScenario } — set when the invitation came
+  // from a roleplay script. The email then names the script, quotes its 簡介,
+  // and deep-links straight to it (?script=…) so the recipient isn't left
+  // guessing what the in-character message is about.
+  async sendIntimacyRequestNotification(senderName, recipientEmail, requestType, message = '', scriptInfo = {}) {
     logInfo('Sending intimacy request email', { kind: 'intimacy_request', requestType });
 
     if (!this.isConfigured()) {
@@ -294,11 +298,26 @@ ${acceptUrl}
     const safeSender = this._escape(senderName || '你的伴侶');
     const safeMessage = this._escape(message).slice(0, 600);
 
+    const { scriptTitle, scriptScenario } = scriptInfo || {};
+    const frontendUrl = process.env.FRONTEND_URL || 'https://twogether.fun';
+    const scriptUrl = scriptTitle
+      ? `${frontendUrl}/?script=${encodeURIComponent(scriptTitle)}`
+      : null;
+    const scriptHtml = scriptTitle
+      ? `
+      <div style="margin: 16px 0; padding: 12px 16px; background: #fdf2f5; border-radius: 8px;">
+        <p style="margin: 0 0 4px;">🎭 這是劇本 <strong>《${this._escape(scriptTitle)}》</strong> 的入戲邀請</p>
+        ${scriptScenario ? `<p style="margin: 0 0 8px; color: #636e72; font-size: 14px;">${this._escape(scriptScenario).slice(0, 300)}</p>` : ''}
+        <a href="${scriptUrl}" style="font-size: 14px;">查看劇本內容 →</a>
+      </div>`
+      : '';
+
     const bodyHtml = `
       <p><strong>${safeSender}</strong> 傳了一則訊息給你${typeLabel ? `（${typeLabel}）` : ''}：</p>
       ${safeMessage
         ? `<div class="quote">${safeMessage.replace(/\n/g, '<br>')}</div>`
         : '<p style="color: #636e72;">（沒有附帶文字訊息）</p>'}
+      ${scriptHtml}
       <p style="color: #636e72; font-size: 14px;">登入 Twogether 查看並回覆。</p>
     `;
 
@@ -312,6 +331,13 @@ ${acceptUrl}
     const textContent = [
       `${senderName || '你的伴侶'} 傳了一則訊息給你${typeLabel ? `（${typeLabel}）` : ''}：`,
       message || '（沒有附帶文字訊息）',
+      ...(scriptTitle
+        ? [
+            '',
+            `🎭 這是劇本《${scriptTitle}》的入戲邀請${scriptScenario ? `：${scriptScenario.slice(0, 300)}` : ''}`,
+            `查看劇本：${scriptUrl}`,
+          ]
+        : []),
       '',
       '打開 Twogether 查看並回覆。',
     ].join('\n');

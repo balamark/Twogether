@@ -173,6 +173,8 @@ interface IntimacyRequest {
   messageContent: string;
   requestType: string;
   roleplayCategory?: string;
+  scriptTitle?: string;
+  scriptScenario?: string;
   scheduledTime?: string;
   status: string;
   respondedAt?: string;
@@ -189,6 +191,8 @@ interface CreateIntimacyRequestRequest {
   messageContent: string;
   requestType: string;
   roleplayCategory?: string;
+  scriptTitle?: string;
+  scriptScenario?: string;
   scheduledTime?: string;
 }
 
@@ -1809,6 +1813,8 @@ class ApiService {
         message: request.messageContent,
         request_type: requestType,
         roleplay_category: request.roleplayCategory,
+        script_title: request.scriptTitle,
+        script_scenario: request.scriptScenario,
         scheduled_time: request.scheduledTime,
       });
       return this.transformIntimacyRequest(response.data.intimacy_request || response.data);
@@ -2705,6 +2711,8 @@ class ApiService {
       message_content?: string;
       request_type?: string;
       roleplay_category?: string;
+      script_title?: string;
+      script_scenario?: string;
       scheduled_time?: string;
       status?: string;
       responded_at?: string;
@@ -2728,6 +2736,8 @@ class ApiService {
       messageContent: typedData?.message_content || '',
       requestType: typedData?.request_type || '',
       roleplayCategory: typedData?.roleplay_category,
+      scriptTitle: typedData?.script_title,
+      scriptScenario: typedData?.script_scenario,
       scheduledTime: typedData?.scheduled_time,
       status: typedData?.status || '',
       respondedAt: typedData?.responded_at,

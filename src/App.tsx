@@ -615,6 +615,26 @@ const LoveTimeApp = () => {
     }
   }, []);
 
+  // ?script=<title> deep link (from invitation emails): stash it, then open
+  // the script in the roleplay view once the user is authenticated.
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const scriptParam = urlParams.get('script');
+    if (scriptParam) {
+      sessionStorage.setItem('pendingScriptDeepLink', scriptParam);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+  useEffect(() => {
+    if (!authState.isAuthenticated) return;
+    const stored = sessionStorage.getItem('pendingScriptDeepLink');
+    if (stored) {
+      sessionStorage.removeItem('pendingScriptDeepLink');
+      setPendingScriptTitle(stored);
+      setCurrentView('roleplay');
+    }
+  }, [authState.isAuthenticated]);
+
   useEffect(() => {
     if (!pairingInvitationToken) {
       const storedToken = sessionStorage.getItem('pairingInviteToken');
@@ -2106,6 +2126,10 @@ const LoveTimeApp = () => {
         <IntimacyRequestsHistory
           authState={authState}
           partnerNickname={nicknames.partner2}
+          onViewScript={(title) => {
+            setPendingScriptTitle(title);
+            setCurrentView('roleplay');
+          }}
         />
       );
       // 'pricing' is the logged-out Premium tab; once signed in it becomes the

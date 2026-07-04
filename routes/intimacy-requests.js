@@ -273,7 +273,15 @@ router.post('/', [
   body('roleplay_category')
     .optional({ nullable: true })
     .isLength({ max: 100 })
-    .withMessage('roleplay_category 過長')
+    .withMessage('roleplay_category 過長'),
+  body('script_title')
+    .optional({ nullable: true })
+    .isLength({ max: 200 })
+    .withMessage('script_title 過長'),
+  body('script_scenario')
+    .optional({ nullable: true })
+    .isLength({ max: 500 })
+    .withMessage('script_scenario 過長')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -287,7 +295,7 @@ router.post('/', [
     }
 
     const userId = req.user.id;
-    const { message, request_type, scheduled_time, roleplay_category } = req.body;
+    const { message, request_type, scheduled_time, roleplay_category, script_title, script_scenario } = req.body;
 
     logInfo('Creating intimacy request', { userId, request_type, hasMessage: !!message, hasSchedule: !!scheduled_time });
 
@@ -318,11 +326,11 @@ router.post('/', [
     const result = await db.query(`
       INSERT INTO intimacy_requests (
         id, couple_id, sender_id, receiver_id, message_content, request_type,
-        roleplay_category, scheduled_time, status, created_at
+        roleplay_category, script_title, script_scenario, scheduled_time, status, created_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', $9)
-      RETURNING id, message_content, request_type, roleplay_category, scheduled_time, status, created_at
-    `, [requestId, coupleId, userId, partnerId, message || null, request_type, roleplay_category || null, scheduled_time || null, now]);
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11)
+      RETURNING id, message_content, request_type, roleplay_category, script_title, script_scenario, scheduled_time, status, created_at
+    `, [requestId, coupleId, userId, partnerId, message || null, request_type, roleplay_category || null, script_title || null, script_scenario || null, scheduled_time || null, now]);
 
     const request = result.rows[0];
 
@@ -359,7 +367,8 @@ router.post('/', [
           senderNickname,
           partner.email,
           request_type,
-          message || ''
+          message || '',
+          { scriptTitle: script_title, scriptScenario: script_scenario }
         );
       } else {
         logInfo('Partner opted out of email or unreachable; skipping intimacy request email', { partnerId });
@@ -807,6 +816,7 @@ router.get('/', async (req, res) => {
     const result = await db.query(`
       SELECT
         ir.id, ir.message_content, ir.request_type, ir.roleplay_category,
+        ir.script_title, ir.script_scenario,
         ir.scheduled_time, ir.status, ir.created_at, ir.responded_at, ir.expires_at,
         ir.response_message, ir.alternative_type, ir.alternative_content,
         ir.alternative_scheduled_time,
@@ -826,6 +836,8 @@ router.get('/', async (req, res) => {
       message_content: row.message_content,
       request_type: row.request_type,
       roleplay_category: row.roleplay_category,
+      script_title: row.script_title,
+      script_scenario: row.script_scenario,
       scheduled_time: row.scheduled_time,
       status: row.status,
       direction: row.direction,

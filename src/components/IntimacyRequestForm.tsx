@@ -408,6 +408,10 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
             ? 'guidance'
             : requestType,
         roleplayCategory: isRoleplay ? selectedScript?.category : undefined,
+        // Name the script + its 簡介 so the recipient (who may never have seen
+        // it) knows what the in-character message refers to and can jump to it.
+        scriptTitle: isRoleplay ? selectedScript?.title : undefined,
+        scriptScenario: isRoleplay ? selectedScript?.scenario : undefined,
         scheduledTime:
           requestType === 'scheduled' && scheduledTime ? localInputToIsoInTz(scheduledTime, tz) : undefined,
       });

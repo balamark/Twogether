@@ -23,12 +23,14 @@ interface AuthState {
 interface IntimacyRequestsHistoryProps {
   authState: AuthState;
   partnerNickname?: string;
+  /** Navigate to the roleplay view and open the named script. */
+  onViewScript?: (title: string) => void;
 }
 
 type FeedbackState = { type: 'success' | 'error'; message: string };
 type Tab = 'received' | 'sent';
 
-export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = ({ authState }) => {
+export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = ({ authState, onViewScript }) => {
   const [items, setItems] = useState<IntimacyRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -204,6 +206,7 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
           setDetailOpenId(null);
           fetchAll();
         }}
+        onViewScript={onViewScript}
       />
     </div>
   );
@@ -470,6 +473,11 @@ function RequestList({
                       </div>
                     )}
                     <div className="text-petal-ink text-sm leading-relaxed break-words">{it.messageContent}</div>
+                    {it.scriptTitle && (
+                      <div className="mt-1.5 text-xs text-petal-rose-deep" data-testid="request-row-script">
+                        🎭 劇本《{it.scriptTitle}》
+                      </div>
+                    )}
                     {hasAlternative && (
                       <div className="mt-2 inline-flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full bg-petal-rose-soft text-petal-rose-deep">
                         對方提了替代方式

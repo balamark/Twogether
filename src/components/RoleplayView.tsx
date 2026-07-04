@@ -338,6 +338,11 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     );
     if (match) {
       handleViewScript(match);
+    } else if (customScripts.length === 0) {
+      // Custom scripts may still be loading (e.g. an email deep link opened
+      // this view right after login). Keep the title pending — this effect
+      // re-runs when customScripts arrive — instead of warning prematurely.
+      return;
     } else {
       showNotification({
         type: 'warning',

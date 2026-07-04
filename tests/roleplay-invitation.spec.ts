@@ -163,4 +163,47 @@ test.describe('Roleplay AI invitation flow', () => {
 
     await expect(page.locator('text=親密邀請已發送').first()).toBeVisible({ timeout: 8000 });
   });
+
+  test('recipient sees which script the invitation came from and can jump to it', async ({ page }) => {
+    // Send a script-tagged invitation A→B via API (the UI send path is
+    // covered by the test above; this one focuses on the recipient side).
+    const scriptTitle = '粉絲與偶像：後台限定應援會'; // built-in default script
+    const base = await request.newContext();
+    const tokenA = await loginOrRegister(base, USER_A);
+    await base.dispose();
+    const ctxA = await request.newContext({ extraHTTPHeaders: { Authorization: `Bearer ${tokenA}` } });
+    const sendRes = await ctxA.post(`${API}/intimacy-requests`, {
+      data: {
+        message: '今晚後台見？',
+        request_type: 'intimate',
+        roleplay_category: 'romantic',
+        script_title: scriptTitle,
+        script_scenario: '演唱會結束後的後台限定應援時光',
+      },
+    });
+    expect(sendRes.ok()).toBeTruthy();
+    await ctxA.dispose();
+
+    // As B: 親密邀請紀錄 → the received row names the script.
+    await loginUI(page, USER_B);
+    await page.getByTestId('user-menu-toggle').click();
+    await page.getByTestId('user-menu-intimacy-history').click();
+
+    const rowScript = page.getByTestId('request-row-script').first();
+    await expect(rowScript).toBeVisible({ timeout: 10000 });
+    await expect(rowScript).toContainText(scriptTitle);
+
+    // Detail modal shows the script context block with the 簡介…
+    await page.getByTestId('intimacy-card').first().click();
+    const context = page.getByTestId('request-script-context');
+    await expect(context).toBeVisible({ timeout: 5000 });
+    await expect(context).toContainText(scriptTitle);
+    await expect(context).toContainText('後台限定應援時光');
+
+    // …and 查看劇本 jumps straight to the script in the roleplay view.
+    await page.getByTestId('request-view-script-button').click();
+    const scriptModal = page.getByTestId('roleplay-modal');
+    await expect(scriptModal).toBeVisible({ timeout: 10000 });
+    await expect(scriptModal).toContainText(scriptTitle);
+  });
 });
