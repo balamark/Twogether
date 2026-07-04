@@ -182,6 +182,31 @@ jobs:
           envsubst < app.yaml > app.yaml.tmp && mv app.yaml.tmp app.yaml
           gcloud app deploy --quiet --project=${{ env.PROJECT_ID }}
 
+      # Regression guard for the blank-page outage (2026-07-04): the served
+      # index.html must be able to load every asset it references. Catches any
+      # index.html ↔ static-files drift (e.g. GAE rebuilding the frontend with
+      # a different bundle hash) before users see a white screen.
+      - name: Post-deploy smoke check — page assets must load
+        if: github.ref == 'refs/heads/main'
+        run: |
+          sleep 20
+          HTML=$(curl -fsS https://twogether.fun/)
+          ASSETS=$(echo "$HTML" | grep -oE 'assets/[A-Za-z0-9_.-]+\.(js|css)' | sort -u)
+          if [ -z "$ASSETS" ]; then
+            echo "❌ No asset references found in served index.html"; exit 1
+          fi
+          FAIL=0
+          for asset in $ASSETS; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "https://twogether.fun/$asset")
+            echo "$asset -> $code"
+            [ "$code" = "200" ] || FAIL=1
+          done
+          if [ "$FAIL" = "1" ]; then
+            echo "❌ Served index.html references assets that 404 — page is blank for users"
+            exit 1
+          fi
+          echo "✅ All referenced assets load"
+
       - name: Clean up old container images
         if: github.ref == 'refs/heads/main'
         run: |

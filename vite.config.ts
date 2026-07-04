@@ -16,6 +16,20 @@ const commitHash = (() => {
   }
 })()
 
+// Release time = the COMMIT's timestamp, not the build wall clock. This keeps
+// builds deterministic: the same commit always produces byte-identical
+// bundles. A wall-clock value here took production down — App Engine's Node
+// buildpack reruns `npm run build` at deploy time, and the container's
+// regenerated index.html pointed at a bundle hash the CI-uploaded static
+// files didn't have (blank page, entry JS 404).
+const commitTime = (() => {
+  try {
+    return execSync('git log -1 --format=%cI', { encoding: 'utf8' }).trim()
+  } catch {
+    return new Date().toISOString()
+  }
+})()
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   // Define CSP based on environment
@@ -50,7 +64,7 @@ export default defineConfig(({ mode }) => {
   // so each deployed commit shows its own version/time/hash.
   define: {
     __APP_VERSION__: JSON.stringify(version),
-    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    __BUILD_TIME__: JSON.stringify(commitTime),
     __COMMIT_HASH__: JSON.stringify(commitHash),
   },
   // Add the base path here for production builds

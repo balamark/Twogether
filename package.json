@@ -8,6 +8,7 @@
     "dev": "vite --port 5174",
     "dev:backend": "NODE_ENV=development nodemon server.js",
     "build": "tsc -b && vite build",
+    "gcp-build": "",
     "preview": "vite preview --port 5174",
     "test": "npm run test:backend && npm run test:e2e",
     "test:backend": "NODE_ENV=test node test-integration.js",
