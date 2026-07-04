@@ -5,7 +5,7 @@ import ActivityView from './components/ActivityView';
 import UpgradeView, { BillingResultView } from './components/UpgradeView';
 import { BookingResultView } from './components/BookingResultView';
 import RoleplayView from './components/RoleplayView';
-import ScriptUploadModal from './components/ScriptUploadModal';
+import ScriptUploadModal, { type PendingScriptDraft } from './components/ScriptUploadModal';
 import GamesView from './components/GamesView';
 import CoinShopView from './components/CoinShopView';
 import OurJourneyView from './components/OurJourneyView';
@@ -96,6 +96,8 @@ export interface RoleplayScript {
   title: string;
   category: 'romantic' | 'adventurous' | 'school' | 'bold';
   scenario: string;
+  /** Scenario location (場景地點), e.g. 教室、辦公室 — filterable. */
+  location?: string | null;
   image?: string;
   script: string;
   isCustom?: boolean;
@@ -113,6 +115,7 @@ interface ApiCustomScript {
   title?: string;
   category?: RoleplayScript['category'];
   scenario?: string;
+  location?: string | null;
   script?: string;
   content?: string;
   tags?: string[];
@@ -552,15 +555,7 @@ const LoveTimeApp = () => {
   // When the free-tier script cap blocks an upload we stash the in-progress
   // draft here and send the user to Upgrade. After they go premium (coupon or
   // purchase) the upload modal re-opens pre-filled so no work is lost.
-  const [pendingScriptDraft, setPendingScriptDraft] = useState<{
-    title: string;
-    category: 'romantic' | 'adventurous' | 'school' | 'bold';
-    scenario: string;
-    content: string;
-    tags: string;
-    isPublic: boolean;
-    photos: File[];
-  } | null>(null);
+  const [pendingScriptDraft, setPendingScriptDraft] = useState<PendingScriptDraft | null>(null);
   const [showIntimacyRequestForm, setShowIntimacyRequestForm] = useState(false);
   const [showNotificationInbox, setShowNotificationInbox] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -1239,6 +1234,7 @@ const LoveTimeApp = () => {
             title: script.title || '',
             category: script.category || 'romantic',
             scenario: script.scenario || '',
+            location: script.location,
             script: script.script || script.content || '',
             tags: script.tags || [],
             duration: script.duration,
@@ -1600,6 +1596,7 @@ const LoveTimeApp = () => {
     tags: string[] = [],
     photos?: File[],
     isPublic: boolean = true,
+    location?: string,
   ) => {
     try {
       // Create script via backend API. Content is stored raw (placeholder
@@ -1609,6 +1606,7 @@ const LoveTimeApp = () => {
         title,
         category,
         scenario,
+        location,
         content,
         tags,
         duration: '15-30分鐘',
@@ -1623,6 +1621,7 @@ const LoveTimeApp = () => {
         title: typedScript.title || title,
         category: typedScript.category || category,
         scenario: typedScript.scenario || scenario,
+        location: typedScript.location ?? location,
         script: typedScript.script || typedScript.content || content,
         tags: typedScript.tags || tags,
         duration: typedScript.duration || '15-30分鐘',
@@ -1670,6 +1669,7 @@ const LoveTimeApp = () => {
           title,
           category,
           scenario,
+          location: location ?? '',
           content,
           tags: tags.join(', '),
           isPublic,
@@ -1707,6 +1707,7 @@ const LoveTimeApp = () => {
       title: string;
       category: 'romantic' | 'adventurous' | 'school' | 'bold';
       scenario: string;
+      location?: string;
       content: string;
       tags: string[];
       photos?: File[];
@@ -1719,6 +1720,7 @@ const LoveTimeApp = () => {
         title: updates.title,
         category: updates.category,
         scenario: updates.scenario,
+        location: updates.location,
         content: updates.content,
         tags: updates.tags,
         photos: updates.photos,
@@ -1735,6 +1737,7 @@ const LoveTimeApp = () => {
                 title: typedScript.title || updates.title,
                 category: typedScript.category || updates.category,
                 scenario: typedScript.scenario || updates.scenario,
+                location: typedScript.location ?? updates.location ?? s.location,
                 script: typedScript.script || typedScript.content || updates.content,
                 tags: typedScript.tags || updates.tags,
                 // Server returns canonical photos + cover; fall back to existing
@@ -2436,6 +2439,16 @@ const LoveTimeApp = () => {
             addCustomScript={addCustomScript}
             updateCustomScript={updateCustomScript}
             onDeleteScript={deleteCustomScript}
+            onRequireUpgrade={(draft, reason) => {
+              // Preserve the in-progress form (same flow as the script cap),
+              // then surface the paywall. The modal re-opens pre-filled after
+              // the user goes premium (see onRedeemed).
+              setPendingScriptDraft(draft);
+              setShowScriptUploadModal(false);
+              setEditingScript(null);
+              setUpgradeReason(reason || '升級 Premium 即可使用 AI 角色辨識');
+              setCurrentView('upgrade');
+            }}
           />
         </ErrorBoundary>
       )}

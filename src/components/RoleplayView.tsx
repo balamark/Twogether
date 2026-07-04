@@ -16,6 +16,8 @@ interface RoleplayScript {
   title: string;
   category: 'romantic' | 'adventurous' | 'school' | 'bold';
   scenario: string;
+  /** Scenario location (場景地點) — filterable. Mirrors App's RoleplayScript. */
+  location?: string | null;
   image?: string;
   script: string;
   isCustom?: boolean;
@@ -195,6 +197,8 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   // a 「查看所有標籤」 toggle and act as an extra filter on top of the chip.
   const [showAllTags, setShowAllTags] = useState(false);
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  // Scenario-location filter (場景地點) — an extra AND filter like activeTag.
+  const [activeLocation, setActiveLocation] = useState<string | null>(null);
   const [collectionView, setCollectionView] = usePersistedViewMode('roleplayView:collection', 'grid');
   const [marketplaceView, setMarketplaceView] = usePersistedViewMode('roleplayView:marketplace', 'grid');
 
@@ -220,6 +224,14 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   const [marketplaceLoading, setMarketplaceLoading] = useState(false);
   const [marketplaceSort, setMarketplaceSort] = useState<'rating' | 'recent' | 'popular'>('rating');
   const [marketplaceCategory, setMarketplaceCategory] = useState<'all' | RoleplayScript['category']>('all');
+  // Server-side text search (title / scenario / location) — debounced so we
+  // don't fire a request per keystroke; stays fast at 1000+ scripts.
+  const [marketplaceQuery, setMarketplaceQuery] = useState('');
+  const [debouncedMarketplaceQuery, setDebouncedMarketplaceQuery] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedMarketplaceQuery(marketplaceQuery.trim()), 350);
+    return () => clearTimeout(t);
+  }, [marketplaceQuery]);
   const [marketplaceDetailId, setMarketplaceDetailId] = useState<string | null>(null);
   const [favoritedMarketplace, setFavoritedMarketplace] = useState<MarketplaceScript[]>([]);
 
@@ -229,6 +241,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
       const list = await apiService.getMarketplaceScripts({
         sort: marketplaceSort,
         category: marketplaceCategory === 'all' ? undefined : marketplaceCategory,
+        q: debouncedMarketplaceQuery || undefined,
         limit: 60,
       });
       setMarketplaceScripts(list);
@@ -242,7 +255,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     } finally {
       setMarketplaceLoading(false);
     }
-  }, [marketplaceSort, marketplaceCategory, showNotification]);
+  }, [marketplaceSort, marketplaceCategory, debouncedMarketplaceQuery, showNotification]);
 
   const loadFavoritedMarketplace = useCallback(async () => {
     try {
@@ -428,15 +441,24 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     ? mineBase.filter((s) =>
         s.title?.toLowerCase().includes(mineQ) ||
         s.scenario?.toLowerCase().includes(mineQ) ||
+        s.location?.toLowerCase().includes(mineQ) ||
         (s.tags || []).some((t) => t.toLowerCase().includes(mineQ)))
     : mineBase;
-  const mineList = activeTag
+  const mineTagged = activeTag
     ? mineSearched.filter((s) => (s.tags || []).includes(activeTag))
     : mineSearched;
+  const mineList = activeLocation
+    ? mineTagged.filter((s) => s.location === activeLocation)
+    : mineTagged;
 
   // Distinct tags across all scripts (for the 查看所有標籤 filter panel).
   const allTags = [...new Set(allScripts.flatMap((s) => s.tags || []))]
     .filter(Boolean)
+    .sort((a, b) => a.localeCompare(b));
+
+  // Distinct scenario locations (場景地點) across all scripts, for the
+  // location chip row shown alongside the tag panel.
+  const allLocations = [...new Set(allScripts.map((s) => s.location).filter((l): l is string => !!l))]
     .sort((a, b) => a.localeCompare(b));
 
   // Convert marketplace data shape into the RoleplayScript the play/view
@@ -446,6 +468,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     title: m.title,
     category: m.category,
     scenario: m.scenario,
+    location: m.location,
     image: m.thumbnailUrl ?? undefined,
     script: m.script,
     isCustom: true,
@@ -715,6 +738,31 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                     }`}
                   >
                     #{tag}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Scenario-location chips (場景地點) — only when any script has one.
+              Click to filter; click the active chip again to clear. */}
+          {allLocations.length > 0 && (
+            <div className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="roleplay-location-chips">
+              <span className="font-body text-[11px] text-petal-muted mr-0.5">📍 地點</span>
+              {allLocations.map((loc) => {
+                const active = activeLocation === loc;
+                return (
+                  <button
+                    key={loc}
+                    onClick={() => setActiveLocation(active ? null : loc)}
+                    data-testid={`roleplay-location-chip-${loc}`}
+                    className={`px-2.5 py-1 rounded-full border text-xs font-body transition-colors ${
+                      active
+                        ? 'bg-petal-ink text-petal-cream border-petal-ink'
+                        : 'bg-white text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
+                    }`}
+                  >
+                    {loc}
                   </button>
                 );
               })}
@@ -1038,6 +1086,27 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             <div className="ml-auto">
               <ViewToggle mode={marketplaceView} setMode={setMarketplaceView} idPrefix="roleplay-marketplace" />
             </div>
+            <div className="relative w-full sm:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-petal-muted" strokeWidth={1.5} />
+              <input
+                type="search"
+                value={marketplaceQuery}
+                onChange={(e) => setMarketplaceQuery(e.target.value)}
+                data-testid="marketplace-search"
+                placeholder="搜尋市集劇本（標題、情境、地點）"
+                className="w-full pl-9 pr-8 py-2 border border-petal-rule rounded-md focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink bg-white"
+              />
+              {marketplaceQuery && (
+                <button
+                  onClick={() => setMarketplaceQuery('')}
+                  data-testid="marketplace-search-clear"
+                  aria-label="清除搜尋"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-petal-muted hover:text-petal-ink"
+                >
+                  <X className="w-4 h-4" strokeWidth={1.5} />
+                </button>
+              )}
+            </div>
           </div>
 
           {marketplaceLoading ? (
@@ -1046,7 +1115,9 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             </p>
           ) : marketplaceScripts.length === 0 ? (
             <p className="font-display italic font-light text-sm text-petal-muted text-center py-10">
-              目前還沒有公開劇本，第一個發布的就是你！
+              {debouncedMarketplaceQuery
+                ? `找不到符合「${debouncedMarketplaceQuery}」的公開劇本，換個關鍵字試試。`
+                : '目前還沒有公開劇本，第一個發布的就是你！'}
             </p>
           ) : (
             marketplaceView === 'grid' ? (
@@ -1231,6 +1302,11 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                 {selectedScript.title}
               </h3>
               <p className="font-display italic font-light text-sm text-petal-muted">{selectedScript.scenario}</p>
+              {selectedScript.location && (
+                <p className="font-body text-xs text-petal-muted mt-1" data-testid="script-modal-location">
+                  📍 {selectedScript.location}
+                </p>
+              )}
             </div>
 
             <div className="px-5 sm:px-8 py-5 sm:py-6">

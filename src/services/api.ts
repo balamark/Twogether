@@ -481,6 +481,7 @@ export interface MarketplaceScript {
   title: string;
   category: ScriptCategory;
   scenario: string;
+  location?: string | null;
   script: string;
   tags: string[];
   duration: string;
@@ -2314,10 +2315,37 @@ class ApiService {
     }
   }
 
+  // Premium: AI identifies speakers + genders in pasted script content so the
+  // upload modal can pre-fill the 角色對應 panel. Throws with the backend's
+  // specific message + error_code (AI_ROLE_PARSE_PREMIUM_ONLY for free tier).
+  async aiParseScriptRoles(content: string): Promise<Array<{ name: string; gender: 'male' | 'female' | 'unknown' }>> {
+    try {
+      const response = await apiClient.post('/custom-scripts/ai-parse-roles', { content });
+      return response.data.roles || [];
+    } catch (error) {
+      console.error('Failed to AI-parse script roles:', error);
+      throw this.extractScriptError(error, 'AI 角色辨識暫時無法使用，請稍後再試');
+    }
+  }
+
+  // Fetch the plain-text content of a public Google Doc (server-side proxy).
+  // Throws with the backend's specific message + error_code (GDOC_NOT_PUBLIC,
+  // GDOC_TOO_LONG, …) so the upload modal can show exactly what to fix.
+  async importGoogleDoc(url: string): Promise<{ content: string; suggestedTitle?: string }> {
+    try {
+      const response = await apiClient.post('/custom-scripts/import-gdoc', { url });
+      return { content: response.data.content, suggestedTitle: response.data.suggestedTitle };
+    } catch (error) {
+      console.error('Failed to import Google Doc:', error);
+      throw this.extractScriptError(error, '無法匯入 Google 文件，請稍後再試');
+    }
+  }
+
   async createCustomScript(script: {
     title: string;
     category: 'romantic' | 'adventurous' | 'school' | 'bold';
     scenario: string;
+    location?: string;
     content: string;
     tags?: string[];
     duration?: string;
@@ -2331,6 +2359,7 @@ class ApiService {
         fd.append('title', script.title);
         fd.append('category', script.category);
         fd.append('scenario', script.scenario);
+        if (script.location !== undefined) fd.append('location', script.location);
         fd.append('content', script.content);
         fd.append('duration', script.duration ?? '15-30分鐘');
         fd.append('tags', JSON.stringify(script.tags ?? []));
@@ -2355,6 +2384,7 @@ class ApiService {
     title?: string;
     category?: 'romantic' | 'adventurous' | 'school' | 'bold';
     scenario?: string;
+    location?: string;
     content?: string;
     tags?: string[];
     duration?: string;
@@ -2373,6 +2403,7 @@ class ApiService {
         if (updates.title !== undefined) fd.append('title', updates.title);
         if (updates.category !== undefined) fd.append('category', updates.category);
         if (updates.scenario !== undefined) fd.append('scenario', updates.scenario);
+        if (updates.location !== undefined) fd.append('location', updates.location);
         if (updates.content !== undefined) fd.append('content', updates.content);
         if (updates.duration !== undefined) fd.append('duration', updates.duration);
         if (updates.tags !== undefined) fd.append('tags', JSON.stringify(updates.tags));
@@ -2448,6 +2479,8 @@ class ApiService {
   async getMarketplaceScripts(params: {
     sort?: 'rating' | 'recent' | 'popular';
     category?: 'romantic' | 'adventurous' | 'school' | 'bold';
+    location?: string;
+    q?: string;
     limit?: number;
     offset?: number;
   } = {}): Promise<MarketplaceScript[]> {

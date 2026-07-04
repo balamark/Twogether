@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, Trash2 } from 'lucide-react';
+import { X, Trash2, FileDown } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { detectScriptSpeakers, applySpeakerAssignments } from '../utils/script';
+import { apiService } from '../services/api';
 import type { RoleplayScript } from '../App';
 
 type ScriptCategory = 'romantic' | 'adventurous' | 'school' | 'bold';
@@ -12,11 +13,17 @@ export interface PendingScriptDraft {
   title: string;
   category: ScriptCategory;
   scenario: string;
+  location: string;
   content: string;
   tags: string;
   isPublic: boolean;
   photos: File[];
 }
+
+// Suggested 場景地點 values (free text still allowed via the datalist input).
+const COMMON_LOCATIONS = [
+  '家裡', '臥室', '飯店', '教室', '辦公室', '公園', '車上', '海邊', '餐廳', '電影院',
+];
 
 // Per-script photo cap — mirrors MAX_SCRIPT_PHOTOS in routes/custom-scripts.js.
 export const MAX_SCRIPT_PHOTOS = 30;
@@ -36,6 +43,7 @@ interface ScriptUploadModalProps {
     tags?: string[],
     photos?: File[],
     isPublic?: boolean,
+    location?: string,
   ) => void;
   updateCustomScript: (
     id: string,
@@ -43,6 +51,7 @@ interface ScriptUploadModalProps {
       title: string;
       category: ScriptCategory;
       scenario: string;
+      location?: string;
       content: string;
       tags: string[];
       photos?: File[];
@@ -52,6 +61,11 @@ interface ScriptUploadModalProps {
   ) => void;
   /** Deletes the script being edited (edit mode only). */
   onDeleteScript: (id: string) => void;
+  /**
+   * Free user tapped a Premium-only affordance (AI 角色辨識): preserve the
+   * in-progress draft and send them to the Upgrade view with a reason.
+   */
+  onRequireUpgrade?: (draft: PendingScriptDraft, reason: string) => void;
 }
 
 // Script Upload Modal Component — supports create AND edit. When editingScript
@@ -67,6 +81,7 @@ const ScriptUploadModal = ({
   addCustomScript,
   updateCustomScript,
   onDeleteScript,
+  onRequireUpgrade,
 }: ScriptUploadModalProps) => {
   const isEditMode = editingScript !== null;
   // Two-step delete confirm (no blocking window.confirm): first click arms it.
@@ -79,6 +94,7 @@ const ScriptUploadModal = ({
     title: editingScript?.title ?? draft?.title ?? '',
     category: (editingScript?.category ?? draft?.category ?? 'romantic') as ScriptCategory,
     scenario: editingScript?.scenario ?? draft?.scenario ?? '',
+    location: editingScript?.location ?? draft?.location ?? '',
     content: editingScript?.script ?? draft?.content ?? '',
     tags: editingScript?.tags ? editingScript.tags.join(', ') : (draft?.tags ?? '')
   }));
@@ -111,7 +127,81 @@ const ScriptUploadModal = ({
     [scriptData.content]
   );
   const [speakerAssignments, setSpeakerAssignments] = useState<Record<string, 'male' | 'female' | 'keep'>>({});
+  // Google Docs import: paste a share link → server fetches the public doc's
+  // plain text and fills the content field. Status is shown inline.
+  const [gdocUrl, setGdocUrl] = useState('');
+  const [gdocStatus, setGdocStatus] = useState<
+    { state: 'idle' } | { state: 'loading' } | { state: 'error' | 'success'; message: string }
+  >({ state: 'idle' });
   useScrollLock(true);
+
+  // AI role detection (Premium): asks the backend to infer each detected
+  // speaker's gender and pre-fills the assignment buttons. Free users get an
+  // inline upgrade prompt (state 'premium') instead of a generic error.
+  const [aiStatus, setAiStatus] = useState<
+    | { state: 'idle' }
+    | { state: 'loading' }
+    | { state: 'error' | 'success' | 'premium'; message: string }
+  >({ state: 'idle' });
+
+  const currentDraft = (): PendingScriptDraft => ({
+    title: scriptData.title,
+    category: scriptData.category,
+    scenario: scriptData.scenario,
+    location: scriptData.location,
+    content: scriptData.content,
+    tags: scriptData.tags,
+    isPublic,
+    photos: newPhotos,
+  });
+
+  const handleAiParseRoles = async () => {
+    if (!scriptData.content.trim() || aiStatus.state === 'loading') return;
+    setAiStatus({ state: 'loading' });
+    try {
+      const roles = await apiService.aiParseScriptRoles(scriptData.content);
+      const next: Record<string, 'male' | 'female'> = {};
+      for (const role of roles) {
+        if ((role.gender === 'male' || role.gender === 'female') && detectedSpeakers.includes(role.name)) {
+          next[role.name] = role.gender;
+        }
+      }
+      const applied = Object.keys(next).length;
+      if (applied === 0) {
+        setAiStatus({ state: 'error', message: 'AI 無法從內容判斷角色性別，請直接點選下方的男／女按鈕手動指定。' });
+        return;
+      }
+      setSpeakerAssignments((prev) => ({ ...prev, ...next }));
+      setAiStatus({ state: 'success', message: `AI 已辨識 ${applied} 個角色的性別，請確認下方的角色對應（可再調整）。` });
+    } catch (error) {
+      const err = error as Error & { error_code?: string };
+      if (err.error_code === 'AI_ROLE_PARSE_PREMIUM_ONLY') {
+        setAiStatus({ state: 'premium', message: err.message });
+      } else {
+        setAiStatus({ state: 'error', message: err.message || 'AI 角色辨識暫時無法使用，請稍後再試。' });
+      }
+    }
+  };
+
+  const handleGdocImport = async () => {
+    if (!gdocUrl.trim() || gdocStatus.state === 'loading') return;
+    setGdocStatus({ state: 'loading' });
+    try {
+      const { content, suggestedTitle } = await apiService.importGoogleDoc(gdocUrl.trim());
+      setScriptData((prev) => ({
+        ...prev,
+        content,
+        // Only fill the title from the doc when the user hasn't typed one.
+        title: prev.title.trim() ? prev.title : (suggestedTitle ?? ''),
+      }));
+      setGdocStatus({ state: 'success', message: '已匯入文件內容，請確認下方劇本內容與角色對應。' });
+    } catch (error) {
+      setGdocStatus({
+        state: 'error',
+        message: (error as Error)?.message || '無法匯入 Google 文件，請稍後再試',
+      });
+    }
+  };
 
   useEffect(() => {
     const urls = newPhotos.map((f) => URL.createObjectURL(f));
@@ -160,6 +250,7 @@ const ScriptUploadModal = ({
         scriptData.title !== (editingScript.title ?? '') ||
         scriptData.category !== (editingScript.category ?? 'romantic') ||
         scriptData.scenario !== (editingScript.scenario ?? '') ||
+        scriptData.location !== (editingScript.location ?? '') ||
         scriptData.content !== (editingScript.script ?? '') ||
         scriptData.tags !== (editingScript.tags ? editingScript.tags.join(', ') : '') ||
         existingPhotos.length !== originalPhotos.length ||
@@ -169,6 +260,7 @@ const ScriptUploadModal = ({
     return (
       scriptData.title.trim() !== '' ||
       scriptData.scenario.trim() !== '' ||
+      scriptData.location.trim() !== '' ||
       scriptData.content.trim() !== '' ||
       scriptData.tags.trim() !== '' ||
       scriptData.category !== 'romantic' ||
@@ -202,6 +294,7 @@ const ScriptUploadModal = ({
         title: scriptData.title,
         category: scriptData.category,
         scenario: scriptData.scenario,
+        location: scriptData.location.trim(),
         content,
         tags,
         photos: newPhotos.length > 0 ? newPhotos : undefined,
@@ -218,6 +311,7 @@ const ScriptUploadModal = ({
         tags,
         newPhotos.length > 0 ? newPhotos : undefined,
         isPublic,
+        scriptData.location.trim() || undefined,
       );
     }
   };
@@ -315,6 +409,73 @@ const ScriptUploadModal = ({
           </div>
 
           <div>
+            <label htmlFor="script-location" className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
+              場景地點（選填）
+            </label>
+            <input
+              id="script-location"
+              name="script-location"
+              type="text"
+              list="script-location-options"
+              maxLength={50}
+              value={scriptData.location}
+              onChange={(e) => setScriptData(prev => ({ ...prev, location: e.target.value }))}
+              data-testid="script-location-input"
+              className="w-full px-3 py-2.5 border border-petal-rule rounded-md focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink bg-white"
+              placeholder="例如：教室、辦公室、飯店…（可自由輸入）"
+            />
+            <datalist id="script-location-options">
+              {COMMON_LOCATIONS.map((loc) => (
+                <option key={loc} value={loc} />
+              ))}
+            </datalist>
+          </div>
+
+          <div>
+            <label htmlFor="script-gdoc-url" className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
+              從 Google 文件匯入（選填）
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="script-gdoc-url"
+                name="script-gdoc-url"
+                type="url"
+                value={gdocUrl}
+                onChange={(e) => {
+                  setGdocUrl(e.target.value);
+                  if (gdocStatus.state !== 'idle') setGdocStatus({ state: 'idle' });
+                }}
+                data-testid="script-gdoc-url-input"
+                className="flex-1 px-3 py-2.5 border border-petal-rule rounded-md focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink bg-white"
+                placeholder="貼上 docs.google.com/document/d/… 分享連結"
+              />
+              <button
+                type="button"
+                onClick={handleGdocImport}
+                disabled={!gdocUrl.trim() || gdocStatus.state === 'loading'}
+                data-testid="script-gdoc-import-button"
+                className="px-4 py-2.5 border border-petal-rule rounded-md font-body text-sm text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
+              >
+                <FileDown className="w-4 h-4" strokeWidth={1.5} />
+                {gdocStatus.state === 'loading' ? '匯入中…' : '匯入'}
+              </button>
+            </div>
+            {gdocStatus.state === 'error' && (
+              <p className="mt-1.5 font-body text-xs text-red-600" data-testid="script-gdoc-error">
+                {gdocStatus.message}
+              </p>
+            )}
+            {gdocStatus.state === 'success' && (
+              <p className="mt-1.5 font-body text-xs text-petal-sage-deep" data-testid="script-gdoc-success">
+                {gdocStatus.message}
+              </p>
+            )}
+            <p className="mt-1.5 font-display italic font-light text-xs text-petal-muted">
+              文件需開啟「知道連結的任何人皆可檢視」權限。
+            </p>
+          </div>
+
+          <div>
             <label htmlFor="script-content" className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
               劇本內容
             </label>
@@ -336,12 +497,54 @@ const ScriptUploadModal = ({
 
           {detectedSpeakers.length > 0 && (
             <div className="p-4 bg-petal-cream-2/40 border border-petal-rule-soft rounded-md" data-testid="speaker-assignment-panel">
-              <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-1">
-                角色對應
-              </h4>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted">
+                  角色對應
+                </h4>
+                <button
+                  type="button"
+                  onClick={handleAiParseRoles}
+                  disabled={aiStatus.state === 'loading'}
+                  data-testid="ai-parse-roles-button"
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-full border border-petal-rose-deep/50 text-petal-rose-deep hover:bg-petal-rose-soft font-body text-xs transition-colors disabled:opacity-50"
+                >
+                  ✨ {aiStatus.state === 'loading' ? 'AI 辨識中…' : 'AI 智慧辨識'}
+                  <span className="px-1.5 py-0.5 rounded-full bg-petal-rose-deep text-petal-cream text-[9px] font-medium uppercase tracking-wide">
+                    Premium
+                  </span>
+                </button>
+              </div>
               <p className="font-display italic font-light text-xs text-petal-muted mb-3 leading-relaxed">
                 偵測到以下角色。指定男／女後，劇本會依你們的性別自動帶入暱稱；「保留原名」則照原文顯示。
               </p>
+              {aiStatus.state === 'success' && (
+                <p className="mb-3 font-body text-xs text-petal-sage-deep" data-testid="ai-parse-roles-success">
+                  {aiStatus.message}
+                </p>
+              )}
+              {aiStatus.state === 'error' && (
+                <p className="mb-3 font-body text-xs text-red-600" data-testid="ai-parse-roles-error">
+                  {aiStatus.message}
+                </p>
+              )}
+              {aiStatus.state === 'premium' && (
+                <div
+                  className="mb-3 p-3 rounded-md border border-petal-rose-deep/40 bg-petal-rose-soft/40"
+                  data-testid="ai-parse-roles-premium-prompt"
+                >
+                  <p className="font-body text-xs text-petal-ink leading-relaxed mb-2">{aiStatus.message}</p>
+                  {onRequireUpgrade && (
+                    <button
+                      type="button"
+                      data-testid="ai-parse-roles-upgrade-button"
+                      onClick={() => onRequireUpgrade(currentDraft(), aiStatus.message)}
+                      className="px-3.5 py-1.5 rounded-md bg-petal-ink text-petal-cream font-body text-xs hover:bg-pink-700 transition-colors"
+                    >
+                      升級 Premium →（草稿會保留）
+                    </button>
+                  )}
+                </div>
+              )}
               <div className="space-y-2">
                 {detectedSpeakers.map((speaker, idx) => {
                   const current = speakerAssignments[speaker] ?? 'keep';

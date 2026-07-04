@@ -1054,6 +1054,108 @@ async function generateCheckupSummary({ dimensions, responseA, responseB }) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Script role parsing (premium) — identify speaker names in a pasted roleplay
+// script and infer each character's gender so the client can rewrite them into
+// [男]/[女] tokens (which display-time parsing swaps for the couple's
+// nicknames). Only the opening slice of the script is sent: speaker names
+// repeat every line, so a few thousand characters are plenty to infer gender.
+const PARSE_ROLES_MAX_INPUT_CHARS = 6000;
+
+const PARSE_ROLES_SYSTEM_PROMPT = `你是劇本角色分析助手。使用者提供一段情侶角色扮演劇本，對白行的格式是「角色名：對白」或「角色名: 對白」。
+
+任務：
+1. 找出所有出現在對白行開頭的「角色名」（冒號前的名字），名字必須與劇本中出現的完全一致。
+2. 依名字本身（如：小明/小芳）、稱謂（如：先生/小姐/學長/學姊）、與對白內容的線索，判斷每個角色的性別。
+3. 無法合理判斷時，gender 用 "unknown"，不要亂猜。
+4. 忽略舞台指示（如（場景：教室））與已經是 [男]/[女]/[他]/[她]/[partner1]/[partner2] 佔位符的行。
+
+回應請呼叫 emit_script_roles tool，不要輸出其他文字。`;
+
+const PARSE_ROLES_TOOL_SCHEMA = {
+  name: 'emit_script_roles',
+  description: 'Return the speakers detected in the script and each one\'s inferred gender.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      roles: {
+        type: 'array',
+        maxItems: 20,
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', maxLength: 50 },
+            gender: { type: 'string', enum: ['male', 'female', 'unknown'] },
+          },
+          required: ['name', 'gender'],
+        },
+      },
+    },
+    required: ['roles'],
+  },
+};
+
+async function parseScriptRoles({ content }) {
+  if (typeof content !== 'string' || content.trim().length === 0) {
+    throw new Error('content is required');
+  }
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 600,
+    system: [
+      {
+        type: 'text',
+        text: PARSE_ROLES_SYSTEM_PROMPT,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [PARSE_ROLES_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_script_roles' },
+    messages: [{ role: 'user', content: content.slice(0, PARSE_ROLES_MAX_INPUT_CHARS) }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.parse_script_roles', {
+    model: response.model || MODEL,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find((b) => b.type === 'tool_use' && b.name === 'emit_script_roles');
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input || {};
+  const roles = (Array.isArray(out.roles) ? out.roles : [])
+    .filter((r) => r && typeof r.name === 'string' && r.name.trim()
+      && ['male', 'female', 'unknown'].includes(r.gender))
+    .map((r) => ({ name: r.name.trim(), gender: r.gender }));
+
+  return {
+    roles,
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -1062,4 +1164,5 @@ module.exports = {
   generateReconciliationOpeners,
   generateEmotionAcceptance,
   generateCheckupSummary,
+  parseScriptRoles,
 };

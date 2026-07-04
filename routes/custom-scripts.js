@@ -10,6 +10,7 @@ const { getCoupleTier, getLimit, checkLimit } = require('../lib/entitlements');
 const { logDbError, errorResponseBody } = require('../lib/db-errors');
 const { logError, logInfo, logWarn } = require('../lib/logger');
 const emailService = require('../services/emailService');
+const llmService = require('../services/llmService');
 
 const router = express.Router();
 
@@ -140,7 +141,7 @@ router.get('/', async (req, res) => {
     // Get custom scripts for the couple OR personal scripts created by this user
     const scriptsResult = await db.query(`
       SELECT
-        id, title, category, scenario, content, tags, duration,
+        id, title, category, scenario, location, content, tags, duration,
         thumbnail_url, is_public, created_by, created_at, updated_at
       FROM custom_scripts
       WHERE couple_id = $1 OR (couple_id IS NULL AND created_by = $2)
@@ -159,6 +160,7 @@ router.get('/', async (req, res) => {
         title: script.title,
         category: script.category,
         scenario: script.scenario,
+        location: script.location,
         script: script.content, // Map content to script for frontend compatibility
         tags: script.tags || [],
         duration: script.duration || '15-30分鐘',
@@ -204,6 +206,10 @@ router.post('/', scriptPhotoUpload, [
   body('scenario')
     .isLength({ min: 1, max: 500 })
     .withMessage('情境描述必須在1-500個字符之間'),
+  body('location')
+    .optional({ values: 'falsy' })
+    .isLength({ max: 50 })
+    .withMessage('場景地點不能超過50個字符'),
   body('content')
     .isLength({ min: 1, max: 50000 })
     .withMessage('劇本內容必須在1-50000個字符之間'),
@@ -227,6 +233,7 @@ router.post('/', scriptPhotoUpload, [
     }
 
     const { title, category, scenario, content, duration = '15-30分鐘' } = req.body;
+    const location = (req.body.location || '').trim() || null;
     const tags = normalizeTags(req.body.tags);
     const userId = req.user.id;
     // Default to public — marketplace opt-out is per-script. Multipart sends
@@ -297,10 +304,10 @@ router.post('/', scriptPhotoUpload, [
     // Insert custom script
     const scriptResult = await db.query(`
       INSERT INTO custom_scripts (
-        couple_id, title, category, scenario, content, tags, duration, created_by, thumbnail_url, is_public
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      RETURNING id, title, category, scenario, content, tags, duration, thumbnail_url, is_public, created_by, created_at
-    `, [coupleId, title, category, scenario, content, JSON.stringify(tags), duration, userId, thumbnailUrl, isPublic]);
+        couple_id, title, category, scenario, location, content, tags, duration, created_by, thumbnail_url, is_public
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING id, title, category, scenario, location, content, tags, duration, thumbnail_url, is_public, created_by, created_at
+    `, [coupleId, title, category, scenario, location, content, JSON.stringify(tags), duration, userId, thumbnailUrl, isPublic]);
 
     const script = scriptResult.rows[0];
 
@@ -323,6 +330,7 @@ router.post('/', scriptPhotoUpload, [
         title: script.title,
         category: script.category,
         scenario: script.scenario,
+        location: script.location,
         script: script.content,
         tags: Array.isArray(script.tags) ? script.tags : JSON.parse(script.tags || '[]'),
         duration: script.duration,
@@ -357,6 +365,10 @@ router.put('/:id', scriptPhotoUpload, [
     .optional()
     .isLength({ min: 1, max: 500 })
     .withMessage('情境描述必須在1-500個字符之間'),
+  body('location')
+    .optional({ values: 'falsy' })
+    .isLength({ max: 50 })
+    .withMessage('場景地點不能超過50個字符'),
   body('content')
     .optional()
     .isLength({ min: 1, max: 50000 })
@@ -392,6 +404,11 @@ router.put('/:id', scriptPhotoUpload, [
     // Normalize tags: in multipart it arrives as a JSON string; in JSON as an array.
     if (updates.tags !== undefined) {
       updates.tags = normalizeTags(updates.tags);
+    }
+
+    // Normalize location: empty string clears it back to NULL.
+    if (updates.location !== undefined) {
+      updates.location = (updates.location || '').trim() || null;
     }
 
     // Verify script ownership - check if user created it or is in the couple
@@ -449,7 +466,7 @@ router.put('/:id', scriptPhotoUpload, [
     let paramIndex = 1;
 
     Object.keys(updates).forEach(key => {
-      if (['title', 'category', 'scenario', 'content', 'duration'].includes(key)) {
+      if (['title', 'category', 'scenario', 'location', 'content', 'duration'].includes(key)) {
         updateFields.push(`${key} = $${paramIndex}`);
         updateValues.push(updates[key]);
         paramIndex++;
@@ -488,7 +505,7 @@ router.put('/:id', scriptPhotoUpload, [
       UPDATE custom_scripts
       SET ${updateFields.join(', ')}
       WHERE id = $${paramIndex}
-      RETURNING id, title, category, scenario, content, tags, duration, thumbnail_url, is_public, created_by, created_at, updated_at
+      RETURNING id, title, category, scenario, location, content, tags, duration, thumbnail_url, is_public, created_by, created_at, updated_at
     `;
 
     const updatedResult = await db.query(updateQuery, updateValues);
@@ -513,6 +530,7 @@ router.put('/:id', scriptPhotoUpload, [
         title: script.title,
         category: script.category,
         scenario: script.scenario,
+        location: script.location,
         script: script.content,
         tags: Array.isArray(script.tags) ? script.tags : JSON.parse(script.tags || '[]'),
         duration: script.duration,
@@ -628,6 +646,166 @@ router.post('/:id/share', async (req, res) => {
   } catch (error) {
     logWarn('Share custom script failed', { id: req.params.id, err: error.message });
     res.status(500).json({ success: false, message: '分享失敗，請稍後再試。' });
+  }
+});
+
+// POST /ai-parse-roles — Premium: AI identifies the speakers in a pasted
+// script and infers each character's gender, so the upload modal can pre-fill
+// the 角色對應 panel and rewrite names into [男]/[女] tokens. Free couples get
+// a specific upgrade prompt (error_code AI_ROLE_PARSE_PREMIUM_ONLY), never a
+// generic failure.
+router.post('/ai-parse-roles', [
+  body('content')
+    .isString()
+    .isLength({ min: 1, max: 50000 })
+    .withMessage('劇本內容必須在1-50000個字符之間'),
+], async (req, res) => {
+  const userId = req.user.id;
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: '請先貼上劇本內容再使用 AI 角色辨識',
+        errors: errors.array(),
+      });
+    }
+
+    const coupleResult = await db.query(
+      'SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1',
+      [userId]
+    );
+    const coupleId = coupleResult.rows.length > 0 ? coupleResult.rows[0].id : null;
+
+    const tier = await getCoupleTier(coupleId);
+    if (tier !== 'premium') {
+      logInfo('custom_scripts.ai_parse_roles.premium_blocked', { userId, coupleId, tier });
+      return res.status(403).json({
+        success: false,
+        message: 'AI 角色辨識是 Premium 專屬功能。升級後，匯入劇本時 AI 會自動判斷每個角色的性別並帶入你們的暱稱。',
+        error_code: 'AI_ROLE_PARSE_PREMIUM_ONLY',
+      });
+    }
+
+    logInfo('custom_scripts.ai_parse_roles.attempt', {
+      userId, coupleId, contentLen: req.body.content.length,
+    });
+
+    const { roles } = await llmService.parseScriptRoles({ content: req.body.content });
+
+    logInfo('custom_scripts.ai_parse_roles.success', {
+      userId, coupleId, roleCount: roles.length,
+    });
+    res.json({ success: true, roles });
+  } catch (error) {
+    logError('AI parse script roles failed', { userId, err: error.message });
+    res.status(502).json({
+      success: false,
+      message: 'AI 角色辨識暫時無法使用，請稍後再試，或直接在「角色對應」手動指定男／女。',
+      error_code: 'AI_ROLE_PARSE_FAILED',
+    });
+  }
+});
+
+// POST /import-gdoc — fetch the plain-text export of a public Google Doc so
+// the upload modal can pre-fill script content. The user pastes any share
+// link; we extract the document id and construct the export URL ourselves —
+// the user-supplied URL is never fetched, so there's no SSRF surface.
+const GDOC_ID_PATTERN = /docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]{10,})/;
+const GDOC_TIMEOUT_MS = 10000;
+// Matches the content max length (50k chars) with headroom for trimming.
+const GDOC_MAX_CHARS = 60000;
+
+router.post('/import-gdoc', [
+  body('url')
+    .isString()
+    .isLength({ min: 10, max: 500 })
+    .withMessage('請提供 Google 文件連結'),
+], async (req, res) => {
+  const userId = req.user.id;
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: '請提供 Google 文件連結',
+      error_code: 'GDOC_INVALID_URL',
+      errors: errors.array(),
+    });
+  }
+
+  const match = String(req.body.url).match(GDOC_ID_PATTERN);
+  if (!match) {
+    logWarn('custom_scripts.import_gdoc.bad_url', { userId });
+    return res.status(400).json({
+      success: false,
+      message: '這不是有效的 Google 文件連結。請貼上 docs.google.com/document/d/… 開頭的分享連結。',
+      error_code: 'GDOC_INVALID_URL',
+    });
+  }
+
+  const docId = match[1];
+  logInfo('custom_scripts.import_gdoc.attempt', { userId, docId });
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GDOC_TIMEOUT_MS);
+  try {
+    const response = await fetch(
+      `https://docs.google.com/document/d/${docId}/export?format=txt`,
+      { signal: controller.signal, redirect: 'follow' }
+    );
+
+    // A private doc redirects to the Google login page (HTML) or returns
+    // 401/403/404 — either way the caller needs to open link sharing.
+    const contentType = response.headers.get('content-type') || '';
+    if (!response.ok || !contentType.includes('text/plain')) {
+      logWarn('custom_scripts.import_gdoc.not_public', {
+        userId, docId, status: response.status, contentType,
+      });
+      return res.status(422).json({
+        success: false,
+        message: '無法讀取這份文件。請在 Google 文件按「共用」，把權限設為「知道連結的任何人皆可檢視」後再試一次。',
+        error_code: 'GDOC_NOT_PUBLIC',
+      });
+    }
+
+    // Normalize Windows newlines and strip the BOM the export prepends.
+    const text = (await response.text()).replace(/^﻿/, '').replace(/\r\n/g, '\n').trim();
+
+    if (!text) {
+      return res.status(422).json({
+        success: false,
+        message: '這份文件是空的，沒有內容可以匯入。',
+        error_code: 'GDOC_EMPTY',
+      });
+    }
+    if (text.length > GDOC_MAX_CHARS) {
+      logInfo('custom_scripts.import_gdoc.too_long', { userId, docId, chars: text.length });
+      return res.status(422).json({
+        success: false,
+        message: `文件內容約 ${text.length.toLocaleString()} 字，超過劇本 50,000 字上限。請先在文件中縮短內容再匯入。`,
+        error_code: 'GDOC_TOO_LONG',
+      });
+    }
+
+    // First non-empty line doubles as a title suggestion for empty forms.
+    const suggestedTitle = (text.split('\n').find((l) => l.trim()) || '').trim().slice(0, 100);
+
+    logInfo('custom_scripts.import_gdoc.success', { userId, docId, chars: text.length });
+    res.json({ success: true, content: text, suggestedTitle });
+  } catch (error) {
+    const timedOut = error.name === 'AbortError';
+    logWarn('custom_scripts.import_gdoc.fetch_failed', {
+      userId, docId, timedOut, err: error.message,
+    });
+    res.status(timedOut ? 504 : 502).json({
+      success: false,
+      message: timedOut
+        ? '讀取 Google 文件逾時，請稍後再試，或直接複製文件內容貼到「劇本內容」。'
+        : '暫時無法連線到 Google 文件，請稍後再試，或直接複製文件內容貼到「劇本內容」。',
+      error_code: timedOut ? 'GDOC_TIMEOUT' : 'GDOC_FETCH_FAILED',
+    });
+  } finally {
+    clearTimeout(timer);
   }
 });
 

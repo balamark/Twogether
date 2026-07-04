@@ -226,6 +226,9 @@ export default function MarketplaceScriptDetail({
               <p className="font-display italic font-light text-sm text-petal-muted mb-3">
                 {script.scenario}
               </p>
+              {script.location && (
+                <p className="font-body text-xs text-petal-muted mt-1">📍 {script.location}</p>
+              )}
               <div className="flex items-center gap-3 flex-wrap">
                 <span className="font-body text-xs text-petal-ink-soft">
                   by {script.authorName}

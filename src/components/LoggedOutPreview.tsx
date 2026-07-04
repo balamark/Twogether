@@ -482,7 +482,7 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scr
             為你們的夜晚<em className="not-italic font-light italic text-pink-600">增添新鮮感</em>
           </h2>
           <p className="font-body text-sm text-petal-ink-soft leading-relaxed max-w-sm mx-auto">
-            精選情境劇本，點開看看內容。登入後劇本會依你們的性別自動帶入雙方暱稱，也能自訂、匯入專屬你們的劇本。
+            精選情境劇本，點開看看內容。登入後劇本會依你們的性別自動帶入雙方暱稱，可從 Google 文件一鍵匯入劇本，Premium 還能讓 AI 自動辨識角色性別。
           </p>
         </div>
 

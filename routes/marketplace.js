@@ -27,6 +27,7 @@ function mapScriptRow(row) {
     title: row.title,
     category: row.category,
     scenario: row.scenario,
+    location: row.location,
     script: row.content,
     tags: Array.isArray(row.tags) ? row.tags : JSON.parse(row.tags || '[]'),
     duration: row.duration || '15-30分鐘',
@@ -48,6 +49,8 @@ router.get(
   [
     query('sort').optional().isIn(['rating', 'recent', 'popular']),
     query('category').optional().isIn(['romantic', 'adventurous', 'school', 'bold']),
+    query('location').optional().isLength({ max: 50 }),
+    query('q').optional().isLength({ max: 100 }),
     query('limit').optional().isInt({ min: 1, max: 100 }).toInt(),
     query('offset').optional().isInt({ min: 0 }).toInt(),
   ],
@@ -56,15 +59,30 @@ router.get(
     try {
       const sort = req.query.sort || 'rating';
       const category = req.query.category;
+      const location = (req.query.location || '').trim();
+      const q = (req.query.q || '').trim();
       const limit = req.query.limit || 30;
       const offset = req.query.offset || 0;
 
       const params = [];
-      let whereClause = '';
+      const conditions = [];
       if (category) {
         params.push(category);
-        whereClause = `WHERE category = $${params.length}`;
+        conditions.push(`category = $${params.length}`);
       }
+      if (location) {
+        params.push(location);
+        conditions.push(`location = $${params.length}`);
+      }
+      if (q) {
+        // Escape LIKE wildcards so a literal % or _ in the query can't scan
+        // everything; search spans title, scenario, and location.
+        params.push(`%${q.replace(/[\\%_]/g, '\\$&')}%`);
+        conditions.push(
+          `(title ILIKE $${params.length} OR scenario ILIKE $${params.length} OR location ILIKE $${params.length})`
+        );
+      }
+      const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
       let orderClause;
       if (sort === 'recent') {

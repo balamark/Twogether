@@ -365,6 +365,34 @@ async function generateCheckupSummary({ dimensions, responseA, responseB }) {
   };
 }
 
+// Deterministic stand-in for Claude's script role parsing: detect speaker
+// names (「名字：對白」 lines), assign the first speaker male and the second
+// female, everyone else unknown. Predictable for e2e tests.
+async function parseScriptRoles({ content }) {
+  const startedAt = Date.now();
+  const speakers = [];
+  for (const rawLine of String(content || '').split('\n')) {
+    const m = rawLine.trim().match(/^([^：:()（）[\]【】\s]{1,12})\s*[：:]/);
+    if (m && !speakers.includes(m[1])) speakers.push(m[1]);
+  }
+  const roles = speakers.map((name, i) => ({
+    name,
+    gender: i === 0 ? 'male' : i === 1 ? 'female' : 'unknown',
+  }));
+
+  return {
+    roles,
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+      assembledPrompt: `[mock] parse roles speakers=${speakers.join(',')}`,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -373,4 +401,5 @@ module.exports = {
   generateReconciliationOpeners,
   generateEmotionAcceptance,
   generateCheckupSummary,
+  parseScriptRoles,
 };
