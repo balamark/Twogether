@@ -63,6 +63,10 @@ export default defineConfig({
         JWT_SECRET: process.env.JWT_SECRET || 'dev-secret-do-not-use-in-prod',
         // Enables the /admin dashboard in tests (adminAuth 503s without it).
         ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'test-admin-pw',
+        // Deterministic + free: without this, a local .env with
+        // LLM_PROVIDER=claude leaks into the test server and e2e runs bill
+        // real Anthropic tokens with non-deterministic output.
+        LLM_PROVIDER: 'mock',
         PORT: '8080'
       }
     },

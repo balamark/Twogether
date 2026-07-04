@@ -159,12 +159,18 @@ async function ensureRoleplaySuggestionTables() {
   }
 }
 
+// Bump whenever the roleplay prompt's voice/perspective behavior changes: the
+// message cache is shared across couples and keyed by this hash, so without a
+// version bump a prompt fix would keep serving stale generations (this bit us
+// when male senders got messages voiced as the script's female protagonist).
+const ROLEPLAY_PROMPT_VERSION = 'v2';
+
 // Stable fingerprint of a script's content so an edited script regenerates while
 // identical content is reused (and shared across couples).
 function roleplayContentHash({ title, scenario, scriptBody, category, senderGender }) {
   return crypto
     .createHash('sha256')
-    .update([title || '', scenario || '', scriptBody || '', category || '', senderGender || ''].join(''))
+    .update([ROLEPLAY_PROMPT_VERSION, title || '', scenario || '', scriptBody || '', category || '', senderGender || ''].join(''))
     .digest('hex');
 }
 

@@ -120,13 +120,17 @@ test.describe('Roleplay AI invitation flow', () => {
     await firstScript.click();
     await genResp;
 
-    // Step 3: exactly the 5 escalating levels, low → high. The sender's gender
-    // (set to male in beforeAll) flows into generation server-side; we don't
-    // assert on the model's natural-language output here since the test server
-    // uses the real LLM (non-deterministic).
+    // Step 3: exactly the 5 escalating levels, low → high.
     for (const lvl of LEVELS) {
       await expect(page.getByTestId(`roleplay-msg-${lvl}`)).toBeVisible({ timeout: 15000 });
     }
+
+    // Regression guard (issue: male sender got messages voiced as the script's
+    // female protagonist): the sender's gender (male, set in beforeAll) must
+    // flow DB → route → LLM provider. The test server uses the mock provider,
+    // which embeds a deterministic「（男性視角）」marker in the summary — if
+    // this fails, senderGender stopped reaching the generator.
+    await expect(page.getByTestId('roleplay-ai-summary')).toContainText('男性視角', { timeout: 10000 });
 
     // Thumb up records feedback and shows the acknowledgement.
     const fbResp = page

@@ -219,8 +219,9 @@ const ROLEPLAY_LEVELS = [
 const ROLEPLAY_SYSTEM_PROMPT = `你是一個專為「成熟情侶」設計的角色扮演助手。使用情境：一對已成年、彼此同意的伴侶，在私密的雙人 App 裡準備玩一個角色扮演劇本。其中一方想在對話開始前，先傳一則「入戲的開場邀請訊息」給另一半，讓對方知道今晚想玩哪個劇本、並順勢進入角色。請永遠以繁體中文回覆。
 
 任務：閱讀使用者提供的劇本（標題、情境、劇本內容、分類），產出：
-1. summary：把這個劇本摘要成 1–2 句「情境設定」，點出角色、場景與氛圍，幫使用者快速融入（最多 120 字，不要劇透整段對白）。
-2. messages：剛好 5 則第一人稱、入戲的開場邀請訊息。每則都是「邀請對方一起開始這個劇本」的口吻，可融入角色身分與場景，像是真的傳給伴侶的訊息（每則約 15–60 字）。
+1. senderRole：最重要的第一步 — 依「傳送者性別」判斷傳送者在劇本中扮演哪個角色，填入該角色的名字或身分（例如「阿凱（富豪雇主）」）。劇本的主角常常不是傳送者：如果劇本圍繞女主角展開、但傳送者是男性，傳送者就是劇中的男性角色，女主角是被邀請的對象。
+2. summary：把這個劇本摘要成 1–2 句「情境設定」，點出角色、場景與氛圍，幫使用者快速融入（最多 120 字，不要劇透整段對白）。
+3. messages：剛好 5 則第一人稱、入戲的開場邀請訊息，全部以 senderRole 這個角色的視角撰寫。每則都是「邀請對方一起開始這個劇本」的口吻，可融入角色身分與場景，像是真的傳給伴侶的訊息（每則約 15–60 字）。
 
 這 5 則訊息的「暗示強度」必須由弱到強、逐級遞增，對應以下 5 個等級（順序固定）：
 - normal（普通暗示）：曖昧、調情、製造期待，但不直接提到性。像是邀約與鋪陳氣氛。
@@ -232,25 +233,26 @@ const ROLEPLAY_SYSTEM_PROMPT = `你是一個專為「成熟情侶」設計的角
 守則：
 - 所有訊息都是傳給「同意的伴侶」、用來開啟雙方都期待的角色扮演，語氣是邀請與渴望，而不是命令或施壓。
 - 緊扣使用者提供的劇本情境與角色身分，不要編造與劇本無關的全新設定。
-- 性別與視角（重要）：訊息是由「傳送者」發出的。請依「傳送者性別」判斷傳送者在劇本中對應的角色，並以該角色的視角撰寫。例如劇本女主角是小香，但傳送者是男性，就要以劇本中的男性角色視角發出邀請（把女主角當成被邀請的對象），絕不能用女主角的視角自稱。若性別為「未指定」，則用中性、不限定自身性別的傳送者視角撰寫。
+- 性別與視角（最重要的規則）：訊息是由「傳送者」發出的。每一則訊息都必須以 senderRole 判斷出的角色第一人稱撰寫。例如劇本女主角是小香，但傳送者是男性，senderRole 就是劇中的男性角色（如雇主阿凱），5 則訊息都要以阿凱的口吻邀請小香入戲 — 絕不能自稱小香、不能說「我會準時回家」這種女主角台詞。產出每一則訊息前，先自問「這句話是 senderRole 會說的嗎？」，視角錯誤就重寫。若性別為「未指定」，則用中性、不限定自身性別的傳送者視角撰寫，不以任何劇中角色自稱。
 - 即使某一級你判斷不適合產生，也務必回傳其餘等級，並為該級填入較收斂的替代文字 — 不可整批拒答或回傳少於 5 則。
 - 使用繁體中文，自然口語，像真的在傳訊息。
 
 回應請只呼叫 emit_roleplay_messages tool，不要輸出其他文字。`;
 
-// Maps the stored gender enum to a Chinese label used in the prompt.
-function genderLabel(g) {
-  if (g === 'male') return '男性';
-  if (g === 'female') return '女性';
-  return '未指定';
-}
-
 const ROLEPLAY_TOOL_SCHEMA = {
   name: 'emit_roleplay_messages',
-  description: 'Return a short script summary and five escalating in-character invitation messages.',
+  description: 'Return the sender\'s in-script role, a short script summary, and five escalating in-character invitation messages written from that role\'s first-person voice.',
   input_schema: {
     type: 'object',
     properties: {
+      // Declared first so the model commits to the sender's perspective
+      // before writing any message text (regression: a male sender got
+      // messages voiced as the script's female protagonist).
+      senderRole: {
+        type: 'string',
+        maxLength: 50,
+        description: '傳送者在劇本中扮演的角色名字或身分，依「傳送者性別」判斷；性別未指定時填「未指定」。',
+      },
       summary: { type: 'string', maxLength: 400 },
       messages: {
         type: 'array',
@@ -266,17 +268,29 @@ const ROLEPLAY_TOOL_SCHEMA = {
         },
       },
     },
-    required: ['summary', 'messages'],
+    required: ['senderRole', 'summary', 'messages'],
   },
 };
 
-async function generateRoleplayMessages({ title, scenario, scriptBody, category, senderGender }) {
-  if (typeof title !== 'string' || title.trim().length === 0) {
-    throw new Error('title is required');
+// The perspective directive leads the user content and spells out the
+// sender→role mapping imperatively. A single "傳送者性別：男性" line proved
+// too weak: with a female-protagonist script the model voiced the messages
+// as the protagonist despite the system-prompt rule.
+function senderPerspectiveDirective(senderGender) {
+  if (senderGender === 'male') {
+    return '傳送者性別：男性。傳送者在這個劇本中扮演「男性角色」— 請先從劇本找出男性角色（senderRole 填他的名字或身分），5 則訊息全部以這個男性角色的第一人稱撰寫，邀請對象是劇本中的女性角色。絕對不可以用女性角色自稱、不可以說出女性角色的台詞。';
   }
+  if (senderGender === 'female') {
+    return '傳送者性別：女性。傳送者在這個劇本中扮演「女性角色」— 請先從劇本找出女性角色（senderRole 填她的名字或身分），5 則訊息全部以這個女性角色的第一人稱撰寫，邀請對象是劇本中的男性角色。絕對不可以用男性角色自稱、不可以說出男性角色的台詞。';
+  }
+  return '傳送者性別：未指定。請以中性、不限定自身性別的傳送者視角撰寫（senderRole 填「未指定」），不要以劇本中的特定角色自稱。';
+}
 
-  const userContent = [
-    `傳送者性別：${genderLabel(senderGender)}`,
+// Exported for prompt-contract tests (src/tests/roleplay-prompt.test.ts):
+// guards the gender-perspective regression without a live API call.
+function buildRoleplayUserContent({ title, scenario, scriptBody, category, senderGender }) {
+  return [
+    senderPerspectiveDirective(senderGender),
     `劇本標題：${title.trim()}`,
     category ? `分類：${String(category).trim()}` : null,
     scenario ? `情境：${String(scenario).trim()}` : null,
@@ -285,6 +299,14 @@ async function generateRoleplayMessages({ title, scenario, scriptBody, category,
   ]
     .filter(Boolean)
     .join('\n');
+}
+
+async function generateRoleplayMessages({ title, scenario, scriptBody, category, senderGender }) {
+  if (typeof title !== 'string' || title.trim().length === 0) {
+    throw new Error('title is required');
+  }
+
+  const userContent = buildRoleplayUserContent({ title, scenario, scriptBody, category, senderGender });
 
   const startedAt = Date.now();
   const response = await getClient().messages.create({
@@ -335,9 +357,15 @@ async function generateRoleplayMessages({ title, scenario, scriptBody, category,
     text: byLevel.get(key) || '',
   }));
 
+  // Log the role the model committed to, so "wrong voice" reports can be
+  // diagnosed from Cloud Logging (compare senderRole with senderGender).
+  const senderRole = (out.senderRole || '').toString().trim();
+  logInfo('llm.claude.roleplay_messages.role', { senderGender, senderRole });
+
   return {
     summary: (out.summary || '').toString().trim(),
     messages,
+    senderRole,
     _meta: {
       provider: 'claude',
       model: response.model || MODEL,
@@ -1165,4 +1193,6 @@ module.exports = {
   generateEmotionAcceptance,
   generateCheckupSummary,
   parseScriptRoles,
+  // Exported for prompt-contract regression tests only.
+  buildRoleplayUserContent,
 };

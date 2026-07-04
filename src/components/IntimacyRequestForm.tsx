@@ -659,7 +659,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                   {aiSummary && (
                     <div className="bg-pink-50 border border-pink-100 rounded-lg p-3">
                       <p className="text-xs font-medium text-pink-600 mb-1">情境設定</p>
-                      <p className="text-sm text-gray-700">{aiSummary}</p>
+                      <p className="text-sm text-gray-700" data-testid="roleplay-ai-summary">{aiSummary}</p>
                     </div>
                   )}
                   <p className="text-xs text-gray-500">暗示強度由弱到強，挑一句你喜歡的；選好後下一步可自由編輯。</p>
