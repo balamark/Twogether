@@ -2410,6 +2410,16 @@ const LoveTimeApp = () => {
             </p>
           </footer>
         )}
+
+        {/* Release line — version / environment / build time / commit hash,
+            baked in by vite.config.ts `define` so every deployed commit
+            shows its own build metadata. */}
+        <footer className="max-w-6xl mx-auto mt-10 pb-4 text-center safe-pb">
+          <p className="font-body text-[11px] text-petal-muted/80" data-testid="build-info">
+            v{__APP_VERSION__} | {import.meta.env.MODE} |{' '}
+            {new Date(__BUILD_TIME__).toLocaleString('zh-TW')} | {__COMMIT_HASH__}
+          </p>
+        </footer>
       </div>
 
       {/* Modals */}

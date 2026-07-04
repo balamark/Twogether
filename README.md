@@ -39,6 +39,9 @@ User-facing feature changes, newest first. (Convention: every UI feature change
 adds a dated entry here; see `CLAUDE.md`.)
 
 ### 2026-07-04
+- **頁尾顯示版本資訊**: 網頁最下方新增一行版本列——版本號、環境、建置時間與 commit hash
+  （例如 `v1.0.0 | production | 2026/7/4 上午10:19:51 | 5da817b`），每次部署自動更新，
+  回報問題時附上這行即可精準對應到程式版本。
 - **修正：AI 入戲邀請的視角跟著你的性別走**: 男性用戶產生的劇本邀請訊息，先前可能以劇中女主角
   的口吻撰寫（例如以女方視角說「我會準時回家」）。已強化 AI 的角色判斷——現在會先確認傳送者在
   劇本中扮演哪個角色，再以該角色的第一人稱撰寫全部訊息，並清除舊的錯誤快取，重新產生即可看到

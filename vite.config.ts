@@ -1,5 +1,20 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+
+const version: string =
+  JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version || '0.0.0'
+
+// Short commit hash of the build, baked into the bundle for the footer's
+// release line. Falls back gracefully where git isn't available.
+const commitHash = (() => {
+  try {
+    return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim()
+  } catch {
+    return 'unknown'
+  }
+})()
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -31,6 +46,13 @@ export default defineConfig(({ mode }) => {
 
   return {
   plugins: [react()],
+  // Build metadata for the footer release line — refreshed on every build,
+  // so each deployed commit shows its own version/time/hash.
+  define: {
+    __APP_VERSION__: JSON.stringify(version),
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+    __COMMIT_HASH__: JSON.stringify(commitHash),
+  },
   // Add the base path here for production builds
   // This tells Vite to generate asset paths relative to the HTML file's location
   base: './', // <--- ADD THIS LINE FOR STATIC HOSTING
