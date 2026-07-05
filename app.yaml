@@ -36,11 +36,18 @@ env_variables:
   # the dashboard — middleware returns 503 when this is unset/empty.
   ADMIN_PASSWORD: $_ADMIN_PASSWORD
 
-# Automatic scaling (free tier compatible)
+# Automatic scaling. min_instances: 1 keeps one instance warm so the first
+# visit after idle doesn't hit a multi-second cold start. With max_instances: 1
+# that's ~24 F1 instance-hours/day, inside the 28h/day free tier. Warmup
+# (inbound_services below + /_ah/warmup in server.js) lets GAE pre-start the
+# instance instead of making a user request wait.
 automatic_scaling:
-  min_instances: 0
+  min_instances: 1
   max_instances: 1
   target_cpu_utilization: 0.8
+
+inbound_services:
+  - warmup
 
 # Instance class (free tier)
 instance_class: F1

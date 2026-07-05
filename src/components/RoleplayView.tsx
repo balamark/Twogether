@@ -527,6 +527,8 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
         <img
           src={script.image}
           alt={script.title}
+          loading="lazy"
+          decoding="async"
           className={`${className} ${fitClass}`}
           onError={(e) => {
             e.currentTarget.style.display = 'none';

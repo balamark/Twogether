@@ -6,6 +6,7 @@ const { body, validationResult } = require('express-validator');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { uploadToSupabase } = require('../lib/supabase-storage');
+const { makeCoverThumbUrl } = require('../lib/script-thumbs');
 const { getCoupleTier, getLimit, checkLimit } = require('../lib/entitlements');
 const { logDbError, errorResponseBody } = require('../lib/db-errors');
 const { logError, logInfo, logWarn } = require('../lib/logger');
@@ -294,12 +295,17 @@ router.post('/', scriptPhotoUpload, [
       }
     }
 
-    // Upload all photos (in submitted order); the first is the cover thumbnail.
+    // Upload all photos (in submitted order); the first is the cover. The
+    // stored thumbnail_url is a small grid derivative of the cover, not the
+    // full-size photo — grids render 56–144px slots and shouldn't download
+    // the 2048px lightbox image (photos[] keeps the full-size URLs).
     const photoUrls = [];
     for (const file of photoFiles) {
       photoUrls.push(await uploadScriptPhoto(file.buffer));
     }
-    const thumbnailUrl = photoUrls[0] || null;
+    const thumbnailUrl = photoUrls.length > 0
+      ? await makeCoverThumbUrl({ buffer: photoFiles[0].buffer, coverUrl: photoUrls[0] })
+      : null;
 
     // Insert custom script
     const scriptResult = await db.query(`
@@ -456,8 +462,19 @@ router.put('/:id', scriptPhotoUpload, [
         uploaded.push(await uploadScriptPhoto(file.buffer));
       }
       finalPhotoUrls = [...kept, ...uploaded];
-      // Cover thumbnail = first photo (or null when the series was cleared).
-      newThumbnailUrl = finalPhotoUrls[0] || null;
+      // Cover = first photo (or null when the series was cleared). Store a
+      // small grid derivative as thumbnail_url: from the upload buffer when
+      // the cover was just uploaded, else by re-downloading the kept URL.
+      if (finalPhotoUrls.length === 0) {
+        newThumbnailUrl = null;
+      } else {
+        const coverIsNewUpload = kept.length === 0 && photoFiles.length > 0;
+        newThumbnailUrl = await makeCoverThumbUrl({
+          buffer: coverIsNewUpload ? photoFiles[0].buffer : null,
+          coverUrl: finalPhotoUrls[0],
+          scriptId,
+        });
+      }
     }
 
     // Build update query

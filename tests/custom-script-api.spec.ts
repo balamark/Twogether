@@ -58,7 +58,12 @@ test.describe('Custom scripts API', () => {
     expect(res.status(), await res.text()).toBe(200);
     const body = await res.json();
     expect(body.success).toBe(true);
+    // thumbnailUrl is the small grid derivative (webp); the full-size photo
+    // lives in photos[0] for the lightbox.
     expect(body.custom_script.thumbnailUrl).toMatch(
+      /\/storage\/v1\/object\/public\/photos\/custom-script-thumbnails\/.+-thumb\.webp$/,
+    );
+    expect(body.custom_script.photos[0]).toMatch(
       /\/storage\/v1\/object\/public\/photos\/custom-script-thumbnails\/.+\.jpg$/,
     );
     expect(body.custom_script.tags).toEqual(['api', 'multipart']);

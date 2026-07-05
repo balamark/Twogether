@@ -140,6 +140,13 @@ app.get('/health', (req, res) => {
   });
 });
 
+// App Engine warmup request (inbound_services: warmup in app.yaml). GAE calls
+// this when spinning up an instance so the first real user request doesn't
+// pay the cold-start cost; paired with min_instances: 1.
+app.get('/_ah/warmup', (req, res) => {
+  res.status(200).send('ok');
+});
+
 // API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/couples', coupleRoutes);

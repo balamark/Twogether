@@ -13,6 +13,7 @@ const db = require('../database/db');
 const { logInfo, logError, logWarn } = require('../lib/logger');
 const { optionalAuth } = require('../middleware/auth');
 const featureFlags = require('../lib/featureFlags');
+const { makeCoverThumbUrl, isGridThumbUrl, THUMB_SUFFIX } = require('../lib/script-thumbs');
 
 const publicRouter = express.Router();
 const adminApiRouter = express.Router();
@@ -778,6 +779,42 @@ adminApiRouter.post('/feature-flags/:key', express.json(), async (req, res) => {
     }
     logError('Admin feature-flag update failed', { err: err.message, key });
     res.status(500).json({ error: 'feature-flag update failed' });
+  }
+});
+
+// POST /api/admin/backfill-script-thumbs — one-shot maintenance. Scripts
+// created before small grid thumbnails existed stored the full-size (2048px)
+// cover photo as thumbnail_url, so the roleplay/marketplace grids downloaded
+// huge images. Regenerate a 512px webp thumb for every such row. Idempotent:
+// already-backfilled rows (URL ends in the thumb suffix) are skipped, and a
+// failed row keeps its old full-size URL (still renders, just slow) so the
+// endpoint can simply be re-run.
+adminApiRouter.post('/backfill-script-thumbs', async (req, res) => {
+  try {
+    const candidates = await db.query(
+      `SELECT id, thumbnail_url FROM custom_scripts
+        WHERE thumbnail_url IS NOT NULL AND thumbnail_url NOT LIKE '%' || $1
+        ORDER BY created_at`,
+      [THUMB_SUFFIX]
+    );
+    let processed = 0;
+    let failed = 0;
+    for (const row of candidates.rows) {
+      // makeCoverThumbUrl never throws — on failure it logs and returns the
+      // original (non-thumb) URL, which we count as failed and leave in place.
+      const thumbUrl = await makeCoverThumbUrl({ coverUrl: row.thumbnail_url, scriptId: row.id });
+      if (isGridThumbUrl(thumbUrl)) {
+        await db.query('UPDATE custom_scripts SET thumbnail_url = $1 WHERE id = $2', [thumbUrl, row.id]);
+        processed++;
+      } else {
+        failed++;
+      }
+    }
+    logInfo('admin.backfill_script_thumbs', { candidates: candidates.rows.length, processed, failed });
+    res.json({ success: true, candidates: candidates.rows.length, processed, failed });
+  } catch (err) {
+    logError('Admin backfill-script-thumbs failed', { err: err.message });
+    res.status(500).json({ error: 'backfill failed — see server logs; safe to re-run' });
   }
 });
 
