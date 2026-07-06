@@ -63,7 +63,7 @@ async function ensureNotificationsTable() {
   }
 }
 
-async function notify(userId, type, title, content, eventId, relatedUserId, priority = 2) {
+async function notify(userId, type, title, content, eventId, relatedUserId, priority = 2, messageContent = null) {
   try {
     await ensureNotificationsTable();
     await db.query(
@@ -90,6 +90,7 @@ async function notify(userId, type, title, content, eventId, relatedUserId, prio
       recipientEmail: recipient.email,
       eventTitle: content,
       type,
+      messageContent,
     });
   } catch (err) {
     logWarn('Event notification email failed', { type, err: err.message });
@@ -333,7 +334,9 @@ router.post(
           '伴侶開啟了一個事件',
           event.title,
           eventId,
-          userId
+          userId,
+          2,
+          firstMessage ? firstMessage.content : null
         );
       }
 
@@ -714,7 +717,9 @@ router.post(
         '伴侶在事件中回覆',
         access.event.title,
         req.params.id,
-        req.user.id
+        req.user.id,
+        2,
+        req.body.content
       );
 
       res.status(201).json({ success: true, message: serializeMessage(msgResult.rows[0]) });
@@ -972,7 +977,9 @@ router.post(
         'AI 諮商師在事件中留言',
         access.event.title,
         req.params.id,
-        req.user.id
+        req.user.id,
+        2,
+        req.body.content
       );
 
       res.status(201).json({ success: true, message: serializeMessage(msgResult.rows[0]) });

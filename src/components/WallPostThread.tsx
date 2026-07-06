@@ -203,7 +203,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
             type="button"
             onClick={handleAiPreview}
             disabled={aiLoading}
-            className="inline-flex items-center gap-1.5 text-petal-rose-deep border border-petal-rose-deep/40 rounded-full px-3 py-1.5 font-body text-xs hover:bg-petal-cream-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 bg-petal-rose-deep text-white font-medium shadow-sm rounded-full px-3 py-1.5 font-body text-xs hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid={`wall-ai-comment-btn-${postId}`}
           >
             <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />

@@ -629,7 +629,7 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
               data-testid="event-ai-counselor-button"
               onClick={inviteAiCounselor}
               disabled={aiInviting}
-              className="px-3 py-2 rounded-full border border-petal-sage-deep text-petal-sage-deep inline-flex items-center gap-2 disabled:opacity-50 hover:bg-petal-sage/20 mr-auto"
+              className="px-3 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition mr-auto"
               title="請 AI 諮商師讀過你們的對話，給一段中立的建議"
             >
               {aiInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
@@ -640,7 +640,7 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
               data-testid="event-acceptance-button"
               onClick={requestAcceptance}
               disabled={accepting}
-              className="px-3 py-2 rounded-full border border-petal-rose text-petal-ink inline-flex items-center gap-2 disabled:opacity-50 hover:bg-petal-rose/15"
+              className="px-3 py-2 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
               title="先別急著解決——讓 AI 教你怎麼接住TA的情緒"
             >
               {accepting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HandHeart className="w-4 h-4" />}
@@ -651,7 +651,7 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
               data-testid="event-reply-rewrite-button"
               onClick={requestRewrite}
               disabled={rewriting || reply.trim().length === 0}
-              className="px-3 py-2 rounded-full border border-petal-sage text-petal-ink inline-flex items-center gap-2 disabled:opacity-50 hover:bg-petal-sage/20"
+              className="px-3 py-2 rounded-full bg-petal-rose text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:shadow-none hover:opacity-90 active:scale-[0.98] transition"
               title="讓 AI 把你的回覆改得更中性、客觀"
             >
               {rewriting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
@@ -662,7 +662,7 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
               data-testid="event-reply-send-button"
               onClick={sendReply}
               disabled={sending || reply.trim().length === 0}
-              className="px-4 py-2 rounded-full bg-petal-ink text-petal-cream inline-flex items-center gap-2 disabled:opacity-50"
+              className="px-4 py-2 rounded-full bg-petal-ink text-petal-cream font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:shadow-none hover:opacity-90 active:scale-[0.98] transition"
             >
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               <span>送出</span>
@@ -725,7 +725,7 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
             data-testid="event-reopen-button"
             disabled={resolving}
             onClick={handleReopen}
-            className="px-4 py-2 rounded-full border border-petal-sage text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2 disabled:opacity-50"
+            className="px-4 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2 disabled:opacity-50"
           >
             {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
             重新開啟討論
@@ -756,7 +756,7 @@ function ResolveControls({
           type="button"
           disabled={busy}
           onClick={onRequest}
-          className="px-4 py-2 rounded-full border border-petal-sage text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2 disabled:opacity-50"
+          className="px-4 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2 disabled:opacity-50"
         >
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
           標記為解決
