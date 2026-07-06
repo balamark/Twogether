@@ -13,6 +13,7 @@ import {
   Globe,
   RotateCcw,
   X,
+  Pencil,
 } from 'lucide-react';
 import apiService, {
   type EventRecord,
@@ -86,6 +87,13 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
   const [aiPreview, setAiPreview] = useState<string | null>(null);
   const [shareWarnOpen, setShareWarnOpen] = useState(false);
   const [sharing, setSharing] = useState(false);
+  // Post-send editing: creator edits title/summary; each side edits own messages.
+  const [editingHeader, setEditingHeader] = useState(false);
+  const [headerTitle, setHeaderTitle] = useState('');
+  const [headerSummary, setHeaderSummary] = useState('');
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingMessageText, setEditingMessageText] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
   const tz = useTimezone();
 
   const insertPhrase = (phrase: string) => {
@@ -220,6 +228,71 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
     }
   };
 
+  const startHeaderEdit = () => {
+    if (!event) return;
+    setHeaderTitle(event.title);
+    setHeaderSummary(event.summary);
+    setEditingHeader(true);
+  };
+
+  const saveHeaderEdit = async () => {
+    if (!event) return;
+    const title = headerTitle.trim();
+    const summary = headerSummary.trim();
+    if (!title || !summary) {
+      showNotification({ type: 'warning', title: '無法儲存', message: '標題與簡介都不能是空白' });
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const updated = await apiService.updateEvent(eventId, { title, summary });
+      setEvent((prev) => (prev ? { ...prev, title: updated.title, summary: updated.summary, contentEditedAt: updated.contentEditedAt } : prev));
+      setEditingHeader(false);
+    } catch (err) {
+      const code = (err as { error_code?: string })?.error_code;
+      showNotification({
+        type: code === 'EVENT_RESOLVED' ? 'warning' : 'error',
+        title: '編輯失敗',
+        message: err instanceof Error ? err.message : '請稍後再試',
+      });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const startMessageEdit = (id: string, content: string) => {
+    setEditingMessageId(id);
+    setEditingMessageText(content);
+  };
+
+  const saveMessageEdit = async () => {
+    if (!editingMessageId) return;
+    const content = editingMessageText.trim();
+    if (!content) {
+      showNotification({ type: 'warning', title: '無法儲存', message: '訊息內容不能是空白' });
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const updated = await apiService.updateEventMessage(eventId, editingMessageId, content);
+      setEvent((prev) =>
+        prev
+          ? { ...prev, messages: prev.messages.map((m) => (m.id === updated.id ? { ...m, content: updated.content, editedAt: updated.editedAt } : m)) }
+          : prev
+      );
+      setEditingMessageId(null);
+    } catch (err) {
+      const code = (err as { error_code?: string })?.error_code;
+      showNotification({
+        type: code === 'EVENT_RESOLVED' ? 'warning' : 'error',
+        title: '編輯失敗',
+        message: err instanceof Error ? err.message : '請稍後再試',
+      });
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const confirmShare = async () => {
     setSharing(true);
     try {
@@ -327,7 +400,17 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
 
       <header className="bg-petal-cream border border-petal-rule rounded-2xl p-5">
         <div className="flex items-start justify-between gap-3 mb-2">
-          <h2 className="text-xl font-serif text-petal-ink flex-1">{event.title}</h2>
+          {editingHeader ? (
+            <input
+              data-testid="event-title-input"
+              value={headerTitle}
+              onChange={(e) => setHeaderTitle(e.target.value)}
+              maxLength={120}
+              className="flex-1 text-xl font-serif text-petal-ink bg-white border border-petal-rule rounded-xl px-3 py-1.5 focus:outline-none focus:border-petal-rose-deep"
+            />
+          ) : (
+            <h2 className="text-xl font-serif text-petal-ink flex-1">{event.title}</h2>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             {event.isPrivate && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-petal-ink/10 text-petal-ink inline-flex items-center gap-1">
@@ -336,13 +419,58 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
               </span>
             )}
             {statusPill(event.status)}
+            {isAuthor && event.status !== 'resolved' && !editingHeader && (
+              <button
+                type="button"
+                data-testid="event-header-edit"
+                onClick={startHeaderEdit}
+                title="編輯標題與簡介"
+                className="p-1.5 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
         </div>
         <p className="text-xs text-petal-muted mb-3">
           {formatTime(event.createdAt, tz)}・{isAuthor ? '你發起' : '伴侶發起'}
+          {event.contentEditedAt && <span>・已編輯</span>}
         </p>
 
-        <p className="text-sm text-petal-ink-soft leading-relaxed mb-3 whitespace-pre-wrap">{event.summary}</p>
+        {editingHeader ? (
+          <div className="mb-3">
+            <textarea
+              data-testid="event-summary-input"
+              value={headerSummary}
+              onChange={(e) => setHeaderSummary(e.target.value)}
+              rows={5}
+              maxLength={1000}
+              className="w-full p-3 rounded-xl border border-petal-rule bg-white text-sm text-petal-ink focus:outline-none focus:border-petal-rose-deep resize-y"
+            />
+            <div className="flex justify-end gap-2 mt-2">
+              <button
+                type="button"
+                onClick={() => setEditingHeader(false)}
+                disabled={savingEdit}
+                className="px-3 py-1.5 rounded-full border border-petal-rule text-xs text-petal-ink hover:bg-petal-sage/20 disabled:opacity-50"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                data-testid="event-header-save"
+                onClick={saveHeaderEdit}
+                disabled={savingEdit}
+                className="px-4 py-1.5 rounded-full bg-petal-ink text-petal-cream text-xs inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {savingEdit && <Loader2 className="w-3 h-3 animate-spin" />}
+                儲存
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-petal-ink-soft leading-relaxed mb-3 whitespace-pre-wrap">{event.summary}</p>
+        )}
 
         <div className="flex flex-wrap gap-1.5">
           {event.emotions.map((e) => (
@@ -416,18 +544,66 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
               );
             }
             const mine = m.senderId === currentUserId;
+            const isEditing = editingMessageId === m.id;
             return (
               <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                 <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                  className={`${isEditing ? 'w-full max-w-[92%]' : 'max-w-[80%]'} rounded-2xl px-4 py-2 ${
                     mine ? 'bg-petal-rose/20' : 'bg-petal-sage/15'
                   }`}
                 >
-                  <p className="text-sm text-petal-ink whitespace-pre-wrap">{m.content}</p>
-                  <p className="text-[10px] text-petal-muted mt-1 flex items-center gap-1">
-                    <span>{formatTime(m.createdAt, tz)}</span>
-                    {mine && m.readAt && <span>・已讀</span>}
-                  </p>
+                  {isEditing ? (
+                    <div>
+                      <textarea
+                        data-testid="event-message-edit-input"
+                        value={editingMessageText}
+                        onChange={(e) => setEditingMessageText(e.target.value)}
+                        rows={4}
+                        maxLength={2000}
+                        className="w-full p-2 rounded-xl border border-petal-rule bg-white text-sm text-petal-ink focus:outline-none focus:border-petal-rose-deep resize-y"
+                      />
+                      <div className="flex justify-end gap-2 mt-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setEditingMessageId(null)}
+                          disabled={savingEdit}
+                          className="px-3 py-1 rounded-full border border-petal-rule text-xs text-petal-ink hover:bg-petal-sage/20 disabled:opacity-50"
+                        >
+                          取消
+                        </button>
+                        <button
+                          type="button"
+                          data-testid="event-message-edit-save"
+                          onClick={saveMessageEdit}
+                          disabled={savingEdit}
+                          className="px-3 py-1 rounded-full bg-petal-ink text-petal-cream text-xs inline-flex items-center gap-1.5 disabled:opacity-50"
+                        >
+                          {savingEdit && <Loader2 className="w-3 h-3 animate-spin" />}
+                          儲存
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm text-petal-ink whitespace-pre-wrap">{m.content}</p>
+                      <p className="text-[10px] text-petal-muted mt-1 flex items-center gap-1">
+                        <span>{formatTime(m.createdAt, tz)}</span>
+                        {m.editedAt && <span>・已編輯</span>}
+                        {mine && m.readAt && <span>・已讀</span>}
+                        {mine && event.status !== 'resolved' && (
+                          <button
+                            type="button"
+                            data-testid={`event-message-edit-${m.id}`}
+                            onClick={() => startMessageEdit(m.id, m.content)}
+                            title="編輯訊息"
+                            className="ml-1 p-0.5 rounded text-petal-muted hover:text-petal-ink"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        )}
+                      </p>
+                    </>
+                  )}
                 </div>
               </div>
             );

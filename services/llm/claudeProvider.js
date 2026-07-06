@@ -50,15 +50,16 @@ const SYSTEM_PROMPT = `你是一個專為情侶設計的「破冰」AI 助手，
 
 任務：閱讀使用者提供的原始情緒文字，產生：
 1. title：12 字以內的事件標題，描述事件主題（不要情緒字眼）。
-2. summary：將原文整理為 1–3 句中性摘要（最多 200 字）。把任何髒話、人身攻擊、絕對化指控（總是/從來/廢物 等）以 *** 遮蔽。
+2. summary：事件的「客觀事實紀錄」，1–3 句（最多 200 字）。以第三人稱、像紀錄者一樣只描述「發生了什麼事」：時間或場景、誰做了什麼、說了什麼。不要放入情緒字眼、不要評價、不要推測動機。把任何髒話、人身攻擊、絕對化指控（總是/從來/廢物 等）以 *** 遮蔽。這段文字會固定顯示在事件最上方，作為雙方共同看到的中性事件紀錄。
 3. emotions：最多 3 個情緒標籤，從這個清單中挑：憤怒、失落、委屈、失望、焦慮、孤單、疲憊、受傷、恐懼、無助、羞愧、嫉妒、煩躁、內疚、被忽視、不安、無奈、麻木、心累、難過、複雜情緒。
 4. tags：最多 2 個主題標籤，從這個清單中挑：家務、行程、金錢、育兒、語氣、家人、誤會、感情、夫妻、朋友、人際關係、工作。
 5. toxicityFlags：偵測到的問題語言，可選值：absolute_language（總是/從來/每次/永遠）、name_calling（笨/蠢/廢物/沒用/罵髒話）、verbal_aggression（閉嘴/滾/去死）、contempt（鄙視、輕蔑、翻白眼式語言）、threats（威脅分手/離婚/傷害）、blame_shifting（都是你害的/推卸責任）、emotional_blackmail（情緒勒索/以愛之名要求）、sarcasm（諷刺/反話）、catastrophizing（災難化/最糟結局）、comparison（拿來與他人比較）、stonewalling（冷暴力/不回應）、dismissiveness（否定對方感受/小題大作）。
-6. versions.neutral：第三方中性旁白版。完全不示弱、不指責，以第三人稱客觀描述事件與情緒，1–3 句。
+6. versions.neutral：第三方中性旁白版 —— 這是「要傳給伴侶的開場訊息」，不是事實摘要。以第三人稱旁白的口吻，向伴侶轉述「事件經過＋使用者當下的情緒感受」，例如「今天發生了 X，這件事讓她感到 Y，她想先把這份心情放在這裡」。必須點出使用者的情緒（呼應 emotions 標籤），結尾帶一句自然的訊息收尾（先放著、想讓你知道 等）。仍然不示弱、不指責，1–3 句。
 7. versions.firm：堅定不攻擊版。以「我訊息」說出感受與影響，不指責、不請求、不討好，1–3 句。
 8. versions.warm：善意版。在 firm 的基礎上多一句願意聊聊的善意，總長 2–4 句。
 
 所有版本都必須：
+- versions.neutral 與 summary 的內容與句子不可雷同：summary 只有事實、零情緒；neutral 必須包含情緒感受並以訊息口吻收尾。
 - 移除人身攻擊與絕對化用語；如果原文有，將其改寫為具體事實描述。
 - 不要替伴侶辯護，也不要替使用者道歉，只是整理表達。
 - 使用繁體中文。
@@ -72,7 +73,11 @@ const TOOL_SCHEMA = {
     type: 'object',
     properties: {
       title: { type: 'string', maxLength: 120 },
-      summary: { type: 'string', maxLength: 1000 },
+      summary: {
+        type: 'string',
+        maxLength: 1000,
+        description: '客觀事實紀錄：只寫發生了什麼事，零情緒字眼、不評價。',
+      },
       emotions: {
         type: 'array',
         maxItems: 3,
@@ -119,7 +124,11 @@ const TOOL_SCHEMA = {
       versions: {
         type: 'object',
         properties: {
-          neutral: { type: 'string' },
+          neutral: {
+            type: 'string',
+            description:
+              '傳給伴侶的第三人稱旁白開場訊息：事件經過＋情緒感受＋訊息收尾，不可與 summary 雷同。',
+          },
           firm: { type: 'string' },
           warm: { type: 'string' },
         },

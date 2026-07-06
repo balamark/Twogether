@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ShieldCheck, Sparkles, ArrowLeft, ArrowRight, Send, Tag, AlertTriangle, Loader2 } from 'lucide-react';
+import { ShieldCheck, Sparkles, ArrowLeft, ArrowRight, Send, Tag, AlertTriangle, Loader2, Pencil } from 'lucide-react';
 import apiService, {
   type IcebreakerPreview,
   type EventVersionKey,
@@ -24,7 +24,7 @@ const VERSION_META: { key: EventVersionKey; label: string; desc: string; accent:
   {
     key: 'neutral',
     label: '第三方中性旁白版',
-    desc: '完全不示弱、不指責，以第三人稱客觀描述事件與情緒。',
+    desc: '以第三人稱旁白轉述事件帶來的感受，作為開場訊息，不重複上方簡介。',
     accent: 'border-petal-sage bg-petal-sage/10',
   },
   {
@@ -46,6 +46,9 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
   const [rawText, setRawText] = useState('');
   const [preview, setPreview] = useState<IcebreakerPreview | null>(null);
   const [selected, setSelected] = useState<EventVersionKey | null>('neutral');
+  // Per-version editable drafts, initialised from the AI originals. Editing one
+  // version never clobbers another, so switching radios preserves edits.
+  const [drafts, setDrafts] = useState<Record<EventVersionKey, string> | null>(null);
   const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,6 +67,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
     try {
       const p = await apiService.previewIcebreaker(trimmed);
       setPreview(p);
+      setDrafts({ ...p.versions });
       setStep('select');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'AI 解析失敗';
@@ -74,6 +78,19 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
 
   const submitEvent = async () => {
     if (!preview) return;
+    let openingMessage: string | null = null;
+    if (!isPrivate && selected) {
+      openingMessage = (drafts?.[selected] ?? preview.versions[selected]).trim();
+      if (openingMessage.length === 0) {
+        setError('開場訊息不可為空，請輸入內容或改存私人事件');
+        return;
+      }
+      if (openingMessage.length > 2000) {
+        setError('開場訊息超過 2000 字，請縮短後再送出');
+        return;
+      }
+    }
+    setError(null);
     setStep('submitting');
     try {
       const event = await apiService.createEvent({
@@ -84,6 +101,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
         toxicityFlags: preview.toxicityFlags,
         versions: preview.versions,
         selectedVersion: isPrivate ? null : selected,
+        openingMessage,
         isPrivate,
       });
       showNotification({
@@ -121,6 +139,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-5">
           <label className="block text-sm text-petal-ink mb-2">把你現在的感受寫下來</label>
           <textarea
+            data-testid="compose-raw-input"
             value={rawText}
             onChange={(e) => setRawText(e.target.value)}
             placeholder="例如：今天早上耳鼻喉科那件事讓我覺得他根本沒在聽我的話…"
@@ -174,6 +193,11 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
           )}
         </div>
 
+        <div className="bg-white border border-petal-rule rounded-xl p-3 mb-3" data-testid="compose-event-summary">
+          <div className="text-[11px] text-petal-muted mb-1">事件簡介（雙方都會看到的中性紀錄）</div>
+          <p className="text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">{preview.summary}</p>
+        </div>
+
         <div className="flex flex-wrap gap-2 mb-2">
           {preview.emotions.map((e) => (
             <span key={e} className="text-xs px-2 py-0.5 rounded-full bg-petal-rose/20 text-petal-ink">
@@ -197,6 +221,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
         {VERSION_META.map((v) => {
           const text = preview.versions[v.key];
           const active = selected === v.key && !isPrivate;
+          const edited = drafts != null && drafts[v.key].trim() !== text.trim();
           return (
             <button
               key={v.key}
@@ -217,6 +242,12 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
                   className="accent-petal-rose-deep"
                 />
                 <span className="text-sm font-medium text-petal-ink">{v.label}</span>
+                {edited && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-petal-rose/20 text-petal-ink inline-flex items-center gap-1">
+                    <Pencil className="w-2.5 h-2.5" />
+                    已編輯
+                  </span>
+                )}
               </div>
               <p className="text-xs text-petal-ink-soft mb-2">{v.desc}</p>
               <p className="text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">{text}</p>
@@ -224,6 +255,24 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
           );
         })}
       </div>
+
+      {!isPrivate && selected && drafts && (
+        <div className="bg-petal-cream border border-petal-rule rounded-2xl p-4">
+          <label className="flex items-center gap-2 text-sm text-petal-ink mb-2">
+            <Pencil className="w-4 h-4 text-petal-rose-deep" />
+            送出前可以修改這段訊息
+          </label>
+          <textarea
+            data-testid="compose-opening-editor"
+            value={drafts[selected]}
+            onChange={(e) => setDrafts({ ...drafts, [selected]: e.target.value })}
+            rows={4}
+            maxLength={2000}
+            className="w-full p-3 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y"
+          />
+          <div className="text-right text-xs text-petal-muted mt-1">{drafts[selected].length} / 2000</div>
+        </div>
+      )}
 
       <label className="flex items-start gap-2 px-1 cursor-pointer">
         <input
