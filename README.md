@@ -39,6 +39,9 @@ User-facing feature changes, newest first. (Convention: every UI feature change
 adds a dated entry here; see `CLAUDE.md`.)
 
 ### 2026-07-06
+- **歷史事件卡片改版**: 事件歷史列表的卡片改為白色卡面＋柔和陰影，在米色背景上清楚浮起，
+  不再與頁面底色融成一片；卡片間距與卡片內部留白統一，沒有摘要或標籤的卡片也不會再出現
+  多餘的空白，整份列表看起來更整齊、更好掃讀。
 - **選擇你的 AI 諮商師**: 全新的個人化功能——9 位個性不同的 AI 諮商師（Sophie 溫柔傾聽、
   Kai 務實教練、Luma 沉穩陪伴⋯）任你挑選。註冊後會先認識你的 AI 諮商師（推薦 Luma），
   之後在「設定」隨時更換；事件討論與牆上的邀請按鈕、AI 留言都會顯示 TA 的名字（例如
