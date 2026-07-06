@@ -353,6 +353,7 @@ export interface EventMessage {
   isAi: boolean;
   createdAt: string;
   readAt: string | null;
+  editedAt: string | null;
 }
 
 // 婚姻檢查 (Marriage Check-up)
@@ -405,6 +406,7 @@ export interface EventRecord {
   resolvedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  contentEditedAt: string | null;
   unreadCount: number;
   lastMessagePreview: string | null;
   messages: EventMessage[];
@@ -418,6 +420,8 @@ export interface CreateEventInput {
   toxicityFlags: string[];
   versions: EventVersions;
   selectedVersion: EventVersionKey | null;
+  /** The (possibly user-edited) opener actually sent; ai versions stay pristine. */
+  openingMessage?: string | null;
   isPrivate: boolean;
 }
 
@@ -2869,6 +2873,7 @@ class ApiService {
         ai_firm: input.versions.firm,
         ai_warm: input.versions.warm,
         selected_version: input.selectedVersion,
+        opening_message: input.openingMessage ?? null,
         is_private: input.isPrivate,
       };
       const response = await apiClient.post('/events', payload);
@@ -2902,6 +2907,26 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to fetch event:', error);
       this.throwApiError(error, '無法取得事件詳情');
+    }
+  }
+
+  async updateEvent(id: string, input: { title?: string; summary?: string }): Promise<EventRecord> {
+    try {
+      const response = await apiClient.patch(`/events/${id}`, input);
+      return this.transformEvent(response.data.event);
+    } catch (error: unknown) {
+      console.error('Failed to update event:', error);
+      this.throwApiError(error, '無法更新事件內容');
+    }
+  }
+
+  async updateEventMessage(eventId: string, messageId: string, content: string): Promise<EventMessage> {
+    try {
+      const response = await apiClient.patch(`/events/${eventId}/messages/${messageId}`, { content });
+      return this.transformEventMessage(response.data.message);
+    } catch (error: unknown) {
+      console.error('Failed to update event message:', error);
+      this.throwApiError(error, '無法更新訊息');
     }
   }
 
@@ -3114,6 +3139,7 @@ class ApiService {
       resolved_at?: string | null;
       created_at?: string;
       updated_at?: string;
+      content_edited_at?: string | null;
       unread_count?: number;
       last_message_preview?: string | null;
       messages?: unknown[];
@@ -3142,6 +3168,7 @@ class ApiService {
       resolvedAt: r.resolved_at ?? null,
       createdAt: r.created_at || '',
       updatedAt: r.updated_at || '',
+      contentEditedAt: r.content_edited_at ?? null,
       unreadCount: Number(r.unread_count) || 0,
       lastMessagePreview: r.last_message_preview ?? null,
       messages: Array.isArray(r.messages) ? r.messages.map((m) => this.transformEventMessage(m)) : [],
@@ -3157,6 +3184,7 @@ class ApiService {
       is_ai?: boolean;
       created_at?: string;
       read_at?: string | null;
+      edited_at?: string | null;
     };
     return {
       id: r.id || '',
@@ -3166,6 +3194,7 @@ class ApiService {
       isAi: r.is_ai === true,
       createdAt: r.created_at || '',
       readAt: r.read_at ?? null,
+      editedAt: r.edited_at ?? null,
     };
   }
 

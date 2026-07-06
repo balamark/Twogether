@@ -139,6 +139,7 @@ function serializeEvent(row, extras = {}) {
     },
     selected_version: row.selected_version,
     is_private: row.is_private,
+    content_edited_at: row.content_edited_at || null,
     public_status: row.public_status || 'private',
     public_title: row.public_title || null,
     status: row.status,
@@ -160,6 +161,7 @@ function serializeMessage(row) {
     is_ai: row.is_ai === true,
     created_at: row.created_at,
     read_at: row.read_at,
+    edited_at: row.edited_at || null,
   };
 }
 
@@ -233,6 +235,11 @@ router.post(
     body('ai_firm').isString().isLength({ min: 1 }),
     body('ai_warm').isString().isLength({ min: 1 }),
     body('selected_version').optional({ nullable: true }).isIn(VERSION_KEYS),
+    body('opening_message')
+      .optional({ nullable: true })
+      .isString()
+      .isLength({ min: 1, max: 2000 })
+      .withMessage('開場訊息需在 1–2000 字之間'),
     body('emotions').optional().isArray(),
     body('tags').optional().isArray(),
     body('toxicity_flags').optional().isArray(),
@@ -258,6 +265,7 @@ router.post(
         ai_firm,
         ai_warm,
         selected_version = null,
+        opening_message = null,
         emotions = [],
         tags = [],
         toxicity_flags = [],
@@ -297,13 +305,24 @@ router.post(
       let firstMessage = null;
       if (!event.is_private && selected_version) {
         const versionMap = { neutral: ai_neutral, firm: ai_firm, warm: ai_warm };
+        // The user may have edited the selected version before sending; the
+        // ai_* columns keep the untouched AI originals as provenance.
+        const openerText =
+          typeof opening_message === 'string' && opening_message.trim()
+            ? opening_message.trim()
+            : versionMap[selected_version];
         const msgResult = await db.query(
           `INSERT INTO event_messages (event_id, sender_id, content)
            VALUES ($1, $2, $3)
            RETURNING *`,
-          [eventId, userId, versionMap[selected_version]]
+          [eventId, userId, openerText]
         );
         firstMessage = msgResult.rows[0];
+        logInfo('events.create.opening_edited', {
+          userId,
+          eventId,
+          edited: openerText !== versionMap[selected_version],
+        });
       }
 
       // Notify partner only for shared events.
@@ -522,6 +541,147 @@ router.get('/:id', [param('id').isUUID()], async (req, res) => {
     res.status(500).json({ success: false, message: '無法取得事件詳情' });
   }
 });
+
+// Edit event title/summary — creator only, blocked once resolved. Edits are
+// corrections, not new activity: no partner notification.
+router.patch(
+  '/:id',
+  [
+    param('id').isUUID(),
+    body('title').optional().isString().isLength({ min: 1, max: 120 }).withMessage('標題需在 1–120 字之間'),
+    body('summary').optional().isString().isLength({ min: 1, max: 1000 }).withMessage('簡介需在 1–1000 字之間'),
+  ],
+  async (req, res) => {
+    if (sendValidationError(req, res)) return;
+    try {
+      const userId = req.user.id;
+      const { title, summary } = req.body;
+      if (title === undefined && summary === undefined) {
+        return res.status(400).json({
+          success: false,
+          message: '沒有可更新的欄位',
+          error_code: 'NO_EDITABLE_FIELDS',
+        });
+      }
+
+      const access = await assertEventAccess(req.params.id, userId);
+      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (access.event.created_by !== userId) {
+        return res.status(403).json({
+          success: false,
+          message: '只有發起人可以編輯事件內容',
+          error_code: 'NOT_EVENT_CREATOR',
+        });
+      }
+      if (access.event.status === 'resolved') {
+        return res.status(400).json({
+          success: false,
+          message: '此事件已解決，無法編輯',
+          error_code: 'EVENT_RESOLVED',
+        });
+      }
+
+      const result = await db.query(
+        `UPDATE events
+         SET title = COALESCE($2, title),
+             summary = COALESCE($3, summary),
+             content_edited_at = NOW(),
+             updated_at = NOW()
+         WHERE id = $1
+         RETURNING *`,
+        [req.params.id, title ?? null, summary ?? null]
+      );
+
+      logInfo('events.edited', {
+        userId,
+        eventId: req.params.id,
+        fields: [title !== undefined && 'title', summary !== undefined && 'summary'].filter(Boolean),
+      });
+
+      res.json({ success: true, event: serializeEvent(result.rows[0]) });
+    } catch (err) {
+      logError('Edit event failed', { err: err.message, stack: err.stack });
+      res.status(500).json({ success: false, message: '編輯事件失敗，請稍後再試' });
+    }
+  }
+);
+
+// Edit own message in an event thread. Sender only, never AI messages, blocked
+// once resolved. read_at is kept — the partner sees an 「已編輯」 marker instead.
+router.patch(
+  '/:id/messages/:msgId',
+  [
+    param('id').isUUID(),
+    param('msgId').isUUID(),
+    body('content').isString().isLength({ min: 1, max: 2000 }).withMessage('訊息需在 1–2000 字之間'),
+  ],
+  async (req, res) => {
+    if (sendValidationError(req, res)) return;
+    try {
+      const userId = req.user.id;
+      const access = await assertEventAccess(req.params.id, userId);
+      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (access.event.is_private) {
+        return res.status(403).json({
+          success: false,
+          message: '私人事件無法編輯訊息',
+          error_code: 'PRIVATE_EVENT',
+        });
+      }
+      if (access.event.status === 'resolved') {
+        return res.status(400).json({
+          success: false,
+          message: '此事件已解決，無法編輯訊息',
+          error_code: 'EVENT_RESOLVED',
+        });
+      }
+
+      // Guarded single-statement update keeps authorization race-free.
+      const result = await db.query(
+        `UPDATE event_messages
+         SET content = $1, edited_at = NOW()
+         WHERE id = $2 AND event_id = $3 AND sender_id = $4 AND is_ai = FALSE
+         RETURNING *`,
+        [req.body.content, req.params.msgId, req.params.id, userId]
+      );
+
+      if (result.rows.length === 0) {
+        const existing = await db.query(
+          `SELECT sender_id, is_ai FROM event_messages WHERE id = $1 AND event_id = $2`,
+          [req.params.msgId, req.params.id]
+        );
+        if (existing.rows.length === 0) {
+          return res.status(404).json({ success: false, message: '找不到訊息' });
+        }
+        if (existing.rows[0].is_ai) {
+          return res.status(403).json({
+            success: false,
+            message: 'AI 諮商師的留言無法編輯',
+            error_code: 'AI_MESSAGE_NOT_EDITABLE',
+          });
+        }
+        return res.status(403).json({
+          success: false,
+          message: '只能編輯自己送出的訊息',
+          error_code: 'NOT_MESSAGE_SENDER',
+        });
+      }
+
+      await db.query(`UPDATE events SET updated_at = NOW() WHERE id = $1`, [req.params.id]);
+
+      logInfo('events.message_edited', {
+        userId,
+        eventId: req.params.id,
+        messageId: req.params.msgId,
+      });
+
+      res.json({ success: true, message: serializeMessage(result.rows[0]) });
+    } catch (err) {
+      logError('Edit event message failed', { err: err.message, stack: err.stack });
+      res.status(500).json({ success: false, message: '編輯訊息失敗，請稍後再試' });
+    }
+  }
+);
 
 // Post reply to an event
 router.post(

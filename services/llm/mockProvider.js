@@ -86,7 +86,9 @@ function buildVersions({ summary, emotions, tags }) {
   const topEmotion = emotions[0] || '一些情緒';
   const topic = tags[0] && tags[0] !== '誤會' ? `${tags[0]}相關的事` : '剛剛發生的事';
 
-  const neutral = `關於${topic}，目前產生了一些情緒波動。整體事件可以這樣描述：${summary} 目前先將狀態整理成這樣的紀錄。`;
+  // Deliberately does NOT embed the summary: the summary is the factual record
+  // shown at the top of the event; neutral is a feelings-forward opener message.
+  const neutral = `旁白一下：關於${topic}，剛剛發生了一些狀況，其中一方現在心裡有「${topEmotion}」的感覺，想先把這份心情放在這裡讓你知道。`;
 
   const firm = `我感受到${topEmotion}，主要是因為${topic}。${summary} 我先把這件事提出來放著。`;
 
