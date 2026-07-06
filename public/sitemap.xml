@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Only the public, no-login pages belong here. Everything else in the SPA
+     is behind auth and renders the logged-out preview, canonicalized to /.
+     Alias paths (/membership, /plans, /become-a-therapist) are intentionally
+     omitted — their pages carry rel=canonical to the URLs listed below. -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://twogether.fun/</loc>
+  </url>
+  <url>
+    <loc>https://twogether.fun/pricing</loc>
+  </url>
+  <url>
+    <loc>https://twogether.fun/therapist-signup</loc>
+  </url>
+</urlset>
