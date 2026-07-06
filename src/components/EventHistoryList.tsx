@@ -93,7 +93,7 @@ export default function EventHistoryList({
   }
   if (visibleEvents.length === 0) {
     return (
-      <div className="bg-petal-cream border border-petal-rule rounded-2xl p-10 text-center text-petal-ink-soft">
+      <div className="bg-white border border-petal-rule-soft rounded-2xl p-10 text-center text-petal-ink-soft">
         <MessageSquareHeart className="w-8 h-8 mx-auto mb-3 text-petal-rose-deep" />
         <p>目前還沒有事件。</p>
         <p className="text-xs mt-1">當你有衝突或情緒想整理時，點上方「建立事件」開始。</p>
@@ -102,7 +102,7 @@ export default function EventHistoryList({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-3">
       {!hideFilters && (
         <div className="flex flex-wrap gap-2">
           {STATUS_OPTIONS.map((opt) => (
@@ -127,11 +127,11 @@ export default function EventHistoryList({
           key={event.id}
           type="button"
           onClick={() => onOpenEvent(event.id)}
-          className="w-full text-left bg-petal-cream border border-petal-rule rounded-2xl p-4 hover:bg-petal-cream-2 transition-colors"
+          className="w-full text-left bg-white border border-petal-rule-soft rounded-2xl p-4 shadow-sm hover:border-petal-rose/60 transition-colors"
         >
-          <div className="flex items-start justify-between gap-3 mb-2">
-            <h3 className="font-serif text-petal-ink truncate flex-1">{event.title}</h3>
-            <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="font-serif text-petal-ink truncate flex-1 leading-snug">{event.title}</h3>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
               {event.isPrivate && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-petal-ink/10 text-petal-ink inline-flex items-center gap-1" title="私人">
                   <Lock className="w-3 h-3" />
@@ -147,26 +147,28 @@ export default function EventHistoryList({
             </div>
           </div>
 
-          <p className="text-xs text-petal-muted mb-2">
+          <p className="text-xs text-petal-muted mt-1">
             {formatDate(event.createdAt, tz)}
             {event.createdBy === currentUserId ? '・你發起' : '・伴侶發起'}
           </p>
 
           {event.lastMessagePreview && (
-            <p className="text-sm text-petal-ink-soft line-clamp-2 mb-2">{event.lastMessagePreview}</p>
+            <p className="text-sm text-petal-ink-soft line-clamp-2 mt-2">{event.lastMessagePreview}</p>
           )}
 
-          <div className="hidden sm:flex flex-wrap gap-1.5">
-            {event.tags.map((t) => (
-              <span
-                key={t}
-                className="text-xs px-2 py-0.5 rounded-full bg-petal-sage/20 text-petal-ink inline-flex items-center gap-1"
-              >
-                <Tag className="w-3 h-3" />
-                {t}
-              </span>
-            ))}
-          </div>
+          {event.tags.length > 0 && (
+            <div className="hidden sm:flex flex-wrap gap-1.5 mt-2.5">
+              {event.tags.map((t) => (
+                <span
+                  key={t}
+                  className="text-xs px-2 py-0.5 rounded-full bg-petal-sage/20 text-petal-ink inline-flex items-center gap-1"
+                >
+                  <Tag className="w-3 h-3" />
+                  {t}
+                </span>
+              ))}
+            </div>
+          )}
         </button>
       ))}
     </div>
