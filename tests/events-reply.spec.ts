@@ -6,7 +6,7 @@ import { test, expect } from '@playwright/test';
 // but we stub the response here too — the goal is to verify the UI flow,
 // not the LLM plumbing (that's covered by the provider unit shape).
 
-const FAKE_USER = { id: '11111111-1111-1111-1111-111111111111', email: 'a@x.test', nickname: 'A' };
+const FAKE_USER = { id: '11111111-1111-1111-1111-111111111111', email: 'a@x.test', nickname: 'A', selected_therapist: 'luma' };
 const FAKE_EVENT_ID = '22222222-2222-2222-2222-222222222222';
 
 const FAKE_EVENT = {

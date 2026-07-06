@@ -7,6 +7,7 @@ const db = require('../database/db');
 const { generateToken, authenticateToken } = require('../middleware/auth');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 const { TIMEZONE_VALUES } = require('../lib/timezone-options');
+const { isValidCompanionId, getCompanion } = require('../lib/aiCompanions');
 const emailService = require('../services/emailService');
 
 const router = express.Router();
@@ -137,7 +138,7 @@ router.post('/login', [
 
     // Find user
     const userResult = await db.query(
-      'SELECT id, nickname, email, gender, birth_date, timezone, email_notifications_enabled, cycle_tracking_enabled, public_share_show_nickname, email_verified, password_hash, created_at FROM users WHERE email = $1',
+      'SELECT id, nickname, email, gender, birth_date, timezone, email_notifications_enabled, cycle_tracking_enabled, public_share_show_nickname, selected_therapist, email_verified, password_hash, created_at FROM users WHERE email = $1',
       [email]
     );
 
@@ -194,6 +195,7 @@ router.post('/login', [
         email_notifications_enabled: user.email_notifications_enabled !== false,
         cycle_tracking_enabled: user.cycle_tracking_enabled === true,
         public_share_show_nickname: user.public_share_show_nickname !== false,
+        selected_therapist: user.selected_therapist || null,
         email_verified: user.email_verified === true,
         created_at: user.created_at
       }
@@ -218,6 +220,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         u.email_notifications_enabled,
         u.cycle_tracking_enabled,
         u.public_share_show_nickname,
+        u.selected_therapist,
         u.email_verified,
         u.created_at, u.last_login,
         c.id as couple_id, c.couple_name, c.anniversary_date, c.primary_timezone,
@@ -263,6 +266,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         email_notifications_enabled: userData.email_notifications_enabled !== false,
         cycle_tracking_enabled: userData.cycle_tracking_enabled === true,
         public_share_show_nickname: userData.public_share_show_nickname !== false,
+        selected_therapist: userData.selected_therapist || null,
         email_verified: userData.email_verified === true,
         created_at: userData.created_at,
         last_login: userData.last_login,
@@ -533,6 +537,47 @@ router.put('/user/gender', authenticateToken, [
     res.status(500).json({
       success: false,
       message: '更新性別設定失敗'
+    });
+  }
+});
+
+// Pick / change the user's AI 諮商師 companion persona. Affects future AI
+// counselor replies only; past messages keep their original attribution.
+router.put('/user/ai-companion', authenticateToken, [
+  body('companion')
+    .isString()
+    .custom((v) => isValidCompanionId(v))
+    .withMessage('請選擇有效的 AI 諮商師'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: '請選擇有效的 AI 諮商師',
+        error_code: 'INVALID_AI_COMPANION',
+        errors: errors.array()
+      });
+    }
+
+    const userId = req.user.id;
+    const { companion } = req.body;
+
+    await db.query(`UPDATE users SET selected_therapist = $1 WHERE id = $2`, [companion, userId]);
+
+    const info = getCompanion(companion);
+    logInfo('User AI companion updated', { userId, companion });
+
+    res.json({
+      success: true,
+      message: `已選擇 ${info.name} 作為你的 AI 諮商師`,
+      selected_therapist: companion
+    });
+  } catch (error) {
+    logError('Update AI companion failed', { err: error.message, stack: error.stack });
+    res.status(500).json({
+      success: false,
+      message: '更新 AI 諮商師失敗，請稍後再試'
     });
   }
 });

@@ -26,6 +26,7 @@ import ReplyStepBar from './ReplyStepBar';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
+import { companionName, resolveCompanion } from '../utils/aiCompanions';
 
 interface NotificationInput {
   type: 'success' | 'error' | 'info' | 'warning';
@@ -37,6 +38,9 @@ interface NotificationInput {
 interface EventDetailProps {
   eventId: string;
   currentUserId: string;
+  // The viewer's chosen AI 諮商師 (null = default Luma); names the invite
+  // button and the counselor preview.
+  companionId?: string | null;
   onBack: () => void;
   showNotification: (n: NotificationInput) => void;
 }
@@ -71,7 +75,8 @@ function formatTime(iso: string, tz: string) {
   }
 }
 
-export default function EventDetail({ eventId, currentUserId, onBack, showNotification }: EventDetailProps) {
+export default function EventDetail({ eventId, currentUserId, companionId, onBack, showNotification }: EventDetailProps) {
+  const myCompanion = resolveCompanion(companionId);
   const [event, setEvent] = useState<EventRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -535,7 +540,9 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
                   <div className="max-w-[92%] w-full rounded-2xl px-4 py-3 bg-petal-sage/15 border border-petal-sage/40">
                     <div className="flex items-center gap-1.5 mb-1 text-petal-sage-deep">
                       <HeartHandshake className="w-3.5 h-3.5" />
-                      <span className="text-xs font-medium">AI 諮商師</span>
+                      <span className="text-xs font-medium">
+                        {companionName(m.aiTherapist) ? `${companionName(m.aiTherapist)}・AI 諮商師` : 'AI 諮商師'}
+                      </span>
                     </div>
                     <p className="text-sm text-petal-ink whitespace-pre-wrap leading-relaxed">{m.content}</p>
                     <p className="text-[10px] text-petal-muted mt-1.5">{formatTime(m.createdAt, tz)}</p>
@@ -630,10 +637,10 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
               onClick={inviteAiCounselor}
               disabled={aiInviting}
               className="px-3 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition mr-auto"
-              title="請 AI 諮商師讀過你們的對話，給一段中立的建議"
+              title={`請 ${myCompanion.name} 讀過你們的對話，給一段中立的建議`}
             >
               {aiInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
-              <span>請 AI 諮商師加入</span>
+              <span>請 {myCompanion.name} 加入</span>
             </button>
             <button
               type="button"
@@ -689,6 +696,7 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
 
       {aiPreview !== null && (
         <AiCounselorPreview
+          companionName={myCompanion.name}
           comment={aiPreview}
           posting={aiPosting}
           onPost={postAiCounselor}
@@ -791,11 +799,13 @@ function ResolveControls({
 }
 
 function AiCounselorPreview({
+  companionName: name,
   comment,
   posting,
   onPost,
   onCancel,
 }: {
+  companionName: string;
   comment: string;
   posting: boolean;
   onPost: () => void;
@@ -812,7 +822,7 @@ function AiCounselorPreview({
           <div className="flex items-center gap-2">
             <HeartHandshake className="w-5 h-5 text-petal-sage-deep" />
             <div>
-              <h3 className="text-lg font-serif text-petal-ink">AI 諮商師的建議</h3>
+              <h3 className="text-lg font-serif text-petal-ink">{name}（AI 諮商師）的建議</h3>
               <p className="text-xs text-petal-ink-soft mt-1">看看這段建議，貼到對話串後雙方都看得到。</p>
             </div>
           </div>

@@ -26,7 +26,7 @@ import { formatRelativeOrDate } from '../utils/datetime';
 
 interface WallViewProps {
   authState: {
-    user: { id: string; nickname?: string } | null;
+    user: { id: string; nickname?: string; selected_therapist?: string | null } | null;
     isAuthenticated: boolean;
     partnerConnected: boolean;
   };
@@ -315,6 +315,7 @@ const WallView: React.FC<WallViewProps> = ({
           <WallPostThread
             postId={post.id}
             currentUserId={userId}
+            companionId={authState.user?.selected_therapist ?? null}
             onReplyCountChange={(newCount) => updateReplyCount(post.id, newCount)}
             onError={(message) =>
               showNotification({ type: 'error', title: '發生錯誤', message })

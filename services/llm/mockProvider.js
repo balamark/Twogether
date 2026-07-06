@@ -196,7 +196,10 @@ async function generateRoleplayMessages({ title, scenario, senderGender /* , scr
 // Deterministic counselor comment for a wall thread. Detects toxic phrasing in
 // the most recent reply (or the post) and, when found, appends a softer
 // rephrase suggestion. No randomness or timestamps — same input, same output.
-async function generateWallCounselorComment({ postContent, postAuthorName, replies /* , moodTag */ }) {
+// `companion` (persona) is accepted for signature parity with the Claude
+// provider; the mock stays deterministic and persona-agnostic on purpose so
+// e2e content assertions don't depend on the picked companion.
+async function generateWallCounselorComment({ postContent, postAuthorName, replies /* , moodTag, companion */ }) {
   if (typeof postContent !== 'string' || postContent.trim().length === 0) {
     throw new Error('postContent is required');
   }

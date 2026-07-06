@@ -27,6 +27,8 @@ import IntimacyRequestsHistory from './components/IntimacyRequestsHistory';
 import IntimacyRequestForm from './components/IntimacyRequestForm';
 import NotificationInbox from './components/NotificationInbox';
 import PairingInvitationHandler from './components/PairingInvitationHandler';
+import AiCompanionOnboarding from './components/AiCompanionPicker';
+import { resolveCompanion } from './utils/aiCompanions';
 import { apiService, getTokenExpiry, clearAuthStorage } from './services/api';
 import type { CycleRecord } from './services/api';
 import { getPrimaryTimezone, formatYmdInTz, browserTz } from './utils/datetime';
@@ -165,6 +167,9 @@ interface User {
   partnerId?: string;
   partnerCode?: string;
   partnerNickname?: string;
+  // Chosen AI 諮商師 companion id (e.g. 'luma'); null/undefined = not picked
+  // yet, which triggers the one-time onboarding picker.
+  selected_therapist?: string | null;
   createdAt: string;
 }
 
@@ -523,6 +528,15 @@ const LoveTimeApp = () => {
   const [pairingPromptDismissed, setPairingPromptDismissed] = useState(
     localStorage.getItem('pairingPromptDismissed') === 'true'
   );
+  // 「認識你的 AI 諮商師」onboarding step — shown once right after sign-up.
+  // Existing users pick / change theirs in 設定 instead (no blocking modal on
+  // login). Skipping keeps the Luma default without saving anything.
+  const [showCompanionOnboarding, setShowCompanionOnboarding] = useState(false);
+  const needsCompanionPick =
+    showCompanionOnboarding &&
+    authState.isAuthenticated &&
+    !!authState.user &&
+    authState.user.selected_therapist == null;
   const [pairingPromptEmail, setPairingPromptEmail] = useState('');
   const [pairingPromptSending, setPairingPromptSending] = useState(false);
   const [pairingPromptSent, setPairingPromptSent] = useState(false);
@@ -717,6 +731,7 @@ const LoveTimeApp = () => {
         email_notifications_enabled?: boolean;
         cycle_tracking_enabled?: boolean;
         email_verified?: boolean;
+        selected_therapist?: string | null;
         created_at?: string;
       };
 
@@ -730,6 +745,7 @@ const LoveTimeApp = () => {
         email_notifications_enabled: userData.email_notifications_enabled,
         cycle_tracking_enabled: userData.cycle_tracking_enabled,
         email_verified: userData.email_verified,
+        selected_therapist: userData.selected_therapist ?? null,
         partnerCode: generatePartnerCode(),
         createdAt: userData.created_at || new Date().toISOString()
       };
@@ -791,7 +807,9 @@ const LoveTimeApp = () => {
       setNicknames(prev => ({ ...prev, partner1: nickname }));
       localStorage.setItem('authState', JSON.stringify({ user, isAuthenticated: true, partnerConnected: false }));
       setShowAuthModal(false);
-      
+      // Onboarding step: meet your AI 諮商師 (companion) right after sign-up.
+      setShowCompanionOnboarding(true);
+
       showNotification({
         type: 'success',
         title: '註冊成功！',
@@ -810,12 +828,14 @@ const LoveTimeApp = () => {
   };
 
   useEffect(() => {
-    if (authState.isAuthenticated && !authState.partnerConnected && !pairingPromptDismissed) {
+    // The AI companion picker takes precedence right after sign-up — don't
+    // stack the pairing prompt on top of it.
+    if (authState.isAuthenticated && !authState.partnerConnected && !pairingPromptDismissed && !needsCompanionPick) {
       setShowPairingPrompt(true);
     } else {
       setShowPairingPrompt(false);
     }
-  }, [authState.isAuthenticated, authState.partnerConnected, pairingPromptDismissed]);
+  }, [authState.isAuthenticated, authState.partnerConnected, pairingPromptDismissed, needsCompanionPick]);
 
   const handlePartnerConnect = async (partnerCode: string) => {
     try {
@@ -2226,6 +2246,30 @@ const LoveTimeApp = () => {
         notifications={notifications}
         onClose={closeNotification}
       />
+
+      {/* One-time AI companion (諮商師) onboarding picker */}
+      {needsCompanionPick && !showPairingInvitation && (
+        <AiCompanionOnboarding
+          onDone={(companionId) => {
+            setShowCompanionOnboarding(false);
+            setAuthState((prev) => {
+              const next: AuthState = {
+                ...prev,
+                user: prev.user ? { ...prev.user, selected_therapist: companionId } : prev.user,
+              };
+              localStorage.setItem('authState', JSON.stringify(next));
+              return next;
+            });
+            showNotification({
+              type: 'success',
+              title: '已選擇 AI 諮商師',
+              message: `${resolveCompanion(companionId).name} 之後會在事件和牆上陪你們聊`,
+              duration: 5000,
+            });
+          }}
+          onDismiss={() => setShowCompanionOnboarding(false)}
+        />
+      )}
 
       {/* Pairing Invitation Handler */}
       {showPairingInvitation && pairingInvitationToken && (

@@ -196,7 +196,7 @@ const FLYWHEEL: { icon: LucideIcon; step: string; title: string; desc: string }[
   { icon: Pencil, step: '1', title: '記錄衝突', desc: '把這次的經過與委屈寫下來，當下不必急著送出。' },
   { icon: TrendingUp, step: '2', title: '分析走勢', desc: '看見過往衝突大多來自哪些原因，掌握你們的相處模式。' },
   { icon: Sparkles, step: '3', title: '學習開口', desc: 'AI 幫你把話說得更中性、更容易和好。' },
-  { icon: HeartHandshake, step: '4', title: '請諮商師協助', desc: '真的卡住了，AI 諮商師陪你聊，或預約真人諮商師。' },
+  { icon: HeartHandshake, step: '4', title: '請諮商師協助', desc: '真的卡住了，你挑選的 AI 諮商師（Luma、Sophie、Kai⋯共 9 位個性不同的陪伴者）陪你聊，或預約真人諮商師。' },
 ];
 
 // Sample "過往衝突主因" mini-analysis shown read-only in the preview.
@@ -413,7 +413,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
         留下你們的<em className="not-italic font-light italic text-pink-600">悄悄話</em>
       </>
     ),
-    description: '在牆上貼下想對彼此說的話，AI 諮商師也會適時給予溫柔的建議。',
+    description: '在牆上貼下想對彼此說的話，你選的 AI 諮商師（例如 Luma）也會適時給予溫柔的建議。',
     sample: (
       <div className="grid grid-cols-2 gap-2.5">
         <SampleCard>

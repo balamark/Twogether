@@ -351,6 +351,7 @@ export interface EventMessage {
   senderId: string;
   content: string;
   isAi: boolean;
+  aiTherapist: string | null;
   createdAt: string;
   readAt: string | null;
   editedAt: string | null;
@@ -465,6 +466,7 @@ export interface WallReply {
   author_id: string;
   author_nickname: string | null;
   is_ai?: boolean;
+  ai_therapist?: string | null;
   created_at: string;
 }
 
@@ -1851,6 +1853,16 @@ class ApiService {
     }
   }
 
+  // AI 諮商師 companion selection (onboarding picker + settings)
+  async updateAiCompanion(companion: string): Promise<void> {
+    try {
+      await apiClient.put('/auth/user/ai-companion', { companion });
+    } catch (error: unknown) {
+      console.error('Failed to update AI companion:', error);
+      throw new Error((error as ApiErrorResponse)?.message || '更新 AI 諮商師失敗，請稍後再試');
+    }
+  }
+
   async updateUserBirthDate(birthDate: string | null): Promise<void> {
     try {
       await apiClient.put('/auth/user/birth-date', { birth_date: birthDate });
@@ -3182,6 +3194,7 @@ class ApiService {
       sender_id?: string;
       content?: string;
       is_ai?: boolean;
+      ai_therapist?: string | null;
       created_at?: string;
       read_at?: string | null;
       edited_at?: string | null;
@@ -3192,6 +3205,7 @@ class ApiService {
       senderId: r.sender_id || '',
       content: r.content || '',
       isAi: r.is_ai === true,
+      aiTherapist: r.ai_therapist ?? null,
       createdAt: r.created_at || '',
       readAt: r.read_at ?? null,
       editedAt: r.edited_at ?? null,

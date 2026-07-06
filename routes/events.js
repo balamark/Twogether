@@ -6,6 +6,7 @@ const { authenticateToken } = require('../middleware/auth');
 const llmService = require('../services/llmService');
 const emailService = require('../services/emailService');
 const { checkLimit } = require('../lib/entitlements');
+const { resolveCompanion } = require('../lib/aiCompanions');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 const {
   countTodayAiUsage,
@@ -63,7 +64,7 @@ async function ensureNotificationsTable() {
   }
 }
 
-async function notify(userId, type, title, content, eventId, relatedUserId, priority = 2, messageContent = null) {
+async function notify(userId, type, title, content, eventId, relatedUserId, priority = 2, messageContent = null, aiName = null) {
   try {
     await ensureNotificationsTable();
     await db.query(
@@ -91,9 +92,21 @@ async function notify(userId, type, title, content, eventId, relatedUserId, prio
       eventTitle: content,
       type,
       messageContent,
+      aiName,
     });
   } catch (err) {
     logWarn('Event notification email failed', { type, err: err.message });
+  }
+}
+
+// The inviting user's chosen AI companion persona (falls back to Luma).
+async function getUserCompanion(userId) {
+  try {
+    const r = await db.query(`SELECT selected_therapist FROM users WHERE id = $1`, [userId]);
+    return resolveCompanion(r.rows[0]?.selected_therapist);
+  } catch (err) {
+    logWarn('getUserCompanion failed; using default', { err: err.message });
+    return resolveCompanion(null);
   }
 }
 
@@ -160,6 +173,7 @@ function serializeMessage(row) {
     sender_id: row.sender_id,
     content: row.content,
     is_ai: row.is_ai === true,
+    ai_therapist: row.ai_therapist || null,
     created_at: row.created_at,
     read_at: row.read_at,
     edited_at: row.edited_at || null,
@@ -916,13 +930,15 @@ router.post('/:id/ai-comment/preview', [param('id').isUUID()], async (req, res) 
       isAi: r.is_ai === true,
     }));
 
-    logInfo('events.ai_comment.preview', { userId, eventId: req.params.id, replyCount: replies.length });
+    const companion = await getUserCompanion(userId);
+    logInfo('events.ai_comment.preview', { userId, eventId: req.params.id, replyCount: replies.length, companion: companion.id });
 
     const result = await llmService.generateWallCounselorComment({
       postContent: access.event.summary,
       postAuthorName: '發起人',
       moodTag: (access.event.emotions || []).join('、') || null,
       replies,
+      companion,
     });
     const meta = result._meta;
     delete result._meta;
@@ -962,24 +978,26 @@ router.post(
         return res.status(400).json({ success: false, message: '此事件已解決，無法新增訊息' });
       }
 
+      const companion = await getUserCompanion(req.user.id);
       const msgResult = await db.query(
-        `INSERT INTO event_messages (event_id, sender_id, content, is_ai)
-         VALUES ($1, $2, $3, TRUE) RETURNING *`,
-        [req.params.id, req.user.id, req.body.content]
+        `INSERT INTO event_messages (event_id, sender_id, content, is_ai, ai_therapist)
+         VALUES ($1, $2, $3, TRUE, $4) RETURNING *`,
+        [req.params.id, req.user.id, req.body.content, companion.id]
       );
       await db.query(`UPDATE events SET updated_at = NOW() WHERE id = $1`, [req.params.id]);
 
-      logInfo('events.ai_comment.posted', { userId: req.user.id, eventId: req.params.id, messageId: msgResult.rows[0].id });
+      logInfo('events.ai_comment.posted', { userId: req.user.id, eventId: req.params.id, messageId: msgResult.rows[0].id, companion: companion.id });
 
       await notify(
         access.partnerId,
         'event_ai_comment',
-        'AI 諮商師在事件中留言',
+        `AI 諮商師 ${companion.name} 在事件中留言`,
         access.event.title,
         req.params.id,
         req.user.id,
         2,
-        req.body.content
+        req.body.content,
+        companion.name
       );
 
       res.status(201).json({ success: true, message: serializeMessage(msgResult.rows[0]) });

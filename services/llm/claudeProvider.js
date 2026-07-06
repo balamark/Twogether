@@ -602,7 +602,7 @@ const WALL_COUNSELOR_TOOL_SCHEMA = {
   },
 };
 
-async function generateWallCounselorComment({ postContent, postAuthorName, moodTag, replies }) {
+async function generateWallCounselorComment({ postContent, postAuthorName, moodTag, replies, companion }) {
   if (typeof postContent !== 'string' || postContent.trim().length === 0) {
     throw new Error('postContent is required');
   }
@@ -623,17 +623,29 @@ async function generateWallCounselorComment({ postContent, postAuthorName, moodT
   }
   const userContent = lines.join('\n');
 
+  // Persona extension (selected AI companion, e.g. Luma / Kai). Appended as a
+  // separate system block AFTER the cache-controlled base prompt so the shared
+  // prefix stays cacheable across users with different companions. Personas
+  // adjust style only — the base prompt's therapeutic rules stay in charge.
+  const system = [
+    {
+      type: 'text',
+      text: WALL_COUNSELOR_SYSTEM_PROMPT,
+      cache_control: { type: 'ephemeral' },
+    },
+  ];
+  if (companion && companion.prompt) {
+    system.push({
+      type: 'text',
+      text: `你的人設（只調整語氣與風格，上述守則永遠優先）：\n${companion.prompt}`,
+    });
+  }
+
   const startedAt = Date.now();
   const response = await getClient().messages.create({
     model: MODEL,
     max_tokens: 1024,
-    system: [
-      {
-        type: 'text',
-        text: WALL_COUNSELOR_SYSTEM_PROMPT,
-        cache_control: { type: 'ephemeral' },
-      },
-    ],
+    system,
     tools: [WALL_COUNSELOR_TOOL_SCHEMA],
     tool_choice: { type: 'tool', name: 'emit_wall_counselor_comment' },
     messages: [{ role: 'user', content: userContent }],
@@ -644,6 +656,7 @@ async function generateWallCounselorComment({ postContent, postAuthorName, moodT
   const cost = estimateCostUSD(response.model || MODEL, u);
   logInfo('llm.claude.wall_counselor', {
     model: response.model || MODEL,
+    companion: companion?.id || null,
     durationMs: ms,
     inputTokens: u.input_tokens || 0,
     outputTokens: u.output_tokens || 0,

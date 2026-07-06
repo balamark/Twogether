@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 // each side edits their own messages, edited content shows an 「已編輯」 marker,
 // and resolved events / partner / AI messages offer no edit affordance.
 
-const FAKE_USER = { id: '11111111-1111-1111-1111-111111111111', email: 'a@x.test', nickname: 'A' };
+const FAKE_USER = { id: '11111111-1111-1111-1111-111111111111', email: 'a@x.test', nickname: 'A', selected_therapist: 'luma' };
 const PARTNER_ID = '99999999-9999-9999-9999-999999999999';
 const EVENT_ID = '22222222-2222-2222-2222-222222222222';
 

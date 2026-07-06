@@ -7,6 +7,7 @@ const emailService = require('../services/emailService');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 const llmService = require('../services/llmService');
 const { checkLimit } = require('../lib/entitlements');
+const { resolveCompanion } = require('../lib/aiCompanions');
 const { resolveAiLimit, countTodayAiUsage, recordAiUsage } = require('../lib/aiUsage');
 
 const router = express.Router();
@@ -90,8 +91,20 @@ function mapReply(row) {
     author_id: row.author_id,
     author_nickname: row.author_nickname,
     is_ai: row.is_ai === true,
+    ai_therapist: row.ai_therapist || null,
     created_at: row.created_at,
   };
+}
+
+// The inviting user's chosen AI companion persona (falls back to Luma).
+async function getUserCompanion(userId) {
+  try {
+    const r = await db.query(`SELECT selected_therapist FROM users WHERE id = $1`, [userId]);
+    return resolveCompanion(r.rows[0]?.selected_therapist);
+  } catch (err) {
+    logWarn('getUserCompanion failed; using default', { err: err.message });
+    return resolveCompanion(null);
+  }
 }
 
 // List all posts for the user's couple, important first, then newest first.
@@ -362,7 +375,7 @@ router.get('/:id/replies', async (req, res) => {
     }
 
     const result = await db.query(
-      `SELECT r.id, r.post_id, r.content, r.author_id, r.is_ai, r.created_at,
+      `SELECT r.id, r.post_id, r.content, r.author_id, r.is_ai, r.ai_therapist, r.created_at,
               u.nickname AS author_nickname
        FROM wall_post_replies r
        JOIN users u ON u.id = r.author_id
@@ -517,13 +530,15 @@ router.post('/:id/ai-comment/preview', async (req, res) => {
       isAi: r.is_ai === true,
     }));
 
-    logInfo('wall.ai_comment.preview', { userId, postId, replyCount: replies.length });
+    const companion = await getUserCompanion(userId);
+    logInfo('wall.ai_comment.preview', { userId, postId, replyCount: replies.length, companion: companion.id });
 
     const result = await llmService.generateWallCounselorComment({
       postContent: post.content,
       postAuthorName: post.author_nickname,
       moodTag: post.mood_tag,
       replies,
+      companion,
     });
     const meta = result._meta;
     delete result._meta;
@@ -587,11 +602,12 @@ router.post(
 
       // author_id = the inviting partner so the existing JOIN users / own-reply
       // delete rules keep working; is_ai flags it as a counselor comment.
+      const companion = await getUserCompanion(userId);
       const inserted = await db.query(
-        `INSERT INTO wall_post_replies (post_id, author_id, content, is_ai)
-         VALUES ($1, $2, $3, TRUE)
-         RETURNING id, post_id, content, author_id, is_ai, created_at`,
-        [postId, userId, content]
+        `INSERT INTO wall_post_replies (post_id, author_id, content, is_ai, ai_therapist)
+         VALUES ($1, $2, $3, TRUE, $4)
+         RETURNING id, post_id, content, author_id, is_ai, ai_therapist, created_at`,
+        [postId, userId, content, companion.id]
       );
       const reply = inserted.rows[0];
       const enriched = await db.query(
@@ -599,17 +615,17 @@ router.post(
         [userId]
       );
 
-      logInfo('wall.ai_comment.posted', { userId, postId, replyId: reply.id });
+      logInfo('wall.ai_comment.posted', { userId, postId, replyId: reply.id, companion: companion.id });
 
       const recipientId =
         post.author_id === userId ? partnerOf(couple, userId) : post.author_id;
       await notifyPartner(
         recipientId,
         'wall_ai_comment',
-        'AI 諮商師在你們的牆上留言',
+        `AI 諮商師 ${companion.name} 在你們的牆上留言`,
         content,
         userId,
-        { senderName: 'AI 諮商師' }
+        { senderName: `AI 諮商師 ${companion.name}` }
       );
 
       res.json({
