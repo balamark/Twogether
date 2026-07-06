@@ -55,6 +55,34 @@ if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
 
+// Canonical host enforcement (SEO). Search Console reports "Page with
+// redirect" when it discovers host variants (www.<domain>, *.appspot.com)
+// of the same app. Permanently (301) redirect GET/HEAD page requests to the
+// canonical host derived from FRONTEND_URL so Google consolidates indexing
+// onto one origin. /api and /health are exempt — machine-to-machine callers
+// (ECPay callbacks, uptime checks) must never be bounced. On staging, where
+// FRONTEND_URL itself is the *.appspot.com host, nothing redirects; instead
+// every page is marked noindex so the staging clone never competes with prod
+// in search results.
+const canonicalHost = (() => {
+  try { return new URL(process.env.FRONTEND_URL).hostname; } catch { return null; }
+})();
+const isNoindexEnv = !!canonicalHost && canonicalHost.endsWith('.appspot.com');
+if (process.env.NODE_ENV === 'production' && canonicalHost) {
+  app.use((req, res, next) => {
+    if (req.path === '/health' || req.path.startsWith('/api/')) return next();
+    if (isNoindexEnv) {
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      return next();
+    }
+    if ((req.method === 'GET' || req.method === 'HEAD') && req.hostname !== canonicalHost) {
+      logInfo('Canonical host redirect', { fromHost: req.hostname, path: req.path });
+      return res.redirect(301, `https://${canonicalHost}${req.originalUrl}`);
+    }
+    next();
+  });
+}
+
 // Session configuration. Cookie maxAge is kept in sync with the JWT TTL
 // (JWT_EXPIRES_IN) so the express-session cookie and the JWT can't expire at
 // wildly different times — both are the "session lifespan" from the user's
@@ -202,6 +230,27 @@ app.get(['/pricing', '/membership', '/plans'], (req, res) => {
 app.get(['/therapist-signup', '/become-a-therapist'], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'public', 'therapist-signup.html'));
+});
+
+// robots.txt is generated per environment: prod invites crawlers and points
+// at the sitemap; noindex environments (staging on *.appspot.com) block all
+// crawling so the clone never gets indexed. Registered before the static
+// middleware so a stray dist/robots.txt can never shadow it.
+app.get('/robots.txt', (req, res) => {
+  res.type('text/plain');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  if (isNoindexEnv) {
+    return res.send('User-agent: *\nDisallow: /\n');
+  }
+  res.send([
+    'User-agent: *',
+    'Allow: /',
+    'Disallow: /api/',
+    'Disallow: /admin',
+    '',
+    `Sitemap: https://${canonicalHost || 'twogether.fun'}/sitemap.xml`,
+    ''
+  ].join('\n'));
 });
 
 // Serve static files from the frontend build
