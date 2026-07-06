@@ -122,6 +122,13 @@ test.describe.serial('Full user journey: sign up → log in → change email →
 
     // Auto-logged-in after sign up.
     await expect(page.getByTestId('user-menu-toggle')).toBeVisible({ timeout: 15000 });
+
+    // The one-time「認識你的 AI 諮商師」onboarding step appears after sign-up.
+    // Pick Sophie (over the Luma default) and continue — saved to the real DB.
+    await expect(page.getByTestId('ai-companion-onboarding')).toBeVisible({ timeout: 10000 });
+    await page.getByTestId('ai-companion-option-sophie').click();
+    await page.getByTestId('ai-companion-continue').click();
+    await expect(page.getByTestId('ai-companion-onboarding')).not.toBeVisible({ timeout: 10000 });
   });
 
   test('log out, then log back in with the sign-up email', async ({ page }) => {

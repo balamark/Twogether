@@ -706,35 +706,49 @@ ${acceptUrl}
     }
   }
 
-  async sendEventNotification({ senderName, recipientEmail, eventTitle = '', type }) {
+  async sendEventNotification({ senderName, recipientEmail, eventTitle = '', type, messageContent = '', aiName = null }) {
     if (!this.isConfigured()) return;
     if (!recipientEmail) return;
 
     const safeSender = this._escape(senderName || '你的伴侶');
     const safeTitle = this._escape(eventTitle).slice(0, 200);
+    const safeMessage = this._escape(messageContent || '').slice(0, 600);
+    // Named AI companion (e.g. Luma) when the counselor persona is known.
+    const aiLabel = aiName ? `AI 諮商師 ${aiName}` : 'AI 諮商師';
+    const safeAiLabel = this._escape(aiLabel);
 
     const meta = {
       event_created:        { emoji: '📣', headline: '伴侶開啟了一個事件',         subject: `📣 ${senderName || '你的伴侶'} 開啟了一個事件` },
       event_reply:          { emoji: '💬', headline: '伴侶在事件中回覆',           subject: `💬 ${senderName || '你的伴侶'} 在事件中回覆了` },
+      event_ai_comment:     { emoji: '🧑‍⚕️', headline: `${aiLabel}在事件中留言`,     subject: `🧑‍⚕️ ${aiLabel}在你們的事件中留言了` },
       event_resolve_request:{ emoji: '🤝', headline: '伴侶希望標記事件為已解決',   subject: `🤝 ${senderName || '你的伴侶'} 希望標記事件為已解決` },
       event_resolved:       { emoji: '✅', headline: '事件已解決',                  subject: `✅ 事件已解決` },
+      event_reopened:       { emoji: '🔄', headline: '伴侶重新開啟了一個事件',     subject: `🔄 ${senderName || '你的伴侶'} 重新開啟了一個事件` },
     }[type] || { emoji: '🔔', headline: '事件更新', subject: '🔔 事件更新' };
+
+    const labelSuffix = type === 'event_created' ? '想說的話' : '的回覆';
+    const messageLabel = type === 'event_ai_comment' ? `${aiLabel}的留言` : `${senderName || '你的伴侶'} ${labelSuffix}`;
+    const safeMessageLabel = type === 'event_ai_comment' ? `${safeAiLabel}的留言` : `${safeSender} ${labelSuffix}`;
 
     const bodyHtml = `
       <p>${meta.headline}：</p>
       <div class="quote"><strong>${safeTitle || '(無標題)'}</strong></div>
+      ${safeMessage ? `
+      <p>${safeMessageLabel}：</p>
+      <div class="quote">${safeMessage.replace(/\n/g, '<br>')}</div>` : ''}
       <p style="color: #636e72; font-size: 14px;">登入 Twogether 查看事件詳情。</p>
     `;
     const html = this._activityEmailHtml({
       headerEmoji: meta.emoji,
       headerTitle: meta.headline,
-      headerSubtitle: safeSender,
+      headerSubtitle: type === 'event_ai_comment' ? `由 ${safeSender} 邀請` : safeSender,
       bodyHtml,
     });
 
     const text = [
       `${meta.headline}`,
       `事件：${eventTitle || '(無標題)'}`,
+      ...(messageContent ? ['', `${messageLabel}：`, String(messageContent).slice(0, 600)] : []),
       '',
       '打開 Twogether 查看事件詳情。',
     ].join('\n');

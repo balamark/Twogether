@@ -26,6 +26,7 @@ import ReplyStepBar from './ReplyStepBar';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
+import { companionName, resolveCompanion } from '../utils/aiCompanions';
 
 interface NotificationInput {
   type: 'success' | 'error' | 'info' | 'warning';
@@ -37,6 +38,9 @@ interface NotificationInput {
 interface EventDetailProps {
   eventId: string;
   currentUserId: string;
+  // The viewer's chosen AI 諮商師 (null = default Luma); names the invite
+  // button and the counselor preview.
+  companionId?: string | null;
   onBack: () => void;
   showNotification: (n: NotificationInput) => void;
 }
@@ -71,7 +75,8 @@ function formatTime(iso: string, tz: string) {
   }
 }
 
-export default function EventDetail({ eventId, currentUserId, onBack, showNotification }: EventDetailProps) {
+export default function EventDetail({ eventId, currentUserId, companionId, onBack, showNotification }: EventDetailProps) {
+  const myCompanion = resolveCompanion(companionId);
   const [event, setEvent] = useState<EventRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -535,7 +540,9 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
                   <div className="max-w-[92%] w-full rounded-2xl px-4 py-3 bg-petal-sage/15 border border-petal-sage/40">
                     <div className="flex items-center gap-1.5 mb-1 text-petal-sage-deep">
                       <HeartHandshake className="w-3.5 h-3.5" />
-                      <span className="text-xs font-medium">AI 諮商師</span>
+                      <span className="text-xs font-medium">
+                        {companionName(m.aiTherapist) ? `${companionName(m.aiTherapist)}・AI 諮商師` : 'AI 諮商師'}
+                      </span>
                     </div>
                     <p className="text-sm text-petal-ink whitespace-pre-wrap leading-relaxed">{m.content}</p>
                     <p className="text-[10px] text-petal-muted mt-1.5">{formatTime(m.createdAt, tz)}</p>
@@ -629,18 +636,18 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
               data-testid="event-ai-counselor-button"
               onClick={inviteAiCounselor}
               disabled={aiInviting}
-              className="px-3 py-2 rounded-full border border-petal-sage-deep text-petal-sage-deep inline-flex items-center gap-2 disabled:opacity-50 hover:bg-petal-sage/20 mr-auto"
-              title="請 AI 諮商師讀過你們的對話，給一段中立的建議"
+              className="px-3 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition mr-auto"
+              title={`請 ${myCompanion.name} 讀過你們的對話，給一段中立的建議`}
             >
               {aiInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
-              <span>請 AI 諮商師加入</span>
+              <span>請 {myCompanion.name} 加入</span>
             </button>
             <button
               type="button"
               data-testid="event-acceptance-button"
               onClick={requestAcceptance}
               disabled={accepting}
-              className="px-3 py-2 rounded-full border border-petal-rose text-petal-ink inline-flex items-center gap-2 disabled:opacity-50 hover:bg-petal-rose/15"
+              className="px-3 py-2 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
               title="先別急著解決——讓 AI 教你怎麼接住TA的情緒"
             >
               {accepting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HandHeart className="w-4 h-4" />}
@@ -651,7 +658,7 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
               data-testid="event-reply-rewrite-button"
               onClick={requestRewrite}
               disabled={rewriting || reply.trim().length === 0}
-              className="px-3 py-2 rounded-full border border-petal-sage text-petal-ink inline-flex items-center gap-2 disabled:opacity-50 hover:bg-petal-sage/20"
+              className="px-3 py-2 rounded-full bg-petal-rose text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:shadow-none hover:opacity-90 active:scale-[0.98] transition"
               title="讓 AI 把你的回覆改得更中性、客觀"
             >
               {rewriting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
@@ -662,7 +669,7 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
               data-testid="event-reply-send-button"
               onClick={sendReply}
               disabled={sending || reply.trim().length === 0}
-              className="px-4 py-2 rounded-full bg-petal-ink text-petal-cream inline-flex items-center gap-2 disabled:opacity-50"
+              className="px-4 py-2 rounded-full bg-petal-ink text-petal-cream font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:shadow-none hover:opacity-90 active:scale-[0.98] transition"
             >
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               <span>送出</span>
@@ -689,6 +696,7 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
 
       {aiPreview !== null && (
         <AiCounselorPreview
+          companionName={myCompanion.name}
           comment={aiPreview}
           posting={aiPosting}
           onPost={postAiCounselor}
@@ -725,7 +733,7 @@ export default function EventDetail({ eventId, currentUserId, onBack, showNotifi
             data-testid="event-reopen-button"
             disabled={resolving}
             onClick={handleReopen}
-            className="px-4 py-2 rounded-full border border-petal-sage text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2 disabled:opacity-50"
+            className="px-4 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2 disabled:opacity-50"
           >
             {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
             重新開啟討論
@@ -756,7 +764,7 @@ function ResolveControls({
           type="button"
           disabled={busy}
           onClick={onRequest}
-          className="px-4 py-2 rounded-full border border-petal-sage text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2 disabled:opacity-50"
+          className="px-4 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2 disabled:opacity-50"
         >
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
           標記為解決
@@ -791,11 +799,13 @@ function ResolveControls({
 }
 
 function AiCounselorPreview({
+  companionName: name,
   comment,
   posting,
   onPost,
   onCancel,
 }: {
+  companionName: string;
   comment: string;
   posting: boolean;
   onPost: () => void;
@@ -812,7 +822,7 @@ function AiCounselorPreview({
           <div className="flex items-center gap-2">
             <HeartHandshake className="w-5 h-5 text-petal-sage-deep" />
             <div>
-              <h3 className="text-lg font-serif text-petal-ink">AI 諮商師的建議</h3>
+              <h3 className="text-lg font-serif text-petal-ink">{name}（AI 諮商師）的建議</h3>
               <p className="text-xs text-petal-ink-soft mt-1">看看這段建議，貼到對話串後雙方都看得到。</p>
             </div>
           </div>

@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { User, Users, CheckCircle, Trash2 } from 'lucide-react';
 import { apiService, type CycleRecord } from '../services/api';
+import { AiCompanionList } from './AiCompanionPicker';
+import { resolveCompanion } from '../utils/aiCompanions';
 import { averageCycleLength, predictNextPeriodStart, ovulationWindow, computeCycleLengths } from '../utils/cycle';
 import { TIMEZONE_OPTIONS } from '../utils/timezone-options';
 import { formatYmdInTz, browserTz as getBrowserTz } from '../utils/datetime';
@@ -38,6 +40,7 @@ interface User {
   partnerId?: string;
   partnerCode?: string;
   partnerNickname?: string;
+  selected_therapist?: string | null;
   createdAt: string;
 }
 
@@ -107,6 +110,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 }) => {
   const [newMemoryQuestion, setNewMemoryQuestion] = useState('');
   const [newEmotion, setNewEmotion] = useState('');
+  const [editingCompanion, setEditingCompanion] = useState(false);
+  const [isSavingCompanion, setIsSavingCompanion] = useState(false);
 
   const addMemoryQuestion = () => {
     const trimmed = newMemoryQuestion.trim();
@@ -283,6 +288,45 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       });
     } finally {
       setIsSavingUserTz(false);
+    }
+  };
+
+  const handleUpdateCompanion = async (next: string) => {
+    if (next === (authState.user?.selected_therapist || null)) {
+      setEditingCompanion(false);
+      return;
+    }
+    setIsSavingCompanion(true);
+    try {
+      await apiService.updateAiCompanion(next);
+      if (authState.user && onAuthStateUpdate) {
+        const updated = {
+          ...authState,
+          user: {
+            ...authState.user,
+            selected_therapist: next,
+          },
+        };
+        onAuthStateUpdate(updated);
+        localStorage.setItem('authState', JSON.stringify(updated));
+        localStorage.setItem('authUser', JSON.stringify(updated.user));
+      }
+      setEditingCompanion(false);
+      showNotification({
+        type: 'success',
+        title: '已更換 AI 諮商師',
+        message: `之後的 AI 回覆將由 ${resolveCompanion(next).name} 陪你們聊，過去的對話不會改變`,
+        duration: 5000,
+      });
+    } catch (err) {
+      showNotification({
+        type: 'error',
+        title: '更新失敗',
+        message: (err as Error)?.message || '無法更新 AI 諮商師，請稍後再試',
+        duration: 5000,
+      });
+    } finally {
+      setIsSavingCompanion(false);
     }
   };
 
@@ -908,6 +952,57 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             </p>
           </div>
         </div>
+      </div>
+
+      {/* AI Companion (諮商師) Selection */}
+      <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6" data-testid="settings-ai-companion">
+        <h3 className="text-lg font-bold text-gray-800 mb-1">AI 諮商師</h3>
+        <p className="text-xs text-gray-500 mb-4">
+          在事件討論和牆上陪你們聊的 AI 諮商師。更換只影響之後的 AI 回覆，過去的對話不會改變。
+        </p>
+        {(() => {
+          const current = resolveCompanion(authState.user?.selected_therapist);
+          return editingCompanion ? (
+            <div className="space-y-3">
+              <AiCompanionList
+                selectedId={current.id}
+                onSelect={handleUpdateCompanion}
+                disabled={isSavingCompanion}
+              />
+              <button
+                type="button"
+                onClick={() => setEditingCompanion(false)}
+                disabled={isSavingCompanion}
+                className="text-sm text-gray-500 hover:text-gray-700 px-2 py-1 disabled:opacity-50"
+              >
+                取消
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xl" aria-hidden>{current.emoji}</span>
+                <div>
+                  <p className="text-sm font-medium text-gray-800">
+                    {current.name}
+                    {!authState.user?.selected_therapist && (
+                      <span className="ml-2 text-xs text-gray-400">（預設）</span>
+                    )}
+                  </p>
+                  <p className="text-xs text-gray-500">{current.tagline}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                data-testid="settings-change-companion"
+                onClick={() => setEditingCompanion(true)}
+                className="px-4 py-2 rounded-full bg-petal-rose-deep text-white text-sm font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition"
+              >
+                更換
+              </button>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Timezone Settings */}

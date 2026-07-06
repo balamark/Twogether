@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 // APIs are stubbed so it doesn't need a paired DB couple — the goal is the UI:
 // the dashboard surfaces the top nudge on 記錄時光, and a check-in can be submitted.
 
-const FAKE_USER = { id: '11111111-1111-1111-1111-111111111111', email: 'a@x.test', nickname: 'A' };
+const FAKE_USER = { id: '11111111-1111-1111-1111-111111111111', email: 'a@x.test', nickname: 'A', selected_therapist: 'luma' };
 const COUPLE_ID = '33333333-3333-3333-3333-333333333333';
 
 test.describe('關係之屋 dashboard', () => {

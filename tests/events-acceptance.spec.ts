@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 // thread. We stub auth + the events APIs (including the new /preview-acceptance
 // endpoint) so the test verifies the UI flow, not the LLM plumbing.
 
-const FAKE_USER = { id: '11111111-1111-1111-1111-111111111111', email: 'a@x.test', nickname: 'A' };
+const FAKE_USER = { id: '11111111-1111-1111-1111-111111111111', email: 'a@x.test', nickname: 'A', selected_therapist: 'luma' };
 const FAKE_EVENT_ID = '22222222-2222-2222-2222-222222222222';
 
 const FAKE_EVENT = {

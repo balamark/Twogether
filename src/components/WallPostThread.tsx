@@ -3,10 +3,14 @@ import { Send, Trash2, Sparkles, X } from 'lucide-react';
 import { apiService, type WallReply } from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatRelativeOrDate } from '../utils/datetime';
+import { companionName, resolveCompanion } from '../utils/aiCompanions';
 
 interface WallPostThreadProps {
   postId: string;
   currentUserId: string | undefined;
+  // The viewer's chosen AI 諮商師 (null = default Luma); names the invite
+  // button and the preview panel.
+  companionId?: string | null;
   onReplyCountChange?: (newCount: number) => void;
   onError?: (message: string) => void;
   onNotify?: (n: { type: 'success' | 'error' | 'warning' | 'info'; title: string; message: string }) => void;
@@ -18,10 +22,12 @@ const formatTime = (iso: string, tz: string) =>
 const WallPostThread: React.FC<WallPostThreadProps> = ({
   postId,
   currentUserId,
+  companionId,
   onReplyCountChange,
   onError,
   onNotify,
 }) => {
+  const myCompanion = resolveCompanion(companionId);
   const [replies, setReplies] = useState<WallReply[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState('');
@@ -167,7 +173,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
                   {isAi ? (
                     <>
                       <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
-                      AI 諮商師
+                      {companionName(reply.ai_therapist) ? `${companionName(reply.ai_therapist)}・AI 諮商師` : 'AI 諮商師'}
                     </>
                   ) : (
                     reply.author_nickname || (isOwn ? '我' : '對方')
@@ -203,11 +209,11 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
             type="button"
             onClick={handleAiPreview}
             disabled={aiLoading}
-            className="inline-flex items-center gap-1.5 text-petal-rose-deep border border-petal-rose-deep/40 rounded-full px-3 py-1.5 font-body text-xs hover:bg-petal-cream-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 bg-petal-rose-deep text-white font-medium shadow-sm rounded-full px-3 py-1.5 font-body text-xs hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid={`wall-ai-comment-btn-${postId}`}
           >
             <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
-            {aiLoading ? 'AI 諮商師思考中⋯' : '請 AI 諮商師看看'}
+            {aiLoading ? `${myCompanion.name} 思考中⋯` : `請 ${myCompanion.name} 看看`}
           </button>
         ) : (
           <div
@@ -216,7 +222,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
           >
             <div className="flex items-center gap-1.5 text-petal-rose-deep font-display text-sm font-medium">
               <Sparkles className="w-4 h-4" strokeWidth={1.5} />
-              AI 諮商師的建議（僅你看得到，貼出後對方才會看到）
+              {myCompanion.name}（AI 諮商師）的建議（僅你看得到，貼出後對方才會看到）
             </div>
             <div className="font-body text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">
               {aiPreview}

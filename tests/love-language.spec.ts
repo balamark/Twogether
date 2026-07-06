@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 // stubbed so it doesn't depend on a real account/DB — the goal is the UI flow:
 // open from the Profile menu, take the 15-question quiz, see + persist a result.
 
-const FAKE_USER = { id: '11111111-1111-1111-1111-111111111111', email: 'a@x.test', nickname: 'A' };
+const FAKE_USER = { id: '11111111-1111-1111-1111-111111111111', email: 'a@x.test', nickname: 'A', selected_therapist: 'luma' };
 
 test.describe('愛的語言 quiz', () => {
   test.beforeEach(async ({ page }) => {

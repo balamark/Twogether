@@ -5,7 +5,7 @@ import { test, expect } from '@playwright/test';
 // ECPay account. Goal: verify the paywall UI + that "升級" kicks off a checkout
 // without actually navigating to ECPay.
 
-const FAKE_USER = { id: '11111111-1111-1111-1111-111111111111', email: 'a@x.test', nickname: 'A' };
+const FAKE_USER = { id: '11111111-1111-1111-1111-111111111111', email: 'a@x.test', nickname: 'A', selected_therapist: 'luma' };
 const COUPLE_ID = '33333333-3333-3333-3333-333333333333';
 
 const BILLING_STATUS_FREE = {
