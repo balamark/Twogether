@@ -28,6 +28,8 @@ import IntimacyRequestForm from './components/IntimacyRequestForm';
 import NotificationInbox from './components/NotificationInbox';
 import PairingInvitationHandler from './components/PairingInvitationHandler';
 import AiCompanionOnboarding from './components/AiCompanionPicker';
+import GettingStartedCard from './components/GettingStartedCard';
+import HelpView from './components/HelpView';
 import { resolveCompanion } from './utils/aiCompanions';
 import { apiService, getTokenExpiry, clearAuthStorage } from './services/api';
 import type { CycleRecord } from './services/api';
@@ -2021,6 +2023,23 @@ const LoveTimeApp = () => {
       case 'record':
       case 'achievements':
         return (
+          <div className="space-y-4">
+          <GettingStartedCard
+            companionPicked={!!authState.user?.selected_therapist}
+            paired={partnerConnected}
+            hasFirstEntry={intimateRecords.length > 0 || localStorage.getItem('gettingStartedEventOpened') === 'true'}
+            onPickCompanion={() => setShowCompanionOnboarding(true)}
+            onInvitePartner={() => {
+              localStorage.removeItem('pairingPromptDismissed');
+              setPairingPromptDismissed(false);
+              setShowPairingPrompt(true);
+            }}
+            onAddRecord={() => setShowRecordModal(true)}
+            onOpenEvents={() => {
+              localStorage.setItem('gettingStartedEventOpened', 'true');
+              setCurrentView('events');
+            }}
+          />
           <CalendarView
             selectedDate={selectedDate}
             setSelectedDate={setSelectedDate}
@@ -2051,6 +2070,7 @@ const LoveTimeApp = () => {
             primaryTimezone={primaryTimezone}
             onNudgePartner={partnerConnected ? () => setShowIntimacyRequestForm(true) : undefined}
           />
+          </div>
         );
       case 'shop': return (
         <CoinShopView
@@ -2083,6 +2103,12 @@ const LoveTimeApp = () => {
           showNotification={showNotification}
           initialEventId={pendingEventId}
           onInitialEventConsumed={() => setPendingEventId(null)}
+          onInvitePartner={() => {
+            localStorage.removeItem('pairingPromptDismissed');
+            setPairingPromptDismissed(false);
+            setShowPairingPrompt(true);
+          }}
+          onNavigate={setCurrentView}
         />
       );
       case 'roleplay': return <RoleplayView
@@ -2142,6 +2168,7 @@ const LoveTimeApp = () => {
         onCycleRecordsChange={setCycleRecords}
       />;
       case 'activity': return <ActivityView showNotification={showNotification} />;
+      case 'help': return <HelpView onFeedback={() => setCurrentView('feedback')} />;
       case 'intimacy-history': return (
         <IntimacyRequestsHistory
           authState={authState}
@@ -2150,6 +2177,7 @@ const LoveTimeApp = () => {
             setPendingScriptTitle(title);
             setCurrentView('roleplay');
           }}
+          onSendInvite={() => setShowIntimacyRequestForm(true)}
         />
       );
       // 'pricing' is the logged-out Premium tab; once signed in it becomes the
@@ -2237,6 +2265,7 @@ const LoveTimeApp = () => {
         onShowJourney={() => setCurrentView('journey')}
         onShowIntimacyHistory={() => setCurrentView('intimacy-history')}
         onShowFeedback={() => setCurrentView('feedback')}
+        onShowHelp={() => setCurrentView('help')}
         onShowLoveLanguage={() => setCurrentView('love-language')}
         onShowUpgrade={() => { setUpgradeReason(null); setCurrentView('upgrade'); }}
       />

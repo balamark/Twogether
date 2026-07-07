@@ -46,6 +46,13 @@ function getClient() {
   return client;
 }
 
+// Punctuation style appended to every user-facing generation prompt. zh-TW
+// readers expect colons/parentheses; em dashes read like translated English
+// (docs/UX_PLAYBOOK.md §R2).
+const PUNCTUATION_RULE = `
+
+標點規則（所有產生的文字一律適用）：不要使用破折號（——、—、–）。需要補充或轉折時，改用冒號、括號或直接分成兩句。`;
+
 const SYSTEM_PROMPT = `你是一個專為情侶設計的「破冰」AI 助手，協助一方把當下強烈、可能傷人的情緒，整理成三種風格的破冰版本。請永遠以繁體中文回覆。
 
 任務：閱讀使用者提供的原始情緒文字，產生：
@@ -326,7 +333,7 @@ async function generateRoleplayMessages({ title, scenario, scriptBody, category,
     system: [
       {
         type: 'text',
-        text: ROLEPLAY_SYSTEM_PROMPT,
+        text: ROLEPLAY_SYSTEM_PROMPT + PUNCTUATION_RULE,
         cache_control: { type: 'ephemeral' },
       },
     ],
@@ -423,7 +430,7 @@ async function generateIcebreaker(rawText, { userGender = null, partnerGender = 
     system: [
       {
         type: 'text',
-        text: SYSTEM_PROMPT,
+        text: SYSTEM_PROMPT + PUNCTUATION_RULE,
         cache_control: { type: 'ephemeral' },
       },
     ],
@@ -518,7 +525,7 @@ async function rewriteReply({ rawReply, eventSummary, recentMessages, createdByS
     system: [
       {
         type: 'text',
-        text: REPLY_REWRITE_SYSTEM_PROMPT,
+        text: REPLY_REWRITE_SYSTEM_PROMPT + PUNCTUATION_RULE,
         cache_control: { type: 'ephemeral' },
       },
     ],
@@ -652,7 +659,7 @@ async function generateWallCounselorComment({ postContent, postAuthorName, moodT
   const system = [
     {
       type: 'text',
-      text: WALL_COUNSELOR_SYSTEM_PROMPT,
+      text: WALL_COUNSELOR_SYSTEM_PROMPT + PUNCTUATION_RULE,
       cache_control: { type: 'ephemeral' },
     },
   ];
@@ -807,7 +814,7 @@ async function generateReconciliationOpeners({ intensity, eventContext }) {
     system: [
       {
         type: 'text',
-        text: RECONCILIATION_SYSTEM_PROMPT,
+        text: RECONCILIATION_SYSTEM_PROMPT + PUNCTUATION_RULE,
         cache_control: { type: 'ephemeral' },
       },
     ],
@@ -951,7 +958,7 @@ async function generateEmotionAcceptance({ eventSummary, recentMessages, created
     system: [
       {
         type: 'text',
-        text: EMOTION_ACCEPTANCE_SYSTEM_PROMPT,
+        text: EMOTION_ACCEPTANCE_SYSTEM_PROMPT + PUNCTUATION_RULE,
         cache_control: { type: 'ephemeral' },
       },
     ],
@@ -1077,7 +1084,7 @@ async function generateCheckupSummary({ dimensions, responseA, responseB }) {
     system: [
       {
         type: 'text',
-        text: CHECKUP_SYSTEM_PROMPT,
+        text: CHECKUP_SYSTEM_PROMPT + PUNCTUATION_RULE,
         cache_control: { type: 'ephemeral' },
       },
     ],

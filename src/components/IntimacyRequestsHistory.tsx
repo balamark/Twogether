@@ -25,12 +25,14 @@ interface IntimacyRequestsHistoryProps {
   partnerNickname?: string;
   /** Navigate to the roleplay view and open the named script. */
   onViewScript?: (title: string) => void;
+  /** Empty-state CTA: open the send-invite form. */
+  onSendInvite?: () => void;
 }
 
 type FeedbackState = { type: 'success' | 'error'; message: string };
 type Tab = 'received' | 'sent';
 
-export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = ({ authState, onViewScript }) => {
+export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = ({ authState, onViewScript, onSendInvite }) => {
   const [items, setItems] = useState<IntimacyRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -191,6 +193,23 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
             <RequestList
               items={activeItems}
               emptyText={activeEmptyText}
+              emptyAction={
+                tab === 'sent' && onSendInvite ? (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-xs text-petal-ink-soft max-w-xs mx-auto leading-relaxed">
+                      挑一種心情或一部劇本，讓另一半知道你今晚想靠近；對方可以接受、改時間或提替代方案。
+                    </p>
+                    <button
+                      type="button"
+                      data-testid="intimacy-empty-send"
+                      onClick={onSendInvite}
+                      className="px-4 py-2 rounded-full bg-petal-rose-deep text-white text-sm font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition"
+                    >
+                      發出第一個邀請
+                    </button>
+                  </div>
+                ) : undefined
+              }
               tz={tz}
               onOpenDetail={(id) => setDetailOpenId(id)}
             />
@@ -438,16 +457,23 @@ function translateStatus(status: string): string {
 function RequestList({
   items,
   emptyText,
+  emptyAction,
   tz,
   onOpenDetail,
 }: {
   items: IntimacyRequest[];
   emptyText: string;
+  emptyAction?: React.ReactNode;
   tz: string;
   onOpenDetail: (id: string) => void;
 }) {
   if (items.length === 0) {
-    return <div className="text-gray-500 text-sm py-6 text-center font-display italic">{emptyText}</div>;
+    return (
+      <div className="py-6 text-center" data-testid="intimacy-empty-state">
+        <div className="text-gray-500 text-sm font-display italic">{emptyText}</div>
+        {emptyAction}
+      </div>
+    );
   }
 
   return (

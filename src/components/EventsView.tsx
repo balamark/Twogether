@@ -4,6 +4,8 @@ import EventHistoryList from './EventHistoryList';
 import ComposeEventFlow from './ComposeEventFlow';
 import EventDetail from './EventDetail';
 import EventAnalytics from './EventAnalytics';
+import SoloModeGate from './SoloModeGate';
+import InfoHint from './InfoHint';
 
 type EventsSubView = 'list' | 'compose' | 'detail' | 'analytics';
 
@@ -31,6 +33,9 @@ interface EventsViewProps {
   showNotification: (notification: NotificationInput) => void;
   initialEventId?: string | null;
   onInitialEventConsumed?: () => void;
+  // Solo-mode gate wiring (unpaired users).
+  onInvitePartner?: () => void;
+  onNavigate?: (view: string) => void;
 }
 
 export default function EventsView({
@@ -38,6 +43,8 @@ export default function EventsView({
   showNotification,
   initialEventId,
   onInitialEventConsumed,
+  onInvitePartner,
+  onNavigate,
 }: EventsViewProps) {
   const [view, setView] = useState<EventsSubView>('list');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -80,22 +87,39 @@ export default function EventsView({
 
   if (!authState.partnerConnected) {
     return (
-      <div className="max-w-2xl mx-auto p-6">
-        <div className="bg-petal-cream border border-petal-rule rounded-2xl p-6 text-center">
-          <Sparkles className="w-8 h-8 mx-auto mb-3 text-petal-rose-deep" />
-          <h2 className="text-xl font-serif text-petal-ink mb-2">尚未配對伴侶</h2>
-          <p className="text-petal-ink-soft text-sm">
-            事件 × 由 AI 替你說功能需要先完成伴侶配對才能使用。請到設定頁完成配對。
-          </p>
-        </div>
-      </div>
+      <SoloModeGate
+        icon={Sparkles}
+        title="吵架了？AI 幫你們把話說開"
+        valueLine="配對之後，你可以把當下的委屈原封不動寫下來（可以罵、可以很火），AI 會整理成對方聽得進去的說法，讓對方先接住你的情緒，再一起把事情解決。"
+        onInvite={onInvitePartner ?? (() => {})}
+        alternatives={[
+          {
+            label: '做愛的語言測驗',
+            desc: '5 分鐘了解自己最需要被愛的方式，配對後可以看到彼此的結果。',
+            onClick: () => onNavigate?.('love-language'),
+          },
+          {
+            label: '逛逛公開問答',
+            desc: '看看其他伴侶怎麼把衝突說開（匿名分享）。',
+            onClick: () => onNavigate?.('therapists'),
+          },
+          {
+            label: '瀏覽角色扮演劇本',
+            desc: '先收藏喜歡的劇本，配對後一起玩。',
+            onClick: () => onNavigate?.('roleplay'),
+          },
+        ]}
+      />
     );
   }
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6">
       <header className="mb-5">
-        <h1 className="text-2xl md:text-3xl font-serif text-petal-ink mb-1">事件 × 由 AI 替你說</h1>
+        <h1 className="text-2xl md:text-3xl font-serif text-petal-ink mb-1 inline-flex items-center gap-1.5">
+          事件 × 由 AI 替你說
+          <InfoHint viewId="events" />
+        </h1>
         <p className="hidden sm:block text-sm text-petal-ink-soft">
           當下情緒不會直接送出。AI 會協助你把感受整理成三種「由 AI 替你說」的版本，由你選擇要不要送出。
         </p>
@@ -118,7 +142,12 @@ export default function EventsView({
 
       <div>
         {view === 'list' && (
-          <EventHistoryList key={refreshKey} onOpenEvent={openDetail} currentUserId={authState.user?.id || ''} />
+          <EventHistoryList
+            key={refreshKey}
+            onOpenEvent={openDetail}
+            currentUserId={authState.user?.id || ''}
+            onCompose={() => setView('compose')}
+          />
         )}
         {view === 'compose' && (
           <ComposeEventFlow

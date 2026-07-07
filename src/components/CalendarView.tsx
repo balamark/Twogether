@@ -854,10 +854,21 @@ const CalendarView = ({
               </article>
               );
             }) : (
-              <div className="border border-dashed border-petal-rule rounded-md py-10 px-6 text-center">
+              <div className="border border-dashed border-petal-rule rounded-md py-10 px-6 text-center" data-testid="records-empty-state">
                 <p className="font-display italic font-light text-base text-petal-muted">
-                  還沒有記錄 — 開始你們的愛情之旅吧
+                  還沒有記錄：留下的每一筆，之後都是你們的回憶
                 </p>
+                <p className="text-xs text-petal-ink-soft mt-2 leading-relaxed max-w-xs mx-auto">
+                  記下親密時光與心情，月曆會看見你們的節奏；太久沒互動時，也會溫柔提醒彼此多關心。
+                </p>
+                <button
+                  type="button"
+                  data-testid="records-empty-add"
+                  onClick={() => setShowRecordModal(true)}
+                  className="mt-4 px-4 py-2 rounded-full bg-petal-rose-deep text-white text-sm font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition"
+                >
+                  ＋ 記下第一筆時光
+                </button>
               </div>
             );
           })()}

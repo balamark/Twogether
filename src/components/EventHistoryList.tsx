@@ -9,6 +9,8 @@ interface EventHistoryListProps {
   currentUserId: string;
   filterStatus?: Exclude<EventStatus, 'resolved'> | null;
   hideFilters?: boolean;
+  // Empty-state CTA: jump straight into the compose flow.
+  onCompose?: () => void;
 }
 
 const STATUS_OPTIONS: { value: EventStatus | 'all'; label: string }[] = [
@@ -53,6 +55,7 @@ export default function EventHistoryList({
   currentUserId,
   filterStatus,
   hideFilters,
+  onCompose,
 }: EventHistoryListProps) {
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,10 +96,27 @@ export default function EventHistoryList({
   }
   if (visibleEvents.length === 0) {
     return (
-      <div className="bg-white border border-petal-rule-soft rounded-2xl p-10 text-center text-petal-ink-soft">
+      <div
+        className="bg-white border border-petal-rule-soft rounded-2xl p-8 text-center text-petal-ink-soft"
+        data-testid="events-empty-state"
+      >
         <MessageSquareHeart className="w-8 h-8 mx-auto mb-3 text-petal-rose-deep" />
-        <p>目前還沒有事件。</p>
-        <p className="text-xs mt-1">當你有衝突或情緒想整理時，點上方「建立事件」開始。</p>
+        <p className="text-petal-ink font-medium">說不出口的委屈，寫在這裡</p>
+        <p className="text-xs mt-1.5 leading-relaxed max-w-xs mx-auto">
+          把當下的情緒原封不動寫下來（可以罵、可以很火），AI 會幫你整理成對方
+          聽得進去的說法，你挑一個版本再送出。
+        </p>
+        {onCompose && (
+          <button
+            type="button"
+            data-testid="events-empty-compose"
+            onClick={onCompose}
+            className="mt-4 px-4 py-2 rounded-full bg-petal-rose-deep text-white text-sm font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition"
+          >
+            寫下第一件想說開的事
+          </button>
+        )}
+        <p className="text-[11px] text-petal-muted mt-3">也可以只存成私人事件，對方不會看到。</p>
       </div>
     );
   }

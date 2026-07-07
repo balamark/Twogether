@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Check, ChevronDown, ChevronUp, HandHeart, Pause, Plus, Send } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
+import InfoHint from './InfoHint';
 import { apiService } from '../services/api';
 import MarriageCheckup from './MarriageCheckup';
 import type { Notification } from '../App';
@@ -411,6 +412,7 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate }: Confli
       </div>
       <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
         和諧<em className="not-italic font-light italic text-pink-600">相處</em>
+        <span className="align-middle ml-2"><InfoHint viewId="conflict" /></span>
       </h2>
       <p className="font-display italic font-light text-base text-petal-muted">
         化解矛盾，增進理解 — 把急切的話留到明天再說。

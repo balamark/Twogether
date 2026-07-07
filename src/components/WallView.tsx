@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import InfoHint from './InfoHint';
 import {
   Plus,
   Star,
@@ -375,6 +376,7 @@ const WallView: React.FC<WallViewProps> = ({
           <div>
             <h2 className="font-display text-2xl sm:text-3xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.1] md:leading-[1.05] mb-3">
               我們的<em className="not-italic font-light italic text-pink-600">牆</em>
+              <span className="align-middle ml-2"><InfoHint viewId="wall" /></span>
             </h2>
             <p className="font-display italic font-light text-base text-petal-muted">
               留下重要的話、心情、需要被理解的事 — 慢慢說。

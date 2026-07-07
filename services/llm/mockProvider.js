@@ -180,7 +180,7 @@ async function generateRoleplayMessages({ title, scenario, senderGender /* , scr
     `想到等下要和你演《${t}》，我心跳有點快…你準備好入戲了嗎？`,
     `《${t}》的氣氛我已經想像好了，今晚我想離你近一點，再近一點。`,
     `我已經忍不住了，今晚就照《${t}》來，我想要你，現在就開始。`,
-    `別等了——今晚的《${t}》，我要你完全屬於我，一刻都不放過。`,
+    `別等了，今晚的《${t}》，我要你完全屬於我，一刻都不放過。`,
   ];
   const messages = ROLEPLAY_LEVELS.map(({ key, label }, i) => ({ level: key, label, text: lines[i] }));
   return {
