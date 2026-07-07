@@ -8,6 +8,7 @@
 >
 > 維護方式：實作完成的 backlog 項目標記 `✅ done (commit)`；新增規範走 PR 討論。
 > 本文件的空間座標以 `檔案:行數` 標示，行數會漂移，請以語意搜尋為主。
+> 英文版：`docs/UX_PLAYBOOK.en.md`（本 zh-TW 檔為正本，兩檔必須在同一個 commit 同步更新）。
 
 ---
 
@@ -28,10 +29,10 @@ Twogether 是一個「情侶關係經營」App：記錄親密時光、用 AI 把
 
 ## §1 現況盤點（2026-07 快照）
 
-### 導覽結構
-登入後 6 個分頁（`src/App.tsx` `navItems`）：
-記錄時光 / 和諧相處 / 衝突事件 / 角色扮演 / 我們的牆 / 心理諮商。
-另有用戶選單（Header 右上）：金幣商店、最近動態、意見回饋、設定、升級 Premium。
+### 導覽結構（P1-1 合併後）
+登入後 5 個分頁（`src/App.tsx` `navItems`）：
+記錄時光 / 好好說話（合併）/ 角色扮演 / 我們的牆 / 心理諮商。
+另有用戶選單（Header 右上）：金幣商店、最近動態、意見回饋、使用說明、設定、升級 Premium。
 
 ### 既有的上手機制
 - 註冊後：AI 諮商師選擇 modal（`AiCompanionPicker.tsx`）→ 配對邀請 modal。
@@ -137,8 +138,12 @@ LoggedOutPreview 的素材）②「邀請另一半」主 CTA ③「配對前你�
 （例：事件送出後→「對方回覆前，可以先看看『如何接住TA的情緒』」）。
 用 localStorage 記 first-time flags，只出現一次。
 
+### P1-4（未完成）配對邀請狀態可見性
+Header 或儀表板顯示「邀請等待中」徽章（含重新發送）；後端允許無 couple 的
+私人事件（schema 改動）。由 P0-3 移轉過來。
+
 ### P2（記錄在案，暫不做）
-- 功能導覽 replay（互動式 tour）——先靠 P0-4，tour 維護成本高。
+- 功能導覽 replay（互動式 tour）——§6 Q3 已決策不做，維護成本高。
 - iOS App 的 onboarding 對齊。
 - 多語系。
 
@@ -161,6 +166,8 @@ LoggedOutPreview 的素材）②「邀請另一半」主 CTA ③「配對前你�
   的話」✓；「AI 三版本改寫」✗）。
 - 錯誤訊息必含下一步（CLAUDE.md 已有此規則，這裡重申適用範圍包括空狀態）。
 - 情緒安全：衝突相關文案永遠不評對錯、不用「你應該」。
+- **AI 產生的文字不用破折號（——、—、–）**：改用冒號、括號或分句。實作為
+  `services/llm/claudeProvider.js` 的 `PUNCTUATION_RULE`（附加到所有 system prompt）。
 
 ### R3 導覽規範
 - 主分頁上限 6 個。要加第 7 個功能 → 併入現有分頁做子分頁，或放用戶選單。
@@ -187,7 +194,11 @@ LoggedOutPreview 的素材）②「邀請另一半」主 CTA ③「配對前你�
   `selected_therapist`，否則 companion modal 不會如預期。**
   點擊目標一律用 `data-testid`（見 memory/feedback_playwright_locators）。
 - **真實流程**：註冊/配對類改動跑 `tests/user-journey.spec.ts`。
+- 導覽到合併分頁用 `getByTestId('nav-tab-communicate')`（舊的 `has-text("事件")` 已無效）。
 - 已知 flake：`roleplay-invitation.spec.ts` 的配對 fixture 偶發失敗，與 UI 改動無關。
+- **部署陷阱**：docs-only push 會跳過部署、卻仍會取消進行中的部署 run。連續 push
+  間隔 <11 分鐘時，確認前一個 run 是 `success` 不是 `cancelled`；被取消就
+  `gh run rerun <id>`。
 
 ---
 
@@ -195,10 +206,11 @@ LoggedOutPreview 的素材）②「邀請另一半」主 CTA ③「配對前你�
 
 | 主題 | 位置 |
 |---|---|
-| 功能介紹文案 | `LoggedOutPreview.tsx`（P0-4 後：`src/content/featureIntros.ts`） |
+| 功能介紹文案與 FAQ | `src/content/featureIntros.ts`（showroom `LoggedOutPreview.tsx` 尚未整併） |
 | 錯誤/訊息規範 | 專案根 `CLAUDE.md`「User-facing messages & logging」 |
-| AI 次數/方案 | `lib/entitlements.js` |
+| AI 次數/方案 | `lib/entitlements.js`；次數端點 `routes/ai-usage.js` |
 | AI 諮商師人設 | `lib/aiCompanions.js`（後端）+ `src/utils/aiCompanions.ts`（顯示） |
+| AI 標點與風格 | `services/llm/claudeProvider.js` 的 `PUNCTUATION_RULE` |
 | 設計 token | `tailwind.config.js`（petal 色票）；圖片永不裁切（CLAUDE.md） |
 | 按鈕樣式基準 | 實色=可點、40% 透明=disabled（2026-07-06 改版後的慣例） |
 
