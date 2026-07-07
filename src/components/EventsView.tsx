@@ -9,7 +9,13 @@ type EventsSubView = 'list' | 'compose' | 'detail' | 'analytics';
 
 interface AuthState {
   isAuthenticated: boolean;
-  user: { id: string; nickname?: string; email?: string; selected_therapist?: string | null } | null;
+  user: {
+    id: string;
+    nickname?: string;
+    email?: string;
+    selected_therapist?: string | null;
+    partnerNickname?: string;
+  } | null;
   partnerConnected: boolean;
 }
 
@@ -126,6 +132,8 @@ export default function EventsView({
             eventId={selectedEventId}
             currentUserId={authState.user?.id || ''}
             companionId={authState.user?.selected_therapist ?? null}
+            myNickname={authState.user?.nickname}
+            partnerNickname={authState.user?.partnerNickname}
             onBack={() => setView('list')}
             showNotification={showNotification}
           />

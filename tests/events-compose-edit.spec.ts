@@ -15,7 +15,7 @@ const PREVIEW = {
   tags: ['育兒'],
   toxicityFlags: [],
   versions: {
-    neutral: '旁白：這件事讓她感到失望，她想先把這份心情放在這裡讓你知道。',
+    neutral: '關於接送的事，我現在心裡有「失望」的感覺，想先把這份心情放在這裡讓你知道。',
     firm: '我感到失望，因為約好的接送計畫沒有實現。我先把這件事提出來放著。',
     warm: '我感到失望，因為約好的接送計畫沒有實現。等彼此平靜後，我願意再聊聊。',
   },
@@ -117,9 +117,44 @@ test.describe('Compose event — summary at top + editable opener', () => {
     await expect(summaryBlock).toContainText('事件簡介');
 
     // The neutral version card shows its own (different) text.
-    const neutralCard = page.locator('button:has-text("第三方中性旁白版")');
+    const neutralCard = page.locator('button:has-text("中性版")');
     await expect(neutralCard).toContainText(PREVIEW.versions.neutral);
     await expect(neutralCard).not.toContainText(PREVIEW.summary);
+  });
+
+  test('edit the summary on the select step; the edited text is sent', async ({ page }) => {
+    let createBody: Record<string, unknown> | null = null;
+    await page.route('**/api/events', async (route) => {
+      if (route.request().method() === 'POST') {
+        createBody = route.request().postDataJSON();
+        return route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            event: { id: '44444444-4444-4444-4444-444444444444', messages: [] },
+          }),
+        });
+      }
+      return route.fallback();
+    });
+
+    await walkToSelectStep(page);
+
+    const EDITED_SUMMARY = '早上約好一起送小孩上學，實際各自行動（我補充：已當面談過一次）。';
+    await page.getByTestId('compose-summary-edit').click();
+    const summaryEditor = page.getByTestId('compose-summary-editor');
+    await expect(summaryEditor).toHaveValue(PREVIEW.summary);
+    await summaryEditor.fill(EDITED_SUMMARY);
+    await page.locator('button:has-text("完成")').click();
+
+    const summaryBlock = page.getByTestId('compose-event-summary');
+    await expect(summaryBlock).toContainText(EDITED_SUMMARY);
+    await expect(summaryBlock).toContainText('已編輯');
+
+    await page.locator('button:has-text("送出")').click();
+    await expect.poll(() => createBody, { timeout: 10000 }).not.toBeNull();
+    expect(createBody!.summary).toBe(EDITED_SUMMARY);
   });
 
   test('edit the selected version before sending; drafts survive switching versions', async ({ page }) => {

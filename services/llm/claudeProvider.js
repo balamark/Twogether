@@ -54,15 +54,17 @@ const SYSTEM_PROMPT = `你是一個專為情侶設計的「破冰」AI 助手，
 3. emotions：最多 3 個情緒標籤，從這個清單中挑：憤怒、失落、委屈、失望、焦慮、孤單、疲憊、受傷、恐懼、無助、羞愧、嫉妒、煩躁、內疚、被忽視、不安、無奈、麻木、心累、難過、複雜情緒。
 4. tags：最多 2 個主題標籤，從這個清單中挑：家務、行程、金錢、育兒、語氣、家人、誤會、感情、夫妻、朋友、人際關係、工作。
 5. toxicityFlags：偵測到的問題語言，可選值：absolute_language（總是/從來/每次/永遠）、name_calling（笨/蠢/廢物/沒用/罵髒話）、verbal_aggression（閉嘴/滾/去死）、contempt（鄙視、輕蔑、翻白眼式語言）、threats（威脅分手/離婚/傷害）、blame_shifting（都是你害的/推卸責任）、emotional_blackmail（情緒勒索/以愛之名要求）、sarcasm（諷刺/反話）、catastrophizing（災難化/最糟結局）、comparison（拿來與他人比較）、stonewalling（冷暴力/不回應）、dismissiveness（否定對方感受/小題大作）。
-6. versions.neutral：第三方中性旁白版 —— 這是「要傳給伴侶的開場訊息」，不是事實摘要。以第三人稱旁白的口吻，向伴侶轉述「事件經過＋使用者當下的情緒感受」，例如「今天發生了 X，這件事讓她感到 Y，她想先把這份心情放在這裡」。必須點出使用者的情緒（呼應 emotions 標籤），結尾帶一句自然的訊息收尾（先放著、想讓你知道 等）。仍然不示弱、不指責，1–3 句。
+6. versions.neutral：中性版 —— 這是「要傳給伴侶的開場訊息」，不是事實摘要。以使用者第一人稱「我」的口吻（像使用者親口對伴侶說話），平靜、就事論事地說出「發生了什麼＋我當下的感受」，例如「今天發生了 X，我心裡有 Y 的感覺，想先把這份心情放在這裡」。必須點出使用者的情緒（呼應 emotions 標籤），結尾帶一句自然的訊息收尾（先放著、想讓你知道 等）。不示弱、不指責，1–3 句。絕對不要用第三人稱旁白轉述（旁白口吻只屬於 summary）。
 7. versions.firm：堅定不攻擊版。以「我訊息」說出感受與影響，不指責、不請求、不討好，1–3 句。
 8. versions.warm：善意版。在 firm 的基礎上多一句願意聊聊的善意，總長 2–4 句。
 
 所有版本都必須：
+- 三個版本一律以使用者第一人稱「我」的口吻書寫，讀起來像使用者親口說的話；只有 summary 用第三人稱紀錄。
 - versions.neutral 與 summary 的內容與句子不可雷同：summary 只有事實、零情緒；neutral 必須包含情緒感受並以訊息口吻收尾。
 - 移除人身攻擊與絕對化用語；如果原文有，將其改寫為具體事實描述。
 - 不要替伴侶辯護，也不要替使用者道歉，只是整理表達。
 - 使用繁體中文。
+- 如果訊息開頭提供了「撰寫者性別／伴侶性別」，在 summary 等第三人稱描述中使用正確的代名詞（男性用「他」、女性用「她」），不要猜測或用錯性別。
 
 回應請呼叫 emit_icebreaker tool，不要輸出其他文字。`;
 
@@ -127,7 +129,7 @@ const TOOL_SCHEMA = {
           neutral: {
             type: 'string',
             description:
-              '傳給伴侶的第三人稱旁白開場訊息：事件經過＋情緒感受＋訊息收尾，不可與 summary 雷同。',
+              '傳給伴侶的開場訊息，以使用者第一人稱「我」的口吻：事件經過＋情緒感受＋訊息收尾，不可與 summary 雷同、不可用旁白轉述。',
           },
           firm: { type: 'string' },
           warm: { type: 'string' },
@@ -390,10 +392,29 @@ async function generateRoleplayMessages({ title, scenario, scriptBody, category,
   };
 }
 
-async function generateIcebreaker(rawText) {
+// 男/女 pronoun hint for prompts; null when unknown or non-binary (the model
+// then avoids gendered pronouns rather than guessing).
+function genderHint(gender, who) {
+  if (gender === 'male') return `${who}的性別：男性（第三人稱請用「他」）`;
+  if (gender === 'female') return `${who}的性別：女性（第三人稱請用「她」）`;
+  if (gender === 'other') return `${who}的性別：非二元（請使用性別中立的稱呼，例如「TA」，不要用他/她）`;
+  return null;
+}
+
+async function generateIcebreaker(rawText, { userGender = null, partnerGender = null } = {}) {
   if (typeof rawText !== 'string' || rawText.trim().length === 0) {
     throw new Error('rawText is required');
   }
+
+  // Gender context rides in the user message (not the system prompt) so the
+  // cached system prefix stays byte-identical across users.
+  const genderLines = [
+    genderHint(userGender, '撰寫者（使用者本人）'),
+    genderHint(partnerGender, '伴侶'),
+  ].filter(Boolean);
+  const userContent = genderLines.length > 0
+    ? `${genderLines.join('\n')}\n\n原始情緒文字：\n${rawText}`
+    : rawText;
 
   const startedAt = Date.now();
   const response = await getClient().messages.create({
@@ -408,7 +429,7 @@ async function generateIcebreaker(rawText) {
     ],
     tools: [TOOL_SCHEMA],
     tool_choice: { type: 'tool', name: 'emit_icebreaker' },
-    messages: [{ role: 'user', content: rawText }],
+    messages: [{ role: 'user', content: userContent }],
   });
 
   const ms = Date.now() - startedAt;
@@ -456,7 +477,7 @@ async function generateIcebreaker(rawText) {
   };
 }
 
-async function rewriteReply({ rawReply, eventSummary, recentMessages, createdBySelf }) {
+async function rewriteReply({ rawReply, eventSummary, recentMessages, createdBySelf, userGender = null, partnerGender = null }) {
   if (typeof rawReply !== 'string' || rawReply.trim().length === 0) {
     throw new Error('rawReply is required');
   }
@@ -466,6 +487,7 @@ async function rewriteReply({ rawReply, eventSummary, recentMessages, createdByS
     '角色說明：',
     '- [你] = 正在寫這則回覆的人（請從這個視角改寫草稿）',
     '- [對方] = 你的伴侶（事件中的另一方）',
+    ...[genderHint(userGender, '- [你] '), genderHint(partnerGender, '- [對方] ')].filter(Boolean),
     '',
   ];
   if (eventSummary && typeof eventSummary === 'string') {
@@ -895,12 +917,13 @@ const EMOTION_ACCEPTANCE_TOOL_SCHEMA = {
   },
 };
 
-async function generateEmotionAcceptance({ eventSummary, recentMessages, createdBySelf }) {
+async function generateEmotionAcceptance({ eventSummary, recentMessages, createdBySelf, userGender = null, partnerGender = null }) {
   const summaryOwner = createdBySelf ? '你' : '對方';
   const contextLines = [
     '角色說明：',
     '- [你] = 正在寫回覆、想要接住情緒的人',
     '- [對方] = 表達了情緒的伴侶',
+    ...[genderHint(userGender, '- [你] '), genderHint(partnerGender, '- [對方] ')].filter(Boolean),
     '',
   ];
   if (eventSummary && typeof eventSummary === 'string') {

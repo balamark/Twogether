@@ -87,8 +87,9 @@ function buildVersions({ summary, emotions, tags }) {
   const topic = tags[0] && tags[0] !== '誤會' ? `${tags[0]}相關的事` : '剛剛發生的事';
 
   // Deliberately does NOT embed the summary: the summary is the factual record
-  // shown at the top of the event; neutral is a feelings-forward opener message.
-  const neutral = `旁白一下：關於${topic}，剛剛發生了一些狀況，其中一方現在心裡有「${topEmotion}」的感覺，想先把這份心情放在這裡讓你知道。`;
+  // shown at the top of the event; neutral is a feelings-forward opener message
+  // in the user's own first-person voice (never narrator).
+  const neutral = `關於${topic}，剛剛發生了一些狀況，我現在心裡有「${topEmotion}」的感覺，想先把這份心情放在這裡讓你知道。`;
 
   const firm = `我感受到${topEmotion}，主要是因為${topic}。${summary} 我先把這件事提出來放著。`;
 
@@ -97,7 +98,9 @@ function buildVersions({ summary, emotions, tags }) {
   return { neutral, firm, warm };
 }
 
-async function generateIcebreaker(rawText /* , context */) {
+// Second param (gender context) accepted for signature parity with the Claude
+// provider; the mock stays deterministic and ignores it.
+async function generateIcebreaker(rawText /* , { userGender, partnerGender } */) {
   if (typeof rawText !== 'string' || rawText.trim().length === 0) {
     throw new Error('rawText is required');
   }

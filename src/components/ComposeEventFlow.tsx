@@ -23,8 +23,8 @@ interface ComposeEventFlowProps {
 const VERSION_META: { key: EventVersionKey; label: string; desc: string; accent: string }[] = [
   {
     key: 'neutral',
-    label: '第三方中性旁白版',
-    desc: '以第三人稱旁白轉述事件帶來的感受，作為開場訊息，不重複上方簡介。',
+    label: '中性版',
+    desc: '用你自己的口吻，平靜、就事論事地說出事件與感受，作為開場訊息。',
     accent: 'border-petal-sage bg-petal-sage/10',
   },
   {
@@ -49,6 +49,10 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
   // Per-version editable drafts, initialised from the AI originals. Editing one
   // version never clobbers another, so switching radios preserves edits.
   const [drafts, setDrafts] = useState<Record<EventVersionKey, string> | null>(null);
+  // Editable copy of the AI summary — fixable right here, before the event
+  // exists (previously only editable after creation).
+  const [summaryDraft, setSummaryDraft] = useState('');
+  const [editingSummary, setEditingSummary] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,6 +72,8 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
       const p = await apiService.previewIcebreaker(trimmed);
       setPreview(p);
       setDrafts({ ...p.versions });
+      setSummaryDraft(p.summary);
+      setEditingSummary(false);
       setStep('select');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'AI 解析失敗';
@@ -78,6 +84,15 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
 
   const submitEvent = async () => {
     if (!preview) return;
+    const summary = summaryDraft.trim();
+    if (summary.length === 0) {
+      setError('事件簡介不可為空');
+      return;
+    }
+    if (summary.length > 1000) {
+      setError('事件簡介超過 1000 字，請縮短後再送出');
+      return;
+    }
     let openingMessage: string | null = null;
     if (!isPrivate && selected) {
       openingMessage = (drafts?.[selected] ?? preview.versions[selected]).trim();
@@ -95,7 +110,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
     try {
       const event = await apiService.createEvent({
         title: preview.title,
-        summary: preview.summary,
+        summary,
         emotions: preview.emotions,
         tags: preview.tags,
         toxicityFlags: preview.toxicityFlags,
@@ -194,8 +209,49 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
         </div>
 
         <div className="bg-white border border-petal-rule rounded-xl p-3 mb-3" data-testid="compose-event-summary">
-          <div className="text-[11px] text-petal-muted mb-1">事件簡介（雙方都會看到的中性紀錄）</div>
-          <p className="text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">{preview.summary}</p>
+          <div className="flex items-center justify-between mb-1">
+            <div className="text-[11px] text-petal-muted">
+              事件簡介（雙方都會看到的中性紀錄）
+              {summaryDraft.trim() !== preview.summary.trim() && (
+                <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-petal-rose/20 text-petal-ink">已編輯</span>
+              )}
+            </div>
+            {!editingSummary && (
+              <button
+                type="button"
+                data-testid="compose-summary-edit"
+                onClick={() => setEditingSummary(true)}
+                title="編輯事件簡介"
+                className="p-1 rounded text-petal-muted hover:text-petal-ink"
+              >
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          {editingSummary ? (
+            <div>
+              <textarea
+                data-testid="compose-summary-editor"
+                value={summaryDraft}
+                onChange={(e) => setSummaryDraft(e.target.value)}
+                rows={3}
+                maxLength={1000}
+                className="w-full p-2 rounded-xl border border-petal-rule bg-white text-sm text-petal-ink focus:outline-none focus:border-petal-rose-deep resize-y"
+              />
+              <div className="flex justify-end items-center gap-2 mt-1">
+                <span className="text-xs text-petal-muted mr-auto">{summaryDraft.length} / 1000</span>
+                <button
+                  type="button"
+                  onClick={() => setEditingSummary(false)}
+                  className="px-3 py-1 rounded-full bg-petal-ink text-petal-cream text-xs font-medium hover:opacity-90"
+                >
+                  完成
+                </button>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">{summaryDraft}</p>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-2 mb-2">

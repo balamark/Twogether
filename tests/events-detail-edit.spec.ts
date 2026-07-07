@@ -39,7 +39,11 @@ const FAKE_EVENT = {
   emotions: ['失望'],
   tags: ['育兒'],
   toxicity_flags: [],
-  versions: { neutral: '', firm: '', warm: '' },
+  versions: {
+    neutral: '關於接送的事，我心裡有失望的感覺，想先放在這裡讓你知道。',
+    firm: '我感到失望，因為約好的接送計畫沒有實現。',
+    warm: '我感到失望，因為約好的接送計畫沒有實現。等平靜後我願意再聊聊。',
+  },
   selected_version: 'neutral',
   is_private: false,
   status: 'open',
@@ -199,7 +203,16 @@ test.describe('Event detail — post-send editing', () => {
     await expect(page.getByTestId(`event-message-edit-${MY_MESSAGE.id}`)).toBeVisible({ timeout: 10000 });
     await expect(page.getByTestId(`event-message-edit-${PARTNER_MESSAGE.id}`)).toHaveCount(0);
 
+    // The speaker's nickname shows on the card.
+    await expect(page.locator(`text=${FAKE_USER.nickname}`).first()).toBeVisible();
+
     await page.getByTestId(`event-message-edit-${MY_MESSAGE.id}`).click();
+
+    // Editing the seeded opener offers the stored AI versions as quick swaps.
+    await expect(page.getByTestId('event-message-version-firm')).toBeVisible();
+    await page.getByTestId('event-message-version-firm').click();
+    await expect(page.getByTestId('event-message-edit-input')).toHaveValue(FAKE_EVENT.versions.firm);
+
     await page.getByTestId('event-message-edit-input').fill(NEW_CONTENT);
     await page.getByTestId('event-message-edit-save').click();
 

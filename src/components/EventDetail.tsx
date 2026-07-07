@@ -41,6 +41,9 @@ interface EventDetailProps {
   // The viewer's chosen AI 諮商師 (null = default Luma); names the invite
   // button and the counselor preview.
   companionId?: string | null;
+  // Display names for the message cards (who said what).
+  myNickname?: string;
+  partnerNickname?: string;
   onBack: () => void;
   showNotification: (n: NotificationInput) => void;
 }
@@ -75,7 +78,7 @@ function formatTime(iso: string, tz: string) {
   }
 }
 
-export default function EventDetail({ eventId, currentUserId, companionId, onBack, showNotification }: EventDetailProps) {
+export default function EventDetail({ eventId, currentUserId, companionId, myNickname, partnerNickname, onBack, showNotification }: EventDetailProps) {
   const myCompanion = resolveCompanion(companionId);
   const [event, setEvent] = useState<EventRecord | null>(null);
   const [loading, setLoading] = useState(true);
@@ -533,7 +536,11 @@ export default function EventDetail({ eventId, currentUserId, companionId, onBac
           {event.messages.length === 0 && (
             <p className="text-sm text-petal-ink-soft text-center py-4">尚無訊息</p>
           )}
-          {event.messages.map((m) => {
+          {(() => {
+            // The creator's opening message was seeded from one of the three
+            // stored AI versions — when editing it, offer the other versions.
+            const firstHumanMessage = event.messages.find((x) => !x.isAi);
+            return event.messages.map((m) => {
             if (m.isAi) {
               return (
                 <div key={m.id} className="flex justify-center">
@@ -552,6 +559,12 @@ export default function EventDetail({ eventId, currentUserId, companionId, onBac
             }
             const mine = m.senderId === currentUserId;
             const isEditing = editingMessageId === m.id;
+            const speakerName = mine ? (myNickname || '我') : (partnerNickname || '對方');
+            const canSwapVersion =
+              mine &&
+              m.id === firstHumanMessage?.id &&
+              event.createdBy === currentUserId &&
+              Object.values(event.versions || {}).some((v) => (v || '').trim().length > 0);
             return (
               <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                 <div
@@ -569,6 +582,28 @@ export default function EventDetail({ eventId, currentUserId, companionId, onBac
                         maxLength={2000}
                         className="w-full p-2 rounded-xl border border-petal-rule bg-white text-sm text-petal-ink focus:outline-none focus:border-petal-rose-deep resize-y"
                       />
+                      {canSwapVersion && (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                          <span className="text-[10px] text-petal-muted">改用當時的其他版本：</span>
+                          {([
+                            ['neutral', '中性版'],
+                            ['firm', '堅定版'],
+                            ['warm', '善意版'],
+                          ] as const).map(([key, label]) =>
+                            (event.versions[key] || '').trim().length > 0 ? (
+                              <button
+                                key={key}
+                                type="button"
+                                data-testid={`event-message-version-${key}`}
+                                onClick={() => setEditingMessageText(event.versions[key])}
+                                className="text-[11px] px-2 py-0.5 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20"
+                              >
+                                {label}
+                              </button>
+                            ) : null
+                          )}
+                        </div>
+                      )}
                       <div className="flex justify-end gap-2 mt-1.5">
                         <button
                           type="button"
@@ -594,7 +629,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, onBac
                     <>
                       <p className="text-sm text-petal-ink whitespace-pre-wrap">{m.content}</p>
                       <p className="text-[10px] text-petal-muted mt-1 flex items-center gap-1">
-                        <span>{formatTime(m.createdAt, tz)}</span>
+                        <span className="font-medium text-petal-ink-soft">{speakerName}</span>
+                        <span>・{formatTime(m.createdAt, tz)}</span>
                         {m.editedAt && <span>・已編輯</span>}
                         {mine && m.readAt && <span>・已讀</span>}
                         {mine && event.status !== 'resolved' && (
@@ -614,8 +650,28 @@ export default function EventDetail({ eventId, currentUserId, companionId, onBac
                 </div>
               </div>
             );
-          })}
+            });
+          })()}
         </section>
+      )}
+
+      {/* Invite the AI 諮商師 based on the conversation so far — deliberately
+          OUTSIDE the reply composer: it reads the thread history, it doesn't
+          rewrite whatever you're typing below. */}
+      {canSendMessage && (
+        <div className="flex">
+          <button
+            type="button"
+            data-testid="event-ai-counselor-button"
+            onClick={inviteAiCounselor}
+            disabled={aiInviting}
+            className="px-3 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
+            title={`請 ${myCompanion.name} 讀過你們的對話，給一段中立的建議`}
+          >
+            {aiInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
+            <span>請 {myCompanion.name} 加入</span>
+          </button>
+        </div>
       )}
 
       {canSendMessage && (
@@ -631,17 +687,6 @@ export default function EventDetail({ eventId, currentUserId, companionId, onBac
             className="w-full p-2 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y"
           />
           <div className="flex flex-wrap justify-end gap-2 mt-2">
-            <button
-              type="button"
-              data-testid="event-ai-counselor-button"
-              onClick={inviteAiCounselor}
-              disabled={aiInviting}
-              className="px-3 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition mr-auto"
-              title={`請 ${myCompanion.name} 讀過你們的對話，給一段中立的建議`}
-            >
-              {aiInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
-              <span>請 {myCompanion.name} 加入</span>
-            </button>
             <button
               type="button"
               data-testid="event-acceptance-button"

@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const { body, param, query, validationResult } = require('express-validator');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
@@ -110,6 +111,63 @@ async function getUserCompanion(userId) {
   }
 }
 
+// Both partners' genders so AI prompts use the right pronouns (他/她) instead
+// of guessing. Either may be null when unset or unpaired.
+async function getCoupleGenders(userId) {
+  try {
+    const r = await db.query(
+      `SELECT u.gender AS user_gender, p.gender AS partner_gender
+         FROM users u
+         LEFT JOIN couples c ON (c.user1_id = u.id OR c.user2_id = u.id) AND c.user2_id IS NOT NULL
+         LEFT JOIN users p ON p.id = CASE WHEN c.user1_id = u.id THEN c.user2_id ELSE c.user1_id END
+        WHERE u.id = $1`,
+      [userId]
+    );
+    return {
+      userGender: r.rows[0]?.user_gender || null,
+      partnerGender: r.rows[0]?.partner_gender || null,
+    };
+  } catch (err) {
+    logWarn('getCoupleGenders failed', { err: err.message });
+    return { userGender: null, partnerGender: null };
+  }
+}
+
+// --- Per-event AI preview cache -------------------------------------------
+// Same input (thread state + persona) → same stored response, no LLM re-call
+// and no hit against the user's daily AI budget. New messages change the hash.
+
+function aiCacheHash(parts) {
+  return crypto.createHash('sha256').update(JSON.stringify(parts)).digest('hex');
+}
+
+async function getAiCache(eventId, userId, kind, inputHash) {
+  try {
+    const r = await db.query(
+      `SELECT response FROM event_ai_cache
+        WHERE event_id = $1 AND user_id = $2 AND kind = $3 AND input_hash = $4`,
+      [eventId, userId, kind, inputHash]
+    );
+    return r.rows[0]?.response || null;
+  } catch (err) {
+    logWarn('getAiCache failed', { kind, err: err.message });
+    return null;
+  }
+}
+
+async function saveAiCache(eventId, userId, kind, inputHash, response) {
+  try {
+    await db.query(
+      `INSERT INTO event_ai_cache (event_id, user_id, kind, input_hash, response)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (event_id, user_id, kind, input_hash) DO UPDATE SET response = EXCLUDED.response`,
+      [eventId, userId, kind, inputHash, JSON.stringify(response)]
+    );
+  } catch (err) {
+    logWarn('saveAiCache failed', { kind, err: err.message });
+  }
+}
+
 async function getCoupleForUser(userId) {
   const result = await db.query(
     `SELECT c.id AS couple_id,
@@ -216,7 +274,8 @@ router.post(
         return res.status(limitCheck.status).json(limitCheck.body);
       }
 
-      const preview = await llmService.generateIcebreaker(rawText);
+      const genders = await getCoupleGenders(userId);
+      const preview = await llmService.generateIcebreaker(rawText, genders);
       const meta = preview._meta;
       delete preview._meta;
 
@@ -788,12 +847,14 @@ router.post(
       }));
 
       const createdBySelf = access.event.created_by === userId;
+      const genders = await getCoupleGenders(userId);
 
       const preview = await llmService.rewriteReply({
         rawReply,
         eventSummary: access.event.summary,
         recentMessages,
         createdBySelf,
+        ...genders,
       });
       const meta = preview._meta;
       delete preview._meta;
@@ -845,15 +906,6 @@ router.post(
       const userId = req.user.id;
       logInfo('events.emotion_acceptance.input', { userId, eventId: req.params.id });
 
-      // Shares the daily AI budget with the icebreaker (both hit the paid LLM).
-      const { tier, limit } = await resolveAiLimit(userId);
-      const usedToday = await countTodayAiUsage(userId);
-      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
-      if (!limitCheck.ok) {
-        logInfo('events.emotion_acceptance.limit', { userId, used: usedToday, limit, tier, blocked: true });
-        return res.status(limitCheck.status).json(limitCheck.body);
-      }
-
       const recent = await db.query(
         `SELECT sender_id, content
            FROM event_messages
@@ -868,11 +920,31 @@ router.post(
       }));
 
       const createdBySelf = access.event.created_by === userId;
+      const genders = await getCoupleGenders(userId);
+
+      // Cache first: an unchanged thread reuses the stored coaching for free —
+      // no LLM tokens, no hit against the daily AI budget.
+      const inputHash = aiCacheHash(['acceptance_v1', access.event.summary, recentMessages, createdBySelf, genders]);
+      const cached = await getAiCache(req.params.id, userId, 'emotion_acceptance', inputHash);
+      if (cached) {
+        logInfo('events.emotion_acceptance.cache_hit', { userId, eventId: req.params.id });
+        return res.json({ success: true, preview: cached, cached: true });
+      }
+
+      // Shares the daily AI budget with the icebreaker (both hit the paid LLM).
+      const { tier, limit } = await resolveAiLimit(userId);
+      const usedToday = await countTodayAiUsage(userId);
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      if (!limitCheck.ok) {
+        logInfo('events.emotion_acceptance.limit', { userId, used: usedToday, limit, tier, blocked: true });
+        return res.status(limitCheck.status).json(limitCheck.body);
+      }
 
       const preview = await llmService.generateEmotionAcceptance({
         eventSummary: access.event.summary,
         recentMessages,
         createdBySelf,
+        ...genders,
       });
       const meta = preview._meta;
       delete preview._meta;
@@ -887,6 +959,7 @@ router.post(
       });
 
       await recordAiUsage(userId, 'emotion_acceptance', access.event.summary, meta);
+      await saveAiCache(req.params.id, userId, 'emotion_acceptance', inputHash, preview);
       res.json({ success: true, preview });
     } catch (err) {
       logError('Emotion acceptance preview failed', { err: err.message, stack: err.stack });
@@ -908,13 +981,6 @@ router.post('/:id/ai-comment/preview', [param('id').isUUID()], async (req, res) 
     }
 
     const userId = req.user.id;
-    const { tier, limit } = await resolveAiLimit(userId);
-    const usedToday = await countTodayAiUsage(userId);
-    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
-    if (!limitCheck.ok) {
-      logInfo('events.ai_comment.limit', { userId, eventId: req.params.id, used: usedToday, limit, tier, blocked: true });
-      return res.status(limitCheck.status).json(limitCheck.body);
-    }
 
     const msgs = await db.query(
       `SELECT m.content, m.is_ai, u.nickname AS author_nickname
@@ -931,6 +997,24 @@ router.post('/:id/ai-comment/preview', [param('id').isUUID()], async (req, res) 
     }));
 
     const companion = await getUserCompanion(userId);
+
+    // Cache first: same thread + same persona → reuse the stored comment for
+    // free (no LLM tokens, no daily-budget hit).
+    const inputHash = aiCacheHash(['counselor_v1', access.event.summary, replies, companion.id]);
+    const cached = await getAiCache(req.params.id, userId, 'event_counselor', inputHash);
+    if (cached) {
+      logInfo('events.ai_comment.cache_hit', { userId, eventId: req.params.id, companion: companion.id });
+      return res.json({ success: true, comment: cached.comment, cached: true });
+    }
+
+    const { tier, limit } = await resolveAiLimit(userId);
+    const usedToday = await countTodayAiUsage(userId);
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    if (!limitCheck.ok) {
+      logInfo('events.ai_comment.limit', { userId, eventId: req.params.id, used: usedToday, limit, tier, blocked: true });
+      return res.status(limitCheck.status).json(limitCheck.body);
+    }
+
     logInfo('events.ai_comment.preview', { userId, eventId: req.params.id, replyCount: replies.length, companion: companion.id });
 
     const result = await llmService.generateWallCounselorComment({
@@ -953,6 +1037,7 @@ router.post('/:id/ai-comment/preview', [param('id').isUUID()], async (req, res) 
     });
 
     await recordAiUsage(userId, 'event_counselor', access.event.summary, meta);
+    await saveAiCache(req.params.id, userId, 'event_counselor', inputHash, { comment: result.comment });
 
     res.json({ success: true, comment: result.comment });
   } catch (err) {
