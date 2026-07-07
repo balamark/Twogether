@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, StickyNote, MessageSquareHeart, Trash2, Pencil, HeartHandshake, Crown } from 'lucide-react';
+import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, StickyNote, Trash2, Pencil, HeartHandshake, Crown } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import ActivityView from './components/ActivityView';
 import UpgradeView, { BillingResultView } from './components/UpgradeView';
@@ -1537,14 +1537,21 @@ const LoveTimeApp = () => {
         setTotalCoins(prev => prev + coinsEarned);
       }
       
-      // Show success notification
+      // Show success notification. First-success nudge (playbook P1-3): point
+      // at the natural next action once, then stay quiet.
+      const firstRecord = !localStorage.getItem('nudgeFirstRecordDone');
+      if (firstRecord) localStorage.setItem('nudgeFirstRecordDone', 'true');
       const { badgeProgress } = checkBadgeProgress();
       showNotification({
         type: 'success',
         title: '記錄成功！',
-        message: badgeProgress,
+        message: firstRecord && !partnerConnected
+          ? `${badgeProgress} 邀請另一半配對後，這些記錄會自動和 TA 共享。`
+          : firstRecord
+            ? `${badgeProgress} 月曆會慢慢看見你們的節奏；也可以到「我們的牆」留句想說的話。`
+            : badgeProgress,
         coins: coinsEarned,
-        duration: 6000
+        duration: firstRecord ? 9000 : 6000
       });
     } catch (error: unknown) {
       console.error('Error adding intimate record:', error);
@@ -1981,8 +1988,9 @@ const LoveTimeApp = () => {
 
   const navItems = [
     { id: 'record', label: '記錄時光', icon: Calendar },
-    { id: 'conflict', label: '和諧相處', icon: MessageCircle },
-    { id: 'events', label: '衝突事件', icon: MessageSquareHeart },
+    // 好好說話 merges the old 和諧相處 + 衝突事件 (playbook §6 Q1): one
+    // positively-named tab, sub-tabs inside.
+    { id: 'communicate', label: '好好說話', icon: MessageCircle },
     { id: 'roleplay', label: '角色扮演', icon: Play },
     { id: 'wall', label: '我們的牆', icon: StickyNote },
     { id: 'therapists', label: '心理諮商', icon: HeartHandshake },
@@ -2090,27 +2098,69 @@ const LoveTimeApp = () => {
         setTotalCoins={setTotalCoins}
         showNotification={showNotification}
       />;
-      case 'conflict': return (
-        <ConflictView
-          showNotification={showNotification}
-          partnerConnected={partnerConnected}
-          onNavigate={setCurrentView}
-        />
-      );
-      case 'events': return (
-        <EventsView
-          authState={authState}
-          showNotification={showNotification}
-          initialEventId={pendingEventId}
-          onInitialEventConsumed={() => setPendingEventId(null)}
-          onInvitePartner={() => {
-            localStorage.removeItem('pairingPromptDismissed');
-            setPairingPromptDismissed(false);
-            setShowPairingPrompt(true);
-          }}
-          onNavigate={setCurrentView}
-        />
-      );
+      // 好好說話：merged tab (playbook §6 Q1). Two sub-views share one nav
+      // slot: 說開一件事 (the old 衝突事件) and 接住情緒與檢查 (the old
+      // 和諧相處). 'events' / 'conflict' stay valid view ids so deep links
+      // (notification taps, reload persistence) keep working.
+      case 'communicate':
+      case 'conflict':
+      case 'events': {
+        const communicateSub = currentView === 'conflict' ? 'harmony' : 'events';
+        return (
+          <div>
+            <div className="max-w-4xl mx-auto px-4 md:px-6 pt-2 flex gap-2" role="tablist" aria-label="好好說話">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={communicateSub === 'events'}
+                data-testid="communicate-subtab-events"
+                onClick={() => setCurrentView('events')}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
+                  communicateSub === 'events'
+                    ? 'bg-petal-ink text-petal-cream border-petal-ink'
+                    : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
+                }`}
+              >
+                說開一件事
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={communicateSub === 'harmony'}
+                data-testid="communicate-subtab-harmony"
+                onClick={() => setCurrentView('conflict')}
+                className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
+                  communicateSub === 'harmony'
+                    ? 'bg-petal-ink text-petal-cream border-petal-ink'
+                    : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
+                }`}
+              >
+                接住情緒・檢查
+              </button>
+            </div>
+            {communicateSub === 'harmony' ? (
+              <ConflictView
+                showNotification={showNotification}
+                partnerConnected={partnerConnected}
+                onNavigate={setCurrentView}
+              />
+            ) : (
+              <EventsView
+                authState={authState}
+                showNotification={showNotification}
+                initialEventId={pendingEventId}
+                onInitialEventConsumed={() => setPendingEventId(null)}
+                onInvitePartner={() => {
+                  localStorage.removeItem('pairingPromptDismissed');
+                  setPairingPromptDismissed(false);
+                  setShowPairingPrompt(true);
+                }}
+                onNavigate={setCurrentView}
+              />
+            )}
+          </div>
+        );
+      }
       case 'roleplay': return <RoleplayView
         defaultRoleplayScripts={defaultRoleplayScripts}
         customScripts={customScripts}
@@ -2434,7 +2484,9 @@ const LoveTimeApp = () => {
         <div className="flex flex-wrap justify-center gap-1.5 mb-10">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = currentView === item.id;
+            const isActive =
+              currentView === item.id ||
+              (item.id === 'communicate' && (currentView === 'events' || currentView === 'conflict'));
             return (
               <button
                 key={item.id}

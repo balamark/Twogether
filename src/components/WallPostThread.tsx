@@ -4,6 +4,8 @@ import { apiService, type WallReply } from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatRelativeOrDate } from '../utils/datetime';
 import { companionName, resolveCompanion } from '../utils/aiCompanions';
+import { useAiQuota } from '../hooks/useAiQuota';
+import AiQuotaHint from './AiQuotaHint';
 
 interface WallPostThreadProps {
   postId: string;
@@ -28,6 +30,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
   onNotify,
 }) => {
   const myCompanion = resolveCompanion(companionId);
+  const { quota, refresh: refreshQuota } = useAiQuota();
   const [replies, setReplies] = useState<WallReply[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState('');
@@ -111,6 +114,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
         onError?.(message);
       }
     } finally {
+      refreshQuota();
       setAiLoading(false);
     }
   };
@@ -215,6 +219,11 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
             <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
             {aiLoading ? `${myCompanion.name} 思考中⋯` : `請 ${myCompanion.name} 看看`}
           </button>
+        ) : null}
+        {!aiPreview ? (
+          <div className="mt-1.5">
+            <AiQuotaHint quota={quota} />
+          </div>
         ) : (
           <div
             className="border border-petal-rose-deep/30 bg-petal-cream-2 rounded-md p-3 space-y-2"

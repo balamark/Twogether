@@ -138,7 +138,7 @@ async function seedAuthAndBaseRoutes(page: import('@playwright/test').Page, even
 async function openDetail(page: import('@playwright/test').Page, title: string) {
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
-  await page.locator('button:has-text("事件")').first().click();
+  await page.getByTestId('nav-tab-communicate').click();
   await page.locator(`text=${title}`).first().click();
 }
 

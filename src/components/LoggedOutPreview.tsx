@@ -661,7 +661,9 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scr
     );
   }
 
-  const config = PREVIEWS[view];
+  // 好好說話 (merged tab) previews the conflict-repair flywheel: it's the
+  // heart of the product and covers both sub-tabs' value.
+  const config = view === 'communicate' ? PREVIEWS.events : PREVIEWS[view];
 
   // Unknown view → friendly generic welcome (keeps old behaviour as a fallback).
   if (!config) {

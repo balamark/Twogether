@@ -102,7 +102,7 @@ test.describe('Compose event — summary at top + editable opener', () => {
   const walkToSelectStep = async (page: import('@playwright/test').Page) => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.locator('button:has-text("事件")').first().click();
+    await page.getByTestId('nav-tab-communicate').click();
     await page.locator('button:has-text("建立事件")').first().click();
     await page.getByTestId('compose-raw-input').fill('他今天早上又沒起床送小孩，超級失望');
     await page.locator('button:has-text("讓 AI 整理")').click();

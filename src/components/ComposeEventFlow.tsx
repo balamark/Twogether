@@ -4,6 +4,8 @@ import apiService, {
   type IcebreakerPreview,
   type EventVersionKey,
 } from '../services/api';
+import { useAiQuota } from '../hooks/useAiQuota';
+import AiQuotaHint from './AiQuotaHint';
 
 type Step = 'input' | 'loading' | 'select' | 'submitting';
 
@@ -43,6 +45,7 @@ const VERSION_META: { key: EventVersionKey; label: string; desc: string; accent:
 
 export default function ComposeEventFlow({ onCreated, onCancel, showNotification }: ComposeEventFlowProps) {
   const [step, setStep] = useState<Step>('input');
+  const { quota, refresh: refreshQuota } = useAiQuota();
   const [rawText, setRawText] = useState('');
   const [preview, setPreview] = useState<IcebreakerPreview | null>(null);
   const [selected, setSelected] = useState<EventVersionKey | null>('neutral');
@@ -79,6 +82,8 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
       const msg = err instanceof Error ? err.message : 'AI 解析失敗';
       setError(msg);
       setStep('input');
+    } finally {
+      refreshQuota();
     }
   };
 
@@ -119,10 +124,19 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
         openingMessage,
         isPrivate,
       });
+      // First-success nudge (docs/UX_PLAYBOOK.md P1-3): point at the natural
+      // next action once, then stay quiet.
+      const firstEvent = !localStorage.getItem('nudgeFirstEventDone');
+      if (firstEvent) localStorage.setItem('nudgeFirstEventDone', 'true');
       showNotification({
         type: 'success',
         title: '事件已建立',
-        message: isPrivate ? '已儲存為私人事件' : '已送出選定版本給對方',
+        message: isPrivate
+          ? '已儲存為私人事件'
+          : firstEvent
+            ? '已送出給對方。等待回覆時，可以打開事件試試「如何接住TA的情緒」，先練習怎麼回應。'
+            : '已送出選定版本給對方',
+        duration: firstEvent ? 9000 : undefined,
       });
       onCreated(event.id);
     } catch (err) {
@@ -165,6 +179,9 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
           <div className="flex justify-between text-xs text-petal-muted mt-1">
             <span>{error && <span className="text-red-500">{error}</span>}</span>
             <span>{rawText.length} / 4000</span>
+          </div>
+          <div className="mt-1">
+            <AiQuotaHint quota={quota} />
           </div>
         </div>
 

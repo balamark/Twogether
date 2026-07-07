@@ -27,6 +27,8 @@ import { useScrollLock } from '../hooks/useScrollLock';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
 import { companionName, resolveCompanion } from '../utils/aiCompanions';
+import { useAiQuota } from '../hooks/useAiQuota';
+import AiQuotaHint from './AiQuotaHint';
 
 interface NotificationInput {
   type: 'success' | 'error' | 'info' | 'warning';
@@ -80,6 +82,7 @@ function formatTime(iso: string, tz: string) {
 
 export default function EventDetail({ eventId, currentUserId, companionId, myNickname, partnerNickname, onBack, showNotification }: EventDetailProps) {
   const myCompanion = resolveCompanion(companionId);
+  const { quota, refresh: refreshQuota } = useAiQuota();
   const [event, setEvent] = useState<EventRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -116,13 +119,24 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       const preview = await apiService.previewReplyRewrite(eventId, draft);
       setRewritePreview(preview);
     } catch (err) {
-      showNotification({
-        type: 'error',
-        title: 'AI 改寫失敗',
-        message: err instanceof Error ? err.message : '請稍後再試',
-      });
+      // A reached daily quota is an expected state, not a red failure.
+      const code = (err as { error_code?: string })?.error_code;
+      if (code === 'AI_DAILY_LIMIT_REACHED') {
+        showNotification({
+          type: 'warning',
+          title: '今日 AI 次數已用完',
+          message: '明天會自動補上；升級 Premium 可提高每日上限。你也可以直接送出自己寫的版本。',
+        });
+      } else {
+        showNotification({
+          type: 'error',
+          title: 'AI 改寫失敗',
+          message: err instanceof Error ? err.message : '請稍後再試',
+        });
+      }
     } finally {
       setRewriting(false);
+      refreshQuota();
     }
   };
 
@@ -156,6 +170,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       }
     } finally {
       setAccepting(false);
+      refreshQuota();
     }
   };
 
@@ -208,13 +223,23 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       const comment = await apiService.previewEventAiComment(eventId);
       setAiPreview(comment);
     } catch (err) {
-      showNotification({
-        type: 'error',
-        title: 'AI 諮商師暫時無法回應',
-        message: err instanceof Error ? err.message : '請稍後再試',
-      });
+      const code = (err as { error_code?: string })?.error_code;
+      if (code === 'AI_DAILY_LIMIT_REACHED') {
+        showNotification({
+          type: 'warning',
+          title: '今日 AI 次數已用完',
+          message: `明天會自動補上；升級 Premium 可提高每日上限。${myCompanion.name} 明天還會在。`,
+        });
+      } else {
+        showNotification({
+          type: 'error',
+          title: 'AI 諮商師暫時無法回應',
+          message: err instanceof Error ? err.message : '請稍後再試',
+        });
+      }
     } finally {
       setAiInviting(false);
+      refreshQuota();
     }
   };
 
@@ -686,7 +711,10 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             maxLength={2000}
             className="w-full p-2 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y"
           />
-          <div className="flex flex-wrap justify-end gap-2 mt-2">
+          <div className="flex justify-end mt-1.5">
+            <AiQuotaHint quota={quota} />
+          </div>
+          <div className="flex flex-wrap justify-end gap-2 mt-1">
             <button
               type="button"
               data-testid="event-acceptance-button"

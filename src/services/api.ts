@@ -345,6 +345,13 @@ export interface EmotionAcceptancePreview {
   toxicityFlags: string[];
 }
 
+export interface AiUsageToday {
+  tier: string;
+  limit: number;
+  used: number;
+  remaining: number;
+}
+
 export interface EventMessage {
   id: string;
   eventId: string;
@@ -1523,6 +1530,13 @@ class ApiService {
   async getCurrentUser(): Promise<unknown> {
     const response = await apiClient.get('/auth/me');
     return response.data?.user;
+  }
+
+  // Today's shared AI budget (icebreaker / rewrite / acceptance / counselor
+  // all draw from the same pool). Powers the「今日剩 N 次」hint.
+  async getAiUsageToday(): Promise<AiUsageToday> {
+    const response = await apiClient.get('/ai-usage/today');
+    return response.data.usage as AiUsageToday;
   }
 
   // Token validation
