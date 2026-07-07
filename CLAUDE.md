@@ -63,3 +63,18 @@ change — don't ship the happy path alone.
 - **Add logging for the new path.** Log attempts and outcomes server-side via
   `lib/logger` (structured `logInfo`/`logWarn`/`logError`) so Cloud Logging shows
   the feature being used, not just when it errors.
+
+## UX conventions (every UI change)
+
+Read `docs/UX_PLAYBOOK.md` before UI work — it holds the binding UX rules and
+the decided product stances (merged conflict tabs, solo-mode before pairing,
+FAQ+(?) help system, visible AI quota). Non-negotiables from it:
+
+- **Empty states are mini-onboarding**: value line (for the relationship, not
+  the feature) + primary CTA + sample. Never a bare "沒有資料" sentence.
+- **Gates are three-part**: why blocked + what you CAN do + a CTA. Applies to
+  unpaired, quota, and unverified states alike.
+- **Max 6 main nav tabs**; new features go into existing tabs or the user menu.
+  Tab names must pass the elevator test or carry a (?) hint.
+- **One blocking modal at a time**; priority order lives in the playbook §R4.
+  Every modal needs a "稍後再說" that doesn't re-fire the same session.
