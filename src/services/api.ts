@@ -352,6 +352,71 @@ export interface AiUsageToday {
   remaining: number;
 }
 
+// 真實故事 (Relationship Wisdom Archive)
+export type StoryVoteType = 'helpful' | 'resonate' | 'repair_worked';
+
+export interface StoryVoteCounts {
+  helpful: number;
+  resonate: number;
+  repair_worked: number;
+}
+
+export interface StorySummary {
+  id: string;
+  title: string;
+  preview: string;
+  tags: string[];
+  authorName: string;
+  votes: StoryVoteCounts;
+  commentCount: number;
+  viewCount: number;
+  createdAt: string;
+  status?: string;
+}
+
+export interface StorySections {
+  context: string;
+  happened: string;
+  impact: string;
+  tried: string;
+  repair: string;
+  now: string;
+}
+
+export interface StoryInsight {
+  title: string;
+  body: string;
+}
+
+export interface StoryComment {
+  id: string;
+  body: string;
+  authorName: string;
+  isMine: boolean;
+  createdAt: string;
+}
+
+export interface StoryDetailData {
+  id: string;
+  title: string;
+  sections: StorySections;
+  tags: string[];
+  authorName: string;
+  isMine: boolean;
+  status: string;
+  aiInsights: { insights: StoryInsight[]; generatedAt: string } | null;
+  votes: StoryVoteCounts;
+  myVotes: StoryVoteType[];
+  comments: StoryComment[];
+  viewCount: number;
+  createdAt: string;
+}
+
+export interface MyStoriesResult {
+  stories: StorySummary[];
+  totals: { reads: number; votes: number; comments: number };
+}
+
 export interface EventMessage {
   id: string;
   eventId: string;
@@ -1537,6 +1602,59 @@ class ApiService {
   async getAiUsageToday(): Promise<AiUsageToday> {
     const response = await apiClient.get('/ai-usage/today');
     return response.data.usage as AiUsageToday;
+  }
+
+  // --- 真實故事 (Relationship Wisdom Archive) ---
+
+  async getStories(params: {
+    q?: string;
+    tag?: string;
+    sort?: 'latest' | 'helpful' | 'most_read';
+    page?: number;
+  } = {}): Promise<{ stories: StorySummary[]; hasMore: boolean; featured?: StorySummary[] }> {
+    const response = await apiClient.get('/stories', { params });
+    return response.data;
+  }
+
+  async getStory(id: string): Promise<StoryDetailData> {
+    const response = await apiClient.get(`/stories/${id}`);
+    return response.data.story as StoryDetailData;
+  }
+
+  async createStory(input: {
+    title: string;
+    tags: string[];
+    sections: StorySections;
+  }): Promise<{ story: { id: string; title: string }; aiInsights: { insights: StoryInsight[] } | null; aiSkipped: boolean }> {
+    const response = await apiClient.post('/stories', input);
+    return response.data;
+  }
+
+  async voteStory(id: string, voteType: StoryVoteType): Promise<{ voted: boolean; counts: StoryVoteCounts }> {
+    const response = await apiClient.post(`/stories/${id}/vote`, { voteType });
+    return response.data;
+  }
+
+  async commentStory(id: string, body: string): Promise<StoryComment> {
+    const response = await apiClient.post(`/stories/${id}/comments`, { body });
+    return response.data.comment as StoryComment;
+  }
+
+  async deleteStory(id: string): Promise<void> {
+    await apiClient.delete(`/stories/${id}`);
+  }
+
+  async getMyStories(): Promise<MyStoriesResult> {
+    const response = await apiClient.get('/stories/mine');
+    return response.data as MyStoriesResult;
+  }
+
+  async reportStory(id: string, reason: string, detail?: string): Promise<void> {
+    await apiClient.post(`/stories/${id}/report`, { reason, detail });
+  }
+
+  async reportStoryComment(id: string, reason: string, detail?: string): Promise<void> {
+    await apiClient.post(`/stories/comments/${id}/report`, { reason, detail });
   }
 
   // Token validation

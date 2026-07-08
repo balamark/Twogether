@@ -28,6 +28,7 @@ const wallRoutes = require('./routes/wall');
 const eventRoutes = require('./routes/events');
 const aiCompanionRoutes = require('./routes/ai-companions');
 const aiUsageRoutes = require('./routes/ai-usage');
+const storyRoutes = require('./routes/stories');
 const scriptFavoritesRoutes = require('./routes/script-favorites');
 const marketplaceRoutes = require('./routes/marketplace');
 const billingRoutes = require('./routes/billing');
@@ -187,6 +188,8 @@ app.use('/api/wall', wallRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/ai-companions', aiCompanionRoutes);
 app.use('/api/ai-usage', aiUsageRoutes);
+app.use('/api/stories', storyRoutes.router);
+app.use('/api/admin/stories', adminAuth, storyRoutes.adminRouter);
 app.use('/api/script-favorites', scriptFavoritesRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 // Billing: /status + /checkout are JWT-protected inside the router; the

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, StickyNote, Trash2, Pencil, HeartHandshake, Crown } from 'lucide-react';
+import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, StickyNote, Trash2, Pencil, HeartHandshake, Crown, BookOpen } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import ActivityView from './components/ActivityView';
 import UpgradeView, { BillingResultView } from './components/UpgradeView';
@@ -30,6 +30,7 @@ import PairingInvitationHandler from './components/PairingInvitationHandler';
 import AiCompanionOnboarding from './components/AiCompanionPicker';
 import GettingStartedCard from './components/GettingStartedCard';
 import HelpView from './components/HelpView';
+import StoriesView from './components/StoriesView';
 import { resolveCompanion } from './utils/aiCompanions';
 import { apiService, getTokenExpiry, clearAuthStorage } from './services/api';
 import type { CycleRecord } from './services/api';
@@ -172,6 +173,9 @@ interface User {
   // Chosen AI 諮商師 companion id (e.g. 'luma'); null/undefined = not picked
   // yet, which triggers the one-time onboarding picker.
   selected_therapist?: string | null;
+  // Public-share anonymity preference (署名 vs 匿名) — drives the story
+  // compose flow's anonymity notice; the server snapshots the real value.
+  public_share_show_nickname?: boolean;
   createdAt: string;
 }
 
@@ -437,8 +441,8 @@ export interface PositionSuggestion {
 const VIEW_STORAGE_KEY = 'tw:lastView';
 const PERSISTED_VIEWS = new Set([
   'record', 'achievements', 'conflict', 'events', 'roleplay', 'wall',
-  'therapists', 'shop', 'journey', 'intimacy-history', 'settings', 'activity',
-  'feedback', 'love-language', 'upgrade', 'pricing', 'foreplay', 'games',
+  'therapists', 'stories', 'shop', 'journey', 'intimacy-history', 'settings', 'activity',
+  'feedback', 'love-language', 'upgrade', 'pricing', 'foreplay', 'games', 'communicate', 'help',
 ]);
 
 const LoveTimeApp = () => {
@@ -734,6 +738,7 @@ const LoveTimeApp = () => {
         cycle_tracking_enabled?: boolean;
         email_verified?: boolean;
         selected_therapist?: string | null;
+        public_share_show_nickname?: boolean;
         created_at?: string;
       };
 
@@ -748,6 +753,7 @@ const LoveTimeApp = () => {
         cycle_tracking_enabled: userData.cycle_tracking_enabled,
         email_verified: userData.email_verified,
         selected_therapist: userData.selected_therapist ?? null,
+        public_share_show_nickname: userData.public_share_show_nickname,
         partnerCode: generatePartnerCode(),
         createdAt: userData.created_at || new Date().toISOString()
       };
@@ -1993,6 +1999,9 @@ const LoveTimeApp = () => {
     { id: 'communicate', label: '好好說話', icon: MessageCircle },
     { id: 'roleplay', label: '角色扮演', icon: Play },
     { id: 'wall', label: '我們的牆', icon: StickyNote },
+    // 真實故事: the public community surface (wisdom archive + 公開問答).
+    // Takes the last main-tab slot (playbook R3 cap = 6).
+    { id: 'stories', label: '真實故事', icon: BookOpen },
     { id: 'therapists', label: '心理諮商', icon: HeartHandshake },
     // Pricing is a sales surface for visitors; signed-in users upgrade via the
     // dedicated 'upgrade' view instead, so this tab is logged-out only.
@@ -2020,6 +2029,16 @@ const LoveTimeApp = () => {
         // Therapist directory is browseable (and applicable) while logged out;
         // booking a consultation prompts for login inside the modal.
         case 'therapists': return <TherapistsView authState={authState} showNotification={showNotification} />;
+        // 真實故事 renders the real view logged-out too (it IS the public
+        // growth surface); write actions prompt sign-in.
+        case 'stories': return (
+          <StoriesView
+            authState={authState}
+            showNotification={showNotification}
+            setShowAuthModal={setShowAuthModal}
+            onFindTherapist={() => setCurrentView('therapists')}
+          />
+        );
         // Each nav tab previews its own feature (read-only) instead of all
         // falling through to one generic login wall. See LoggedOutPreview.
         default: return <LoggedOutPreview view={currentView} onSignUp={() => setShowAuthModal(true)} scripts={defaultRoleplayScripts} />;
@@ -2219,6 +2238,14 @@ const LoveTimeApp = () => {
       />;
       case 'activity': return <ActivityView showNotification={showNotification} />;
       case 'help': return <HelpView onFeedback={() => setCurrentView('feedback')} />;
+      case 'stories': return (
+        <StoriesView
+          authState={authState}
+          showNotification={showNotification}
+          setShowAuthModal={setShowAuthModal}
+          onFindTherapist={() => setCurrentView('therapists')}
+        />
+      );
       case 'intimacy-history': return (
         <IntimacyRequestsHistory
           authState={authState}

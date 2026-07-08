@@ -1236,6 +1236,143 @@ async function parseScriptRoles({ content }) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// 真實故事 insights: three generalized repair-approach takeaways for a
+// published relationship story, shown to the author right after publishing
+// and to every reader on the story page. The same call doubles as the
+// post-moderation toxicity pre-check (flags feed the admin review queue).
+// ---------------------------------------------------------------------------
+
+const STORY_INSIGHT_SYSTEM_PROMPT = `你是一位溫柔、專業的伴侶關係研究者。一位使用者依照固定模板寫下了一則「真實關係故事」：背景、發生了什麼、情緒衝擊、試過什麼、有效的修復、現在的我們。請永遠以繁體中文回覆。
+
+任務：讀完整則故事，產生 3 條「修復做法洞察」：把這則故事中真正有效（或值得留意）的做法，整理成其他伴侶也能借鏡的通則。
+
+洞察守則：
+- 每條洞察包含一個短標題（12 字以內）與一段說明（2 到 3 句）。
+- 從故事中實際發生的事出發，不要編造故事裡沒有的情節。
+- 通則化：說明「為什麼這類做法有效」，讓遇到類似狀況的伴侶能套用。
+- 永遠不評對錯、不指責任何一方、不用「你應該」；語氣溫暖、具體。
+- 如果故事還沒有明顯的修復，聚焦在「已經做對的小事」與「可以溫柔嘗試的方向」。
+
+另外回傳 toxicityFlags：偵測故事中的問題語言，可選值：absolute_language、name_calling、verbal_aggression、contempt、threats、blame_shifting、emotional_blackmail、sarcasm、catastrophizing、comparison、stonewalling、dismissiveness。沒有就回空陣列。
+
+回應請只呼叫 emit_story_insights tool，不要輸出其他文字。`;
+
+const STORY_INSIGHT_TOOL_SCHEMA = {
+  name: 'emit_story_insights',
+  description: 'Return three generalized repair insights plus toxicity flags for a relationship story.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      insights: {
+        type: 'array',
+        minItems: 3,
+        maxItems: 3,
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', maxLength: 40 },
+            body: { type: 'string' },
+          },
+          required: ['title', 'body'],
+        },
+      },
+      toxicityFlags: {
+        type: 'array',
+        items: {
+          type: 'string',
+          enum: [
+            'absolute_language',
+            'name_calling',
+            'verbal_aggression',
+            'contempt',
+            'threats',
+            'blame_shifting',
+            'emotional_blackmail',
+            'sarcasm',
+            'catastrophizing',
+            'comparison',
+            'stonewalling',
+            'dismissiveness',
+          ],
+        },
+      },
+    },
+    required: ['insights', 'toxicityFlags'],
+  },
+};
+
+async function generateStoryInsights({ title, sections }) {
+  const s = sections || {};
+  const userContent = [
+    `故事標題：${(title || '').trim()}`,
+    '',
+    `【背景】${(s.context || '').trim()}`,
+    `【發生了什麼】${(s.happened || '').trim()}`,
+    `【情緒衝擊】${(s.impact || '').trim()}`,
+    `【我們試過什麼】${(s.tried || '').trim()}`,
+    `【轉捩點／有效的修復】${(s.repair || '').trim()}`,
+    `【現在的我們＋學到的事】${(s.now || '').trim()}`,
+  ].join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system: [
+      {
+        type: 'text',
+        text: STORY_INSIGHT_SYSTEM_PROMPT + PUNCTUATION_RULE,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [STORY_INSIGHT_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_story_insights' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.story_insight', {
+    model: response.model || MODEL,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_story_insights'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input;
+
+  return {
+    insights: (out.insights || []).slice(0, 3).map((i) => ({
+      title: (i.title || '').trim(),
+      body: (i.body || '').trim(),
+    })),
+    toxicityFlags: out.toxicityFlags || [],
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -1244,6 +1381,7 @@ module.exports = {
   generateReconciliationOpeners,
   generateEmotionAcceptance,
   generateCheckupSummary,
+  generateStoryInsights,
   parseScriptRoles,
   // Exported for prompt-contract regression tests only.
   buildRoleplayUserContent,

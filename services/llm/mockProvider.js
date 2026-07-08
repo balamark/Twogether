@@ -401,6 +401,42 @@ async function parseScriptRoles({ content }) {
   };
 }
 
+// Deterministic story insights: fixed templates parameterized by title so e2e
+// assertions are stable; toxicity flags reuse the shared lexical detector.
+async function generateStoryInsights({ title, sections }) {
+  const s = sections || {};
+  const allText = [s.context, s.happened, s.impact, s.tried, s.repair, s.now]
+    .map((t) => (t || '').toString())
+    .join('\n');
+  const toxicityFlags = detectToxicity(allText);
+  const t = (title || '你們的故事').toString().trim();
+
+  return {
+    insights: [
+      {
+        title: '先接住情緒再談事情',
+        body: `在「${t}」裡，先讓彼此的感受被看見，是修復能開始的關鍵。遇到類似狀況的伴侶，可以先說出對方的感受，再討論怎麼辦。`,
+      },
+      {
+        title: '把指責換成具體的事',
+        body: '故事中有效的一步，是把「你都不在乎」換成具體發生的事與自己的感受。這讓對方比較能聽進去，也比較知道能改什麼。',
+      },
+      {
+        title: '小的修復動作也算數',
+        body: '轉捩點往往不是大和解，而是一個先伸出的小動作。願意先遞出一句話或一杯水，常常就是關係回暖的開始。',
+      },
+    ],
+    toxicityFlags,
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: 0,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -409,5 +445,6 @@ module.exports = {
   generateReconciliationOpeners,
   generateEmotionAcceptance,
   generateCheckupSummary,
+  generateStoryInsights,
   parseScriptRoles,
 };

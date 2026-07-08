@@ -901,6 +901,7 @@ const ADMIN_HTML = `<!doctype html>
       <button class="tab" data-panel="therapists">諮商師</button>
       <button class="tab" data-panel="reviews">評價</button>
       <button class="tab" data-panel="feedback">用戶心得</button>
+      <button class="tab" data-panel="stories">真實故事</button>
       <button class="tab" data-panel="pool">分潤</button>
       <button class="tab" data-panel="roleplay">邀請劇本</button>
       <button class="tab" data-panel="ai-usage">AI 用量</button>
@@ -1041,6 +1042,33 @@ const ADMIN_HTML = `<!doctype html>
         <table id="feedbackTable">
           <thead>
             <tr><th>顯示名稱</th><th>帳號</th><th class="num">評分</th><th>內容</th><th>時間</th><th>操作</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Panel: 真實故事 moderation -->
+    <div class="panel" id="panel-stories">
+      <p class="sub">真實故事採先發後審：這裡處理檢舉與 AI 毒性標記。隱藏後前台立即 404，可還原。</p>
+      <div class="controls">
+        <button id="storiesRefresh">重新整理</button>
+        <span class="muted" id="storiesStatusMsg"></span>
+      </div>
+      <h3 style="margin:12px 0 6px">待處理檢舉</h3>
+      <div style="overflow-x:auto">
+        <table id="storyReportsTable">
+          <thead>
+            <tr><th>對象</th><th>內容摘錄</th><th>原因</th><th>檢舉者</th><th>時間</th><th>操作</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <h3 style="margin:16px 0 6px">AI 標記待覆核（已發表）</h3>
+      <div style="overflow-x:auto">
+        <table id="storyFlaggedTable">
+          <thead>
+            <tr><th>標題</th><th>標記</th><th>時間</th><th>操作</th></tr>
           </thead>
           <tbody></tbody>
         </table>
@@ -1692,6 +1720,74 @@ const ADMIN_HTML = `<!doctype html>
     $('feedbackRefresh').addEventListener('click', loadFeedback);
     $('feedbackStatus').addEventListener('change', loadFeedback);
 
+    // ── 真實故事 moderation ────────────────────────────────────────────────
+    async function loadStories() {
+      $('storiesStatusMsg').textContent = '載入中…';
+      try {
+        var repRes = await fetch('/api/admin/stories/reports?status=pending');
+        var flagRes = await fetch('/api/admin/stories/flagged');
+        if (!repRes.ok || !flagRes.ok) throw new Error('stories ' + repRes.status + '/' + flagRes.status);
+        var reports = (await repRes.json()).reports || [];
+        var flagged = (await flagRes.json()).stories || [];
+        renderStoryReports(reports);
+        renderStoryFlagged(flagged);
+        $('storiesStatusMsg').textContent = '更新於 ' + new Date().toLocaleTimeString('zh-TW');
+      } catch (e) { $('storiesStatusMsg').textContent = '載入失敗: ' + e.message; }
+    }
+    function renderStoryReports(rows) {
+      var tbody = document.querySelector('#storyReportsTable tbody');
+      if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="muted">沒有待處理檢舉</td></tr>'; return; }
+      var REASONS = { inappropriate: '不當內容', spam: '垃圾訊息', privacy: '洩露隱私', other: '其他' };
+      tbody.innerHTML = rows.map(function (r) {
+        var isStory = !!r.story_id;
+        var excerpt = isStory ? (r.story_title || '') : (r.comment_body || '').slice(0, 80);
+        var hideBtn = isStory
+          ? '<button data-story-hide="' + r.story_id + '">隱藏故事</button>'
+          : '<button data-comment-hide="' + r.comment_id + '">隱藏留言</button>';
+        return '<tr>' +
+          '<td>' + (isStory ? '故事' : '留言') + '</td>' +
+          '<td style="max-width:300px">' + esc(excerpt) + '</td>' +
+          '<td>' + esc(REASONS[r.reason] || r.reason) + (r.detail ? '：' + esc(r.detail) : '') + '</td>' +
+          '<td>' + esc(r.reporter_email || '—') + '</td>' +
+          '<td>' + fmtDate(r.created_at) + '</td>' +
+          '<td>' + hideBtn + '</td>' +
+          '</tr>';
+      }).join('');
+      wireStoryModeration(tbody);
+    }
+    function renderStoryFlagged(rows) {
+      var tbody = document.querySelector('#storyFlaggedTable tbody');
+      if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="4" class="muted">沒有 AI 標記的故事</td></tr>'; return; }
+      tbody.innerHTML = rows.map(function (r) {
+        return '<tr>' +
+          '<td style="max-width:300px">' + esc(r.title) + '</td>' +
+          '<td>' + (r.toxicity_flags || []).map(esc).join(', ') + '</td>' +
+          '<td>' + fmtDate(r.created_at) + '</td>' +
+          '<td><button data-story-hide="' + r.id + '">隱藏</button></td>' +
+          '</tr>';
+      }).join('');
+      wireStoryModeration(tbody);
+    }
+    function wireStoryModeration(scope) {
+      scope.querySelectorAll('button[data-story-hide]').forEach(function (btn) {
+        btn.addEventListener('click', function () { moderateStory('/api/admin/stories/' + btn.getAttribute('data-story-hide') + '/moderate', btn); });
+      });
+      scope.querySelectorAll('button[data-comment-hide]').forEach(function (btn) {
+        btn.addEventListener('click', function () { moderateStory('/api/admin/stories/comments/' + btn.getAttribute('data-comment-hide') + '/moderate', btn); });
+      });
+    }
+    async function moderateStory(url, btn) {
+      btn.disabled = true;
+      try {
+        var res = await fetch(url, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'hide' })
+        });
+        if (!res.ok) throw new Error('moderate ' + res.status);
+        await loadStories();
+      } catch (e) { btn.disabled = false; $('storiesStatusMsg').textContent = '操作失敗: ' + e.message; }
+    }
+    $('storiesRefresh').addEventListener('click', loadStories);
+
     // ── Q&A revenue pool ───────────────────────────────────────────────────
     var POOL_STRATEGY = { even: '平均分配', volume: '依回覆量', engagement: '依參與度' };
     var POOL_STATUS = { draft: '草稿', computed: '已計算', finalized: '已結算', paid_out: '已撥款' };
@@ -2000,11 +2096,12 @@ const ADMIN_HTML = `<!doctype html>
 
     // Lazy-load the reviews + pool + roleplay + ai-usage + flags tabs the first
     // time they're opened.
-    var reviewsLoaded = false, feedbackLoaded = false, poolLoaded = false, roleplayLoaded = false, aiUsageLoaded = false, flagsLoaded = false;
+    var reviewsLoaded = false, feedbackLoaded = false, poolLoaded = false, roleplayLoaded = false, aiUsageLoaded = false, flagsLoaded = false, storiesLoaded = false;
     document.querySelectorAll('.tab').forEach(function (btn) {
       var panel = btn.getAttribute('data-panel');
       if (panel === 'reviews') btn.addEventListener('click', function () { if (!reviewsLoaded) { reviewsLoaded = true; loadReviews(); } });
       if (panel === 'feedback') btn.addEventListener('click', function () { if (!feedbackLoaded) { feedbackLoaded = true; loadFeedback(); } });
+      if (panel === 'stories') btn.addEventListener('click', function () { if (!storiesLoaded) { storiesLoaded = true; loadStories(); } });
       if (panel === 'pool') btn.addEventListener('click', function () { if (!poolLoaded) { poolLoaded = true; loadPools(); } });
       if (panel === 'roleplay') btn.addEventListener('click', function () { if (!roleplayLoaded) { roleplayLoaded = true; loadRoleplay(); } });
       if (panel === 'ai-usage') btn.addEventListener('click', function () { if (!aiUsageLoaded) { aiUsageLoaded = true; loadAiUsage(); } });

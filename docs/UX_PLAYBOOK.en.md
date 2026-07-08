@@ -37,10 +37,13 @@ catches the emotion → AI counselor steps in → mark resolved). Not the calend
 
 ## §1 State of the world (July 2026 snapshot)
 
-### Navigation
-Five main tabs after the P1-1 merge (`src/App.tsx` `navItems`):
+### Navigation (post 2026-07-08)
+Six main tabs (`src/App.tsx` `navItems`, at the R3 cap):
 記錄時光 (moments) / 好好說話 (talk-it-through, merged) / 角色扮演 (roleplay) /
-我們的牆 (our wall) / 心理諮商 (counseling).
+我們的牆 (our wall) / 真實故事 (real stories, the public community surface) /
+心理諮商 (counseling, directory-only now). 真實故事 renders the real view when
+logged out (therapists precedent) and absorbed 公開問答. Logged-out nav shows a
+7th visitors-only Premium chip — an accepted exception.
 Plus the user menu (top right): coin shop, activity feed, feedback, help,
 settings, Premium upgrade.
 
@@ -256,6 +259,22 @@ No interactive tour. Copy shares a single source with the logged-out showroom.
 ### Q4 AI quota → **show remaining count before it runs out** ✅ (shipped as P1-2)
 Show 「今日剩 N 次」next to AI buttons; at zero the buttons stay clickable and
 explain (refills tomorrow / upgrade), never grey dead buttons.
+
+---
+
+### Decision added 2026-07-08: 真實故事 (Relationship Wisdom Archive)
+- Shipped this round: guided-template stories + search + cross-couple comments
+  + three vote types (有幫助/有共鳴/修復有效) + read counts & author impact
+  stats + instant AI insights at publish + 3 community badges + 本週精選.
+  Community polls and the public API are the next batch.
+- New main tab 真實故事 absorbed 公開問答 (last free tab slot); therapists tab
+  is directory-only.
+- Moderation: post-moderation + reports + publish-time LLM toxicity flags
+  (admin dashboard 真實故事 panel).
+- Stories are USER-scoped (unpaired users can publish — Q2 solo stance);
+  anonymity is snapshotted at publish from public_share_show_nickname.
+- New notification type `story_comment`; anonymous view counting is per-IP
+  throttled (routes/stories.js).
 
 ---
 

@@ -23,6 +23,7 @@ module.exports = {
   generateReconciliationOpeners: provider.generateReconciliationOpeners,
   generateEmotionAcceptance: provider.generateEmotionAcceptance,
   generateCheckupSummary: provider.generateCheckupSummary,
+  generateStoryInsights: provider.generateStoryInsights,
   parseScriptRoles: provider.parseScriptRoles,
   providerName: PROVIDER_NAME,
 };

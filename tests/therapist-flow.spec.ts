@@ -52,10 +52,8 @@ async function openTherapists(page: Page) {
   await expect(page.getByTestId('therapists-view')).toBeVisible({ timeout: 10000 });
 }
 
-// The view opens on the 公開問答 tab; the directory (cards + booking) lives under
-// the 找諮商師 tab, so switch to it before browsing/booking.
+// 公開問答 moved to the 真實故事 tab; the therapists view IS the directory now.
 async function openDirectoryTab(page: Page) {
-  await page.getByTestId('therapist-tab-directory').click();
   await expect(page.getByTestId('therapist-card').first()).toBeVisible({ timeout: 10000 });
 }
 
@@ -112,14 +110,16 @@ test.describe('Therapist counseling', () => {
     await expect(page.getByTestId('chat-messages')).toContainText(msg, { timeout: 10000 });
   });
 
-  test('公開問答 tab is the default and the full profile shows reviews', async ({ page }) => {
+  test('公開問答 lives under 真實故事; the therapist profile shows reviews', async ({ page }) => {
     await login(page);
-    await openTherapists(page);
 
-    // The view opens on the 公開問答 (Public Q&A) tab.
+    // 公開問答 moved to the 真實故事 tab (stories sub-tab).
+    await page.getByTestId('nav-tab-stories').click();
+    await page.getByTestId('stories-tab-qa').click();
     await expect(page.getByTestId('public-qa-view')).toBeVisible({ timeout: 10000 });
 
-    // Switch to 找諮商師 and open a therapist's full profile.
+    // The therapists view is directory-only now: open a full profile.
+    await openTherapists(page);
     await openDirectoryTab(page);
     await page.getByTestId('therapist-card').first().getByTestId('therapist-profile-button').click();
 

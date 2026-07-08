@@ -58,6 +58,31 @@ const ACHIEVEMENT_TYPES = {
     icon: '👑',
     category: 'special',
     points: 500
+  },
+  // 真實故事 community badges. Stories are user-scoped but achievements are
+  // couple-scoped: counts include stories authored by EITHER member. Unpaired
+  // authors earn these retroactively at the first check after pairing (story
+  // counts persist on the user).
+  'story_teller': {
+    name: '說故事的人',
+    description: '發表第一則真實故事',
+    icon: '📖',
+    category: 'community',
+    points: 30
+  },
+  'wisdom_keeper': {
+    name: '智慧守護者',
+    description: '發表 3 則真實故事',
+    icon: '🏛️',
+    category: 'community',
+    points: 100
+  },
+  'repair_navigator': {
+    name: '修復領航員',
+    description: '你的故事累積獲得 10 個「修復有效」',
+    icon: '🧭',
+    category: 'community',
+    points: 150
   }
 };
 
@@ -195,6 +220,26 @@ router.post('/check', async (req, res) => {
       total_coins: 0
     };
 
+    // 真實故事 stats: stories authored by either couple member + the
+    // 「修復有效」 votes those stories have received.
+    let storyStats = { story_count: 0, repair_votes: 0 };
+    try {
+      const storyResult = await db.query(`
+        SELECT
+          COUNT(DISTINCT s.id)::int AS story_count,
+          COUNT(v.id)::int AS repair_votes
+        FROM couples c
+        JOIN relationship_stories s
+          ON s.author_id IN (c.user1_id, c.user2_id) AND s.status = 'published'
+        LEFT JOIN story_votes v
+          ON v.story_id = s.id AND v.vote_type = 'repair_worked'
+        WHERE c.id = $1
+      `, [coupleId]);
+      storyStats = storyResult.rows[0] || storyStats;
+    } catch (storyErr) {
+      logInfo('Story achievement stats unavailable', { err: storyErr.message });
+    }
+
     // Define achievement conditions mapped to badge_type
     const achievementChecks = [
       {
@@ -226,6 +271,21 @@ router.post('/check', async (req, res) => {
         condition: parseInt(stats.love_moments_count) >= 100,
         badge_type: 'love_master',
         milestone_value: 100
+      },
+      {
+        condition: parseInt(storyStats.story_count) >= 1,
+        badge_type: 'story_teller',
+        milestone_value: 1
+      },
+      {
+        condition: parseInt(storyStats.story_count) >= 3,
+        badge_type: 'wisdom_keeper',
+        milestone_value: 3
+      },
+      {
+        condition: parseInt(storyStats.repair_votes) >= 10,
+        badge_type: 'repair_navigator',
+        milestone_value: 10
       }
     ];
 

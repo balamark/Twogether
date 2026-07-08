@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Heart, X, UserPlus, Clock, Languages, Award, CalendarCheck, MessageCircle, Send, StickyNote, UserCog, Upload, CheckCircle2, AlertCircle, Globe, Users, Video, Wallet } from 'lucide-react';
+import { Heart, X, UserPlus, Clock, Languages, Award, CalendarCheck, MessageCircle, Send, StickyNote, UserCog, Upload, CheckCircle2, AlertCircle, Globe, Video, Wallet } from 'lucide-react';
 import {
   apiService,
   type Therapist,
@@ -19,7 +19,6 @@ import { useScrollLock } from '../hooks/useScrollLock';
 import { FOCUS_AREAS, focusLabel, formatNtd } from './therapistShared';
 import PaymentMethodPicker from './PaymentMethodPicker';
 import { FocusFilter } from './FocusFilter';
-import PublicQaView from './PublicQaView';
 import TherapistProfileModal from './TherapistProfileModal';
 
 interface TherapistsViewProps {
@@ -65,7 +64,6 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
 
   // Two separate interfaces: the open 公開問答 browse (default — the showcase /
   // funnel) and the 找諮商師 directory where you book a (free) chat.
-  const [tab, setTab] = useState<'qa' | 'directory'>('qa');
 
   const [bookingTarget, setBookingTarget] = useState<Therapist | null>(null);
   const [profileTarget, setProfileTarget] = useState<Therapist | null>(null);
@@ -146,39 +144,8 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
         </p>
       </div>
 
-      {/* Mode tabs: 公開問答 (browse) vs 找諮商師 (directory + free chat) */}
-      <div className="flex justify-center">
-        <div className="inline-flex p-1 rounded-full bg-petal-cream-2 border border-petal-rule">
-          <button
-            onClick={() => setTab('qa')}
-            data-testid="therapist-tab-qa"
-            className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full font-body text-[13px] font-medium transition-colors ${
-              tab === 'qa' ? 'bg-petal-ink text-petal-cream' : 'text-petal-ink-soft hover:text-petal-ink'
-            }`}
-          >
-            <Globe className="w-3.5 h-3.5" strokeWidth={1.5} /> 公開問答
-          </button>
-          <button
-            onClick={() => setTab('directory')}
-            data-testid="therapist-tab-directory"
-            className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full font-body text-[13px] font-medium transition-colors ${
-              tab === 'directory' ? 'bg-petal-ink text-petal-cream' : 'text-petal-ink-soft hover:text-petal-ink'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5" strokeWidth={1.5} /> 找諮商師
-          </button>
-        </div>
-      </div>
-
-      {tab === 'qa' && (
-        <PublicQaView
-          isAuthenticated={authState.isAuthenticated}
-          showNotification={showNotification}
-          onFindTherapist={() => setTab('directory')}
-        />
-      )}
-
-      {tab === 'directory' && (
+      {/* 公開問答 moved to the 真實故事 tab (StoriesView) — this view is the
+          therapist directory only now. */}
       <>
       {/* Actions row. 成為諮商師 lives in the page footer now (therapists sign
           in with a normal account, so there's no separate login button here). */}
@@ -248,7 +215,6 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
         </div>
       )}
       </>
-      )}
 
       {bookingTarget && (
         <ConsultationModal
