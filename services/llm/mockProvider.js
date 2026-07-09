@@ -437,6 +437,34 @@ async function generateStoryInsights({ title, sections }) {
   };
 }
 
+// Deterministic freeform structuring: split the raw text into 6 roughly-equal
+// slices, one per section, so the review step always has editable content.
+async function structureStory({ rawText }) {
+  const text = (rawText || '').toString().trim();
+  const keys = ['context', 'happened', 'impact', 'tried', 'repair', 'now'];
+  const sections = {};
+  if (text.length === 0) {
+    keys.forEach((k) => { sections[k] = ''; });
+  } else {
+    const size = Math.ceil(text.length / keys.length);
+    keys.forEach((k, i) => {
+      const slice = text.slice(i * size, (i + 1) * size).trim();
+      // Guarantee non-empty sections even for short input.
+      sections[k] = slice.length > 0 ? slice : text.slice(0, Math.min(text.length, 12));
+    });
+  }
+  return {
+    sections,
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: 0,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -446,5 +474,6 @@ module.exports = {
   generateEmotionAcceptance,
   generateCheckupSummary,
   generateStoryInsights,
+  structureStory,
   parseScriptRoles,
 };

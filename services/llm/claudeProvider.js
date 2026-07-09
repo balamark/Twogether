@@ -1373,6 +1373,112 @@ async function generateStoryInsights({ title, sections }) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// 真實故事 freeform structuring: the author pasted their whole story as one
+// block instead of filling the 6-section template. Split their own words into
+// the fixed sections (rearranging, lightly trimming; NOT rewriting the voice
+// or inventing content) so they can review and edit before publishing.
+// ---------------------------------------------------------------------------
+
+const STORY_STRUCTURE_SYSTEM_PROMPT = `你是一位貼心的編輯助手。一位使用者把他們的關係故事一次寫完了，沒有照模板分段。請永遠以繁體中文回覆。
+
+任務：把使用者的原文，依照固定的 6 個段落重新歸位：
+1. context（背景）：你們是什麼關係、事情發生前的狀態。
+2. happened（發生了什麼）：具體發生的事、當時的話或行為。
+3. impact（情緒衝擊）：這件事帶來的感受。
+4. tried（我們試過什麼）：嘗試過的方法，失敗與成功。
+5. repair（轉捩點與修復）：真正有效、讓事情好轉的那一步。
+6. now（現在的我們）：現在的狀態與學到的事。
+
+守則：
+- 盡量使用使用者的原句原詞，只做重新排列與輕微修剪；不要改寫語氣、不要編造原文沒有的內容。
+- 每個段落都要有內容。如果原文對某段著墨很少，用原文能支持的一兩句話帶過，不要空白、不要瞎掰。
+- 把每段整理成通順的一小段文字，不要用條列符號。
+- 只使用繁體中文。
+
+回應請只呼叫 emit_story_sections tool，不要輸出其他文字。`;
+
+const STORY_STRUCTURE_TOOL_SCHEMA = {
+  name: 'emit_story_sections',
+  description: 'Split a freeform relationship story into the six fixed template sections.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      context: { type: 'string' },
+      happened: { type: 'string' },
+      impact: { type: 'string' },
+      tried: { type: 'string' },
+      repair: { type: 'string' },
+      now: { type: 'string' },
+    },
+    required: ['context', 'happened', 'impact', 'tried', 'repair', 'now'],
+  },
+};
+
+async function structureStory({ rawText }) {
+  if (typeof rawText !== 'string' || rawText.trim().length === 0) {
+    throw new Error('rawText is required');
+  }
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 2048,
+    system: [
+      {
+        type: 'text',
+        text: STORY_STRUCTURE_SYSTEM_PROMPT + PUNCTUATION_RULE,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [STORY_STRUCTURE_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_story_sections' },
+    messages: [{ role: 'user', content: `以下是使用者一次寫完的故事原文：\n\n${rawText.trim()}` }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.story_structure', {
+    model: response.model || MODEL,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_story_sections'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input;
+
+  return {
+    sections: {
+      context: (out.context || '').trim(),
+      happened: (out.happened || '').trim(),
+      impact: (out.impact || '').trim(),
+      tried: (out.tried || '').trim(),
+      repair: (out.repair || '').trim(),
+      now: (out.now || '').trim(),
+    },
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -1382,6 +1488,7 @@ module.exports = {
   generateEmotionAcceptance,
   generateCheckupSummary,
   generateStoryInsights,
+  structureStory,
   parseScriptRoles,
   // Exported for prompt-contract regression tests only.
   buildRoleplayUserContent,

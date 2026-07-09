@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, ArrowRight, Send, Loader2, Lightbulb, ShieldCheck, Tag, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Send, Loader2, Lightbulb, ShieldCheck, Tag, CheckCircle2, Sparkles } from 'lucide-react';
 import { apiService, type StorySections, type StoryInsight } from '../services/api';
 
 // Guided story template (docs/UX_PLAYBOOK — story archive): one template
@@ -52,7 +52,9 @@ const SECTION_STEPS: { key: keyof StorySections; label: string; prompt: string; 
   },
 ];
 
-type Step = 'intro' | number | 'meta' | 'submitting' | 'done';
+// 'freeform' = paste-once mode; 'review' = editable preview of AI-split
+// sections before the meta (title/tags) step.
+type Step = 'intro' | 'freeform' | 'review' | number | 'meta' | 'submitting' | 'done';
 
 export default function StoryComposeFlow({
   showNickname,
@@ -74,8 +76,54 @@ export default function StoryComposeFlow({
   const [tagsInput, setTagsInput] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ id: string; insights: StoryInsight[] | null; aiSkipped: boolean } | null>(null);
+  // Freeform mode.
+  const [freeText, setFreeText] = useState('');
+  const [structuring, setStructuring] = useState(false);
+  // Where the meta step's "back" returns to (last guided section vs the
+  // freeform review screen).
+  const [metaReturn, setMetaReturn] = useState<Step>(SECTION_STEPS.length - 1);
 
   const stepIndex = typeof step === 'number' ? step : -1;
+
+  const runStructure = async () => {
+    const raw = freeText.trim();
+    if (raw.length < 30) {
+      setError('請先寫下你的故事（至少 30 字），AI 才能幫你分段');
+      return;
+    }
+    setError(null);
+    setStructuring(true);
+    try {
+      const split = await apiService.structureStory(raw);
+      setSections(split);
+      setStep('review');
+    } catch (err) {
+      const e = err as { message?: string; error_code?: string };
+      if (e.error_code === 'AI_DAILY_LIMIT_REACHED') {
+        showNotification({
+          type: 'warning',
+          title: '今日 AI 次數已用完',
+          message: '明天會自動補上；你也可以改用「跟著步驟寫」自己分段。',
+        });
+      } else {
+        setError(e.message || 'AI 分段失敗，請稍後再試，或改用逐步填寫');
+      }
+    } finally {
+      setStructuring(false);
+    }
+  };
+
+  const reviewToMeta = () => {
+    for (const s of SECTION_STEPS) {
+      if (sections[s.key].trim().length < 10) {
+        setError(`「${s.label}」至少需要 10 個字，補一點細節再繼續`);
+        return;
+      }
+    }
+    setError(null);
+    setMetaReturn('review');
+    setStep('meta');
+  };
 
   const nextFromSection = () => {
     const s = SECTION_STEPS[stepIndex];
@@ -85,7 +133,7 @@ export default function StoryComposeFlow({
       return;
     }
     setError(null);
-    if (stepIndex === SECTION_STEPS.length - 1) setStep('meta');
+    if (stepIndex === SECTION_STEPS.length - 1) { setMetaReturn(SECTION_STEPS.length - 1); setStep('meta'); }
     else setStep(stepIndex + 1);
   };
 
@@ -133,17 +181,37 @@ export default function StoryComposeFlow({
             </p>
           </div>
         </div>
-        <div className="bg-petal-cream border border-petal-rule rounded-2xl p-4">
-          <p className="text-sm text-petal-ink mb-2">故事的 6 個段落：</p>
-          <ol className="space-y-1">
-            {SECTION_STEPS.map((s, i) => (
-              <li key={s.key} className="text-sm text-petal-ink-soft">
-                {i + 1}. {s.label}
-              </li>
-            ))}
-          </ol>
+        {/* Two ways in: guided 6 steps, or paste-once + AI splits it. */}
+        <div className="space-y-2.5">
+          <button
+            type="button"
+            data-testid="story-mode-guided"
+            onClick={() => setStep(0)}
+            className="w-full text-left rounded-2xl border border-petal-rule bg-white hover:border-petal-rose p-4 transition"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-petal-ink">跟著步驟寫</span>
+              <ArrowRight className="w-4 h-4 text-petal-muted" />
+            </div>
+            <p className="text-xs text-petal-ink-soft mt-1">一步一個問題引導你，適合想被帶著寫的人。共 6 段：{SECTION_STEPS.map((s) => s.label).join('、')}。</p>
+          </button>
+          <button
+            type="button"
+            data-testid="story-mode-freeform"
+            onClick={() => { setError(null); setStep('freeform'); }}
+            className="w-full text-left rounded-2xl border border-petal-rose/60 bg-petal-rose/5 hover:border-petal-rose p-4 transition"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-petal-ink inline-flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-petal-rose-deep" />
+                一次寫完，AI 幫你分段
+              </span>
+              <ArrowRight className="w-4 h-4 text-petal-muted" />
+            </div>
+            <p className="text-xs text-petal-ink-soft mt-1">把整個故事一次打完或貼上，AI 會幫你分成 6 段，你再確認、修改即可。</p>
+          </button>
         </div>
-        <div className="flex justify-between">
+        <div className="flex justify-start">
           <button
             type="button"
             onClick={onCancel}
@@ -152,13 +220,96 @@ export default function StoryComposeFlow({
             <ArrowLeft className="w-4 h-4" />
             返回
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'freeform') {
+    return (
+      <div className="space-y-4" data-testid="story-compose-freeform">
+        <div className="bg-petal-cream border border-petal-rule rounded-2xl p-5">
+          <h3 className="text-lg font-serif text-petal-ink mb-1">一次寫完你的故事</h3>
+          <p className="text-sm text-petal-ink-soft mb-3">
+            不用管順序，把發生的事、當時的感受、你們怎麼走過來，一次寫完或貼上。AI 會幫你分成 6 段，你再確認修改。
+          </p>
+          <textarea
+            data-testid="story-freeform-input"
+            value={freeText}
+            onChange={(e) => setFreeText(e.target.value)}
+            placeholder="例如：我們交往三年，那天他遲到四十分鐘還先怪我生氣，我覺得很受傷，冷戰了兩天，後來他先傳訊息說知道讓我等很久⋯現在我們約好遲到先講、見面先抱。"
+            rows={10}
+            maxLength={6000}
+            className="w-full p-3 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y"
+          />
+          <div className="flex justify-between text-xs text-petal-muted mt-1">
+            <span>{error && <span className="text-red-500">{error}</span>}</span>
+            <span>{freeText.length} / 6000</span>
+          </div>
+        </div>
+        <div className="flex justify-between">
           <button
             type="button"
-            data-testid="story-compose-start"
-            onClick={() => setStep(0)}
-            className="px-5 py-2 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2"
+            onClick={() => { setError(null); setStep('intro'); }}
+            disabled={structuring}
+            className="px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2 disabled:opacity-50"
           >
-            開始寫
+            <ArrowLeft className="w-4 h-4" />
+            返回
+          </button>
+          <button
+            type="button"
+            data-testid="story-freeform-structure"
+            onClick={runStructure}
+            disabled={structuring}
+            className="px-5 py-2 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2 disabled:opacity-50"
+          >
+            {structuring ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+            AI 幫我分段
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'review') {
+    return (
+      <div className="space-y-4" data-testid="story-compose-review">
+        <div className="bg-petal-sage/10 border border-petal-sage rounded-2xl p-4 flex gap-3 items-start">
+          <Sparkles className="w-5 h-5 text-petal-sage-deep flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-petal-ink-soft leading-relaxed">
+            AI 幫你分好 6 段了，讀一遍、有需要就直接改。每段至少 10 個字。
+          </p>
+        </div>
+        {SECTION_STEPS.map((s) => (
+          <div key={s.key} className="bg-petal-cream border border-petal-rule rounded-2xl p-4" data-testid={`story-review-${s.key}`}>
+            <div className="text-[11px] font-medium text-petal-rose-deep mb-1.5">{s.label}</div>
+            <textarea
+              value={sections[s.key]}
+              onChange={(e) => setSections({ ...sections, [s.key]: e.target.value })}
+              rows={3}
+              maxLength={2000}
+              className="w-full p-2.5 rounded-xl border border-petal-rule bg-white text-sm text-petal-ink focus:outline-none focus:border-petal-rose-deep resize-y"
+            />
+          </div>
+        ))}
+        {error && <p className="text-sm text-red-500">{error}</p>}
+        <div className="flex justify-between">
+          <button
+            type="button"
+            onClick={() => { setError(null); setStep('freeform'); }}
+            className="px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            重寫
+          </button>
+          <button
+            type="button"
+            data-testid="story-review-next"
+            onClick={reviewToMeta}
+            className="px-5 py-2 rounded-full bg-petal-ink text-petal-cream font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2"
+          >
+            下一步
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -244,7 +395,7 @@ export default function StoryComposeFlow({
         <div className="flex justify-between">
           <button
             type="button"
-            onClick={() => setStep(SECTION_STEPS.length - 1)}
+            onClick={() => setStep(metaReturn)}
             disabled={step === 'submitting'}
             className="px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2 disabled:opacity-50"
           >
@@ -281,7 +432,7 @@ export default function StoryComposeFlow({
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-5" data-testid="story-ai-insights">
           <div className="flex items-center gap-2 mb-3 text-petal-rose-deep">
             <Lightbulb className="w-5 h-5" />
-            <h3 className="text-base font-serif text-petal-ink">AI 從你的故事看見的修復智慧</h3>
+            <h3 className="text-base font-serif text-petal-ink">AI 幫你把故事整理成 3 個重點</h3>
           </div>
           <div className="space-y-3">
             {result.insights.map((i) => (

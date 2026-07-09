@@ -1630,6 +1630,12 @@ class ApiService {
     return response.data;
   }
 
+  // Freeform mode: paste the whole story, AI splits it into the 6 sections.
+  async structureStory(rawText: string): Promise<StorySections> {
+    const response = await apiClient.post('/stories/structure', { rawText });
+    return response.data.sections as StorySections;
+  }
+
   async voteStory(id: string, voteType: StoryVoteType): Promise<{ voted: boolean; counts: StoryVoteCounts }> {
     const response = await apiClient.post(`/stories/${id}/vote`, { voteType });
     return response.data;

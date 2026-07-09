@@ -53,7 +53,7 @@ test.describe.serial('真實故事 — real publish/vote/impact round trip', () 
       .or(page.getByTestId('story-compose-cta'))
       .first()
       .click();
-    await page.getByTestId('story-compose-start').click();
+    await page.getByTestId('story-mode-guided').click();
 
     const texts = [
       '我們交往三年，平常都約在車站碰面一起回家。',

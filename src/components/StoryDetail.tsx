@@ -182,7 +182,7 @@ export default function StoryDetail({
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-5" data-testid="story-detail-insights">
           <div className="flex items-center gap-2 mb-3 text-petal-rose-deep">
             <Lightbulb className="w-5 h-5" />
-            <h3 className="text-base font-serif text-petal-ink">這則故事的修復智慧</h3>
+            <h3 className="text-base font-serif text-petal-ink">AI 重點整理</h3>
           </div>
           <div className="space-y-3">
             {story.aiInsights.insights.map((i) => (
