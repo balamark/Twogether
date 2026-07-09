@@ -38,6 +38,11 @@ Then visit: http://localhost:8080
 User-facing feature changes, newest first. (Convention: every UI feature change
 adds a dated entry here; see `CLAUDE.md`.)
 
+### 2026-07-09
+- **分享劇本的 Email 直接開啟該劇本**: 當伴侶把某個角色扮演劇本分享給你時，邀請信裡的
+  「登入查看劇本」按鈕現在會直接帶你到那個劇本，登入後立刻打開它，不再只是停在「角色扮演」
+  分頁讓你自己找。純文字版信件也附上同一個連結。
+
 ### 2026-07-08
 - **全新主分頁「真實故事」：智慧故事庫上線**: 把你們最難的時刻，變成幫助其他伴侶的智慧。
   依 6 段引導模板（背景→發生了什麼→情緒衝擊→試過什麼→轉捩點與修復→現在的我們）寫下
