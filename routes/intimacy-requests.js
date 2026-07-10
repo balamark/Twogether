@@ -9,6 +9,11 @@ const characterMappingService = require('../services/characterMappingService');
 const llmService = require('../services/llmService');
 const { getCoupleIdForUser, getCoupleTier, getLimit, checkLimit } = require('../lib/entitlements');
 const { logInfo, logWarn, logError } = require('../lib/logger');
+const {
+  selectToneIds,
+  buildSuggestions: buildNudgeSuggestions,
+  DEFAULT_COUNT: NUDGE_OPTION_COUNT,
+} = require('../lib/intimacyNudgeTones');
 
 const router = express.Router();
 
@@ -159,10 +164,10 @@ async function ensureRoleplaySuggestionTables() {
   }
 }
 
-// Cache for the「溫柔提醒」nudge suggestions. Keyed by (couple_id, days) so that
-// re-opening the same gap (or the partner opening it) reuses the same three
-// AI-generated lines for free instead of re-billing the daily AI budget.
-// Runtime-created belt-and-suspenders alongside migration 072.
+// Cache for the platform-voiced「溫柔提醒」options. Keyed by (couple_id, days) so
+// re-opening the same gap (or the partner opening it) reuses the same randomly
+// selected set, keeping the options stable. Runtime-created belt-and-suspenders
+// alongside migration 072.
 async function ensureIntimacyNudgeCacheTable() {
   try {
     await db.query(`
@@ -695,10 +700,12 @@ router.post('/reconciliation-openers', [
   }
 });
 
-// Generate three gentle, NEUTRAL「溫柔提醒」lines for the 已經幾天沒有親密了 card.
-// The user picks one and it's delivered to the partner (see /send-nudge-message).
-// Cached per (couple, days): a cache hit is instant, free, and doesn't touch the
-// daily AI budget; `regenerate: true` bypasses the cache and refreshes it.
+// Offer three platform-voiced「溫柔提醒」options for the 已經幾天沒有親密了 card.
+// The copy is authored BY Twogether (not the partner) and drawn from a curated
+// tone catalog: the recommended tone (鼓勵連結) plus a random couple of others,
+// with the real day count substituted. The user picks one and it's delivered to
+// the partner (see /send-nudge-message). Cached per (couple, days) so re-opening
+// the same gap shows a stable set; `regenerate: true` reshuffles the options.
 router.post('/nudge-suggestions', [
   body('days').isInt({ min: 0, max: 3650 }).withMessage('天數格式錯誤'),
   body('regenerate').optional().isBoolean(),
@@ -720,12 +727,12 @@ router.post('/nudge-suggestions', [
       logWarn('intimacy.nudge.no_couple', { userId });
       return res.status(404).json({
         success: false,
-        message: '需要先完成配對，才能請 AI 幫你溫柔提醒另一半。',
+        message: '需要先完成配對，才能讓 Twogether 幫你溫柔提醒另一半。',
         error_code: 'NO_COMPLETE_COUPLE',
       });
     }
 
-    // Cache hit (unless forcing a regenerate).
+    // Cache hit (unless forcing a reshuffle).
     if (!regenerate) {
       try {
         const cached = await db.query(
@@ -741,71 +748,23 @@ router.post('/nudge-suggestions', [
       }
     }
 
-    // Cache miss / forced regenerate → bill against the daily AI budget.
-    const { tier, limit } = await resolveAiLimit(userId);
-    const usedToday = await countTodayAiUsage(userId);
-    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
-    if (!limitCheck.ok) {
-      logInfo('intimacy.nudge.limit', { userId, used: usedToday, limit, tier, blocked: true });
-      return res.status(limitCheck.status).json(limitCheck.body);
-    }
+    // Cache miss / reshuffle → randomly select tones (recommended always included)
+    // and render the platform-voiced copy with the real day count.
+    const toneIds = selectToneIds(NUDGE_OPTION_COUNT);
+    const suggestions = buildNudgeSuggestions(toneIds, days);
+    logInfo('intimacy.nudge.built', { userId, coupleId, days, regenerate, tones: toneIds });
 
-    const userGender = await getUserGender(userId);
-    let partnerGender = null;
-    try {
-      const pg = await db.query(
-        `SELECT u.gender FROM couples c
-           JOIN users u ON u.id = CASE WHEN c.user1_id = $1 THEN c.user2_id ELSE c.user1_id END
-          WHERE c.id = $2 LIMIT 1`,
-        [userId, coupleId]
-      );
-      partnerGender = pg.rows[0]?.gender || null;
-    } catch (pgErr) {
-      logWarn('intimacy nudge partner gender lookup failed', { err: pgErr.message });
-    }
-
-    logInfo('intimacy.nudge.input', { userId, coupleId, days, regenerate });
-
-    const result = await llmService.generateIntimacyNudges({ days, userGender, partnerGender });
-    const meta = result._meta;
-    delete result._meta;
-
-    const suggestions = (result.nudges || []).filter((n) => n && n.text && n.text.trim());
-    if (suggestions.length === 0) {
-      logWarn('intimacy.nudge.empty', { userId, days });
-      return res.status(502).json({
-        success: false,
-        message: 'AI 暫時想不出合適的提醒句子，請稍後再試，或直接自行傳訊息給另一半。',
-        error_code: 'INTIMACY_NUDGES_EMPTY',
-      });
-    }
-
-    logInfo('intimacy.nudge.cost', {
-      userId,
-      provider: meta?.provider,
-      model: meta?.model,
-      costUsd: meta?.costUsd,
-      durationMs: meta?.durationMs,
-      count: suggestions.length,
-      usedToday: usedToday + 1,
-      limit,
-      tier,
-    });
-
-    await recordAiUsage(userId, 'intimacy_nudge', JSON.stringify({ days }), meta);
-
-    // Persist to the shared per-couple cache so future opens of this gap are free.
     try {
       await db.query(
         `INSERT INTO intimacy_nudge_cache (couple_id, days, suggestions, provider, model, gen_count)
-         VALUES ($1, $2, $3::jsonb, $4, $5, 1)
+         VALUES ($1, $2, $3::jsonb, 'template', 'tone-catalog', 1)
          ON CONFLICT (couple_id, days) DO UPDATE SET
            suggestions = EXCLUDED.suggestions,
            provider = EXCLUDED.provider,
            model = EXCLUDED.model,
            gen_count = intimacy_nudge_cache.gen_count + 1,
            updated_at = NOW()`,
-        [coupleId, days, JSON.stringify(suggestions), meta?.provider || null, meta?.model || null]
+        [coupleId, days, JSON.stringify(suggestions)]
       );
     } catch (saveErr) {
       logWarn('intimacy nudge cache save failed', { err: saveErr.message });
@@ -813,10 +772,10 @@ router.post('/nudge-suggestions', [
 
     res.json({ success: true, suggestions, cached: false });
   } catch (error) {
-    logError('Generate intimacy nudges failed', { err: error.message, stack: error.stack });
+    logError('Build intimacy nudges failed', { err: error.message, stack: error.stack });
     res.status(500).json({
       success: false,
-      message: 'AI 暫時無法產生提醒句子，請稍後再試，或直接自行傳訊息給另一半。',
+      message: '暫時無法產生提醒句子，請稍後再試，或直接自行傳訊息給另一半。',
       error_code: 'INTIMACY_NUDGES_FAILED',
     });
   }
@@ -874,7 +833,7 @@ router.post('/send-nudge-message', [
           user_id, notification_type, title, content,
           intimacy_request_id, related_user_id, priority
         ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-      `, [partnerId, 'intimacy_request', '溫柔提醒', message, requestId, userId, 2]);
+      `, [partnerId, 'intimacy_request', 'Twogether 溫柔提醒', message, requestId, userId, 2]);
     } catch (notificationError) {
       logWarn('Failed to create intimacy nudge notification', { err: notificationError.message });
     }
@@ -886,11 +845,9 @@ router.post('/send-nudge-message', [
       if (partner && emailService.isConfigured()) {
         const partnerRow = await db.query('SELECT nickname FROM users WHERE id = $1', [partnerId]);
         await emailService.sendIntimacyReminderNudgeEmail({
-          senderNickname: req.user.nickname || '你的伴侶',
           partnerNickname: partnerRow.rows[0]?.nickname || '親愛的',
           partnerEmail: partner.email,
           message,
-          days,
         });
         emailedPartner = true;
       }
