@@ -706,37 +706,32 @@ ${acceptUrl}
     }
   }
 
-  // Gentle「溫柔提醒」nudge from the 已經幾天沒有親密了 card. Neutral, low-pressure
-  // framing: the partner picked a soft reminder line to reconnect. Best-effort;
-  // the in-app reminder is the primary channel.
-  async sendIntimacyReminderNudgeEmail({ senderNickname, partnerNickname, partnerEmail, message, days = null }) {
+  // Platform-voiced「溫柔提醒」from the 已經幾天沒有親密了 card. Authored BY Twogether
+  // (a caring friend, not a monitor) — never attributed to the partner. Neutral,
+  // low-pressure, focused on reconnecting. Best-effort; the in-app reminder is
+  // the primary channel.
+  async sendIntimacyReminderNudgeEmail({ partnerNickname, partnerEmail, message }) {
     if (!this.isConfigured()) return;
     if (!partnerEmail) return;
 
-    const safeSender = this._escape(senderNickname || '你的伴侶');
     const safePartner = this._escape(partnerNickname || '親愛的');
     const safeMessage = this._escape(message || '').slice(0, 500);
-    const dayLine = Number.isFinite(days)
-      ? `<p style="color:#636e72;font-size:14px;">（距離上次親密已經 ${Math.max(0, Math.floor(days))} 天了）</p>`
-      : '';
 
     const bodyHtml = `
-      <p>${safePartner}，<strong>${safeSender}</strong> 想輕輕地提醒你：</p>
+      <p>${safePartner}，Twogether 想輕輕地提醒你們：</p>
       <div class="quote">${safeMessage.replace(/\n/g, '<br>')}</div>
-      ${dayLine}
-      <p style="color:#636e72;font-size:14px;">沒有壓力，只是想找個時間靠近彼此一點 🙂</p>
+      <p style="color:#636e72;font-size:14px;">沒有壓力，只是想陪你們別忘了照顧彼此 🙂</p>
     `;
     const html = this._activityEmailHtml({
-      headerEmoji: '💗',
+      headerEmoji: '💛',
       headerTitle: '一則溫柔提醒',
-      headerSubtitle: '你的伴侶想和你靠近一點',
+      headerSubtitle: 'Twogether 想陪你們靠近一點',
       bodyHtml,
     });
 
     const text = [
-      `${senderNickname || '你的伴侶'} 想輕輕地提醒你：`,
+      'Twogether 想輕輕地提醒你們：',
       message || '',
-      Number.isFinite(days) ? `（距離上次親密已經 ${Math.max(0, Math.floor(days))} 天了）` : '',
       '',
       '打開 Twogether 查看。',
     ].filter(Boolean).join('\n');
@@ -745,7 +740,7 @@ ${acceptUrl}
       await this.transporter.sendMail({
         from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
         to: partnerEmail,
-        subject: `💗 ${senderNickname || '你的伴侶'} 想和你靠近一點`,
+        subject: '💛 Twogether 溫柔提醒',
         text,
         html,
       });

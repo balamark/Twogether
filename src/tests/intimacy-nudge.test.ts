@@ -1,46 +1,58 @@
 import { describe, it, expect } from 'vitest';
 import { createRequire } from 'module';
 
-// Contract test for the「溫柔提醒」nudge generator that backs the quick button on
-// the 已經幾天沒有親密了 card. Uses the deterministic mock provider (no live API):
-// pins the shape the route + UI depend on — exactly three suggestions, each with
-// a label + non-empty text, and the day count woven into the copy. (CommonJS
-// backend module, hence createRequire.)
+// Contract test for the platform-voiced「溫柔提醒」tone catalog that backs the quick
+// button on the 已經幾天沒有親密了 card. The reminder is authored BY Twogether (not
+// the partner): pins that we always offer the recommended tone plus a random
+// couple of others, substitute the real day count, and keep the copy free of
+// partner-attribution. (CommonJS backend module, hence createRequire.)
 const require = createRequire(import.meta.url);
-const mockProvider = require('../../services/llm/mockProvider.js');
-const { BILLABLE_KINDS } = require('../../lib/aiUsage.js');
+const {
+  TONES,
+  RECOMMENDED_TONE_ID,
+  DEFAULT_COUNT,
+  selectToneIds,
+  buildSuggestions,
+  renderTone,
+} = require('../../lib/intimacyNudgeTones.js');
 
-describe('generateIntimacyNudges — mock provider contract', () => {
-  it('returns exactly three labelled, non-empty suggestions', async () => {
-    const result = await mockProvider.generateIntimacyNudges({ days: 16 });
-    expect(result.nudges).toHaveLength(3);
-    for (const n of result.nudges) {
-      expect(typeof n.label).toBe('string');
-      expect(n.label.length).toBeGreaterThan(0);
-      expect(n.text.trim().length).toBeGreaterThan(0);
+describe('intimacy nudge tone catalog', () => {
+  it('exposes the 12 curated tones with a recommended default', () => {
+    expect(TONES).toHaveLength(12);
+    expect(TONES.filter((t: { recommended?: boolean }) => t.recommended)).toHaveLength(1);
+    expect(RECOMMENDED_TONE_ID).toBe('encourage');
+  });
+
+  it('selectToneIds returns the default count and always includes the recommended tone first', () => {
+    for (let i = 0; i < 30; i += 1) {
+      const ids = selectToneIds(DEFAULT_COUNT);
+      expect(ids).toHaveLength(3);
+      expect(ids[0]).toBe(RECOMMENDED_TONE_ID);
+      expect(new Set(ids).size).toBe(ids.length); // no duplicates
     }
-    expect(result.toxicityFlags).toEqual([]);
-    expect(result._meta.provider).toBe('mock');
   });
 
-  it('weaves the day count into the copy (fact stated neutrally)', async () => {
-    const result = await mockProvider.generateIntimacyNudges({ days: 9 });
-    expect(result.nudges.some((n: { text: string }) => n.text.includes('9 天'))).toBe(true);
+  it('buildSuggestions substitutes the real day count and flags the recommended option', () => {
+    const suggestions = buildSuggestions(['encourage', 'warm', 'minimal'], 8);
+    expect(suggestions).toHaveLength(3);
+    for (const s of suggestions) {
+      expect(s.text).toContain('8 天');
+      expect(s.text.trim().length).toBeGreaterThan(0);
+      expect(s.text).not.toContain('{days}');
+    }
+    expect(suggestions[0].recommended).toBe(true);
   });
 
-  it('is deterministic for the same day count', async () => {
-    const a = await mockProvider.generateIntimacyNudges({ days: 12 });
-    const b = await mockProvider.generateIntimacyNudges({ days: 12 });
-    expect(a.nudges).toEqual(b.nudges);
+  it('is platform-voiced, not partner-voiced (no first-person longing)', () => {
+    for (const t of TONES) {
+      const text = renderTone(t, 8);
+      expect(text).not.toMatch(/好想你|我想你|抱抱我/);
+    }
   });
 
-  it('handles an unknown day count without inventing a number', async () => {
-    const result = await mockProvider.generateIntimacyNudges({ days: null });
-    expect(result.nudges).toHaveLength(3);
-    expect(result.nudges.every((n: { text: string }) => n.text.trim().length > 0)).toBe(true);
-  });
-
-  it('draws from the shared daily AI budget', () => {
-    expect(BILLABLE_KINDS).toContain('intimacy_nudge');
+  it('handles an unknown day count without inventing a number', () => {
+    const text = renderTone(TONES.find((t: { id: string }) => t.id === 'minimal'), null);
+    expect(text).not.toContain('{days}');
+    expect(text).toContain('一段時間');
   });
 });
