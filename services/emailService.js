@@ -1259,6 +1259,15 @@ ${acceptUrl}
     const safeTitle = this._escape(scriptTitle || '一個劇本');
     const safeScenario = this._escape(scenario || '').slice(0, 300);
 
+    // Deep-link straight to the shared script (?script=<title>) so the partner
+    // lands on it after login instead of the generic 角色扮演 tab. Uses the raw
+    // title (encodeURIComponent handles encoding); matches the convention in
+    // sendIntimacyRequestNotification and is resolved by App.tsx / RoleplayView.
+    const frontendUrl = process.env.FRONTEND_URL || 'https://twogether.fun';
+    const scriptUrl = scriptTitle
+      ? `${frontendUrl}/?script=${encodeURIComponent(scriptTitle)}`
+      : frontendUrl;
+
     const bodyHtml = `
       <p><strong>${safeSharer}</strong> 想和你一起試試這個角色扮演劇本 💕</p>
       <div class="quote">
@@ -1273,6 +1282,7 @@ ${acceptUrl}
       headerSubtitle: safeTitle,
       bodyHtml,
       ctaLabel: '💕 登入查看劇本',
+      ctaUrl: scriptUrl,
     });
 
     const text = [
@@ -1280,7 +1290,8 @@ ${acceptUrl}
       `「${scriptTitle || '一個劇本'}」`,
       scenario ? `\n${scenario}` : '',
       '',
-      '登入 Twogether 看看完整劇本。',
+      '登入 Twogether 看看完整劇本：',
+      scriptUrl,
     ].join('\n');
 
     try {
