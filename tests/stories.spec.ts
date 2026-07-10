@@ -194,7 +194,7 @@ test.describe('真實故事 — archive UI wiring', () => {
 
     await page.getByTestId('story-compose-cta').click();
     await expect(page.getByTestId('story-compose-intro')).toBeVisible();
-    await page.getByTestId('story-compose-start').click();
+    await page.getByTestId('story-mode-guided').click();
 
     const sectionTexts = [
       '我們交往三年，平常都約在車站碰面。',
@@ -216,6 +216,47 @@ test.describe('真實故事 — archive UI wiring', () => {
 
     await expect(page.getByTestId('story-compose-done')).toBeVisible({ timeout: 10000 });
     await expect(page.getByTestId('story-ai-insights')).toContainText('先接住情緒再談事情');
+  });
+
+  test('freeform mode: paste once, AI splits into sections, then publish', async ({ page }) => {
+    await seed(page);
+    await page.route('**/api/stories/structure', async (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          sections: {
+            context: '我們交往三年，平常都約在車站碰面一起回家。',
+            happened: '那天他遲到四十分鐘，還先怪我生氣。',
+            impact: '我覺得非常受傷，也很委屈難過。',
+            tried: '一開始我們冷戰了兩天，越拖越僵。',
+            repair: '他先傳了一句：我知道讓你等很久。',
+            now: '現在我們約好遲到先講、見面先抱。',
+          },
+        }),
+      })
+    );
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+    await page.getByTestId('nav-tab-stories').click();
+    await page.getByTestId('story-compose-cta').click();
+    await page.getByTestId('story-mode-freeform').click();
+
+    await page.getByTestId('story-freeform-input').fill(
+      '我們交往三年，那天他遲到四十分鐘還先怪我生氣，我覺得很受傷，冷戰兩天後他先道歉，現在我們約好遲到先講。'
+    );
+    await page.getByTestId('story-freeform-structure').click();
+
+    // AI-split sections show up in the editable review step.
+    await expect(page.getByTestId('story-compose-review')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('story-review-repair')).toContainText('我知道讓你等很久');
+    await page.getByTestId('story-review-next').click();
+
+    await expect(page.getByTestId('story-compose-meta')).toBeVisible();
+    await page.getByTestId('story-title-input').fill('車站接送吵架後的修復');
+    await page.getByTestId('story-submit').click();
+    await expect(page.getByTestId('story-compose-done')).toBeVisible({ timeout: 10000 });
   });
 
   test('我的故事 shows the impact line', async ({ page }) => {

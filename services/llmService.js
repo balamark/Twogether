@@ -24,6 +24,7 @@ module.exports = {
   generateEmotionAcceptance: provider.generateEmotionAcceptance,
   generateCheckupSummary: provider.generateCheckupSummary,
   generateStoryInsights: provider.generateStoryInsights,
+  structureStory: provider.structureStory,
   parseScriptRoles: provider.parseScriptRoles,
   providerName: PROVIDER_NAME,
 };

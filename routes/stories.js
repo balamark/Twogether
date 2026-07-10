@@ -330,6 +330,39 @@ router.get('/:id', optionalAuth, [param('id').isUUID()], async (req, res) => {
 // ---------------------------------------------------------------------------
 // Publish a story
 // ---------------------------------------------------------------------------
+// Freeform → structured: the author pasted their whole story; AI splits it
+// into the 6 template sections for them to review before publishing. No DB
+// write; counts against the shared daily AI budget.
+// ---------------------------------------------------------------------------
+router.post(
+  '/structure',
+  authenticateToken,
+  [body('rawText').isString().trim().isLength({ min: 30, max: 6000 })
+    .withMessage('請先寫下你的故事（至少 30 字），AI 才能幫你分段')],
+  async (req, res) => {
+    if (sendValidationError(req, res)) return;
+    try {
+      const userId = req.user.id;
+      const { tier, limit } = await resolveAiLimit(userId);
+      const usedToday = await countTodayAiUsage(userId);
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      if (!limitCheck.ok) {
+        logInfo('story.structure.limit', { userId, used: usedToday, limit, tier });
+        return res.status(limitCheck.status).json(limitCheck.body);
+      }
+
+      const result = await llmService.structureStory({ rawText: req.body.rawText });
+      await recordAiUsage(userId, 'story_structure', req.body.rawText.slice(0, 200), result._meta);
+      logInfo('story.structure.done', { userId, provider: result._meta?.provider, costUsd: result._meta?.costUsd });
+      res.json({ success: true, sections: result.sections });
+    } catch (err) {
+      logError('Story structure failed', { err: err.message, stack: err.stack });
+      res.status(500).json({ success: false, message: 'AI 分段失敗，請稍後再試，或改用逐步填寫' });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
 router.post(
   '/',
   authenticateToken,
