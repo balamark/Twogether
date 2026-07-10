@@ -26,5 +26,6 @@ module.exports = {
   generateStoryInsights: provider.generateStoryInsights,
   structureStory: provider.structureStory,
   parseScriptRoles: provider.parseScriptRoles,
+  generateIntimacyNudges: provider.generateIntimacyNudges,
   providerName: PROVIDER_NAME,
 };

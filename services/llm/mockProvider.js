@@ -465,6 +465,30 @@ async function structureStory({ rawText }) {
   };
 }
 
+// Deterministic intimacy reminder nudges. Same day count → same three gentle,
+// neutral one-liners. No randomness or timestamps. Real provider can replace.
+async function generateIntimacyNudges({ days }) {
+  const dayCount = Number.isFinite(days) ? Math.max(0, Math.floor(days)) : null;
+  const d = dayCount === null ? '有一陣子' : `${dayCount} 天`;
+  const startedAt = Date.now();
+  const nudges = [
+    { label: '輕鬆邀約', text: `${d}沒親密囉～找個時間靠近一下吧 🙂` },
+    { label: '溫柔關心', text: `突然發現我們${d}沒好好抱抱了，好想你 💗` },
+    { label: '俏皮撒嬌', text: `喂～已經${d}了耶，今晚要不要來點我們的時間？😌` },
+  ];
+  return {
+    nudges,
+    toxicityFlags: [],
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -476,4 +500,5 @@ module.exports = {
   generateStoryInsights,
   structureStory,
   parseScriptRoles,
+  generateIntimacyNudges,
 };

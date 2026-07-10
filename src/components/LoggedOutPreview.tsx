@@ -101,6 +101,30 @@ const SampleStats: React.FC = () => {
       {nudge.hint && (
         <p className="mt-2 font-body text-xs text-petal-rose-deep text-center leading-snug">{nudge.hint}</p>
       )}
+
+      {/* Read-only preview of the「請 AI 溫柔提醒」quick action: the AI therapist
+          phrases the gap neutrally and offers three options to send. */}
+      <div className="mt-3 rounded-md border border-petal-rose-soft bg-petal-rose-soft/10 p-3">
+        <div className="flex items-center justify-between mb-2">
+          <span className="inline-flex items-center gap-1.5 font-body text-xs font-medium text-petal-rose-deep">
+            <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
+            請 AI 溫柔提醒另一半
+          </span>
+          <SampleTag />
+        </div>
+        <ul className="space-y-1.5">
+          {[
+            { label: '輕鬆邀約', text: '16 天沒親密囉～找個時間靠近一下吧 🙂' },
+            { label: '溫柔關心', text: '突然發現我們 16 天沒好好抱抱了，好想你 💗' },
+            { label: '俏皮撒嬌', text: '喂～已經 16 天了耶，今晚要不要來點我們的時間？😌' },
+          ].map((s, i) => (
+            <li key={i} className="bg-white rounded-md border border-petal-rule p-2">
+              <div className="font-body text-[9px] uppercase tracking-[0.12em] text-petal-rose-deep mb-0.5">{s.label}</div>
+              <p className="font-body text-xs text-petal-ink leading-snug">{s.text}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 };

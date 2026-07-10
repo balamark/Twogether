@@ -245,6 +245,12 @@ export interface ReconciliationOpener {
   text: string;
 }
 
+// One AI-generated「溫柔提醒」line for the 已經幾天沒有親密了 card.
+export interface NudgeSuggestion {
+  label: string;
+  text: string;
+}
+
 interface RoleplayMessageFeedbackInput {
   scriptId?: string;
   scriptTitle?: string;
@@ -2222,6 +2228,42 @@ class ApiService {
       console.error('Failed to generate reconciliation openers:', error);
       // Preserve error_code/message from the interceptor so the UI can branch.
       throw error;
+    }
+  }
+
+  // Ask the AI therapist for three gentle, neutral「溫柔提醒」lines for the given
+  // gap (days since last intimacy). Results are cached server-side per couple+day;
+  // pass regenerate to force a fresh set. 429 (AI_DAILY_LIMIT_REACHED) propagates
+  // via the shared interceptor; error_code is preserved for the UI.
+  async generateIntimacyNudges(days: number, regenerate = false): Promise<NudgeSuggestion[]> {
+    try {
+      const response = await apiClient.post('/intimacy-requests/nudge-suggestions', {
+        days,
+        regenerate: regenerate || undefined,
+      });
+      return (response.data.suggestions || []) as NudgeSuggestion[];
+    } catch (error: unknown) {
+      console.error('Failed to generate intimacy nudges:', error);
+      throw error;
+    }
+  }
+
+  // Deliver a chosen「溫柔提醒」line to the partner (in-app 邀請紀錄 + 貼心提醒 email).
+  // Returns the success message to surface to the sender.
+  async sendIntimacyNudgeMessage(message: string, days: number | null): Promise<string> {
+    try {
+      const response = await apiClient.post('/intimacy-requests/send-nudge-message', {
+        message,
+        days: days ?? undefined,
+      });
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || '無法送出提醒');
+      }
+      return response.data.message || '已把溫柔提醒送給TA了 💗';
+    } catch (error: unknown) {
+      console.error('Failed to send intimacy nudge message:', error);
+      if (error instanceof Error && error.message) throw error;
+      throw new Error((error as ApiErrorResponse)?.message || '無法送出提醒');
     }
   }
 
