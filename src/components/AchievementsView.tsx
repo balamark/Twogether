@@ -1,6 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
-import { Send } from 'lucide-react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { Send, Sparkles, RefreshCw, X } from 'lucide-react';
 import apiService from '../services/api';
+import type { NudgeSuggestion } from '../services/api';
+import type { Notification } from '../App';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { useFeatureFlag } from '../contexts/FeatureFlagsContext';
 import { formatDate, formatYmdInTz } from '../utils/datetime';
@@ -629,6 +631,143 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
   );
 }
 
+// Quick「溫柔提醒」action for the 已經幾天沒有親密了 card. Asks the AI therapist to
+// phrase the gap NEUTRALLY (three options) so it reads as a light invitation, not
+// a demand, then delivers the chosen line to the partner (in-app + email). The
+// suggestions are cached server-side per couple+day; we also memoize per
+// day-count in-session so re-opening the same gap doesn't re-request.
+function IntimacyNudgeButton({
+  days,
+  showNotification,
+}: {
+  days: number;
+  showNotification: (n: Omit<Notification, 'id'>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState<NudgeSuggestion[]>([]);
+  const [sendingIdx, setSendingIdx] = useState<number | null>(null);
+  const [sentIdx, setSentIdx] = useState<number | null>(null);
+  const cacheRef = useRef<Record<number, NudgeSuggestion[]>>({});
+
+  const load = useCallback(async (regenerate: boolean) => {
+    setLoading(true);
+    try {
+      if (!regenerate && cacheRef.current[days]) {
+        setSuggestions(cacheRef.current[days]);
+      } else {
+        const result = await apiService.generateIntimacyNudges(days, regenerate);
+        cacheRef.current[days] = result;
+        setSuggestions(result);
+        setSentIdx(null);
+      }
+    } catch (error) {
+      showNotification({
+        type: 'error',
+        title: '產生失敗',
+        message: (error as Error)?.message || 'AI 暫時無法產生提醒句子，請稍後再試，或直接自行傳訊息給另一半。',
+        duration: 5000,
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [days, showNotification]);
+
+  const handleOpen = () => {
+    setOpen(true);
+    if (suggestions.length === 0) load(false);
+  };
+
+  const handleSend = async (idx: number) => {
+    const s = suggestions[idx];
+    if (!s || sendingIdx !== null) return;
+    if (!window.confirm(`確定要把這句溫柔提醒傳給TA嗎？\n\n「${s.text}」`)) return;
+    setSendingIdx(idx);
+    try {
+      const msg = await apiService.sendIntimacyNudgeMessage(s.text, days);
+      setSentIdx(idx);
+      showNotification({ type: 'success', title: '已送出', message: msg, duration: 4000 });
+    } catch (error) {
+      showNotification({
+        type: 'error',
+        title: '送出失敗',
+        message: (error as Error)?.message || '請稍後再試。',
+        duration: 4000,
+      });
+    } finally {
+      setSendingIdx(null);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={handleOpen}
+        data-testid="intimacy-nudge-open"
+        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border border-petal-rose-soft bg-white text-petal-rose-deep hover:bg-petal-rose-soft/20 transition-colors font-body text-sm font-medium"
+      >
+        <Sparkles className="w-4 h-4" strokeWidth={1.5} />
+        請 AI 溫柔提醒另一半
+      </button>
+    );
+  }
+
+  return (
+    <div className="rounded-md border border-petal-rose-soft bg-petal-rose-soft/10 p-4 space-y-3" data-testid="intimacy-nudge-panel">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5 font-body text-sm font-medium text-petal-rose-deep">
+          <Sparkles className="w-4 h-4" strokeWidth={1.5} />
+          選一句溫柔提醒傳給TA
+        </div>
+        <button type="button" onClick={() => setOpen(false)} className="text-petal-muted hover:text-petal-ink" aria-label="收起">
+          <X className="w-4 h-4" strokeWidth={1.5} />
+        </button>
+      </div>
+      <p className="font-body text-xs text-petal-muted">中性、不帶壓力的說法，讓靠近變得自然一點。挑一句傳給TA，也會寄一封貼心提醒信。</p>
+
+      {loading ? (
+        <p className="font-body text-sm text-petal-muted py-4 text-center">AI 正在想幾句溫柔的話…</p>
+      ) : (
+        <ul className="space-y-2">
+          {suggestions.map((s, idx) => (
+            <li key={idx} className="bg-white rounded-md border border-petal-rule p-3">
+              {s.label && (
+                <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep mb-1">{s.label}</div>
+              )}
+              <p className="font-body text-sm text-petal-ink leading-snug">{s.text}</p>
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => handleSend(idx)}
+                  disabled={sendingIdx !== null || sentIdx === idx}
+                  data-testid="intimacy-nudge-send"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-pink-500 text-white hover:bg-pink-600 disabled:opacity-60 transition-colors font-body text-xs font-medium"
+                >
+                  <Send className="w-3.5 h-3.5" strokeWidth={1.5} />
+                  {sentIdx === idx ? '已送出' : sendingIdx === idx ? '送出中…' : '傳給TA'}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!loading && suggestions.length > 0 && (
+        <button
+          type="button"
+          onClick={() => load(true)}
+          data-testid="intimacy-nudge-regenerate"
+          className="inline-flex items-center gap-1.5 font-body text-xs text-petal-muted hover:text-petal-ink"
+        >
+          <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} />
+          換一批
+        </button>
+      )}
+    </div>
+  );
+}
+
 interface IntimacyStatsCardsProps {
   records: IntimateRecord[];
   birthDate?: string | null;
@@ -636,6 +775,9 @@ interface IntimacyStatsCardsProps {
   // Opens the 親密邀請 flow; shown as a CTA when the gap gets long. Only pass
   // when a partner is connected.
   onNudgePartner?: () => void;
+  // Enables the「請 AI 溫柔提醒」quick button (needs a connected partner to send).
+  partnerConnected?: boolean;
+  showNotification?: (n: Omit<Notification, 'id'>) => void;
 }
 
 // Progressive escalation for the「已經幾天沒有親密了」card. Because intimate
@@ -705,7 +847,7 @@ function weeklyRecommendationForAge(age: number): string | null {
   return '約 1';
 }
 
-export function IntimacyStatsCards({ records, birthDate, onOpenSettings, onNudgePartner }: IntimacyStatsCardsProps) {
+export function IntimacyStatsCards({ records, birthDate, onOpenSettings, onNudgePartner, partnerConnected, showNotification }: IntimacyStatsCardsProps) {
   const derived = useMemo(() => {
     if (!records || records.length === 0) {
       return { total: 0, monthlyAvg: 0, weeklyAvg: 0, thisWeek: 0, thisMonth: 0, daysSinceLast: null as number | null };
@@ -833,6 +975,12 @@ export function IntimacyStatsCards({ records, birthDate, onOpenSettings, onNudge
           <Send className="w-4 h-4" strokeWidth={1.5} />
           發送親密邀請給另一半
         </button>
+      )}
+
+      {/* Lighter, always-available option: let the AI therapist phrase a gentle,
+          neutral reminder (three choices) so nudging doesn't feel like a demand. */}
+      {partnerConnected && showNotification && hasRecords && derived.daysSinceLast !== null && (
+        <IntimacyNudgeButton days={derived.daysSinceLast} showNotification={showNotification} />
       )}
 
       {/* All-time totals — kept small */}

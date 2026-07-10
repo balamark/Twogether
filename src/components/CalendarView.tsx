@@ -435,6 +435,8 @@ const CalendarView = ({
         birthDate={authState.user?.birth_date}
         onOpenSettings={() => setCurrentView('settings')}
         onNudgePartner={onNudgePartner}
+        partnerConnected={authState.partnerConnected}
+        showNotification={showNotification}
       />
 
       {/* Enhanced Record Modal */}

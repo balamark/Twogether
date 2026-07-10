@@ -706,6 +706,55 @@ ${acceptUrl}
     }
   }
 
+  // Gentle「溫柔提醒」nudge from the 已經幾天沒有親密了 card. Neutral, low-pressure
+  // framing: the partner picked a soft reminder line to reconnect. Best-effort;
+  // the in-app reminder is the primary channel.
+  async sendIntimacyReminderNudgeEmail({ senderNickname, partnerNickname, partnerEmail, message, days = null }) {
+    if (!this.isConfigured()) return;
+    if (!partnerEmail) return;
+
+    const safeSender = this._escape(senderNickname || '你的伴侶');
+    const safePartner = this._escape(partnerNickname || '親愛的');
+    const safeMessage = this._escape(message || '').slice(0, 500);
+    const dayLine = Number.isFinite(days)
+      ? `<p style="color:#636e72;font-size:14px;">（距離上次親密已經 ${Math.max(0, Math.floor(days))} 天了）</p>`
+      : '';
+
+    const bodyHtml = `
+      <p>${safePartner}，<strong>${safeSender}</strong> 想輕輕地提醒你：</p>
+      <div class="quote">${safeMessage.replace(/\n/g, '<br>')}</div>
+      ${dayLine}
+      <p style="color:#636e72;font-size:14px;">沒有壓力，只是想找個時間靠近彼此一點 🙂</p>
+    `;
+    const html = this._activityEmailHtml({
+      headerEmoji: '💗',
+      headerTitle: '一則溫柔提醒',
+      headerSubtitle: '你的伴侶想和你靠近一點',
+      bodyHtml,
+    });
+
+    const text = [
+      `${senderNickname || '你的伴侶'} 想輕輕地提醒你：`,
+      message || '',
+      Number.isFinite(days) ? `（距離上次親密已經 ${Math.max(0, Math.floor(days))} 天了）` : '',
+      '',
+      '打開 Twogether 查看。',
+    ].filter(Boolean).join('\n');
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+        to: partnerEmail,
+        subject: `💗 ${senderNickname || '你的伴侶'} 想和你靠近一點`,
+        text,
+        html,
+      });
+      logInfo('Intimacy nudge email sent', { kind: 'intimacy_nudge' });
+    } catch (error) {
+      logError('Failed to send intimacy nudge email', { kind: 'intimacy_nudge', ...smtpErrorFields(error) });
+    }
+  }
+
   async sendEventNotification({ senderName, recipientEmail, eventTitle = '', type, messageContent = '', aiName = null }) {
     if (!this.isConfigured()) return;
     if (!recipientEmail) return;

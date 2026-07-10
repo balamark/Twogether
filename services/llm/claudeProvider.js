@@ -1479,6 +1479,136 @@ async function structureStory({ rawText }) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Intimacy reminder nudges ("溫柔提醒")
+// ---------------------------------------------------------------------------
+// The 已經幾天沒有親密了 stat shows how many days it's been since the couple's
+// last intimate moment. Sending a full 親密邀請 can feel like a demand; this
+// helper instead produces THREE gentle, NEUTRAL one-liners the user can pick
+// from — stating the fact softly and inviting reconnection without pressure,
+// guilt, or blame. The chosen line is delivered to the partner.
+
+const INTIMACY_NUDGE_SYSTEM_PROMPT = `你是一位溫柔、中立、專業的伴侶親密關係教練。情境：一對伴侶已經有一段時間沒有親密了，其中一方想傳一則「輕輕的提醒」給另一半，但不希望聽起來像是在要求、抱怨或施壓。請永遠以繁體中文回覆。
+
+任務：依「距離上次親密的天數」，寫出「三則」可以直接傳給伴侶的溫柔提醒候選。
+
+核心守則：
+- 立場中立、就事論事：可以自然地點出天數這個「事實」，語氣是輕鬆的邀請與關心，不是命令、不是討債、不是抱怨。
+- 絕對不要讓對方有壓力或罪惡感：不指責、不說「你都不主動」、不情緒勒索、不比較、不翻舊帳。
+- 溫暖、可愛、口語，像真的會在訊息裡傳的話。可以帶一點俏皮或撒嬌，但不肉麻、不色情。
+- 每則都很短（1 句、最多 2 短句），可以自然地放入天數，並可用一個輕鬆的表情符號（🙂💗😌 等，最多一個）。
+- 三則語氣要略有不同（例如：輕鬆邀約／溫柔關心／俏皮撒嬌），讓使用者有得挑。
+- 範例風格（僅供參考語氣，不要照抄）：「X 天沒親密囉～找個時間靠近一下吧 🙂」。
+- 只使用繁體中文。
+
+回應請只呼叫 emit_intimacy_nudges tool，不要輸出其他文字。`;
+
+const INTIMACY_NUDGE_TOOL_SCHEMA = {
+  name: 'emit_intimacy_nudges',
+  description: 'Return three short, gentle, neutral reminder messages a partner can send after a stretch without intimacy.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      nudges: {
+        type: 'array',
+        minItems: 3,
+        maxItems: 3,
+        items: {
+          type: 'object',
+          properties: {
+            label: { type: 'string', description: '一個 4～8 字的短標題，例如「輕鬆邀約」「溫柔關心」「俏皮撒嬌」' },
+            text: { type: 'string', description: '可直接傳出的溫柔提醒，1 句（最多 2 短句）' },
+          },
+          required: ['label', 'text'],
+        },
+      },
+      toxicityFlags: {
+        type: 'array',
+        items: { type: 'string' },
+      },
+    },
+    required: ['nudges', 'toxicityFlags'],
+  },
+};
+
+async function generateIntimacyNudges({ days, userGender = null, partnerGender = null }) {
+  const dayCount = Number.isFinite(days) ? Math.max(0, Math.floor(days)) : null;
+
+  // Gender context rides in the user message so the cached system prefix stays
+  // byte-identical across users.
+  const genderLines = [
+    genderHint(userGender, '撰寫者（使用者本人）'),
+    genderHint(partnerGender, '伴侶'),
+  ].filter(Boolean);
+  const lines = [];
+  if (genderLines.length > 0) lines.push(genderLines.join('\n'), '');
+  lines.push(
+    dayCount === null
+      ? '距離上次親密已經有一段時間了（天數未知，請用「有一陣子」這類說法，不要編造具體數字）。'
+      : `距離上次親密已經 ${dayCount} 天了。`
+  );
+  lines.push('請產生三則溫柔、中性、不帶壓力的提醒訊息。');
+  const userContent = lines.join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system: [
+      {
+        type: 'text',
+        text: INTIMACY_NUDGE_SYSTEM_PROMPT + PUNCTUATION_RULE,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [INTIMACY_NUDGE_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_intimacy_nudges' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.intimacy_nudge', {
+    model: response.model || MODEL,
+    days: dayCount,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_intimacy_nudges'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input || {};
+
+  return {
+    nudges: (Array.isArray(out.nudges) ? out.nudges : [])
+      .filter((n) => n && typeof n.text === 'string' && n.text.trim())
+      .slice(0, 3)
+      .map((n) => ({ label: (n.label || '').toString().trim(), text: n.text.trim() })),
+    toxicityFlags: out.toxicityFlags || [],
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -1490,6 +1620,7 @@ module.exports = {
   generateStoryInsights,
   structureStory,
   parseScriptRoles,
+  generateIntimacyNudges,
   // Exported for prompt-contract regression tests only.
   buildRoleplayUserContent,
 };
