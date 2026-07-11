@@ -7,6 +7,7 @@ import { companionName, resolveCompanion } from '../utils/aiCompanions';
 import { useAiQuota } from '../hooks/useAiQuota';
 import AiQuotaHint from './AiQuotaHint';
 import MessageTranslationCard from './MessageTranslationCard';
+import ConflictBanner from './ConflictBanner';
 
 interface WallPostThreadProps {
   postId: string;
@@ -191,6 +192,13 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
         <div className="font-body text-xs text-petal-muted italic">
           還沒有回覆 — 留下第一句話吧。
         </div>
+      )}
+
+      {!loading && (
+        <ConflictBanner
+          messages={replies.map((r) => ({ content: r.content, isAi: r.is_ai === true }))}
+          threadKey={`wall:${postId}`}
+        />
       )}
 
       {/* 情緒翻譯 lens toggle — shared across both partners. Turns each message

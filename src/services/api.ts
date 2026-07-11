@@ -493,6 +493,7 @@ export interface EventRecord {
   unreadCount: number;
   lastMessagePreview: string | null;
   translationEnabled: boolean;
+  therapyNote: TherapyNote | null;
   messages: EventMessage[];
 }
 
@@ -505,6 +506,16 @@ export interface MessageTranslation {
 
 // Keyed by message id.
 export type MessageTranslationMap = Record<string, MessageTranslation>;
+
+// 治療摘要 (Therapy Note) — the structured post-conflict summary for a resolved
+// event. Shared to both partners, generated once.
+export interface TherapyNote {
+  trigger: string;
+  needs: { who: string; need: string }[];
+  cycle: string[];
+  repairs: { who: string; text: string }[];
+  nextTime: string;
+}
 
 export interface CreateEventInput {
   title: string;
@@ -3267,6 +3278,18 @@ class ApiService {
     }
   }
 
+  // Fetch the post-conflict 治療摘要 for a resolved event. Generated once and
+  // shared to both partners, so re-opens are free.
+  async getEventTherapyNote(eventId: string): Promise<TherapyNote> {
+    try {
+      const response = await apiClient.get(`/events/${eventId}/therapy-note`);
+      return response.data.therapyNote as TherapyNote;
+    } catch (error: unknown) {
+      console.error('Failed to fetch therapy note:', error);
+      this.throwApiError(error, '治療摘要暫時無法產生，請稍後再試');
+    }
+  }
+
   async markEventMessageRead(eventId: string, msgId: string): Promise<void> {
     try {
       await apiClient.put(`/events/${eventId}/messages/${msgId}/read`);
@@ -3409,6 +3432,7 @@ class ApiService {
       unread_count?: number;
       last_message_preview?: string | null;
       translation_enabled?: boolean;
+      therapy_note?: TherapyNote | null;
       messages?: unknown[];
     };
     return {
@@ -3439,6 +3463,7 @@ class ApiService {
       unreadCount: Number(r.unread_count) || 0,
       lastMessagePreview: r.last_message_preview ?? null,
       translationEnabled: r.translation_enabled === true,
+      therapyNote: r.therapy_note ?? null,
       messages: Array.isArray(r.messages) ? r.messages.map((m) => this.transformEventMessage(m)) : [],
     };
   }

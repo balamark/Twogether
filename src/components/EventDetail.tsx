@@ -14,6 +14,7 @@ import {
   RotateCcw,
   X,
   Pencil,
+  NotebookPen,
 } from 'lucide-react';
 import apiService, {
   type EventRecord,
@@ -22,9 +23,12 @@ import apiService, {
   type EmotionAcceptancePreview,
   type EventVersionKey,
   type MessageTranslationMap,
+  type TherapyNote,
 } from '../services/api';
 import ReplyStepBar from './ReplyStepBar';
 import MessageTranslationCard from './MessageTranslationCard';
+import TherapyNoteCard from './TherapyNoteCard';
+import ConflictBanner from './ConflictBanner';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
@@ -110,6 +114,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const [translationEnabled, setTranslationEnabled] = useState(false);
   const [translations, setTranslations] = useState<MessageTranslationMap>({});
   const [translationLoading, setTranslationLoading] = useState(false);
+  const [therapyNote, setTherapyNote] = useState<TherapyNote | null>(null);
+  const [therapyLoading, setTherapyLoading] = useState(false);
   const tz = useTimezone();
 
   const insertPhrase = (phrase: string) => {
@@ -217,6 +223,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       const data = await apiService.getEvent(eventId);
       setEvent(data);
       setTranslationEnabled(data.translationEnabled);
+      setTherapyNote(data.therapyNote);
       if (data.translationEnabled) loadTranslations();
       // Mark inbound unread messages as read (fire-and-forget)
       data.messages
@@ -240,6 +247,32 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
         title: '無法更新情緒翻譯設定',
         message: err instanceof Error ? err.message : '請稍後再試',
       });
+    }
+  };
+
+  const loadTherapyNote = async () => {
+    setTherapyLoading(true);
+    try {
+      const note = await apiService.getEventTherapyNote(eventId);
+      setTherapyNote(note);
+    } catch (err) {
+      const code = (err as { error_code?: string })?.error_code;
+      if (code === 'AI_DAILY_LIMIT_REACHED') {
+        showNotification({
+          type: 'warning',
+          title: '今日 AI 次數已用完',
+          message: '治療摘要次數已達今日上限，升級 Premium 可提高每日上限，明天也會自動補上。',
+        });
+      } else {
+        showNotification({
+          type: 'error',
+          title: '治療摘要暫時無法產生',
+          message: err instanceof Error ? err.message : '請稍後再試',
+        });
+      }
+    } finally {
+      setTherapyLoading(false);
+      refreshQuota();
     }
   };
 
@@ -607,6 +640,10 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
         )}
       </header>
 
+      {!event.isPrivate && event.status !== 'resolved' && (
+        <ConflictBanner messages={event.messages} threadKey={`event:${event.id}`} />
+      )}
+
       {!event.isPrivate && (
         <section className="bg-petal-cream border border-petal-rule rounded-2xl p-4 space-y-3">
           {/* 情緒翻譯 lens toggle — shared across both partners. Turns each
@@ -887,21 +924,47 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       )}
 
       {!event.isPrivate && event.status === 'resolved' && (
-        <div className="flex flex-col items-center gap-2 text-center bg-petal-sage/15 border border-petal-sage/40 rounded-2xl p-4">
-          <p className="text-sm text-petal-ink-soft inline-flex items-center gap-1.5">
-            <CheckCircle2 className="w-4 h-4 text-petal-sage-deep" />
-            這個事件已解決。如果還想再聊聊，可以重新開啟。
-          </p>
-          <button
-            type="button"
-            data-testid="event-reopen-button"
-            disabled={resolving}
-            onClick={handleReopen}
-            className="px-4 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2 disabled:opacity-50"
-          >
-            {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-            重新開啟討論
-          </button>
+        <div className="space-y-3">
+          {therapyNote ? (
+            <TherapyNoteCard note={therapyNote} />
+          ) : (
+            <div className="bg-petal-sage/15 border border-petal-sage/40 rounded-2xl p-4 text-center space-y-2">
+              <p className="text-sm text-petal-ink inline-flex items-center gap-1.5">
+                <NotebookPen className="w-4 h-4 text-petal-sage-deep" />
+                想不想讓 AI 幫你們整理這次衝突的「治療摘要」？
+              </p>
+              <p className="text-xs text-petal-ink-soft leading-relaxed">
+                看清楚這次的觸發點、彼此真正的需求、你們落入的循環，還有下次可以先說的一句話。
+              </p>
+              <button
+                type="button"
+                data-testid="event-therapy-note-button"
+                disabled={therapyLoading}
+                onClick={loadTherapyNote}
+                className="px-4 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2 disabled:opacity-50"
+              >
+                {therapyLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <NotebookPen className="w-4 h-4" />}
+                {therapyLoading ? '整理中⋯' : '產生治療摘要'}
+              </button>
+            </div>
+          )}
+
+          <div className="flex flex-col items-center gap-2 text-center bg-petal-sage/15 border border-petal-sage/40 rounded-2xl p-4">
+            <p className="text-sm text-petal-ink-soft inline-flex items-center gap-1.5">
+              <CheckCircle2 className="w-4 h-4 text-petal-sage-deep" />
+              這個事件已解決。如果還想再聊聊，可以重新開啟。
+            </p>
+            <button
+              type="button"
+              data-testid="event-reopen-button"
+              disabled={resolving}
+              onClick={handleReopen}
+              className="px-4 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2 disabled:opacity-50"
+            >
+              {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+              重新開啟討論
+            </button>
+          </div>
         </div>
       )}
     </div>

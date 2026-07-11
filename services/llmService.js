@@ -27,5 +27,6 @@ module.exports = {
   structureStory: provider.structureStory,
   parseScriptRoles: provider.parseScriptRoles,
   generateThreadTranslations: provider.generateThreadTranslations,
+  generateTherapyNote: provider.generateTherapyNote,
   providerName: PROVIDER_NAME,
 };
