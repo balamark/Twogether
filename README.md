@@ -36,7 +36,15 @@ Then visit: http://localhost:8080
 ## 📝 Changelog
 
 User-facing feature changes, newest first. (Convention: every UI feature change
-adds a dated entry here; see `CLAUDE.md`.)
+adds a fragment file in `changelog/`; CI compiles them into the block below —
+see `CLAUDE.md`.)
+
+<!-- changelog:begin (generated from changelog/*.md — edit those, not this) -->
+### 2026-07-11
+- **分享連結有預覽卡片了**: 把 Twogether（首頁、付費方案、成為諮商師）貼到 LINE、
+  Facebook 或 Threads，現在會顯示品牌預覽圖與說明文字，不再是一條光禿禿的網址。
+- **全新品牌 icon**: 瀏覽器分頁與 iOS 加入主畫面的圖示換成 Twogether 的雙環標誌
+  （玫瑰色與鼠尾草綠漸層），取代原本的開發工具預設圖示。
 
 ### 2026-07-10
 - **自訂劇本封面可用短影片**: 上傳自訂劇本時，第一個檔案除了照片，現在也可以放一段短影片
@@ -248,6 +256,7 @@ adds a dated entry here; see `CLAUDE.md`.)
   親密邀請) as the gap passes 7 / 10 / 12 / 15 days.
 - **金幣商店移入 Profile**: Coin shop moved into the Profile menu so the Two*gether*
   logo renders fully on mobile.
+<!-- changelog:end -->
 
 ## 📧 Email 通知
 

@@ -7,9 +7,13 @@ current.
 
 When you ship a user-facing UI feature change:
 
-1. **Add a dated entry to the `## 📝 Changelog` section in `README.md`** (newest
-   first, grouped by date). Keep it user-facing and concise — what changed and
-   why it matters, not implementation detail.
+1. **Add a changelog fragment file `changelog/YYYY-MM-DD-<slug>.md`** (today's
+   date, short kebab-case slug, e.g. `changelog/2026-07-11-social-previews.md`)
+   containing just the markdown bullet(s): `- **標題**: 說明…`. Keep it
+   user-facing and concise — what changed and why it matters, not implementation
+   detail. One new file per change; **never edit the generated changelog block
+   in `README.md` by hand** — CI (`.github/workflows/changelog.yml`) recompiles
+   it on merge to main. Preview locally with `npm run changelog`.
 2. **Write a short thread/social post** promoting the feature (a few punchy lines,
    plain language, emoji ok) and give it to the user to share publicly. The thread
    post goes in the chat reply, not the repo (unless asked).
