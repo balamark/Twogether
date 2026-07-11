@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { X, Trash2, FileDown } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
-import { detectScriptSpeakers, applySpeakerAssignments } from '../utils/script';
+import { detectScriptSpeakers, applySpeakerAssignments, isVideoUrl, VIDEO_MAX_BYTES } from '../utils/script';
 import { apiService } from '../services/api';
 import type { RoleplayScript } from '../App';
 
@@ -213,8 +213,14 @@ const ScriptUploadModal = ({
     const picked = Array.from(e.target.files ?? []);
     e.target.value = ''; // allow re-picking the same file
     if (picked.length === 0) return;
-    const oversize = picked.find((f) => f.size > 5 * 1024 * 1024);
-    if (oversize) {
+    // Per-type size caps: videos may be larger than images (stored raw).
+    const oversizeVideo = picked.find((f) => f.type.startsWith('video/') && f.size > VIDEO_MAX_BYTES);
+    if (oversizeVideo) {
+      alert(`影片大小不能超過 ${Math.round(VIDEO_MAX_BYTES / (1024 * 1024))}MB，請壓縮或改用較短的片段後再試。`);
+      return;
+    }
+    const oversizeImage = picked.find((f) => !f.type.startsWith('video/') && f.size > 5 * 1024 * 1024);
+    if (oversizeImage) {
       alert('每張照片大小不能超過 5MB');
       return;
     }
@@ -597,14 +603,14 @@ const ScriptUploadModal = ({
 
           <div>
             <label htmlFor="script-thumbnail" className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
-              劇本照片（選填，最多 {MAX_SCRIPT_PHOTOS} 張，每張最大 5MB）
-              <span className="ml-1 normal-case tracking-normal text-petal-muted/80">· 第一張為封面</span>
+              劇本封面照片／影片（選填，最多 {MAX_SCRIPT_PHOTOS} 個，照片每張最大 5MB、影片最大 {Math.round(VIDEO_MAX_BYTES / (1024 * 1024))}MB）
+              <span className="ml-1 normal-case tracking-normal text-petal-muted/80">· 第一個為封面，可用短影片</span>
             </label>
             <input
               id="script-thumbnail"
               name="photos"
               type="file"
-              accept="image/jpeg,image/png,image/webp"
+              accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime"
               multiple
               onChange={handleAddPhotos}
               disabled={photoCount >= MAX_SCRIPT_PHOTOS}
@@ -616,9 +622,17 @@ const ScriptUploadModal = ({
               <div className="mt-3 grid grid-cols-4 sm:grid-cols-5 gap-2" data-testid="script-photos-grid">
                 {existingPhotos.map((url, idx) => {
                   const isCover = idx === 0;
+                  const isVideo = isVideoUrl(url);
                   return (
                     <div key={`ex-${url}-${idx}`} className="relative aspect-square rounded-md overflow-hidden border border-petal-rule bg-petal-cream-2">
-                      <img src={url} alt={`photo ${idx + 1}`} className="w-full h-full object-cover" />
+                      {isVideo ? (
+                        <video src={url} className="w-full h-full object-cover" muted loop playsInline autoPlay />
+                      ) : (
+                        <img src={url} alt={`photo ${idx + 1}`} className="w-full h-full object-cover" />
+                      )}
+                      {isVideo && (
+                        <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-body">影片</span>
+                      )}
                       {isCover && (
                         <span className="absolute bottom-0 inset-x-0 bg-petal-ink/70 text-petal-cream text-[10px] text-center py-0.5">封面</span>
                       )}
@@ -635,9 +649,17 @@ const ScriptUploadModal = ({
                 })}
                 {newPhotoPreviews.map((url, idx) => {
                   const isCover = existingPhotos.length === 0 && idx === 0;
+                  const isVideo = newPhotos[idx]?.type.startsWith('video/');
                   return (
                     <div key={`new-${idx}`} className="relative aspect-square rounded-md overflow-hidden border border-petal-rule bg-petal-cream-2">
-                      <img src={url} alt={existingPhotos.length === 0 && idx === 0 ? 'thumbnail preview' : `new photo ${idx + 1}`} className="w-full h-full object-cover" />
+                      {isVideo ? (
+                        <video src={url} className="w-full h-full object-cover" muted loop playsInline autoPlay />
+                      ) : (
+                        <img src={url} alt={existingPhotos.length === 0 && idx === 0 ? 'thumbnail preview' : `new photo ${idx + 1}`} className="w-full h-full object-cover" />
+                      )}
+                      {isVideo && (
+                        <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-body">影片</span>
+                      )}
                       {isCover && (
                         <span className="absolute bottom-0 inset-x-0 bg-petal-ink/70 text-petal-cream text-[10px] text-center py-0.5">封面</span>
                       )}
@@ -657,8 +679,8 @@ const ScriptUploadModal = ({
 
             <p className="mt-2 font-display italic font-light text-xs text-petal-muted">
               {photoCount > 0
-                ? `已選 ${photoCount} / ${MAX_SCRIPT_PHOTOS} 張 · 點開劇本可左右滑看全部照片`
-                : '未上傳照片時，會使用編輯式預設圖。'}
+                ? `已選 ${photoCount} / ${MAX_SCRIPT_PHOTOS} 個 · 影片封面會靜音循環播放，點開可看全部照片與影片`
+                : '未上傳時，會使用編輯式預設圖。第一個放影片，封面就會動起來。'}
             </p>
           </div>
 

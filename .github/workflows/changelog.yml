@@ -1,0 +1,50 @@
+# Compiles changelog fragments (changelog/YYYY-MM-DD-<slug>.md) into the
+# marked block of README.md and commits the result. PRs only ever ADD fragment
+# files — one new file per change, so concurrent PRs can't conflict — and this
+# workflow keeps README.md as the single readable changelog on main.
+#
+# No retrigger loop: the auto-commit touches only README.md, which is outside
+# this workflow's paths filter and outside deploy.yml's paths-filter; [skip ci]
+# is belt-and-braces.
+name: Compile changelog
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'changelog/**'
+      - 'scripts/build-changelog.mjs'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: changelog-main
+  cancel-in-progress: false
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Dependency-free (node stdlib only) — no npm ci needed.
+      - run: node scripts/build-changelog.mjs
+
+      - name: Commit compiled README if changed
+        run: |
+          if git diff --quiet README.md; then
+            echo "README.md already up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "docs: compile changelog from fragments [skip ci]"
+          git push origin main
