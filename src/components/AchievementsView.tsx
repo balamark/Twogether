@@ -631,11 +631,11 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
   );
 }
 
-// Quick「溫柔提醒」action for the 已經幾天沒有親密了 card. Asks the AI therapist to
-// phrase the gap NEUTRALLY (three options) so it reads as a light invitation, not
-// a demand, then delivers the chosen line to the partner (in-app + email). The
-// suggestions are cached server-side per couple+day; we also memoize per
-// day-count in-session so re-opening the same gap doesn't re-request.
+// Quick「溫柔提醒」action for the 已經幾天沒有親密了 card. Twogether (the platform,
+// NOT the partner) phrases the gap in a neutral, low-pressure way and offers three
+// options — the recommended tone plus a couple of random others — for the user to
+// send to their partner (in-app + email). Options are cached server-side per
+// couple+day; we also memoize per day-count in-session so re-opening is instant.
 function IntimacyNudgeButton({
   days,
   showNotification,
@@ -665,7 +665,7 @@ function IntimacyNudgeButton({
       showNotification({
         type: 'error',
         title: '產生失敗',
-        message: (error as Error)?.message || 'AI 暫時無法產生提醒句子，請稍後再試，或直接自行傳訊息給另一半。',
+        message: (error as Error)?.message || '暫時無法產生提醒句子，請稍後再試，或直接自行傳訊息給另一半。',
         duration: 5000,
       });
     } finally {
@@ -681,7 +681,7 @@ function IntimacyNudgeButton({
   const handleSend = async (idx: number) => {
     const s = suggestions[idx];
     if (!s || sendingIdx !== null) return;
-    if (!window.confirm(`確定要把這句溫柔提醒傳給TA嗎？\n\n「${s.text}」`)) return;
+    if (!window.confirm(`要讓 Twogether 把這則溫柔提醒送給TA嗎？\n\n「${s.text}」`)) return;
     setSendingIdx(idx);
     try {
       const msg = await apiService.sendIntimacyNudgeMessage(s.text, days);
@@ -708,7 +708,7 @@ function IntimacyNudgeButton({
         className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border border-petal-rose-soft bg-white text-petal-rose-deep hover:bg-petal-rose-soft/20 transition-colors font-body text-sm font-medium"
       >
         <Sparkles className="w-4 h-4" strokeWidth={1.5} />
-        請 AI 溫柔提醒另一半
+        讓 Twogether 溫柔提醒另一半
       </button>
     );
   }
@@ -718,23 +718,28 @@ function IntimacyNudgeButton({
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 font-body text-sm font-medium text-petal-rose-deep">
           <Sparkles className="w-4 h-4" strokeWidth={1.5} />
-          選一句溫柔提醒傳給TA
+          選一則由 Twogether 送出的溫柔提醒
         </div>
         <button type="button" onClick={() => setOpen(false)} className="text-petal-muted hover:text-petal-ink" aria-label="收起">
           <X className="w-4 h-4" strokeWidth={1.5} />
         </button>
       </div>
-      <p className="font-body text-xs text-petal-muted">中性、不帶壓力的說法，讓靠近變得自然一點。挑一句傳給TA，也會寄一封貼心提醒信。</p>
+      <p className="font-body text-xs text-petal-muted">由平台以中性、不帶壓力的語氣提醒你們（不是以你的名義）。挑一則送給TA，也會寄一封貼心提醒信。</p>
 
       {loading ? (
-        <p className="font-body text-sm text-petal-muted py-4 text-center">AI 正在想幾句溫柔的話…</p>
+        <p className="font-body text-sm text-petal-muted py-4 text-center">正在準備幾則溫柔的提醒…</p>
       ) : (
         <ul className="space-y-2">
           {suggestions.map((s, idx) => (
-            <li key={idx} className="bg-white rounded-md border border-petal-rule p-3">
-              {s.label && (
-                <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep mb-1">{s.label}</div>
-              )}
+            <li key={s.id || idx} className={`bg-white rounded-md border p-3 ${s.recommended ? 'border-petal-rose-deep' : 'border-petal-rule'}`}>
+              <div className="flex items-center gap-2 mb-1">
+                {s.label && (
+                  <span className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep">{s.emoji ? `${s.emoji} ` : ''}{s.label}</span>
+                )}
+                {s.recommended && (
+                  <span className="font-body text-[10px] px-1.5 py-0.5 rounded-full bg-petal-rose-soft/60 text-petal-rose-deep">推薦</span>
+                )}
+              </div>
               <p className="font-body text-sm text-petal-ink leading-snug">{s.text}</p>
               <div className="mt-2 flex justify-end">
                 <button
@@ -745,7 +750,7 @@ function IntimacyNudgeButton({
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-pink-500 text-white hover:bg-pink-600 disabled:opacity-60 transition-colors font-body text-xs font-medium"
                 >
                   <Send className="w-3.5 h-3.5" strokeWidth={1.5} />
-                  {sentIdx === idx ? '已送出' : sendingIdx === idx ? '送出中…' : '傳給TA'}
+                  {sentIdx === idx ? '已送出' : sendingIdx === idx ? '送出中…' : '送給TA'}
                 </button>
               </div>
             </li>
@@ -775,7 +780,7 @@ interface IntimacyStatsCardsProps {
   // Opens the 親密邀請 flow; shown as a CTA when the gap gets long. Only pass
   // when a partner is connected.
   onNudgePartner?: () => void;
-  // Enables the「請 AI 溫柔提醒」quick button (needs a connected partner to send).
+  // Enables the「讓 Twogether 溫柔提醒」quick button (needs a connected partner).
   partnerConnected?: boolean;
   showNotification?: (n: Omit<Notification, 'id'>) => void;
 }
@@ -977,8 +982,9 @@ export function IntimacyStatsCards({ records, birthDate, onOpenSettings, onNudge
         </button>
       )}
 
-      {/* Lighter, always-available option: let the AI therapist phrase a gentle,
-          neutral reminder (three choices) so nudging doesn't feel like a demand. */}
+      {/* Lighter, always-available option: let Twogether (the platform) phrase a
+          gentle, neutral reminder (three choices) so it doesn't feel like a demand
+          from you. */}
       {partnerConnected && showNotification && hasRecords && derived.daysSinceLast !== null && (
         <IntimacyNudgeButton days={derived.daysSinceLast} showNotification={showNotification} />
       )}

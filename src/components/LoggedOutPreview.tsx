@@ -103,24 +103,29 @@ const SampleStats: React.FC = () => {
         <p className="mt-2 font-body text-xs text-petal-rose-deep text-center leading-snug">{nudge.hint}</p>
       )}
 
-      {/* Read-only preview of the「請 AI 溫柔提醒」quick action: the AI therapist
+      {/* Read-only preview of the「讓 Twogether 溫柔提醒」quick action: the platform
           phrases the gap neutrally and offers three options to send. */}
       <div className="mt-3 rounded-md border border-petal-rose-soft bg-petal-rose-soft/10 p-3">
         <div className="flex items-center justify-between mb-2">
           <span className="inline-flex items-center gap-1.5 font-body text-xs font-medium text-petal-rose-deep">
             <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
-            請 AI 溫柔提醒另一半
+            讓 Twogether 溫柔提醒另一半
           </span>
           <SampleTag />
         </div>
         <ul className="space-y-1.5">
           {[
-            { label: '輕鬆邀約', text: '16 天沒親密囉～找個時間靠近一下吧 🙂' },
-            { label: '溫柔關心', text: '突然發現我們 16 天沒好好抱抱了，好想你 💗' },
-            { label: '俏皮撒嬌', text: '喂～已經 16 天了耶，今晚要不要來點我們的時間？😌' },
+            { label: '🫶 鼓勵連結', text: '已經 16 天沒有記錄親密時光。一個擁抱、一場散步，或一段沒有打擾的聊天，都能讓彼此更靠近。', recommended: true },
+            { label: '💛 溫柔關心', text: 'Twogether 注意到，你們已經 16 天沒有記錄親密時光了。如果最近生活比較忙，不妨找個舒服的時間，好好陪伴彼此。', recommended: false },
+            { label: '🌿 不只談性', text: '已經有 16 天沒有記錄親密時光了。親密不一定只有性愛，也可以是一個擁抱、一句關心，或一起度過的一段時光。', recommended: false },
           ].map((s, i) => (
-            <li key={i} className="bg-white rounded-md border border-petal-rule p-2">
-              <div className="font-body text-[9px] uppercase tracking-[0.12em] text-petal-rose-deep mb-0.5">{s.label}</div>
+            <li key={i} className={`bg-white rounded-md border p-2 ${s.recommended ? 'border-petal-rose-deep' : 'border-petal-rule'}`}>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="font-body text-[9px] uppercase tracking-[0.12em] text-petal-rose-deep">{s.label}</span>
+                {s.recommended && (
+                  <span className="font-body text-[9px] px-1 py-0.5 rounded-full bg-petal-rose-soft/60 text-petal-rose-deep">推薦</span>
+                )}
+              </div>
               <p className="font-body text-xs text-petal-ink leading-snug">{s.text}</p>
             </li>
           ))}

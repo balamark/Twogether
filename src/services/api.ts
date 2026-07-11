@@ -245,10 +245,14 @@ export interface ReconciliationOpener {
   text: string;
 }
 
-// One AI-generated「溫柔提醒」line for the 已經幾天沒有親密了 card.
+// One platform-voiced「溫柔提醒」option for the 已經幾天沒有親密了 card. Authored
+// by Twogether (not the partner); `recommended` marks the default tone.
 export interface NudgeSuggestion {
+  id?: string;
   label: string;
+  emoji?: string;
   text: string;
+  recommended?: boolean;
 }
 
 interface RoleplayMessageFeedbackInput {
@@ -2231,10 +2235,9 @@ class ApiService {
     }
   }
 
-  // Ask the AI therapist for three gentle, neutral「溫柔提醒」lines for the given
-  // gap (days since last intimacy). Results are cached server-side per couple+day;
-  // pass regenerate to force a fresh set. 429 (AI_DAILY_LIMIT_REACHED) propagates
-  // via the shared interceptor; error_code is preserved for the UI.
+  // Fetch three platform-voiced「溫柔提醒」options for the given gap (days since
+  // last intimacy). Twogether authors the copy from a curated tone catalog;
+  // results are cached server-side per couple+day, and regenerate reshuffles.
   async generateIntimacyNudges(days: number, regenerate = false): Promise<NudgeSuggestion[]> {
     try {
       const response = await apiClient.post('/intimacy-requests/nudge-suggestions', {
