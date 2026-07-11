@@ -522,6 +522,46 @@ async function generateThreadTranslations({ messages, targetIds }) {
   };
 }
 
+// Deterministic post-conflict therapy note. Picks the first two distinct human
+// speakers, maps each to a need via the lexicon, and builds a fixed-shape cycle
+// + repair + next-time line. Same input → same output. Real provider replaces.
+async function generateTherapyNote({ eventSummary, messages }) {
+  const startedAt = Date.now();
+  const humans = (Array.isArray(messages) ? messages : []).filter((m) => !m.isAi);
+  const names = [];
+  for (const m of humans) {
+    const who = (m.speaker || '').toString().trim();
+    if (who && !names.includes(who)) names.push(who);
+    if (names.length >= 2) break;
+  }
+  const a = names[0] || '一方';
+  const b = names[1] || '另一方';
+  const needA = pickNeed((humans[0]?.content || '').toString()).need;
+  const needB = pickNeed((humans.find((m) => (m.speaker || '') === b)?.content || '').toString()).need;
+
+  return {
+    trigger: (eventSummary || '這次的分歧').toString().trim().slice(0, 40),
+    needs: [
+      { who: a, need: needA },
+      { who: b, need: needB },
+    ],
+    cycle: [`${a} 追問`, `${b} 退縮`, `${a} 更急`, `${b} 更沉默`],
+    repairs: [
+      { who: b, text: '願意承認自己忽略了對方的訊息。' },
+      { who: a, text: '願意說出真正擔心的是失去連結。' },
+    ],
+    nextTime: '我現在不是生氣，我只是有點害怕。',
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+      assembledPrompt: `[mock] therapy note for ${humans.length} human messages`,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -534,4 +574,5 @@ module.exports = {
   structureStory,
   parseScriptRoles,
   generateThreadTranslations,
+  generateTherapyNote,
 };

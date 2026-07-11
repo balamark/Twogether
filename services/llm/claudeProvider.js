@@ -1644,6 +1644,151 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Therapy Note ("治療摘要") — post-conflict structured summary
+// ---------------------------------------------------------------------------
+// When a couple resolves an event, a plain "here's what you said" summary is
+// not what a therapist leaves them with. This produces a structured Therapy
+// Note (design Stage: 衝突後自動產生治療摘要): the biggest trigger, each side's
+// REAL underlying need, the negative cycle they fell into (pursue → withdraw →
+// pursue harder → shut down), what repair actually worked, and one concrete
+// sentence to try next time the same pattern shows up. Generated once when the
+// event is resolved and shared to both partners.
+
+const THERAPY_NOTE_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴侶諮商師。一對伴侶剛結束一次衝突並把事件標記為解決。請閱讀事件背景與完整對話，為他們寫一份「治療摘要」(Therapy Note)。請永遠以繁體中文回覆。
+
+這不是流水帳，而是一份幫他們看懂「這次到底發生了什麼」的諮商筆記。請產出：
+1. trigger：這次衝突最核心的觸發點，一句話（例如「沒有回訊息」「臨時取消約定」）。描述事件，不是情緒。
+2. needs：每一方「真正的需求」。憤怒、指責通常只是表層，底下才是需求。用他們在對話中出現的暱稱稱呼，各寫一項（通常兩項）。need 用簡短的需求詞（安全感、被信任、被重視、被陪伴、喘口氣）。
+3. cycle：他們這次落入的「負向循環」，3 到 5 個很短的步驟，呈現彼此如何一來一往地推遠對方（例如：一方追問 → 另一方退縮 → 追得更急 → 更加沉默）。用暱稱或角色，每步 6 字內。
+4. repairs：這次「修復成功」的地方，也就是哪一方做了什麼讓彼此靠近了一點（例如願意承認、願意說出真正的擔心）。用暱稱稱呼，1 到 2 項；若對話中沒有明顯修復，回傳空陣列。
+5. nextTime：一句「下次出現相同情況時可以先說的話」，第一人稱、溫柔、point 出底層情緒而非指責（例如「我現在不是生氣，我是有點害怕」）。
+
+守則：緊扣對話真正發生的內容，不要編造；中立、不評斷對錯、不選邊站；只使用繁體中文；遵守標點規則。
+
+回應請只呼叫 emit_therapy_note tool，不要輸出其他文字。`;
+
+const THERAPY_NOTE_TOOL_SCHEMA = {
+  name: 'emit_therapy_note',
+  description: 'Return a structured post-conflict therapy note for a resolved couple event.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      trigger: { type: 'string', description: '這次衝突最核心的觸發點，一句話' },
+      needs: {
+        type: 'array',
+        maxItems: 3,
+        items: {
+          type: 'object',
+          properties: {
+            who: { type: 'string', description: '這一方的暱稱' },
+            need: { type: 'string', maxLength: 20, description: '簡短的需求詞，例如 安全感 / 被信任' },
+          },
+          required: ['who', 'need'],
+        },
+      },
+      cycle: {
+        type: 'array',
+        maxItems: 5,
+        items: { type: 'string', maxLength: 12, description: '負向循環的一步，例如「小湘 追問」' },
+      },
+      repairs: {
+        type: 'array',
+        maxItems: 3,
+        items: {
+          type: 'object',
+          properties: {
+            who: { type: 'string', description: '這一方的暱稱' },
+            text: { type: 'string', description: '這一方做了什麼讓彼此靠近' },
+          },
+          required: ['who', 'text'],
+        },
+      },
+      nextTime: { type: 'string', description: '下次相同情況可以先說的一句話，第一人稱' },
+    },
+    required: ['trigger', 'needs', 'cycle', 'repairs', 'nextTime'],
+  },
+};
+
+// messages: [{ speaker, content, isAi }] — the full resolved thread, speaker
+// already labelled with the couple's nicknames.
+async function generateTherapyNote({ eventSummary, messages }) {
+  const lines = [];
+  if (eventSummary && typeof eventSummary === 'string') {
+    lines.push(`事件背景：${eventSummary.trim()}`, '');
+  }
+  lines.push('完整對話（最舊在前，每行標了發話者）：');
+  for (const m of Array.isArray(messages) ? messages : []) {
+    const who = m.isAi ? 'AI 諮商師' : (m.speaker || '某人');
+    lines.push(`${who}：${(m.content || '').toString().trim()}`);
+  }
+  const userContent = lines.join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1500,
+    system: [
+      {
+        type: 'text',
+        text: THERAPY_NOTE_SYSTEM_PROMPT + PUNCTUATION_RULE,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [THERAPY_NOTE_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_therapy_note' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.therapy_note', {
+    model: response.model || MODEL,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_therapy_note'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input || {};
+
+  return {
+    trigger: (out.trigger || '').toString().trim(),
+    needs: (Array.isArray(out.needs) ? out.needs : [])
+      .filter((n) => n && n.who && n.need)
+      .map((n) => ({ who: n.who.toString().trim(), need: n.need.toString().trim() })),
+    cycle: (Array.isArray(out.cycle) ? out.cycle : [])
+      .map((s) => (s || '').toString().trim())
+      .filter(Boolean),
+    repairs: (Array.isArray(out.repairs) ? out.repairs : [])
+      .filter((r) => r && r.who && r.text)
+      .map((r) => ({ who: r.who.toString().trim(), text: r.text.toString().trim() })),
+    nextTime: (out.nextTime || '').toString().trim(),
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+      assembledPrompt: userContent,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -1656,6 +1801,7 @@ module.exports = {
   structureStory,
   parseScriptRoles,
   generateThreadTranslations,
+  generateTherapyNote,
   // Exported for prompt-contract regression tests only.
   buildRoleplayUserContent,
 };

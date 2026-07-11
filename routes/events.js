@@ -216,6 +216,7 @@ function serializeEvent(row, extras = {}) {
     public_title: row.public_title || null,
     status: row.status,
     translation_enabled: row.translation_enabled === true,
+    therapy_note: row.therapy_note || null,
     resolve_requested_by: row.resolve_requested_by,
     resolve_requested_at: row.resolve_requested_at,
     resolved_at: row.resolved_at,
@@ -1219,6 +1220,85 @@ router.get('/:id/translations', [param('id').isUUID()], async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// 治療摘要 (Therapy Note) — post-conflict structured summary
+// ---------------------------------------------------------------------------
+
+// Return the therapy note for a resolved event. Generated once (the first
+// partner to open the resolved event triggers it) and stored on the event, so
+// both partners read the same note and re-opens cost nothing.
+router.get('/:id/therapy-note', [param('id').isUUID()], async (req, res) => {
+  if (sendValidationError(req, res)) return;
+  try {
+    const access = await assertEventAccess(req.params.id, req.user.id);
+    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (access.event.is_private) {
+      return res.status(403).json({ success: false, message: '私人事件沒有治療摘要', error_code: 'PRIVATE_EVENT' });
+    }
+    if (access.event.status !== 'resolved') {
+      return res.status(400).json({
+        success: false,
+        message: '事件解決後，AI 才會為你們整理這次衝突的治療摘要。',
+        error_code: 'EVENT_NOT_RESOLVED',
+      });
+    }
+    const userId = req.user.id;
+
+    // Already generated → return the shared note for free.
+    if (access.event.therapy_note) {
+      return res.json({ success: true, therapyNote: access.event.therapy_note, cached: true });
+    }
+
+    const msgs = await db.query(
+      `SELECT m.content, m.is_ai, u.nickname AS author_nickname
+         FROM event_messages m
+         JOIN users u ON u.id = m.sender_id
+        WHERE m.event_id = $1
+        ORDER BY m.created_at ASC`,
+      [req.params.id]
+    );
+    const messages = msgs.rows.map((r) => ({
+      speaker: r.author_nickname || '某人',
+      content: r.content,
+      isAi: r.is_ai === true,
+    }));
+
+    const { tier, limit } = await resolveAiLimit(userId);
+    const usedToday = await countTodayAiUsage(userId);
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    if (!limitCheck.ok) {
+      logInfo('events.therapy_note.limit', { userId, eventId: req.params.id, used: usedToday, limit, tier, blocked: true });
+      return res.status(limitCheck.status).json(limitCheck.body);
+    }
+
+    logInfo('events.therapy_note.generate', { userId, eventId: req.params.id, messageCount: messages.length });
+
+    const result = await llmService.generateTherapyNote({
+      eventSummary: access.event.summary,
+      messages,
+    });
+    const meta = result._meta;
+    delete result._meta;
+
+    logInfo('events.therapy_note.cost', {
+      userId,
+      eventId: req.params.id,
+      provider: meta?.provider,
+      model: meta?.model,
+      costUsd: meta?.costUsd,
+      durationMs: meta?.durationMs,
+    });
+
+    await recordAiUsage(userId, 'therapy_note', access.event.summary, meta);
+    await db.query(`UPDATE events SET therapy_note = $2 WHERE id = $1`, [req.params.id, JSON.stringify(result)]);
+
+    res.json({ success: true, therapyNote: result });
+  } catch (err) {
+    logError('Get event therapy note failed', { err: err.message, stack: err.stack, eventId: req.params.id });
+    res.status(500).json({ success: false, message: '治療摘要暫時無法產生，請稍後再試' });
+  }
+});
+
 // Mark an inbound message as read
 router.put(
   '/:id/messages/:msgId/read',
@@ -1399,6 +1479,7 @@ router.post('/:id/reopen', [param('id').isUUID()], async (req, res) => {
              resolved_at = NULL,
              resolve_requested_by = NULL,
              resolve_requested_at = NULL,
+             therapy_note = NULL,
              updated_at = NOW()
        WHERE id = $1 RETURNING *`,
       [req.params.id]

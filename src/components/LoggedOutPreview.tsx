@@ -12,6 +12,7 @@ import {
   Sparkles,
   HeartHandshake,
   HandHeart,
+  NotebookPen,
   ClipboardCheck,
   Crown,
   Check,
@@ -313,9 +314,44 @@ const MarriageCheckupSample: React.FC = () => (
   </SampleCard>
 );
 
+// Post-conflict 治療摘要 read-only sample: after a fight is resolved, AI leaves
+// a structured therapy note (trigger, real needs, the negative cycle, a
+// next-time line) instead of a plain summary.
+const TherapyNoteSample: React.FC = () => (
+  <SampleCard>
+    <div className="flex items-center justify-between mb-3">
+      <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
+        <NotebookPen className="w-3.5 h-3.5 text-petal-sage-deep" />
+        吵完之後，AI 留下一份治療摘要
+      </span>
+      <SampleTag />
+    </div>
+    <div className="space-y-2.5">
+      <div>
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-0.5">這次最大的觸發點</div>
+        <p className="font-body text-sm text-petal-ink">沒有回訊息</p>
+      </div>
+      <div>
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-0.5">真正的需求</div>
+        <p className="font-body text-sm text-petal-ink">小晴 需要<span className="text-petal-rose-deep">安全感</span>・阿哲 需要<span className="text-petal-rose-deep">被信任</span></p>
+      </div>
+      <div>
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-0.5">負向循環</div>
+        <p className="font-body text-xs text-petal-ink-soft">小晴 追 → 阿哲 逃 → 小晴 追更兇 → 阿哲 更沉默</p>
+      </div>
+      <div className="rounded-md bg-petal-rose-soft/30 border border-petal-rose-soft px-3 py-2">
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep mb-0.5">下次可以先說</div>
+        <p className="font-body text-sm text-petal-ink">「我現在不是生氣，我只是有點害怕。」</p>
+      </div>
+    </div>
+  </SampleCard>
+);
+
 const ConflictFlywheelSample: React.FC = () => (
   <div className="space-y-4">
     <EmotionAcceptanceSample />
+
+    <TherapyNoteSample />
 
     {/* Mini trend analysis */}
     <SampleCard>
