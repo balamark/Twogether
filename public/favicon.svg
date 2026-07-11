@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Brand mark: rose→sage gradient (same as the .brand .logo in pricing.html)
+       with two interlocking rings — "two, together". -->
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d4938a"/>
+      <stop offset="1" stop-color="#7d8f75"/>
+    </linearGradient>
+  </defs>
+  <circle cx="32" cy="32" r="32" fill="url(#g)"/>
+  <circle cx="25" cy="32" r="11" fill="none" stroke="#fbf7f2" stroke-width="3.5"/>
+  <circle cx="39" cy="32" r="11" fill="none" stroke="#fbf7f2" stroke-width="3.5"/>
+</svg>

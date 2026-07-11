@@ -38,6 +38,12 @@ Then visit: http://localhost:8080
 User-facing feature changes, newest first. (Convention: every UI feature change
 adds a dated entry here; see `CLAUDE.md`.)
 
+### 2026-07-11
+- **分享連結有預覽卡片了**: 把 Twogether（首頁、付費方案、成為諮商師）貼到 LINE、
+  Facebook 或 Threads，現在會顯示品牌預覽圖與說明文字，不再是一條光禿禿的網址。
+- **全新品牌 icon**: 瀏覽器分頁與 iOS 加入主畫面的圖示換成 Twogether 的雙環標誌
+  （玫瑰色與鼠尾草綠漸層），取代原本的開發工具預設圖示。
+
 ### 2026-07-07
 - **「好好說話」：兩個分頁合而為一**: 「和諧相處」與「衝突事件」合併成一個正向命名的
   主分頁「好好說話」，內部分「說開一件事」（原衝突事件）與「接住情緒・檢查」（原和諧相處）
