@@ -1789,6 +1789,169 @@ async function generateTherapyNote({ eventSummary, messages }) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Draft analysis ("即時情緒檢測") — per-message emotion meter for the composer
+// ---------------------------------------------------------------------------
+// Before a charged reply is sent, show the writer what it will actually do:
+// the layered emotions (with intensity), how the partner is likely to MIShear
+// it versus the real worry underneath, the need driving it, and a rewrite that
+// says the need instead of the attack. This is the "每一句訊息都有 AI 評估" panel.
+
+const DRAFT_ANALYSIS_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴侶諮商師，正在幫一個人「送出訊息前」檢查這句話。使用者打了一段要傳給伴侶的草稿，可能情緒還沒整理好。請永遠以繁體中文回覆。
+
+你的工作不是評斷對錯，而是幫使用者看見這句話送出去會發生什麼，然後給一個更靠近彼此的版本。請產出：
+1. emotions：這句話底層的情緒，最多 3 個，由表層到深層。每個含 label（情緒名，繁體中文）、emoji（一個對應的表情符號）、intensity（0 到 100 的整數強度）。
+2. partnerHears.misread：對方在情緒中最可能「誤聽」成的攻擊訊息（一句話，通常比原文更刺，例如「你很爛」「你不在乎我」）。
+3. partnerHears.real：這句話底下，對方其實該聽見的真正擔心或渴望（一句話，脆弱、真實，例如「你是不是不要這個家了？」）。
+4. need：使用者這句話底層的核心需求，簡短（例如：安全感、被重視、被陪伴、被理解）。
+5. rewrite：把這句話改寫成說出需求而非攻擊的版本，第一人稱、溫柔但真實，1 到 2 句（例如「我今天很想你，不知道你今晚會不會回來？」）。
+6. toxicityFlags：偵測到的問題語言（可為空）。
+
+守則：緊扣使用者草稿真正的立場與感受，不要編造新的指控；不要說教、不要罵使用者；只使用繁體中文；遵守標點規則。
+
+回應請只呼叫 emit_draft_analysis tool，不要輸出其他文字。`;
+
+const DRAFT_ANALYSIS_TOOL_SCHEMA = {
+  name: 'emit_draft_analysis',
+  description: 'Return the per-message emotion meter for a reply draft.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      emotions: {
+        type: 'array',
+        maxItems: 3,
+        items: {
+          type: 'object',
+          properties: {
+            label: { type: 'string', maxLength: 10 },
+            emoji: { type: 'string', maxLength: 4 },
+            intensity: { type: 'integer', minimum: 0, maximum: 100 },
+          },
+          required: ['label', 'emoji', 'intensity'],
+        },
+      },
+      partnerHears: {
+        type: 'object',
+        properties: {
+          misread: { type: 'string', description: '對方最可能誤聽成的攻擊，一句話' },
+          real: { type: 'string', description: '底下真正該被聽見的擔心或渴望，一句話' },
+        },
+        required: ['misread', 'real'],
+      },
+      need: { type: 'string', maxLength: 20 },
+      rewrite: { type: 'string', description: '說出需求而非攻擊的改寫版本，1 到 2 句' },
+      toxicityFlags: {
+        type: 'array',
+        items: {
+          type: 'string',
+          enum: [
+            'absolute_language', 'name_calling', 'verbal_aggression', 'contempt',
+            'threats', 'blame_shifting', 'emotional_blackmail', 'sarcasm',
+            'catastrophizing', 'comparison', 'stonewalling', 'dismissiveness',
+          ],
+        },
+      },
+    },
+    required: ['emotions', 'partnerHears', 'need', 'rewrite', 'toxicityFlags'],
+  },
+};
+
+// draft: the in-progress reply text. eventSummary / recentMessages give the
+// model the conflict context so partnerHears is grounded in this relationship.
+async function analyzeDraft({ draft, eventSummary, recentMessages, userGender = null, partnerGender = null }) {
+  if (typeof draft !== 'string' || draft.trim().length === 0) {
+    throw new Error('draft is required');
+  }
+
+  const lines = [
+    '角色說明：',
+    '- [你] = 正在寫這句話、準備送出的人',
+    '- [對方] = 你的伴侶（會收到這句話的人）',
+    ...[genderHint(userGender, '- [你] '), genderHint(partnerGender, '- [對方] ')].filter(Boolean),
+    '',
+  ];
+  if (eventSummary && typeof eventSummary === 'string') {
+    lines.push(`事件背景：${eventSummary.trim()}`, '');
+  }
+  if (Array.isArray(recentMessages) && recentMessages.length > 0) {
+    lines.push('最近對話（最舊在前，每行已標註發話者）：');
+    for (const m of recentMessages) {
+      lines.push(`${m.fromSelf ? '[你]' : '[對方]'}：${(m.content || '').trim()}`);
+    }
+    lines.push('');
+  }
+  lines.push('[你正準備送出的草稿]：', draft.trim());
+  const userContent = lines.join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system: [
+      {
+        type: 'text',
+        text: DRAFT_ANALYSIS_SYSTEM_PROMPT + PUNCTUATION_RULE,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [DRAFT_ANALYSIS_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_draft_analysis' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.draft_analysis', {
+    model: response.model || MODEL,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_draft_analysis'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input || {};
+
+  return {
+    emotions: (Array.isArray(out.emotions) ? out.emotions : [])
+      .filter((e) => e && e.label)
+      .slice(0, 3)
+      .map((e) => ({
+        label: e.label.toString().trim(),
+        emoji: (e.emoji || '💭').toString().trim(),
+        intensity: Math.max(0, Math.min(100, Number(e.intensity) || 0)),
+      })),
+    partnerHears: {
+      misread: (out.partnerHears?.misread || '').toString().trim(),
+      real: (out.partnerHears?.real || '').toString().trim(),
+    },
+    need: (out.need || '').toString().trim(),
+    rewrite: (out.rewrite || '').toString().trim(),
+    toxicityFlags: out.toxicityFlags || [],
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+      assembledPrompt: userContent,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -1802,6 +1965,7 @@ module.exports = {
   parseScriptRoles,
   generateThreadTranslations,
   generateTherapyNote,
+  analyzeDraft,
   // Exported for prompt-contract regression tests only.
   buildRoleplayUserContent,
 };

@@ -889,6 +889,83 @@ router.post(
   }
 );
 
+// Per-message emotion meter ("即時情緒檢測"): analyze a reply draft BEFORE it is
+// sent — the layered emotions, how the partner may mishear it vs the real worry
+// underneath, the need, and a rewrite. Stateless (no message is created).
+// Cached per (event, user, draft) so re-checking the same draft is free.
+router.post(
+  '/:id/messages/analyze-draft',
+  [
+    param('id').isUUID(),
+    body('draft').isString().isLength({ min: 1, max: 2000 }).withMessage('內容需在 1–2000 字之間'),
+  ],
+  async (req, res) => {
+    if (sendValidationError(req, res)) return;
+    try {
+      const access = await assertEventAccess(req.params.id, req.user.id);
+      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (access.event.is_private) {
+        return res.status(403).json({ success: false, message: '私人事件不支援情緒檢測', error_code: 'PRIVATE_EVENT' });
+      }
+
+      const userId = req.user.id;
+      const draft = req.body.draft;
+
+      const recent = await db.query(
+        `SELECT sender_id, content FROM event_messages
+          WHERE event_id = $1 ORDER BY created_at DESC LIMIT 10`,
+        [req.params.id]
+      );
+      const recentMessages = recent.rows.reverse().map((m) => ({
+        fromSelf: m.sender_id === userId,
+        content: m.content,
+      }));
+      const genders = await getCoupleGenders(userId);
+
+      // Cache first: same draft + same thread → reuse for free (no budget hit).
+      const inputHash = aiCacheHash(['draft_analysis_v1', access.event.summary, recentMessages, draft, genders]);
+      const cached = await getAiCache(req.params.id, userId, 'draft_analysis', inputHash);
+      if (cached) {
+        return res.json({ success: true, analysis: cached, cached: true });
+      }
+
+      const { tier, limit } = await resolveAiLimit(userId);
+      const usedToday = await countTodayAiUsage(userId);
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      if (!limitCheck.ok) {
+        logInfo('events.draft_analysis.limit', { userId, eventId: req.params.id, used: usedToday, limit, tier, blocked: true });
+        return res.status(limitCheck.status).json(limitCheck.body);
+      }
+
+      const analysis = await llmService.analyzeDraft({
+        draft,
+        eventSummary: access.event.summary,
+        recentMessages,
+        ...genders,
+      });
+      const meta = analysis._meta;
+      delete analysis._meta;
+
+      logInfo('events.draft_analysis.cost', {
+        userId,
+        eventId: req.params.id,
+        provider: meta?.provider,
+        model: meta?.model,
+        costUsd: meta?.costUsd,
+        durationMs: meta?.durationMs,
+      });
+
+      await recordAiUsage(userId, 'draft_analysis', draft, meta);
+      await saveAiCache(req.params.id, userId, 'draft_analysis', inputHash, analysis);
+
+      res.json({ success: true, analysis });
+    } catch (err) {
+      logError('Draft analysis failed', { err: err.message, stack: err.stack, eventId: req.params.id });
+      res.status(500).json({ success: false, message: '情緒檢測暫時無法產生，請稍後再試' });
+    }
+  }
+);
+
 // Preview-only AI "接住情緒" coaching for the receiver. Stateless — no DB write.
 // Loads the event summary + recent messages so the LLM can coach the user on how
 // to RECEIVE their partner's emotion (validate first, not solve). Mirrors the

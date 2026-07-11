@@ -14,6 +14,7 @@ import {
   HandHeart,
   Hand,
   NotebookPen,
+  Gauge,
   ClipboardCheck,
   Crown,
   Check,
@@ -366,9 +367,55 @@ const SafetyBannerSample: React.FC = () => (
   </div>
 );
 
+// Per-message emotion meter read-only sample: before a charged reply is sent,
+// AI shows the emotions, how the partner may mishear it vs the real worry, the
+// need, and a rewrite.
+const EmotionMeterSample: React.FC = () => {
+  const bars = [
+    { emoji: '😢', label: '傷心', pct: 70 },
+    { emoji: '😰', label: '焦慮', pct: 80 },
+    { emoji: '😠', label: '生氣', pct: 50 },
+  ];
+  return (
+    <SampleCard>
+      <div className="flex items-center justify-between mb-3">
+        <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
+          <Gauge className="w-3.5 h-3.5 text-petal-rose-deep" />
+          送出前，先看看這句話
+        </span>
+        <SampleTag />
+      </div>
+      <div className="rounded-md bg-petal-cream-2 px-3 py-2 mb-2.5">
+        <p className="font-body text-sm text-petal-ink">你到底要不要回家？</p>
+      </div>
+      <div className="space-y-1.5 mb-2.5">
+        {bars.map((b) => (
+          <div key={b.label} className="flex items-center gap-2">
+            <span className="w-14 shrink-0 font-body text-xs text-petal-ink">{b.emoji} {b.label}</span>
+            <div className="flex-1 h-2 rounded-full bg-white overflow-hidden">
+              <div className="h-full rounded-full bg-petal-rose-deep" style={{ width: `${b.pct}%` }} />
+            </div>
+            <span className="w-8 text-right font-body text-[11px] text-petal-muted">{b.pct}%</span>
+          </div>
+        ))}
+      </div>
+      <div className="font-body text-[13px] text-petal-ink space-y-0.5 mb-2.5">
+        <p><span className="text-red-500 mr-1">✕</span>對方可能聽成：你很爛。</p>
+        <p><span className="text-petal-sage-deep mr-1">✓</span>其實想說：你是不是不要這個家了？</p>
+      </div>
+      <div className="rounded-md bg-petal-rose-soft/30 border border-petal-rose-soft px-3 py-2">
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep mb-0.5">試著這樣說</div>
+        <p className="font-body text-sm text-petal-ink">「我今天很想你，不知道你今晚會不會回來？」</p>
+      </div>
+    </SampleCard>
+  );
+};
+
 const ConflictFlywheelSample: React.FC = () => (
   <div className="space-y-4">
     <SafetyBannerSample />
+
+    <EmotionMeterSample />
 
     <EmotionAcceptanceSample />
 
