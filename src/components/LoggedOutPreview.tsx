@@ -443,16 +443,33 @@ const PREVIEWS: Record<string, PreviewConfig> = {
         留下你們的<em className="not-italic font-light italic text-pink-600">悄悄話</em>
       </>
     ),
-    description: '在牆上貼下想對彼此說的話，你選的 AI 諮商師（例如 Luma）也會適時給予溫柔的建議。',
+    description: '在牆上貼下想對彼此說的話，你選的 AI 諮商師（例如 Luma）也會適時給予溫柔的建議。開啟「情緒翻譯」後，AI 還會把每句指責翻成底層的需求，讓對方聽到的不是攻擊，而是需要。',
     sample: (
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between gap-2 bg-petal-cream-2 border border-petal-rule rounded-xl px-3 py-2">
+          <div className="flex items-center gap-1.5">
+            <HeartHandshake className="w-4 h-4 text-petal-rose-deep" strokeWidth={1.5} />
+            <span className="font-body text-xs text-petal-ink">情緒翻譯</span>
+            <SampleTag />
+          </div>
+          <span className="relative inline-flex h-5 w-9 items-center rounded-full bg-petal-rose-deep">
+            <span className="inline-block h-4 w-4 translate-x-4 rounded-full bg-white" />
+          </span>
+        </div>
         <SampleCard>
-          <p className="font-body text-sm text-petal-ink">謝謝你昨天陪我加班到那麼晚 🫶</p>
+          <p className="font-body text-sm text-petal-ink">你根本沒有把家庭放第一。</p>
           <div className="font-body text-[11px] text-petal-muted mt-1.5">— 小晴</div>
-        </SampleCard>
-        <SampleCard>
-          <p className="font-body text-sm text-petal-ink">下次換我煮飯，你負責吃就好 😋</p>
-          <div className="font-body text-[11px] text-petal-muted mt-1.5">— 阿哲</div>
+          <div className="mt-1.5 rounded-xl border border-petal-rose-deep/25 bg-petal-cream-2 px-3 py-2">
+            <div className="flex items-center gap-1.5 text-petal-rose-deep">
+              <HeartHandshake className="w-3.5 h-3.5" strokeWidth={1.5} />
+              <span className="font-body text-[11px] font-medium">可能真正想表達的是</span>
+            </div>
+            <p className="mt-1 font-body text-sm text-petal-ink leading-relaxed">「我最近很沒有安全感，希望家庭能被放在更重要的位置。」</p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1">
+              <span className="inline-flex items-center rounded-full bg-petal-rose-deep/10 text-petal-rose-deep font-body text-[11px] px-2 py-0.5">需要安全感</span>
+              <span className="inline-flex items-center rounded-full border border-petal-rule text-petal-muted font-body text-[11px] px-2 py-0.5">孤單</span>
+            </div>
+          </div>
         </SampleCard>
       </div>
     ),

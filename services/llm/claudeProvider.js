@@ -589,11 +589,16 @@ const WALL_COUNSELOR_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴
 
 任務：寫出「一段」諮商師留言，會被貼進對話串、兩個人都看得到。你的目標是幫雙方降溫、被理解，而不是評斷對錯。
 
+你的角色（最重要）：
+- 你就是他們此刻的諮商師。不要叫他們「去找諮商師 / 心理師 / 專業人士 / 輔導」，也不要把「去諮商」「找人談」當成建議或結尾。把話丟回給別的專業，等於在他們最需要的當下離場。
+- 你要「當下就做」諮商師該做的事：先同理雙方，接著把每一句指責、抱怨、絕對化的話「翻譯成底層的情緒與需求」（例如「這句話背後，可能是：我很怕失去你」「這聽起來像是在說：我需要被重視」），讓對方聽到的不是攻擊，而是需要，再提出一個更靠近彼此的說法。
+- 安全例外（唯一例外）：只有當對話出現家暴、肢體暴力、自我傷害 / 自殺、或明確的傷害威脅等安全風險時，才可以、也應該溫和地引導他們尋求專業或緊急協助。除此之外，都由你來承接與陪伴。
+
 留言守則：
 - 絕對中立，不選邊站。先同理「兩個人」的感受（可用他們的暱稱稱呼）。
-- 如果某句話帶有指責、絕對化用語（總是／從來／每次）、輕蔑或人身攻擊，請溫和地指出那是一種「說法」帶來的影響（例如「這句話可能讓對方覺得被責怪」），不要說某個人「錯了」或「不對」。
+- 如果某句話帶有指責、絕對化用語（總是／從來／每次）、輕蔑或人身攻擊，請溫和地指出那是一種「說法」帶來的影響（例如「這句話可能讓對方覺得被責怪」），不要說某個人「錯了」或「不對」，並把它翻譯成底層的情緒與需求。
 - 接著提供「一個」更靠近彼此的替代說法，用「也許可以這樣說：…」帶出，把指責改寫成「我訊息」或共同面對的語氣。
-- 語氣溫暖、具體、不說教；像一個在旁邊輕聲提醒的第三者。
+- 語氣溫暖、具體、不說教；像一個在旁邊輕聲提醒、願意陪他們走下去的第三者。
 - 長度約 2 到 4 句，務必精簡（遠少於 1000 字）。
 - 只使用繁體中文；不要編造對話裡沒有的事實。
 
@@ -1479,6 +1484,166 @@ async function structureStory({ rawText }) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Emotion / need translation ("情緒翻譯")
+// ---------------------------------------------------------------------------
+// The couple is stuck reading each other's messages as attacks. This is the
+// product's core move (design Stage 1 + Stage 2): for each message, look past
+// the surface complaint to the layered emotion (anger is usually the top layer;
+// fear / loneliness / need-for-reassurance sit underneath) and rewrite it as
+// the underlying NEED in a gentle first-person "I-message". The other partner
+// then reads a need, not an attack. The AI never judges who is right.
+//
+// Batched on purpose: one call translates every still-untranslated message in
+// the thread, so turning the lens on costs a single quota unit regardless of
+// thread length, and the model sees the whole exchange (the cycle) for context.
+
+const THREAD_TRANSLATION_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴侶諮商師，正在幫一對伴侶做「情緒翻譯」。他們正卡在把對方每一句話都聽成攻擊。你的工作不是分析誰對誰錯，而是替「每一句話」翻譯出底層真正的情緒與需求，讓對方聽到的不是指責，而是需要。請永遠以繁體中文回覆。
+
+核心理念：憤怒通常只是表層，底下才是真正重要的。例如「我很生氣」底下常常是「我很害怕」，再底下是「我怕失去你」。指責的話（你總是…、你根本沒有…、你眼裡只有…）背後，幾乎都藏著一個沒被說出口的需求（安全感、被重視、被陪伴、被信任、被肯定）。
+
+任務：閱讀整段對話脈絡，然後「只針對我請你翻譯的那幾則訊息」，各自產出：
+1. id：對應訊息的 id（原封不動回傳）。
+2. emotions：最多 3 個底層情緒，由表層到深層（例如 憤怒 → 害怕 → 孤單）。每個含 label（情緒名，繁體中文）與 intensity（0 到 100 的整數，表示強度）。
+3. need：一個簡短的核心需求詞（例如：安全感、被重視、被陪伴、被信任、被肯定、被理解、喘口氣）。
+4. rewrite：把這句話翻譯成「可能真正想表達的是」的第一人稱版本，溫柔、不指責、說出感受與需求（NVC 我訊息），像這個人心底真正想說卻沒說出口的那句話。1 到 2 句。
+
+守則：
+- 永遠翻譯，不評論、不選邊、不評斷對錯，也不要在 rewrite 裡替對方講道理或反駁。
+- 不要編造對話裡沒有的事實；緊扣這個人真正的立場與感受，只是把它翻譯得讓人聽得進去。
+- 如果某句話本來就已經溫和、沒有攻擊，rewrite 就忠實地把它的善意與需求說得更清楚，不要硬加衝突。
+- rewrite 一律第一人稱「我」，繁體中文。
+
+回應請只呼叫 emit_thread_translations tool，不要輸出其他文字。`;
+
+const THREAD_TRANSLATION_TOOL_SCHEMA = {
+  name: 'emit_thread_translations',
+  description: "Return an emotion/need translation for each requested message id.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      translations: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', description: '對應訊息的 id，原封不動回傳' },
+            emotions: {
+              type: 'array',
+              maxItems: 3,
+              items: {
+                type: 'object',
+                properties: {
+                  label: { type: 'string', maxLength: 10 },
+                  intensity: { type: 'integer', minimum: 0, maximum: 100 },
+                },
+                required: ['label', 'intensity'],
+              },
+            },
+            need: { type: 'string', maxLength: 20, description: '核心需求詞，例如 安全感 / 被重視 / 被陪伴' },
+            rewrite: { type: 'string', description: '第一人稱「可能真正想表達的是」翻譯，1 到 2 句' },
+          },
+          required: ['id', 'need', 'rewrite'],
+        },
+      },
+    },
+    required: ['translations'],
+  },
+};
+
+// messages: [{ id, speaker: '[A]'|'[B]'|nickname, content }] — the full thread
+//   for context. targetIds: which message ids to actually translate (the ones
+//   not yet cached). context: { summary } optional topic to ground the model.
+async function generateThreadTranslations({ messages, targetIds, context }) {
+  const all = Array.isArray(messages) ? messages : [];
+  const wanted = Array.isArray(targetIds) && targetIds.length > 0
+    ? targetIds
+    : all.map((m) => m.id);
+  if (wanted.length === 0) {
+    return { translations: [], _meta: { provider: 'claude', model: MODEL, durationMs: 0, usage: {}, costUsd: 0 } };
+  }
+
+  const lines = [];
+  if (context && context.summary) {
+    lines.push(`事件背景（僅供理解氛圍，不要複述）：${String(context.summary).trim()}`, '');
+  }
+  lines.push('完整對話（最舊在前，每行標了發話者與訊息 id）：');
+  for (const m of all) {
+    lines.push(`[id=${m.id}] ${m.speaker || '某人'}：${(m.content || '').toString().trim()}`);
+  }
+  lines.push('');
+  lines.push(`請只翻譯以下這幾則訊息的 id：${wanted.join('、')}`);
+  const userContent = lines.join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 2048,
+    system: [
+      {
+        type: 'text',
+        text: THREAD_TRANSLATION_SYSTEM_PROMPT + PUNCTUATION_RULE,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [THREAD_TRANSLATION_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_thread_translations' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.need_translation', {
+    model: response.model || MODEL,
+    requested: wanted.length,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_thread_translations'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input || {};
+  const translations = (Array.isArray(out.translations) ? out.translations : [])
+    .filter((t) => t && typeof t.id === 'string' && typeof t.rewrite === 'string' && t.rewrite.trim())
+    .map((t) => ({
+      id: t.id,
+      emotions: Array.isArray(t.emotions)
+        ? t.emotions
+            .filter((e) => e && typeof e.label === 'string')
+            .slice(0, 3)
+            .map((e) => ({ label: e.label.trim(), intensity: Math.max(0, Math.min(100, Number(e.intensity) || 0)) }))
+        : [],
+      need: (t.need || '').toString().trim(),
+      rewrite: t.rewrite.trim(),
+    }));
+
+  return {
+    translations,
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+      assembledPrompt: userContent,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -1490,6 +1655,7 @@ module.exports = {
   generateStoryInsights,
   structureStory,
   parseScriptRoles,
+  generateThreadTranslations,
   // Exported for prompt-contract regression tests only.
   buildRoleplayUserContent,
 };

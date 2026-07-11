@@ -465,6 +465,63 @@ async function structureStory({ rawText }) {
   };
 }
 
+// Deterministic emotion/need translation for a thread. For each requested
+// message, picks a surface emotion from the lexicon, maps it to an underlying
+// need, and rewrites the line as a gentle first-person I-message. Same input →
+// same output; no randomness. Real provider (Claude) replaces this.
+const NEED_LEXICON = [
+  { keys: ['家庭', '第一', '重要', '在乎'], need: '被重視', rewrite: '我最近很沒有安全感，希望我們的家能被放在更重要的位置。' },
+  { keys: ['工作', '忙', '加班', '賺'], need: '被看見', rewrite: '我希望你能看見，我這麼努力，其實也是在照顧這個家。' },
+  { keys: ['隊', '這邊', '站'], need: '被支持', rewrite: '我希望在這件事上，你能站到我這邊，當我的隊友。' },
+  { keys: ['陪', '一個人', '孤單', '回家'], need: '被陪伴', rewrite: '我最近很想你，也有點孤單，很需要你的陪伴。' },
+  { keys: ['碎念', '唸', '煩'], need: '喘口氣', rewrite: '我現在有點 overwhelmed，想先休息一下再談。' },
+  { keys: ['信任', '懷疑', '相信'], need: '被信任', rewrite: '我很在乎我們，也希望能感覺到你對我的信任。' },
+];
+
+function pickNeed(text) {
+  for (const entry of NEED_LEXICON) {
+    if (entry.keys.some((k) => text.includes(k))) return entry;
+  }
+  return { need: '被理解', rewrite: '我其實只是想被你理解，希望我們能好好聽彼此說話。' };
+}
+
+async function generateThreadTranslations({ messages, targetIds }) {
+  const startedAt = Date.now();
+  const all = Array.isArray(messages) ? messages : [];
+  const wanted = Array.isArray(targetIds) && targetIds.length > 0
+    ? new Set(targetIds)
+    : new Set(all.map((m) => m.id));
+
+  const translations = all
+    .filter((m) => wanted.has(m.id))
+    .map((m) => {
+      const text = (m.content || '').toString();
+      const surface = pickEmotions(text)[0] || '複雜情緒';
+      const { need, rewrite } = pickNeed(text);
+      return {
+        id: m.id,
+        emotions: [
+          { label: surface, intensity: 60 },
+          { label: '不安', intensity: 45 },
+        ],
+        need,
+        rewrite,
+      };
+    });
+
+  return {
+    translations,
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+      assembledPrompt: `[mock] translate ${translations.length} of ${all.length} messages`,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -476,4 +533,5 @@ module.exports = {
   generateStoryInsights,
   structureStory,
   parseScriptRoles,
+  generateThreadTranslations,
 };
