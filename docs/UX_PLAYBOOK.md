@@ -144,6 +144,12 @@ LoggedOutPreview 的素材）②「邀請另一半」主 CTA ③「配對前你�
 Header 或儀表板顯示「邀請等待中」徽章（含重新發送）；後端允許無 couple 的
 私人事件（schema 改動）。由 P0-3 移轉過來。
 
+### P1-5（未完成）引導模式（Therapist Mode）前端量測
+2026-07-11 出貨的「開始引導」/今日練習 tray 目前只有後端 logInfo
+（`events.facilitation.*`），沒有 R5 要求的前端曝光/點擊事件
+（`onboarding.facilitation.<action>`）。等前端有輕量 track 機制（或沿用
+activity 記錄）時補上：開始引導點擊、快速回覆 chip 點擊、tray 收合。
+
 ### P2（記錄在案，暫不做）
 - 功能導覽 replay（互動式 tour）——§6 Q3 已決策不做，維護成本高。
 - iOS App 的 onboarding 對齊。

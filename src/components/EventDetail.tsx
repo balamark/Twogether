@@ -15,6 +15,7 @@ import {
   X,
   Pencil,
   NotebookPen,
+  PlayCircle,
 } from 'lucide-react';
 import apiService, {
   type EventRecord,
@@ -24,11 +25,14 @@ import apiService, {
   type EventVersionKey,
   type MessageTranslationMap,
   type TherapyNote,
+  type FacilitationSession,
 } from '../services/api';
 import ReplyStepBar from './ReplyStepBar';
 import MessageTranslationCard from './MessageTranslationCard';
 import TherapyNoteCard from './TherapyNoteCard';
 import ConflictBanner from './ConflictBanner';
+import TherapistTurnCard from './TherapistTurnCard';
+import SessionProgress from './SessionProgress';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
@@ -116,6 +120,13 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const [translationLoading, setTranslationLoading] = useState(false);
   const [therapyNote, setTherapyNote] = useState<TherapyNote | null>(null);
   const [therapyLoading, setTherapyLoading] = useState(false);
+  // 引導模式 (Therapist Mode)
+  const [facilitation, setFacilitation] = useState<FacilitationSession | null>(null);
+  const [facilitating, setFacilitating] = useState(false);
+  const [endingSession, setEndingSession] = useState(false);
+  // Quota ran out mid-session: pause auto-advance so each further reply doesn't
+  // re-fire the same warning toast. Cleared on event change / next success.
+  const [advancePaused, setAdvancePaused] = useState(false);
   const tz = useTimezone();
 
   const insertPhrase = (phrase: string) => {
@@ -218,13 +229,18 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     }
   };
 
-  const refresh = async () => {
+  const refresh = async (opts?: { skipFacilitation?: boolean }) => {
     try {
       const data = await apiService.getEvent(eventId);
       setEvent(data);
       setTranslationEnabled(data.translationEnabled);
       setTherapyNote(data.therapyNote);
       if (data.translationEnabled) loadTranslations();
+      // Callers that just received fresh session state from a mutation response
+      // skip the refetch so it can't race-overwrite the newer value.
+      if (!opts?.skipFacilitation) {
+        apiService.getFacilitation(eventId).then(setFacilitation).catch(() => {});
+      }
       // Mark inbound unread messages as read (fire-and-forget)
       data.messages
         .filter((m) => m.senderId !== currentUserId && !m.readAt)
@@ -276,8 +292,95 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     }
   };
 
+  // 引導模式: shared handling for start + advance. Expected states (quota,
+  // resolved, unpaired, stale session) surface as warning/info with a next
+  // step; red errors are reserved for real failures.
+  const handleFacilitationError = (err: unknown, phase: 'start' | 'advance') => {
+    const code = (err as { error_code?: string })?.error_code;
+    if (code === 'AI_DAILY_LIMIT_REACHED') {
+      if (phase === 'advance') setAdvancePaused(true);
+      showNotification({
+        type: 'warning',
+        title: '今日 AI 次數已用完',
+        message: '引導練習次數已達今日上限，升級 Premium 可提高每日上限；明天會自動補上，引導也會接著繼續。',
+      });
+    } else if (code === 'NOT_PAIRED') {
+      showNotification({
+        type: 'info',
+        title: '引導模式需要兩個人',
+        message: err instanceof Error ? err.message : '先邀請另一半配對，就能一起練習。',
+      });
+    } else if (code === 'EVENT_RESOLVED') {
+      showNotification({
+        type: 'info',
+        title: '此事件已解決',
+        message: err instanceof Error ? err.message : '如需再談可先重新開啟事件。',
+      });
+    } else if (code === 'PRIVATE_EVENT') {
+      showNotification({
+        type: 'info',
+        title: '私人事件不支援引導',
+        message: '引導模式需要兩個人一起參與，私人事件只有你看得到。',
+      });
+    } else if (code === 'NO_SESSION') {
+      // Local state is stale (e.g. the partner ended the session) — resync
+      // quietly instead of toasting.
+      apiService.getFacilitation(eventId).then(setFacilitation).catch(() => {});
+    } else {
+      showNotification({
+        type: 'error',
+        title: '引導暫時無法進行',
+        message: err instanceof Error ? err.message : '請稍後再試',
+      });
+    }
+  };
+
+  const startFacilitation = async () => {
+    setFacilitating(true);
+    try {
+      const res = await apiService.startFacilitation(eventId);
+      setFacilitation(res.session);
+      setAdvancePaused(false);
+      await refresh({ skipFacilitation: true });
+    } catch (err) {
+      handleFacilitationError(err, 'start');
+    } finally {
+      setFacilitating(false);
+      refreshQuota();
+    }
+  };
+
+  // After the awaited partner replies, fetch the therapist's next turn.
+  const advanceFacilitation = async () => {
+    setFacilitating(true);
+    try {
+      const res = await apiService.advanceFacilitation(eventId);
+      setFacilitation(res.session);
+      setAdvancePaused(false);
+      await refresh({ skipFacilitation: true });
+    } catch (err) {
+      handleFacilitationError(err, 'advance');
+    } finally {
+      setFacilitating(false);
+      refreshQuota();
+    }
+  };
+
+  const endFacilitation = async () => {
+    setEndingSession(true);
+    try {
+      const s = await apiService.endFacilitation(eventId);
+      setFacilitation(s);
+    } catch (err) {
+      showNotification({ type: 'error', title: '無法結束引導', message: err instanceof Error ? err.message : '請稍後再試' });
+    } finally {
+      setEndingSession(false);
+    }
+  };
+
   useEffect(() => {
     setLoading(true);
+    setAdvancePaused(false);
     refresh().finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
@@ -290,6 +393,12 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       await apiService.replyToEvent(eventId, content);
       setReply('');
       await refresh();
+      // In an active session, if the therapist was waiting on me, my reply
+      // completes the step — fetch the next facilitated turn. Skipped while
+      // paused (quota spent) so we don't re-toast on every reply.
+      const myTurn = facilitation && facilitation.status === 'active' &&
+        (facilitation.turnOwner === currentUserId || facilitation.turnOwner === null);
+      if (myTurn && !advancePaused) await advanceFacilitation();
     } catch (err) {
       showNotification({
         type: 'error',
@@ -691,6 +800,26 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             // stored AI versions — when editing it, offer the other versions.
             const firstHumanMessage = event.messages.find((x) => !x.isAi);
             return event.messages.map((m) => {
+            // Therapist Mode turn: render the structured exercise card.
+            if (m.isAi && m.facilitation) {
+              const f = m.facilitation;
+              const isMyTurn = f.target === 'both' || f.targetUserId === currentUserId;
+              const label = companionName(m.aiTherapist) ? `${companionName(m.aiTherapist)}・引導者` : '引導者';
+              return (
+                <div key={m.id} className="flex justify-center">
+                  <div className="max-w-[92%] w-full">
+                    <TherapistTurnCard
+                      facilitation={f}
+                      say={m.content}
+                      companionLabel={label}
+                      isMyTurn={isMyTurn}
+                      onQuickReply={(text) => setReply(text)}
+                    />
+                    <p className="text-[10px] text-petal-muted mt-1 text-center">{formatTime(m.createdAt, tz)}</p>
+                  </div>
+                </div>
+              );
+            }
             if (m.isAi) {
               return (
                 <div key={m.id} className="flex justify-center">
@@ -812,23 +941,65 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           OUTSIDE the reply composer: it reads the thread history, it doesn't
           rewrite whatever you're typing below. */}
       {canSendMessage && (
-        <div className="flex">
-          <button
-            type="button"
-            data-testid="event-ai-counselor-button"
-            onClick={inviteAiCounselor}
-            disabled={aiInviting}
-            className="px-3 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
-            title={`請 ${myCompanion.name} 讀過你們的對話，給一段中立的建議`}
-          >
-            {aiInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
-            <span>請 {myCompanion.name} 加入</span>
-          </button>
+        <div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              data-testid="event-ai-counselor-button"
+              onClick={inviteAiCounselor}
+              disabled={aiInviting}
+              className="px-3 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
+              title={`請 ${myCompanion.name} 讀過你們的對話，給一段中立的建議`}
+            >
+              {aiInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
+              <span>請 {myCompanion.name} 加入</span>
+            </button>
+            {/* 引導模式: a facilitated session, not one-shot advice. Shown only when
+                no session is active — an active one renders its progress tray. */}
+            {(!facilitation || facilitation.status !== 'active') && (
+              <button
+                type="button"
+                data-testid="event-facilitation-start-button"
+                onClick={startFacilitation}
+                disabled={facilitating}
+                className="px-3 py-2 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
+              >
+                {facilitating ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
+                <span>開始引導</span>
+              </button>
+            )}
+          </div>
+          {/* Visible on mobile (tooltips aren't): what 開始引導 does + that both
+              buttons draw from the shared daily AI budget. */}
+          <div className="flex flex-wrap items-center justify-between gap-1 mt-1.5">
+            <p className="font-body text-xs text-petal-muted">
+              「開始引導」：{myCompanion.name} 會像諮商師一樣，一步一步帶你們做練習（會使用 AI 次數）。
+            </p>
+            <AiQuotaHint quota={quota} />
+          </div>
         </div>
+      )}
+
+      {canSendMessage && facilitation && facilitation.status === 'active' && (
+        <SessionProgress eventId={eventId} session={facilitation} onEnd={endFacilitation} ending={endingSession} />
       )}
 
       {canSendMessage && (
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-3">
+          {facilitation && facilitation.status === 'active' && (
+            <div className="mb-2 font-body text-xs space-y-0.5" data-testid="facilitation-turn-hint">
+              {advancePaused ? (
+                <span className="text-petal-muted">⏸️ 今日 AI 次數已用完，明天會自動接續引導。你們仍可自由回覆。</span>
+              ) : facilitation.turnOwner === currentUserId || facilitation.turnOwner === null ? (
+                <span className="text-petal-rose-deep">🎯 輪到你了：照著上面 {myCompanion.name} 的引導回應。</span>
+              ) : (
+                <>
+                  <span className="text-petal-muted block">⏳ 等待 {partnerNickname || '對方'} 回應這一步…</span>
+                  <span className="text-petal-muted block">你也可以先自由回覆，練習會等 {partnerNickname || '對方'} 完成這一步再繼續。</span>
+                </>
+              )}
+            </div>
+          )}
           <ReplyStepBar onInsertPhrase={insertPhrase} />
           <textarea
             data-testid="event-reply-input"

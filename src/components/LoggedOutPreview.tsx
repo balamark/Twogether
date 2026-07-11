@@ -366,9 +366,48 @@ const SafetyBannerSample: React.FC = () => (
   </div>
 );
 
+// Therapist Mode ("引導模式") read-only sample: the AI runs a turn-based
+// exercise (a "card") instead of an advice essay, then scores it — with a
+// 今日練習 scoreboard so therapy feels measurable.
+const TherapistModeSample: React.FC = () => (
+  <SampleCard>
+    <div className="flex items-center justify-between mb-3">
+      <span className="inline-flex items-center gap-1.5 font-body text-xs text-petal-rose-deep">
+        <Sparkles className="w-3.5 h-3.5" />
+        Luma・引導者
+      </span>
+      <SampleTag />
+    </div>
+    <div className="rounded-2xl border border-petal-rose-deep/25 bg-petal-cream p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="rounded-full border border-petal-sage bg-petal-sage/20 text-petal-sage-deep px-2 py-0.5 font-body text-[11px] font-medium">🪞 鏡映</span>
+        <span className="rounded-full border border-petal-sage bg-petal-sage/20 text-petal-sage-deep px-2 py-0.5 font-body text-[11px] font-medium">✅ 做到了</span>
+      </div>
+      <p className="font-body text-sm text-petal-ink leading-relaxed">我們一次只做一小步。先不要解釋，只重複你聽到的。</p>
+      <div className="rounded-xl border border-petal-rose-deep bg-petal-rose-soft/20 px-3 py-2">
+        <div className="font-body text-[11px] font-medium text-petal-rose-deep mb-0.5">換你了</div>
+        <p className="font-body text-sm text-petal-ink">用「我聽到你說的是…」開頭，說出你聽到的。</p>
+      </div>
+    </div>
+    <div className="mt-3 rounded-xl border border-petal-rule bg-petal-cream-2 px-3 py-2">
+      <div className="flex items-center justify-between">
+        <span className="font-display italic text-sm text-petal-ink">今日練習</span>
+        <span className="font-body text-xs text-petal-muted">關係技巧分數 <span className="font-display italic text-petal-rose-deep">78%</span></span>
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 font-body text-xs text-petal-ink">
+        <span>✓ 🎯 情緒標記</span>
+        <span>✓ 🪞 鏡映</span>
+        <span className="text-petal-muted">… 🫶 肯定</span>
+      </div>
+    </div>
+  </SampleCard>
+);
+
 const ConflictFlywheelSample: React.FC = () => (
   <div className="space-y-4">
     <SafetyBannerSample />
+
+    <TherapistModeSample />
 
     <EmotionAcceptanceSample />
 

@@ -14,6 +14,7 @@
 
 const Anthropic = require('@anthropic-ai/sdk');
 const { logInfo } = require('../../lib/logger');
+const { pickableCards, CARD_IDS, shapeFacilitatorTurn } = require('../../lib/therapyCards');
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 
@@ -1789,6 +1790,166 @@ async function generateTherapyNote({ eventSummary, messages }) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Therapist Mode ("引導模式") — the facilitator turn
+// ---------------------------------------------------------------------------
+// The core reframe: the AI is NOT an advisor writing a wise paragraph. It is a
+// facilitator running a live, turn-based session — it picks ONE small exercise
+// (a "card"), directs ONE partner to do one thing, waits, scores it, then moves
+// on. Every call produces a single therapeutic *turn*, never a lecture.
+
+const FACILITATOR_SYSTEM_PROMPT = `你是一位正在主持「現場伴侶諮商」的引導者（facilitator），不是給建議的人。這對伴侶正卡在衝突裡。請永遠以繁體中文回覆。
+
+你的核心原則：
+- 不要幫他們解決衝突，不要說教，不要長篇大論。你「說的話」（say）一次最多 2 個簡短段落。
+- 一次只帶「一個」小練習。指定由哪一位先做（target），等對方做完，你才繼續。
+- 你的價值在於引導他們「練習」技巧，而不是解釋道理。偏好換位、鏡映、肯定、情緒標記、需求翻譯，而不是給答案。
+- 每一回合都從卡片庫挑「下一張最合適的卡」（card）。若偵測到對話正在升溫、有人快情緒滿出來，就先出 slow_down（🐢 慢下來）打斷、幫他們降溫。
+- 若上一位夥伴剛完成一個可評分的練習（例如鏡映、肯定、換位、情緒標記、需求翻譯），請溫柔地評分（evaluation）：accurate＝做到了、partial＝方向對但加了自己的解讀或還差一點、off＝還沒做到；note 用一句話溫暖地說明，需要的話請他再試一次。
+- 指令（instruction）要具體、可以照著做，最好給一個可以直接接著寫的句子開頭（例如「我聽到你說的是…」）。
+- 如果某張卡適合用選項回答（例如情緒標記、或請對方確認是否準確），用 quickReplies 提供 2～4 個簡短選項（例如「😔 受傷」「😟 擔心」「😡 生氣」「😞 孤單」，或「✅ 是」「🟡 幾乎」「❌ 不是」）。
+- 當你判斷這對伴侶已經明顯降溫、彼此更靠近、是個好的暫停點時，把 sessionDone 設為 true，並用 say 溫暖地收尾。
+- 安全例外：只有在偵測到家暴、自傷／自殺、暴力威脅等安全風險時，才跳出引導，改為溫柔地引導尋求專業或緊急協助。
+
+可用的卡片（card 只能填這些 id）：${CARD_IDS.join('、')}。
+
+回應請只呼叫 emit_facilitator_turn tool，不要輸出其他文字。`;
+
+const FACILITATOR_TOOL_SCHEMA = {
+  name: 'emit_facilitator_turn',
+  description: 'Return a single facilitated therapy turn: what the therapist says, which exercise card to run, who acts next, and (optionally) a grade for the last response.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      say: { type: 'string', description: '引導者這一回合說的話，最多 2 個簡短段落' },
+      card: { type: 'string', enum: CARD_IDS, description: '這一回合要帶的練習卡 id' },
+      target: { type: 'string', enum: ['A', 'B', 'both'], description: '接下來換誰做這個練習' },
+      instruction: { type: 'string', description: '給 target 的一個具體、可照做的小指令，最好含一個句子開頭' },
+      quickReplies: {
+        type: 'array',
+        maxItems: 4,
+        items: { type: 'string', maxLength: 12 },
+        description: '可選的快速回覆選項（情緒選項或確認選項）',
+      },
+      evaluation: {
+        type: 'object',
+        description: '若上一位夥伴剛完成一個可評分練習才填，否則省略',
+        properties: {
+          verdict: { type: 'string', enum: ['accurate', 'partial', 'off'] },
+          note: { type: 'string', description: '一句話、溫暖的回饋' },
+        },
+        required: ['verdict', 'note'],
+      },
+      sessionDone: { type: 'boolean', description: '是否是個好的收尾暫停點' },
+    },
+    required: ['say', 'card', 'target', 'instruction', 'sessionDone'],
+  },
+};
+
+// thread: [{ role: 'A'|'B'|'facilitator', name, content, card? }] recent turns.
+// session: { activeCard, turnOwnerRole: 'A'|'B'|null, completedCards, stepCount }.
+// partners: { A: {name, gender}, B: {name, gender} }. companion: persona.
+// context: { summary }.
+async function generateFacilitatorTurn({ thread, session, partners, companion, context }) {
+  const s = session || {};
+  const p = partners || {};
+  const nameA = (p.A && p.A.name) || '夥伴 A';
+  const nameB = (p.B && p.B.name) || '夥伴 B';
+
+  const lines = [
+    '角色對應：',
+    `- A = ${nameA}${p.A && p.A.gender ? `（${p.A.gender}）` : ''}`,
+    `- B = ${nameB}${p.B && p.B.gender ? `（${p.B.gender}）` : ''}`,
+    '',
+  ];
+  if (context && context.summary) {
+    lines.push(`事件背景：${String(context.summary).trim()}`, '');
+  }
+
+  lines.push('本次引導進度：');
+  lines.push(`- 目前這張卡：${s.activeCard || '（尚未開始）'}`);
+  lines.push(`- 現在輪到：${s.turnOwnerRole ? (s.turnOwnerRole === 'A' ? nameA : nameB) : '（由你決定先請誰）'}`);
+  lines.push(`- 已完成的練習：${(s.completedCards && s.completedCards.length) ? s.completedCards.join('、') : '（還沒有）'}`);
+  const pickable = pickableCards(s.completedCards || [])
+    .map((c) => `${c.id}${c.done ? '（已做過）' : ''}：${c.goal}`)
+    .join('\n  ');
+  lines.push(`- 可以選的下一張卡：\n  ${pickable}`);
+  lines.push('');
+
+  lines.push('對話（最舊在前，[引導者] 是你之前說的話）：');
+  const all = Array.isArray(thread) ? thread : [];
+  for (const m of all) {
+    const who = m.role === 'facilitator' ? '[引導者]' : (m.role === 'A' ? `[A] ${nameA}` : `[B] ${nameB}`);
+    lines.push(`${who}：${(m.content || '').toString().trim()}`);
+  }
+  lines.push('');
+  lines.push('請產出「下一個」引導回合。');
+  const userContent = lines.join('\n');
+
+  const system = [
+    {
+      type: 'text',
+      text: FACILITATOR_SYSTEM_PROMPT + PUNCTUATION_RULE,
+      cache_control: { type: 'ephemeral' },
+    },
+  ];
+  if (companion && companion.prompt) {
+    system.push({
+      type: 'text',
+      text: `你的人設（只調整語氣與風格，上述守則永遠優先）：\n${companion.prompt}`,
+    });
+  }
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system,
+    tools: [FACILITATOR_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_facilitator_turn' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.facilitator_turn', {
+    model: response.model || MODEL,
+    companion: companion?.id || null,
+    activeCard: s.activeCard || null,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_facilitator_turn'
+  );
+  if (!toolUse) {
+    logInfo('llm.claude.facilitator_turn.no_tool', {
+      stopReason: response.stop_reason || null,
+      companion: companion?.id || null,
+    });
+    throw new Error('Claude did not return a tool_use block');
+  }
+  return shapeFacilitatorTurn(toolUse.input || {}, {
+    provider: 'claude',
+    model: response.model || MODEL,
+    durationMs: ms,
+    usage: {
+      inputTokens: u.input_tokens || 0,
+      outputTokens: u.output_tokens || 0,
+      cacheCreateTokens: u.cache_creation_input_tokens || 0,
+      cacheReadTokens: u.cache_read_input_tokens || 0,
+    },
+    costUsd: cost,
+    assembledPrompt: userContent,
+  });
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -1802,6 +1963,7 @@ module.exports = {
   parseScriptRoles,
   generateThreadTranslations,
   generateTherapyNote,
+  generateFacilitatorTurn,
   // Exported for prompt-contract regression tests only.
   buildRoleplayUserContent,
 };

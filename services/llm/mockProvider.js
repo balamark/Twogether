@@ -562,6 +562,58 @@ async function generateTherapyNote({ eventSummary, messages }) {
   };
 }
 
+// Deterministic Therapist Mode facilitator turn. Cycles through a fixed
+// exercise sequence by stepCount so a full session can be driven in tests
+// without the paid LLM. Same input → same output. Normalization goes through
+// the shared shapeFacilitatorTurn so mock and claude obey one contract.
+const { getCard: mockGetCard, shapeFacilitatorTurn } = require('../../lib/therapyCards');
+
+const MOCK_FACILITATION_SEQUENCE = [
+  { card: 'slow_down', target: 'both', instruction: '先一起深呼吸三次。準備好了，我們就開始。' },
+  { card: 'emotion_label', target: 'A', instruction: '選一個你覺得對方此刻的情緒。', quickReplies: ['😔 受傷', '😟 擔心', '😡 生氣', '😞 孤單'] },
+  { card: 'mirror', target: 'B', instruction: '先不要解釋，只重複你聽到的：「我聽到你說的是…」' },
+  { card: 'validation', target: 'A', instruction: '不需要同意，也試著說：「我可以理解你為什麼會覺得…」' },
+  { card: 'perspective_switch', target: 'B', instruction: '站在對方的角度，完成：「我想我是在告訴你…」' },
+  { card: 'need_translation', target: 'A', instruction: '把剛剛的話翻成「我需要…」。' },
+];
+
+async function generateFacilitatorTurn({ session } = {}) {
+  const startedAt = Date.now();
+  const s = session || {};
+  const step = Math.max(0, Number(s.stepCount) || 0);
+  const idx = Math.min(step, MOCK_FACILITATION_SEQUENCE.length - 1);
+  const pick = MOCK_FACILITATION_SEQUENCE[idx];
+  const done = step >= MOCK_FACILITATION_SEQUENCE.length - 1;
+
+  // Grade the previous response if the active card was evaluable.
+  const prevCard = mockGetCard(s.activeCard);
+  const evaluation = prevCard && prevCard.evaluable && s.turnOwnerRole
+    ? { verdict: 'accurate', note: '你做到了，這就是重點。' }
+    : null;
+
+  return shapeFacilitatorTurn(
+    {
+      say: done
+        ? '我看見你們願意試著聽見彼此，這已經是很重要的一步。今天先到這裡，好好抱一下。'
+        : '我們一次只做一小步。慢慢來，我在這裡陪你們。',
+      card: pick.card,
+      target: pick.target,
+      instruction: pick.instruction,
+      quickReplies: pick.quickReplies || [],
+      evaluation,
+      sessionDone: done,
+    },
+    {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+      assembledPrompt: `[mock] facilitator step ${step} → ${pick.card}`,
+    }
+  );
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -575,4 +627,5 @@ module.exports = {
   parseScriptRoles,
   generateThreadTranslations,
   generateTherapyNote,
+  generateFacilitatorTurn,
 };
