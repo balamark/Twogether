@@ -78,6 +78,7 @@ function mapPost(row) {
     reply_count: Number(row.reply_count || 0),
     public_status: row.public_status || 'private',
     public_title: row.public_title || null,
+    translation_enabled: row.translation_enabled === true,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -120,7 +121,7 @@ router.get('/', async (req, res) => {
     const result = await db.query(
       `SELECT
          p.id, p.content, p.mood_tag, p.category, p.author_id,
-         p.public_status, p.public_title,
+         p.public_status, p.public_title, p.translation_enabled,
          p.created_at, p.updated_at,
          u.nickname AS author_nickname,
          (SELECT COUNT(*) FROM wall_post_replies r WHERE r.post_id = p.id) AS reply_count
@@ -366,7 +367,7 @@ router.get('/:id/replies', async (req, res) => {
     }
 
     const access = await db.query(
-      `SELECT id FROM wall_posts WHERE id = $1 AND couple_id = $2`,
+      `SELECT id, translation_enabled FROM wall_posts WHERE id = $1 AND couple_id = $2`,
       [postId, couple.id]
     );
 
@@ -387,6 +388,7 @@ router.get('/:id/replies', async (req, res) => {
     res.json({
       success: true,
       replies: result.rows.map(mapReply),
+      translation_enabled: access.rows[0].translation_enabled === true,
     });
   } catch (error) {
     logDbError('List wall replies error:', error, {
@@ -645,6 +647,145 @@ router.post(
     }
   }
 );
+
+// ---------------------------------------------------------------------------
+// 情緒翻譯 (emotion / need translation) — shared per-thread lens
+// ---------------------------------------------------------------------------
+
+// Toggle the shared translation lens for a wall thread. Either partner can flip
+// it; state lives on the post so both load the same on/off view.
+router.patch(
+  '/:id/translation',
+  [body('enabled').isBoolean()],
+  async (req, res) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ success: false, message: '驗證失敗', errors: errors.array() });
+      }
+      const postId = req.params.id;
+      const userId = req.user.id;
+      const couple = await findCoupleForUser(userId);
+      if (!couple) return res.status(404).json({ success: false, message: '找不到貼文' });
+
+      const post = await db.query(
+        `SELECT id FROM wall_posts WHERE id = $1 AND couple_id = $2`,
+        [postId, couple.id]
+      );
+      if (post.rows.length === 0) return res.status(404).json({ success: false, message: '找不到貼文' });
+
+      const enabled = req.body.enabled === true;
+      await db.query(`UPDATE wall_posts SET translation_enabled = $2 WHERE id = $1`, [postId, enabled]);
+      logInfo('wall.translation.toggle', { userId, postId, enabled });
+      res.json({ success: true, translation_enabled: enabled });
+    } catch (error) {
+      logError('Toggle wall translation failed', { err: error.message, stack: error.stack, post_id: req.params.id });
+      res.status(500).json({ success: false, message: '無法更新情緒翻譯設定，請稍後再試' });
+    }
+  }
+);
+
+// Return the emotion/need translation for every human reply in the thread.
+// Cached per reply (replies are immutable): only still-untranslated ones cost
+// one batched LLM call + one shared-budget unit; a fully cached thread is free.
+router.get('/:id/translations', async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const userId = req.user.id;
+    const couple = await findCoupleForUser(userId);
+    if (!couple) return res.status(404).json({ success: false, message: '找不到貼文' });
+
+    const postResult = await db.query(
+      `SELECT id, content FROM wall_posts WHERE id = $1 AND couple_id = $2`,
+      [postId, couple.id]
+    );
+    if (postResult.rows.length === 0) return res.status(404).json({ success: false, message: '找不到貼文' });
+
+    const repliesResult = await db.query(
+      `SELECT r.id, r.content, r.is_ai, u.nickname AS author_nickname
+         FROM wall_post_replies r
+         JOIN users u ON u.id = r.author_id
+        WHERE r.post_id = $1
+        ORDER BY r.created_at ASC`,
+      [postId]
+    );
+    const humanIds = repliesResult.rows.filter((r) => r.is_ai !== true).map((r) => r.id);
+
+    const cachedRows = humanIds.length > 0
+      ? (await db.query(
+          `SELECT message_id, translation FROM message_need_translations
+            WHERE surface = 'wall' AND message_id = ANY($1::uuid[])`,
+          [humanIds]
+        )).rows
+      : [];
+    const translations = {};
+    for (const row of cachedRows) translations[row.message_id] = row.translation;
+
+    const missing = humanIds.filter((id) => !translations[id]);
+
+    if (missing.length > 0) {
+      const { tier, limit } = await resolveAiLimit(userId);
+      const usedToday = await countTodayAiUsage(userId);
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      if (!limitCheck.ok) {
+        logInfo('wall.translation.limit', { userId, postId, used: usedToday, limit, tier, blocked: true });
+        return res.status(limitCheck.status).json(limitCheck.body);
+      }
+
+      // The post itself leads the thread as context (not translated here).
+      const threadForModel = [
+        { id: `post:${postResult.rows[0].id}`, speaker: '貼文', content: postResult.rows[0].content },
+        ...repliesResult.rows.map((r) => ({
+          id: r.id,
+          speaker: r.is_ai === true ? 'AI 諮商師' : (r.author_nickname || '某人'),
+          content: r.content,
+        })),
+      ];
+
+      logInfo('wall.translation.generate', { userId, postId, missing: missing.length });
+
+      const result = await llmService.generateThreadTranslations({
+        messages: threadForModel,
+        targetIds: missing,
+        context: { summary: postResult.rows[0].content },
+      });
+      const meta = result._meta;
+      delete result._meta;
+
+      logInfo('wall.translation.cost', {
+        userId,
+        postId,
+        provider: meta?.provider,
+        model: meta?.model,
+        costUsd: meta?.costUsd,
+        durationMs: meta?.durationMs,
+      });
+
+      await recordAiUsage(userId, 'need_translation', postResult.rows[0].content, meta);
+
+      for (const t of result.translations || []) {
+        if (!missing.includes(t.id)) continue;
+        const payload = { emotions: t.emotions || [], need: t.need || '', rewrite: t.rewrite || '' };
+        translations[t.id] = payload;
+        try {
+          await db.query(
+            `INSERT INTO message_need_translations (surface, message_id, couple_id, translation)
+             VALUES ('wall', $1, $2, $3)
+             ON CONFLICT (surface, message_id) DO UPDATE SET translation = EXCLUDED.translation`,
+            [t.id, couple.id, JSON.stringify(payload)]
+          );
+        } catch (err) {
+          logWarn('save wall translation failed', { messageId: t.id, err: err.message });
+        }
+      }
+    }
+
+    res.json({ success: true, translations });
+  } catch (error) {
+    logError('Get wall translations failed', { err: error.message, stack: error.stack, post_id: req.params.id });
+    res.status(500).json({ success: false, message: '情緒翻譯暫時無法產生，請稍後再試' });
+  }
+});
 
 // Delete own reply.
 router.delete('/replies/:replyId', async (req, res) => {

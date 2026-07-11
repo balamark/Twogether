@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Send, Trash2, Sparkles, X } from 'lucide-react';
-import { apiService, type WallReply } from '../services/api';
+import { Send, Trash2, Sparkles, X, HeartHandshake } from 'lucide-react';
+import { apiService, type WallReply, type MessageTranslationMap } from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatRelativeOrDate } from '../utils/datetime';
 import { companionName, resolveCompanion } from '../utils/aiCompanions';
 import { useAiQuota } from '../hooks/useAiQuota';
 import AiQuotaHint from './AiQuotaHint';
+import MessageTranslationCard from './MessageTranslationCard';
 
 interface WallPostThreadProps {
   postId: string;
@@ -38,17 +39,43 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
   const [aiPreview, setAiPreview] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPosting, setAiPosting] = useState(false);
+  const [translationEnabled, setTranslationEnabled] = useState(false);
+  const [translations, setTranslations] = useState<MessageTranslationMap>({});
+  const [translationLoading, setTranslationLoading] = useState(false);
   const tz = useTimezone();
+
+  // Load the emotion/need translations for the thread's human replies. Cached
+  // server-side per reply, so this only bills for still-untranslated messages.
+  const loadTranslations = async () => {
+    setTranslationLoading(true);
+    try {
+      const map = await apiService.getWallTranslations(postId);
+      setTranslations(map);
+    } catch (err) {
+      const code = (err as { error_code?: string })?.error_code;
+      const message = err instanceof Error ? err.message : '情緒翻譯暫時無法產生';
+      if (code === 'AI_DAILY_LIMIT_REACHED') {
+        onNotify?.({ type: 'warning', title: 'AI 額度已用完', message });
+      } else {
+        onError?.(message);
+      }
+    } finally {
+      refreshQuota();
+      setTranslationLoading(false);
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
     const load = async () => {
       setLoading(true);
       try {
-        const data = await apiService.getWallPostReplies(postId);
+        const data = await apiService.getWallThread(postId);
         if (!cancelled) {
-          setReplies(data);
-          onReplyCountChange?.(data.length);
+          setReplies(data.replies);
+          onReplyCountChange?.(data.replies.length);
+          setTranslationEnabled(data.translationEnabled);
+          if (data.translationEnabled) loadTranslations();
         }
       } catch (err) {
         if (!cancelled) {
@@ -65,6 +92,18 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [postId]);
 
+  const handleToggleTranslation = async () => {
+    const next = !translationEnabled;
+    setTranslationEnabled(next);
+    try {
+      await apiService.setWallTranslation(postId, next);
+      if (next) await loadTranslations();
+    } catch (err) {
+      setTranslationEnabled(!next);
+      onError?.(err instanceof Error ? err.message : '無法更新情緒翻譯設定');
+    }
+  };
+
   const handleSend = async () => {
     const trimmed = draft.trim();
     if (!trimmed) return;
@@ -77,6 +116,8 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
         return next;
       });
       setDraft('');
+      // Translate the newcomer so the lens stays complete without a manual retap.
+      if (translationEnabled) loadTranslations();
     } catch (err) {
       onError?.(err instanceof Error ? err.message : '回覆失敗');
     } finally {
@@ -152,6 +193,43 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
         </div>
       )}
 
+      {/* 情緒翻譯 lens toggle — shared across both partners. Turns each message
+          into the underlying emotion + need so nobody reads an attack. */}
+      {!loading && (
+        <div className="flex items-center justify-between gap-2 bg-petal-cream-2 border border-petal-rule rounded-xl px-3 py-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <HeartHandshake className="w-4 h-4 text-petal-rose-deep shrink-0" strokeWidth={1.5} />
+            <span className="font-body text-xs text-petal-ink truncate">情緒翻譯</span>
+            <span
+              className="font-body text-[11px] text-petal-muted cursor-help shrink-0"
+              title="開啟後，AI 會在每句話下方顯示背後的情緒與需求，幫你們從「立場」轉向「需求」。兩人都看得到。"
+            >
+              (?)
+            </span>
+            {translationLoading && (
+              <span className="font-body text-[11px] text-petal-muted shrink-0">翻譯中…</span>
+            )}
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={translationEnabled}
+            aria-label="情緒翻譯"
+            onClick={handleToggleTranslation}
+            data-testid={`wall-translation-toggle-${postId}`}
+            className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+              translationEnabled ? 'bg-petal-rose-deep' : 'bg-petal-rule'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                translationEnabled ? 'translate-x-4' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
+        </div>
+      )}
+
       {replies.map((reply) => {
         const isOwn = reply.author_id === currentUserId;
         const isAi = reply.is_ai === true;
@@ -201,6 +279,9 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
             <div className="mt-1 font-body text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">
               {reply.content}
             </div>
+            {translationEnabled && !isAi && translations[reply.id] && (
+              <MessageTranslationCard translation={translations[reply.id]} />
+            )}
           </div>
         );
       })}

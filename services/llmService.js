@@ -26,5 +26,6 @@ module.exports = {
   generateStoryInsights: provider.generateStoryInsights,
   structureStory: provider.structureStory,
   parseScriptRoles: provider.parseScriptRoles,
+  generateThreadTranslations: provider.generateThreadTranslations,
   providerName: PROVIDER_NAME,
 };

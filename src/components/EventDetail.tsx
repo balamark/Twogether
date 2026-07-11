@@ -21,8 +21,10 @@ import apiService, {
   type ReplyRewritePreview,
   type EmotionAcceptancePreview,
   type EventVersionKey,
+  type MessageTranslationMap,
 } from '../services/api';
 import ReplyStepBar from './ReplyStepBar';
+import MessageTranslationCard from './MessageTranslationCard';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
@@ -105,6 +107,9 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editingMessageText, setEditingMessageText] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [translationEnabled, setTranslationEnabled] = useState(false);
+  const [translations, setTranslations] = useState<MessageTranslationMap>({});
+  const [translationLoading, setTranslationLoading] = useState(false);
   const tz = useTimezone();
 
   const insertPhrase = (phrase: string) => {
@@ -179,16 +184,62 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     setAcceptancePreview(null);
   };
 
+  // Load the emotion/need translations for the thread's human messages. Cached
+  // server-side per message, so this only bills for still-untranslated ones.
+  const loadTranslations = async () => {
+    setTranslationLoading(true);
+    try {
+      const map = await apiService.getEventTranslations(eventId);
+      setTranslations(map);
+    } catch (err) {
+      const code = (err as { error_code?: string })?.error_code;
+      if (code === 'AI_DAILY_LIMIT_REACHED') {
+        showNotification({
+          type: 'warning',
+          title: '今日 AI 次數已用完',
+          message: '情緒翻譯次數已達今日上限，升級 Premium 可提高每日上限。',
+        });
+      } else {
+        showNotification({
+          type: 'error',
+          title: '情緒翻譯失敗',
+          message: err instanceof Error ? err.message : '請稍後再試',
+        });
+      }
+    } finally {
+      setTranslationLoading(false);
+      refreshQuota();
+    }
+  };
+
   const refresh = async () => {
     try {
       const data = await apiService.getEvent(eventId);
       setEvent(data);
+      setTranslationEnabled(data.translationEnabled);
+      if (data.translationEnabled) loadTranslations();
       // Mark inbound unread messages as read (fire-and-forget)
       data.messages
         .filter((m) => m.senderId !== currentUserId && !m.readAt)
         .forEach((m) => apiService.markEventMessageRead(eventId, m.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : '無法取得事件詳情');
+    }
+  };
+
+  const handleToggleTranslation = async () => {
+    const next = !translationEnabled;
+    setTranslationEnabled(next);
+    try {
+      await apiService.setEventTranslation(eventId, next);
+      if (next) await loadTranslations();
+    } catch (err) {
+      setTranslationEnabled(!next);
+      showNotification({
+        type: 'error',
+        title: '無法更新情緒翻譯設定',
+        message: err instanceof Error ? err.message : '請稍後再試',
+      });
     }
   };
 
@@ -558,6 +609,43 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
 
       {!event.isPrivate && (
         <section className="bg-petal-cream border border-petal-rule rounded-2xl p-4 space-y-3">
+          {/* 情緒翻譯 lens toggle — shared across both partners. Turns each
+              message into the underlying emotion + need so nobody reads an
+              attack. */}
+          <div className="flex items-center justify-between gap-2 bg-petal-cream-2 border border-petal-rule rounded-xl px-3 py-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <HeartHandshake className="w-4 h-4 text-petal-rose-deep shrink-0" strokeWidth={1.5} />
+              <span className="text-xs text-petal-ink truncate">情緒翻譯</span>
+              <span
+                className="text-[11px] text-petal-muted cursor-help shrink-0"
+                title="開啟後，AI 會在每句話下方顯示背後的情緒與需求，幫你們從「立場」轉向「需求」。兩人都看得到。"
+              >
+                (?)
+              </span>
+              {translationLoading && (
+                <span className="text-[11px] text-petal-muted shrink-0 inline-flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />翻譯中…
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={translationEnabled}
+              aria-label="情緒翻譯"
+              onClick={handleToggleTranslation}
+              data-testid="event-translation-toggle"
+              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+                translationEnabled ? 'bg-petal-rose-deep' : 'bg-petal-rule'
+              }`}
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  translationEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                }`}
+              />
+            </button>
+          </div>
           {event.messages.length === 0 && (
             <p className="text-sm text-petal-ink-soft text-center py-4">尚無訊息</p>
           )}
@@ -670,6 +758,9 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                           </button>
                         )}
                       </p>
+                      {translationEnabled && translations[m.id] && (
+                        <MessageTranslationCard translation={translations[m.id]} />
+                      )}
                     </>
                   )}
                 </div>

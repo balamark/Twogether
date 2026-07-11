@@ -492,8 +492,19 @@ export interface EventRecord {
   contentEditedAt: string | null;
   unreadCount: number;
   lastMessagePreview: string | null;
+  translationEnabled: boolean;
   messages: EventMessage[];
 }
+
+// 情緒翻譯 (emotion / need translation) for a single message.
+export interface MessageTranslation {
+  emotions: { label: string; intensity: number }[];
+  need: string;
+  rewrite: string;
+}
+
+// Keyed by message id.
+export type MessageTranslationMap = Record<string, MessageTranslation>;
 
 export interface CreateEventInput {
   title: string;
@@ -2847,6 +2858,43 @@ class ApiService {
     }
   }
 
+  // Replies plus the shared 情緒翻譯 toggle state for a wall thread.
+  async getWallThread(postId: string): Promise<{ replies: WallReply[]; translationEnabled: boolean }> {
+    try {
+      const response = await apiClient.get(`/wall/${postId}/replies`);
+      return {
+        replies: (response.data.replies || []) as WallReply[],
+        translationEnabled: response.data.translation_enabled === true,
+      };
+    } catch (error) {
+      console.error('Failed to fetch wall thread:', error);
+      throw error;
+    }
+  }
+
+  // Toggle the shared 情緒翻譯 lens for a wall thread.
+  async setWallTranslation(postId: string, enabled: boolean): Promise<boolean> {
+    try {
+      const response = await apiClient.patch(`/wall/${postId}/translation`, { enabled });
+      return response.data.translation_enabled === true;
+    } catch (error) {
+      console.error('Failed to toggle wall translation:', error);
+      throw error;
+    }
+  }
+
+  // Emotion/need translation for every human reply in a wall thread (cached per
+  // reply; only untranslated ones cost AI budget).
+  async getWallTranslations(postId: string): Promise<MessageTranslationMap> {
+    try {
+      const response = await apiClient.get(`/wall/${postId}/translations`);
+      return (response.data.translations || {}) as MessageTranslationMap;
+    } catch (error) {
+      console.error('Failed to fetch wall translations:', error);
+      throw error;
+    }
+  }
+
   // Custom Gifts API
   async getCustomGifts(): Promise<unknown[]> {
     try {
@@ -3196,6 +3244,29 @@ class ApiService {
     }
   }
 
+  // Toggle the shared 情緒翻譯 (emotion/need translation) lens for an event thread.
+  async setEventTranslation(eventId: string, enabled: boolean): Promise<boolean> {
+    try {
+      const response = await apiClient.patch(`/events/${eventId}/translation`, { enabled });
+      return response.data.translation_enabled === true;
+    } catch (error: unknown) {
+      console.error('Failed to toggle event translation:', error);
+      this.throwApiError(error, '無法更新情緒翻譯設定，請稍後再試');
+    }
+  }
+
+  // Fetch the emotion/need translation for every human message in an event
+  // thread (cached per message; only untranslated ones cost AI budget).
+  async getEventTranslations(eventId: string): Promise<MessageTranslationMap> {
+    try {
+      const response = await apiClient.get(`/events/${eventId}/translations`);
+      return (response.data.translations || {}) as MessageTranslationMap;
+    } catch (error: unknown) {
+      console.error('Failed to fetch event translations:', error);
+      this.throwApiError(error, '情緒翻譯暫時無法產生，請稍後再試');
+    }
+  }
+
   async markEventMessageRead(eventId: string, msgId: string): Promise<void> {
     try {
       await apiClient.put(`/events/${eventId}/messages/${msgId}/read`);
@@ -3337,6 +3408,7 @@ class ApiService {
       content_edited_at?: string | null;
       unread_count?: number;
       last_message_preview?: string | null;
+      translation_enabled?: boolean;
       messages?: unknown[];
     };
     return {
@@ -3366,6 +3438,7 @@ class ApiService {
       contentEditedAt: r.content_edited_at ?? null,
       unreadCount: Number(r.unread_count) || 0,
       lastMessagePreview: r.last_message_preview ?? null,
+      translationEnabled: r.translation_enabled === true,
       messages: Array.isArray(r.messages) ? r.messages.map((m) => this.transformEventMessage(m)) : [],
     };
   }

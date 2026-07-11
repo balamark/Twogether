@@ -215,6 +215,7 @@ function serializeEvent(row, extras = {}) {
     public_status: row.public_status || 'private',
     public_title: row.public_title || null,
     status: row.status,
+    translation_enabled: row.translation_enabled === true,
     resolve_requested_by: row.resolve_requested_by,
     resolve_requested_at: row.resolve_requested_at,
     resolved_at: row.resolved_at,
@@ -1092,6 +1093,131 @@ router.post(
     }
   }
 );
+
+// ---------------------------------------------------------------------------
+// 情緒翻譯 (emotion / need translation) — shared per-thread lens
+// ---------------------------------------------------------------------------
+
+// Toggle the shared translation lens for an event thread. Either partner can
+// flip it; the state is stored on the event so both load the same on/off view.
+router.patch(
+  '/:id/translation',
+  [param('id').isUUID(), body('enabled').isBoolean()],
+  async (req, res) => {
+    if (sendValidationError(req, res)) return;
+    try {
+      const access = await assertEventAccess(req.params.id, req.user.id);
+      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (access.event.is_private) {
+        return res.status(403).json({ success: false, message: '私人事件無法開啟情緒翻譯', error_code: 'PRIVATE_EVENT' });
+      }
+      const enabled = req.body.enabled === true;
+      await db.query(`UPDATE events SET translation_enabled = $2 WHERE id = $1`, [req.params.id, enabled]);
+      logInfo('events.translation.toggle', { userId: req.user.id, eventId: req.params.id, enabled });
+      res.json({ success: true, translation_enabled: enabled });
+    } catch (err) {
+      logError('Toggle event translation failed', { err: err.message, stack: err.stack, eventId: req.params.id });
+      res.status(500).json({ success: false, message: '無法更新情緒翻譯設定，請稍後再試' });
+    }
+  }
+);
+
+// Return the emotion/need translation for every human message in the thread.
+// Cached per message (messages are immutable), so only the still-untranslated
+// ones cost one batched LLM call + one shared-budget unit; a fully cached
+// thread costs nothing.
+router.get('/:id/translations', [param('id').isUUID()], async (req, res) => {
+  if (sendValidationError(req, res)) return;
+  try {
+    const access = await assertEventAccess(req.params.id, req.user.id);
+    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (access.event.is_private) {
+      return res.status(403).json({ success: false, message: '私人事件無法使用情緒翻譯', error_code: 'PRIVATE_EVENT' });
+    }
+    const userId = req.user.id;
+
+    const msgs = await db.query(
+      `SELECT m.id, m.content, m.is_ai, u.nickname AS author_nickname
+         FROM event_messages m
+         JOIN users u ON u.id = m.sender_id
+        WHERE m.event_id = $1
+        ORDER BY m.created_at ASC`,
+      [req.params.id]
+    );
+    const humanIds = msgs.rows.filter((r) => r.is_ai !== true).map((r) => r.id);
+
+    // Load whatever is already cached for this thread's human messages.
+    const cachedRows = humanIds.length > 0
+      ? (await db.query(
+          `SELECT message_id, translation FROM message_need_translations
+            WHERE surface = 'event' AND message_id = ANY($1::uuid[])`,
+          [humanIds]
+        )).rows
+      : [];
+    const translations = {};
+    for (const row of cachedRows) translations[row.message_id] = row.translation;
+
+    const missing = humanIds.filter((id) => !translations[id]);
+
+    if (missing.length > 0) {
+      const { tier, limit } = await resolveAiLimit(userId);
+      const usedToday = await countTodayAiUsage(userId);
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      if (!limitCheck.ok) {
+        logInfo('events.translation.limit', { userId, eventId: req.params.id, used: usedToday, limit, tier, blocked: true });
+        return res.status(limitCheck.status).json(limitCheck.body);
+      }
+
+      const threadForModel = msgs.rows.map((r) => ({
+        id: r.id,
+        speaker: r.is_ai === true ? 'AI 諮商師' : (r.author_nickname || '某人'),
+        content: r.content,
+      }));
+
+      logInfo('events.translation.generate', { userId, eventId: req.params.id, missing: missing.length });
+
+      const result = await llmService.generateThreadTranslations({
+        messages: threadForModel,
+        targetIds: missing,
+        context: { summary: access.event.summary },
+      });
+      const meta = result._meta;
+      delete result._meta;
+
+      logInfo('events.translation.cost', {
+        userId,
+        eventId: req.params.id,
+        provider: meta?.provider,
+        model: meta?.model,
+        costUsd: meta?.costUsd,
+        durationMs: meta?.durationMs,
+      });
+
+      await recordAiUsage(userId, 'need_translation', access.event.summary, meta);
+
+      for (const t of result.translations || []) {
+        if (!missing.includes(t.id)) continue;
+        const payload = { emotions: t.emotions || [], need: t.need || '', rewrite: t.rewrite || '' };
+        translations[t.id] = payload;
+        try {
+          await db.query(
+            `INSERT INTO message_need_translations (surface, message_id, couple_id, translation)
+             VALUES ('event', $1, $2, $3)
+             ON CONFLICT (surface, message_id) DO UPDATE SET translation = EXCLUDED.translation`,
+            [t.id, access.coupleId, JSON.stringify(payload)]
+          );
+        } catch (err) {
+          logWarn('save event translation failed', { messageId: t.id, err: err.message });
+        }
+      }
+    }
+
+    res.json({ success: true, translations });
+  } catch (err) {
+    logError('Get event translations failed', { err: err.message, stack: err.stack, eventId: req.params.id });
+    res.status(500).json({ success: false, message: '情緒翻譯暫時無法產生，請稍後再試' });
+  }
+});
 
 // Mark an inbound message as read
 router.put(
