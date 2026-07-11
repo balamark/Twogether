@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 // Backend CommonJS module — the deck is shared truth for Therapist Mode.
 import cards from '../../lib/therapyCards.js';
 
-const { getCard, cardMeta, pickableCards, applyVerdict, scoreSession, CARD_IDS } = cards;
+const { getCard, cardMeta, pickableCards, applyVerdict, scoreSession, shapeFacilitatorTurn, CARD_IDS } = cards;
 
 describe('therapyCards deck', () => {
   it('exposes the 8-card starter deck with required fields', () => {
@@ -19,8 +19,41 @@ describe('therapyCards deck', () => {
   });
 
   it('cardMeta returns only display fields (no prompt leakage)', () => {
-    expect(cardMeta('mirror')).toEqual({ id: 'mirror', label: '鏡映', emoji: '🪞', color: 'sky' });
+    expect(cardMeta('mirror')).toEqual({ id: 'mirror', label: '鏡映', emoji: '🪞', color: 'sage' });
     expect(cardMeta('nope')).toBeNull();
+  });
+});
+
+describe('shapeFacilitatorTurn (shared provider contract)', () => {
+  const meta = { provider: 'test' };
+
+  it('falls back to slow_down on unknown cards and both on unknown targets', () => {
+    const t = shapeFacilitatorTurn({ card: 'made_up', target: 'C', say: 'hi', instruction: 'x' }, meta);
+    expect(t.card).toBe('slow_down');
+    expect(t.cardMeta?.id).toBe('slow_down');
+    expect(t.target).toBe('both');
+    expect(t._meta).toBe(meta);
+  });
+
+  it('caps quickReplies at 4 and drops empties', () => {
+    const t = shapeFacilitatorTurn(
+      { card: 'emotion_label', target: 'A', quickReplies: ['a', ' ', 'b', 'c', 'd', 'e'] },
+      meta
+    );
+    expect(t.quickReplies).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('normalizes evaluation and rejects unknown verdicts', () => {
+    const ok = shapeFacilitatorTurn(
+      { card: 'mirror', target: 'B', evaluation: { verdict: 'partial', note: ' 快了 ' } },
+      meta
+    );
+    expect(ok.evaluation).toEqual({ verdict: 'partial', note: '快了' });
+    const bad = shapeFacilitatorTurn(
+      { card: 'mirror', target: 'B', evaluation: { verdict: 'great', note: 'x' } },
+      meta
+    );
+    expect(bad.evaluation).toBeNull();
   });
 });
 

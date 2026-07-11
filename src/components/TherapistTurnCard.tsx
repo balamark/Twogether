@@ -14,15 +14,15 @@ interface Props {
   onQuickReply: (text: string) => void;
 }
 
-// Card accent by colour key (see lib/therapyCards.js). Kept light so the card
-// reads as a gentle prompt, not an alert.
+// Card accent by colour key (see lib/therapyCards.js). Petal-family accents so
+// the chips sit inside the app's warm soft-petal system (amber stays: it's the
+// one warm hue the palette lacks); kept light so the card reads as a gentle
+// prompt, not an alert.
 const CHIP: Record<string, string> = {
-  sky: 'bg-sky-50 border-sky-200 text-sky-700',
-  violet: 'bg-violet-50 border-violet-200 text-violet-700',
   rose: 'bg-petal-rose-soft/30 border-petal-rose-soft text-petal-rose-deep',
-  amber: 'bg-amber-50 border-amber-200 text-amber-700',
   sage: 'bg-petal-sage/20 border-petal-sage text-petal-sage-deep',
-  stone: 'bg-stone-100 border-stone-200 text-stone-600',
+  amber: 'bg-amber-50 border-amber-200 text-amber-700',
+  neutral: 'bg-petal-cream-2 border-petal-rule text-petal-ink',
 };
 
 const VERDICT: Record<string, { label: string; cls: string }> = {
@@ -32,8 +32,8 @@ const VERDICT: Record<string, { label: string; cls: string }> = {
 };
 
 const TherapistTurnCard: React.FC<Props> = ({ facilitation, say, companionLabel, isMyTurn, onQuickReply }) => {
-  const { cardMeta, instruction, quickReplies, evaluation, sessionDone } = facilitation;
-  const chip = (cardMeta && CHIP[cardMeta.color]) || CHIP.stone;
+  const { cardMeta, instruction, quickReplies, evaluation, evaluatedCardMeta, sessionDone } = facilitation;
+  const chip = (cardMeta && CHIP[cardMeta.color]) || CHIP.neutral;
 
   return (
     <div className="rounded-2xl border border-petal-rose-deep/25 bg-petal-cream p-4 space-y-3" data-testid="therapist-turn-card">
@@ -55,7 +55,11 @@ const TherapistTurnCard: React.FC<Props> = ({ facilitation, say, companionLabel,
       </div>
 
       {evaluation?.note && (
-        <p className="font-body text-[13px] text-petal-muted leading-relaxed">{evaluation.note}</p>
+        <p className="font-body text-[13px] text-petal-muted leading-relaxed">
+          {/* Name the exercise being graded — the badge sits on the NEXT card's
+              turn, so without this it reads as grading the new card. */}
+          {evaluatedCardMeta ? `${evaluatedCardMeta.emoji} ${evaluatedCardMeta.label}：${evaluation.note}` : evaluation.note}
+        </p>
       )}
 
       {say && <p className="font-body text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">{say}</p>}
@@ -75,7 +79,7 @@ const TherapistTurnCard: React.FC<Props> = ({ facilitation, say, companionLabel,
                   type="button"
                   data-testid="therapist-quick-reply"
                   onClick={() => onQuickReply(q)}
-                  className="rounded-full border border-petal-rose-deep/40 bg-white px-3 py-1 font-body text-xs text-petal-ink hover:bg-petal-rose-soft/20 active:scale-[0.98] transition"
+                  className="rounded-full border border-petal-rose-deep/40 bg-white px-3.5 py-2 font-body text-sm text-petal-ink hover:bg-petal-rose-soft/20 active:scale-[0.98] transition"
                 >
                   {q}
                 </button>

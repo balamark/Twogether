@@ -564,8 +564,9 @@ async function generateTherapyNote({ eventSummary, messages }) {
 
 // Deterministic Therapist Mode facilitator turn. Cycles through a fixed
 // exercise sequence by stepCount so a full session can be driven in tests
-// without the paid LLM. Same input → same output.
-const { cardMeta: mockCardMeta, CARD_IDS: MOCK_CARD_IDS, getCard: mockGetCard } = require('../../lib/therapyCards');
+// without the paid LLM. Same input → same output. Normalization goes through
+// the shared shapeFacilitatorTurn so mock and claude obey one contract.
+const { getCard: mockGetCard, shapeFacilitatorTurn } = require('../../lib/therapyCards');
 
 const MOCK_FACILITATION_SEQUENCE = [
   { card: 'slow_down', target: 'both', instruction: '先一起深呼吸三次。準備好了，我們就開始。' },
@@ -590,27 +591,27 @@ async function generateFacilitatorTurn({ session } = {}) {
     ? { verdict: 'accurate', note: '你做到了，這就是重點。' }
     : null;
 
-  const cardId = MOCK_CARD_IDS.includes(pick.card) ? pick.card : 'slow_down';
-  return {
-    say: done
-      ? '我看見你們願意試著聽見彼此，這已經是很重要的一步。今天先到這裡，好好抱一下。'
-      : '我們一次只做一小步。慢慢來，我在這裡陪你們。',
-    card: cardId,
-    cardMeta: mockCardMeta(cardId),
-    target: pick.target,
-    instruction: pick.instruction,
-    quickReplies: pick.quickReplies || [],
-    evaluation,
-    sessionDone: done,
-    _meta: {
+  return shapeFacilitatorTurn(
+    {
+      say: done
+        ? '我看見你們願意試著聽見彼此，這已經是很重要的一步。今天先到這裡，好好抱一下。'
+        : '我們一次只做一小步。慢慢來，我在這裡陪你們。',
+      card: pick.card,
+      target: pick.target,
+      instruction: pick.instruction,
+      quickReplies: pick.quickReplies || [],
+      evaluation,
+      sessionDone: done,
+    },
+    {
       provider: 'mock',
       model: 'mock',
       durationMs: Date.now() - startedAt,
       usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
       costUsd: 0,
-      assembledPrompt: `[mock] facilitator step ${step} → ${cardId}`,
-    },
-  };
+      assembledPrompt: `[mock] facilitator step ${step} → ${pick.card}`,
+    }
+  );
 }
 
 module.exports = {

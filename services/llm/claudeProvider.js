@@ -14,7 +14,7 @@
 
 const Anthropic = require('@anthropic-ai/sdk');
 const { logInfo } = require('../../lib/logger');
-const { pickableCards, cardMeta, CARD_IDS } = require('../../lib/therapyCards');
+const { pickableCards, CARD_IDS, shapeFacilitatorTurn } = require('../../lib/therapyCards');
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 
@@ -1950,29 +1950,6 @@ async function generateFacilitatorTurn({ thread, session, partners, companion, c
   });
 }
 
-// Normalize + attach the card's display metadata so the frontend renders the
-// chip straight from the payload. Shared by the claude + mock providers.
-function shapeFacilitatorTurn(out, meta) {
-  const cardId = CARD_IDS.includes(out.card) ? out.card : 'slow_down';
-  const target = ['A', 'B', 'both'].includes(out.target) ? out.target : 'both';
-  const evaluation = out.evaluation && ['accurate', 'partial', 'off'].includes(out.evaluation.verdict)
-    ? { verdict: out.evaluation.verdict, note: (out.evaluation.note || '').toString().trim() }
-    : null;
-  return {
-    say: (out.say || '').toString().trim(),
-    card: cardId,
-    cardMeta: cardMeta(cardId),
-    target,
-    instruction: (out.instruction || '').toString().trim(),
-    quickReplies: Array.isArray(out.quickReplies)
-      ? out.quickReplies.filter((q) => typeof q === 'string' && q.trim()).slice(0, 4).map((q) => q.trim())
-      : [],
-    evaluation,
-    sessionDone: out.sessionDone === true,
-    _meta: meta,
-  };
-}
-
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -1989,5 +1966,4 @@ module.exports = {
   generateFacilitatorTurn,
   // Exported for prompt-contract regression tests only.
   buildRoleplayUserContent,
-  shapeFacilitatorTurn,
 };

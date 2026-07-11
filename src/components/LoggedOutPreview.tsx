@@ -380,7 +380,7 @@ const TherapistModeSample: React.FC = () => (
     </div>
     <div className="rounded-2xl border border-petal-rose-deep/25 bg-petal-cream p-3 space-y-2">
       <div className="flex items-center gap-2">
-        <span className="rounded-full border border-sky-200 bg-sky-50 text-sky-700 px-2 py-0.5 font-body text-[11px] font-medium">🪞 鏡映</span>
+        <span className="rounded-full border border-petal-sage bg-petal-sage/20 text-petal-sage-deep px-2 py-0.5 font-body text-[11px] font-medium">🪞 鏡映</span>
         <span className="rounded-full border border-petal-sage bg-petal-sage/20 text-petal-sage-deep px-2 py-0.5 font-body text-[11px] font-medium">✅ 做到了</span>
       </div>
       <p className="font-body text-sm text-petal-ink leading-relaxed">我們一次只做一小步。先不要解釋，只重複你聽到的。</p>

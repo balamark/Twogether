@@ -40,12 +40,13 @@ const AI_TURN = {
   ai_therapist: 'luma',
   facilitation: {
     card: 'mirror',
-    cardMeta: { id: 'mirror', label: '鏡映', emoji: '🪞', color: 'sky' },
+    cardMeta: { id: 'mirror', label: '鏡映', emoji: '🪞', color: 'sage' },
     target: 'A',
     targetUserId: FAKE_USER.id,
     instruction: '用「我聽到你說的是…」開頭，說出你聽到的。',
     quickReplies: ['我聽到你說的是…'],
     evaluation: null,
+    evaluatedCardMeta: null,
     sessionDone: false,
   },
   created_at: new Date().toISOString(),
@@ -55,14 +56,10 @@ const AI_TURN = {
 
 const SESSION = {
   status: 'active',
-  activeCard: 'mirror',
-  activeCardMeta: { id: 'mirror', label: '鏡映', emoji: '🪞', color: 'sky' },
+  activeCardMeta: { id: 'mirror', label: '鏡映', emoji: '🪞', color: 'sage' },
   turnOwner: FAKE_USER.id,
-  completedCards: ['emotion_label'],
   completedCardsMeta: [{ id: 'emotion_label', label: '情緒標記', emoji: '🎯', color: 'amber' }],
-  skillScores: { emotion_labeling: { attempts: 1, score: 1 } },
   skillScore: 100,
-  stepCount: 2,
 };
 
 test.describe('Event thread — 引導模式 (Therapist Mode)', () => {

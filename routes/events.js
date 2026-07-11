@@ -8,7 +8,7 @@ const llmService = require('../services/llmService');
 const emailService = require('../services/emailService');
 const { checkLimit } = require('../lib/entitlements');
 const { resolveCompanion } = require('../lib/aiCompanions');
-const { cardMeta, getCard, applyVerdict, scoreSession } = require('../lib/therapyCards');
+const { cardMeta, applyVerdict, scoreSession } = require('../lib/therapyCards');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 const {
   countTodayAiUsage,
@@ -1554,20 +1554,16 @@ async function loadFacilitationThread(eventId, partners, limit = 16) {
   }));
 }
 
-// Shape a session row for the frontend (scoreboard + turn state).
+// Shape a session row for the frontend (scoreboard + turn state). Only what the
+// UI consumes — raw skill accounting and card-id lists stay server-side.
 function serializeSession(row) {
   if (!row) return null;
-  const completed = row.completed_cards || [];
   return {
     status: row.status,
-    activeCard: row.active_card || null,
     activeCardMeta: row.active_card ? cardMeta(row.active_card) : null,
     turnOwner: row.turn_owner || null,
-    completedCards: completed,
-    completedCardsMeta: completed.map(cardMeta).filter(Boolean),
-    skillScores: row.skill_scores || {},
+    completedCardsMeta: (row.completed_cards || []).map(cardMeta).filter(Boolean),
     skillScore: scoreSession(row.skill_scores || {}),
-    stepCount: row.step_count || 0,
   };
 }
 
@@ -1588,6 +1584,9 @@ async function postFacilitatorTurn(eventId, userId, companion, turn, partners) {
     instruction: turn.instruction,
     quickReplies: turn.quickReplies || [],
     evaluation: turn.evaluation || null,
+    // The evaluation grades the PREVIOUS exercise; name it so the badge can't
+    // be misread as grading the new card.
+    evaluatedCardMeta: turn.evaluatedCardMeta || null,
     sessionDone: turn.sessionDone === true,
   };
   const content = turn.say || turn.instruction || '';
@@ -1600,17 +1599,24 @@ async function postFacilitatorTurn(eventId, userId, companion, turn, partners) {
   return msg.rows[0];
 }
 
-// Shared guard for the two AI-producing facilitation routes.
-async function facilitationPreflight(access, res) {
+// Shared guard for the two AI-producing facilitation routes. Each rejection is
+// logged so Cloud Logging shows how often users hit these walls, not just when
+// the feature succeeds.
+async function facilitationPreflight(access, res, userId) {
+  const blocked = (reason) =>
+    logInfo('events.facilitation.blocked', { userId, eventId: access.event.id, reason });
   if (access.event.is_private) {
+    blocked('private_event');
     res.status(403).json({ success: false, message: '私人事件無法使用引導模式', error_code: 'PRIVATE_EVENT' });
     return false;
   }
   if (access.event.status === 'resolved') {
+    blocked('event_resolved');
     res.status(400).json({ success: false, message: '此事件已解決，如需再談可先重新開啟事件', error_code: 'EVENT_RESOLVED' });
     return false;
   }
   if (!access.partnerId) {
+    blocked('not_paired');
     res.status(400).json({
       success: false,
       message: '引導模式需要兩個人一起練習。先邀請另一半配對，配對後就能一起進行；在那之前，你仍可用「請 AI 諮商師加入」聽聽建議。',
@@ -1635,20 +1641,17 @@ router.get('/:id/facilitation', [param('id').isUUID()], async (req, res) => {
   }
 });
 
-// START (or resume) a facilitated session. Idempotent: if one is already
-// active, return it without a new LLM call so a double-tap costs nothing.
+// START (or resume) a facilitated session. Idempotent AND race-safe: the
+// session row is claimed (step_count = 0 marks an in-flight claim) BEFORE the
+// LLM call, so two partners tapping 開始引導 simultaneously produce one turn and
+// one charge — the loser resumes the winner's session for free.
 router.post('/:id/facilitation/start', [param('id').isUUID()], async (req, res) => {
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
     if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
-    if (!(await facilitationPreflight(access, res))) return;
-
     const userId = req.user.id;
-    const existing = await getSessionRow(req.params.id);
-    if (existing && existing.status === 'active') {
-      return res.json({ success: true, session: serializeSession(existing), message: null, resumed: true });
-    }
+    if (!(await facilitationPreflight(access, res, userId))) return;
 
     const { tier, limit } = await resolveAiLimit(userId);
     const usedToday = await countTodayAiUsage(userId);
@@ -1658,51 +1661,86 @@ router.post('/:id/facilitation/start', [param('id').isUUID()], async (req, res) 
       return res.status(limitCheck.status).json(limitCheck.body);
     }
 
-    const partners = await loadFacilitationPartners(access.event);
-    const companion = await getUserCompanion(userId);
-    const thread = await loadFacilitationThread(req.params.id, partners);
-
-    logInfo('events.facilitation.start', { userId, eventId: req.params.id, companion: companion.id });
-
-    const turn = await llmService.generateFacilitatorTurn({
-      thread,
-      session: { activeCard: null, turnOwnerRole: null, completedCards: [], stepCount: 0 },
-      partners,
-      companion,
-      context: { summary: access.event.summary },
-    });
-    const meta = turn._meta;
-    delete turn._meta;
-
-    const turnOwner = targetUserId(turn.target, partners);
-    const status = turn.sessionDone ? 'ended' : 'active';
-    const sessionRow = (await db.query(
-      `INSERT INTO event_facilitation_sessions
-         (event_id, status, active_card, turn_owner, completed_cards, skill_scores, step_count, started_at, updated_at)
-       VALUES ($1, $2, $3, $4, '{}', '{}'::jsonb, 1, NOW(), NOW())
-       ON CONFLICT (event_id) DO UPDATE SET
-         status = EXCLUDED.status, active_card = EXCLUDED.active_card, turn_owner = EXCLUDED.turn_owner,
-         completed_cards = '{}', skill_scores = '{}'::jsonb, step_count = 1,
-         started_at = NOW(), updated_at = NOW()
-       RETURNING *`,
-      [req.params.id, status, turn.card, turnOwner]
+    // Claim the slot. No row back = a session row already exists.
+    let claim = (await db.query(
+      `INSERT INTO event_facilitation_sessions (event_id, status, step_count)
+       VALUES ($1, 'active', 0)
+       ON CONFLICT (event_id) DO NOTHING RETURNING *`,
+      [req.params.id]
     )).rows[0];
+    if (!claim) {
+      const existing = await getSessionRow(req.params.id);
+      if (existing && existing.status === 'active') {
+        // Already running (or another request is mid-start): resume, no charge.
+        return res.json({ success: true, session: serializeSession(existing), message: null });
+      }
+      // Ended session: claim the restart. 0 rows = someone else just did.
+      claim = (await db.query(
+        `UPDATE event_facilitation_sessions
+            SET status = 'active', active_card = NULL, turn_owner = NULL,
+                completed_cards = '{}', skill_scores = '{}'::jsonb, step_count = 0,
+                started_at = NOW(), updated_at = NOW()
+          WHERE event_id = $1 AND status = 'ended' RETURNING *`,
+        [req.params.id]
+      )).rows[0];
+      if (!claim) {
+        const current = await getSessionRow(req.params.id);
+        return res.json({ success: true, session: serializeSession(current), message: null });
+      }
+    }
 
-    const aiMsg = await postFacilitatorTurn(req.params.id, userId, companion, turn, partners);
-    await recordAiUsage(userId, 'facilitation_turn', access.event.summary || '引導', meta);
+    logInfo('events.facilitation.start', { userId, eventId: req.params.id });
 
-    logInfo('events.facilitation.cost', {
-      userId, eventId: req.params.id, phase: 'start',
-      provider: meta?.provider, model: meta?.model, costUsd: meta?.costUsd, durationMs: meta?.durationMs, card: turn.card,
-    });
+    let turn;
+    try {
+      const [partners, companion] = await Promise.all([
+        loadFacilitationPartners(access.event),
+        getUserCompanion(userId),
+      ]);
+      const thread = await loadFacilitationThread(req.params.id, partners);
 
-    await notify(
-      access.partnerId, 'event_ai_comment',
-      `${companion.name} 開始了一段引導練習`, access.event.title,
-      req.params.id, userId, 2, turn.say, companion.name
-    );
+      turn = await llmService.generateFacilitatorTurn({
+        thread,
+        session: { activeCard: null, turnOwnerRole: null, completedCards: [], stepCount: 0 },
+        partners,
+        companion,
+        context: { summary: access.event.summary },
+      });
+      const meta = turn._meta;
+      delete turn._meta;
 
-    res.status(201).json({ success: true, session: serializeSession(sessionRow), message: serializeMessage(aiMsg) });
+      const turnOwner = targetUserId(turn.target, partners);
+      const status = turn.sessionDone ? 'ended' : 'active';
+      const sessionRow = (await db.query(
+        `UPDATE event_facilitation_sessions
+            SET status = $2, active_card = $3, turn_owner = $4, step_count = 1, updated_at = NOW()
+          WHERE event_id = $1 RETURNING *`,
+        [req.params.id, status, turn.card, turnOwner]
+      )).rows[0];
+
+      const aiMsg = await postFacilitatorTurn(req.params.id, userId, companion, turn, partners);
+      await recordAiUsage(userId, 'facilitation_turn', access.event.summary || '引導', meta);
+
+      logInfo('events.facilitation.cost', {
+        userId, eventId: req.params.id, phase: 'start',
+        provider: meta?.provider, model: meta?.model, costUsd: meta?.costUsd, durationMs: meta?.durationMs, card: turn.card,
+      });
+
+      await notify(
+        access.partnerId, 'event_ai_comment',
+        `${companion.name} 開始了一段引導練習`, access.event.title,
+        req.params.id, userId, 2, turn.say, companion.name
+      );
+
+      res.status(201).json({ success: true, session: serializeSession(sessionRow), message: serializeMessage(aiMsg) });
+    } catch (genErr) {
+      // Release the claim so a retry isn't stuck resuming an empty session.
+      await db.query(
+        `DELETE FROM event_facilitation_sessions WHERE event_id = $1 AND step_count = 0`,
+        [req.params.id]
+      ).catch(() => {});
+      throw genErr;
+    }
   } catch (err) {
     logError('Start facilitation failed', { err: err.message, stack: err.stack, eventId: req.params.id });
     res.status(500).json({ success: false, message: '無法開始引導，請稍後再試' });
@@ -1710,31 +1748,34 @@ router.post('/:id/facilitation/start', [param('id').isUUID()], async (req, res) 
 });
 
 // ADVANCE the session: score the awaited partner's latest reply and produce the
-// next turn. No-op (returns current state, no LLM) when the latest message is
-// still an AI turn — nobody has responded yet — so it's safe to call and can't
-// double-charge.
+// next turn. Race-safe and no-op-safe: (a) when the latest thread entry is still
+// the facilitator's, nobody has responded — return current state without an LLM
+// call; (b) the step is claimed with an optimistic step_count check BEFORE the
+// LLM call, so two clients advancing simultaneously produce one turn, one charge.
 router.post('/:id/facilitation/next', [param('id').isUUID()], async (req, res) => {
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
     if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    const userId = req.user.id;
 
     const session = await getSessionRow(req.params.id);
     if (!session || session.status !== 'active') {
       return res.status(400).json({ success: false, message: '目前沒有進行中的引導', error_code: 'NO_SESSION' });
     }
-    if (!(await facilitationPreflight(access, res))) return;
+    if (!(await facilitationPreflight(access, res, userId))) return;
+
+    const [partners, companion] = await Promise.all([
+      loadFacilitationPartners(access.event),
+      getUserCompanion(userId),
+    ]);
+    const thread = await loadFacilitationThread(req.params.id, partners);
 
     // Only advance if the couple has actually responded since the last AI turn.
-    const last = await db.query(
-      `SELECT is_ai FROM event_messages WHERE event_id = $1 ORDER BY created_at DESC LIMIT 1`,
-      [req.params.id]
-    );
-    if (last.rows[0]?.is_ai === true) {
-      return res.json({ success: true, session: serializeSession(session), message: null, waiting: true });
+    if (thread.length === 0 || thread[thread.length - 1].role === 'facilitator') {
+      return res.json({ success: true, session: serializeSession(session), message: null });
     }
 
-    const userId = req.user.id;
     const { tier, limit } = await resolveAiLimit(userId);
     const usedToday = await countTodayAiUsage(userId);
     const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
@@ -1743,11 +1784,20 @@ router.post('/:id/facilitation/next', [param('id').isUUID()], async (req, res) =
       return res.status(limitCheck.status).json(limitCheck.body);
     }
 
-    const partners = await loadFacilitationPartners(access.event);
-    const companion = await getUserCompanion(userId);
-    const thread = await loadFacilitationThread(req.params.id, partners);
-    const turnOwnerRole = session.turn_owner ? roleOfUser(session.turn_owner, partners) : null;
+    // Claim this step: whoever bumps step_count first generates; the loser gets
+    // the winner's fresh state back instead of a second turn + second charge.
+    const claimed = (await db.query(
+      `UPDATE event_facilitation_sessions
+          SET step_count = step_count + 1, updated_at = NOW()
+        WHERE event_id = $1 AND step_count = $2 AND status = 'active' RETURNING *`,
+      [req.params.id, session.step_count]
+    )).rows[0];
+    if (!claimed) {
+      const current = await getSessionRow(req.params.id);
+      return res.json({ success: true, session: serializeSession(current), message: null });
+    }
 
+    const turnOwnerRole = session.turn_owner ? roleOfUser(session.turn_owner, partners) : null;
     const turn = await llmService.generateFacilitatorTurn({
       thread,
       session: {
@@ -1765,9 +1815,11 @@ router.post('/:id/facilitation/next', [param('id').isUUID()], async (req, res) =
 
     // Grade the card the couple JUST practised (the session's active card), then
     // mark it complete when the facilitator moves on to a different card.
+    // applyVerdict itself ignores non-evaluable cards.
     let skillScores = session.skill_scores || {};
-    if (turn.evaluation && session.active_card && getCard(session.active_card)?.evaluable) {
+    if (turn.evaluation && session.active_card) {
       skillScores = applyVerdict(skillScores, session.active_card, turn.evaluation.verdict);
+      turn.evaluatedCardMeta = cardMeta(session.active_card);
     }
     const completed = session.completed_cards || [];
     if (session.active_card && turn.card !== session.active_card && !completed.includes(session.active_card)) {
@@ -1779,7 +1831,7 @@ router.post('/:id/facilitation/next', [param('id').isUUID()], async (req, res) =
     const sessionRow = (await db.query(
       `UPDATE event_facilitation_sessions
           SET status = $2, active_card = $3, turn_owner = $4, completed_cards = $5,
-              skill_scores = $6, step_count = step_count + 1, updated_at = NOW()
+              skill_scores = $6, updated_at = NOW()
         WHERE event_id = $1 RETURNING *`,
       [req.params.id, status, turn.card, turnOwner, completed, JSON.stringify(skillScores)]
     )).rows[0];

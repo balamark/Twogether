@@ -450,27 +450,23 @@ export interface MessageFacilitation {
   instruction: string;
   quickReplies: string[];
   evaluation: FacilitationEvaluation | null;
+  // The evaluation grades the PREVIOUS exercise — this names which one.
+  evaluatedCardMeta: TherapyCardMeta | null;
   sessionDone: boolean;
 }
 
 // Live session state + scoreboard for the 今日練習 tray and composer turn hint.
 export interface FacilitationSession {
   status: 'active' | 'ended';
-  activeCard: string | null;
   activeCardMeta: TherapyCardMeta | null;
   turnOwner: string | null;
-  completedCards: string[];
   completedCardsMeta: TherapyCardMeta[];
-  skillScores: Record<string, { attempts: number; score: number }>;
   skillScore: number | null;
-  stepCount: number;
 }
 
 export interface FacilitationAdvance {
   session: FacilitationSession | null;
   message: EventMessage | null;
-  waiting?: boolean;
-  resumed?: boolean;
 }
 
 export interface EventMessage {
@@ -3357,7 +3353,6 @@ class ApiService {
       return {
         session: (response.data.session ?? null) as FacilitationSession | null,
         message: response.data.message ? this.transformEventMessage(response.data.message) : null,
-        resumed: response.data.resumed === true,
       };
     } catch (error: unknown) {
       console.error('Failed to start facilitation:', error);
@@ -3372,7 +3367,6 @@ class ApiService {
       return {
         session: (response.data.session ?? null) as FacilitationSession | null,
         message: response.data.message ? this.transformEventMessage(response.data.message) : null,
-        waiting: response.data.waiting === true,
       };
     } catch (error: unknown) {
       console.error('Failed to advance facilitation:', error);
