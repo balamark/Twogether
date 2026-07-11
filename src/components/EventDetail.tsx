@@ -15,6 +15,7 @@ import {
   X,
   Pencil,
   NotebookPen,
+  PlayCircle,
 } from 'lucide-react';
 import apiService, {
   type EventRecord,
@@ -24,11 +25,14 @@ import apiService, {
   type EventVersionKey,
   type MessageTranslationMap,
   type TherapyNote,
+  type FacilitationSession,
 } from '../services/api';
 import ReplyStepBar from './ReplyStepBar';
 import MessageTranslationCard from './MessageTranslationCard';
 import TherapyNoteCard from './TherapyNoteCard';
 import ConflictBanner from './ConflictBanner';
+import TherapistTurnCard from './TherapistTurnCard';
+import SessionProgress from './SessionProgress';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
@@ -116,6 +120,10 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const [translationLoading, setTranslationLoading] = useState(false);
   const [therapyNote, setTherapyNote] = useState<TherapyNote | null>(null);
   const [therapyLoading, setTherapyLoading] = useState(false);
+  // 引導模式 (Therapist Mode)
+  const [facilitation, setFacilitation] = useState<FacilitationSession | null>(null);
+  const [facilitating, setFacilitating] = useState(false);
+  const [endingSession, setEndingSession] = useState(false);
   const tz = useTimezone();
 
   const insertPhrase = (phrase: string) => {
@@ -225,6 +233,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       setTranslationEnabled(data.translationEnabled);
       setTherapyNote(data.therapyNote);
       if (data.translationEnabled) loadTranslations();
+      apiService.getFacilitation(eventId).then(setFacilitation).catch(() => {});
       // Mark inbound unread messages as read (fire-and-forget)
       data.messages
         .filter((m) => m.senderId !== currentUserId && !m.readAt)
@@ -276,6 +285,71 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     }
   };
 
+  // 引導模式: quota-aware handling shared by start + advance.
+  const handleFacilitationError = (err: unknown) => {
+    const code = (err as { error_code?: string })?.error_code;
+    if (code === 'AI_DAILY_LIMIT_REACHED') {
+      showNotification({
+        type: 'warning',
+        title: '今日 AI 次數已用完',
+        message: '引導練習次數已達今日上限，升級 Premium 可提高每日上限，明天也會自動補上。',
+      });
+    } else if (code === 'NOT_PAIRED') {
+      showNotification({
+        type: 'info',
+        title: '引導模式需要兩個人',
+        message: err instanceof Error ? err.message : '先邀請另一半配對，就能一起練習。',
+      });
+    } else {
+      showNotification({
+        type: 'error',
+        title: '引導暫時無法進行',
+        message: err instanceof Error ? err.message : '請稍後再試',
+      });
+    }
+  };
+
+  const startFacilitation = async () => {
+    setFacilitating(true);
+    try {
+      const res = await apiService.startFacilitation(eventId);
+      setFacilitation(res.session);
+      await refresh();
+    } catch (err) {
+      handleFacilitationError(err);
+    } finally {
+      setFacilitating(false);
+      refreshQuota();
+    }
+  };
+
+  // After the awaited partner replies, fetch the therapist's next turn.
+  const advanceFacilitation = async () => {
+    setFacilitating(true);
+    try {
+      const res = await apiService.advanceFacilitation(eventId);
+      setFacilitation(res.session);
+      await refresh();
+    } catch (err) {
+      handleFacilitationError(err);
+    } finally {
+      setFacilitating(false);
+      refreshQuota();
+    }
+  };
+
+  const endFacilitation = async () => {
+    setEndingSession(true);
+    try {
+      const s = await apiService.endFacilitation(eventId);
+      setFacilitation(s);
+    } catch (err) {
+      showNotification({ type: 'error', title: '無法結束引導', message: err instanceof Error ? err.message : '請稍後再試' });
+    } finally {
+      setEndingSession(false);
+    }
+  };
+
   useEffect(() => {
     setLoading(true);
     refresh().finally(() => setLoading(false));
@@ -290,6 +364,11 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       await apiService.replyToEvent(eventId, content);
       setReply('');
       await refresh();
+      // In an active session, if the therapist was waiting on me, my reply
+      // completes the step — fetch the next facilitated turn.
+      const myTurn = facilitation && facilitation.status === 'active' &&
+        (facilitation.turnOwner === currentUserId || facilitation.turnOwner === null);
+      if (myTurn) await advanceFacilitation();
     } catch (err) {
       showNotification({
         type: 'error',
@@ -691,6 +770,26 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             // stored AI versions — when editing it, offer the other versions.
             const firstHumanMessage = event.messages.find((x) => !x.isAi);
             return event.messages.map((m) => {
+            // Therapist Mode turn: render the structured exercise card.
+            if (m.isAi && m.facilitation) {
+              const f = m.facilitation;
+              const isMyTurn = f.target === 'both' || f.targetUserId === currentUserId;
+              const label = companionName(m.aiTherapist) ? `${companionName(m.aiTherapist)}・引導者` : '引導者';
+              return (
+                <div key={m.id} className="flex justify-center">
+                  <div className="max-w-[92%] w-full">
+                    <TherapistTurnCard
+                      facilitation={f}
+                      say={m.content}
+                      companionLabel={label}
+                      isMyTurn={isMyTurn}
+                      onQuickReply={(text) => setReply(text)}
+                    />
+                    <p className="text-[10px] text-petal-muted mt-1 text-center">{formatTime(m.createdAt, tz)}</p>
+                  </div>
+                </div>
+              );
+            }
             if (m.isAi) {
               return (
                 <div key={m.id} className="flex justify-center">
@@ -812,7 +911,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           OUTSIDE the reply composer: it reads the thread history, it doesn't
           rewrite whatever you're typing below. */}
       {canSendMessage && (
-        <div className="flex">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             data-testid="event-ai-counselor-button"
@@ -824,11 +923,39 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             {aiInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
             <span>請 {myCompanion.name} 加入</span>
           </button>
+          {/* 引導模式: a facilitated session, not one-shot advice. Shown only when
+              no session is active — an active one renders its progress tray. */}
+          {(!facilitation || facilitation.status !== 'active') && (
+            <button
+              type="button"
+              data-testid="event-facilitation-start-button"
+              onClick={startFacilitation}
+              disabled={facilitating}
+              className="px-3 py-2 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
+              title={`讓 ${myCompanion.name} 帶你們做一段一步一步的練習，而不只是給建議`}
+            >
+              {facilitating ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
+              <span>開始引導</span>
+            </button>
+          )}
         </div>
+      )}
+
+      {canSendMessage && facilitation && facilitation.status === 'active' && (
+        <SessionProgress session={facilitation} onEnd={endFacilitation} ending={endingSession} />
       )}
 
       {canSendMessage && (
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-3">
+          {facilitation && facilitation.status === 'active' && (
+            <div className="mb-2 font-body text-xs" data-testid="facilitation-turn-hint">
+              {facilitation.turnOwner === currentUserId || facilitation.turnOwner === null ? (
+                <span className="text-petal-rose-deep">🎯 輪到你了——照著上面 {myCompanion.name} 的引導回應。</span>
+              ) : (
+                <span className="text-petal-muted">⏳ 等待 {partnerNickname || '對方'} 回應這一步…</span>
+              )}
+            </div>
+          )}
           <ReplyStepBar onInsertPhrase={insertPhrase} />
           <textarea
             data-testid="event-reply-input"

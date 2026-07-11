@@ -427,6 +427,52 @@ export interface MyStoriesResult {
   totals: { reads: number; votes: number; comments: number };
 }
 
+// 引導模式 (Therapist Mode) — the structured payload attached to an AI
+// facilitator turn so the frontend renders it as a therapist card, not a plain
+// bubble. Null on ordinary human messages.
+export interface TherapyCardMeta {
+  id: string;
+  label: string;
+  emoji: string;
+  color: string;
+}
+
+export interface FacilitationEvaluation {
+  verdict: 'accurate' | 'partial' | 'off';
+  note: string;
+}
+
+export interface MessageFacilitation {
+  card: string;
+  cardMeta: TherapyCardMeta | null;
+  target: 'A' | 'B' | 'both';
+  targetUserId: string | null;
+  instruction: string;
+  quickReplies: string[];
+  evaluation: FacilitationEvaluation | null;
+  sessionDone: boolean;
+}
+
+// Live session state + scoreboard for the 今日練習 tray and composer turn hint.
+export interface FacilitationSession {
+  status: 'active' | 'ended';
+  activeCard: string | null;
+  activeCardMeta: TherapyCardMeta | null;
+  turnOwner: string | null;
+  completedCards: string[];
+  completedCardsMeta: TherapyCardMeta[];
+  skillScores: Record<string, { attempts: number; score: number }>;
+  skillScore: number | null;
+  stepCount: number;
+}
+
+export interface FacilitationAdvance {
+  session: FacilitationSession | null;
+  message: EventMessage | null;
+  waiting?: boolean;
+  resumed?: boolean;
+}
+
 export interface EventMessage {
   id: string;
   eventId: string;
@@ -434,6 +480,7 @@ export interface EventMessage {
   content: string;
   isAi: boolean;
   aiTherapist: string | null;
+  facilitation: MessageFacilitation | null;
   createdAt: string;
   readAt: string | null;
   editedAt: string | null;
@@ -3290,6 +3337,59 @@ class ApiService {
     }
   }
 
+  // ---- 引導模式 (Therapist Mode) ----
+
+  // Current facilitation session state + scoreboard (null when none started).
+  async getFacilitation(eventId: string): Promise<FacilitationSession | null> {
+    try {
+      const response = await apiClient.get(`/events/${eventId}/facilitation`);
+      return (response.data.session ?? null) as FacilitationSession | null;
+    } catch (error: unknown) {
+      console.error('Failed to fetch facilitation:', error);
+      this.throwApiError(error, '無法載入引導進度，請稍後再試');
+    }
+  }
+
+  // Start (or resume) a facilitated session; returns the first therapist turn.
+  async startFacilitation(eventId: string): Promise<FacilitationAdvance> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/facilitation/start`);
+      return {
+        session: (response.data.session ?? null) as FacilitationSession | null,
+        message: response.data.message ? this.transformEventMessage(response.data.message) : null,
+        resumed: response.data.resumed === true,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to start facilitation:', error);
+      this.throwApiError(error, '無法開始引導，請稍後再試');
+    }
+  }
+
+  // Advance the session after the awaited partner has replied.
+  async advanceFacilitation(eventId: string): Promise<FacilitationAdvance> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/facilitation/next`);
+      return {
+        session: (response.data.session ?? null) as FacilitationSession | null,
+        message: response.data.message ? this.transformEventMessage(response.data.message) : null,
+        waiting: response.data.waiting === true,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to advance facilitation:', error);
+      this.throwApiError(error, '引導暫時無法繼續，請稍後再試');
+    }
+  }
+
+  async endFacilitation(eventId: string): Promise<FacilitationSession | null> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/facilitation/end`);
+      return (response.data.session ?? null) as FacilitationSession | null;
+    } catch (error: unknown) {
+      console.error('Failed to end facilitation:', error);
+      this.throwApiError(error, '無法結束引導，請稍後再試');
+    }
+  }
+
   async markEventMessageRead(eventId: string, msgId: string): Promise<void> {
     try {
       await apiClient.put(`/events/${eventId}/messages/${msgId}/read`);
@@ -3476,6 +3576,7 @@ class ApiService {
       content?: string;
       is_ai?: boolean;
       ai_therapist?: string | null;
+      facilitation?: MessageFacilitation | null;
       created_at?: string;
       read_at?: string | null;
       edited_at?: string | null;
@@ -3487,6 +3588,7 @@ class ApiService {
       content: r.content || '',
       isAi: r.is_ai === true,
       aiTherapist: r.ai_therapist ?? null,
+      facilitation: r.facilitation ?? null,
       createdAt: r.created_at || '',
       readAt: r.read_at ?? null,
       editedAt: r.edited_at ?? null,
