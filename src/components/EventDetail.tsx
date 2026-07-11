@@ -28,6 +28,7 @@ import apiService, {
 import ReplyStepBar from './ReplyStepBar';
 import MessageTranslationCard from './MessageTranslationCard';
 import TherapyNoteCard from './TherapyNoteCard';
+import ConflictBanner from './ConflictBanner';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
@@ -638,6 +639,10 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           </div>
         )}
       </header>
+
+      {!event.isPrivate && event.status !== 'resolved' && (
+        <ConflictBanner messages={event.messages} threadKey={`event:${event.id}`} />
+      )}
 
       {!event.isPrivate && (
         <section className="bg-petal-cream border border-petal-rule rounded-2xl p-4 space-y-3">

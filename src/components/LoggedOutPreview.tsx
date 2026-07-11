@@ -12,6 +12,7 @@ import {
   Sparkles,
   HeartHandshake,
   HandHeart,
+  Hand,
   NotebookPen,
   ClipboardCheck,
   Crown,
@@ -347,8 +348,28 @@ const TherapyNoteSample: React.FC = () => (
   </SampleCard>
 );
 
+// Stage 0 safety-check read-only sample: when a thread heats up, AI names what
+// is happening and offers a pause instead of taking sides.
+const SafetyBannerSample: React.FC = () => (
+  <div className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 flex items-start gap-2.5">
+    <Hand className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" strokeWidth={1.5} />
+    <div className="min-w-0 flex-1">
+      <div className="flex items-center gap-2">
+        <p className="font-body text-sm font-medium text-orange-900">先暫停一下</p>
+        <SampleTag />
+      </div>
+      <p className="font-body text-[13px] leading-relaxed mt-0.5 text-orange-900/90">
+        我注意到你們現在比較像是在保護自己，而不是理解彼此。要不要先暫停十分鐘、深呼吸一下，
+        等平靜一點再繼續？
+      </p>
+    </div>
+  </div>
+);
+
 const ConflictFlywheelSample: React.FC = () => (
   <div className="space-y-4">
+    <SafetyBannerSample />
+
     <EmotionAcceptanceSample />
 
     <TherapyNoteSample />
