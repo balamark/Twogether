@@ -62,6 +62,19 @@ export function scriptHasUnresolvedGenderTokens(content: string): boolean {
   return /\[男\]|\[他\]|\[女\]|\[她\]/i.test(content);
 }
 
+// Max bytes for a script cover/photo video. Mirrors VIDEO_MAX_BYTES in
+// routes/custom-scripts.js. Images stay capped at 5MB separately.
+export const VIDEO_MAX_BYTES = 20 * 1024 * 1024;
+
+// Is this media URL a video? Script covers/photos store images and videos in
+// the same URL fields (thumbnail_url / custom_script_photos.url); we generate
+// the filenames, so the extension is a reliable discriminator for choosing
+// <video> vs <img> at render time. Tolerates query strings / fragments.
+export function isVideoUrl(url: string | null | undefined): boolean {
+  if (!url) return false;
+  return /\.(mp4|webm|mov|m4v|quicktime)(?:[?#].*)?$/i.test(url);
+}
+
 // Distinct speaker names found in dialogue lines, in order of first
 // appearance. Placeholder tokens never match (the regex excludes brackets).
 export function detectScriptSpeakers(content: string): string[] {

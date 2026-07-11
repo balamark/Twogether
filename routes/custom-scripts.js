@@ -17,15 +17,30 @@ const router = express.Router();
 // Max photos a single custom script may carry (cover + extras).
 const MAX_SCRIPT_PHOTOS = 30;
 
+// Per-file size caps. Videos are stored raw (no re-encode), so they get a
+// larger cap than images (which sharp downscales anyway). Kept in sync with
+// VIDEO_MAX_BYTES in src/utils/script.ts.
+const IMAGE_MAX_BYTES = 5 * 1024 * 1024; // 5MB per image
+const VIDEO_MAX_BYTES = 20 * 1024 * 1024; // 20MB per video
+
+// Is this upload a video? multer only exposes originalname + mimetype in the
+// fileFilter, so match on both. Cover videos display as a "living" cover.
+function isVideoFile(file) {
+  return /^video\//i.test(file.mimetype || '')
+    || /\.(mp4|webm|mov|m4v)$/i.test(file.originalname || '');
+}
+
 const thumbnailUpload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB per image
+    // Highest per-file ceiling; per-type caps (image 5MB / video 20MB) are
+    // enforced explicitly in the handlers so each gets a specific message.
+    fileSize: VIDEO_MAX_BYTES,
     files: MAX_SCRIPT_PHOTOS + 1, // up to 30 photos (+ legacy single `thumbnail`)
   },
   fileFilter: (req, file, cb) => {
-    if (!file.originalname.match(/\.(jpg|jpeg|png|webp|gif)$/i)) {
-      return cb(new Error('只允許上傳圖片文件 (jpg, jpeg, png, webp, gif)'), false);
+    if (!file.originalname.match(/\.(jpg|jpeg|png|webp|gif|mp4|webm|mov|m4v)$/i)) {
+      return cb(new Error('只允許上傳圖片 (jpg, png, webp, gif) 或影片 (mp4, webm, mov)'), false);
     }
     cb(null, true);
   },
@@ -33,10 +48,38 @@ const thumbnailUpload = multer({
 
 // Accept both the legacy single `thumbnail` field and the new `photos[]` field
 // so old clients keep working while the modal sends a multi-photo series.
-const scriptPhotoUpload = thumbnailUpload.fields([
+const scriptPhotoUploadRaw = thumbnailUpload.fields([
   { name: 'thumbnail', maxCount: 1 },
   { name: 'photos', maxCount: MAX_SCRIPT_PHOTOS },
 ]);
+
+// Wrap the multer middleware so its errors (oversize file, rejected type)
+// become specific, actionable JSON with an error_code instead of a generic 500.
+function scriptPhotoUpload(req, res, next) {
+  scriptPhotoUploadRaw(req, res, (err) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({
+          success: false,
+          message: `影片大小不能超過 ${Math.round(VIDEO_MAX_BYTES / (1024 * 1024))}MB，照片不能超過 ${Math.round(IMAGE_MAX_BYTES / (1024 * 1024))}MB，請壓縮後再試。`,
+          error_code: 'SCRIPT_MEDIA_TOO_LARGE',
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        message: '上傳的檔案數量或格式不符，請確認後再試。',
+        error_code: 'SCRIPT_MEDIA_INVALID',
+      });
+    }
+    // fileFilter rejections arrive as a plain Error with our own message.
+    return res.status(400).json({
+      success: false,
+      message: err.message || '上傳的檔案格式不支援。',
+      error_code: 'SCRIPT_MEDIA_INVALID',
+    });
+  });
+}
 
 // Flatten multer .fields() output into one ordered list: legacy thumbnail first
 // (it's the cover), then the photos[] in submitted order.
@@ -45,11 +88,45 @@ function incomingPhotoFiles(req) {
   return [...(f.thumbnail || []), ...(f.photos || [])];
 }
 
-// Process + upload one image, returning its public URL.
-async function uploadScriptPhoto(buffer) {
-  const processed = await processThumbnail(buffer);
+// Process + upload one media file (image or video), returning its public URL.
+// Images are normalized through sharp → JPEG; videos are stored raw (no
+// re-encode) with their own mime + extension so the client can render <video>.
+async function uploadScriptPhoto(file) {
+  if (isVideoFile(file)) {
+    const ext = (file.originalname.match(/\.(mp4|webm|mov|m4v)$/i)?.[1] || 'mp4').toLowerCase();
+    const mimeType = file.mimetype && /^video\//i.test(file.mimetype)
+      ? file.mimetype
+      : (ext === 'webm' ? 'video/webm' : ext === 'mov' ? 'video/quicktime' : 'video/mp4');
+    const fileName = `custom-script-videos/${uuidv4()}-${Date.now()}.${ext}`;
+    return uploadToSupabase(file.buffer, fileName, mimeType);
+  }
+  const processed = await processThumbnail(file.buffer);
   const fileName = `custom-script-thumbnails/${uuidv4()}-${Date.now()}.jpg`;
   return uploadToSupabase(processed, fileName, 'image/jpeg');
+}
+
+// Enforce per-type size caps (image 5MB / video 20MB) with a specific,
+// actionable message + error_code. Returns null when all files are within
+// limits, otherwise a { status, body } to send back.
+function checkMediaSizes(files) {
+  for (const file of files) {
+    const isVideo = isVideoFile(file);
+    const max = isVideo ? VIDEO_MAX_BYTES : IMAGE_MAX_BYTES;
+    if ((file.size || 0) > max) {
+      const limitMb = Math.round(max / (1024 * 1024));
+      return {
+        status: 400,
+        body: {
+          success: false,
+          message: isVideo
+            ? `影片大小不能超過 ${limitMb}MB，請壓縮或改用較短的片段後再試。`
+            : `每張照片大小不能超過 ${limitMb}MB，請壓縮後再試。`,
+          error_code: 'SCRIPT_MEDIA_TOO_LARGE',
+        },
+      };
+    }
+  }
+  return null;
 }
 
 // Parses `existingPhotos` (JSON array of kept URLs from multipart) into an array.
@@ -276,6 +353,13 @@ router.post('/', scriptPhotoUpload, [
       });
     }
 
+    // Per-type size cap (image 5MB / video 20MB).
+    const oversize = checkMediaSizes(photoFiles);
+    if (oversize) {
+      logWarn('custom_scripts.media_too_large', { userId, blocked: true });
+      return res.status(oversize.status).json(oversize.body);
+    }
+
     // Freemium cap: free couples may keep only N custom scripts; premium is
     // unlimited. Count the same set the GET endpoint returns (couple scripts +
     // this user's personal scripts) so the number matches what the user sees.
@@ -297,7 +381,7 @@ router.post('/', scriptPhotoUpload, [
     // Upload all photos (in submitted order); the first is the cover thumbnail.
     const photoUrls = [];
     for (const file of photoFiles) {
-      photoUrls.push(await uploadScriptPhoto(file.buffer));
+      photoUrls.push(await uploadScriptPhoto(file));
     }
     const thumbnailUrl = photoUrls[0] || null;
 
@@ -451,9 +535,14 @@ router.put('/:id', scriptPhotoUpload, [
           error_code: 'SCRIPT_PHOTO_LIMIT_REACHED',
         });
       }
+      const oversize = checkMediaSizes(photoFiles);
+      if (oversize) {
+        logWarn('custom_scripts.media_too_large', { userId, scriptId, blocked: true });
+        return res.status(oversize.status).json(oversize.body);
+      }
       const uploaded = [];
       for (const file of photoFiles) {
-        uploaded.push(await uploadScriptPhoto(file.buffer));
+        uploaded.push(await uploadScriptPhoto(file));
       }
       finalPhotoUrls = [...kept, ...uploaded];
       // Cover thumbnail = first photo (or null when the series was cleared).

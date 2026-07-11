@@ -9,7 +9,7 @@ import MarketplaceScriptDetail from './MarketplaceScriptDetail';
 import PetalSelect from './PetalSelect';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatYmdInTz, formatDate } from '../utils/datetime';
-import { scriptHasUnresolvedGenderTokens } from '../utils/script';
+import { scriptHasUnresolvedGenderTokens, isVideoUrl } from '../utils/script';
 
 interface RoleplayScript {
   id: string;
@@ -522,6 +522,30 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
       return <ScriptThumbPlaceholder category={script.category} title={script.title} className={className} />;
     }
     const fitClass = fit === 'contain' ? 'object-contain' : 'object-cover';
+    // A video cover plays as a "living" cover: muted + looped + autoplay so it
+    // reads as an animated thumbnail; playsInline keeps it inline on iOS.
+    if (isVideoUrl(script.image)) {
+      return (
+        <>
+          <video
+            src={script.image}
+            className={`${className} ${fitClass}`}
+            autoPlay
+            muted
+            loop
+            playsInline
+            data-testid="script-thumb-video"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+              (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'flex';
+            }}
+          />
+          <div className={`hidden ${className}`}>
+            <ScriptThumbPlaceholder category={script.category} title={script.title} />
+          </div>
+        </>
+      );
+    }
     return (
       <>
         <img
@@ -1243,13 +1267,26 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               onTouchEnd={(e) => onPhotoSwipeEnd(e, stepModalPhoto)}
             >
               {lightboxPhotos.length > 0 ? (
-                <img
-                  src={lightboxPhotos[modalPhotoIndex]}
-                  alt={`${selectedScript.title} ${modalPhotoIndex + 1}`}
-                  onClick={() => showLightboxAt(modalPhotoIndex)}
-                  className="w-full h-full object-contain cursor-zoom-in"
-                  data-testid="roleplay-modal-photo"
-                />
+                isVideoUrl(lightboxPhotos[modalPhotoIndex]) ? (
+                  <video
+                    src={lightboxPhotos[modalPhotoIndex]}
+                    onClick={() => showLightboxAt(modalPhotoIndex)}
+                    className="w-full h-full object-contain cursor-zoom-in"
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    data-testid="roleplay-modal-photo"
+                  />
+                ) : (
+                  <img
+                    src={lightboxPhotos[modalPhotoIndex]}
+                    alt={`${selectedScript.title} ${modalPhotoIndex + 1}`}
+                    onClick={() => showLightboxAt(modalPhotoIndex)}
+                    className="w-full h-full object-contain cursor-zoom-in"
+                    data-testid="roleplay-modal-photo"
+                  />
+                )
               ) : (
                 renderThumb(selectedScript, 'w-full h-full', 'contain')
               )}
@@ -1434,15 +1471,28 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               </>
             )}
 
-            <img
-              src={lightboxPhotos[lightboxIndex]}
-              alt={`${selectedScript.title} ${lightboxIndex + 1}`}
-              onClick={(e) => e.stopPropagation()}
-              // Fit the whole image within the viewport on any screen — never
-              // crop or overflow. max-h/max-w + object-contain letterboxes it.
-              className="block max-h-full max-w-full w-auto h-auto object-contain cursor-default"
-              data-testid="roleplay-modal-lightbox-image"
-            />
+            {isVideoUrl(lightboxPhotos[lightboxIndex]) ? (
+              <video
+                src={lightboxPhotos[lightboxIndex]}
+                onClick={(e) => e.stopPropagation()}
+                // Full-screen viewer gets full playback controls + sound.
+                controls
+                autoPlay
+                playsInline
+                className="block max-h-full max-w-full w-auto h-auto object-contain cursor-default"
+                data-testid="roleplay-modal-lightbox-video"
+              />
+            ) : (
+              <img
+                src={lightboxPhotos[lightboxIndex]}
+                alt={`${selectedScript.title} ${lightboxIndex + 1}`}
+                onClick={(e) => e.stopPropagation()}
+                // Fit the whole image within the viewport on any screen — never
+                // crop or overflow. max-h/max-w + object-contain letterboxes it.
+                className="block max-h-full max-w-full w-auto h-auto object-contain cursor-default"
+                data-testid="roleplay-modal-lightbox-image"
+              />
+            )}
           </div>
         )}
         </>

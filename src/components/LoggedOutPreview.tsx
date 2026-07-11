@@ -18,6 +18,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { daysSinceLastNudge } from './AchievementsView';
+import { isVideoUrl } from '../utils/script';
 
 interface PreviewScript {
   id: string;
@@ -530,7 +531,11 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scr
             >
               <div className="aspect-video bg-petal-cream-2 flex items-center justify-center">
                 {s.image ? (
-                  <img src={s.image} alt={s.title} className="w-full h-full object-contain" />
+                  isVideoUrl(s.image) ? (
+                    <video src={s.image} className="w-full h-full object-contain" autoPlay muted loop playsInline />
+                  ) : (
+                    <img src={s.image} alt={s.title} className="w-full h-full object-contain" />
+                  )
                 ) : (
                   <Play className="w-6 h-6 text-petal-muted" strokeWidth={1.5} />
                 )}
