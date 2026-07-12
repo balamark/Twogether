@@ -1161,6 +1161,13 @@ router.get('/:id/translations', [param('id').isUUID()], async (req, res) => {
     for (const row of cachedRows) translations[row.message_id] = row.translation;
 
     const missing = humanIds.filter((id) => !translations[id]);
+    logInfo('events.translation.request', {
+      userId,
+      eventId: req.params.id,
+      humanMessages: humanIds.length,
+      cached: cachedRows.length,
+      missing: missing.length,
+    });
 
     if (missing.length > 0) {
       const { tier, limit } = await resolveAiLimit(userId);
@@ -1198,10 +1205,13 @@ router.get('/:id/translations', [param('id').isUUID()], async (req, res) => {
 
       await recordAiUsage(userId, 'need_translation', access.event.summary, meta);
 
+      let saved = 0;
+      const unmatched = [];
       for (const t of result.translations || []) {
-        if (!missing.includes(t.id)) continue;
+        if (!missing.includes(t.id)) { unmatched.push(t.id); continue; }
         const payload = { emotions: t.emotions || [], need: t.need || '', rewrite: t.rewrite || '' };
         translations[t.id] = payload;
+        saved += 1;
         try {
           await db.query(
             `INSERT INTO message_need_translations (surface, message_id, couple_id, translation)
@@ -1213,8 +1223,23 @@ router.get('/:id/translations', [param('id').isUUID()], async (req, res) => {
           logWarn('save event translation failed', { messageId: t.id, err: err.message });
         }
       }
+      // If saved < missing, some requested messages came back unusable — this is
+      // the signal for a "toggle on but nothing renders" report.
+      logInfo('events.translation.saved', {
+        userId,
+        eventId: req.params.id,
+        requested: missing.length,
+        returned: (result.translations || []).length,
+        saved,
+        unmatched,
+      });
     }
 
+    logInfo('events.translation.respond', {
+      userId,
+      eventId: req.params.id,
+      returnedKeys: Object.keys(translations).length,
+    });
     res.json({ success: true, translations });
   } catch (err) {
     logError('Get event translations failed', { err: err.message, stack: err.stack, eventId: req.params.id });

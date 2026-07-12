@@ -49,10 +49,18 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
   // server-side per reply, so this only bills for still-untranslated messages.
   const loadTranslations = async () => {
     setTranslationLoading(true);
+    const startedAt = Date.now();
+    console.info('[情緒翻譯] wall: loading translations…', { postId });
     try {
       const map = await apiService.getWallTranslations(postId);
+      const keys = Object.keys(map);
+      console.info('[情緒翻譯] wall: got translations', { postId, count: keys.length, ms: Date.now() - startedAt, keys });
+      if (keys.length === 0) {
+        console.warn('[情緒翻譯] wall: empty translation map — nothing will render');
+      }
       setTranslations(map);
     } catch (err) {
+      console.error('[情緒翻譯] wall: load failed', err);
       const code = (err as { error_code?: string })?.error_code;
       const message = err instanceof Error ? err.message : '情緒翻譯暫時無法產生';
       if (code === 'AI_DAILY_LIMIT_REACHED') {

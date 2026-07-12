@@ -129,6 +129,10 @@ app.use(helmet({
       // blob: is needed for URL.createObjectURL() previews (e.g. thumbnail
       // preview in the custom script upload/edit modal).
       imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
+      // Roleplay script cover videos are served from Supabase storage over
+      // https. Without an explicit media-src, <video> falls back to
+      // default-src 'self' and the browser blocks them.
+      mediaSrc: ["'self'", "data:", "blob:", "https:"],
       connectSrc: ["'self'", "https:"],
       // Allow the premium checkout form to POST to ECPay's hosted payment page.
       formAction: ["'self'", "https://payment-stage.ecpay.com.tw", "https://payment.ecpay.com.tw"]

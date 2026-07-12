@@ -205,10 +205,23 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   // server-side per message, so this only bills for still-untranslated ones.
   const loadTranslations = async () => {
     setTranslationLoading(true);
+    const startedAt = Date.now();
+    console.info('[情緒翻譯] event: loading translations…', { eventId });
     try {
       const map = await apiService.getEventTranslations(eventId);
+      const keys = Object.keys(map);
+      console.info('[情緒翻譯] event: got translations', {
+        eventId,
+        count: keys.length,
+        ms: Date.now() - startedAt,
+        keys,
+      });
+      if (keys.length === 0) {
+        console.warn('[情緒翻譯] event: empty translation map — nothing will render');
+      }
       setTranslations(map);
     } catch (err) {
+      console.error('[情緒翻譯] event: load failed', err);
       const code = (err as { error_code?: string })?.error_code;
       if (code === 'AI_DAILY_LIMIT_REACHED') {
         showNotification({

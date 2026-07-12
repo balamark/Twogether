@@ -722,6 +722,9 @@ router.get('/:id/translations', async (req, res) => {
     for (const row of cachedRows) translations[row.message_id] = row.translation;
 
     const missing = humanIds.filter((id) => !translations[id]);
+    logInfo('wall.translation.request', {
+      userId, postId, humanMessages: humanIds.length, cached: cachedRows.length, missing: missing.length,
+    });
 
     if (missing.length > 0) {
       const { tier, limit } = await resolveAiLimit(userId);
@@ -763,10 +766,13 @@ router.get('/:id/translations', async (req, res) => {
 
       await recordAiUsage(userId, 'need_translation', postResult.rows[0].content, meta);
 
+      let saved = 0;
+      const unmatched = [];
       for (const t of result.translations || []) {
-        if (!missing.includes(t.id)) continue;
+        if (!missing.includes(t.id)) { unmatched.push(t.id); continue; }
         const payload = { emotions: t.emotions || [], need: t.need || '', rewrite: t.rewrite || '' };
         translations[t.id] = payload;
+        saved += 1;
         try {
           await db.query(
             `INSERT INTO message_need_translations (surface, message_id, couple_id, translation)
@@ -778,8 +784,12 @@ router.get('/:id/translations', async (req, res) => {
           logWarn('save wall translation failed', { messageId: t.id, err: err.message });
         }
       }
+      logInfo('wall.translation.saved', {
+        userId, postId, requested: missing.length, returned: (result.translations || []).length, saved, unmatched,
+      });
     }
 
+    logInfo('wall.translation.respond', { userId, postId, returnedKeys: Object.keys(translations).length });
     res.json({ success: true, translations });
   } catch (error) {
     logError('Get wall translations failed', { err: error.message, stack: error.stack, post_id: req.params.id });

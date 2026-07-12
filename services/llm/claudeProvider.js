@@ -1503,8 +1503,8 @@ const THREAD_TRANSLATION_SYSTEM_PROMPT = `你是一位溫柔、專業、中立�
 
 核心理念：憤怒通常只是表層，底下才是真正重要的。例如「我很生氣」底下常常是「我很害怕」，再底下是「我怕失去你」。指責的話（你總是…、你根本沒有…、你眼裡只有…）背後，幾乎都藏著一個沒被說出口的需求（安全感、被重視、被陪伴、被信任、被肯定）。
 
-任務：閱讀整段對話脈絡，然後「只針對我請你翻譯的那幾則訊息」，各自產出：
-1. id：對應訊息的 id（原封不動回傳）。
+任務：閱讀整段對話脈絡，然後「只針對我請你翻譯的那幾則訊息（用編號指定）」，各自產出：
+1. ref：對應訊息的編號（提示中每行開頭的 #N，原封不動回傳那個數字）。
 2. emotions：最多 3 個底層情緒，由表層到深層（例如 憤怒 → 害怕 → 孤單）。每個含 label（情緒名，繁體中文）與 intensity（0 到 100 的整數，表示強度）。
 3. need：一個簡短的核心需求詞（例如：安全感、被重視、被陪伴、被信任、被肯定、被理解、喘口氣）。
 4. rewrite：把這句話翻譯成「可能真正想表達的是」的第一人稱版本，溫柔、不指責、說出感受與需求（NVC 我訊息），像這個人心底真正想說卻沒說出口的那句話。1 到 2 句。
@@ -1519,7 +1519,7 @@ const THREAD_TRANSLATION_SYSTEM_PROMPT = `你是一位溫柔、專業、中立�
 
 const THREAD_TRANSLATION_TOOL_SCHEMA = {
   name: 'emit_thread_translations',
-  description: "Return an emotion/need translation for each requested message id.",
+  description: "Return an emotion/need translation for each requested message ref.",
   input_schema: {
     type: 'object',
     properties: {
@@ -1528,7 +1528,10 @@ const THREAD_TRANSLATION_TOOL_SCHEMA = {
         items: {
           type: 'object',
           properties: {
-            id: { type: 'string', description: '對應訊息的 id，原封不動回傳' },
+            // Short integer ref (the #N shown in the prompt), mapped back to
+            // the real message id server-side. Integers are far more reliable
+            // for the model to echo than 36-char UUIDs.
+            ref: { type: 'integer', description: '對應訊息的編號（提示中的 #N），原封不動回傳' },
             emotions: {
               type: 'array',
               maxItems: 3,
@@ -1544,7 +1547,7 @@ const THREAD_TRANSLATION_TOOL_SCHEMA = {
             need: { type: 'string', maxLength: 20, description: '核心需求詞，例如 安全感 / 被重視 / 被陪伴' },
             rewrite: { type: 'string', description: '第一人稱「可能真正想表達的是」翻譯，1 到 2 句' },
           },
-          required: ['id', 'need', 'rewrite'],
+          required: ['ref', 'need', 'rewrite'],
         },
       },
     },
@@ -1564,16 +1567,28 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
     return { translations: [], _meta: { provider: 'claude', model: MODEL, durationMs: 0, usage: {}, costUsd: 0 } };
   }
 
+  // Relabel messages with short integer refs (#1, #2…) for the model, and keep
+  // a ref→real-id map. Models echo small integers reliably; full UUIDs they do
+  // not, which silently dropped every translation before.
+  const refToId = new Map();
+  const idToRef = new Map();
+  all.forEach((m, i) => {
+    const ref = i + 1;
+    refToId.set(ref, m.id);
+    idToRef.set(m.id, ref);
+  });
+  const wantedRefs = wanted.map((id) => idToRef.get(id)).filter((r) => r != null);
+
   const lines = [];
   if (context && context.summary) {
     lines.push(`事件背景（僅供理解氛圍，不要複述）：${String(context.summary).trim()}`, '');
   }
-  lines.push('完整對話（最舊在前，每行標了發話者與訊息 id）：');
-  for (const m of all) {
-    lines.push(`[id=${m.id}] ${m.speaker || '某人'}：${(m.content || '').toString().trim()}`);
-  }
+  lines.push('完整對話（最舊在前，每行標了編號與發話者）：');
+  all.forEach((m, i) => {
+    lines.push(`#${i + 1} ${m.speaker || '某人'}：${(m.content || '').toString().trim()}`);
+  });
   lines.push('');
-  lines.push(`請只翻譯以下這幾則訊息的 id：${wanted.join('、')}`);
+  lines.push(`請只翻譯以下編號的訊息：${wantedRefs.map((r) => `#${r}`).join('、')}`);
   const userContent = lines.join('\n');
 
   const startedAt = Date.now();
@@ -1613,19 +1628,35 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
     throw new Error('Claude did not return a tool_use block');
   }
   const out = toolUse.input || {};
-  const translations = (Array.isArray(out.translations) ? out.translations : [])
-    .filter((t) => t && typeof t.id === 'string' && typeof t.rewrite === 'string' && t.rewrite.trim())
-    .map((t) => ({
-      id: t.id,
-      emotions: Array.isArray(t.emotions)
-        ? t.emotions
-            .filter((e) => e && typeof e.label === 'string')
-            .slice(0, 3)
-            .map((e) => ({ label: e.label.trim(), intensity: Math.max(0, Math.min(100, Number(e.intensity) || 0)) }))
-        : [],
-      need: (t.need || '').toString().trim(),
-      rewrite: t.rewrite.trim(),
-    }));
+  const rawList = Array.isArray(out.translations) ? out.translations : [];
+  const translations = rawList
+    .map((t) => {
+      // Accept the ref as number or numeric string; map back to the real id.
+      const ref = typeof t?.ref === 'number' ? t.ref : parseInt(t?.ref, 10);
+      const id = refToId.get(ref);
+      if (!id || typeof t.rewrite !== 'string' || !t.rewrite.trim()) return null;
+      return {
+        id,
+        emotions: Array.isArray(t.emotions)
+          ? t.emotions
+              .filter((e) => e && typeof e.label === 'string')
+              .slice(0, 3)
+              .map((e) => ({ label: e.label.trim(), intensity: Math.max(0, Math.min(100, Number(e.intensity) || 0)) }))
+          : [],
+        need: (t.need || '').toString().trim(),
+        rewrite: t.rewrite.trim(),
+      };
+    })
+    .filter(Boolean);
+
+  // Surface ref-matching health so a silent "nothing rendered" is debuggable.
+  const returnedRefs = rawList.map((t) => t?.ref);
+  logInfo('llm.claude.need_translation.map', {
+    requestedRefs: wantedRefs,
+    returnedRefs,
+    matched: translations.length,
+    unmatched: rawList.length - translations.length,
+  });
 
   return {
     translations,
