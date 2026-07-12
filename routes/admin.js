@@ -902,6 +902,7 @@ const ADMIN_HTML = `<!doctype html>
       <button class="tab" data-panel="reviews">評價</button>
       <button class="tab" data-panel="feedback">用戶心得</button>
       <button class="tab" data-panel="stories">真實故事</button>
+      <button class="tab" data-panel="polls">投票心聲</button>
       <button class="tab" data-panel="pool">分潤</button>
       <button class="tab" data-panel="roleplay">邀請劇本</button>
       <button class="tab" data-panel="ai-usage">AI 用量</button>
@@ -1069,6 +1070,23 @@ const ADMIN_HTML = `<!doctype html>
         <table id="storyFlaggedTable">
           <thead>
             <tr><th>標題</th><th>標記</th><th>時間</th><th>操作</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Panel: 投票心聲 moderation -->
+    <div class="panel" id="panel-polls">
+      <p class="sub">社群投票的「心聲」留言檢舉。隱藏後前台立即消失，可還原。</p>
+      <div class="controls">
+        <button id="pollsRefresh">重新整理</button>
+        <span class="muted" id="pollsStatusMsg"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="pollVoiceReportsTable">
+          <thead>
+            <tr><th>投票題目</th><th>心聲內容</th><th>原因</th><th>檢舉者</th><th>時間</th><th>操作</th></tr>
           </thead>
           <tbody></tbody>
         </table>
@@ -1788,6 +1806,46 @@ const ADMIN_HTML = `<!doctype html>
     }
     $('storiesRefresh').addEventListener('click', loadStories);
 
+    // ── 投票心聲 moderation ────────────────────────────────────────────────
+    async function loadPollVoices() {
+      $('pollsStatusMsg').textContent = '載入中…';
+      try {
+        var res = await fetch('/api/admin/polls/voice-reports?status=pending');
+        if (!res.ok) throw new Error('polls ' + res.status);
+        renderPollVoiceReports((await res.json()).reports || []);
+        $('pollsStatusMsg').textContent = '更新於 ' + new Date().toLocaleTimeString('zh-TW');
+      } catch (e) { $('pollsStatusMsg').textContent = '載入失敗: ' + e.message; }
+    }
+    function renderPollVoiceReports(rows) {
+      var tbody = document.querySelector('#pollVoiceReportsTable tbody');
+      if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="muted">沒有待處理檢舉</td></tr>'; return; }
+      var REASONS = { inappropriate: '不當內容', spam: '垃圾訊息', privacy: '洩露隱私', other: '其他' };
+      tbody.innerHTML = rows.map(function (r) {
+        return '<tr>' +
+          '<td style="max-width:200px">' + esc(r.question) + '</td>' +
+          '<td style="max-width:280px">' + esc(r.voice_body) + '</td>' +
+          '<td>' + esc(REASONS[r.reason] || r.reason) + '</td>' +
+          '<td>' + esc(r.reporter_email || '—') + '</td>' +
+          '<td>' + fmtDate(r.created_at) + '</td>' +
+          '<td><button data-voice-hide="' + r.voice_id + '">隱藏</button></td>' +
+          '</tr>';
+      }).join('');
+      tbody.querySelectorAll('button[data-voice-hide]').forEach(function (btn) {
+        btn.addEventListener('click', function () { moderatePollVoice(btn.getAttribute('data-voice-hide'), btn); });
+      });
+    }
+    async function moderatePollVoice(voiceId, btn) {
+      btn.disabled = true;
+      try {
+        var res = await fetch('/api/admin/polls/voices/' + voiceId + '/moderate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'hide' })
+        });
+        if (!res.ok) throw new Error('moderate ' + res.status);
+        await loadPollVoices();
+      } catch (e) { btn.disabled = false; $('pollsStatusMsg').textContent = '操作失敗: ' + e.message; }
+    }
+    $('pollsRefresh').addEventListener('click', loadPollVoices);
+
     // ── Q&A revenue pool ───────────────────────────────────────────────────
     var POOL_STRATEGY = { even: '平均分配', volume: '依回覆量', engagement: '依參與度' };
     var POOL_STATUS = { draft: '草稿', computed: '已計算', finalized: '已結算', paid_out: '已撥款' };
@@ -2096,12 +2154,13 @@ const ADMIN_HTML = `<!doctype html>
 
     // Lazy-load the reviews + pool + roleplay + ai-usage + flags tabs the first
     // time they're opened.
-    var reviewsLoaded = false, feedbackLoaded = false, poolLoaded = false, roleplayLoaded = false, aiUsageLoaded = false, flagsLoaded = false, storiesLoaded = false;
+    var reviewsLoaded = false, feedbackLoaded = false, poolLoaded = false, roleplayLoaded = false, aiUsageLoaded = false, flagsLoaded = false, storiesLoaded = false, pollsLoaded = false;
     document.querySelectorAll('.tab').forEach(function (btn) {
       var panel = btn.getAttribute('data-panel');
       if (panel === 'reviews') btn.addEventListener('click', function () { if (!reviewsLoaded) { reviewsLoaded = true; loadReviews(); } });
       if (panel === 'feedback') btn.addEventListener('click', function () { if (!feedbackLoaded) { feedbackLoaded = true; loadFeedback(); } });
       if (panel === 'stories') btn.addEventListener('click', function () { if (!storiesLoaded) { storiesLoaded = true; loadStories(); } });
+      if (panel === 'polls') btn.addEventListener('click', function () { if (!pollsLoaded) { pollsLoaded = true; loadPollVoices(); } });
       if (panel === 'pool') btn.addEventListener('click', function () { if (!poolLoaded) { poolLoaded = true; loadPools(); } });
       if (panel === 'roleplay') btn.addEventListener('click', function () { if (!roleplayLoaded) { roleplayLoaded = true; loadRoleplay(); } });
       if (panel === 'ai-usage') btn.addEventListener('click', function () { if (!aiUsageLoaded) { aiUsageLoaded = true; loadAiUsage(); } });

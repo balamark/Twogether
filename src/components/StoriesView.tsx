@@ -1,10 +1,11 @@
 import { useState } from 'react';
-import { BookOpen, Globe, User as UserIcon } from 'lucide-react';
+import { BookOpen, Globe, User as UserIcon, Vote } from 'lucide-react';
 import StoryList from './StoryList';
 import StoryDetail from './StoryDetail';
 import StoryComposeFlow from './StoryComposeFlow';
 import MyStories from './MyStories';
 import PublicQaView from './PublicQaView';
+import PollsView from './PollsView';
 import InfoHint from './InfoHint';
 
 // 真實故事 main tab: the public-facing community surface. Sub-tabs:
@@ -29,7 +30,7 @@ interface StoriesViewProps {
   onFindTherapist: () => void;
 }
 
-type SubTab = 'wisdom' | 'qa' | 'mine';
+type SubTab = 'wisdom' | 'polls' | 'qa' | 'mine';
 type WisdomView = { kind: 'list' } | { kind: 'detail'; id: string } | { kind: 'compose' };
 
 export default function StoriesView({
@@ -85,6 +86,16 @@ export default function StoriesView({
           </button>
           <button
             type="button"
+            data-testid="stories-tab-polls"
+            onClick={() => setTab('polls')}
+            className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full font-body text-[13px] font-medium transition-colors ${
+              tab === 'polls' ? 'bg-petal-ink text-petal-cream' : 'text-petal-ink-soft hover:text-petal-ink'
+            }`}
+          >
+            <Vote className="w-3.5 h-3.5" strokeWidth={1.5} /> 大家怎麼做
+          </button>
+          <button
+            type="button"
             data-testid="stories-tab-qa"
             onClick={() => setTab('qa')}
             className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full font-body text-[13px] font-medium transition-colors ${
@@ -130,6 +141,14 @@ export default function StoriesView({
           showNickname={authState.user?.public_share_show_nickname !== false}
           onDone={(storyId) => setWisdomView({ kind: 'detail', id: storyId })}
           onCancel={() => setWisdomView({ kind: 'list' })}
+          showNotification={showNotification}
+        />
+      )}
+
+      {tab === 'polls' && (
+        <PollsView
+          isAuthenticated={authState.isAuthenticated}
+          onRequireLogin={() => setShowAuthModal(true)}
           showNotification={showNotification}
         />
       )}

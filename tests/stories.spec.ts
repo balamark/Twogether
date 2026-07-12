@@ -286,6 +286,49 @@ test.describe('真實故事 — archive UI wiring', () => {
     await expect(page.getByTestId('public-qa-view')).toBeVisible({ timeout: 10000 });
   });
 
+  test('大家怎麼做 sub-tab: vote reveals result split', async ({ page }) => {
+    await seed(page);
+    const POLL = {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      question: '吵架後，誰該先低頭？',
+      scenario: '一場沒有對錯的爭執後⋯',
+      tags: ['溝通'],
+      totalVotes: 0,
+      myOptionId: null,
+      voiceCount: 0,
+      options: [
+        { id: 'opt-1', label: '我會先開口', votes: 0, percent: 0 },
+        { id: 'opt-2', label: '等對方先', votes: 0, percent: 0 },
+      ],
+    };
+    await page.route('**/api/polls', async (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, polls: [POLL] }) })
+    );
+    await page.route('**/api/polls/*/vote', async (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          poll: { ...POLL, totalVotes: 1, myOptionId: 'opt-1', options: [
+            { id: 'opt-1', label: '我會先開口', votes: 1, percent: 100 },
+            { id: 'opt-2', label: '等對方先', votes: 0, percent: 0 },
+          ] },
+        }),
+      })
+    );
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+    await page.getByTestId('nav-tab-stories').click();
+    await page.getByTestId('stories-tab-polls').click();
+    await expect(page.getByTestId('polls-view')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('poll-card').first()).toContainText('吵架後，誰該先低頭');
+
+    // Before voting: tappable options. After voting: result bars with %.
+    await page.getByTestId('poll-option-vote').first().click();
+    await expect(page.getByTestId('poll-option-result').first()).toContainText('100%', { timeout: 5000 });
+  });
+
   test('logged-out: archive browsable, voting prompts sign-in', async ({ page }) => {
     await seed(page, { authed: false });
     await page.goto('/');

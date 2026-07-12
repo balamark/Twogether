@@ -469,6 +469,35 @@ export interface FacilitationAdvance {
   message: EventMessage | null;
 }
 
+// 真實情侶會怎麼做 (Community polls)
+export interface PollOption {
+  id: string;
+  label: string;
+  votes: number;
+  percent: number;
+}
+
+export interface PollVoice {
+  id: string;
+  body: string;
+  optionLabel: string | null;
+  authorName: string;
+  isMine: boolean;
+  createdAt: string;
+}
+
+export interface CommunityPoll {
+  id: string;
+  question: string;
+  scenario: string | null;
+  tags: string[];
+  totalVotes: number;
+  myOptionId: string | null;
+  options: PollOption[];
+  voiceCount?: number;
+  voices?: PollVoice[];
+}
+
 export interface EventMessage {
   id: string;
   eventId: string;
@@ -1736,6 +1765,32 @@ class ApiService {
 
   async reportStoryComment(id: string, reason: string, detail?: string): Promise<void> {
     await apiClient.post(`/stories/comments/${id}/report`, { reason, detail });
+  }
+
+  // --- 真實情侶會怎麼做 (Community polls) ---
+
+  async getPolls(): Promise<CommunityPoll[]> {
+    const response = await apiClient.get('/polls');
+    return response.data.polls as CommunityPoll[];
+  }
+
+  async getPoll(id: string): Promise<CommunityPoll> {
+    const response = await apiClient.get(`/polls/${id}`);
+    return response.data.poll as CommunityPoll;
+  }
+
+  async votePoll(id: string, optionId: string): Promise<CommunityPoll> {
+    const response = await apiClient.post(`/polls/${id}/vote`, { optionId });
+    return response.data.poll as CommunityPoll;
+  }
+
+  async addPollVoice(id: string, body: string, optionId?: string | null): Promise<PollVoice> {
+    const response = await apiClient.post(`/polls/${id}/voices`, { body, optionId: optionId ?? null });
+    return response.data.voice as PollVoice;
+  }
+
+  async reportPollVoice(id: string, reason: string): Promise<void> {
+    await apiClient.post(`/polls/voices/${id}/report`, { reason });
   }
 
   // Token validation
