@@ -3262,7 +3262,7 @@ class ApiService {
       return this.transformEvent(response.data.event);
     } catch (error: unknown) {
       console.error('Failed to create event:', error);
-      this.throwApiError(error, '無法建立事件');
+      this.throwApiError(error, '無法建立對話');
     }
   }
 
@@ -3278,7 +3278,7 @@ class ApiService {
       return { events, total: response.data.total || 0 };
     } catch (error: unknown) {
       console.error('Failed to list events:', error);
-      this.throwApiError(error, '無法取得事件列表');
+      this.throwApiError(error, '無法取得對話列表');
     }
   }
 
@@ -3288,7 +3288,7 @@ class ApiService {
       return this.transformEvent(response.data.event);
     } catch (error: unknown) {
       console.error('Failed to fetch event:', error);
-      this.throwApiError(error, '無法取得事件詳情');
+      this.throwApiError(error, '無法取得對話詳情');
     }
   }
 
@@ -3298,7 +3298,7 @@ class ApiService {
       return this.transformEvent(response.data.event);
     } catch (error: unknown) {
       console.error('Failed to update event:', error);
-      this.throwApiError(error, '無法更新事件內容');
+      this.throwApiError(error, '無法更新對話內容');
     }
   }
 
@@ -3508,7 +3508,7 @@ class ApiService {
       return this.transformEvent(response.data.event);
     } catch (error: unknown) {
       console.error('Failed to reopen event:', error);
-      this.throwApiError(error, '無法重新開啟事件');
+      this.throwApiError(error, '無法重新開啟對話');
     }
   }
 

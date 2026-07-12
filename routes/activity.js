@@ -57,7 +57,7 @@ router.get('/', async (req, res) => {
           FROM wall_posts wp WHERE wp.couple_id = $1
 
         UNION ALL
-        SELECT 'event', e.created_by, '建立了事件「' || e.title || '」', e.created_at
+        SELECT 'event', e.created_by, '開始了對話「' || e.title || '」', e.created_at
           FROM events e WHERE e.couple_id = $1
 
         UNION ALL

@@ -26,7 +26,7 @@ const VERSION_META: { key: EventVersionKey; label: string; desc: string; accent:
   {
     key: 'neutral',
     label: '中性版',
-    desc: '用你自己的口吻，平靜、就事論事地說出事件與感受，作為開場訊息。',
+    desc: '用你自己的口吻，平靜、就事論事地說出這件事與感受，作為開場訊息。',
     accent: 'border-petal-sage bg-petal-sage/10',
   },
   {
@@ -91,18 +91,18 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
     if (!preview) return;
     const summary = summaryDraft.trim();
     if (summary.length === 0) {
-      setError('事件簡介不可為空');
+      setError('對話簡介不可為空');
       return;
     }
     if (summary.length > 1000) {
-      setError('事件簡介超過 1000 字，請縮短後再送出');
+      setError('對話簡介超過 1000 字，請縮短後再送出');
       return;
     }
     let openingMessage: string | null = null;
     if (!isPrivate && selected) {
       openingMessage = (drafts?.[selected] ?? preview.versions[selected]).trim();
       if (openingMessage.length === 0) {
-        setError('開場訊息不可為空，請輸入內容或改存私人事件');
+        setError('開場訊息不可為空，請輸入內容或改存私人對話');
         return;
       }
       if (openingMessage.length > 2000) {
@@ -130,17 +130,17 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
       if (firstEvent) localStorage.setItem('nudgeFirstEventDone', 'true');
       showNotification({
         type: 'success',
-        title: '事件已建立',
+        title: '對話已建立',
         message: isPrivate
-          ? '已儲存為私人事件'
+          ? '已儲存為私人對話'
           : firstEvent
-            ? '已送出給對方。等待回覆時，可以打開事件試試「如何接住TA的情緒」，先練習怎麼回應。'
+            ? '已送出給對方。等待回覆時，可以打開對話試試「如何接住TA的情緒」，先練習怎麼回應。'
             : '已送出選定版本給對方',
         duration: firstEvent ? 9000 : undefined,
       });
       onCreated(event.id);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '建立事件失敗';
+      const msg = err instanceof Error ? err.message : '建立對話失敗';
       setError(msg);
       setStep('select');
     }
@@ -228,7 +228,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
         <div className="bg-white border border-petal-rule rounded-xl p-3 mb-3" data-testid="compose-event-summary">
           <div className="flex items-center justify-between mb-1">
             <div className="text-[11px] text-petal-muted">
-              事件簡介（雙方都會看到的中性紀錄）
+              對話簡介（雙方都會看到的中性紀錄）
               {summaryDraft.trim() !== preview.summary.trim() && (
                 <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-petal-rose/20 text-petal-ink">已編輯</span>
               )}
@@ -238,7 +238,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
                 type="button"
                 data-testid="compose-summary-edit"
                 onClick={() => setEditingSummary(true)}
-                title="編輯事件簡介"
+                title="編輯對話簡介"
                 className="p-1 rounded text-petal-muted hover:text-petal-ink"
               >
                 <Pencil className="w-3.5 h-3.5" />
@@ -288,7 +288,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
         </div>
       </div>
 
-      <h3 className="text-sm text-petal-ink-soft px-1">選一個版本送出（也可以不送出，存為私人事件）</h3>
+      <h3 className="text-sm text-petal-ink-soft px-1">選一個版本送出（也可以不送出，存為私人對話）</h3>
 
       <div className="space-y-3">
         {VERSION_META.map((v) => {
@@ -355,7 +355,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
           className="mt-1 accent-petal-ink"
         />
         <span className="text-sm text-petal-ink-soft">
-          也可以不送出（儲存為私人事件，對方看不到）
+          也可以不送出（儲存為私人對話，對方看不到）
         </span>
       </label>
 
@@ -381,7 +381,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
           ) : (
             <Send className="w-4 h-4" />
           )}
-          <span>{isPrivate ? '儲存私人事件' : '送出'}</span>
+          <span>{isPrivate ? '儲存私人對話' : '送出'}</span>
         </button>
       </div>
     </div>

@@ -448,7 +448,7 @@ router.post(
       });
     } catch (err) {
       logError('Create event failed', { err: err.message, stack: err.stack });
-      res.status(500).json({ success: false, message: '建立事件失敗' });
+      res.status(500).json({ success: false, message: '建立對話失敗' });
     }
   }
 );
@@ -612,7 +612,7 @@ router.get(
       res.json({ success: true, events, total });
     } catch (err) {
       logError('List events failed', { err: err.message, stack: err.stack });
-      res.status(500).json({ success: false, message: '無法取得事件列表' });
+      res.status(500).json({ success: false, message: '無法取得對話列表' });
     }
   }
 );
@@ -622,9 +622,9 @@ router.get('/:id', [param('id').isUUID()], async (req, res) => {
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     if (access.event.is_private && access.event.created_by !== req.user.id) {
-      return res.status(403).json({ success: false, message: '此為私人事件' });
+      return res.status(403).json({ success: false, message: '此為私人對話' });
     }
 
     const messagesResult = await db.query(
@@ -640,7 +640,7 @@ router.get('/:id', [param('id').isUUID()], async (req, res) => {
     });
   } catch (err) {
     logError('Get event failed', { err: err.message, stack: err.stack });
-    res.status(500).json({ success: false, message: '無法取得事件詳情' });
+    res.status(500).json({ success: false, message: '無法取得對話詳情' });
   }
 });
 
@@ -667,18 +667,18 @@ router.patch(
       }
 
       const access = await assertEventAccess(req.params.id, userId);
-      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
       if (access.event.created_by !== userId) {
         return res.status(403).json({
           success: false,
-          message: '只有發起人可以編輯事件內容',
+          message: '只有發起人可以編輯對話內容',
           error_code: 'NOT_EVENT_CREATOR',
         });
       }
       if (access.event.status === 'resolved') {
         return res.status(400).json({
           success: false,
-          message: '此事件已解決，無法編輯',
+          message: '這段對話已完成，無法編輯',
           error_code: 'EVENT_RESOLVED',
         });
       }
@@ -703,7 +703,7 @@ router.patch(
       res.json({ success: true, event: serializeEvent(result.rows[0]) });
     } catch (err) {
       logError('Edit event failed', { err: err.message, stack: err.stack });
-      res.status(500).json({ success: false, message: '編輯事件失敗，請稍後再試' });
+      res.status(500).json({ success: false, message: '編輯對話失敗，請稍後再試' });
     }
   }
 );
@@ -722,18 +722,18 @@ router.patch(
     try {
       const userId = req.user.id;
       const access = await assertEventAccess(req.params.id, userId);
-      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
       if (access.event.is_private) {
         return res.status(403).json({
           success: false,
-          message: '私人事件無法編輯訊息',
+          message: '私人對話無法編輯訊息',
           error_code: 'PRIVATE_EVENT',
         });
       }
       if (access.event.status === 'resolved') {
         return res.status(400).json({
           success: false,
-          message: '此事件已解決，無法編輯訊息',
+          message: '這段對話已完成，無法編輯訊息',
           error_code: 'EVENT_RESOLVED',
         });
       }
@@ -793,12 +793,12 @@ router.post(
     if (sendValidationError(req, res)) return;
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
-      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
       if (access.event.is_private) {
-        return res.status(403).json({ success: false, message: '私人事件無法新增訊息' });
+        return res.status(403).json({ success: false, message: '私人對話無法新增訊息' });
       }
       if (access.event.status === 'resolved') {
-        return res.status(400).json({ success: false, message: '此事件已解決，無法新增訊息' });
+        return res.status(400).json({ success: false, message: '這段對話已完成，無法新增訊息' });
       }
 
       const msgResult = await db.query(
@@ -841,9 +841,9 @@ router.post(
     if (sendValidationError(req, res)) return;
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
-      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
       if (access.event.is_private) {
-        return res.status(403).json({ success: false, message: '私人事件不支援 AI 回覆改寫' });
+        return res.status(403).json({ success: false, message: '私人對話不支援 AI 回覆改寫' });
       }
 
       const userId = req.user.id;
@@ -924,9 +924,9 @@ router.post(
     if (sendValidationError(req, res)) return;
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
-      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
       if (access.event.is_private) {
-        return res.status(403).json({ success: false, message: '私人事件不支援 AI 接住情緒建議' });
+        return res.status(403).json({ success: false, message: '私人對話不支援 AI 接住情緒建議' });
       }
 
       const userId = req.user.id;
@@ -1001,9 +1001,9 @@ router.post('/:id/ai-comment/preview', [param('id').isUUID()], async (req, res) 
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     if (access.event.is_private) {
-      return res.status(403).json({ success: false, message: '私人事件無法邀請 AI 諮商師' });
+      return res.status(403).json({ success: false, message: '私人對話無法邀請 AI 諮商師' });
     }
 
     const userId = req.user.id;
@@ -1081,12 +1081,12 @@ router.post(
     if (sendValidationError(req, res)) return;
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
-      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
       if (access.event.is_private) {
-        return res.status(403).json({ success: false, message: '私人事件無法新增訊息' });
+        return res.status(403).json({ success: false, message: '私人對話無法新增訊息' });
       }
       if (access.event.status === 'resolved') {
-        return res.status(400).json({ success: false, message: '此事件已解決，無法新增訊息' });
+        return res.status(400).json({ success: false, message: '這段對話已完成，無法新增訊息' });
       }
 
       const companion = await getUserCompanion(req.user.id);
@@ -1132,9 +1132,9 @@ router.patch(
     if (sendValidationError(req, res)) return;
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
-      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
       if (access.event.is_private) {
-        return res.status(403).json({ success: false, message: '私人事件無法開啟情緒翻譯', error_code: 'PRIVATE_EVENT' });
+        return res.status(403).json({ success: false, message: '私人對話無法開啟情緒翻譯', error_code: 'PRIVATE_EVENT' });
       }
       const enabled = req.body.enabled === true;
       await db.query(`UPDATE events SET translation_enabled = $2 WHERE id = $1`, [req.params.id, enabled]);
@@ -1155,9 +1155,9 @@ router.get('/:id/translations', [param('id').isUUID()], async (req, res) => {
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     if (access.event.is_private) {
-      return res.status(403).json({ success: false, message: '私人事件無法使用情緒翻譯', error_code: 'PRIVATE_EVENT' });
+      return res.status(403).json({ success: false, message: '私人對話無法使用情緒翻譯', error_code: 'PRIVATE_EVENT' });
     }
     const userId = req.user.id;
 
@@ -1280,14 +1280,14 @@ router.get('/:id/therapy-note', [param('id').isUUID()], async (req, res) => {
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     if (access.event.is_private) {
-      return res.status(403).json({ success: false, message: '私人事件沒有治療摘要', error_code: 'PRIVATE_EVENT' });
+      return res.status(403).json({ success: false, message: '私人對話沒有治療摘要', error_code: 'PRIVATE_EVENT' });
     }
     if (access.event.status !== 'resolved') {
       return res.status(400).json({
         success: false,
-        message: '事件解決後，AI 才會為你們整理這次衝突的治療摘要。',
+        message: '對話結束後，AI 才會為你們整理這次衝突的治療摘要。',
         error_code: 'EVENT_NOT_RESOLVED',
       });
     }
@@ -1356,7 +1356,7 @@ router.put(
     if (sendValidationError(req, res)) return;
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
-      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
 
       const result = await db.query(
         `UPDATE event_messages
@@ -1384,9 +1384,9 @@ router.post(
     if (sendValidationError(req, res)) return;
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
-      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
       if (access.event.is_private) {
-        return res.status(400).json({ success: false, message: '私人事件無法公開分享' });
+        return res.status(400).json({ success: false, message: '私人對話無法公開分享' });
       }
       const title = (req.body.title && req.body.title.trim()) || access.event.title;
       const result = await db.query(
@@ -1415,7 +1415,7 @@ router.post('/:id/unpublish', [param('id').isUUID()], async (req, res) => {
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     const result = await db.query(
       `UPDATE events
           SET public_status = 'private', published_at = NULL
@@ -1440,12 +1440,12 @@ router.post('/:id/resolve-request', [param('id').isUUID()], async (req, res) => 
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     if (access.event.is_private) {
-      return res.status(400).json({ success: false, message: '私人事件不需雙方確認，請使用解決 API' });
+      return res.status(400).json({ success: false, message: '私人對話不需雙方確認，請使用解決 API' });
     }
     if (access.event.status !== 'open') {
-      return res.status(400).json({ success: false, message: '事件目前無法發起解決請求' });
+      return res.status(400).json({ success: false, message: '這段對話目前無法發起解決請求' });
     }
 
     const result = await db.query(
@@ -1478,9 +1478,9 @@ router.post('/:id/resolve-confirm', [param('id').isUUID()], async (req, res) => 
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     if (access.event.status !== 'resolve_pending') {
-      return res.status(400).json({ success: false, message: '事件目前不在等待確認的狀態' });
+      return res.status(400).json({ success: false, message: '這段對話目前不在等待確認的狀態' });
     }
     if (access.event.resolve_requested_by === req.user.id) {
       return res.status(400).json({ success: false, message: '需由另一方確認解決' });
@@ -1514,12 +1514,12 @@ router.post('/:id/reopen', [param('id').isUUID()], async (req, res) => {
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     if (access.event.is_private) {
-      return res.status(400).json({ success: false, message: '私人事件無法重新開啟' });
+      return res.status(400).json({ success: false, message: '私人對話無法重新開啟' });
     }
     if (access.event.status !== 'resolved') {
-      return res.status(400).json({ success: false, message: '只有已解決的事件可以重新開啟' });
+      return res.status(400).json({ success: false, message: '只有已解決的對話可以重新開啟' });
     }
 
     const result = await db.query(
@@ -1548,7 +1548,7 @@ router.post('/:id/reopen', [param('id').isUUID()], async (req, res) => {
     res.json({ success: true, event: serializeEvent(result.rows[0]) });
   } catch (err) {
     logError('Reopen event failed', { err: err.message, stack: err.stack });
-    res.status(500).json({ success: false, message: '無法重新開啟事件' });
+    res.status(500).json({ success: false, message: '無法重新開啟對話' });
   }
 });
 
@@ -1655,12 +1655,12 @@ async function facilitationPreflight(access, res, userId) {
     logInfo('events.facilitation.blocked', { userId, eventId: access.event.id, reason });
   if (access.event.is_private) {
     blocked('private_event');
-    res.status(403).json({ success: false, message: '私人事件無法使用引導模式', error_code: 'PRIVATE_EVENT' });
+    res.status(403).json({ success: false, message: '私人對話無法使用引導模式', error_code: 'PRIVATE_EVENT' });
     return false;
   }
   if (access.event.status === 'resolved') {
     blocked('event_resolved');
-    res.status(400).json({ success: false, message: '此事件已解決，如需再談可先重新開啟事件', error_code: 'EVENT_RESOLVED' });
+    res.status(400).json({ success: false, message: '這段對話已完成，如需再談可先重新開啟對話', error_code: 'EVENT_RESOLVED' });
     return false;
   }
   if (!access.partnerId) {
@@ -1680,7 +1680,7 @@ router.get('/:id/facilitation', [param('id').isUUID()], async (req, res) => {
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     const row = await getSessionRow(req.params.id);
     res.json({ success: true, session: serializeSession(row) });
   } catch (err) {
@@ -1697,7 +1697,7 @@ router.post('/:id/facilitation/start', [param('id').isUUID()], async (req, res) 
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     const userId = req.user.id;
     if (!(await facilitationPreflight(access, res, userId))) return;
 
@@ -1804,7 +1804,7 @@ router.post('/:id/facilitation/next', [param('id').isUUID()], async (req, res) =
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     const userId = req.user.id;
 
     const session = await getSessionRow(req.params.id);
@@ -1911,7 +1911,7 @@ router.post('/:id/facilitation/end', [param('id').isUUID()], async (req, res) =>
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     const row = (await db.query(
       `UPDATE event_facilitation_sessions SET status = 'ended', updated_at = NOW()
         WHERE event_id = $1 RETURNING *`,

@@ -1079,7 +1079,7 @@ const ChatRoom: React.FC<{
           <div>
             <h3 className="font-display text-lg font-medium text-petal-ink">諮商室 · {consultation.therapistName}</h3>
             <p className="font-body text-xs text-petal-muted">
-              你們與諮商師的對話 — 可引用記錄過的「事件」一起討論
+              你們與諮商師的對話 — 可引用記錄過的「對話」一起討論
             </p>
           </div>
           <button onClick={onClose} className="p-1 text-petal-muted hover:text-petal-ink" aria-label="關閉">
@@ -1127,7 +1127,7 @@ const ChatRoom: React.FC<{
                   </div>
                   {m.event && (
                     <div className="mb-1 px-3 py-2 rounded-lg bg-petal-cream-2 border border-petal-rule max-w-full">
-                      <div className="font-body text-[10px] uppercase tracking-wide text-petal-muted">引用事件</div>
+                      <div className="font-body text-[10px] uppercase tracking-wide text-petal-muted">引用對話</div>
                       <div className="font-body text-xs font-medium text-petal-ink">{m.event.title}</div>
                       <div className="font-body text-xs text-petal-ink-soft line-clamp-2">{m.event.summary}</div>
                     </div>
@@ -1165,7 +1165,7 @@ const ChatRoom: React.FC<{
               <button
                 onClick={() => setShowEventPicker(true)}
                 data-testid="reference-event-button"
-                title="引用事件"
+                title="引用對話"
                 className="shrink-0 p-2 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors"
               >
                 <StickyNote className="w-4 h-4" strokeWidth={1.5} />
@@ -1209,13 +1209,13 @@ const ChatRoom: React.FC<{
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setShowEventPicker(false)}>
           <div className="bg-petal-cream w-full max-w-md max-h-[70vh] overflow-y-auto rounded-lg border border-petal-rule shadow-petal" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 bg-petal-cream flex items-center justify-between px-4 py-3 border-b border-petal-rule">
-              <h4 className="font-display text-base text-petal-ink">引用一個事件</h4>
+              <h4 className="font-display text-base text-petal-ink">引用一段對話</h4>
               <button onClick={() => setShowEventPicker(false)} className="text-petal-muted hover:text-petal-ink"><X className="w-4 h-4" /></button>
             </div>
             <div className="p-3 space-y-2" data-testid="event-picker">
               {events.length === 0 ? (
                 <p className="font-body text-sm text-petal-muted text-center py-6">
-                  你們還沒有記錄過事件。
+                  你們還沒有記錄過對話。
                 </p>
               ) : (
                 events.map((ev) => (

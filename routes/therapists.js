@@ -688,7 +688,7 @@ router.post('/consultations/:id/messages', authenticateToken, [
         [eventId, access.row.couple_id]
       );
       if (ev.rows.length === 0) {
-        return res.status(400).json({ success: false, message: '引用的事件無效' });
+        return res.status(400).json({ success: false, message: '引用的對話無效' });
       }
     }
 

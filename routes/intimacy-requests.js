@@ -631,7 +631,7 @@ const RECONCILIATION_INTENSITIES = ['goodwill', 'reflect', 'talk'];
 
 router.post('/reconciliation-openers', [
   body('intensity').isIn(RECONCILIATION_INTENSITIES).withMessage('請選擇和解強度'),
-  body('eventId').optional({ nullable: true }).isUUID().withMessage('事件 ID 格式錯誤'),
+  body('eventId').optional({ nullable: true }).isUUID().withMessage('對話 ID 格式錯誤'),
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -659,7 +659,7 @@ router.post('/reconciliation-openers', [
         logWarn('intimacy.reconciliation.event_not_found', { userId, eventId });
         return res.status(404).json({
           success: false,
-          message: '找不到這個事件，可能已被刪除。你可以改選其他事件，或不選事件直接產生開場白。',
+          message: '找不到這段對話，可能已被刪除。你可以改選其他對話，或不選對話直接產生開場白。',
           error_code: 'EVENT_NOT_FOUND',
         });
       }

@@ -96,7 +96,7 @@ async function webhookHandler(req, res) {
         if (ev.replyToken) {
           await lineService.replyMessage(
             ev.replyToken,
-            '✅ 綁定成功！之後伴侶的重要通知（事件回覆、親密邀請等）都會傳到這裡。\n想關閉可到「設定 → LINE 通知」。'
+            '✅ 綁定成功！之後伴侶的重要通知（對話回覆、親密邀請等）都會傳到這裡。\n想關閉可到「設定 → LINE 通知」。'
           );
         }
       }

@@ -259,7 +259,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
         .filter((m) => m.senderId !== currentUserId && !m.readAt)
         .forEach((m) => apiService.markEventMessageRead(eventId, m.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : '無法取得事件詳情');
+      setError(err instanceof Error ? err.message : '無法取得對話詳情');
     }
   };
 
@@ -326,14 +326,14 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     } else if (code === 'EVENT_RESOLVED') {
       showNotification({
         type: 'info',
-        title: '此事件已解決',
-        message: err instanceof Error ? err.message : '如需再談可先重新開啟事件。',
+        title: '這段對話已完成',
+        message: err instanceof Error ? err.message : '如需再談可先重新開啟對話。',
       });
     } else if (code === 'PRIVATE_EVENT') {
       showNotification({
         type: 'info',
-        title: '私人事件不支援引導',
-        message: '引導模式需要兩個人一起參與，私人事件只有你看得到。',
+        title: '私人對話不支援引導',
+        message: '引導模式需要兩個人一起參與，私人對話只有你看得到。',
       });
     } else if (code === 'NO_SESSION') {
       // Local state is stale (e.g. the partner ended the session) — resync
@@ -589,7 +589,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     try {
       await apiService.confirmEventResolve(eventId);
       await refresh();
-      showNotification({ type: 'success', title: '事件已解決', message: '雙方確認完成' });
+      showNotification({ type: 'success', title: '這段對話已完成', message: '雙方確認完成' });
     } catch (err) {
       showNotification({
         type: 'error',
@@ -606,7 +606,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     try {
       await apiService.reopenEvent(eventId);
       await refresh();
-      showNotification({ type: 'success', title: '已重新開啟', message: '可以繼續討論這個事件了' });
+      showNotification({ type: 'success', title: '已重新開啟', message: '可以繼續討論這段對話了' });
     } catch (err) {
       showNotification({
         type: 'error',
@@ -625,7 +625,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     return (
       <div className="space-y-3">
         <BackButton onBack={onBack} />
-        <div className="p-6 text-center text-red-500">{error || '找不到事件'}</div>
+        <div className="p-6 text-center text-red-500">{error || '找不到對話'}</div>
       </div>
     );
   }
@@ -1136,7 +1136,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           <div className="flex flex-col items-center gap-2 text-center bg-petal-sage/15 border border-petal-sage/40 rounded-2xl p-4">
             <p className="text-sm text-petal-ink-soft inline-flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4 text-petal-sage-deep" />
-              這個事件已解決。如果還想再聊聊，可以重新開啟。
+              這段對話已完成。如果還想再聊聊，可以重新開啟。
             </p>
             <button
               type="button"

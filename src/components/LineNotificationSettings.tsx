@@ -83,7 +83,7 @@ export default function LineNotificationSettings({
     <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6" data-testid="settings-line">
       <h3 className="text-lg font-bold text-gray-800 mb-1">LINE 通知</h3>
       <p className="text-xs text-gray-500 mb-4">
-        把伴侶的重要通知（事件回覆、親密邀請等）同步推播到你的 LINE。綁定後隨時可關閉。
+        把伴侶的重要通知（對話回覆、親密邀請等）同步推播到你的 LINE。綁定後隨時可關閉。
       </p>
 
       {linked ? (
