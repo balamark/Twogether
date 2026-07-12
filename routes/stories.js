@@ -132,7 +132,11 @@ router.get(
 
       const orderBy = {
         latest: 's.created_at DESC',
-        helpful: '(helpful_count + resonate_count + repair_count) DESC, s.created_at DESC',
+        // Total votes = one row per vote in the joined story_votes. Must be the
+        // raw aggregate, not the SELECT aliases: Postgres resolves bare
+        // identifiers inside an ORDER BY expression as input columns, so
+        // "(helpful_count + ...)" throws `column "helpful_count" does not exist`.
+        helpful: 'COUNT(v.id) DESC, s.created_at DESC',
         most_read: 's.view_count DESC, s.created_at DESC',
       }[sort];
 

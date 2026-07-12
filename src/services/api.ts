@@ -2941,7 +2941,9 @@ class ApiService {
   // reply; only untranslated ones cost AI budget).
   async getWallTranslations(postId: string): Promise<MessageTranslationMap> {
     try {
-      const response = await apiClient.get(`/wall/${postId}/translations`);
+      // ~17s batched LLM call, over the 15s client default (see
+      // getEventTranslations). Extend so a slow thread doesn't read as failed.
+      const response = await apiClient.get(`/wall/${postId}/translations`, { timeout: 45000 });
       return (response.data.translations || {}) as MessageTranslationMap;
     } catch (error) {
       console.error('Failed to fetch wall translations:', error);
@@ -3313,7 +3315,10 @@ class ApiService {
   // thread (cached per message; only untranslated ones cost AI budget).
   async getEventTranslations(eventId: string): Promise<MessageTranslationMap> {
     try {
-      const response = await apiClient.get(`/events/${eventId}/translations`);
+      // The batched LLM translation of a thread takes ~17s in prod, over the
+      // 15s client default — bump this call so users don't see a false
+      // "情緒翻譯失敗" while the server actually succeeds (returns 200).
+      const response = await apiClient.get(`/events/${eventId}/translations`, { timeout: 45000 });
       return (response.data.translations || {}) as MessageTranslationMap;
     } catch (error: unknown) {
       console.error('Failed to fetch event translations:', error);
