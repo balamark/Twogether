@@ -961,7 +961,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6" data-testid="settings-ai-companion">
         <h3 className="text-lg font-bold text-gray-800 mb-1">AI 諮商師</h3>
         <p className="text-xs text-gray-500 mb-4">
-          在事件討論和牆上陪你們聊的 AI 諮商師。更換只影響之後的 AI 回覆，過去的對話不會改變。
+          在對話和牆上陪你們聊的 AI 諮商師。更換只影響之後的 AI 回覆，過去的對話不會改變。
         </p>
         {(() => {
           const current = resolveCompanion(authState.user?.selected_therapist);
@@ -1189,7 +1189,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
               接收伴侶活動的電子郵件通知
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              當伴侶在牆上留言、開啟事件、回覆訊息或回應親密邀請時，寄一封電子郵件給你。應用內通知不受影響。
+              當伴侶在牆上留言、開始對話、回覆訊息或回應親密邀請時，寄一封電子郵件給你。應用內通知不受影響。
             </p>
           </div>
           <input

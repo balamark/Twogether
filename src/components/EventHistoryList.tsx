@@ -73,7 +73,7 @@ export default function EventHistoryList({
         if (!cancelled) setEvents(res.events);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : '無法取得事件列表');
+        if (!cancelled) setError(err instanceof Error ? err.message : '無法取得對話列表');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -116,7 +116,7 @@ export default function EventHistoryList({
             寫下第一件想說開的事
           </button>
         )}
-        <p className="text-[11px] text-petal-muted mt-3">也可以只存成私人事件，對方不會看到。</p>
+        <p className="text-[11px] text-petal-muted mt-3">也可以只存成私人對話，對方不會看到。</p>
       </div>
     );
   }

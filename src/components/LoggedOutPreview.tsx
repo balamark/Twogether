@@ -256,9 +256,9 @@ const EmotionAcceptanceSample: React.FC = () => (
         <p className="font-body text-sm text-petal-ink">「你又忘記了，我覺得自己一點都不重要。」</p>
       </div>
       <div className="rounded-md bg-white border border-petal-rule px-3 py-2">
-        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-1">② AI 整理事件＋翻成不傷人的話</div>
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-1">② AI 整理對話＋翻成不傷人的話</div>
         <div className="rounded bg-petal-cream-2 px-2 py-1.5 mb-1.5">
-          <div className="font-body text-[10px] text-petal-muted">事件簡介（中性紀錄）</div>
+          <div className="font-body text-[10px] text-petal-muted">對話簡介（中性紀錄）</div>
           <p className="font-body text-xs text-petal-ink-soft">兩人約好的紀念日晚餐，其中一方因加班忘記赴約。</p>
         </div>
         <p className="font-body text-sm text-petal-ink">「當約定被忘記時，我會覺得失落，因為我很在乎我們的相處。」</p>

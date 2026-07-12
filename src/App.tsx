@@ -2369,7 +2369,7 @@ const LoveTimeApp = () => {
             showNotification({
               type: 'success',
               title: '已選擇 AI 諮商師',
-              message: `${resolveCompanion(companionId).name} 之後會在事件和牆上陪你們聊`,
+              message: `${resolveCompanion(companionId).name} 之後會在對話和牆上陪你們聊`,
               duration: 5000,
             });
           }}

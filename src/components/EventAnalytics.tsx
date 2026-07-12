@@ -60,8 +60,8 @@ export default function EventAnalytics() {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard icon={TrendingUp} label="近 7 日事件" value={data.counts.last7} />
-        <KpiCard icon={BarChart3} label="近 30 日事件" value={data.counts.last30} />
+        <KpiCard icon={TrendingUp} label="近 7 日對話" value={data.counts.last7} />
+        <KpiCard icon={BarChart3} label="近 30 日對話" value={data.counts.last30} />
         <KpiCard icon={CheckCircle2} label="解決率" value={`${data.resolutionRate}%`} />
         <KpiCard
           icon={Clock3}
@@ -72,11 +72,11 @@ export default function EventAnalytics() {
 
       {!hasAnyData ? (
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-10 text-center text-petal-ink-soft">
-          目前還沒有足夠資料可分析。建立幾個事件後再回來看看。
+          目前還沒有足夠資料可分析。累積幾段對話後再回來看看。
         </div>
       ) : (
         <>
-          <ChartCard title="近 30 日事件趨勢">
+          <ChartCard title="近 30 日對話趨勢">
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={data.dailyTrend}>
                 <CartesianGrid stroke={GRID} strokeDasharray="3 3" />
@@ -88,7 +88,7 @@ export default function EventAnalytics() {
             </ResponsiveContainer>
           </ChartCard>
 
-          <ChartCard title="事件類型分布">
+          <ChartCard title="對話類型分布">
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={data.tagDistribution}>
                 <CartesianGrid stroke={GRID} strokeDasharray="3 3" />
