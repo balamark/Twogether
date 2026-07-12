@@ -15,7 +15,9 @@ const { logInfo, logWarn, logError } = require('../lib/logger');
 const router = express.Router();
 
 const LINK_CODE_TTL_MIN = 15;
-const OA_ADD_URL = process.env.LINE_OA_ADD_URL || 'https://line.me/R/ti/p/@twogether';
+// Official account add-friend deep link. Basic ID @598gtkgy; overridable via
+// the LINE_OA_ADD_URL env (GitHub Actions variable → app.yaml).
+const OA_ADD_URL = process.env.LINE_OA_ADD_URL || 'https://line.me/R/ti/p/@598gtkgy';
 
 // Unambiguous code alphabet (no 0/O/1/I) so users can type it reliably.
 function makeLinkCode() {
