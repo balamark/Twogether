@@ -68,8 +68,9 @@ async function notifyReminder(userId, type, title, content) {
   } catch (err) {
     logWarn('relationship reminder notification failed', { err: err.message, type });
   }
-  // Mirror to LINE (no-ops unless linked + opted in).
-  lineService.pushToUserIfLinked(db, userId, `🔔 Twogether\n${title}\n「${content}」\n👉 https://twogether.fun`);
+  // Mirror to LINE (no-ops unless linked + opted in). Reminder content is
+  // already full prose, so it rides along as-is.
+  lineService.pushToUserIfLinked(db, userId, `💗 Twogether｜${title}\n${content}\n👉 https://twogether.fun`);
 }
 
 // Returns true if a reminder of this kind hasn't been sent within the cooldown,

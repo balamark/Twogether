@@ -386,8 +386,25 @@ router.post('/', [
       // Don't fail the request if notification creation fails
     }
 
-    // Mirror to LINE (no-ops unless the partner linked + opted in).
-    lineService.pushToUserIfLinked(db, partnerId, `💌 Twogether\n${req.user.nickname || '你的伴侶'} 傳來一個親密邀請\n👉 https://twogether.fun`);
+    // Mirror to LINE (no-ops unless the partner linked + opted in). Include the
+    // invite type, script, and message so the push alone tells the story.
+    const INTIMACY_TYPE_LABELS = {
+      general: '一般邀請',
+      romantic: '浪漫時光',
+      playful: '玩鬧互動',
+      surprise: '驚喜',
+      compliment: '讚美',
+      intimate: '親密時光',
+      reconciliation: '和好邀請',
+      guidance: '情緒指引',
+    };
+    const lineInvitePush = [
+      `💌 Twogether｜${req.user.nickname || '你的伴侶'} 傳來親密邀請`,
+      `類型：${INTIMACY_TYPE_LABELS[request_type] || request_type}${script_title ? `・劇本《${script_title}》` : ''}`,
+      message ? `「${lineService.excerpt(message)}」` : null,
+      '👉 https://twogether.fun',
+    ].filter(Boolean).join('\n');
+    lineService.pushToUserIfLinked(db, partnerId, lineInvitePush);
 
     // Send email notification to partner — honors the partner's "Email 通知"
     // switch (the in-app notification above is sent regardless).
@@ -1227,8 +1244,18 @@ router.put('/:id/respond', [
       // Don't fail the request if notification creation fails
     }
 
-    // Mirror to LINE (no-ops unless the sender linked + opted in).
-    lineService.pushToUserIfLinked(db, request.sender_id, `💌 Twogether\n對方回應了你的親密邀請\n👉 https://twogether.fun`);
+    // Mirror to LINE (no-ops unless the sender linked + opted in). Say HOW they
+    // responded and carry their message/alternative so the push tells the story.
+    const respLabel = normalizedStatus === 'accepted'
+      ? '接受了你的親密邀請 💚'
+      : (alternative_content ? '對你的親密邀請提出了替代方案' : '婉拒了你的親密邀請');
+    const lineResponsePush = [
+      `💌 Twogether｜對方${respLabel}`,
+      response_message ? `「${lineService.excerpt(response_message)}」` : null,
+      alternative_content ? `替代方案：${lineService.excerpt(alternative_content, 150)}` : null,
+      '👉 https://twogether.fun',
+    ].filter(Boolean).join('\n');
+    lineService.pushToUserIfLinked(db, request.sender_id, lineResponsePush);
 
     // Fire-and-forget email to the original sender. Honors per-user opt-out.
     try {

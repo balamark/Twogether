@@ -47,8 +47,13 @@ async function notifyPartner(partnerId, type, title, content, relatedUserId, opt
     logWarn('Failed to create notification', { type, err: err.message });
   }
 
-  // Mirror to LINE (no-ops unless the partner linked + opted in).
-  lineService.pushToUserIfLinked(db, partnerId, `🔔 Twogether\n${title}\n「${content.slice(0, 120)}」\n👉 https://twogether.fun`);
+  // Mirror to LINE (no-ops unless the partner linked + opted in). Carry the
+  // full post/reply text (excerpted) so the push alone tells the story.
+  lineService.pushToUserIfLinked(
+    db,
+    partnerId,
+    `💌 Twogether｜${title}\n「${lineService.excerpt(content)}」\n👉 https://twogether.fun`
+  );
 
   // Fire-and-forget email to the partner. Honors per-user opt-out.
   try {

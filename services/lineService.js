@@ -19,6 +19,15 @@ function isConfigured() {
   return !!(CHANNEL_ID && CHANNEL_SECRET);
 }
 
+// Push copy principle: the notification should carry as much of the actual
+// content as fits — the user should only need to open the app when the text
+// is longer than the excerpt.
+function excerpt(text, n = 300) {
+  const t = (text || '').toString().trim();
+  if (!t) return '';
+  return t.length > n ? `${t.slice(0, n)}……（打開 App 看完整內容）` : t;
+}
+
 // In-memory token cache. Tokens last 30 days; refresh a day early.
 let cachedToken = null;
 let cachedTokenExpiresAt = 0;
@@ -148,6 +157,7 @@ async function pushToUserIfLinked(db, userId, text) {
 
 module.exports = {
   isConfigured,
+  excerpt,
   getChannelAccessToken,
   verifySignature,
   pushMessage,

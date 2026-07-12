@@ -79,9 +79,24 @@ async function notify(userId, type, title, content, eventId, relatedUserId, prio
     logWarn('Event notification insert failed', { type, err: err.message });
   }
 
-  // Mirror to LINE (no-ops unless the recipient linked + opted in). The in-app
-  // notification title is a good short push body.
-  lineService.pushToUserIfLinked(db, userId, `🔔 Twogether\n${title}\n「${content}」\n👉 https://twogether.fun`);
+  // Mirror to LINE (no-ops unless the recipient linked + opted in). Carry the
+  // actual message content so the push alone tells the story; users only open
+  // the app when the text exceeds the excerpt.
+  const EVENT_PUSH_EMOJI = {
+    event_created: '📣',
+    event_reply: '💬',
+    event_ai_comment: '🧑‍⚕️',
+    event_resolve_request: '🤝',
+    event_resolved: '✅',
+    event_reopened: '🔄',
+  };
+  const linePush = [
+    `${EVENT_PUSH_EMOJI[type] || '🔔'} Twogether｜${title}`,
+    `事件：${content}`,
+    messageContent ? `「${lineService.excerpt(messageContent)}」` : null,
+    '👉 https://twogether.fun',
+  ].filter(Boolean).join('\n');
+  lineService.pushToUserIfLinked(db, userId, linePush);
 
   // Fire-and-forget email mirroring the in-app notification. Skips silently
   // when the recipient is opted out, unconfigured, or unreachable.
