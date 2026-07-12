@@ -186,6 +186,12 @@ On top of the existing changelog/promo/showroom/error-copy rules:
 - **Punctuation in AI-generated text: no em dashes（——、—、–）**; use colons,
   parentheses, or split the sentence. Implemented as `PUNCTUATION_RULE`
   appended to every system prompt in `services/llm/claudeProvider.js`.
+- **Notification tone (added 2026-07-12)**: notifications should feel like an
+  invitation to understand each other, never a signal that someone is being
+  blamed or reported. Prefer 分享 (share), 情境 (situation), 對話
+  (conversation), 一起 (together) over 事件 (incident), 回報 (report), 指責
+  (accuse), 提出問題 (raise a problem). E.g. 「伴侶分享了一個情境」✓ vs
+  「伴侶開啟了一個事件」✗. Applies to every channel: email, in-app, LINE push.
 
 ### R3 Navigation rules
 - Hard cap of 6 main tabs (currently 5). A seventh feature goes inside an

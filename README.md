@@ -40,6 +40,12 @@ adds a fragment file in `changelog/`; CI compiles them into the block below —
 see `CLAUDE.md`.)
 
 <!-- changelog:begin (generated from changelog/*.md — edit those, not this) -->
+### 2026-07-13
+- **通知語氣更溫柔：從「事件」到「情境」**: 通知文字全面調整——「伴侶開啟了一個事件」改為
+  「伴侶分享了一個情境」、「事件已解決」改為「你們一起走過了這個情境」、「希望標記為已解決」
+  改為「覺得可以一起劃下句點了」。通知是邀請彼此理解，不是誰被指控的訊號；Email、App 內
+  與 LINE 推播同步更新。
+
 ### 2026-07-12
 - **修正：親密天數兩處數字不一致**: 「關係之屋」顯示的「已經 N 天沒有親密了」與「記錄時光」
   下方的統計卡片，之前會差一天（一個算實際滿 24 小時、一個算跨過幾個日期）。現在兩處都以

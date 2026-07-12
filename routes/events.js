@@ -92,7 +92,7 @@ async function notify(userId, type, title, content, eventId, relatedUserId, prio
   };
   const linePush = [
     `${EVENT_PUSH_EMOJI[type] || '🔔'} Twogether｜${title}`,
-    `事件：${content}`,
+    `情境：${content}`,
     messageContent ? `「${lineService.excerpt(messageContent)}」` : null,
     '👉 https://twogether.fun',
   ].filter(Boolean).join('\n');
@@ -428,7 +428,9 @@ router.post(
         await notify(
           couple.partner_id,
           'event_created',
-          '伴侶開啟了一個事件',
+          // Tone guideline (playbook R2): an invitation to understand, not an
+          // incident report —「分享了一個情境」not「開啟了一個事件」.
+          '伴侶分享了一個情境',
           event.title,
           eventId,
           userId,
@@ -811,7 +813,7 @@ router.post(
       await notify(
         access.partnerId,
         'event_reply',
-        '伴侶在事件中回覆',
+        '伴侶回覆了你們的對話',
         access.event.title,
         req.params.id,
         req.user.id,
@@ -1100,7 +1102,7 @@ router.post(
       await notify(
         access.partnerId,
         'event_ai_comment',
-        `AI 諮商師 ${companion.name} 在事件中留言`,
+        `AI 諮商師 ${companion.name} 在對話中留言`,
         access.event.title,
         req.params.id,
         req.user.id,
@@ -1458,7 +1460,7 @@ router.post('/:id/resolve-request', [param('id').isUUID()], async (req, res) => 
     await notify(
       access.partnerId,
       'event_resolve_request',
-      '伴侶希望標記事件為已解決',
+      '伴侶覺得可以一起劃下句點了',
       access.event.title,
       req.params.id,
       req.user.id
@@ -1494,7 +1496,7 @@ router.post('/:id/resolve-confirm', [param('id').isUUID()], async (req, res) => 
     await notify(
       access.partnerId,
       'event_resolved',
-      '事件已解決',
+      '你們一起走過了這個情境',
       access.event.title,
       req.params.id,
       req.user.id
@@ -1535,7 +1537,8 @@ router.post('/:id/reopen', [param('id').isUUID()], async (req, res) => {
     await notify(
       access.partnerId,
       'event_reopened',
-      '伴侶重新開啟了一個事件',
+      // Tone guideline: 對話 over 事件.
+      '伴侶想繼續聊聊這個情境',
       access.event.title,
       req.params.id,
       req.user.id

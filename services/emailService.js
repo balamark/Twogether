@@ -761,14 +761,16 @@ ${acceptUrl}
     const aiLabel = aiName ? `AI 諮商師 ${aiName}` : 'AI 諮商師';
     const safeAiLabel = this._escape(aiLabel);
 
+    // Tone guideline (docs/UX_PLAYBOOK.md R2): notifications are invitations to
+    // understand, not incident reports — 分享/情境/對話 over 開啟/事件/回報.
     const meta = {
-      event_created:        { emoji: '📣', headline: '伴侶開啟了一個事件',         subject: `📣 ${senderName || '你的伴侶'} 開啟了一個事件` },
-      event_reply:          { emoji: '💬', headline: '伴侶在事件中回覆',           subject: `💬 ${senderName || '你的伴侶'} 在事件中回覆了` },
-      event_ai_comment:     { emoji: '🧑‍⚕️', headline: `${aiLabel}在事件中留言`,     subject: `🧑‍⚕️ ${aiLabel}在你們的事件中留言了` },
-      event_resolve_request:{ emoji: '🤝', headline: '伴侶希望標記事件為已解決',   subject: `🤝 ${senderName || '你的伴侶'} 希望標記事件為已解決` },
-      event_resolved:       { emoji: '✅', headline: '事件已解決',                  subject: `✅ 事件已解決` },
-      event_reopened:       { emoji: '🔄', headline: '伴侶重新開啟了一個事件',     subject: `🔄 ${senderName || '你的伴侶'} 重新開啟了一個事件` },
-    }[type] || { emoji: '🔔', headline: '事件更新', subject: '🔔 事件更新' };
+      event_created:        { emoji: '📣', headline: '伴侶分享了一個情境',         subject: `📣 ${senderName || '你的伴侶'} 分享了一個情境` },
+      event_reply:          { emoji: '💬', headline: '伴侶回覆了你們的對話',       subject: `💬 ${senderName || '你的伴侶'} 回覆了你們的對話` },
+      event_ai_comment:     { emoji: '🧑‍⚕️', headline: `${aiLabel}在對話中留言`,     subject: `🧑‍⚕️ ${aiLabel}在你們的對話中留言了` },
+      event_resolve_request:{ emoji: '🤝', headline: '伴侶覺得可以一起劃下句點了', subject: `🤝 ${senderName || '你的伴侶'} 覺得這個情境可以劃下句點了` },
+      event_resolved:       { emoji: '✅', headline: '你們一起走過了這個情境',     subject: `✅ 你們一起走過了這個情境` },
+      event_reopened:       { emoji: '🔄', headline: '伴侶想繼續聊聊這個情境',     subject: `🔄 ${senderName || '你的伴侶'} 想繼續聊聊這個情境` },
+    }[type] || { emoji: '🔔', headline: '有新的對話更新', subject: '🔔 有新的對話更新' };
 
     const labelSuffix = type === 'event_created' ? '想說的話' : '的回覆';
     const messageLabel = type === 'event_ai_comment' ? `${aiLabel}的留言` : `${senderName || '你的伴侶'} ${labelSuffix}`;
@@ -780,7 +782,7 @@ ${acceptUrl}
       ${safeMessage ? `
       <p>${safeMessageLabel}：</p>
       <div class="quote">${safeMessage.replace(/\n/g, '<br>')}</div>` : ''}
-      <p style="color: #636e72; font-size: 14px;">登入 Twogether 查看事件詳情。</p>
+      <p style="color: #636e72; font-size: 14px;">登入 Twogether 一起看看、聊聊。</p>
     `;
     const html = this._activityEmailHtml({
       headerEmoji: meta.emoji,
@@ -791,10 +793,10 @@ ${acceptUrl}
 
     const text = [
       `${meta.headline}`,
-      `事件：${eventTitle || '(無標題)'}`,
+      `情境：${eventTitle || '(無標題)'}`,
       ...(messageContent ? ['', `${messageLabel}：`, String(messageContent).slice(0, 600)] : []),
       '',
-      '打開 Twogether 查看事件詳情。',
+      '打開 Twogether 一起看看、聊聊。',
     ].join('\n');
 
     try {
