@@ -5,6 +5,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const emailService = require('../services/emailService');
+const lineService = require('../services/lineService');
 const characterMappingService = require('../services/characterMappingService');
 const llmService = require('../services/llmService');
 const { getCoupleIdForUser, getCoupleTier, getLimit, checkLimit } = require('../lib/entitlements');
@@ -384,6 +385,9 @@ router.post('/', [
       logWarn('Failed to create intimacy request notification', { err: notificationError.message });
       // Don't fail the request if notification creation fails
     }
+
+    // Mirror to LINE (no-ops unless the partner linked + opted in).
+    lineService.pushToUserIfLinked(db, partnerId, `💌 Twogether\n${req.user.nickname || '你的伴侶'} 傳來一個親密邀請\n👉 https://twogether.fun`);
 
     // Send email notification to partner — honors the partner's "Email 通知"
     // switch (the in-app notification above is sent regardless).
@@ -1222,6 +1226,9 @@ router.put('/:id/respond', [
       logWarn('Failed to create intimacy response notification', { err: notificationError.message });
       // Don't fail the request if notification creation fails
     }
+
+    // Mirror to LINE (no-ops unless the sender linked + opted in).
+    lineService.pushToUserIfLinked(db, request.sender_id, `💌 Twogether\n對方回應了你的親密邀請\n👉 https://twogether.fun`);
 
     // Fire-and-forget email to the original sender. Honors per-user opt-out.
     try {

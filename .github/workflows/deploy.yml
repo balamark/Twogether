@@ -176,6 +176,9 @@ jobs:
           _LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'claude' }}
           _ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           _ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          _LINE_CHANNEL_ID: ${{ secrets.LINE_CHANNEL_ID }}
+          _LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+          _LINE_OA_ADD_URL: ${{ vars.LINE_OA_ADD_URL }}
         run: |
           echo "🚀 Deploying Twogether app directly to App Engine..."
           # Create app.yaml with actual environment variables
@@ -310,6 +313,9 @@ jobs:
           _LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'claude' }}
           _ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           _ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          _LINE_CHANNEL_ID: ${{ secrets.LINE_CHANNEL_ID }}
+          _LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
+          _LINE_OA_ADD_URL: ${{ vars.LINE_OA_ADD_URL }}
         run: |
           echo "🚀 Deploying PR #${{ github.event.pull_request.number }} to staging..."
           envsubst < app.staging.yaml > app.staging.yaml.tmp && mv app.staging.yaml.tmp app.staging.yaml

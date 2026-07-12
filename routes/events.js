@@ -6,6 +6,7 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const llmService = require('../services/llmService');
 const emailService = require('../services/emailService');
+const lineService = require('../services/lineService');
 const { checkLimit } = require('../lib/entitlements');
 const { resolveCompanion } = require('../lib/aiCompanions');
 const { cardMeta, applyVerdict, scoreSession } = require('../lib/therapyCards');
@@ -77,6 +78,10 @@ async function notify(userId, type, title, content, eventId, relatedUserId, prio
   } catch (err) {
     logWarn('Event notification insert failed', { type, err: err.message });
   }
+
+  // Mirror to LINE (no-ops unless the recipient linked + opted in). The in-app
+  // notification title is a good short push body.
+  lineService.pushToUserIfLinked(db, userId, `🔔 Twogether\n${title}\n「${content}」\n👉 https://twogether.fun`);
 
   // Fire-and-forget email mirroring the in-app notification. Skips silently
   // when the recipient is opted out, unconfigured, or unreachable.

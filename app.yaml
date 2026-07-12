@@ -35,6 +35,12 @@ env_variables:
   # Admin funnel dashboard gate (/admin and /api/admin/*). Required to enable
   # the dashboard — middleware returns 503 when this is unset/empty.
   ADMIN_PASSWORD: $_ADMIN_PASSWORD
+  # LINE Messaging API: mirror in-app notifications to a user's LINE. The
+  # channel access token is minted from these at runtime (services/lineService).
+  LINE_CHANNEL_ID: $_LINE_CHANNEL_ID
+  LINE_CHANNEL_SECRET: $_LINE_CHANNEL_SECRET
+  # The official account's "add friend" deep link, shown in Settings.
+  LINE_OA_ADD_URL: $_LINE_OA_ADD_URL
 
 # Automatic scaling (free tier compatible)
 automatic_scaling:

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { User, Users, CheckCircle, Trash2 } from 'lucide-react';
 import { apiService, type CycleRecord } from '../services/api';
 import { AiCompanionList } from './AiCompanionPicker';
+import LineNotificationSettings from './LineNotificationSettings';
 import { resolveCompanion } from '../utils/aiCompanions';
 import { averageCycleLength, predictNextPeriodStart, ovulationWindow, computeCycleLengths } from '../utils/cycle';
 import { TIMEZONE_OPTIONS } from '../utils/timezone-options';
@@ -955,6 +956,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       </div>
 
       {/* AI Companion (諮商師) Selection */}
+      <LineNotificationSettings showNotification={showNotification} />
+
       <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6" data-testid="settings-ai-companion">
         <h3 className="text-lg font-bold text-gray-800 mb-1">AI 諮商師</h3>
         <p className="text-xs text-gray-500 mb-4">

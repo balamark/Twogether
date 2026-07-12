@@ -14,6 +14,7 @@ const { authenticateToken } = require('../middleware/auth');
 const { logDbError, errorResponseBody } = require('../lib/db-errors');
 const { logInfo, logWarn } = require('../lib/logger');
 const emailService = require('../services/emailService');
+const lineService = require('../services/lineService');
 
 const router = express.Router();
 router.use(authenticateToken);
@@ -67,6 +68,8 @@ async function notifyReminder(userId, type, title, content) {
   } catch (err) {
     logWarn('relationship reminder notification failed', { err: err.message, type });
   }
+  // Mirror to LINE (no-ops unless linked + opted in).
+  lineService.pushToUserIfLinked(db, userId, `🔔 Twogether\n${title}\n「${content}」\n👉 https://twogether.fun`);
 }
 
 // Returns true if a reminder of this kind hasn't been sent within the cooldown,

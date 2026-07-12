@@ -4,6 +4,7 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { logDbError, errorResponseBody } = require('../lib/db-errors');
 const emailService = require('../services/emailService');
+const lineService = require('../services/lineService');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 const llmService = require('../services/llmService');
 const { checkLimit } = require('../lib/entitlements');
@@ -45,6 +46,9 @@ async function notifyPartner(partnerId, type, title, content, relatedUserId, opt
   } catch (err) {
     logWarn('Failed to create notification', { type, err: err.message });
   }
+
+  // Mirror to LINE (no-ops unless the partner linked + opted in).
+  lineService.pushToUserIfLinked(db, partnerId, `🔔 Twogether\n${title}\n「${content.slice(0, 120)}」\n👉 https://twogether.fun`);
 
   // Fire-and-forget email to the partner. Honors per-user opt-out.
   try {

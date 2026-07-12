@@ -2131,6 +2131,34 @@ class ApiService {
     }
   }
 
+  // --- LINE 通知整合 ---
+  async getLineStatus(): Promise<{ configured: boolean; linked: boolean; notificationsEnabled: boolean }> {
+    const res = await apiClient.get('/line/status');
+    console.info('[LINE] status', res.data);
+    return res.data;
+  }
+
+  async requestLineLinkCode(): Promise<{ code: string; ttlMinutes: number; addFriendUrl: string }> {
+    try {
+      const res = await apiClient.post('/line/link-code');
+      console.info('[LINE] link code issued', { ttlMinutes: res.data.ttlMinutes });
+      return res.data;
+    } catch (error: unknown) {
+      console.error('[LINE] link code failed', error);
+      throw new Error((error as ApiErrorResponse)?.message || '無法產生綁定碼，請稍後再試');
+    }
+  }
+
+  async setLineNotifications(enabled: boolean): Promise<void> {
+    await apiClient.put('/line/notifications', { enabled });
+    console.info('[LINE] notifications toggled', { enabled });
+  }
+
+  async unlinkLine(): Promise<void> {
+    await apiClient.post('/line/unlink');
+    console.info('[LINE] unlinked');
+  }
+
   async updateUserBirthDate(birthDate: string | null): Promise<void> {
     try {
       await apiClient.put('/auth/user/birth-date', { birth_date: birthDate });
