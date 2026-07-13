@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Send, Sparkles, RefreshCw, X } from 'lucide-react';
+import { Send, Sparkles, RefreshCw, X, HelpCircle } from 'lucide-react';
 import apiService from '../services/api';
 import type { NudgeSuggestion } from '../services/api';
 import type { Notification } from '../App';
@@ -852,6 +852,73 @@ function weeklyRecommendationForAge(age: number): string | null {
   return '約 1';
 }
 
+// On-demand health reference. Previously an always-on banner; now a (?) popover
+// so it's available when curious without feeling clinical on every visit. Models
+// the InfoHint pattern (button + absolute popover, close on outside mousedown).
+function HealthReferenceHint({
+  recommendation,
+  hasBirthDate,
+  onOpenSettings,
+}: {
+  recommendation: string | null;
+  hasBirthDate: boolean;
+  onOpenSettings?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [open]);
+
+  return (
+    <div className="relative inline-flex" ref={ref}>
+      <button
+        type="button"
+        aria-label="健康參考"
+        data-testid="health-reference-hint"
+        onClick={() => setOpen((o) => !o)}
+        className="p-1 rounded-full text-petal-muted hover:text-petal-rose-deep transition"
+      >
+        <HelpCircle className="w-4 h-4" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-30 w-72 bg-white border border-petal-rule rounded-xl shadow-petal p-3 text-left">
+          {recommendation ? (
+            <p className="text-sm text-petal-ink leading-relaxed">
+              健康參考：建議每週 <span className="font-semibold">{recommendation}</span> 次
+              <span className="text-xs text-petal-muted">（一般參考，非醫療建議）</span>
+            </p>
+          ) : (
+            <p className="text-sm text-petal-ink leading-relaxed">規律親密對身心都有好處。</p>
+          )}
+          <ul className="mt-2 ml-4 list-disc space-y-1 text-xs text-petal-ink/80">
+            <li>降低壓力與焦慮：促進腦內啡、催產素分泌，降低壓力荷爾蒙皮質醇。</li>
+            <li>改善睡眠：高潮後的催乳素與催產素有助於更深層的睡眠。</li>
+            <li>免疫支持：研究指出每週 1–2 次與較高的免疫球蛋白 A（IgA）有關。</li>
+            <li>心血管健康：屬於輕至中等強度的身體活動，對心臟有益。</li>
+          </ul>
+          {!hasBirthDate && onOpenSettings && (
+            <button
+              type="button"
+              onClick={() => { setOpen(false); onOpenSettings(); }}
+              data-testid="stats-birthday-prompt"
+              className="mt-2 block w-full text-left font-body text-xs text-petal-rose-deep hover:text-petal-ink underline decoration-dotted"
+            >
+              新增生日以獲得依年齡的健康參考建議 →
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function IntimacyStatsCards({ records, birthDate, onOpenSettings, onNudgePartner, partnerConnected, showNotification }: IntimacyStatsCardsProps) {
   const derived = useMemo(() => {
     if (!records || records.length === 0) {
@@ -897,37 +964,18 @@ export function IntimacyStatsCards({ records, birthDate, onOpenSettings, onNudge
 
   return (
     <div className="space-y-3">
-      {/* Age-based health-reference nudge */}
-      {recommendation && (
-        <div className="bg-petal-rose-soft/20 border border-petal-rose-soft rounded-md p-4">
-          <div className="flex items-baseline flex-wrap gap-x-2">
-            <span className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-rose-deep">健康參考</span>
-            <span className="font-display italic text-petal-ink">
-              建議每週 <em className="not-italic font-semibold">{recommendation}</em> 次
-            </span>
-            <span className="font-body text-xs text-petal-muted">（一般參考，非醫療建議）</span>
-          </div>
-          <details className="mt-2 text-xs text-petal-muted">
-            <summary className="cursor-pointer hover:text-petal-ink">了解規律親密的好處</summary>
-            <ul className="mt-2 ml-4 list-disc space-y-1 text-petal-ink/80">
-              <li>降低壓力與焦慮：促進腦內啡、催產素分泌，降低壓力荷爾蒙皮質醇。</li>
-              <li>改善睡眠：高潮後的催乳素與催產素有助於更深層的睡眠。</li>
-              <li>免疫支持：研究指出每週 1–2 次與較高的免疫球蛋白 A（IgA）有關。</li>
-              <li>心血管健康：屬於輕至中等強度的身體活動，對心臟有益。</li>
-            </ul>
-          </details>
-        </div>
-      )}
-      {!birthDate && onOpenSettings && (
-        <button
-          type="button"
-          onClick={onOpenSettings}
-          data-testid="stats-birthday-prompt"
-          className="block w-full text-left font-body text-xs text-petal-muted hover:text-petal-ink underline decoration-dotted"
-        >
-          新增生日以獲得依年齡的健康參考建議 →
-        </button>
-      )}
+      {/* Section label with an on-demand health-reference (?) hint (replaces the
+          old always-on banner). */}
+      <div className="flex items-center justify-between">
+        <span className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted">
+          近況節奏
+        </span>
+        <HealthReferenceHint
+          recommendation={recommendation}
+          hasBirthDate={!!birthDate}
+          onOpenSettings={onOpenSettings}
+        />
+      </div>
 
       {/* Recent / actionable metrics */}
       <div className={`grid grid-cols-2 ${showWeeklyAvg ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-3 sm:gap-4`}>
