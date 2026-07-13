@@ -185,9 +185,17 @@ const CalendarMock: React.FC = () => {
 
   return (
     <div className="bg-petal-cream border border-petal-rule rounded-md p-4">
-      <div className="flex items-center justify-between mb-3">
-        <span className="font-display italic text-base text-petal-ink">六月</span>
-        <SampleTag />
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <span className="font-display italic text-base text-petal-ink">你們的節奏</span>
+          <p className="font-body text-[11px] text-petal-muted mt-0.5">點月曆任一天新增或查看紀錄</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-petal-ink text-petal-cream rounded-md font-display italic text-xs">
+            ＋ 記錄今天
+          </span>
+          <SampleTag />
+        </div>
       </div>
       <div className="grid grid-cols-7 gap-y-1.5 text-center">
         {['日', '一', '二', '三', '四', '五', '六'].map((d) => (
@@ -486,9 +494,11 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       '看見你們的節奏：親密時光與生理期都在一張月曆上。太久沒親密時，App 會溫柔提醒另一半多關心你。',
     sample: (
       <>
-        <SampleStats />
-        <SampleRecordList />
         <CalendarMock />
+        <div className="mt-4">
+          <SampleStats />
+        </div>
+        <SampleRecordList />
       </>
     ),
   },
