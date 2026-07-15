@@ -10,6 +10,13 @@ const llmService = require('../services/llmService');
 const { checkLimit } = require('../lib/entitlements');
 const { resolveCompanion } = require('../lib/aiCompanions');
 const { resolveAiLimit, countTodayAiUsage, recordAiUsage } = require('../lib/aiUsage');
+const {
+  uploadMedia,
+  checkMediaSizes,
+  normalizeUrlList,
+  createMediaMulter,
+  wrapMulterErrors,
+} = require('../lib/media-upload');
 
 const router = express.Router();
 
@@ -18,6 +25,55 @@ const WALL_MOOD_TAGS = [
   '想念你', '需要空間', '想被抱抱', '想溝通',
   '感謝', '撒嬌', '開心', '難過', '有想法',
 ];
+
+// A wall post may carry up to this many photos/videos. Kept in sync with
+// WALL_MAX_MEDIA in src/components/WallPostComposer.tsx.
+const WALL_MAX_MEDIA = 4;
+
+// Multipart middleware for the `media[]` field (photos/videos). Errors become
+// actionable JSON with a wall-specific error_code. A no-op for JSON requests.
+const wallMediaUpload = wrapMulterErrors(
+  createMediaMulter({ maxFiles: WALL_MAX_MEDIA }).array('media', WALL_MAX_MEDIA),
+  { tooLargeCode: 'WALL_MEDIA_TOO_LARGE', invalidCode: 'WALL_MEDIA_INVALID' }
+);
+
+// Upload one wall media file (image or video) → public Supabase URL.
+function uploadWallMedia(file) {
+  return uploadMedia(file, { imagePrefix: 'wall-photos/', videoPrefix: 'wall-videos/' });
+}
+
+// Fetch ordered media URLs for a set of post ids → { postId: [url, ...] }.
+// Degrades to no media (rather than failing the list) if the table isn't
+// present yet, e.g. a pre-migration environment.
+async function fetchMediaForPosts(postIds) {
+  const map = {};
+  if (!postIds.length) return map;
+  try {
+    const result = await db.query(
+      `SELECT post_id, url FROM wall_post_media
+        WHERE post_id = ANY($1::uuid[])
+        ORDER BY post_id, sort_order, created_at`,
+      [postIds]
+    );
+    for (const row of result.rows) {
+      (map[row.post_id] = map[row.post_id] || []).push(row.url);
+    }
+  } catch (err) {
+    logWarn('fetchMediaForPosts failed', { err: err.message });
+  }
+  return map;
+}
+
+// Replace a post's media rows with `urls` (already ordered).
+async function replaceWallMedia(postId, urls) {
+  await db.query('DELETE FROM wall_post_media WHERE post_id = $1', [postId]);
+  for (let i = 0; i < urls.length; i++) {
+    await db.query(
+      'INSERT INTO wall_post_media (post_id, url, sort_order) VALUES ($1, $2, $3)',
+      [postId, urls[i], i]
+    );
+  }
+}
 
 router.use(authenticateToken);
 
@@ -85,6 +141,7 @@ function mapPost(row) {
     author_id: row.author_id,
     author_nickname: row.author_nickname,
     reply_count: Number(row.reply_count || 0),
+    media: Array.isArray(row.media) ? row.media : [],
     public_status: row.public_status || 'private',
     public_title: row.public_title || null,
     translation_enabled: row.translation_enabled === true,
@@ -141,9 +198,13 @@ router.get('/', async (req, res) => {
       [couple.id]
     );
 
+    const mediaByPost = await fetchMediaForPosts(result.rows.map((r) => r.id));
+
     res.json({
       success: true,
-      wall_posts: result.rows.map(mapPost),
+      wall_posts: result.rows.map((row) =>
+        mapPost({ ...row, media: mediaByPost[row.id] || [] })
+      ),
     });
   } catch (error) {
     logDbError('Get wall posts error:', error, { user_id: req.user?.id });
@@ -151,14 +212,18 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Create a new post and notify the partner.
+// Create a new post and notify the partner. Accepts multipart (with a `media[]`
+// series of up to 4 photos/videos) or plain JSON; multer is a no-op for JSON.
+// A post may be text-only, media-only, or both — but not entirely empty.
 router.post(
   '/',
+  wallMediaUpload,
   [
     body('content')
+      .optional({ nullable: true })
       .isString()
-      .isLength({ min: 1, max: 2000 })
-      .withMessage('內容必須在 1-2000 字之間'),
+      .isLength({ max: 2000 })
+      .withMessage('內容不能超過 2000 字'),
     body('mood_tag')
       .optional({ nullable: true })
       .custom((val) => val === null || val === '' || WALL_MOOD_TAGS.includes(val))
@@ -188,9 +253,41 @@ router.post(
         });
       }
 
-      const content = req.body.content;
+      const content = (req.body.content || '').trim();
       const moodTag = req.body.mood_tag || null;
       const category = req.body.category || 'general';
+      const mediaFiles = req.files || [];
+
+      // A post needs either text or at least one photo/video — a specific,
+      // actionable reason instead of a generic validation failure.
+      if (!content && mediaFiles.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: '請輸入內容，或至少上傳一張照片或影片',
+          error_code: 'WALL_POST_EMPTY',
+        });
+      }
+
+      // Per-type size cap (image 5MB / video 20MB) with a specific message.
+      const oversize = checkMediaSizes(mediaFiles, { tooLargeCode: 'WALL_MEDIA_TOO_LARGE' });
+      if (oversize) {
+        logWarn('wall.post.media_too_large', { userId, coupleId: couple.id, blocked: true });
+        return res.status(oversize.status).json(oversize.body);
+      }
+
+      logInfo('wall.post.create.attempt', {
+        userId,
+        coupleId: couple.id,
+        mediaCount: mediaFiles.length,
+        contentLen: content.length,
+      });
+
+      // Upload media (in submitted order) before inserting the post so a failed
+      // upload doesn't leave a half-formed post behind.
+      const mediaUrls = [];
+      for (const file of mediaFiles) {
+        mediaUrls.push(await uploadWallMedia(file));
+      }
 
       const inserted = await db.query(
         `INSERT INTO wall_posts (couple_id, author_id, content, mood_tag, category)
@@ -201,15 +298,29 @@ router.post(
 
       const post = inserted.rows[0];
 
+      if (mediaUrls.length > 0) {
+        await replaceWallMedia(post.id, mediaUrls);
+      }
+
       // Hydrate with author nickname for client.
       const enriched = await db.query(
         `SELECT u.nickname AS author_nickname FROM users u WHERE u.id = $1`,
         [userId]
       );
 
+      logInfo('wall.post.create.success', {
+        userId,
+        coupleId: couple.id,
+        postId: post.id,
+        mediaCount: mediaUrls.length,
+      });
+
+      // Media-only posts have no text to preview — describe the attachment so the
+      // partner's notification still tells the story.
+      const notifyBody = content || `傳送了 ${mediaUrls.length} 個照片／影片`;
       const partnerId = partnerOf(couple, userId);
       const title = category === 'important' ? '對方留下了重要的話 ⭐' : '對方在牆上留言';
-      await notifyPartner(partnerId, 'wall_post', title, content, userId, {
+      await notifyPartner(partnerId, 'wall_post', title, notifyBody, userId, {
         isImportant: category === 'important',
         senderName: enriched.rows[0]?.author_nickname || null,
       });
@@ -221,6 +332,7 @@ router.post(
           ...post,
           author_nickname: enriched.rows[0]?.author_nickname || null,
           reply_count: 0,
+          media: mediaUrls,
         }),
       });
     } catch (error) {
@@ -230,15 +342,19 @@ router.post(
   }
 );
 
-// Edit own post.
+// Edit own post. Accepts multipart (with new `media[]` files and/or an
+// `existingMedia` JSON list of kept URLs) or plain JSON. Media is only rebuilt
+// when the request carries `existingMedia` or new files; otherwise it's left
+// untouched, mirroring the custom-script updater.
 router.put(
   '/:id',
+  wallMediaUpload,
   [
     body('content')
       .optional()
       .isString()
-      .isLength({ min: 1, max: 2000 })
-      .withMessage('內容必須在 1-2000 字之間'),
+      .isLength({ max: 2000 })
+      .withMessage('內容不能超過 2000 字'),
     body('mood_tag')
       .optional({ nullable: true })
       .custom((val) => val === null || val === '' || WALL_MOOD_TAGS.includes(val))
@@ -263,7 +379,7 @@ router.put(
       const userId = req.user.id;
 
       const existing = await db.query(
-        `SELECT id FROM wall_posts WHERE id = $1 AND author_id = $2`,
+        `SELECT id, content FROM wall_posts WHERE id = $1 AND author_id = $2`,
         [postId, userId]
       );
 
@@ -274,13 +390,54 @@ router.put(
         });
       }
 
+      const newFiles = req.files || [];
+      const mediaChanged = req.body.existingMedia !== undefined || newFiles.length > 0;
+
+      // Per-type size cap on any newly uploaded files.
+      const oversize = checkMediaSizes(newFiles, { tooLargeCode: 'WALL_MEDIA_TOO_LARGE' });
+      if (oversize) {
+        logWarn('wall.post.media_too_large', { userId, postId, blocked: true });
+        return res.status(oversize.status).json(oversize.body);
+      }
+
+      // Work out the final media set (kept URLs first, then new uploads) so we
+      // can enforce the per-post cap and the not-entirely-empty rule.
+      const keptUrls = normalizeUrlList(req.body.existingMedia);
+      if (mediaChanged && keptUrls.length + newFiles.length > WALL_MAX_MEDIA) {
+        return res.status(400).json({
+          success: false,
+          message: `每則貼文最多只能上傳 ${WALL_MAX_MEDIA} 張照片或影片`,
+          error_code: 'WALL_MEDIA_LIMIT',
+        });
+      }
+
+      // Resolve what content and media the post will have AFTER this update, to
+      // block an edit that would leave the post entirely empty.
+      const finalContent =
+        req.body.content !== undefined
+          ? (req.body.content || '').trim()
+          : (existing.rows[0].content || '').trim();
+      const currentMediaCount = mediaChanged
+        ? 0
+        : ((await fetchMediaForPosts([postId]))[postId] || []).length;
+      const finalMediaCount = mediaChanged
+        ? keptUrls.length + newFiles.length
+        : currentMediaCount;
+      if (!finalContent && finalMediaCount === 0) {
+        return res.status(400).json({
+          success: false,
+          message: '請輸入內容，或至少保留一張照片或影片',
+          error_code: 'WALL_POST_EMPTY',
+        });
+      }
+
       const fields = [];
       const values = [];
       let i = 1;
 
       if (req.body.content !== undefined) {
         fields.push(`content = $${i++}`);
-        values.push(req.body.content);
+        values.push((req.body.content || '').trim());
       }
       if (req.body.mood_tag !== undefined) {
         fields.push(`mood_tag = $${i++}`);
@@ -291,11 +448,23 @@ router.put(
         values.push(req.body.category);
       }
 
+      // Rebuild media when requested. Upload new files, then persist kept URLs
+      // (in order) followed by the new uploads.
+      let finalMedia = null;
+      if (mediaChanged) {
+        const newUrls = [];
+        for (const file of newFiles) {
+          newUrls.push(await uploadWallMedia(file));
+        }
+        finalMedia = [...keptUrls, ...newUrls];
+        await replaceWallMedia(postId, finalMedia);
+        logInfo('wall.post.update.media', { userId, postId, mediaCount: finalMedia.length });
+      }
+
+      // If only media changed (no scalar fields), still touch the row so
+      // updated_at advances and we can return the fresh post.
       if (fields.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: '沒有提供有效的更新欄位',
-        });
+        fields.push(`updated_at = NOW()`);
       }
 
       values.push(postId);
@@ -315,6 +484,11 @@ router.put(
         [postId, userId]
       );
 
+      // Return the current media so the client can update the card in place.
+      const media = finalMedia !== null
+        ? finalMedia
+        : ((await fetchMediaForPosts([postId]))[postId] || []);
+
       res.json({
         success: true,
         message: '貼文更新成功',
@@ -322,6 +496,7 @@ router.put(
           ...post,
           author_nickname: enriched.rows[0]?.author_nickname || null,
           reply_count: enriched.rows[0]?.reply_count || 0,
+          media,
         }),
       });
     } catch (error) {

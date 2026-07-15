@@ -577,6 +577,22 @@ const PREVIEWS: Record<string, PreviewConfig> = {
             </div>
           </div>
         </SampleCard>
+        <SampleCard>
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <span className="font-body text-xs text-petal-ink">小宇</span>
+            <span className="font-body text-[11px] text-petal-muted">· 開心</span>
+            <SampleTag />
+          </div>
+          <p className="font-body text-sm text-petal-ink">今天的約會超棒，留張合照 📷</p>
+          <div className="mt-2 w-full aspect-video rounded-md border border-petal-rule bg-petal-cream-2 overflow-hidden">
+            <img
+              src="/images/roleplay/reunion-love.png"
+              alt="範例貼文照片"
+              loading="lazy"
+              className="w-full h-full object-contain"
+            />
+          </div>
+        </SampleCard>
       </div>
     ),
   },
