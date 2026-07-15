@@ -1374,9 +1374,10 @@ router.put(
   }
 );
 
-// Share an event thread into the public 公開問答 (anonymised, read-only). Either
-// partner can publish their couple's event; a single-party toggle with an
-// in-app warning on the client. Private events can't be shared (no shared thread).
+// Share an event thread into the public 公開問答 (anonymised, read-only). For a
+// shared (couple) event either partner can publish; a private (solo) event can
+// be shared too, but only by its author — the partner can't see it. The public
+// thread anonymises everyone and, for a private event, simply shows the summary.
 router.post(
   '/:id/publish',
   [param('id').isUUID(), body('title').optional().isString().isLength({ max: 200 })],
@@ -1385,8 +1386,12 @@ router.post(
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
       if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
-      if (access.event.is_private) {
-        return res.status(400).json({ success: false, message: '私人對話無法公開分享' });
+      if (access.event.is_private && access.event.created_by !== req.user.id) {
+        return res.status(403).json({
+          success: false,
+          error_code: 'PRIVATE_EVENT_NOT_AUTHOR',
+          message: '這是對方的私人對話，只有建立者可以決定要不要公開。',
+        });
       }
       const title = (req.body.title && req.body.title.trim()) || access.event.title;
       const result = await db.query(
@@ -1416,6 +1421,13 @@ router.post('/:id/unpublish', [param('id').isUUID()], async (req, res) => {
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
     if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
+    if (access.event.is_private && access.event.created_by !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        error_code: 'PRIVATE_EVENT_NOT_AUTHOR',
+        message: '這是對方的私人對話，只有建立者可以取消公開。',
+      });
+    }
     const result = await db.query(
       `UPDATE events
           SET public_status = 'private', published_at = NULL
