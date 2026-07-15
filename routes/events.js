@@ -1374,10 +1374,62 @@ router.put(
   }
 );
 
-// Share an event thread into the public 公開問答 (anonymised, read-only). For a
-// shared (couple) event either partner can publish; a private (solo) event can
-// be shared too, but only by its author — the partner can't see it. The public
-// thread anonymises everyone and, for a private event, simply shows the summary.
+// Turn a private (solo) conversation into a shared one so the partner can see
+// it. Only the author can do this, and it's one-way — once the partner can see
+// it there's no taking it back. This is the first step of the two-stage share
+// flow: private → shared (partner sees it) → optionally 匿名公開到公開問答.
+router.post('/:id/share-with-partner', [param('id').isUUID()], async (req, res) => {
+  if (sendValidationError(req, res)) return;
+  try {
+    const access = await assertEventAccess(req.params.id, req.user.id);
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
+    if (!access.event.is_private) {
+      return res.status(400).json({
+        success: false,
+        error_code: 'ALREADY_SHARED',
+        message: '這段對話伴侶已經看得到了。',
+      });
+    }
+    if (access.event.created_by !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        error_code: 'PRIVATE_EVENT_NOT_AUTHOR',
+        message: '這是對方的私人對話，只有建立者可以決定要不要讓你看得到。',
+      });
+    }
+    const result = await db.query(
+      `UPDATE events SET is_private = FALSE, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [req.params.id]
+    );
+    const event = result.rows[0];
+    // Let the partner know, mirroring a freshly-shared event's invitation tone.
+    await notify(
+      access.partnerId,
+      'event_created',
+      '伴侶分享了一個情境',
+      event.title,
+      event.id,
+      req.user.id,
+      2,
+      event.summary
+    );
+    logInfo('events.shared_with_partner', { userId: req.user.id, eventId: req.params.id });
+    res.json({
+      success: true,
+      message: '已讓伴侶看得到這段對話，你們可以一起討論了。',
+      event: serializeEvent(event),
+    });
+  } catch (err) {
+    logError('Share event with partner failed', { err: err.message, stack: err.stack, eventId: req.params.id });
+    res.status(500).json({ success: false, message: '分享失敗，請稍後再試' });
+  }
+});
+
+// Share an event thread into the public 公開問答 (anonymised, read-only). Either
+// partner can publish their couple's event; a single-party toggle with an
+// in-app warning on the client. A private (solo) event must first be shared
+// with the partner (POST /:id/share-with-partner) before it can be published —
+// the public thread anonymises both participants, so it needs a shared thread.
 router.post(
   '/:id/publish',
   [param('id').isUUID(), body('title').optional().isString().isLength({ max: 200 })],
@@ -1386,11 +1438,11 @@ router.post(
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
       if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
-      if (access.event.is_private && access.event.created_by !== req.user.id) {
-        return res.status(403).json({
+      if (access.event.is_private) {
+        return res.status(400).json({
           success: false,
-          error_code: 'PRIVATE_EVENT_NOT_AUTHOR',
-          message: '這是對方的私人對話，只有建立者可以決定要不要公開。',
+          error_code: 'PRIVATE_EVENT',
+          message: '請先讓伴侶看得到這段對話，才能匿名公開到公開問答。',
         });
       }
       const title = (req.body.title && req.body.title.trim()) || access.event.title;
@@ -1421,13 +1473,6 @@ router.post('/:id/unpublish', [param('id').isUUID()], async (req, res) => {
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
     if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
-    if (access.event.is_private && access.event.created_by !== req.user.id) {
-      return res.status(403).json({
-        success: false,
-        error_code: 'PRIVATE_EVENT_NOT_AUTHOR',
-        message: '這是對方的私人對話，只有建立者可以取消公開。',
-      });
-    }
     const result = await db.query(
       `UPDATE events
           SET public_status = 'private', published_at = NULL

@@ -11,6 +11,7 @@ import {
   HeartHandshake,
   HandHeart,
   Globe,
+  Users,
   RotateCcw,
   X,
   Pencil,
@@ -108,6 +109,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const [aiPreview, setAiPreview] = useState<string | null>(null);
   const [shareWarnOpen, setShareWarnOpen] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [sharePartnerOpen, setSharePartnerOpen] = useState(false);
+  const [sharingPartner, setSharingPartner] = useState(false);
   // Post-send editing: creator edits title/summary; each side edits own messages.
   const [editingHeader, setEditingHeader] = useState(false);
   const [headerTitle, setHeaderTitle] = useState('');
@@ -550,6 +553,30 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     }
   };
 
+  // Step 1 of sharing: turn a private (solo) conversation into a shared one so
+  // the partner can see it. One-way; after this the 公開問答 control appears.
+  const confirmShareWithPartner = async () => {
+    setSharingPartner(true);
+    try {
+      const updated = await apiService.shareEventWithPartner(eventId);
+      setEvent((prev) => (prev ? { ...prev, isPrivate: updated.isPrivate } : prev));
+      setSharePartnerOpen(false);
+      showNotification({
+        type: 'success',
+        title: '已分享給伴侶',
+        message: '伴侶現在看得到這段對話，你們可以一起討論了。',
+      });
+    } catch (err) {
+      showNotification({
+        type: 'error',
+        title: '分享失敗',
+        message: err instanceof Error ? err.message : '請稍後再試',
+      });
+    } finally {
+      setSharingPartner(false);
+    }
+  };
+
   const unshare = async () => {
     setSharing(true);
     try {
@@ -728,10 +755,29 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           ))}
         </div>
 
-        {/* Share to 公開問答 (anonymised, single-party toggle with warning).
-            Shared events can be published by either partner; a private (solo)
-            conversation can be shared too, but only by its author. */}
-        {(!event.isPrivate || isAuthor) && (
+        {/* Private (solo) conversation → let the partner see it (step 1 of the
+            two-stage share flow). Author-only, one-way. Once shared, the 公開問答
+            control below appears. */}
+        {event.isPrivate && isAuthor && (
+          <div className="mt-4 pt-3 border-t border-petal-rule space-y-1.5">
+            <button
+              type="button"
+              data-testid="event-share-partner-button"
+              onClick={() => setSharePartnerOpen(true)}
+              className="text-xs px-3 py-1.5 rounded-full border border-petal-rose text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink inline-flex items-center gap-1.5"
+            >
+              <Users className="w-3.5 h-3.5" />
+              讓伴侶也看得到
+            </button>
+            <p className="text-[11px] text-petal-muted leading-relaxed">
+              這段對話目前只有你看得到。讓伴侶看得到後，你們就能一起討論；之後也能選擇匿名公開到「公開問答」。
+            </p>
+          </div>
+        )}
+
+        {/* Share to 公開問答 (anonymised, single-party toggle with warning). Only
+            for shared events — a private one must be shared with the partner first. */}
+        {!event.isPrivate && (
           <div className="mt-4 pt-3 border-t border-petal-rule">
             {event.publicStatus === 'published' ? (
               <div className="flex items-center justify-between gap-2">
@@ -750,22 +796,15 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 </button>
               </div>
             ) : (
-              <div className="space-y-1.5">
-                <button
-                  type="button"
-                  data-testid="event-share-button"
-                  onClick={() => setShareWarnOpen(true)}
-                  className="text-xs px-3 py-1.5 rounded-full border border-petal-sage text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink inline-flex items-center gap-1.5"
-                >
-                  <Globe className="w-3.5 h-3.5" />
-                  匿名公開到公開問答
-                </button>
-                {event.isPrivate && (
-                  <p className="text-[11px] text-petal-muted leading-relaxed">
-                    這是只有你看得到的私人對話。公開後會以匿名方式分享到「公開問答」幫助其他人，你隨時可以取消公開。
-                  </p>
-                )}
-              </div>
+              <button
+                type="button"
+                data-testid="event-share-button"
+                onClick={() => setShareWarnOpen(true)}
+                className="text-xs px-3 py-1.5 rounded-full border border-petal-sage text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink inline-flex items-center gap-1.5"
+              >
+                <Globe className="w-3.5 h-3.5" />
+                匿名公開到公開問答
+              </button>
             )}
           </div>
         )}
@@ -1101,9 +1140,16 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       {shareWarnOpen && (
         <ShareWarning
           busy={sharing}
-          isPrivate={event.isPrivate}
           onConfirm={confirmShare}
           onCancel={() => setShareWarnOpen(false)}
+        />
+      )}
+
+      {sharePartnerOpen && (
+        <ShareWithPartnerWarning
+          busy={sharingPartner}
+          onConfirm={confirmShareWithPartner}
+          onCancel={() => setSharePartnerOpen(false)}
         />
       )}
 
@@ -1280,14 +1326,60 @@ function AiCounselorPreview({
   );
 }
 
-function ShareWarning({
+function ShareWithPartnerWarning({
   busy,
-  isPrivate,
   onConfirm,
   onCancel,
 }: {
   busy: boolean;
-  isPrivate?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  useScrollLock(true);
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-testid="event-share-partner-warning">
+      <div className="bg-petal-cream rounded-2xl max-w-md w-full p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Users className="w-5 h-5 text-petal-rose-deep" />
+          <h3 className="text-lg font-serif text-petal-ink">讓伴侶也看得到</h3>
+        </div>
+        <p className="text-sm text-petal-ink-soft leading-relaxed mb-2">
+          目前這段對話<span className="text-petal-ink font-medium">只有你看得到</span>。
+          分享後，<span className="text-petal-ink font-medium">伴侶會看到標題與內容</span>，你們就能一起討論這件事。
+        </p>
+        <p className="text-sm text-petal-ink-soft leading-relaxed mb-4">
+          這個動作<span className="text-petal-ink font-medium">無法復原</span>——伴侶看過就收不回了。日後如果想幫助其他人，還能再選擇匿名公開到「公開問答」。
+        </p>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-sm px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20"
+          >
+            先不要
+          </button>
+          <button
+            type="button"
+            data-testid="event-share-partner-confirm"
+            onClick={onConfirm}
+            disabled={busy}
+            className="text-sm px-4 py-2 rounded-full bg-petal-ink text-petal-cream inline-flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+            確定分享給伴侶
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ShareWarning({
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  busy: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -1299,19 +1391,12 @@ function ShareWarning({
           <Globe className="w-5 h-5 text-petal-rose-deep" />
           <h3 className="text-lg font-serif text-petal-ink">公開到「公開問答」</h3>
         </div>
-        {isPrivate && (
-          <p className="text-sm text-petal-ink-soft leading-relaxed mb-2">
-            這原本是<span className="text-petal-ink font-medium">只有你看得到的私人對話</span>。
-          </p>
-        )}
         <p className="text-sm text-petal-ink-soft leading-relaxed mb-2">
           公開後，這段對話會<span className="text-petal-ink font-medium">匿名</span>顯示在「公開問答」，
           <span className="text-petal-ink font-medium">所有人（包含未登入的訪客）都看得到</span>。
         </p>
         <p className="text-sm text-petal-ink-soft leading-relaxed mb-4">
-          {isPrivate
-            ? '你會顯示為「匿名」，不會出現名字。你隨時可以取消公開。'
-            : '你們會顯示為「匿名 A / 匿名 B」，不會出現名字。你隨時可以取消公開。'}
+          你們會顯示為「匿名 A / 匿名 B」，不會出現名字。你隨時可以取消公開。
         </p>
         <div className="flex justify-end gap-2">
           <button

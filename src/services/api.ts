@@ -3923,6 +3923,18 @@ class ApiService {
     }
   }
 
+  // Turn a private (solo) conversation into a shared one so the partner can see
+  // it — step 1 of the two-stage share flow (private → shared → 公開問答).
+  async shareEventWithPartner(eventId: string): Promise<EventRecord> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/share-with-partner`);
+      return this.transformEvent(response.data.event);
+    } catch (error: unknown) {
+      console.error('Failed to share event with partner:', error);
+      this.throwApiError(error, '分享失敗，請稍後再試');
+    }
+  }
+
   // Share / un-share a conflict event into 公開問答.
   async publishEvent(eventId: string, title?: string): Promise<EventRecord> {
     try {
