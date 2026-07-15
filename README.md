@@ -40,6 +40,9 @@ adds a fragment file in `changelog/`; CI compiles them into the block below —
 see `CLAUDE.md`.)
 
 <!-- changelog:begin (generated from changelog/*.md — edit those, not this) -->
+### 2026-07-15
+- **私人對話也能匿名公開**: 只有你看得到的私人對話，現在也能一鍵匿名分享到「公開問答」幫助其他伴侶，公開前會提醒你這原本是私人內容，且隨時可以取消公開。
+
 ### 2026-07-13
 - **通知語氣更溫柔：從「事件」到「情境」**: 通知文字全面調整——「伴侶開啟了一個事件」改為
   「伴侶分享了一個情境」、「事件已解決」改為「你們一起走過了這個情境」、「希望標記為已解決」
