@@ -629,6 +629,9 @@ export interface WallPost {
   author_id: string;
   author_nickname: string | null;
   reply_count: number;
+  // Ordered public URLs of attached photos/videos (empty for text-only posts).
+  // Use isVideoUrl() (src/utils/script.ts) to render <img> vs <video>.
+  media: string[];
   public_status?: 'private' | 'published';
   public_title?: string | null;
   created_at: string;
@@ -650,12 +653,19 @@ export interface CreateWallPostInput {
   content: string;
   mood_tag?: string | null;
   category?: WallPostCategory;
+  // New photo/video files to attach (up to 4). Sent as multipart when present.
+  media?: File[];
 }
 
 export interface UpdateWallPostInput {
   content?: string;
   mood_tag?: string | null;
   category?: WallPostCategory;
+  // New photo/video files to attach.
+  media?: File[];
+  // URLs of existing media to keep, in order. Presence of this field (even
+  // empty) tells the server to rebuild the media set; absence leaves it as-is.
+  existingMedia?: string[];
 }
 
 // Marketplace — public custom-script discovery + community rating
@@ -2916,7 +2926,22 @@ class ApiService {
 
   async createWallPost(input: CreateWallPostInput): Promise<WallPost> {
     try {
-      const response = await apiClient.post('/wall', input);
+      // Multipart path when photos/videos are attached; mirrors createCustomScript.
+      if (input.media && input.media.length > 0) {
+        const fd = new FormData();
+        fd.append('content', input.content);
+        if (input.mood_tag) fd.append('mood_tag', input.mood_tag);
+        if (input.category) fd.append('category', input.category);
+        for (const file of input.media) fd.append('media', file);
+        const response = await apiClient.post('/wall', fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data.wall_post as WallPost;
+      }
+      // No files → plain JSON.
+      const { media: _media, ...body } = input;
+      void _media;
+      const response = await apiClient.post('/wall', body);
       return response.data.wall_post as WallPost;
     } catch (error) {
       console.error('Failed to create wall post:', error);
@@ -2926,7 +2951,28 @@ class ApiService {
 
   async updateWallPost(id: string, updates: UpdateWallPostInput): Promise<WallPost> {
     try {
-      const response = await apiClient.put(`/wall/${id}`, updates);
+      const mediaChanged =
+        (updates.media && updates.media.length > 0) || updates.existingMedia !== undefined;
+      // Multipart path when the media set changed; mirrors updateCustomScript.
+      if (mediaChanged) {
+        const fd = new FormData();
+        if (updates.content !== undefined) fd.append('content', updates.content);
+        if (updates.mood_tag !== undefined) fd.append('mood_tag', updates.mood_tag ?? '');
+        if (updates.category !== undefined) fd.append('category', updates.category);
+        if (updates.existingMedia !== undefined) {
+          fd.append('existingMedia', JSON.stringify(updates.existingMedia));
+        }
+        for (const file of updates.media ?? []) fd.append('media', file);
+        const response = await apiClient.put(`/wall/${id}`, fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data.wall_post as WallPost;
+      }
+      // No media change → plain JSON.
+      const { media: _media, existingMedia: _existingMedia, ...body } = updates;
+      void _media;
+      void _existingMedia;
+      const response = await apiClient.put(`/wall/${id}`, body);
       return response.data.wall_post as WallPost;
     } catch (error) {
       console.error('Failed to update wall post:', error);

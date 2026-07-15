@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { X, Sparkles, Star } from 'lucide-react';
+import { X, Sparkles, Star, ImagePlus } from 'lucide-react';
 import type { WallPost, WallPostCategory } from '../services/api';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { isVideoUrl, VIDEO_MAX_BYTES } from '../utils/script';
 
 export interface WallExample {
   id: string;
@@ -18,6 +19,9 @@ interface WallPostComposerProps {
     content: string;
     mood_tag: string | null;
     category: WallPostCategory;
+    media: File[];
+    // Present in edit mode: URLs of existing media the user chose to keep.
+    existingMedia?: string[];
   }) => Promise<void>;
   moodTags: readonly string[];
   examples: WallExample[];
@@ -26,6 +30,9 @@ interface WallPostComposerProps {
 }
 
 const MAX_CONTENT = 2000;
+// Max photos/videos per post. Kept in sync with WALL_MAX_MEDIA in routes/wall.js.
+const WALL_MAX_MEDIA = 4;
+const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 const WallPostComposer: React.FC<WallPostComposerProps> = ({
   isOpen,
@@ -42,6 +49,11 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
   const [showTemplates, setShowTemplates] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Media: `existingMedia` are URLs already on the post (edit mode) the user can
+  // remove; `newMedia` are freshly picked File objects to upload.
+  const [existingMedia, setExistingMedia] = useState<string[]>([]);
+  const [newMedia, setNewMedia] = useState<File[]>([]);
+  const [newMediaPreviews, setNewMediaPreviews] = useState<string[]>([]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -49,24 +61,37 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
       setContent(editingPost.content);
       setMoodTag(editingPost.mood_tag);
       setCategory(editingPost.category);
+      setExistingMedia(editingPost.media ?? []);
       setShowTemplates(false);
     } else if (initialTemplate) {
       setContent(initialTemplate.content);
       setMoodTag(initialTemplate.mood_tag);
       setCategory(initialTemplate.category);
+      setExistingMedia([]);
       setShowTemplates(false);
     } else {
       setContent('');
       setMoodTag(null);
       setCategory('general');
+      setExistingMedia([]);
       setShowTemplates(true);
     }
+    setNewMedia([]);
     setError(null);
   }, [isOpen, editingPost, initialTemplate]);
+
+  // Object URLs for local previews; revoke on change to avoid leaks.
+  useEffect(() => {
+    const urls = newMedia.map((f) => URL.createObjectURL(f));
+    setNewMediaPreviews(urls);
+    return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  }, [newMedia]);
 
   useScrollLock(isOpen);
 
   if (!isOpen) return null;
+
+  const mediaCount = existingMedia.length + newMedia.length;
 
   const applyTemplate = (template: WallExample) => {
     setContent(template.content);
@@ -75,9 +100,38 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
     setShowTemplates(false);
   };
 
+  const handleAddMedia = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(e.target.files ?? []);
+    e.target.value = ''; // allow re-picking the same file
+    if (picked.length === 0) return;
+    // Per-type size caps: videos may be larger than images (stored raw).
+    const oversizeVideo = picked.find((f) => f.type.startsWith('video/') && f.size > VIDEO_MAX_BYTES);
+    if (oversizeVideo) {
+      setError(`影片大小不能超過 ${Math.round(VIDEO_MAX_BYTES / (1024 * 1024))}MB，請壓縮或改用較短的片段後再試。`);
+      return;
+    }
+    const oversizeImage = picked.find((f) => !f.type.startsWith('video/') && f.size > IMAGE_MAX_BYTES);
+    if (oversizeImage) {
+      setError(`每張照片大小不能超過 ${Math.round(IMAGE_MAX_BYTES / (1024 * 1024))}MB，請壓縮後再試。`);
+      return;
+    }
+    const room = WALL_MAX_MEDIA - mediaCount;
+    if (room <= 0) {
+      setError(`每則貼文最多只能上傳 ${WALL_MAX_MEDIA} 張照片或影片`);
+      return;
+    }
+    setError(null);
+    setNewMedia((prev) => [...prev, ...picked.slice(0, room)]);
+  };
+
+  const removeExistingMedia = (idx: number) =>
+    setExistingMedia((prev) => prev.filter((_, i) => i !== idx));
+  const removeNewMedia = (idx: number) =>
+    setNewMedia((prev) => prev.filter((_, i) => i !== idx));
+
   const handleSubmit = async () => {
-    if (!content.trim()) {
-      setError('內容不能為空');
+    if (!content.trim() && mediaCount === 0) {
+      setError('請輸入內容，或至少上傳一張照片或影片');
       return;
     }
     if (content.length > MAX_CONTENT) {
@@ -91,6 +145,9 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
         content: content.trim(),
         mood_tag: moodTag,
         category,
+        media: newMedia,
+        // In edit mode always send the kept list so removals are applied.
+        ...(editingPost ? { existingMedia } : {}),
       });
       onClose();
     } catch (err) {
@@ -188,6 +245,88 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
 
           <div>
             <label className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-2 block">
+              照片／影片（可選，最多 {WALL_MAX_MEDIA} 個）
+            </label>
+            <label
+              className={`inline-flex items-center gap-2 px-3 py-2 rounded-md border border-petal-rule font-body text-xs text-petal-ink-soft transition-colors ${
+                mediaCount >= WALL_MAX_MEDIA
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'cursor-pointer hover:border-petal-rose-deep hover:text-petal-ink'
+              }`}
+            >
+              <ImagePlus className="w-4 h-4" strokeWidth={1.5} />
+              新增照片／影片
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+                multiple
+                onChange={handleAddMedia}
+                disabled={mediaCount >= WALL_MAX_MEDIA}
+                className="hidden"
+                data-testid="wall-composer-media-input"
+              />
+            </label>
+            <p className="mt-1 font-body text-[11px] text-petal-muted">
+              照片每張最大 {Math.round(IMAGE_MAX_BYTES / (1024 * 1024))}MB、影片最大 {Math.round(VIDEO_MAX_BYTES / (1024 * 1024))}MB
+            </p>
+
+            {mediaCount > 0 && (
+              <div className="mt-3 grid grid-cols-4 gap-2" data-testid="wall-composer-media-grid">
+                {existingMedia.map((url, idx) => (
+                  <div
+                    key={`ex-${url}-${idx}`}
+                    className="relative aspect-square rounded-md overflow-hidden border border-petal-rule bg-petal-cream-2"
+                  >
+                    {isVideoUrl(url) ? (
+                      <video src={url} className="w-full h-full object-contain" muted loop playsInline autoPlay />
+                    ) : (
+                      <img src={url} alt={`附件 ${idx + 1}`} className="w-full h-full object-contain" />
+                    )}
+                    {isVideoUrl(url) && (
+                      <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-body">影片</span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeExistingMedia(idx)}
+                      aria-label="移除"
+                      className="absolute top-1 right-1 w-5 h-5 inline-flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                    >
+                      <X className="w-3 h-3" strokeWidth={2} />
+                    </button>
+                  </div>
+                ))}
+                {newMediaPreviews.map((url, idx) => {
+                  const isVideo = newMedia[idx]?.type.startsWith('video/');
+                  return (
+                    <div
+                      key={`new-${idx}`}
+                      className="relative aspect-square rounded-md overflow-hidden border border-petal-rule bg-petal-cream-2"
+                    >
+                      {isVideo ? (
+                        <video src={url} className="w-full h-full object-contain" muted loop playsInline autoPlay />
+                      ) : (
+                        <img src={url} alt={`新附件 ${idx + 1}`} className="w-full h-full object-contain" />
+                      )}
+                      {isVideo && (
+                        <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-body">影片</span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeNewMedia(idx)}
+                        aria-label="移除"
+                        className="absolute top-1 right-1 w-5 h-5 inline-flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                      >
+                        <X className="w-3 h-3" strokeWidth={2} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-2 block">
               心情標籤（可選）
             </label>
             <div className="flex flex-wrap gap-1.5">
@@ -265,7 +404,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
           </button>
           <button
             onClick={handleSubmit}
-            disabled={submitting || !content.trim()}
+            disabled={submitting || (!content.trim() && mediaCount === 0)}
             className="bg-petal-ink text-petal-cream px-5 py-2 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             data-testid="wall-composer-submit"
           >

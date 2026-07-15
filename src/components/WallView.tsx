@@ -24,6 +24,7 @@ import WallPostComposer, { type WallExample } from './WallPostComposer';
 import WallPostThread from './WallPostThread';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatRelativeOrDate } from '../utils/datetime';
+import { isVideoUrl } from '../utils/script';
 
 interface WallViewProps {
   authState: {
@@ -67,6 +68,9 @@ const WallView: React.FC<WallViewProps> = ({
   const [editingPost, setEditingPost] = useState<WallPost | null>(null);
   const [initialTemplate, setInitialTemplate] = useState<WallExample | null>(null);
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
+  // Full-screen image viewer (videos play inline in the card, so only images
+  // open the lightbox).
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [showTutorial, setShowTutorial] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return !localStorage.getItem(tutorialKey);
@@ -112,6 +116,8 @@ const WallView: React.FC<WallViewProps> = ({
     content: string;
     mood_tag: string | null;
     category: WallPostCategory;
+    media: File[];
+    existingMedia?: string[];
   }) => {
     if (editingPost) {
       const updated = await apiService.updateWallPost(editingPost.id, input);
@@ -267,9 +273,48 @@ const WallView: React.FC<WallViewProps> = ({
           )}
         </div>
 
-        <div className="font-body text-[15px] text-petal-ink leading-relaxed whitespace-pre-wrap">
-          {post.content}
-        </div>
+        {post.content && (
+          <div className="font-body text-[15px] text-petal-ink leading-relaxed whitespace-pre-wrap">
+            {post.content}
+          </div>
+        )}
+
+        {(post.media?.length ?? 0) > 0 && (
+          <div
+            className={`mt-3 grid gap-2 ${
+              post.media.length === 1 ? 'grid-cols-1' : 'grid-cols-2'
+            }`}
+            data-testid={`wall-post-media-${post.id}`}
+          >
+            {post.media.map((url, idx) =>
+              isVideoUrl(url) ? (
+                <video
+                  key={`${url}-${idx}`}
+                  src={url}
+                  controls
+                  playsInline
+                  preload="metadata"
+                  className="w-full aspect-video object-contain rounded-md border border-petal-rule bg-petal-cream-2"
+                />
+              ) : (
+                <button
+                  key={`${url}-${idx}`}
+                  type="button"
+                  onClick={() => setLightboxUrl(url)}
+                  className="block w-full aspect-video rounded-md border border-petal-rule bg-petal-cream-2 overflow-hidden focus:outline-none focus:ring-2 focus:ring-petal-rose-deep"
+                  aria-label="放大檢視照片"
+                >
+                  <img
+                    src={url}
+                    alt={`貼文照片 ${idx + 1}`}
+                    loading="lazy"
+                    className="w-full h-full object-contain"
+                  />
+                </button>
+              )
+            )}
+          </div>
+        )}
 
         <div className="mt-3 flex items-center gap-4">
           <button
@@ -548,6 +593,29 @@ const WallView: React.FC<WallViewProps> = ({
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setLightboxUrl(null)}
+          data-testid="wall-lightbox"
+        >
+          <button
+            type="button"
+            onClick={() => setLightboxUrl(null)}
+            aria-label="關閉"
+            className="absolute top-4 right-4 w-9 h-9 inline-flex items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"
+          >
+            <X className="w-5 h-5" strokeWidth={1.5} />
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="放大檢視"
+            className="max-w-full max-h-full object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>
