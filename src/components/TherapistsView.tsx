@@ -17,6 +17,7 @@ import {
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { FOCUS_AREAS, focusLabel, formatNtd } from './therapistShared';
+import { POSITIONING_ONE_LINER, POSITIONING_SUBLINE, NOT_A_SUBSTITUTE } from '../content/positioning';
 import PaymentMethodPicker from './PaymentMethodPicker';
 import { FocusFilter } from './FocusFilter';
 import TherapistProfileModal from './TherapistProfileModal';
@@ -131,7 +132,10 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
 
   return (
     <div className="space-y-8" data-testid="therapists-view">
-      {/* Intro */}
+      {/* Intro — leads with the Therapy Companion positioning: we sit beside
+          therapists, not against them. The 167-hours one-liner + the honest
+          "not a substitute" note come from src/content/positioning.ts so every
+          surface stays in sync. */}
       <div className="text-center max-w-2xl mx-auto">
         <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
           — 心理諮商
@@ -140,7 +144,12 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
           與真人 <em className="not-italic italic text-pink-600">諮商心理師</em> 聊聊
         </h2>
         <p className="font-display italic font-light text-base text-petal-muted">
-          有些議題值得和一位受過專業訓練的人好好談。選擇一位諮商師，預約屬於你們的對話。
+          {POSITIONING_ONE_LINER}
+          <br className="hidden sm:block" />
+          {POSITIONING_SUBLINE}有些議題值得和一位受過專業訓練的人好好談——選擇一位諮商師，預約屬於你們的對話。
+        </p>
+        <p className="mt-3 font-body text-xs text-petal-muted max-w-md mx-auto leading-relaxed">
+          {NOT_A_SUBSTITUTE}
         </p>
       </div>
 

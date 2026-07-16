@@ -1,6 +1,16 @@
-# Twogether - 情侶親密時光記錄 App
+# Twogether — 諮商延伸工具（Therapy Companion）
 
-A modern couples app for recording intimate moments, achievements, and relationship milestones. Now built with a cost-optimized single-server architecture using Node.js + React.
+> 諮商室只有一小時，真正的關係發生在剩下的 167 個小時。
+> Twogether 幫伴侶把心理師教的方法帶回每一天。**不取代諮商，而是延伸諮商。**
+
+Twogether is a **Therapy Companion** for couples — it helps partners carry what a
+therapist teaches back into everyday life: record what happened between sessions,
+practise communication, and repair connection. It stands *beside* therapists
+rather than competing with them (the AI demonstrates and organizes; diagnosis and
+treatment stay with a licensed professional). Built on a cost-optimized
+single-server architecture using Node.js + React.
+
+See [`docs/UX_PLAYBOOK.md`](docs/UX_PLAYBOOK.md) for the binding product stances.
 
 ## ⚡ TL;DR - Get Started in 3 Commands
 
@@ -42,6 +52,7 @@ see `CLAUDE.md`.)
 <!-- changelog:begin (generated from changelog/*.md — edit those, not this) -->
 ### 2026-07-16
 - **「真實故事」升級為「好文 · 故事」，還能分享好文章**: 把原本藏在「好好說話」裡的長文〈翻譯彼此的語言〉搬進「真實故事」，和智慧故事合併成「好文 · 故事」一個地方。現在除了看伴侶們的真實故事，還能分享你讀到的好文章（純文字貼上、附上出處即可），用「全部／好文／故事」隨手切換，一起讀、一起變得更好。
+- **新定位：Twogether 是心理諮商的延伸工具，不是取代**: 全站訊息更新——「諮商室只有一小時，真正的關係發生在剩下的 167 個小時」。Twogether 幫伴侶把心理師教的方法帶回每一天。登入前的介紹頁、「心理諮商」分頁、認識 AI 諮商師的畫面，都清楚說明：AI 是日常練習的陪伴，示範心理師可能會怎麼引導雙方思考，而真正的診斷與治療仍由合格的心理師負責。我們和心理師站在同一陣線，而不是競爭。
 - **牆上貼文可設為私密**：每則貼文都能一鍵切換「只有我看得到」，對方看不到也不會收到通知；分享給對方的貼文仍可照常「匿名公開」。
 - **照片自動依方向顯示**：直式、橫式照片都會用合適的比例呈現，不再左右一大片留白，也不會裁切。
 - **自訂心情標籤**：除了預設標籤，現在可以自己輸入心情，常用的自訂標籤下次還會記得，一鍵再選。
