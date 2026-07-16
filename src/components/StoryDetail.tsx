@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ThumbsUp, HeartHandshake, Wrench, Lightbulb, Send, Loader2, Flag, Eye } from 'lucide-react';
+import { ArrowLeft, ThumbsUp, HeartHandshake, Wrench, Lightbulb, Send, Loader2, Flag, Eye, Link as LinkIcon } from 'lucide-react';
 import { apiService, type StoryDetailData, type StoryVoteType } from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatRelativeOrDate } from '../utils/datetime';
@@ -167,15 +167,39 @@ export default function StoryDetail({
         </div>
       </div>
 
-      {/* Template sections */}
-      <div className="space-y-3">
-        {SECTION_LABELS.map((s) => (
-          <div key={s.key} className="bg-white border border-petal-rule-soft rounded-2xl p-4">
-            <div className="text-[11px] font-medium text-petal-rose-deep mb-1.5">{s.label}</div>
-            <p className="text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">{story.sections[s.key]}</p>
-          </div>
-        ))}
-      </div>
+      {/* Article body (kind='article') vs guided template sections (kind='story') */}
+      {story.kind === 'article' ? (
+        <div className="bg-white border border-petal-rule-soft rounded-2xl p-5" data-testid="article-body">
+          {(story.sourceUrl || story.sourceAuthor) && (
+            <div className="mb-3 pb-3 border-b border-petal-rule-soft text-xs text-petal-muted flex flex-wrap items-center gap-x-3 gap-y-1">
+              {story.sourceAuthor && <span>原作者／出處：{story.sourceAuthor}</span>}
+              {story.sourceUrl && (
+                <a
+                  href={story.sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  className="inline-flex items-center gap-1 text-petal-rose-deep hover:underline"
+                >
+                  <LinkIcon className="w-3 h-3" /> 原文連結
+                </a>
+              )}
+            </div>
+          )}
+          <p className="text-[15px] text-petal-ink leading-loose whitespace-pre-wrap">{story.body}</p>
+          <p className="mt-4 pt-3 border-t border-petal-rule-soft text-[11px] text-petal-muted">
+            由 {story.authorName} 分享。內容版權屬原作者所有。
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {SECTION_LABELS.map((s) => (
+            <div key={s.key} className="bg-white border border-petal-rule-soft rounded-2xl p-4">
+              <div className="text-[11px] font-medium text-petal-rose-deep mb-1.5">{s.label}</div>
+              <p className="text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">{story.sections[s.key]}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* AI insights */}
       {story.aiInsights && story.aiInsights.insights.length > 0 && (

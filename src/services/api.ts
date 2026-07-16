@@ -371,9 +371,14 @@ export interface StoryVoteCounts {
   repair_worked: number;
 }
 
+export type StoryKind = 'story' | 'article';
+
 export interface StorySummary {
   id: string;
   title: string;
+  // 'story' = guided 6-section personal story; 'article' = a plain-text good
+  // read the user shared. Both live in the same 好文 · 故事 list.
+  kind: StoryKind;
   preview: string;
   tags: string[];
   authorName: string;
@@ -409,7 +414,20 @@ export interface StoryComment {
 export interface StoryDetailData {
   id: string;
   title: string;
-  sections: StorySections;
+  kind: StoryKind;
+  // Guided-story sections (each value is null for kind='article').
+  sections: {
+    context: string | null;
+    happened: string | null;
+    impact: string | null;
+    tried: string | null;
+    repair: string | null;
+    now: string | null;
+  };
+  // Article fields (null for kind='story').
+  body: string | null;
+  sourceUrl: string | null;
+  sourceAuthor: string | null;
   tags: string[];
   authorName: string;
   isMine: boolean;
@@ -1730,6 +1748,7 @@ class ApiService {
   async getStories(params: {
     q?: string;
     tag?: string;
+    kind?: StoryKind;
     sort?: 'latest' | 'helpful' | 'most_read';
     page?: number;
   } = {}): Promise<{ stories: StorySummary[]; hasMore: boolean; featured?: StorySummary[] }> {
@@ -1748,6 +1767,19 @@ class ApiService {
     sections: StorySections;
   }): Promise<{ story: { id: string; title: string }; aiInsights: { insights: StoryInsight[] } | null; aiSkipped: boolean }> {
     const response = await apiClient.post('/stories', input);
+    return response.data;
+  }
+
+  // 好文分享: share a plain-text article you found. Stored verbatim (no AI
+  // split), rides the same detail/vote/comment surface as stories.
+  async createArticle(input: {
+    title: string;
+    body: string;
+    tags: string[];
+    sourceUrl?: string;
+    sourceAuthor?: string;
+  }): Promise<{ story: { id: string; title: string; kind: StoryKind } }> {
+    const response = await apiClient.post('/stories/article', input);
     return response.data;
   }
 

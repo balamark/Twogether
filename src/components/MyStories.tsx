@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Eye, ThumbsUp, MessageCircle, Trash2, Loader2, PenLine } from 'lucide-react';
+import { Eye, ThumbsUp, MessageCircle, Trash2, Loader2, PenLine, BookOpen, FileText } from 'lucide-react';
 import { apiService, type MyStoriesResult } from '../services/api';
 
 // 我的故事: the author's impact dashboard. Visible-impact stats are the core
@@ -41,7 +41,7 @@ export default function MyStories({
     setDeleting(true);
     try {
       await apiService.deleteStory(id);
-      showNotification({ type: 'success', title: '已刪除', message: '故事已從智慧故事庫移除' });
+      showNotification({ type: 'success', title: '已刪除', message: '已從「好文 · 故事」移除' });
       setConfirmDeleteId(null);
       load();
     } catch (err) {
@@ -96,6 +96,14 @@ export default function MyStories({
               <button type="button" onClick={() => onOpenStory(s.id)} className="text-left flex-1">
                 <span className="font-medium text-petal-ink hover:text-petal-rose-deep transition">{s.title}</span>
               </button>
+              <span
+                className={`inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full shrink-0 ${
+                  s.kind === 'article' ? 'bg-petal-rose/15 text-petal-rose-deep' : 'bg-petal-sage/20 text-petal-ink'
+                }`}
+              >
+                {s.kind === 'article' ? <FileText className="w-3 h-3" strokeWidth={1.5} /> : <BookOpen className="w-3 h-3" strokeWidth={1.5} />}
+                {s.kind === 'article' ? '好文' : '故事'}
+              </span>
               {s.status === 'hidden' && (
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 shrink-0">已隱藏</span>
               )}
