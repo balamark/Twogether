@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { X, Sparkles, Star, ImagePlus } from 'lucide-react';
-import type { WallPost, WallPostCategory } from '../services/api';
+import { X, Sparkles, Star, ImagePlus, Lock, Plus } from 'lucide-react';
+import { apiService, type WallPost, type WallPostCategory } from '../services/api';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { isVideoUrl, VIDEO_MAX_BYTES } from '../utils/script';
 
@@ -20,6 +20,7 @@ interface WallPostComposerProps {
     mood_tag: string | null;
     category: WallPostCategory;
     media: File[];
+    is_private: boolean;
     // Present in edit mode: URLs of existing media the user chose to keep.
     existingMedia?: string[];
   }) => Promise<void>;
@@ -54,6 +55,13 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
   const [existingMedia, setExistingMedia] = useState<string[]>([]);
   const [newMedia, setNewMedia] = useState<File[]>([]);
   const [newMediaPreviews, setNewMediaPreviews] = useState<string[]>([]);
+  // Privacy: when on, only the author can see this post.
+  const [isPrivate, setIsPrivate] = useState(false);
+  // Custom mood tags: the couple's previously-used non-preset tags, plus an
+  // inline field to type a brand new one.
+  const [customTags, setCustomTags] = useState<string[]>([]);
+  const [showCustomInput, setShowCustomInput] = useState(false);
+  const [customInput, setCustomInput] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -62,23 +70,38 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
       setMoodTag(editingPost.mood_tag);
       setCategory(editingPost.category);
       setExistingMedia(editingPost.media ?? []);
+      setIsPrivate(editingPost.is_private ?? false);
       setShowTemplates(false);
     } else if (initialTemplate) {
       setContent(initialTemplate.content);
       setMoodTag(initialTemplate.mood_tag);
       setCategory(initialTemplate.category);
       setExistingMedia([]);
+      setIsPrivate(false);
       setShowTemplates(false);
     } else {
       setContent('');
       setMoodTag(null);
       setCategory('general');
       setExistingMedia([]);
+      setIsPrivate(false);
       setShowTemplates(true);
     }
     setNewMedia([]);
+    setShowCustomInput(false);
+    setCustomInput('');
     setError(null);
   }, [isOpen, editingPost, initialTemplate]);
+
+  // Load the couple's remembered custom mood tags when the composer opens.
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    apiService.getWallCustomMoodTags().then((tags) => {
+      if (!cancelled) setCustomTags(tags);
+    });
+    return () => { cancelled = true; };
+  }, [isOpen]);
 
   // Object URLs for local previews; revoke on change to avoid leaks.
   useEffect(() => {
@@ -93,11 +116,35 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
 
   const mediaCount = existingMedia.length + newMedia.length;
 
+  const presetSet = new Set(moodTags);
+  // Custom chips = remembered tags + the current selection if it's a custom one
+  // (so an edited post's custom tag always shows as selected), de-duped.
+  const customChips = Array.from(
+    new Set([
+      ...customTags,
+      ...(moodTag && !presetSet.has(moodTag) ? [moodTag] : []),
+    ])
+  );
+
   const applyTemplate = (template: WallExample) => {
     setContent(template.content);
     setMoodTag(template.mood_tag);
     setCategory(template.category);
     setShowTemplates(false);
+  };
+
+  const applyCustomTag = () => {
+    const tag = customInput.trim().slice(0, 32);
+    if (!tag) {
+      setShowCustomInput(false);
+      return;
+    }
+    setMoodTag(tag);
+    if (!presetSet.has(tag) && !customTags.includes(tag)) {
+      setCustomTags((prev) => [tag, ...prev]);
+    }
+    setCustomInput('');
+    setShowCustomInput(false);
   };
 
   const handleAddMedia = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -146,6 +193,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
         mood_tag: moodTag,
         category,
         media: newMedia,
+        is_private: isPrivate,
         // In edit mode always send the kept list so removals are applied.
         ...(editingPost ? { existingMedia } : {}),
       });
@@ -330,7 +378,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
               心情標籤（可選）
             </label>
             <div className="flex flex-wrap gap-1.5">
-              {moodTags.map((tag) => {
+              {[...moodTags, ...customChips].map((tag) => {
                 const active = moodTag === tag;
                 return (
                   <button
@@ -347,6 +395,39 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                   </button>
                 );
               })}
+
+              {showCustomInput ? (
+                <input
+                  autoFocus
+                  type="text"
+                  value={customInput}
+                  maxLength={32}
+                  onChange={(e) => setCustomInput(e.target.value)}
+                  onBlur={applyCustomTag}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      applyCustomTag();
+                    } else if (e.key === 'Escape') {
+                      setShowCustomInput(false);
+                      setCustomInput('');
+                    }
+                  }}
+                  placeholder="自訂心情…"
+                  data-testid="wall-composer-custom-mood-input"
+                  className="px-3 py-1 rounded-full border border-petal-ink bg-white font-body text-[12px] text-petal-ink placeholder:text-petal-muted focus:outline-none w-28"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowCustomInput(true)}
+                  data-testid="wall-composer-custom-mood-add"
+                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-dashed border-petal-rule font-body text-[12px] text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors"
+                >
+                  <Plus className="w-3 h-3" strokeWidth={2} />
+                  自訂
+                </button>
+              )}
             </div>
           </div>
 
@@ -387,6 +468,40 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                 </div>
               </button>
             </div>
+          </div>
+
+          <div>
+            <button
+              type="button"
+              onClick={() => setIsPrivate((v) => !v)}
+              data-testid="wall-composer-private-toggle"
+              className={`w-full flex items-center justify-between p-3 rounded-md border text-left transition-colors ${
+                isPrivate
+                  ? 'bg-petal-cream-2 border-petal-ink'
+                  : 'bg-white border-petal-rule hover:border-petal-ink'
+              }`}
+            >
+              <div className="flex items-start gap-2.5">
+                <Lock className="w-4 h-4 mt-0.5 text-petal-ink-soft" strokeWidth={1.5} />
+                <div>
+                  <div className="font-display text-sm font-medium text-petal-ink">只有我看得到（私密）</div>
+                  <div className="font-body text-[11px] text-petal-muted mt-0.5">
+                    {isPrivate ? '對方看不到這則貼文，也不會收到通知。' : '關閉時，貼文會分享給對方。'}
+                  </div>
+                </div>
+              </div>
+              <span
+                className={`relative inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full transition-colors ${
+                  isPrivate ? 'bg-petal-ink' : 'bg-petal-rule'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                    isPrivate ? 'translate-x-4' : 'translate-x-0.5'
+                  }`}
+                />
+              </span>
+            </button>
           </div>
 
           {error && (

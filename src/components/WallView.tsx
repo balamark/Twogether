@@ -13,6 +13,7 @@ import {
   ChevronUp,
   Globe,
   Loader2,
+  Lock,
 } from 'lucide-react';
 import {
   apiService,
@@ -71,6 +72,10 @@ const WallView: React.FC<WallViewProps> = ({
   // Full-screen image viewer (videos play inline in the card, so only images
   // open the lightbox).
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  // Natural aspect ratio (w/h) per media URL, learned on load, so portrait
+  // photos get portrait slots instead of a fixed 16:9 that pillarboxes them.
+  const [mediaRatios, setMediaRatios] = useState<Record<string, number>>({});
+  const [privacyBusyId, setPrivacyBusyId] = useState<string | null>(null);
   const [showTutorial, setShowTutorial] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return !localStorage.getItem(tutorialKey);
@@ -117,6 +122,7 @@ const WallView: React.FC<WallViewProps> = ({
     mood_tag: string | null;
     category: WallPostCategory;
     media: File[];
+    is_private: boolean;
     existingMedia?: string[];
   }) => {
     if (editingPost) {
@@ -175,6 +181,39 @@ const WallView: React.FC<WallViewProps> = ({
     setPosts((prev) =>
       prev.map((p) => (p.id === postId ? { ...p, reply_count: newCount } : p))
     );
+  };
+
+  // Remember a media item's natural aspect ratio (clamped so extreme panoramas
+  // or very tall shots stay within a sane slot), used to size its grid cell.
+  const rememberRatio = (url: string, w: number, h: number) => {
+    if (!w || !h) return;
+    const ratio = Math.min(1.8, Math.max(0.6, w / h));
+    setMediaRatios((prev) => (prev[url] ? prev : { ...prev, [url]: ratio }));
+  };
+
+  // Quick toggle a post's privacy from its card (own posts only). Optimistic,
+  // rolls back on failure.
+  const togglePrivacy = async (post: WallPost) => {
+    const next = !post.is_private;
+    setPrivacyBusyId(post.id);
+    setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, is_private: next } : p)));
+    try {
+      await apiService.updateWallPost(post.id, { is_private: next });
+      showNotification({
+        type: 'info',
+        title: next ? '已設為私密' : '已分享給對方',
+        message: next ? '對方看不到這則貼文，也不會收到通知。' : '對方現在看得到這則貼文了。',
+      });
+    } catch (err) {
+      setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, is_private: !next } : p)));
+      showNotification({
+        type: 'error',
+        title: '操作失敗',
+        message: err instanceof Error ? err.message : '請稍後再試',
+      });
+    } finally {
+      setPrivacyBusyId(null);
+    }
   };
 
   // Share to 公開問答 (anonymised). Single-party toggle with a warning dialog.
@@ -239,6 +278,15 @@ const WallView: React.FC<WallViewProps> = ({
                 重要
               </span>
             )}
+            {post.is_private && (
+              <span
+                className="inline-flex items-center px-2 py-0.5 rounded-full bg-petal-cream-2 text-petal-ink-soft font-body text-[10px] uppercase tracking-[0.12em]"
+                data-testid={`wall-post-private-badge-${post.id}`}
+              >
+                <Lock className="w-3 h-3 mr-1" strokeWidth={1.5} />
+                只有我看得到
+              </span>
+            )}
             <span className="font-display text-base font-medium text-petal-ink">
               {authorName}
             </span>
@@ -286,33 +334,52 @@ const WallView: React.FC<WallViewProps> = ({
             }`}
             data-testid={`wall-post-media-${post.id}`}
           >
-            {post.media.map((url, idx) =>
-              isVideoUrl(url) ? (
+            {post.media.map((url, idx) => {
+              // Size each cell to the media's own ratio once known (portrait →
+              // portrait slot → little/no side border); fall back to 16:9 while
+              // loading. object-contain keeps the image uncropped.
+              const ratio = mediaRatios[url];
+              const cellStyle = ratio
+                ? { aspectRatio: String(ratio), maxHeight: '70vh' }
+                : undefined;
+              return isVideoUrl(url) ? (
                 <video
                   key={`${url}-${idx}`}
                   src={url}
                   controls
                   playsInline
                   preload="metadata"
-                  className="w-full aspect-video object-contain rounded-md border border-petal-rule bg-petal-cream-2"
+                  onLoadedMetadata={(e) =>
+                    rememberRatio(url, e.currentTarget.videoWidth, e.currentTarget.videoHeight)
+                  }
+                  style={cellStyle}
+                  className={`w-full object-contain rounded-md border border-petal-rule bg-petal-cream-2 ${
+                    ratio ? '' : 'aspect-video'
+                  }`}
                 />
               ) : (
                 <button
                   key={`${url}-${idx}`}
                   type="button"
                   onClick={() => setLightboxUrl(url)}
-                  className="block w-full aspect-video rounded-md border border-petal-rule bg-petal-cream-2 overflow-hidden focus:outline-none focus:ring-2 focus:ring-petal-rose-deep"
+                  style={cellStyle}
+                  className={`block w-full rounded-md border border-petal-rule bg-petal-cream-2 overflow-hidden focus:outline-none focus:ring-2 focus:ring-petal-rose-deep ${
+                    ratio ? '' : 'aspect-video'
+                  }`}
                   aria-label="放大檢視照片"
                 >
                   <img
                     src={url}
                     alt={`貼文照片 ${idx + 1}`}
                     loading="lazy"
+                    onLoad={(e) =>
+                      rememberRatio(url, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)
+                    }
                     className="w-full h-full object-contain"
                   />
                 </button>
-              )
-            )}
+              );
+            })}
           </div>
         )}
 
@@ -332,8 +399,29 @@ const WallView: React.FC<WallViewProps> = ({
             )}
           </button>
 
-          {/* Share to 公開問答 (anonymised) */}
-          {post.public_status === 'published' ? (
+          {/* Own-post privacy quick toggle. A private post is hidden from the
+              partner, so the 匿名公開 (public) option is hidden while private. */}
+          {isOwn && (
+            <button
+              type="button"
+              onClick={() => togglePrivacy(post)}
+              disabled={privacyBusyId === post.id}
+              data-testid={`wall-privacy-toggle-${post.id}`}
+              className="flex items-center gap-1.5 text-petal-ink-soft hover:text-petal-ink font-body text-xs disabled:opacity-50"
+            >
+              {privacyBusyId === post.id ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : post.is_private ? (
+                <Lock className="w-3.5 h-3.5" strokeWidth={1.5} />
+              ) : (
+                <Globe className="w-3.5 h-3.5" strokeWidth={1.5} />
+              )}
+              {post.is_private ? '私密・分享給對方' : '設為私密'}
+            </button>
+          )}
+
+          {/* Share to 公開問答 (anonymised) — only for shared (non-private) posts */}
+          {!post.is_private && (post.public_status === 'published' ? (
             <button
               type="button"
               onClick={() => unshare(post)}
@@ -354,7 +442,7 @@ const WallView: React.FC<WallViewProps> = ({
               <Globe className="w-3.5 h-3.5" strokeWidth={1.5} />
               匿名公開
             </button>
-          )}
+          ))}
         </div>
 
         {isExpanded && (

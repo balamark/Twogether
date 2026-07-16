@@ -632,6 +632,9 @@ export interface WallPost {
   // Ordered public URLs of attached photos/videos (empty for text-only posts).
   // Use isVideoUrl() (src/utils/script.ts) to render <img> vs <video>.
   media: string[];
+  // When true, only the author can see this post; the partner never sees it and
+  // isn't notified. Distinct from public_status (匿名公開 to the public Q&A).
+  is_private: boolean;
   public_status?: 'private' | 'published';
   public_title?: string | null;
   created_at: string;
@@ -655,6 +658,8 @@ export interface CreateWallPostInput {
   category?: WallPostCategory;
   // New photo/video files to attach (up to 4). Sent as multipart when present.
   media?: File[];
+  // When true, only the author can see the post.
+  is_private?: boolean;
 }
 
 export interface UpdateWallPostInput {
@@ -666,6 +671,8 @@ export interface UpdateWallPostInput {
   // URLs of existing media to keep, in order. Presence of this field (even
   // empty) tells the server to rebuild the media set; absence leaves it as-is.
   existingMedia?: string[];
+  // Toggle post privacy (used by the composer and the card's quick toggle).
+  is_private?: boolean;
 }
 
 // Marketplace — public custom-script discovery + community rating
@@ -2924,6 +2931,18 @@ class ApiService {
     }
   }
 
+  // Custom (non-preset) mood tags the couple has used before, for the composer's
+  // "remembered tags" chips. Non-fatal: returns [] on error.
+  async getWallCustomMoodTags(): Promise<string[]> {
+    try {
+      const response = await apiClient.get('/wall/mood-tags');
+      return (response.data.tags || []) as string[];
+    } catch (error) {
+      console.error('Failed to fetch wall mood tags:', error);
+      return [];
+    }
+  }
+
   async createWallPost(input: CreateWallPostInput): Promise<WallPost> {
     try {
       // Multipart path when photos/videos are attached; mirrors createCustomScript.
@@ -2932,6 +2951,7 @@ class ApiService {
         fd.append('content', input.content);
         if (input.mood_tag) fd.append('mood_tag', input.mood_tag);
         if (input.category) fd.append('category', input.category);
+        if (input.is_private !== undefined) fd.append('is_private', String(input.is_private));
         for (const file of input.media) fd.append('media', file);
         const response = await apiClient.post('/wall', fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
@@ -2959,6 +2979,7 @@ class ApiService {
         if (updates.content !== undefined) fd.append('content', updates.content);
         if (updates.mood_tag !== undefined) fd.append('mood_tag', updates.mood_tag ?? '');
         if (updates.category !== undefined) fd.append('category', updates.category);
+        if (updates.is_private !== undefined) fd.append('is_private', String(updates.is_private));
         if (updates.existingMedia !== undefined) {
           fd.append('existingMedia', JSON.stringify(updates.existingMedia));
         }
