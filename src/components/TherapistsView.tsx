@@ -21,6 +21,7 @@ import { POSITIONING_ONE_LINER, POSITIONING_SUBLINE, NOT_A_SUBSTITUTE } from '..
 import PaymentMethodPicker from './PaymentMethodPicker';
 import { FocusFilter } from './FocusFilter';
 import TherapistProfileModal from './TherapistProfileModal';
+import TherapySummaryCard from './TherapySummaryCard';
 
 interface TherapistsViewProps {
   authState: {
@@ -152,6 +153,14 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
           {NOT_A_SUBSTITUTE}
         </p>
       </div>
+
+      {/* 諮商摘要 — the between-sessions digest the couple brings INTO a session.
+          This is the Therapy Companion flagship: it sits above the directory so
+          "整理你們的近況 → 帶去和心理師談" reads as one flow. */}
+      <TherapySummaryCard
+        authState={{ isAuthenticated: authState.isAuthenticated, partnerConnected: authState.partnerConnected }}
+        showNotification={showNotification}
+      />
 
       {/* 公開問答 moved to the 真實故事 tab (StoriesView) — this view is the
           therapist directory only now. */}

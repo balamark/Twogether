@@ -32,15 +32,32 @@ Then visit: http://localhost:8080
 
 ## Features
 
+Twogether is a **Therapy Companion** first — the therapy-extension features lead,
+and the intimacy/roleplay features are the *connection* side of the same
+relationship-health story (not hidden, just not the headline a therapist sees).
+
+**諮商延伸 · 把方法帶回日常 (Therapy extension)**
+
+- **好好說 (事件記錄)**: Log what happened between sessions so the next therapy hour starts on the real issue, not 30 minutes of recall
+- **AI 諮商師 · 引導模式**: The AI *demonstrates* how a therapist might guide the two of you — turn-based practice cards (鏡映/換位/肯定), not a verdict
+- **治療摘要 & 諮商摘要**: A structured note after each repaired conflict, plus a two-week 諮商摘要 to bring into a session
+- **情緒翻譯 · 安全踩剎車**: Translate blame into the underlying need; auto de-escalate a thread when it heats up
+- **婚姻檢查**: Each partner rates key dimensions, then reveal side-by-side with a neutral AI summary
+- **心理諮商名錄**: Book a real, licensed counselor when a topic needs professional help
+- **關係時間軸 · 統計分析**: Conflict patterns and trends over time
+
+**日常連結 · 關係的另一面 (Everyday connection)**
+
 - **親密記錄**: Log intimate moments with mood, duration, location, and photos
-- **成就系統**: Earn badges for milestones and achievements
 - **角色扮演**: Custom roleplay scripts and scenarios with predefined templates
-- **親密邀請系統**: Send and respond to intimacy requests with notifications
-- **替代選項**: Alternative intimate activities when requests are declined
-- **通知系統**: Real-time notifications for requests and responses
-- **金幣商店**: Virtual currency system for rewards
+- **親密邀請系統 & 替代選項**: Send/respond to intimacy requests; suggest alternatives when declined
+- **我們的牆**: A shared wall for photos, videos and notes to each other
+- **成就系統 & 金幣商店**: Badges for milestones and a virtual-currency reward system
+
+**基礎 (Platform)**
+
 - **配對系統**: Secure partner pairing with codes
-- **統計分析**: Weekly/monthly intimacy statistics
+- **通知系統**: Real-time notifications (in-app, Email, LINE)
 - **隱私保護**: Secure authentication and data storage
 
 ## 📝 Changelog
@@ -53,6 +70,7 @@ see `CLAUDE.md`.)
 ### 2026-07-16
 - **「真實故事」升級為「好文 · 故事」，還能分享好文章**: 把原本藏在「好好說話」裡的長文〈翻譯彼此的語言〉搬進「真實故事」，和智慧故事合併成「好文 · 故事」一個地方。現在除了看伴侶們的真實故事，還能分享你讀到的好文章（純文字貼上、附上出處即可），用「全部／好文／故事」隨手切換，一起讀、一起變得更好。
 - **新定位：Twogether 是心理諮商的延伸工具，不是取代**: 全站訊息更新——「諮商室只有一小時，真正的關係發生在剩下的 167 個小時」。Twogether 幫伴侶把心理師教的方法帶回每一天。登入前的介紹頁、「心理諮商」分頁、認識 AI 諮商師的畫面，都清楚說明：AI 是日常練習的陪伴，示範心理師可能會怎麼引導雙方思考，而真正的診斷與治療仍由合格的心理師負責。我們和心理師站在同一陣線，而不是競爭。
+- **諮商摘要：把最近兩週，一鍵整理成帶去諮商的摘要**: 「心理諮商」分頁新增「諮商摘要」。選「最近兩週」或「最近 30 天」，AI 會把你們這段期間記錄的事件整理成一份摘要——最常出現的衝突主題、雙方最常感受到的情緒、已經成功修復的事件、還沒解決的事件，以及三個想帶去和心理師討論的問題。進諮商室時不用再花 30 分鐘回想發生了什麼，心理師可以更快進入真正有價值的討論。摘要兩人共享、只會產生一次（事件有變動才會重新整理，不重複扣 AI 次數），還能一鍵「複製給心理師」。這是 Twogether 作為「諮商延伸工具」的核心：諮商室只有一小時，我們幫你們用好剩下的 167 個小時。
 - **牆上貼文可設為私密**：每則貼文都能一鍵切換「只有我看得到」，對方看不到也不會收到通知；分享給對方的貼文仍可照常「匿名公開」。
 - **照片自動依方向顯示**：直式、橫式照片都會用合適的比例呈現，不再左右一大片留白，也不會裁切。
 - **自訂心情標籤**：除了預設標籤，現在可以自己輸入心情，常用的自訂標籤下次還會記得，一鍵再選。

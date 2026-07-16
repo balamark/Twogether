@@ -607,6 +607,28 @@ export interface TherapyNote {
   nextTime: string;
 }
 
+// The between-sessions 諮商摘要: a digest of a window of events the couple can
+// bring into their next counseling session.
+export interface TherapySummary {
+  overview: string;
+  themes: string[];
+  emotions: string[];
+  repaired: { title: string; insight: string }[];
+  unresolved: { title: string; note: string }[];
+  questions: string[];
+}
+
+export type TherapySummaryResult =
+  | {
+      ok: true;
+      summary: TherapySummary;
+      period: { days: number; label: string; eventCount: number };
+      cached: boolean;
+    }
+  // Expected non-error states (not paired yet / no events in window) — the UI
+  // shows a guiding empty state, not a red error toast.
+  | { ok: false; errorCode: 'NOT_PAIRED' | 'NO_EVENTS'; message: string };
+
 export interface CreateEventInput {
   title: string;
   summary: string;
@@ -3630,6 +3652,36 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to fetch event analytics:', error);
       this.throwApiError(error, '無法取得分析資料');
+    }
+  }
+
+  // Fetch (or generate) the between-sessions 諮商摘要 for the couple's recent
+  // events. Returns a discriminated result so the caller can distinguish the
+  // real summary from the expected "not paired" / "no events" states, which the
+  // server returns as HTTP 200 with success:false + an error_code (per CLAUDE.md
+  // — a reached quota is thrown, but these guided states are not errors).
+  async getTherapySummary(days = 14): Promise<TherapySummaryResult> {
+    try {
+      const response = await apiClient.get('/events/therapy-summary', { params: { days } });
+      const d = response.data ?? {};
+      if (d.success === false) {
+        return {
+          ok: false,
+          errorCode: (d.error_code as 'NOT_PAIRED' | 'NO_EVENTS') ?? 'NO_EVENTS',
+          message: d.message ?? '目前還沒有可整理的事件。',
+        };
+      }
+      return {
+        ok: true,
+        summary: d.summary as TherapySummary,
+        period: d.period as { days: number; label: string; eventCount: number },
+        cached: d.cached === true,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch therapy summary:', error);
+      // Quota exhaustion (429) and true failures still throw with error_code
+      // preserved, so the view can surface the specific quota message.
+      this.throwApiError(error, '諮商摘要暫時無法產生，請稍後再試');
     }
   }
 
