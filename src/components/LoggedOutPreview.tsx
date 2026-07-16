@@ -17,6 +17,7 @@ import {
   ClipboardCheck,
   Crown,
   Check,
+  Lock,
   type LucideIcon,
 } from 'lucide-react';
 import { daysSinceLastNudge } from './AchievementsView';
@@ -578,18 +579,24 @@ const PREVIEWS: Record<string, PreviewConfig> = {
           </div>
         </SampleCard>
         <SampleCard>
-          <div className="flex items-center gap-1.5 mb-1.5">
+          <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-petal-cream-2 text-petal-ink-soft font-body text-[9px] uppercase tracking-[0.1em]">
+              <Lock className="w-2.5 h-2.5 mr-0.5" strokeWidth={1.5} />
+              只有我看得到
+            </span>
             <span className="font-body text-xs text-petal-ink">小宇</span>
-            <span className="font-body text-[11px] text-petal-muted">· 開心</span>
+            {/* custom mood tag (自訂輸入) */}
+            <span className="font-body text-[11px] text-petal-muted">· 加班中</span>
             <SampleTag />
           </div>
           <p className="font-body text-sm text-petal-ink">今天的約會超棒，留張合照 📷</p>
-          <div className="mt-2 w-full aspect-video rounded-md border border-petal-rule bg-petal-cream-2 overflow-hidden">
+          {/* Photo shown at its own aspect ratio (no forced crop / heavy border). */}
+          <div className="mt-2 rounded-md border border-petal-rule bg-petal-cream-2 overflow-hidden">
             <img
               src="/images/roleplay/reunion-love.png"
               alt="範例貼文照片"
               loading="lazy"
-              className="w-full h-full object-contain"
+              className="w-full h-auto max-h-56 object-contain"
             />
           </div>
         </SampleCard>
