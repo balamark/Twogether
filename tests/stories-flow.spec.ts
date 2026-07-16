@@ -53,6 +53,8 @@ test.describe.serial('真實故事 — real publish/vote/impact round trip', () 
       .or(page.getByTestId('story-compose-cta'))
       .first()
       .click();
+    // Compose now opens a chooser (guided story vs shared article) first.
+    await page.getByTestId('compose-choose-story').click();
     await page.getByTestId('story-mode-guided').click();
 
     const texts = [
