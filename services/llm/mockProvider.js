@@ -614,6 +614,45 @@ async function generateFacilitatorTurn({ session } = {}) {
   );
 }
 
+// Deterministic 諮商摘要 (between-sessions therapy summary). Derives themes /
+// emotions from the precomputed stats and splits events by status, so tests can
+// drive the endpoint without the paid LLM. Same input → same output.
+async function generateTherapySummary({ periodLabel, events, stats }) {
+  const startedAt = Date.now();
+  const evs = Array.isArray(events) ? events : [];
+  const themes = (stats?.themeCounts || []).map((t) => t.tag).filter(Boolean).slice(0, 4);
+  const emotions = (stats?.emotionCounts || []).map((e) => e.emotion).filter(Boolean).slice(0, 4);
+  const repaired = evs
+    .filter((e) => e.status === 'resolved')
+    .map((e) => ({ title: (e.title || '未命名').toString().trim(), insight: '你們願意把話說開，讓彼此靠近了一點。' }))
+    .slice(0, 6);
+  const unresolved = evs
+    .filter((e) => e.status !== 'resolved')
+    .map((e) => ({ title: (e.title || '未命名').toString().trim(), note: '這件事還沒劃下句點，可以帶去諮商裡一起看。' }))
+    .slice(0, 6);
+
+  return {
+    overview: `${periodLabel || '最近兩週'}你們記錄了 ${evs.length} 件事，最常圍繞在${themes[0] || '相處'}上。`,
+    themes,
+    emotions,
+    repaired,
+    unresolved,
+    questions: [
+      '我們每次談到同一個主題就會升溫，可以怎麼開始這個對話？',
+      '當一方想靠近、另一方想先冷靜，我們可以怎麼配合彼此的節奏？',
+      '這段期間還沒解決的事，哪一件最值得我們先一起處理？',
+    ],
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+      assembledPrompt: `[mock] therapy summary for ${evs.length} events`,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -627,5 +666,6 @@ module.exports = {
   parseScriptRoles,
   generateThreadTranslations,
   generateTherapyNote,
+  generateTherapySummary,
   generateFacilitatorTurn,
 };

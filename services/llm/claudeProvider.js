@@ -1981,6 +1981,180 @@ async function generateFacilitatorTurn({ thread, session, partners, companion, c
   });
 }
 
+// ---------------------------------------------------------------------------
+// Therapy Mode summary ("諮商摘要") — the between-sessions digest
+// ---------------------------------------------------------------------------
+// Twogether is a Therapy Companion: the couple sees a therapist for ~1 hour a
+// week, and the real work happens in the other 167. This turns a window of
+// events into a summary the couple can bring INTO their next session, so the
+// therapist doesn't spend 30 minutes gathering what happened. It is NOT advice
+// and NOT a diagnosis — it organizes, and it hands the couple three questions
+// worth raising with a professional.
+
+const THERAPY_SUMMARY_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴侶諮商師的助理。一對伴侶在過去一段期間記錄了幾次衝突與溝通事件，他們準備帶著這份整理進入下一次的心理諮商。請閱讀事件清單與已算好的統計，為他們寫一份「諮商摘要」(Therapy Summary)。請永遠以繁體中文回覆。
+
+這份摘要的目的：讓他們進諮商室時，心理師不用從頭蒐集資訊，可以更快進入真正有價值的討論。你只做「整理」，不做診斷、不下指令、不評斷對錯、不選邊站。真正的治療由合格心理師負責。
+
+請產出：
+1. overview：一句話，中性地描述這段期間他們的關係狀態或最需要被看見的模式（不責備任一方）。
+2. themes：這段期間最常出現的衝突主題，2 到 4 項；用已提供的主題統計為基礎，把它翻成人看得懂的短語（例如「家務分配」「回訊息的節奏」）。
+3. emotions：雙方這段期間最常感受到的情緒，2 到 4 項；用已提供的情緒統計為基礎。
+4. repaired：這段期間「已經成功修復」的事件（status 為 resolved），各附一句他們做對了什麼讓彼此靠近；若沒有，回傳空陣列。
+5. unresolved：這段期間「還沒解決」的事件，各附一句還卡在哪裡、可能還需要處理的點；若沒有，回傳空陣列。
+6. questions：三個「想帶去和心理師討論的問題」，具體、扣著上面的模式、用第一人稱複數（我們），讓伴侶可以直接照著問（例如「我們每次談到家務就會升溫，可以怎麼開始這個對話？」）。
+
+守則：緊扣提供的事件內容，不要編造；中立、溫柔；只使用繁體中文；遵守標點規則。
+
+回應請只呼叫 emit_therapy_summary tool，不要輸出其他文字。`;
+
+const THERAPY_SUMMARY_TOOL_SCHEMA = {
+  name: 'emit_therapy_summary',
+  description: 'Return a structured between-sessions therapy summary the couple can bring to their next counseling session.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      overview: { type: 'string', description: '一句話中性描述這段期間的關係模式' },
+      themes: {
+        type: 'array',
+        maxItems: 4,
+        items: { type: 'string', maxLength: 20, description: '一個衝突主題的人看得懂短語' },
+      },
+      emotions: {
+        type: 'array',
+        maxItems: 4,
+        items: { type: 'string', maxLength: 12, description: '一個常見情緒詞' },
+      },
+      repaired: {
+        type: 'array',
+        maxItems: 6,
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: '事件標題' },
+            insight: { type: 'string', description: '他們做對了什麼讓彼此靠近，一句話' },
+          },
+          required: ['title', 'insight'],
+        },
+      },
+      unresolved: {
+        type: 'array',
+        maxItems: 6,
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: '事件標題' },
+            note: { type: 'string', description: '還卡在哪裡、可能還需要處理的點，一句話' },
+          },
+          required: ['title', 'note'],
+        },
+      },
+      questions: {
+        type: 'array',
+        minItems: 3,
+        maxItems: 3,
+        items: { type: 'string', description: '想帶去和心理師討論的一個問題，第一人稱複數' },
+      },
+    },
+    required: ['overview', 'themes', 'emotions', 'repaired', 'unresolved', 'questions'],
+  },
+};
+
+// events: [{ title, summary, status, tags, emotions, createdAt, resolvedAt, therapyNote }]
+// stats:  { themeCounts:[{tag,count}], emotionCounts:[{emotion,count}], repairedCount, unresolvedCount }
+async function generateTherapySummary({ periodLabel, events, stats }) {
+  const evs = Array.isArray(events) ? events : [];
+  const lines = [];
+  lines.push(`期間：${periodLabel || '最近兩週'}`);
+  lines.push(`事件總數：${evs.length}（已解決 ${stats?.repairedCount ?? 0}，未解決 ${stats?.unresolvedCount ?? 0}）`, '');
+
+  const themeCounts = stats?.themeCounts || [];
+  if (themeCounts.length) {
+    lines.push('主題統計（標籤：次數）：' + themeCounts.map((t) => `${t.tag}×${t.count}`).join('、'));
+  }
+  const emotionCounts = stats?.emotionCounts || [];
+  if (emotionCounts.length) {
+    lines.push('情緒統計（情緒：次數）：' + emotionCounts.map((e) => `${e.emotion}×${e.count}`).join('、'));
+  }
+  lines.push('', '事件清單（最舊在前）：');
+  evs.forEach((e, i) => {
+    const state = e.status === 'resolved' ? '已解決' : '未解決';
+    lines.push(`${i + 1}. [${state}]《${(e.title || '未命名').toString().trim()}》`);
+    if (e.summary) lines.push(`   摘要：${e.summary.toString().trim()}`);
+    if (Array.isArray(e.tags) && e.tags.length) lines.push(`   主題：${e.tags.join('、')}`);
+    if (Array.isArray(e.emotions) && e.emotions.length) lines.push(`   情緒：${e.emotions.join('、')}`);
+    if (e.therapyNote && e.therapyNote.nextTime) lines.push(`   當時的修復重點：${e.therapyNote.nextTime}`);
+  });
+  const userContent = lines.join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1800,
+    system: [
+      {
+        type: 'text',
+        text: THERAPY_SUMMARY_SYSTEM_PROMPT + PUNCTUATION_RULE,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [THERAPY_SUMMARY_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_therapy_summary' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.therapy_summary', {
+    model: response.model || MODEL,
+    durationMs: ms,
+    eventCount: evs.length,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_therapy_summary'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input || {};
+  const cleanStr = (s) => (s || '').toString().trim();
+  const cleanList = (arr, max) =>
+    (Array.isArray(arr) ? arr : []).map(cleanStr).filter(Boolean).slice(0, max);
+  const cleanPairs = (arr, k, max) =>
+    (Array.isArray(arr) ? arr : [])
+      .filter((r) => r && r.title && r[k])
+      .map((r) => ({ title: cleanStr(r.title), [k]: cleanStr(r[k]) }))
+      .slice(0, max);
+
+  return {
+    overview: cleanStr(out.overview),
+    themes: cleanList(out.themes, 4),
+    emotions: cleanList(out.emotions, 4),
+    repaired: cleanPairs(out.repaired, 'insight', 6),
+    unresolved: cleanPairs(out.unresolved, 'note', 6),
+    questions: cleanList(out.questions, 3),
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+      assembledPrompt: userContent,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -1994,6 +2168,7 @@ module.exports = {
   parseScriptRoles,
   generateThreadTranslations,
   generateTherapyNote,
+  generateTherapySummary,
   generateFacilitatorTurn,
   // Exported for prompt-contract regression tests only.
   buildRoleplayUserContent,

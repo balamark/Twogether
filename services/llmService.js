@@ -28,6 +28,7 @@ module.exports = {
   parseScriptRoles: provider.parseScriptRoles,
   generateThreadTranslations: provider.generateThreadTranslations,
   generateTherapyNote: provider.generateTherapyNote,
+  generateTherapySummary: provider.generateTherapySummary,
   generateFacilitatorTurn: provider.generateFacilitatorTurn,
   providerName: PROVIDER_NAME,
 };

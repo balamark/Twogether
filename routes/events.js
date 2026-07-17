@@ -552,6 +552,174 @@ router.get('/analytics', async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Therapy Mode summary ("諮商摘要") — the between-sessions digest a couple can
+// bring INTO their next counseling session. Twogether is a Therapy Companion:
+// the therapist gets ~1 hour, the couple lives the other 167 — this hands the
+// therapist a ready summary so the session starts on the real issue.
+// ---------------------------------------------------------------------------
+
+async function ensureTherapySummariesTable() {
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS therapy_summaries (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        couple_id UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
+        period_days INTEGER NOT NULL,
+        input_hash VARCHAR(64) NOT NULL,
+        summary JSONB NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        UNIQUE (couple_id, input_hash)
+      );
+    `);
+  } catch (err) {
+    logWarn('ensureTherapySummariesTable failed', { err: err.message });
+  }
+}
+
+// GET /api/events/therapy-summary?days=14 — aggregate the couple's events over a
+// window into a shared, cached 諮商摘要. Generated once per (couple, event-set);
+// re-opens and the partner's view are free. Regenerates when events change.
+router.get(
+  '/therapy-summary',
+  [query('days').optional().isInt({ min: 7, max: 30 }).toInt()],
+  async (req, res) => {
+    if (sendValidationError(req, res)) return;
+    try {
+      const userId = req.user.id;
+      const days = req.query.days || 14;
+      const periodLabel = days === 14 ? '最近兩週' : `最近 ${days} 天`;
+
+      const couple = await getCoupleForUser(userId);
+      if (!couple) {
+        // Solo users have no partner events to summarise — an expected state,
+        // not a failure. Guide them to pairing (playbook: three-part gate).
+        return res.status(200).json({
+          success: false,
+          error_code: 'NOT_PAIRED',
+          message: '諮商摘要會整理你們兩人一起記錄的事件。先和另一半配對，累積幾件事後就能一鍵整理成帶去諮商的摘要。',
+        });
+      }
+      const coupleId = couple.couple_id;
+
+      const evResult = await db.query(
+        `SELECT id, title, summary, status, tags, emotions,
+                created_at, resolved_at, therapy_note, content_edited_at
+           FROM events
+          WHERE couple_id = $1
+            AND is_private = FALSE
+            AND created_at >= NOW() - ($2 || ' days')::interval
+          ORDER BY created_at ASC`,
+        [coupleId, String(days)]
+      );
+      const rows = evResult.rows;
+
+      if (rows.length === 0) {
+        // Empty window is expected (info), not an error — give a next step.
+        return res.status(200).json({
+          success: false,
+          error_code: 'NO_EVENTS',
+          message: `${periodLabel}還沒有可整理的事件。在「好好說話」記錄幾件最近發生的事，這裡就會幫你們整理成一份帶去諮商的摘要。`,
+        });
+      }
+
+      // Deterministic aggregates — hand the model counts so it narrates, not tallies.
+      const themeMap = new Map();
+      const emotionMap = new Map();
+      let repairedCount = 0;
+      let unresolvedCount = 0;
+      for (const r of rows) {
+        (r.tags || []).forEach((t) => themeMap.set(t, (themeMap.get(t) || 0) + 1));
+        (r.emotions || []).forEach((e) => emotionMap.set(e, (emotionMap.get(e) || 0) + 1));
+        if (r.status === 'resolved') repairedCount += 1;
+        else unresolvedCount += 1;
+      }
+      const sortDesc = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]);
+      const themeCounts = sortDesc(themeMap).map(([tag, count]) => ({ tag, count }));
+      const emotionCounts = sortDesc(emotionMap).map(([emotion, count]) => ({ emotion, count }));
+      const stats = { themeCounts, emotionCounts, repairedCount, unresolvedCount };
+
+      // Cache key: the event set + each event's mutable markers + window. Any
+      // change (new event, resolution, edited content, a new therapy note)
+      // busts the cache so the summary stays fresh, but re-opens are free.
+      const fingerprint = rows.map((r) => [
+        r.id,
+        r.status,
+        r.content_edited_at ? new Date(r.content_edited_at).getTime() : 0,
+        r.therapy_note ? 1 : 0,
+      ]);
+      const inputHash = aiCacheHash(['therapy_summary_v1', days, fingerprint]);
+
+      await ensureTherapySummariesTable();
+      const cached = await db.query(
+        `SELECT summary FROM therapy_summaries WHERE couple_id = $1 AND input_hash = $2`,
+        [coupleId, inputHash]
+      );
+      if (cached.rows[0]) {
+        return res.json({
+          success: true,
+          summary: cached.rows[0].summary,
+          period: { days, label: periodLabel, eventCount: rows.length },
+          cached: true,
+        });
+      }
+
+      // Fresh generation costs one AI credit (same budget as the therapy note).
+      const { tier, limit } = await resolveAiLimit(userId);
+      const usedToday = await countTodayAiUsage(userId);
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      if (!limitCheck.ok) {
+        logInfo('events.therapy_summary.limit', { userId, coupleId, used: usedToday, limit, tier, blocked: true });
+        return res.status(limitCheck.status).json(limitCheck.body);
+      }
+
+      logInfo('events.therapy_summary.generate', { userId, coupleId, days, eventCount: rows.length });
+
+      const events = rows.map((r) => ({
+        title: r.title,
+        summary: r.summary,
+        status: r.status,
+        tags: r.tags || [],
+        emotions: r.emotions || [],
+        createdAt: r.created_at,
+        resolvedAt: r.resolved_at,
+        therapyNote: r.therapy_note || null,
+      }));
+
+      const result = await llmService.generateTherapySummary({ periodLabel, events, stats });
+      const meta = result._meta;
+      delete result._meta;
+
+      logInfo('events.therapy_summary.cost', {
+        userId,
+        coupleId,
+        provider: meta?.provider,
+        model: meta?.model,
+        costUsd: meta?.costUsd,
+        durationMs: meta?.durationMs,
+      });
+
+      await recordAiUsage(userId, 'therapy_summary', `${periodLabel}・${rows.length} 件`, meta);
+      // Upsert so a racing partner request collapses onto the same row.
+      await db.query(
+        `INSERT INTO therapy_summaries (couple_id, period_days, input_hash, summary)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (couple_id, input_hash) DO UPDATE SET summary = EXCLUDED.summary`,
+        [coupleId, days, inputHash, JSON.stringify(result)]
+      );
+
+      res.json({
+        success: true,
+        summary: result,
+        period: { days, label: periodLabel, eventCount: rows.length },
+      });
+    } catch (err) {
+      logError('Therapy summary failed', { err: err.message, stack: err.stack });
+      res.status(500).json({ success: false, message: '諮商摘要暫時無法產生，請稍後再試' });
+    }
+  }
+);
+
 // List events for caller's couple
 router.get(
   '/',

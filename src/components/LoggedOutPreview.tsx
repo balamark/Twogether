@@ -22,6 +22,11 @@ import {
 } from 'lucide-react';
 import { daysSinceLastNudge } from './AchievementsView';
 import { isVideoUrl } from '../utils/script';
+import {
+  POSITIONING_ONE_LINER,
+  POSITIONING_SUBLINE,
+  NOT_A_SUBSTITUTE,
+} from '../content/positioning';
 
 interface PreviewScript {
   id: string;
@@ -603,6 +608,54 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       </div>
     ),
   },
+  // 心理諮商 tab: leads with the Therapy Companion positioning — Twogether sits
+  // beside therapists, not against them. Static sample of the "between-sessions"
+  // loop + the honest "not a substitute" note (src/content/positioning.ts).
+  therapists: {
+    icon: HeartHandshake,
+    eyebrow: '心理諮商 · 延伸，而非取代',
+    title: (
+      <>
+        把心理師教的方法，<em className="not-italic font-light italic text-pink-600">帶回每一天</em>
+      </>
+    ),
+    description:
+      `${POSITIONING_ONE_LINER}${POSITIONING_SUBLINE}記錄事件、練習溝通、修復連結，下次進諮商室不用再花 30 分鐘回想發生了什麼；卡住時也能預約真人諮商師。`,
+    sample: (
+      <div className="space-y-4">
+        <SampleCard>
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
+              <HeartHandshake className="w-3.5 h-3.5 text-petal-rose-deep" />
+              一週諮商一次，剩下的 167 小時交給練習
+            </span>
+            <SampleTag />
+          </div>
+          <ol className="space-y-2.5">
+            {[
+              { n: '1', t: '好好說（事件記錄）', d: '把這週發生的事寫下來，下次諮商不用再花 30 分鐘回想。' },
+              { n: '2', t: 'AI 示範引導', d: '不是給答案，而是示範心理師可能會怎麼帶你們一步步練習。' },
+              { n: '3', t: '諮商摘要', d: '把最近兩週整理成一份摘要，帶進諮商室更快進入重點。' },
+              { n: '4', t: '預約真人諮商師', d: '真的卡住了，挑一位受過專業訓練的人好好談。' },
+            ].map((s) => (
+              <li key={s.n} className="flex items-start gap-3 text-left">
+                <span className="shrink-0 w-6 h-6 rounded-full bg-petal-cream-2 text-pink-600 font-body text-xs flex items-center justify-center">
+                  {s.n}
+                </span>
+                <div className="min-w-0">
+                  <div className="font-body text-sm font-medium text-petal-ink">{s.t}</div>
+                  <div className="font-body text-xs text-petal-muted leading-relaxed">{s.d}</div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </SampleCard>
+        <p className="font-body text-xs text-petal-muted leading-relaxed text-center px-2">
+          {NOT_A_SUBSTITUTE}
+        </p>
+      </div>
+    ),
+  },
 };
 
 // Roleplay scripts mix [partner1]/[partner2] and [男]/[女]/[他]/[她] role
@@ -856,8 +909,11 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scr
           <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-4">
             歡迎使用 <em className="not-italic font-light italic text-pink-600">Twogether</em>
           </h2>
+          <p className="font-display italic font-light text-base text-petal-ink-soft mb-2 leading-relaxed">
+            {POSITIONING_ONE_LINER}
+          </p>
           <p className="font-display italic font-light text-base text-petal-muted mb-8">
-            登入以開始記錄你們的愛情時光。
+            {POSITIONING_SUBLINE}
           </p>
           <button
             onClick={onSignUp}
