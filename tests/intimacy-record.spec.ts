@@ -97,10 +97,10 @@ test.describe('Intimacy Record Flow', () => {
     const recordFormHeader = page.getByTestId('record-modal-heading');
     await expect(recordFormHeader).toBeVisible({ timeout: 10000 });
 
-    // Modal no longer exposes time/duration/mood inputs — confirm they're gone.
+    // Modal exposes an editable 時長 (duration) field but no raw time input.
     // (Date is selected via the in-modal CalendarDatePicker; default is today, which is fine here.)
     await expect(page.locator('input[type="time"]')).toHaveCount(0);
-    await expect(page.getByTestId('record-duration-input')).toHaveCount(0);
+    await expect(page.getByTestId('record-duration-input')).toHaveCount(1);
 
     // Fill form fields by testid
     const descriptionField = page.getByTestId('record-description-input');
@@ -111,6 +111,13 @@ test.describe('Intimacy Record Flow', () => {
     const locationField = page.getByTestId('record-location-input');
     if (await locationField.isVisible({ timeout: 2000 })) {
       await locationField.fill(TEST_RECORD.location);
+    }
+
+    // Duration is now editable — confirm it accepts a custom value.
+    const durationField = page.getByTestId('record-duration-input');
+    if (await durationField.isVisible({ timeout: 2000 })) {
+      await durationField.fill('30-60分鐘');
+      await expect(durationField).toHaveValue('30-60分鐘');
     }
 
     const notesField = page.getByTestId('record-notes-input');
