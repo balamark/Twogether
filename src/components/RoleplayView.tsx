@@ -880,14 +880,6 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                     <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
                     查看
                   </button>
-                  <button
-                    onClick={() => handleQuickPlay(script)}
-                    data-testid={script.isCustom ? `script-card-custom-play-button-${script.id}` : `script-list-play-button-${index}`}
-                    className="bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
-                  >
-                    <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                    開始
-                  </button>
                 </div>
               </div>
             ))}
@@ -947,14 +939,6 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                     >
                       <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
                       查看
-                    </button>
-                    <button
-                      onClick={() => handleQuickPlay(script)}
-                      data-testid={script.isCustom ? `script-card-custom-play-button-${script.id}` : `script-list-play-button-${index}`}
-                      className="hidden sm:inline-flex bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
-                    >
-                      <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                      開始
                     </button>
                   </>
                 ),

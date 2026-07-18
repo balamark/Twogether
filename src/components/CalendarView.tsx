@@ -643,6 +643,39 @@ const CalendarView = ({
                   />
                 </div>
 
+                {/* Duration — editable so the roleplay default (15-30分鐘) can be changed */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Clock className="w-4 h-4 inline mr-2" />
+                    時長 (可選)
+                  </label>
+                  <input
+                    type="text"
+                    value={recordForm.duration}
+                    onChange={(e) => setRecordForm({...recordForm, duration: e.target.value})}
+                    placeholder="例如：15-30分鐘"
+                    data-testid="record-duration-input"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                  />
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {['15-30分鐘', '30-60分鐘', '1小時以上'].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setRecordForm({...recordForm, duration: preset})}
+                        data-testid={`record-duration-preset-${preset}`}
+                        className={`px-2.5 py-1 rounded-full border font-body text-xs transition-colors ${
+                          recordForm.duration === preset
+                            ? 'border-pink-500 bg-pink-50 text-pink-700'
+                            : 'border-petal-rule text-petal-muted hover:border-petal-ink hover:text-petal-ink'
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Roleplay Script Reference */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
