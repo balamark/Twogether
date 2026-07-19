@@ -5,6 +5,7 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const pairingService = require('../services/pairingService');
 const { logInfo, logWarn, logError } = require('../lib/logger');
+const { notifyPartnerAction } = require('../services/notificationService');
 const { TIMEZONE_VALUES } = require('../lib/timezone-options');
 
 const router = express.Router();
@@ -372,6 +373,8 @@ router.put('/journey', [
 
     logInfo('Couple journey updated', { coupleId });
 
+    notifyPartnerAction({ actorId: userId, type: 'couple_settings_updated', content: '你們的情侶旅程資訊有更新' });
+
     res.json({
       success: true,
       message: '情侶旅程更新成功'
@@ -433,6 +436,8 @@ router.put('/primary-timezone', [
 
     logInfo('Couple primary timezone updated', { coupleId, primaryTimezone });
 
+    notifyPartnerAction({ actorId: userId, type: 'couple_settings_updated', content: `共用時區已更新為 ${primaryTimezone}` });
+
     res.json({
       success: true,
       message: '共用時區已更新',
@@ -484,6 +489,8 @@ router.put('/nicknames', [
       [validNickname, userId]
     );
     logInfo('User nickname updated', { userId, nickname: validNickname });
+
+    notifyPartnerAction({ actorId: userId, type: 'profile_updated', content: `暱稱已更新為「${validNickname}」` });
 
     res.json({
       success: true,

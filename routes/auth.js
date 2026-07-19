@@ -6,6 +6,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { generateToken, authenticateToken } = require('../middleware/auth');
 const { logInfo, logWarn, logError } = require('../lib/logger');
+const { notifyPartnerAction } = require('../services/notificationService');
 const { TIMEZONE_VALUES } = require('../lib/timezone-options');
 const { isValidCompanionId, getCompanion } = require('../lib/aiCompanions');
 const emailService = require('../services/emailService');
@@ -526,6 +527,8 @@ router.put('/user/gender', authenticateToken, [
 
     logInfo('User gender updated', { userId });
 
+    notifyPartnerAction({ actorId: userId, type: 'profile_updated', content: '更新了性別設定' });
+
     res.json({
       success: true,
       message: '性別設定已更新',
@@ -567,6 +570,8 @@ router.put('/user/ai-companion', authenticateToken, [
 
     const info = getCompanion(companion);
     logInfo('User AI companion updated', { userId, companion });
+
+    notifyPartnerAction({ actorId: userId, type: 'profile_updated', content: `選擇了 ${info.name} 作為 AI 諮商師` });
 
     res.json({
       success: true,
@@ -845,6 +850,8 @@ router.put('/user/birth-date', authenticateToken, [
       [birthDate, userId]
     );
 
+    notifyPartnerAction({ actorId: userId, type: 'profile_updated', content: '更新了生日資訊' });
+
     res.json({
       success: true,
       message: '生日已更新',
@@ -886,6 +893,8 @@ router.put('/user/timezone', authenticateToken, [
       `UPDATE users SET timezone = $1 WHERE id = $2`,
       [timezone, userId]
     );
+
+    notifyPartnerAction({ actorId: userId, type: 'profile_updated', content: timezone ? `更新了所在時區為 ${timezone}` : '更新了所在時區' });
 
     res.json({
       success: true,

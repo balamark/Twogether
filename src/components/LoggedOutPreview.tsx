@@ -18,6 +18,7 @@ import {
   Crown,
   Check,
   Lock,
+  Bell,
   type LucideIcon,
 } from 'lucide-react';
 import { daysSinceLastNudge } from './AchievementsView';
@@ -68,6 +69,38 @@ const SampleCard: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     {children}
   </div>
 );
+
+// Read-only「通知中心」sample: every action your partner takes shows up here, so
+// you always know what TA just did (愛的記錄、劇本、禮物、婚姻健檢…). Static 範例 data.
+const NotificationCenterSample: React.FC = () => {
+  const rows = [
+    { emoji: '💝', title: '小晴新增了一則愛的記錄', body: '昨晚的約會好浪漫', dot: 'bg-blue-500', unread: true },
+    { emoji: '🎁', title: '小晴新增了一個客製禮物', body: '🎁 一起看電影的夜晚', dot: 'bg-blue-500', unread: true },
+    { emoji: '💑', title: '小晴發起了一次婚姻健檢', body: '打開 App 一起完成健檢', dot: 'bg-yellow-500', unread: false },
+  ];
+  return (
+    <div className="rounded-md border border-petal-rule bg-petal-cream overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-petal-rule bg-petal-cream-2">
+        <div className="flex items-center gap-1.5">
+          <Bell className="w-4 h-4 text-petal-rose-deep" strokeWidth={1.5} />
+          <span className="font-body text-xs font-medium text-petal-ink">通知中心</span>
+        </div>
+        <SampleTag />
+      </div>
+      <ul className="divide-y divide-petal-rule">
+        {rows.map((r, i) => (
+          <li key={i} className={`flex items-start gap-2.5 px-3 py-2.5 ${r.unread ? 'bg-petal-rose-soft/10' : ''}`}>
+            <span className={`mt-1.5 h-2 w-2 rounded-full ${r.dot}`} />
+            <div className="min-w-0">
+              <p className="font-body text-sm text-petal-ink">{r.emoji} {r.title}</p>
+              <p className="font-body text-xs text-petal-muted mt-0.5 truncate">{r.body}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
 
 // A read-only month calendar mockup for the 記錄時光 preview — closer to what a
 // real signed-in user sees than a plain list. Static "範例" data.
@@ -497,7 +530,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       </>
     ),
     description:
-      '看見你們的節奏：親密時光與生理期都在一張月曆上。太久沒親密時，App 會溫柔提醒另一半多關心你。',
+      '看見你們的節奏：親密時光與生理期都在一張月曆上。太久沒親密時，App 會溫柔提醒另一半多關心你。另一半的每個操作也會出現在通知中心，讓你隨時知道 TA 做了什麼。',
     sample: (
       <>
         <CalendarMock />
@@ -505,6 +538,9 @@ const PREVIEWS: Record<string, PreviewConfig> = {
           <SampleStats />
         </div>
         <SampleRecordList />
+        <div className="mt-4">
+          <NotificationCenterSample />
+        </div>
       </>
     ),
   },

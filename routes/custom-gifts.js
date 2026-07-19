@@ -4,6 +4,7 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { logDbError, errorResponseBody } = require('../lib/db-errors');
 const { logError } = require('../lib/logger');
+const { notifyPartnerAction } = require('../services/notificationService');
 
 const router = express.Router();
 
@@ -106,6 +107,12 @@ router.post('/', [
     `, [coupleId, title, description, cost, category, icon, userId]);
 
     const gift = giftResult.rows[0];
+
+    notifyPartnerAction({
+      actorId: userId,
+      type: 'custom_gift_created',
+      content: gift.title ? `${gift.icon || '🎁'} ${gift.title}` : null,
+    });
 
     res.json({
       success: true,
@@ -218,6 +225,12 @@ router.put('/:id', [
     const updatedResult = await db.query(updateQuery, updateValues);
     const gift = updatedResult.rows[0];
 
+    notifyPartnerAction({
+      actorId: userId,
+      type: 'custom_gift_updated',
+      content: gift.title ? `${gift.icon || '🎁'} ${gift.title}` : null,
+    });
+
     res.json({
       success: true,
       message: '禮品更新成功',
@@ -251,7 +264,7 @@ router.delete('/:id', async (req, res) => {
 
     // Verify gift ownership - check if user created it or is in the couple
     const giftResult = await db.query(`
-      SELECT cg.id
+      SELECT cg.id, cg.title, cg.icon
       FROM custom_gifts cg
       LEFT JOIN couples c ON cg.couple_id = c.id
       WHERE cg.id = $1 AND (
@@ -269,6 +282,14 @@ router.delete('/:id', async (req, res) => {
     }
 
     await db.query('DELETE FROM custom_gifts WHERE id = $1', [giftId]);
+
+    notifyPartnerAction({
+      actorId: userId,
+      type: 'custom_gift_deleted',
+      content: giftResult.rows[0].title
+        ? `${giftResult.rows[0].icon || '🎁'} ${giftResult.rows[0].title}`
+        : null,
+    });
 
     res.json({
       success: true,

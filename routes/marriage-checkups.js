@@ -6,6 +6,7 @@ const llmService = require('../services/llmService');
 const { checkLimit } = require('../lib/entitlements');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 const { countTodayAiUsage, resolveAiLimit, recordAiUsage } = require('../lib/aiUsage');
+const { notifyPartnerAction } = require('../services/notificationService');
 
 const router = express.Router();
 router.use(authenticateToken);
@@ -237,6 +238,7 @@ router.post('/', async (req, res) => {
       );
       row = ins.rows[0];
       logInfo('marriage_checkup.started', { userId, coupleId: couple.couple_id, checkupId: row.id });
+      notifyPartnerAction({ actorId: userId, type: 'checkup_created' });
     }
     const loaded = await loadCheckup(row.id, userId, couple.couple_id);
     res.status(201).json({
@@ -298,6 +300,7 @@ router.post(
         [req.params.id, userId, JSON.stringify(clean)]
       );
       logInfo('marriage_checkup.response', { userId, checkupId: req.params.id });
+      notifyPartnerAction({ actorId: userId, type: 'checkup_response' });
 
       // Both submitted? Reveal + summarise.
       const after = await loadCheckup(req.params.id, userId, couple.couple_id);
