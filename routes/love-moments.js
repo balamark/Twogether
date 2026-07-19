@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { logInfo, logError } = require('../lib/logger');
+const { notifyPartnerAction } = require('../services/notificationService');
 
 const router = express.Router();
 
@@ -94,6 +95,13 @@ router.post('/', [
     }
 
     logInfo('Love moment created', { momentId, coupleId, hasPhoto: !!moment.photo_id });
+
+    // Let the partner know (in-app + LINE + email), best-effort.
+    notifyPartnerAction({
+      actorId: userId,
+      type: 'love_moment_created',
+      content: moment.description || moment.notes || moment.location || null,
+    });
 
     res.status(201).json({
       success: true,
@@ -363,6 +371,12 @@ router.put('/:id', [
 
     logInfo('Love moment updated', { momentId });
 
+    notifyPartnerAction({
+      actorId: userId,
+      type: 'love_moment_updated',
+      content: req.body.description || req.body.notes || req.body.location || null,
+    });
+
     res.json({
       success: true,
       message: '愛情時刻更新成功'
@@ -403,6 +417,8 @@ router.delete('/:id', async (req, res) => {
     }
 
     logInfo('Love moment deleted', { momentId });
+
+    notifyPartnerAction({ actorId: userId, type: 'love_moment_deleted' });
 
     res.json({
       success: true,

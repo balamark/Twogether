@@ -706,6 +706,52 @@ ${acceptUrl}
     }
   }
 
+  // Generic partner-action email — the email mirror for services/notificationService.js.
+  // Any couple-shared action (love moment, gift, cycle record, checkup…) routes its
+  // email through here so we don't need a bespoke template per type. `title` is the
+  // already-composed headline ("💝 小明新增了一則愛的記錄"); `content` is the detail line.
+  // Best-effort and gated upstream by getUserEmailIfOptedIn.
+  async sendPartnerActionNotification({ senderName, recipientEmail, title, content = '' }) {
+    if (!this.isConfigured()) return;
+    if (!recipientEmail) return;
+
+    const safeSender = this._escape(senderName || '你的另一半');
+    const safeContent = this._escape(content).slice(0, 600);
+    const cleanTitle = this._escape(title || '你的另一半有新動態');
+
+    const bodyHtml = `
+      <p><strong>${safeSender}</strong> 在 Twogether 上有了新動態：</p>
+      <div class="quote">${safeContent.replace(/\n/g, '<br>')}</div>
+      <p style="color: #636e72; font-size: 14px;">登入 Twogether 查看，並在通知中心看到 TA 的所有動態。</p>
+    `;
+    const html = this._activityEmailHtml({
+      headerEmoji: '🔔',
+      headerTitle: cleanTitle,
+      headerSubtitle: '你的另一半剛剛做了一些事',
+      bodyHtml,
+    });
+
+    const text = [
+      `${senderName || '你的另一半'} 有了新動態：`,
+      content || '',
+      '',
+      '打開 Twogether 查看完整內容。',
+    ].join('\n');
+
+    try {
+      await this.transporter.sendMail({
+        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+        to: recipientEmail,
+        subject: cleanTitle,
+        text,
+        html,
+      });
+      logInfo('Partner action email sent', {});
+    } catch (error) {
+      logError('Failed to send partner action email', { ...smtpErrorFields(error) });
+    }
+  }
+
   // Platform-voiced「溫柔提醒」from the 已經幾天沒有親密了 card. Authored BY Twogether
   // (a caring friend, not a monitor) — never attributed to the partner. Neutral,
   // low-pressure, focused on reconnecting. Best-effort; the in-app reminder is

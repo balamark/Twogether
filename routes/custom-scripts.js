@@ -7,6 +7,7 @@ const { logDbError, errorResponseBody } = require('../lib/db-errors');
 const { logError, logInfo, logWarn } = require('../lib/logger');
 const emailService = require('../services/emailService');
 const llmService = require('../services/llmService');
+const { notifyPartnerAction } = require('../services/notificationService');
 const {
   IMAGE_MAX_BYTES,
   VIDEO_MAX_BYTES,
@@ -313,6 +314,12 @@ router.post('/', scriptPhotoUpload, [
       photoCount: photoUrls.length,
     });
 
+    notifyPartnerAction({
+      actorId: userId,
+      type: 'custom_script_created',
+      content: script.title ? `《${script.title}》` : null,
+    });
+
     res.json({
       success: true,
       message: '劇本創建成功',
@@ -518,6 +525,12 @@ router.put('/:id', scriptPhotoUpload, [
       : ((await fetchPhotosForScripts([scriptId]))[scriptId]
           || (script.thumbnail_url ? [script.thumbnail_url] : []));
 
+    notifyPartnerAction({
+      actorId: userId,
+      type: 'custom_script_updated',
+      content: script.title ? `《${script.title}》` : null,
+    });
+
     res.json({
       success: true,
       message: '劇本更新成功',
@@ -553,7 +566,7 @@ router.delete('/:id', async (req, res) => {
 
     // Verify script ownership - check if user created it or is in the couple
     const scriptResult = await db.query(`
-      SELECT cs.id
+      SELECT cs.id, cs.title
       FROM custom_scripts cs
       LEFT JOIN couples c ON cs.couple_id = c.id
       WHERE cs.id = $1 AND (
@@ -571,6 +584,12 @@ router.delete('/:id', async (req, res) => {
     }
 
     await db.query('DELETE FROM custom_scripts WHERE id = $1', [scriptId]);
+
+    notifyPartnerAction({
+      actorId: userId,
+      type: 'custom_script_deleted',
+      content: scriptResult.rows[0].title ? `《${scriptResult.rows[0].title}》` : null,
+    });
 
     res.json({
       success: true,
