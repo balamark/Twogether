@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown, MessageSquarePlus, Activity, LifeBuoy } from 'lucide-react';
 import { apiService } from '../services/api';
+import type { BillingStatus } from '../services/api';
 
 interface User {
   id: string;
@@ -33,6 +34,18 @@ interface HeaderProps {
   onShowFeedback: () => void;
   onShowLoveLanguage: () => void;
   onShowHelp: () => void;
+  // Couple's Premium status; when premium, the menu shows the expiry date so it's
+  // always visible (not just on the upgrade page).
+  billingStatus?: BillingStatus | null;
+}
+
+// Short M/D for the header badge (full date lives on the upgrade page).
+function formatShortDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString('zh-TW', { month: 'numeric', day: 'numeric' });
+  } catch {
+    return iso;
+  }
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -51,6 +64,7 @@ const Header: React.FC<HeaderProps> = ({
   onShowFeedback,
   onShowLoveLanguage,
   onShowHelp,
+  billingStatus,
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -233,10 +247,18 @@ const Header: React.FC<HeaderProps> = ({
                           setShowUserMenu(false);
                         }}
                         data-testid="user-menu-upgrade"
+                        data-tier={billingStatus?.tier || 'free'}
                         className="w-full flex items-center space-x-2 px-3 py-2 font-body text-sm text-pink-600 hover:bg-petal-cream-2 rounded-md transition-colors"
                       >
                         <Crown className="w-3.5 h-3.5" strokeWidth={1.5} />
-                        <span>升級 Premium</span>
+                        {billingStatus?.tier === 'premium' ? (
+                          <span>
+                            Premium 會員
+                            {billingStatus.expiresAt ? `・到期 ${formatShortDate(billingStatus.expiresAt)}` : ''}
+                          </span>
+                        ) : (
+                          <span>升級 Premium</span>
+                        )}
                       </button>
                       <button
                         onClick={() => {

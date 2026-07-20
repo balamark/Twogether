@@ -13,6 +13,7 @@ const { cardMeta, applyVerdict, scoreSession } = require('../lib/therapyCards');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 const {
   countTodayAiUsage,
+  countTodayAiUsageByKind,
   resolveAiLimit,
   recordAiUsage,
 } = require('../lib/aiUsage');
@@ -1071,11 +1072,14 @@ router.post(
       logInfo('events.reply_rewrite.input', { userId, eventId: req.params.id, len: rawReply.length, raw: rawReply });
 
       // Shares the daily AI budget with the icebreaker (both hit the paid LLM).
-      const { tier, limit } = await resolveAiLimit(userId);
+      const { tier, limit, coupleId } = await resolveAiLimit(userId);
       const usedToday = await countTodayAiUsage(userId);
       const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
       if (!limitCheck.ok) {
-        logInfo('events.reply_rewrite.limit', { userId, used: usedToday, limit, tier, blocked: true });
+        // Include the per-kind breakdown so a block can be attributed to the
+        // right feature (改寫 vs 角色扮演 vs 諮商師…) directly from the logs.
+        const { byKind } = await countTodayAiUsageByKind(userId);
+        logInfo('events.reply_rewrite.limit', { userId, coupleId, used: usedToday, limit, tier, byKind, blocked: true });
         return res.status(limitCheck.status).json(limitCheck.body);
       }
 

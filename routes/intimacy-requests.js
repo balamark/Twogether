@@ -8,7 +8,8 @@ const emailService = require('../services/emailService');
 const lineService = require('../services/lineService');
 const characterMappingService = require('../services/characterMappingService');
 const llmService = require('../services/llmService');
-const { getCoupleIdForUser, getCoupleTier, getLimit, checkLimit } = require('../lib/entitlements');
+const { getCoupleIdForUser, checkLimit } = require('../lib/entitlements');
+const { countTodayAiUsage, resolveAiLimit, recordAiUsage } = require('../lib/aiUsage');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 const {
   selectToneIds,
@@ -23,96 +24,12 @@ router.use(authenticateToken);
 
 const NUDGE_THRESHOLD = 3;
 
-// ---------------------------------------------------------------------------
 // AI usage gating — the roleplay invitation generator hits the paid LLM, so it
-// shares the tier-aware daily AI budget with the events icebreaker/reply-rewrite
-// (same event_ai_usage table; see routes/events.js). Helpers are duplicated here
-// the same way ensureNotificationsTable is, to keep the routers self-contained.
-// ---------------------------------------------------------------------------
-
-async function ensureEventAiUsageTable() {
-  try {
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS event_ai_usage (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        kind VARCHAR(32) NOT NULL,
-        provider VARCHAR(32),
-        model VARCHAR(64),
-        duration_ms INTEGER,
-        input_tokens INTEGER,
-        output_tokens INTEGER,
-        cache_create_tokens INTEGER,
-        cache_read_tokens INTEGER,
-        cost_usd NUMERIC(12, 8),
-        raw_input TEXT,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-      );
-    `);
-    await db.query(`
-      CREATE INDEX IF NOT EXISTS idx_event_ai_usage_user_day
-        ON event_ai_usage (user_id, kind, created_at DESC)
-    `);
-  } catch (err) {
-    logWarn('ensureEventAiUsageTable failed', { err: err.message });
-  }
-}
-
-// All paid AI calls share one daily budget — keep this kind list in sync with
-// countTodayAiUsage in routes/events.js.
-async function countTodayAiUsage(userId) {
-  try {
-    await ensureEventAiUsageTable();
-    const result = await db.query(
-      `SELECT COUNT(*)::int AS c
-         FROM event_ai_usage
-        WHERE user_id = $1
-          AND kind IN ('icebreaker', 'reply_rewrite', 'roleplay_messages', 'reconciliation_opener')
-          AND created_at >= DATE_TRUNC('day', NOW())`,
-      [userId]
-    );
-    return result.rows[0]?.c || 0;
-  } catch (err) {
-    // Fail open — serve the user rather than block on a count failure.
-    logWarn('countTodayAiUsage failed', { err: err.message });
-    return 0;
-  }
-}
-
-async function resolveAiLimit(userId) {
-  const coupleId = await getCoupleIdForUser(userId);
-  const tier = await getCoupleTier(coupleId);
-  return { tier, limit: getLimit(tier, 'icebreaker_per_day') };
-}
-
-async function recordAiUsage(userId, kind, rawInput, meta) {
-  try {
-    await ensureEventAiUsageTable();
-    const usage = meta?.usage || {};
-    await db.query(
-      `INSERT INTO event_ai_usage (
-         user_id, kind, provider, model, duration_ms,
-         input_tokens, output_tokens, cache_create_tokens, cache_read_tokens,
-         cost_usd, raw_input
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-      [
-        userId,
-        kind,
-        meta?.provider || null,
-        meta?.model || null,
-        meta?.durationMs ?? null,
-        usage.inputTokens ?? null,
-        usage.outputTokens ?? null,
-        usage.cacheCreateTokens ?? null,
-        usage.cacheReadTokens ?? null,
-        meta?.costUsd ?? null,
-        rawInput,
-      ]
-    );
-  } catch (err) {
-    logWarn('recordAiUsage failed', { kind, err: err.message });
-  }
-}
+// shares the tier-aware daily AI budget with every other paid-LLM feature. The
+// helpers (countTodayAiUsage / resolveAiLimit / recordAiUsage) are imported from
+// lib/aiUsage.js so this router counts against the SAME 12-kind budget as the
+// rest — a local copy previously counted only 4 kinds, so the「剩 N 次」hint and
+// the actual deduction disagreed depending on which endpoint you hit.
 
 // ---------------------------------------------------------------------------
 // Roleplay message cache + feedback. Schema lives in migration 050; this lazy
