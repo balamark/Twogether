@@ -254,12 +254,108 @@ function serializeMessage(row) {
     sender_id: row.sender_id,
     content: row.content,
     is_ai: row.is_ai === true,
+    is_therapist: row.is_therapist === true,
     ai_therapist: row.ai_therapist || null,
     facilitation: row.facilitation || null,
     created_at: row.created_at,
     read_at: row.read_at,
     edited_at: row.edited_at || null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Reusable read/write helpers — shared by the couple-member endpoints below and
+// by the dedicated-therapist endpoints in routes/therapists.js. `privateVisibleTo`
+// controls whose private events are visible: pass a member's userId to include
+// their own private events, or null (e.g. a therapist) to exclude ALL private
+// items. `viewerId` is used only to compute unread_count relative to the reader.
+// ---------------------------------------------------------------------------
+
+async function listEventsForCouple(
+  coupleId,
+  viewerId,
+  { privateVisibleTo = null, status = 'all', tag, limit = 50, offset = 0 } = {}
+) {
+  // WHERE-clause params only reference columns; viewerId is used solely by the
+  // unread_count subquery in the list query, so it is NOT part of the count
+  // query (passing an unreferenced param makes Postgres reject the bind).
+  const conds = ['e.couple_id = $1'];
+  const whereParams = [coupleId];
+  let i = 2;
+  if (privateVisibleTo) {
+    conds.push(`(e.is_private = FALSE OR e.created_by = $${i++})`);
+    whereParams.push(privateVisibleTo);
+  } else {
+    conds.push('e.is_private = FALSE');
+  }
+  if (status && status !== 'all') {
+    conds.push(`e.status = $${i++}`);
+    whereParams.push(status);
+  }
+  if (tag) {
+    conds.push(`$${i++} = ANY(e.tags)`);
+    whereParams.push(tag);
+  }
+  const where = conds.join(' AND ');
+
+  const countResult = await db.query(`SELECT COUNT(*) FROM events e WHERE ${where}`, whereParams);
+  const total = parseInt(countResult.rows[0].count, 10);
+
+  // List query appends viewerId (unread_count), then limit + offset.
+  const listParams = [...whereParams];
+  const viewerIdx = listParams.push(viewerId);
+  const limitIdx = listParams.push(parseInt(limit, 10));
+  const offsetIdx = listParams.push(parseInt(offset, 10));
+  const listResult = await db.query(
+    `SELECT e.*,
+            (SELECT content FROM event_messages m WHERE m.event_id = e.id
+               ORDER BY m.created_at DESC LIMIT 1) AS last_message_preview,
+            (SELECT COUNT(*) FROM event_messages m
+               WHERE m.event_id = e.id AND m.sender_id <> $${viewerIdx} AND m.read_at IS NULL)::int AS unread_count
+     FROM events e
+     WHERE ${where}
+     ORDER BY e.created_at DESC
+     LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+    listParams
+  );
+
+  const events = listResult.rows.map((row) =>
+    serializeEvent(row, {
+      last_message_preview: row.last_message_preview,
+      unread_count: row.unread_count || 0,
+    })
+  );
+  return { events, total };
+}
+
+// One event (with full message log) scoped to a couple, applying the privacy
+// rule. Returns a serialized event or null when it isn't visible to the viewer.
+async function getEventDetailForCouple(eventId, coupleId, { privateVisibleTo = null } = {}) {
+  const result = await db.query(
+    `SELECT * FROM events WHERE id = $1 AND couple_id = $2`,
+    [eventId, coupleId]
+  );
+  const event = result.rows[0];
+  if (!event) return null;
+  if (event.is_private && event.created_by !== privateVisibleTo) return null;
+
+  const messagesResult = await db.query(
+    `SELECT * FROM event_messages WHERE event_id = $1 ORDER BY created_at ASC`,
+    [eventId]
+  );
+  return serializeEvent(event, { messages: messagesResult.rows.map(serializeMessage) });
+}
+
+// Insert a message and bump the event's updated_at. isTherapist flags a
+// dedicated-therapist message so the UI can render it distinctly.
+async function insertEventMessage(eventId, senderId, content, { isTherapist = false } = {}) {
+  const msgResult = await db.query(
+    `INSERT INTO event_messages (event_id, sender_id, content, is_therapist)
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [eventId, senderId, content, isTherapist]
+  );
+  await db.query(`UPDATE events SET updated_at = NOW() WHERE id = $1`, [eventId]);
+  return serializeMessage(msgResult.rows[0]);
 }
 
 function sendValidationError(req, res) {
@@ -738,44 +834,13 @@ router.get(
 
       const { status = 'all', tag, limit = 50, offset = 0 } = req.query;
 
-      const conds = ['e.couple_id = $1', '(e.is_private = FALSE OR e.created_by = $2)'];
-      const params = [couple.couple_id, userId];
-      let i = 3;
-      if (status !== 'all') {
-        conds.push(`e.status = $${i++}`);
-        params.push(status);
-      }
-      if (tag) {
-        conds.push(`$${i++} = ANY(e.tags)`);
-        params.push(tag);
-      }
-
-      const where = conds.join(' AND ');
-
-      const countResult = await db.query(`SELECT COUNT(*) FROM events e WHERE ${where}`, params);
-      const total = parseInt(countResult.rows[0].count, 10);
-
-      params.push(parseInt(limit, 10), parseInt(offset, 10));
-
-      const listResult = await db.query(
-        `SELECT e.*,
-                (SELECT content FROM event_messages m WHERE m.event_id = e.id
-                   ORDER BY m.created_at DESC LIMIT 1) AS last_message_preview,
-                (SELECT COUNT(*) FROM event_messages m
-                   WHERE m.event_id = e.id AND m.sender_id <> $2 AND m.read_at IS NULL)::int AS unread_count
-         FROM events e
-         WHERE ${where}
-         ORDER BY e.created_at DESC
-         LIMIT $${i++} OFFSET $${i++}`,
-        params
-      );
-
-      const events = listResult.rows.map((row) =>
-        serializeEvent(row, {
-          last_message_preview: row.last_message_preview,
-          unread_count: row.unread_count || 0,
-        })
-      );
+      const { events, total } = await listEventsForCouple(couple.couple_id, userId, {
+        privateVisibleTo: userId,
+        status,
+        tag,
+        limit,
+        offset,
+      });
 
       res.json({ success: true, events, total });
     } catch (err) {
@@ -791,21 +856,15 @@ router.get('/:id', [param('id').isUUID()], async (req, res) => {
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
     if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
-    if (access.event.is_private && access.event.created_by !== req.user.id) {
+
+    const event = await getEventDetailForCouple(req.params.id, access.coupleId, {
+      privateVisibleTo: req.user.id,
+    });
+    if (!event) {
       return res.status(403).json({ success: false, message: '此為私人對話' });
     }
 
-    const messagesResult = await db.query(
-      `SELECT * FROM event_messages WHERE event_id = $1 ORDER BY created_at ASC`,
-      [req.params.id]
-    );
-
-    res.json({
-      success: true,
-      event: serializeEvent(access.event, {
-        messages: messagesResult.rows.map(serializeMessage),
-      }),
-    });
+    res.json({ success: true, event });
   } catch (err) {
     logError('Get event failed', { err: err.message, stack: err.stack });
     res.status(500).json({ success: false, message: '無法取得對話詳情' });
@@ -969,14 +1028,7 @@ router.post(
         return res.status(400).json({ success: false, message: '這段對話已完成，無法新增訊息' });
       }
 
-      const msgResult = await db.query(
-        `INSERT INTO event_messages (event_id, sender_id, content)
-         VALUES ($1, $2, $3) RETURNING *`,
-        [req.params.id, req.user.id, req.body.content]
-      );
-
-      // Touch updated_at so list ordering reflects activity
-      await db.query(`UPDATE events SET updated_at = NOW() WHERE id = $1`, [req.params.id]);
+      const message = await insertEventMessage(req.params.id, req.user.id, req.body.content);
 
       await notify(
         access.partnerId,
@@ -989,7 +1041,7 @@ router.post(
         req.body.content
       );
 
-      res.status(201).json({ success: true, message: serializeMessage(msgResult.rows[0]) });
+      res.status(201).json({ success: true, message });
     } catch (err) {
       logError('Post event message failed', { err: err.message, stack: err.stack });
       res.status(500).json({ success: false, message: '無法新增訊息' });
@@ -2152,3 +2204,8 @@ router.post('/:id/facilitation/end', [param('id').isUUID()], async (req, res) =>
 
 module.exports = router;
 module.exports.TAG_VOCAB = TAG_VOCAB;
+// Reusable helpers for the dedicated-therapist endpoints (routes/therapists.js).
+module.exports.listEventsForCouple = listEventsForCouple;
+module.exports.getEventDetailForCouple = getEventDetailForCouple;
+module.exports.insertEventMessage = insertEventMessage;
+module.exports.notify = notify;

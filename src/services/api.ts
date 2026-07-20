@@ -522,6 +522,8 @@ export interface EventMessage {
   senderId: string;
   content: string;
   isAi: boolean;
+  // True for a message left by the couple's dedicated (human) therapist.
+  isTherapist: boolean;
   aiTherapist: string | null;
   facilitation: MessageFacilitation | null;
   createdAt: string;
@@ -688,6 +690,8 @@ export interface WallReply {
   author_id: string;
   author_nickname: string | null;
   is_ai?: boolean;
+  // True for a reply left by the couple's dedicated (human) therapist.
+  is_therapist?: boolean;
   ai_therapist?: string | null;
   created_at: string;
 }
@@ -1184,6 +1188,28 @@ export interface TherapistConsultation {
 }
 
 export type MeetingProvider = 'zoom' | 'meet' | 'other';
+
+// 專屬心理師 (Dedicated therapist) — a couple's currently-linked therapist, who
+// can read their non-private wall + 好好說話 content (and comment iff canComment).
+export interface DedicatedTherapist {
+  id: string;            // couple_therapists row id
+  therapistId: string;
+  displayName: string;
+  title: string | null;
+  photoUrl: string | null;
+  canComment: boolean;
+  addedBy: string | null;
+  createdAt: string;
+}
+
+// The therapist's view of one couple who added them as dedicated therapist.
+export interface TherapistClientCouple {
+  coupleId: string;
+  coupleName: string | null;
+  partnerNames: string[];
+  canComment: boolean;
+  since: string;
+}
 
 export interface TherapistEarnings {
   introSessionsUsed: number;
@@ -3808,6 +3834,7 @@ class ApiService {
       sender_id?: string;
       content?: string;
       is_ai?: boolean;
+      is_therapist?: boolean;
       ai_therapist?: string | null;
       facilitation?: MessageFacilitation | null;
       created_at?: string;
@@ -3820,6 +3847,7 @@ class ApiService {
       senderId: r.sender_id || '',
       content: r.content || '',
       isAi: r.is_ai === true,
+      isTherapist: r.is_therapist === true,
       aiTherapist: r.ai_therapist ?? null,
       facilitation: r.facilitation ?? null,
       createdAt: r.created_at || '',
@@ -3980,6 +4008,141 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to fetch consultations:', error);
       this.throwApiError(error, '無法取得預約紀錄');
+    }
+  }
+
+  // --- 專屬心理師 (dedicated therapist) --------------------------------------
+
+  // The caller's couple's current dedicated therapist (or null).
+  async getDedicatedTherapist(): Promise<DedicatedTherapist | null> {
+    try {
+      const response = await apiClient.get('/therapists/dedicated');
+      return (response.data?.dedicated ?? null) as DedicatedTherapist | null;
+    } catch (error: unknown) {
+      console.error('Failed to fetch dedicated therapist:', error);
+      this.throwApiError(error, '無法取得專屬心理師資訊');
+    }
+  }
+
+  // Set (or switch to) a dedicated therapist. canComment optionally grants the
+  // therapist reply/message permission. Throws with error_code NO_COUPLE /
+  // THERAPIST_NOT_AVAILABLE so the UI can show a specific reason.
+  async setDedicatedTherapist(therapistId: string, canComment = false): Promise<DedicatedTherapist> {
+    try {
+      const response = await apiClient.post('/therapists/dedicated', { therapistId, canComment });
+      return response.data?.dedicated as DedicatedTherapist;
+    } catch (error: unknown) {
+      console.error('Failed to set dedicated therapist:', error);
+      this.throwApiError(error, '設定專屬心理師失敗，請稍後再試');
+    }
+  }
+
+  // Toggle the therapist's comment permission without re-selecting them.
+  async updateDedicatedTherapistPermission(canComment: boolean): Promise<boolean> {
+    try {
+      const response = await apiClient.patch('/therapists/dedicated', { canComment });
+      return response.data?.canComment === true;
+    } catch (error: unknown) {
+      console.error('Failed to update dedicated therapist permission:', error);
+      this.throwApiError(error, '更新權限失敗，請稍後再試');
+    }
+  }
+
+  async removeDedicatedTherapist(): Promise<void> {
+    try {
+      await apiClient.delete('/therapists/dedicated');
+    } catch (error: unknown) {
+      console.error('Failed to remove dedicated therapist:', error);
+      this.throwApiError(error, '解除失敗，請稍後再試');
+    }
+  }
+
+  // --- Therapist side: my client couples ------------------------------------
+
+  async getTherapistClients(): Promise<TherapistClientCouple[]> {
+    try {
+      const response = await apiClient.get('/therapists/clients');
+      return (response.data?.clients || []) as TherapistClientCouple[];
+    } catch (error: unknown) {
+      console.error('Failed to fetch therapist clients:', error);
+      this.throwApiError(error, '無法取得個案列表');
+    }
+  }
+
+  async getClientWall(coupleId: string): Promise<{ posts: WallPost[]; canComment: boolean }> {
+    try {
+      const response = await apiClient.get(`/therapists/clients/${coupleId}/wall`);
+      return {
+        posts: (response.data?.wall_posts || []) as WallPost[],
+        canComment: response.data?.canComment === true,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch client wall:', error);
+      this.throwApiError(error, '無法取得牆內容');
+    }
+  }
+
+  async getClientWallReplies(
+    coupleId: string,
+    postId: string
+  ): Promise<{ replies: WallReply[]; translationEnabled: boolean; canComment: boolean }> {
+    try {
+      const response = await apiClient.get(`/therapists/clients/${coupleId}/wall/${postId}/replies`);
+      return {
+        replies: (response.data?.replies || []) as WallReply[],
+        translationEnabled: response.data?.translation_enabled === true,
+        canComment: response.data?.canComment === true,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch client wall replies:', error);
+      this.throwApiError(error, '無法取得回覆');
+    }
+  }
+
+  async addClientWallReply(coupleId: string, postId: string, content: string): Promise<WallReply> {
+    try {
+      const response = await apiClient.post(`/therapists/clients/${coupleId}/wall/${postId}/replies`, { content });
+      return response.data?.reply as WallReply;
+    } catch (error: unknown) {
+      console.error('Failed to add client wall reply:', error);
+      this.throwApiError(error, '留言失敗，請稍後再試');
+    }
+  }
+
+  async getClientEvents(coupleId: string): Promise<{ events: EventRecord[]; total: number; canComment: boolean }> {
+    try {
+      const response = await apiClient.get(`/therapists/clients/${coupleId}/events`);
+      return {
+        events: (response.data?.events || []).map((row: unknown) => this.transformEvent(row)),
+        total: response.data?.total || 0,
+        canComment: response.data?.canComment === true,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch client events:', error);
+      this.throwApiError(error, '無法取得對話列表');
+    }
+  }
+
+  async getClientEventDetail(coupleId: string, eventId: string): Promise<{ event: EventRecord; canComment: boolean }> {
+    try {
+      const response = await apiClient.get(`/therapists/clients/${coupleId}/events/${eventId}`);
+      return {
+        event: this.transformEvent(response.data?.event),
+        canComment: response.data?.canComment === true,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch client event detail:', error);
+      this.throwApiError(error, '無法取得對話詳情');
+    }
+  }
+
+  async addClientEventMessage(coupleId: string, eventId: string, content: string): Promise<EventMessage> {
+    try {
+      const response = await apiClient.post(`/therapists/clients/${coupleId}/events/${eventId}/messages`, { content });
+      return this.transformEventMessage(response.data?.message);
+    } catch (error: unknown) {
+      console.error('Failed to add client event message:', error);
+      this.throwApiError(error, '留言失敗，請稍後再試');
     }
   }
 

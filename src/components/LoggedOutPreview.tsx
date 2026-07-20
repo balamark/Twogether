@@ -19,6 +19,8 @@ import {
   Check,
   Lock,
   Bell,
+  ShieldCheck,
+  MessageSquare,
   type LucideIcon,
 } from 'lucide-react';
 import { daysSinceLastNudge } from './AchievementsView';
@@ -686,6 +688,30 @@ const PREVIEWS: Record<string, PreviewConfig> = {
             ))}
           </ol>
         </SampleCard>
+
+        {/* 專屬心理師 — a couple can grant one approved therapist read (and
+            optionally comment) access to their wall + 好好說話, private items
+            excluded. */}
+        <SampleCard>
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-pink-500" />
+              專屬心理師
+            </span>
+            <SampleTag />
+          </div>
+          <p className="font-body text-sm text-petal-ink-soft leading-relaxed">
+            把一位諮商師設為你們的<strong className="text-petal-ink">專屬心理師</strong>，
+            他就能唯讀檢視你們的<strong className="text-petal-ink">牆</strong>與
+            <strong className="text-petal-ink">好好說話</strong>，更了解你們的關係脈絡。
+          </p>
+          <ul className="mt-2.5 space-y-1.5 font-body text-xs text-petal-muted">
+            <li className="flex items-center gap-1.5"><Lock className="w-3 h-3 text-petal-sage-deep" /> 私密內容不會被看到</li>
+            <li className="flex items-center gap-1.5"><MessageSquare className="w-3 h-3 text-pink-500" /> 可選擇是否開放心理師留言</li>
+            <li className="flex items-center gap-1.5"><HeartHandshake className="w-3 h-3 text-pink-500" /> 隨時可以解除</li>
+          </ul>
+        </SampleCard>
+
         <p className="font-body text-xs text-petal-muted leading-relaxed text-center px-2">
           {NOT_A_SUBSTITUTE}
         </p>

@@ -182,6 +182,7 @@ function mapReply(row) {
     author_id: row.author_id,
     author_nickname: row.author_nickname,
     is_ai: row.is_ai === true,
+    is_therapist: row.is_therapist === true,
     ai_therapist: row.ai_therapist || null,
     created_at: row.created_at,
   };
@@ -198,6 +199,87 @@ async function getUserCompanion(userId) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Reusable read/write helpers — shared by the couple-member endpoints below and
+// by the dedicated-therapist endpoints in routes/therapists.js. `privateVisibleTo`
+// controls whose private posts are visible: pass a member's userId to include
+// their own private posts, or null (e.g. a therapist) to exclude ALL private
+// items. Private content is never exposed to a third party.
+// ---------------------------------------------------------------------------
+
+// List a couple's wall posts, important first then newest first.
+async function listWallPostsForCouple(coupleId, { privateVisibleTo = null } = {}) {
+  const privateClause = privateVisibleTo
+    ? '(p.is_private = false OR p.author_id = $2)'
+    : 'p.is_private = false';
+  const params = privateVisibleTo ? [coupleId, privateVisibleTo] : [coupleId];
+
+  const result = await db.query(
+    `SELECT
+       p.id, p.content, p.mood_tag, p.category, p.author_id, p.is_private,
+       p.public_status, p.public_title, p.translation_enabled,
+       p.created_at, p.updated_at,
+       u.nickname AS author_nickname,
+       (SELECT COUNT(*) FROM wall_post_replies r WHERE r.post_id = p.id) AS reply_count
+     FROM wall_posts p
+     JOIN users u ON u.id = p.author_id
+     WHERE p.couple_id = $1 AND ${privateClause}
+     ORDER BY (p.category = 'important') DESC, p.created_at DESC`,
+    params
+  );
+
+  const mediaByPost = await fetchMediaForPosts(result.rows.map((r) => r.id));
+  return result.rows.map((row) =>
+    mapPost({ ...row, media: mediaByPost[row.id] || [] })
+  );
+}
+
+// Fetch one post scoped to a couple, applying the same privacy rule. Returns the
+// raw row ({ id, translation_enabled, is_private, author_id }) or null when the
+// post doesn't belong to the couple or is a private post the viewer can't see.
+async function getWallPostForCouple(postId, coupleId, { privateVisibleTo = null } = {}) {
+  const result = await db.query(
+    `SELECT id, translation_enabled, is_private, author_id
+       FROM wall_posts WHERE id = $1 AND couple_id = $2`,
+    [postId, coupleId]
+  );
+  const post = result.rows[0];
+  if (!post) return null;
+  if (post.is_private === true && post.author_id !== privateVisibleTo) return null;
+  return post;
+}
+
+// All replies for a post (caller must have already checked post access).
+async function listRepliesForPost(postId) {
+  const result = await db.query(
+    `SELECT r.id, r.post_id, r.content, r.author_id, r.is_ai, r.is_therapist,
+            r.ai_therapist, r.created_at, u.nickname AS author_nickname
+     FROM wall_post_replies r
+     JOIN users u ON u.id = r.author_id
+     WHERE r.post_id = $1
+     ORDER BY r.created_at ASC`,
+    [postId]
+  );
+  return result.rows.map(mapReply);
+}
+
+// Insert a reply and return it hydrated with the author nickname. isTherapist
+// flags a dedicated-therapist comment so the UI can render it distinctly.
+async function insertWallReply(postId, authorId, content, { isTherapist = false } = {}) {
+  const inserted = await db.query(
+    `INSERT INTO wall_post_replies (post_id, author_id, content, is_therapist)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id, post_id, content, author_id, is_ai, is_therapist, ai_therapist, created_at`,
+    [postId, authorId, content, isTherapist]
+  );
+  const reply = inserted.rows[0];
+  const enriched = await db.query(
+    `SELECT nickname AS author_nickname FROM users WHERE id = $1`,
+    [authorId]
+  );
+  return mapReply({ ...reply, author_nickname: enriched.rows[0]?.author_nickname || null });
+}
+
 // List all posts for the user's couple, important first, then newest first.
 router.get('/', async (req, res) => {
   try {
@@ -210,28 +292,9 @@ router.get('/', async (req, res) => {
 
     // Private posts are visible only to their author — the partner neither sees
     // them here nor is notified about them.
-    const result = await db.query(
-      `SELECT
-         p.id, p.content, p.mood_tag, p.category, p.author_id, p.is_private,
-         p.public_status, p.public_title, p.translation_enabled,
-         p.created_at, p.updated_at,
-         u.nickname AS author_nickname,
-         (SELECT COUNT(*) FROM wall_post_replies r WHERE r.post_id = p.id) AS reply_count
-       FROM wall_posts p
-       JOIN users u ON u.id = p.author_id
-       WHERE p.couple_id = $1 AND (p.is_private = false OR p.author_id = $2)
-       ORDER BY (p.category = 'important') DESC, p.created_at DESC`,
-      [couple.id, userId]
-    );
+    const wall_posts = await listWallPostsForCouple(couple.id, { privateVisibleTo: userId });
 
-    const mediaByPost = await fetchMediaForPosts(result.rows.map((r) => r.id));
-
-    res.json({
-      success: true,
-      wall_posts: result.rows.map((row) =>
-        mapPost({ ...row, media: mediaByPost[row.id] || [] })
-      ),
-    });
+    res.json({ success: true, wall_posts });
   } catch (error) {
     logDbError('Get wall posts error:', error, { user_id: req.user?.id });
     res.status(500).json(errorResponseBody('無法獲取貼文', error));
@@ -613,30 +676,18 @@ router.get('/:id/replies', async (req, res) => {
       return res.status(404).json({ success: false, message: '找不到貼文' });
     }
 
-    const access = await db.query(
-      `SELECT id, translation_enabled, is_private, author_id FROM wall_posts WHERE id = $1 AND couple_id = $2`,
-      [postId, couple.id]
-    );
-
     // A private post (and its replies) is visible only to its author.
-    if (access.rows.length === 0 || (access.rows[0].is_private === true && access.rows[0].author_id !== userId)) {
+    const post = await getWallPostForCouple(postId, couple.id, { privateVisibleTo: userId });
+    if (!post) {
       return res.status(404).json({ success: false, message: '找不到貼文' });
     }
 
-    const result = await db.query(
-      `SELECT r.id, r.post_id, r.content, r.author_id, r.is_ai, r.ai_therapist, r.created_at,
-              u.nickname AS author_nickname
-       FROM wall_post_replies r
-       JOIN users u ON u.id = r.author_id
-       WHERE r.post_id = $1
-       ORDER BY r.created_at ASC`,
-      [postId]
-    );
+    const replies = await listRepliesForPost(postId);
 
     res.json({
       success: true,
-      replies: result.rows.map(mapReply),
-      translation_enabled: access.rows[0].translation_enabled === true,
+      replies,
+      translation_enabled: post.translation_enabled === true,
     });
   } catch (error) {
     logDbError('List wall replies error:', error, {
@@ -675,31 +726,14 @@ router.post(
         return res.status(404).json({ success: false, message: '找不到貼文' });
       }
 
-      const postResult = await db.query(
-        `SELECT id, author_id, is_private FROM wall_posts WHERE id = $1 AND couple_id = $2`,
-        [postId, couple.id]
-      );
-
       // A private post is author-only; the partner can neither see nor reply.
-      if (postResult.rows.length === 0 || (postResult.rows[0].is_private === true && postResult.rows[0].author_id !== userId)) {
+      const post = await getWallPostForCouple(postId, couple.id, { privateVisibleTo: userId });
+      if (!post) {
         return res.status(404).json({ success: false, message: '找不到貼文' });
       }
 
-      const post = postResult.rows[0];
       const content = req.body.content;
-
-      const inserted = await db.query(
-        `INSERT INTO wall_post_replies (post_id, author_id, content)
-         VALUES ($1, $2, $3)
-         RETURNING id, post_id, content, author_id, created_at`,
-        [postId, userId, content]
-      );
-
-      const reply = inserted.rows[0];
-      const enriched = await db.query(
-        `SELECT nickname AS author_nickname FROM users WHERE id = $1`,
-        [userId]
-      );
+      const reply = await insertWallReply(postId, userId, content);
 
       // Notify the other person — if replier is the original author, notify
       // partner; otherwise notify the original author. Private posts never
@@ -713,17 +747,14 @@ router.post(
           '對方回覆了你的貼文',
           content,
           userId,
-          { senderName: enriched.rows[0]?.author_nickname || null }
+          { senderName: reply.author_nickname || null }
         );
       }
 
       res.json({
         success: true,
         message: '回覆成功',
-        reply: mapReply({
-          ...reply,
-          author_nickname: enriched.rows[0]?.author_nickname || null,
-        }),
+        reply,
       });
     } catch (error) {
       logDbError('Create wall reply error:', error, {
@@ -1165,3 +1196,9 @@ router.post('/:id/unpublish', async (req, res) => {
 });
 
 module.exports = router;
+// Reusable helpers for the dedicated-therapist endpoints (routes/therapists.js).
+module.exports.listWallPostsForCouple = listWallPostsForCouple;
+module.exports.getWallPostForCouple = getWallPostForCouple;
+module.exports.listRepliesForPost = listRepliesForPost;
+module.exports.insertWallReply = insertWallReply;
+module.exports.notifyPartner = notifyPartner;

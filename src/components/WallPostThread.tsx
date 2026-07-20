@@ -249,13 +249,18 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
       {replies.map((reply) => {
         const isOwn = reply.author_id === currentUserId;
         const isAi = reply.is_ai === true;
+        // A reply from the couple's dedicated (human) therapist — render it
+        // distinctly from the two partners and from the AI 諮商師.
+        const isTherapist = reply.is_therapist === true;
         return (
           <div
             key={reply.id}
             className={
               isAi
                 ? 'pl-4 border-l-2 border-petal-rose-deep/40 bg-petal-cream-2 rounded-r-md py-2 pr-2'
-                : 'pl-4 border-l-2 border-petal-rule'
+                : isTherapist
+                  ? 'pl-4 border-l-2 border-pink-400 bg-pink-50/60 rounded-r-md py-2 pr-2'
+                  : 'pl-4 border-l-2 border-petal-rule'
             }
             data-testid={`wall-reply-${reply.id}`}
           >
@@ -265,13 +270,20 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
                   className={
                     isAi
                       ? 'font-display text-sm font-medium text-petal-rose-deep flex items-center gap-1'
-                      : 'font-display text-sm font-medium text-petal-ink'
+                      : isTherapist
+                        ? 'font-display text-sm font-medium text-pink-700 flex items-center gap-1'
+                        : 'font-display text-sm font-medium text-petal-ink'
                   }
                 >
                   {isAi ? (
                     <>
                       <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
                       {companionName(reply.ai_therapist) ? `${companionName(reply.ai_therapist)}・AI 諮商師` : 'AI 諮商師'}
+                    </>
+                  ) : isTherapist ? (
+                    <>
+                      <HeartHandshake className="w-3.5 h-3.5" strokeWidth={1.5} />
+                      {reply.author_nickname ? `${reply.author_nickname}・心理師` : '專屬心理師'}
                     </>
                   ) : (
                     reply.author_nickname || (isOwn ? '我' : '對方')
@@ -295,7 +307,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
             <div className="mt-1 font-body text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">
               {reply.content}
             </div>
-            {translationEnabled && !isAi && translations[reply.id] && (
+            {translationEnabled && !isAi && !isTherapist && translations[reply.id] && (
               <MessageTranslationCard translation={translations[reply.id]} />
             )}
           </div>
