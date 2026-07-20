@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { X, Heart, Award, Languages, Star, ExternalLink, CalendarCheck } from 'lucide-react';
+import { X, Heart, Award, Languages, Star, ExternalLink, CalendarCheck, ShieldCheck } from 'lucide-react';
 import {
   apiService,
   type Therapist,
@@ -80,12 +80,43 @@ interface TherapistProfileModalProps {
   isAuthenticated: boolean;
   onClose: () => void;
   onBook: () => void;
+  // Called after this therapist is set as the couple's dedicated therapist, so
+  // the parent can refresh its 專屬心理師 panel.
+  onDedicated?: () => void;
   showNotification: (n: Omit<Notification, 'id'>) => void;
 }
 
-const TherapistProfileModal: React.FC<TherapistProfileModalProps> = ({ therapist: t, isAuthenticated, onClose, onBook, showNotification }) => {
+const TherapistProfileModal: React.FC<TherapistProfileModalProps> = ({ therapist: t, isAuthenticated, onClose, onBook, onDedicated, showNotification }) => {
   useScrollLock(true);
   const [reviews, setReviews] = useState<TherapistReviewsResult | null>(null);
+  const [canComment, setCanComment] = useState(false);
+  const [settingDedicated, setSettingDedicated] = useState(false);
+
+  const setAsDedicated = async () => {
+    try {
+      setSettingDedicated(true);
+      await apiService.setDedicatedTherapist(t.id, canComment);
+      showNotification({
+        type: 'success',
+        title: '已設為專屬心理師',
+        message: `${t.displayName} 現在可以檢視你們的牆與好好說話${canComment ? '，並可留言' : ''}`,
+        duration: 3800,
+      });
+      onDedicated?.();
+      onClose();
+    } catch (err) {
+      const e = err as { error_code?: string; message?: string };
+      const isNoCouple = e?.error_code === 'NO_COUPLE';
+      const message = isNoCouple
+        ? '請先和另一半配對，才能指定專屬心理師'
+        : e?.error_code === 'THERAPIST_NOT_AVAILABLE'
+          ? '這位心理師目前無法被指定為專屬'
+          : (e?.message || '請稍後再試');
+      showNotification({ type: isNoCouple ? 'warning' : 'error', title: '無法設定', message, duration: 4000 });
+    } finally {
+      setSettingDedicated(false);
+    }
+  };
 
   const loadReviews = useCallback(async () => {
     try {
@@ -175,6 +206,42 @@ const TherapistProfileModal: React.FC<TherapistProfileModalProps> = ({ therapist
             </button>
           )}
         </div>
+
+        {/* 設為專屬心理師 — grant this therapist read (and optionally comment)
+            access to the couple's wall + 好好說話. Takes effect immediately and
+            can be revoked any time from the 心理諮商 tab. */}
+        {isAuthenticated && (
+          <div className="mx-5 sm:mx-6 mb-4 rounded-lg border border-pink-200 bg-pink-50/60 p-4" data-testid="set-dedicated-section">
+            <div className="flex items-start gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-pink-500 shrink-0 mt-0.5" strokeWidth={1.5} />
+              <div className="min-w-0">
+                <div className="font-body text-sm font-medium text-petal-ink">設為我們的專屬心理師</div>
+                <p className="mt-0.5 font-body text-xs text-petal-ink-soft leading-relaxed">
+                  設定後，這位心理師可以唯讀檢視你們的<strong>牆</strong>與<strong>好好說話</strong>
+                  （不含私密內容），隨時可解除。
+                </p>
+              </div>
+            </div>
+            <label className="mt-3 flex items-center gap-2 font-body text-xs text-petal-ink-soft cursor-pointer">
+              <input
+                type="checkbox"
+                checked={canComment}
+                onChange={(e) => setCanComment(e.target.checked)}
+                data-testid="set-dedicated-cancomment"
+                className="rounded border-petal-rule text-pink-500 focus:ring-pink-400"
+              />
+              同時允許此心理師在牆與好好說話留言
+            </label>
+            <button
+              onClick={setAsDedicated}
+              disabled={settingDedicated}
+              data-testid="set-dedicated-button"
+              className="mt-3 w-full py-2 rounded-full bg-petal-ink text-petal-cream hover:bg-pink-700 disabled:opacity-50 transition-colors font-body text-[13px] font-medium"
+            >
+              {settingDedicated ? '設定中…' : '設為專屬心理師'}
+            </button>
+          </div>
+        )}
 
         {/* Rich sections */}
         <Section title="給來談者的一段話" show={!!t.introMessage}><TextBlock text={t.introMessage} /></Section>

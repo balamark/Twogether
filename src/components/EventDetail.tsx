@@ -897,6 +897,22 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 </div>
               );
             }
+            // A message from the couple's dedicated (human) therapist — centered
+            // and pink, distinct from the two partners and the AI 諮商師.
+            if (m.isTherapist) {
+              return (
+                <div key={m.id} className="flex justify-center">
+                  <div className="max-w-[92%] w-full rounded-2xl px-4 py-3 bg-pink-50 border border-pink-200">
+                    <div className="flex items-center gap-1.5 mb-1 text-pink-700">
+                      <HeartHandshake className="w-3.5 h-3.5" />
+                      <span className="text-xs font-medium">專屬心理師</span>
+                    </div>
+                    <p className="text-sm text-petal-ink whitespace-pre-wrap leading-relaxed">{m.content}</p>
+                    <p className="text-[10px] text-petal-muted mt-1.5">{formatTime(m.createdAt, tz)}</p>
+                  </div>
+                </div>
+              );
+            }
             const mine = m.senderId === currentUserId;
             const isEditing = editingMessageId === m.id;
             const speakerName = mine ? (myNickname || '我') : (partnerNickname || '對方');

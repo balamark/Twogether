@@ -22,6 +22,8 @@ import PaymentMethodPicker from './PaymentMethodPicker';
 import { FocusFilter } from './FocusFilter';
 import TherapistProfileModal from './TherapistProfileModal';
 import TherapySummaryCard from './TherapySummaryCard';
+import DedicatedTherapistPanel from './DedicatedTherapistPanel';
+import TherapistClientsPanel from './TherapistClientsPanel';
 
 interface TherapistsViewProps {
   authState: {
@@ -79,6 +81,9 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
   const [ownProfile, setOwnProfile] = useState<OwnTherapistProfile | null>(null);
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [showEarnings, setShowEarnings] = useState(false);
+  // Bumped when a therapist is set as dedicated (from a profile modal) so the
+  // 你們的專屬心理師 panel re-fetches.
+  const [dedicatedKey, setDedicatedKey] = useState(0);
 
   const loadOwnProfile = useCallback(async () => {
     if (!authState.isAuthenticated) { setOwnProfile(null); return; }
@@ -161,6 +166,18 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
         authState={{ isAuthenticated: authState.isAuthenticated, partnerConnected: authState.partnerConnected }}
         showNotification={showNotification}
       />
+
+      {/* 你們的專屬心理師 — set/manage the couple's dedicated therapist. */}
+      <DedicatedTherapistPanel
+        reloadKey={dedicatedKey}
+        isAuthenticated={authState.isAuthenticated}
+        showNotification={showNotification}
+      />
+
+      {/* 我輔導的伴侶 — only shown to a logged-in therapist. */}
+      {ownProfile && (
+        <TherapistClientsPanel showNotification={showNotification} />
+      )}
 
       {/* 公開問答 moved to the 真實故事 tab (StoriesView) — this view is the
           therapist directory only now. */}
@@ -260,6 +277,7 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
           isAuthenticated={authState.isAuthenticated}
           onClose={() => setProfileTarget(null)}
           onBook={() => { const t = profileTarget; setProfileTarget(null); setBookingTarget(t); }}
+          onDedicated={() => setDedicatedKey((k) => k + 1)}
           showNotification={showNotification}
         />
       )}

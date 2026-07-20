@@ -25,6 +25,11 @@ const ecpay = require('../lib/ecpay');
 const newebpay = require('../lib/newebpay');
 const qaPool = require('../lib/qaPool');
 const { logInfo, logWarn, logError } = require('../lib/logger');
+// Reusable read/write helpers for a dedicated therapist's view of a couple's
+// wall and 好好說話 (events) content. These modules don't require this one, so
+// there's no require cycle.
+const wallRoutes = require('./wall');
+const eventsRoutes = require('./events');
 
 const router = express.Router();
 const adminRouter = express.Router();
@@ -1257,6 +1262,420 @@ router.post('/qa/:id/vote', authenticateToken, async (req, res) => {
   } catch (error) {
     logError('Failed to vote public Q&A', { id: req.params.id, err: error.message });
     res.status(500).json({ success: false, message: '操作失敗，請稍後再試' });
+  }
+});
+
+// ===========================================================================
+// 專屬心理師 (Dedicated therapist) — a couple adds ONE approved therapist who
+// then gets read-only (and, if granted, comment) access to their non-private
+// wall + 好好說話 content. Defined BEFORE GET '/:id' so '/dedicated' and
+// '/clients' aren't captured as a therapist id.
+// ===========================================================================
+
+// The couple the requesting user belongs to (paired OR solo/draft couple).
+async function findCoupleForMember(userId) {
+  const r = await db.query(
+    `SELECT id, user1_id, user2_id, couple_name FROM couples WHERE user1_id = $1 OR user2_id = $1`,
+    [userId]
+  );
+  return r.rows[0] || null;
+}
+
+// The active dedicated-therapist link between coupleId and the logged-in user
+// (who must be the approved therapist). Returns { id, can_comment } or null.
+async function getDedicatedTherapistLink(coupleId, userId) {
+  const r = await db.query(
+    `SELECT ct.id, ct.can_comment
+       FROM couple_therapists ct
+       JOIN therapists t ON t.id = ct.therapist_id
+      WHERE ct.couple_id = $1 AND t.user_id = $2
+        AND ct.status = 'active' AND t.status = 'approved'`,
+    [coupleId, userId]
+  );
+  return r.rows[0] || null;
+}
+
+const toDedicated = (row) => ({
+  id: row.id,
+  therapistId: row.therapist_id,
+  displayName: row.display_name,
+  title: row.title || null,
+  photoUrl: row.photo_url || null,
+  canComment: row.can_comment === true,
+  addedBy: row.added_by || null,
+  createdAt: row.created_at,
+});
+
+// In-app only notification (avoids the wall/event email templates for
+// relationship-status changes like adding/removing a dedicated therapist).
+async function insertNotification(userId, type, title, content, relatedUserId, priority = 1) {
+  if (!userId) return;
+  try {
+    await db.query(
+      `INSERT INTO notifications (user_id, notification_type, title, content, related_user_id, priority)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [userId, type, title, (content || '').slice(0, 200), relatedUserId || null, priority]
+    );
+  } catch (err) {
+    logWarn('insertNotification failed', { type, err: err.message });
+  }
+}
+
+// Both partners of a couple (ids), for fan-out notifications.
+async function coupleMemberIds(coupleId) {
+  const c = await db.query(`SELECT user1_id, user2_id FROM couples WHERE id = $1`, [coupleId]);
+  if (c.rows.length === 0) return [];
+  return [c.rows[0].user1_id, c.rows[0].user2_id].filter(Boolean);
+}
+
+// GET /api/therapists/dedicated — the caller's couple's current dedicated
+// therapist (or null).
+router.get('/dedicated', authenticateToken, async (req, res) => {
+  try {
+    const couple = await findCoupleForMember(req.user.id);
+    if (!couple) return res.json({ success: true, dedicated: null });
+    const result = await db.query(
+      `SELECT ct.id, ct.can_comment, ct.created_at, ct.added_by,
+              t.id AS therapist_id, t.display_name, t.title, t.photo_url
+         FROM couple_therapists ct
+         JOIN therapists t ON t.id = ct.therapist_id
+        WHERE ct.couple_id = $1 AND ct.status = 'active'`,
+      [couple.id]
+    );
+    const row = result.rows[0];
+    res.json({ success: true, dedicated: row ? toDedicated(row) : null });
+  } catch (error) {
+    logError('Failed to load dedicated therapist', { userId: req.user?.id, err: error.message });
+    res.status(500).json({ success: false, message: '無法取得專屬心理師資訊' });
+  }
+});
+
+// POST /api/therapists/dedicated — set (or switch to) a dedicated therapist.
+// Takes effect immediately; can be revoked any time. Optional canComment grants
+// the therapist reply/message permission.
+router.post('/dedicated', authenticateToken, [
+  body('therapistId').isUUID().withMessage('therapistId 無效'),
+  body('canComment').optional().isBoolean(),
+], async (req, res) => {
+  if (!handleValidation(req, res)) return;
+  try {
+    const userId = req.user.id;
+    const couple = await findCoupleForMember(userId);
+    if (!couple) {
+      return res.status(400).json({
+        success: false,
+        error_code: 'NO_COUPLE',
+        message: '請先建立你們的關係後，再指定專屬心理師',
+      });
+    }
+
+    const therapistId = req.body.therapistId;
+    const canComment = req.body.canComment === true;
+
+    const t = await db.query(
+      `SELECT id, user_id, display_name, title, photo_url, status FROM therapists WHERE id = $1`,
+      [therapistId]
+    );
+    if (t.rows.length === 0 || t.rows[0].status !== 'approved') {
+      return res.status(400).json({
+        success: false,
+        error_code: 'THERAPIST_NOT_AVAILABLE',
+        message: '此心理師目前無法被指定為專屬心理師',
+      });
+    }
+    const therapist = t.rows[0];
+
+    // Switch atomically: revoke any current active link, then insert the new one.
+    const link = await db.transaction(async (client) => {
+      await client.query(
+        `UPDATE couple_therapists
+            SET status = 'revoked', revoked_at = NOW(), revoked_by = $2
+          WHERE couple_id = $1 AND status = 'active'`,
+        [couple.id, userId]
+      );
+      const inserted = await client.query(
+        `INSERT INTO couple_therapists (couple_id, therapist_id, added_by, can_comment)
+         VALUES ($1, $2, $3, $4)
+         RETURNING id, can_comment, created_at, added_by`,
+        [couple.id, therapistId, userId, canComment]
+      );
+      return inserted.rows[0];
+    });
+
+    logInfo('therapist.dedicated.set', { userId, coupleId: couple.id, therapistId, canComment });
+
+    // Transparency: notify the partner and the therapist (non-blocking).
+    (async () => {
+      const partnerId = couple.user1_id === userId ? couple.user2_id : couple.user1_id;
+      await insertNotification(
+        partnerId,
+        'dedicated_therapist_added',
+        '你們新增了專屬心理師',
+        `${therapist.display_name} 現在可以檢視你們的牆與好好說話${canComment ? '，並可留言' : ''}`,
+        userId
+      );
+      await insertNotification(
+        therapist.user_id,
+        'dedicated_client_added',
+        '有伴侶將你設為專屬心理師',
+        '你可以在「我輔導的伴侶」檢視他們的牆與好好說話',
+        userId
+      );
+    })().catch((err) => logWarn('notify dedicated set failed', { err: err.message }));
+
+    res.status(201).json({
+      success: true,
+      message: '已設定專屬心理師',
+      dedicated: toDedicated({
+        ...link,
+        therapist_id: therapistId,
+        display_name: therapist.display_name,
+        title: therapist.title,
+        photo_url: therapist.photo_url,
+      }),
+    });
+  } catch (error) {
+    logError('Failed to set dedicated therapist', { userId: req.user?.id, err: error.message });
+    res.status(500).json({ success: false, message: '設定專屬心理師失敗，請稍後再試' });
+  }
+});
+
+// PATCH /api/therapists/dedicated — toggle the therapist's comment permission
+// without re-selecting them.
+router.patch('/dedicated', authenticateToken, [
+  body('canComment').isBoolean().withMessage('canComment 需為布林值'),
+], async (req, res) => {
+  if (!handleValidation(req, res)) return;
+  try {
+    const userId = req.user.id;
+    const couple = await findCoupleForMember(userId);
+    if (!couple) {
+      return res.status(400).json({ success: false, error_code: 'NO_COUPLE', message: '請先建立你們的關係' });
+    }
+    const canComment = req.body.canComment === true;
+    const result = await db.query(
+      `UPDATE couple_therapists SET can_comment = $2
+        WHERE couple_id = $1 AND status = 'active' RETURNING id`,
+      [couple.id, canComment]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error_code: 'NO_DEDICATED_THERAPIST', message: '你們還沒有專屬心理師' });
+    }
+    logInfo('therapist.dedicated.permission', { userId, coupleId: couple.id, canComment });
+    res.json({ success: true, message: canComment ? '已允許心理師留言' : '已關閉心理師留言權限', canComment });
+  } catch (error) {
+    logError('Failed to update dedicated permission', { userId: req.user?.id, err: error.message });
+    res.status(500).json({ success: false, message: '更新權限失敗，請稍後再試' });
+  }
+});
+
+// DELETE /api/therapists/dedicated — revoke the couple's dedicated therapist.
+router.delete('/dedicated', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const couple = await findCoupleForMember(userId);
+    if (!couple) {
+      return res.status(400).json({ success: false, error_code: 'NO_COUPLE', message: '請先建立你們的關係' });
+    }
+    const result = await db.query(
+      `UPDATE couple_therapists SET status = 'revoked', revoked_at = NOW(), revoked_by = $2
+        WHERE couple_id = $1 AND status = 'active' RETURNING id, therapist_id`,
+      [couple.id, userId]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error_code: 'NO_DEDICATED_THERAPIST', message: '你們目前沒有專屬心理師' });
+    }
+    logInfo('therapist.dedicated.revoked', { userId, coupleId: couple.id });
+    res.json({ success: true, message: '已解除專屬心理師' });
+  } catch (error) {
+    logError('Failed to revoke dedicated therapist', { userId: req.user?.id, err: error.message });
+    res.status(500).json({ success: false, message: '解除失敗，請稍後再試' });
+  }
+});
+
+// --- Therapist side: my client couples ------------------------------------
+
+// GET /api/therapists/clients — couples that added the logged-in therapist.
+router.get('/clients', authenticateToken, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT ct.couple_id, ct.can_comment, ct.created_at,
+              c.couple_name,
+              u1.nickname AS partner1_name, u2.nickname AS partner2_name
+         FROM couple_therapists ct
+         JOIN therapists t ON t.id = ct.therapist_id
+         JOIN couples c ON c.id = ct.couple_id
+         LEFT JOIN users u1 ON u1.id = c.user1_id
+         LEFT JOIN users u2 ON u2.id = c.user2_id
+        WHERE t.user_id = $1 AND t.status = 'approved' AND ct.status = 'active'
+        ORDER BY ct.created_at DESC`,
+      [req.user.id]
+    );
+    res.json({
+      success: true,
+      clients: result.rows.map((r) => ({
+        coupleId: r.couple_id,
+        coupleName: r.couple_name || null,
+        partnerNames: [r.partner1_name, r.partner2_name].filter(Boolean),
+        canComment: r.can_comment === true,
+        since: r.created_at,
+      })),
+    });
+  } catch (error) {
+    logError('Failed to list therapist clients', { userId: req.user?.id, err: error.message });
+    res.status(500).json({ success: false, message: '無法取得個案列表' });
+  }
+});
+
+// Guard: resolve the dedicated link or send 403. Returns the link or null (after
+// having already responded).
+async function requireDedicatedLink(req, res) {
+  const link = await getDedicatedTherapistLink(req.params.coupleId, req.user.id);
+  if (!link) {
+    res.status(403).json({
+      success: false,
+      error_code: 'NOT_DEDICATED_THERAPIST',
+      message: '你不是這對伴侶的專屬心理師',
+    });
+    return null;
+  }
+  return link;
+}
+
+// GET /api/therapists/clients/:coupleId/wall — read the couple's non-private wall.
+router.get('/clients/:coupleId/wall', authenticateToken, async (req, res) => {
+  try {
+    const link = await requireDedicatedLink(req, res);
+    if (!link) return;
+    const wall_posts = await wallRoutes.listWallPostsForCouple(req.params.coupleId, { privateVisibleTo: null });
+    res.json({ success: true, wall_posts, canComment: link.can_comment === true });
+  } catch (error) {
+    logError('Failed to load client wall', { userId: req.user?.id, coupleId: req.params.coupleId, err: error.message });
+    res.status(500).json({ success: false, message: '無法取得牆內容' });
+  }
+});
+
+// GET /api/therapists/clients/:coupleId/wall/:postId/replies
+router.get('/clients/:coupleId/wall/:postId/replies', authenticateToken, async (req, res) => {
+  try {
+    const link = await requireDedicatedLink(req, res);
+    if (!link) return;
+    const post = await wallRoutes.getWallPostForCouple(req.params.postId, req.params.coupleId, { privateVisibleTo: null });
+    if (!post) return res.status(404).json({ success: false, message: '找不到貼文' });
+    const replies = await wallRoutes.listRepliesForPost(req.params.postId);
+    res.json({
+      success: true,
+      replies,
+      translation_enabled: post.translation_enabled === true,
+      canComment: link.can_comment === true,
+    });
+  } catch (error) {
+    logError('Failed to load client wall replies', { userId: req.user?.id, err: error.message });
+    res.status(500).json({ success: false, message: '無法取得回覆' });
+  }
+});
+
+// POST /api/therapists/clients/:coupleId/wall/:postId/replies — therapist comment
+// (requires can_comment). Never touches private posts.
+router.post('/clients/:coupleId/wall/:postId/replies', authenticateToken, [
+  body('content').isString().isLength({ min: 1, max: 1000 }).withMessage('回覆內容必須在 1-1000 字之間'),
+], async (req, res) => {
+  if (!handleValidation(req, res)) return;
+  try {
+    const link = await requireDedicatedLink(req, res);
+    if (!link) return;
+    if (!link.can_comment) {
+      return res.status(403).json({ success: false, error_code: 'NO_COMMENT_PERMISSION', message: '這對伴侶尚未開放留言權限給你' });
+    }
+    const post = await wallRoutes.getWallPostForCouple(req.params.postId, req.params.coupleId, { privateVisibleTo: null });
+    if (!post) return res.status(404).json({ success: false, message: '找不到貼文' });
+
+    const reply = await wallRoutes.insertWallReply(req.params.postId, req.user.id, req.body.content, { isTherapist: true });
+    logInfo('therapist.client.wall_reply', { userId: req.user.id, coupleId: req.params.coupleId, postId: req.params.postId });
+
+    // Notify both partners that their therapist commented (non-blocking).
+    (async () => {
+      const ids = await coupleMemberIds(req.params.coupleId);
+      for (const uid of ids) {
+        await wallRoutes.notifyPartner(uid, 'wall_reply', '你們的專屬心理師在牆上留言', req.body.content, req.user.id);
+      }
+    })().catch((err) => logWarn('notify therapist wall reply failed', { err: err.message }));
+
+    res.status(201).json({ success: true, reply });
+  } catch (error) {
+    logError('Failed to add therapist wall reply', { userId: req.user?.id, err: error.message });
+    res.status(500).json({ success: false, message: '留言失敗，請稍後再試' });
+  }
+});
+
+// GET /api/therapists/clients/:coupleId/events — read the couple's non-private
+// 好好說話 events list.
+router.get('/clients/:coupleId/events', authenticateToken, async (req, res) => {
+  try {
+    const link = await requireDedicatedLink(req, res);
+    if (!link) return;
+    const { events, total } = await eventsRoutes.listEventsForCouple(req.params.coupleId, req.user.id, {
+      privateVisibleTo: null,
+    });
+    res.json({ success: true, events, total, canComment: link.can_comment === true });
+  } catch (error) {
+    logError('Failed to load client events', { userId: req.user?.id, coupleId: req.params.coupleId, err: error.message });
+    res.status(500).json({ success: false, message: '無法取得對話列表' });
+  }
+});
+
+// GET /api/therapists/clients/:coupleId/events/:eventId — event detail + messages.
+router.get('/clients/:coupleId/events/:eventId', authenticateToken, async (req, res) => {
+  try {
+    const link = await requireDedicatedLink(req, res);
+    if (!link) return;
+    const event = await eventsRoutes.getEventDetailForCouple(req.params.eventId, req.params.coupleId, {
+      privateVisibleTo: null,
+    });
+    if (!event) return res.status(404).json({ success: false, message: '找不到對話' });
+    res.json({ success: true, event, canComment: link.can_comment === true });
+  } catch (error) {
+    logError('Failed to load client event detail', { userId: req.user?.id, err: error.message });
+    res.status(500).json({ success: false, message: '無法取得對話詳情' });
+  }
+});
+
+// POST /api/therapists/clients/:coupleId/events/:eventId/messages — therapist
+// message (requires can_comment). Never touches private events.
+router.post('/clients/:coupleId/events/:eventId/messages', authenticateToken, [
+  body('content').isString().isLength({ min: 1, max: 2000 }).withMessage('內容需在 1-2000 字之間'),
+], async (req, res) => {
+  if (!handleValidation(req, res)) return;
+  try {
+    const link = await requireDedicatedLink(req, res);
+    if (!link) return;
+    if (!link.can_comment) {
+      return res.status(403).json({ success: false, error_code: 'NO_COMMENT_PERMISSION', message: '這對伴侶尚未開放留言權限給你' });
+    }
+    // Only non-private, still-open events accept a therapist message.
+    const event = await eventsRoutes.getEventDetailForCouple(req.params.eventId, req.params.coupleId, {
+      privateVisibleTo: null,
+    });
+    if (!event) return res.status(404).json({ success: false, message: '找不到對話' });
+    if (event.status === 'resolved') {
+      return res.status(400).json({ success: false, message: '這段對話已完成，無法新增訊息' });
+    }
+
+    const message = await eventsRoutes.insertEventMessage(req.params.eventId, req.user.id, req.body.content, { isTherapist: true });
+    logInfo('therapist.client.event_message', { userId: req.user.id, coupleId: req.params.coupleId, eventId: req.params.eventId });
+
+    // Notify both partners (non-blocking).
+    (async () => {
+      const ids = await coupleMemberIds(req.params.coupleId);
+      for (const uid of ids) {
+        await eventsRoutes.notify(uid, 'event_reply', '你們的專屬心理師回覆了對話', event.title, req.params.eventId, req.user.id, 2, req.body.content);
+      }
+    })().catch((err) => logWarn('notify therapist event message failed', { err: err.message }));
+
+    res.status(201).json({ success: true, message });
+  } catch (error) {
+    logError('Failed to add therapist event message', { userId: req.user?.id, err: error.message });
+    res.status(500).json({ success: false, message: '留言失敗，請稍後再試' });
   }
 });
 
