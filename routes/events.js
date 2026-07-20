@@ -665,13 +665,22 @@ async function ensureTherapySummariesTable() {
         period_days INTEGER NOT NULL,
         input_hash VARCHAR(64) NOT NULL,
         summary JSONB NOT NULL,
+        event_count INTEGER,
         created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
         UNIQUE (couple_id, input_hash)
       );
     `);
+    // event_count added later so past summaries can list "共 N 件事件" in history.
+    await db.query(
+      `ALTER TABLE therapy_summaries ADD COLUMN IF NOT EXISTS event_count INTEGER`
+    );
   } catch (err) {
     logWarn('ensureTherapySummariesTable failed', { err: err.message });
   }
+}
+
+function periodLabelFor(days) {
+  return Number(days) === 14 ? '最近兩週' : `最近 ${days} 天`;
 }
 
 // GET /api/events/therapy-summary?days=14 — aggregate the couple's events over a
@@ -799,10 +808,11 @@ router.get(
       await recordAiUsage(userId, 'therapy_summary', `${periodLabel}・${rows.length} 件`, meta);
       // Upsert so a racing partner request collapses onto the same row.
       await db.query(
-        `INSERT INTO therapy_summaries (couple_id, period_days, input_hash, summary)
-         VALUES ($1, $2, $3, $4)
-         ON CONFLICT (couple_id, input_hash) DO UPDATE SET summary = EXCLUDED.summary`,
-        [coupleId, days, inputHash, JSON.stringify(result)]
+        `INSERT INTO therapy_summaries (couple_id, period_days, input_hash, summary, event_count)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (couple_id, input_hash)
+           DO UPDATE SET summary = EXCLUDED.summary, event_count = EXCLUDED.event_count`,
+        [coupleId, days, inputHash, JSON.stringify(result), rows.length]
       );
 
       res.json({
@@ -816,6 +826,46 @@ router.get(
     }
   }
 );
+
+// GET /api/events/therapy-summary/history — the couple's previously generated
+// 諮商摘要 snapshots, newest first. Every distinct event-set produced a cached
+// row (see the generate route); this exposes them so either partner can re-open
+// an earlier summary — the one they took to a past session — without spending an
+// AI credit to regenerate the same thing.
+router.get('/therapy-summary/history', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const couple = await getCoupleForUser(userId);
+    if (!couple) {
+      // Not an error: solo users simply have no shared history yet.
+      return res.json({ success: true, history: [] });
+    }
+
+    await ensureTherapySummariesTable();
+    const result = await db.query(
+      `SELECT id, period_days, event_count, summary, created_at
+         FROM therapy_summaries
+        WHERE couple_id = $1
+        ORDER BY created_at DESC
+        LIMIT 50`,
+      [couple.couple_id]
+    );
+
+    const history = result.rows.map((r) => ({
+      id: r.id,
+      periodDays: r.period_days,
+      periodLabel: periodLabelFor(r.period_days),
+      eventCount: r.event_count,
+      createdAt: r.created_at,
+      summary: r.summary,
+    }));
+
+    res.json({ success: true, history });
+  } catch (err) {
+    logError('Therapy summary history failed', { err: err.message, stack: err.stack });
+    res.status(500).json({ success: false, message: '無法載入諮商摘要紀錄，請稍後再試' });
+  }
+});
 
 // List events for caller's couple
 router.get(

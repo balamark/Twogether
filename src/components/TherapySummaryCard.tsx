@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ClipboardList,
   Sparkles,
@@ -11,8 +11,11 @@ import {
   Copy,
   Check,
   UserPlus,
+  History,
+  ChevronDown,
+  Clock,
 } from 'lucide-react';
-import { apiService, type TherapySummary } from '../services/api';
+import { apiService, type TherapySummary, type TherapySummaryHistoryEntry } from '../services/api';
 import type { Notification } from './ErrorNotification';
 import { NOT_A_SUBSTITUTE_SHORT } from '../content/positioning';
 
@@ -50,6 +53,14 @@ function summaryToText(s: TherapySummary, periodLabel: string): string {
   return lines.join('\n');
 }
 
+// Short date for the history list — the couple recognises "which session was
+// this for" by roughly when they made it.
+function formatHistoryDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+}
+
 const SectionTitle: React.FC<{ icon: React.ReactNode; children: React.ReactNode }> = ({ icon, children }) => (
   <div className="flex items-center gap-1.5 text-petal-sage-deep mb-1.5">
     {icon}
@@ -79,6 +90,39 @@ const TherapySummaryCard: React.FC<Props> = ({ authState, showNotification }) =>
   // Guiding empty state (not paired / no events) — never a red error.
   const [notice, setNotice] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // Past summaries the couple already generated — re-opening one is free.
+  const [history, setHistory] = useState<TherapySummaryHistoryEntry[]>([]);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  // Which historic snapshot is on screen (null = a freshly generated one). Drives
+  // the "檢視歷史紀錄" badge and stops us re-charging an AI credit for old digests.
+  const [viewingId, setViewingId] = useState<string | null>(null);
+  const [viewingDate, setViewingDate] = useState<string | null>(null);
+
+  const loadHistory = useCallback(async () => {
+    if (!authState.isAuthenticated) return;
+    try {
+      const rows = await apiService.getTherapySummaryHistory();
+      setHistory(rows);
+    } catch {
+      // History is a convenience — a failure here shouldn't disrupt the card.
+    }
+  }, [authState.isAuthenticated]);
+
+  useEffect(() => {
+    loadHistory();
+  }, [loadHistory]);
+
+  // Re-open a past summary from the cache — no AI credit, no server round-trip
+  // to regenerate. This is the core of the feature: same digest, zero tokens.
+  const viewHistoric = (entry: TherapySummaryHistoryEntry) => {
+    setSummary(entry.summary);
+    setPeriodLabel(entry.periodLabel);
+    setEventCount(entry.eventCount ?? 0);
+    setViewingId(entry.id);
+    setViewingDate(entry.createdAt);
+    setNotice(null);
+    setCopied(false);
+  };
 
   const generate = async (targetDays: number) => {
     if (!authState.isAuthenticated) {
@@ -89,12 +133,16 @@ const TherapySummaryCard: React.FC<Props> = ({ authState, showNotification }) =>
     setNotice(null);
     setSummary(null);
     setCopied(false);
+    setViewingId(null);
+    setViewingDate(null);
     try {
       const res = await apiService.getTherapySummary(targetDays);
       if (res.ok) {
         setSummary(res.summary);
         setPeriodLabel(res.period.label);
         setEventCount(res.period.eventCount);
+        // A new event-set produces a new cached snapshot — refresh the list.
+        loadHistory();
       } else {
         setNotice(res.message);
       }
@@ -167,6 +215,56 @@ const TherapySummaryCard: React.FC<Props> = ({ authState, showNotification }) =>
         </button>
       </div>
 
+      {/* Past summaries — re-open any earlier digest without spending an AI credit */}
+      {history.length > 0 && (
+        <div className="mt-3" data-testid="therapy-summary-history">
+          <button
+            onClick={() => setHistoryOpen((v) => !v)}
+            aria-expanded={historyOpen}
+            data-testid="therapy-summary-history-toggle"
+            className="inline-flex items-center gap-1.5 font-body text-xs text-petal-muted hover:text-petal-ink transition-colors"
+          >
+            <History className="w-3.5 h-3.5" strokeWidth={1.5} />
+            歷史紀錄（{history.length}）
+            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${historyOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {historyOpen && (
+            <ul className="mt-2 space-y-1.5">
+              {history.map((h) => {
+                const active = viewingId === h.id;
+                return (
+                  <li key={h.id}>
+                    <button
+                      onClick={() => viewHistoric(h)}
+                      data-testid="therapy-summary-history-item"
+                      className={`w-full flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left transition-colors ${
+                        active
+                          ? 'border-petal-rose-deep bg-petal-rose-soft/20'
+                          : 'border-petal-rule bg-white hover:border-petal-ink'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2 min-w-0">
+                        <Clock className="w-3.5 h-3.5 text-petal-muted shrink-0" strokeWidth={1.5} />
+                        <span className="font-body text-xs text-petal-ink truncate">
+                          {h.periodLabel}
+                          {typeof h.eventCount === 'number' ? ` · 共 ${h.eventCount} 件` : ''}
+                        </span>
+                      </span>
+                      <span className="font-body text-[11px] text-petal-muted shrink-0">
+                        {formatHistoryDate(h.createdAt)}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <p className="mt-1.5 font-body text-[11px] text-petal-muted leading-relaxed">
+            點開舊摘要不會重新產生、也不扣 AI 次數。
+          </p>
+        </div>
+      )}
+
       {/* Guiding empty state (not paired / no events) */}
       {notice && (
         <div
@@ -182,8 +280,17 @@ const TherapySummaryCard: React.FC<Props> = ({ authState, showNotification }) =>
       {summary && (
         <div className="mt-4 space-y-4" data-testid="therapy-summary-result">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-body text-xs text-petal-muted">
-              {periodLabel} · 共 {eventCount} 件事件
+            <span className="font-body text-xs text-petal-muted flex items-center gap-2 flex-wrap">
+              <span>{periodLabel} · 共 {eventCount} 件事件</span>
+              {viewingId && viewingDate && (
+                <span
+                  data-testid="therapy-summary-historic-badge"
+                  className="inline-flex items-center gap-1 rounded-full bg-petal-cream-2 text-petal-ink-soft px-2 py-0.5 text-[11px]"
+                >
+                  <History className="w-3 h-3" strokeWidth={1.5} />
+                  歷史紀錄 · {formatHistoryDate(viewingDate)}
+                </span>
+              )}
             </span>
             <button
               onClick={copy}

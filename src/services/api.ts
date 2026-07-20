@@ -631,6 +631,17 @@ export type TherapySummaryResult =
   // shows a guiding empty state, not a red error toast.
   | { ok: false; errorCode: 'NOT_PAIRED' | 'NO_EVENTS'; message: string };
 
+// A previously generated 諮商摘要 snapshot the couple can re-open for free — the
+// full summary travels with each entry so viewing an old one costs no AI credit.
+export interface TherapySummaryHistoryEntry {
+  id: string;
+  periodDays: number;
+  periodLabel: string;
+  eventCount: number | null;
+  createdAt: string;
+  summary: TherapySummary;
+}
+
 export interface CreateEventInput {
   title: string;
   summary: string;
@@ -3708,6 +3719,19 @@ class ApiService {
       // Quota exhaustion (429) and true failures still throw with error_code
       // preserved, so the view can surface the specific quota message.
       this.throwApiError(error, '諮商摘要暫時無法產生，請稍後再試');
+    }
+  }
+
+  // Past 諮商摘要 snapshots for the couple, newest first. Each entry carries its
+  // full summary so re-opening an old one is instant and costs no AI credit — the
+  // whole point is to avoid regenerating (and re-paying for) the same digest.
+  async getTherapySummaryHistory(): Promise<TherapySummaryHistoryEntry[]> {
+    try {
+      const response = await apiClient.get('/events/therapy-summary/history');
+      return (response.data?.history as TherapySummaryHistoryEntry[]) ?? [];
+    } catch (error: unknown) {
+      console.error('Failed to fetch therapy summary history:', error);
+      return [];
     }
   }
 
