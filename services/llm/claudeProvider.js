@@ -14,6 +14,7 @@
 
 const Anthropic = require('@anthropic-ai/sdk');
 const { logInfo } = require('../../lib/logger');
+const { pickableCards, CARD_IDS, shapeFacilitatorTurn } = require('../../lib/therapyCards');
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 
@@ -1502,8 +1503,8 @@ const THREAD_TRANSLATION_SYSTEM_PROMPT = `你是一位溫柔、專業、中立�
 
 核心理念：憤怒通常只是表層，底下才是真正重要的。例如「我很生氣」底下常常是「我很害怕」，再底下是「我怕失去你」。指責的話（你總是…、你根本沒有…、你眼裡只有…）背後，幾乎都藏著一個沒被說出口的需求（安全感、被重視、被陪伴、被信任、被肯定）。
 
-任務：閱讀整段對話脈絡，然後「只針對我請你翻譯的那幾則訊息」，各自產出：
-1. id：對應訊息的 id（原封不動回傳）。
+任務：閱讀整段對話脈絡，然後「只針對我請你翻譯的那幾則訊息（用編號指定）」，各自產出：
+1. ref：對應訊息的編號（提示中每行開頭的 #N，原封不動回傳那個數字）。
 2. emotions：最多 3 個底層情緒，由表層到深層（例如 憤怒 → 害怕 → 孤單）。每個含 label（情緒名，繁體中文）與 intensity（0 到 100 的整數，表示強度）。
 3. need：一個簡短的核心需求詞（例如：安全感、被重視、被陪伴、被信任、被肯定、被理解、喘口氣）。
 4. rewrite：把這句話翻譯成「可能真正想表達的是」的第一人稱版本，溫柔、不指責、說出感受與需求（NVC 我訊息），像這個人心底真正想說卻沒說出口的那句話。1 到 2 句。
@@ -1518,7 +1519,7 @@ const THREAD_TRANSLATION_SYSTEM_PROMPT = `你是一位溫柔、專業、中立�
 
 const THREAD_TRANSLATION_TOOL_SCHEMA = {
   name: 'emit_thread_translations',
-  description: "Return an emotion/need translation for each requested message id.",
+  description: "Return an emotion/need translation for each requested message ref.",
   input_schema: {
     type: 'object',
     properties: {
@@ -1527,7 +1528,10 @@ const THREAD_TRANSLATION_TOOL_SCHEMA = {
         items: {
           type: 'object',
           properties: {
-            id: { type: 'string', description: '對應訊息的 id，原封不動回傳' },
+            // Short integer ref (the #N shown in the prompt), mapped back to
+            // the real message id server-side. Integers are far more reliable
+            // for the model to echo than 36-char UUIDs.
+            ref: { type: 'integer', description: '對應訊息的編號（提示中的 #N），原封不動回傳' },
             emotions: {
               type: 'array',
               maxItems: 3,
@@ -1543,7 +1547,7 @@ const THREAD_TRANSLATION_TOOL_SCHEMA = {
             need: { type: 'string', maxLength: 20, description: '核心需求詞，例如 安全感 / 被重視 / 被陪伴' },
             rewrite: { type: 'string', description: '第一人稱「可能真正想表達的是」翻譯，1 到 2 句' },
           },
-          required: ['id', 'need', 'rewrite'],
+          required: ['ref', 'need', 'rewrite'],
         },
       },
     },
@@ -1563,16 +1567,28 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
     return { translations: [], _meta: { provider: 'claude', model: MODEL, durationMs: 0, usage: {}, costUsd: 0 } };
   }
 
+  // Relabel messages with short integer refs (#1, #2…) for the model, and keep
+  // a ref→real-id map. Models echo small integers reliably; full UUIDs they do
+  // not, which silently dropped every translation before.
+  const refToId = new Map();
+  const idToRef = new Map();
+  all.forEach((m, i) => {
+    const ref = i + 1;
+    refToId.set(ref, m.id);
+    idToRef.set(m.id, ref);
+  });
+  const wantedRefs = wanted.map((id) => idToRef.get(id)).filter((r) => r != null);
+
   const lines = [];
   if (context && context.summary) {
     lines.push(`事件背景（僅供理解氛圍，不要複述）：${String(context.summary).trim()}`, '');
   }
-  lines.push('完整對話（最舊在前，每行標了發話者與訊息 id）：');
-  for (const m of all) {
-    lines.push(`[id=${m.id}] ${m.speaker || '某人'}：${(m.content || '').toString().trim()}`);
-  }
+  lines.push('完整對話（最舊在前，每行標了編號與發話者）：');
+  all.forEach((m, i) => {
+    lines.push(`#${i + 1} ${m.speaker || '某人'}：${(m.content || '').toString().trim()}`);
+  });
   lines.push('');
-  lines.push(`請只翻譯以下這幾則訊息的 id：${wanted.join('、')}`);
+  lines.push(`請只翻譯以下編號的訊息：${wantedRefs.map((r) => `#${r}`).join('、')}`);
   const userContent = lines.join('\n');
 
   const startedAt = Date.now();
@@ -1612,19 +1628,35 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
     throw new Error('Claude did not return a tool_use block');
   }
   const out = toolUse.input || {};
-  const translations = (Array.isArray(out.translations) ? out.translations : [])
-    .filter((t) => t && typeof t.id === 'string' && typeof t.rewrite === 'string' && t.rewrite.trim())
-    .map((t) => ({
-      id: t.id,
-      emotions: Array.isArray(t.emotions)
-        ? t.emotions
-            .filter((e) => e && typeof e.label === 'string')
-            .slice(0, 3)
-            .map((e) => ({ label: e.label.trim(), intensity: Math.max(0, Math.min(100, Number(e.intensity) || 0)) }))
-        : [],
-      need: (t.need || '').toString().trim(),
-      rewrite: t.rewrite.trim(),
-    }));
+  const rawList = Array.isArray(out.translations) ? out.translations : [];
+  const translations = rawList
+    .map((t) => {
+      // Accept the ref as number or numeric string; map back to the real id.
+      const ref = typeof t?.ref === 'number' ? t.ref : parseInt(t?.ref, 10);
+      const id = refToId.get(ref);
+      if (!id || typeof t.rewrite !== 'string' || !t.rewrite.trim()) return null;
+      return {
+        id,
+        emotions: Array.isArray(t.emotions)
+          ? t.emotions
+              .filter((e) => e && typeof e.label === 'string')
+              .slice(0, 3)
+              .map((e) => ({ label: e.label.trim(), intensity: Math.max(0, Math.min(100, Number(e.intensity) || 0)) }))
+          : [],
+        need: (t.need || '').toString().trim(),
+        rewrite: t.rewrite.trim(),
+      };
+    })
+    .filter(Boolean);
+
+  // Surface ref-matching health so a silent "nothing rendered" is debuggable.
+  const returnedRefs = rawList.map((t) => t?.ref);
+  logInfo('llm.claude.need_translation.map', {
+    requestedRefs: wantedRefs,
+    returnedRefs,
+    matched: translations.length,
+    unmatched: rawList.length - translations.length,
+  });
 
   return {
     translations,
@@ -1952,6 +1984,339 @@ async function analyzeDraft({ draft, eventSummary, recentMessages, userGender = 
   };
 }
 
+// Therapist Mode ("引導模式") — the facilitator turn
+// ---------------------------------------------------------------------------
+// The core reframe: the AI is NOT an advisor writing a wise paragraph. It is a
+// facilitator running a live, turn-based session — it picks ONE small exercise
+// (a "card"), directs ONE partner to do one thing, waits, scores it, then moves
+// on. Every call produces a single therapeutic *turn*, never a lecture.
+
+const FACILITATOR_SYSTEM_PROMPT = `你是一位正在主持「現場伴侶諮商」的引導者（facilitator），不是給建議的人。這對伴侶正卡在衝突裡。請永遠以繁體中文回覆。
+
+你的核心原則：
+- 不要幫他們解決衝突，不要說教，不要長篇大論。你「說的話」（say）一次最多 2 個簡短段落。
+- 一次只帶「一個」小練習。指定由哪一位先做（target），等對方做完，你才繼續。
+- 你的價值在於引導他們「練習」技巧，而不是解釋道理。偏好換位、鏡映、肯定、情緒標記、需求翻譯，而不是給答案。
+- 每一回合都從卡片庫挑「下一張最合適的卡」（card）。若偵測到對話正在升溫、有人快情緒滿出來，就先出 slow_down（🐢 慢下來）打斷、幫他們降溫。
+- 若上一位夥伴剛完成一個可評分的練習（例如鏡映、肯定、換位、情緒標記、需求翻譯），請溫柔地評分（evaluation）：accurate＝做到了、partial＝方向對但加了自己的解讀或還差一點、off＝還沒做到；note 用一句話溫暖地說明，需要的話請他再試一次。
+- 指令（instruction）要具體、可以照著做，最好給一個可以直接接著寫的句子開頭（例如「我聽到你說的是…」）。
+- 如果某張卡適合用選項回答（例如情緒標記、或請對方確認是否準確），用 quickReplies 提供 2～4 個簡短選項（例如「😔 受傷」「😟 擔心」「😡 生氣」「😞 孤單」，或「✅ 是」「🟡 幾乎」「❌ 不是」）。
+- 當你判斷這對伴侶已經明顯降溫、彼此更靠近、是個好的暫停點時，把 sessionDone 設為 true，並用 say 溫暖地收尾。
+- 安全例外：只有在偵測到家暴、自傷／自殺、暴力威脅等安全風險時，才跳出引導，改為溫柔地引導尋求專業或緊急協助。
+
+可用的卡片（card 只能填這些 id）：${CARD_IDS.join('、')}。
+
+回應請只呼叫 emit_facilitator_turn tool，不要輸出其他文字。`;
+
+const FACILITATOR_TOOL_SCHEMA = {
+  name: 'emit_facilitator_turn',
+  description: 'Return a single facilitated therapy turn: what the therapist says, which exercise card to run, who acts next, and (optionally) a grade for the last response.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      say: { type: 'string', description: '引導者這一回合說的話，最多 2 個簡短段落' },
+      card: { type: 'string', enum: CARD_IDS, description: '這一回合要帶的練習卡 id' },
+      target: { type: 'string', enum: ['A', 'B', 'both'], description: '接下來換誰做這個練習' },
+      instruction: { type: 'string', description: '給 target 的一個具體、可照做的小指令，最好含一個句子開頭' },
+      quickReplies: {
+        type: 'array',
+        maxItems: 4,
+        items: { type: 'string', maxLength: 12 },
+        description: '可選的快速回覆選項（情緒選項或確認選項）',
+      },
+      evaluation: {
+        type: 'object',
+        description: '若上一位夥伴剛完成一個可評分練習才填，否則省略',
+        properties: {
+          verdict: { type: 'string', enum: ['accurate', 'partial', 'off'] },
+          note: { type: 'string', description: '一句話、溫暖的回饋' },
+        },
+        required: ['verdict', 'note'],
+      },
+      sessionDone: { type: 'boolean', description: '是否是個好的收尾暫停點' },
+    },
+    required: ['say', 'card', 'target', 'instruction', 'sessionDone'],
+  },
+};
+
+// thread: [{ role: 'A'|'B'|'facilitator', name, content, card? }] recent turns.
+// session: { activeCard, turnOwnerRole: 'A'|'B'|null, completedCards, stepCount }.
+// partners: { A: {name, gender}, B: {name, gender} }. companion: persona.
+// context: { summary }.
+async function generateFacilitatorTurn({ thread, session, partners, companion, context }) {
+  const s = session || {};
+  const p = partners || {};
+  const nameA = (p.A && p.A.name) || '夥伴 A';
+  const nameB = (p.B && p.B.name) || '夥伴 B';
+
+  const lines = [
+    '角色對應：',
+    `- A = ${nameA}${p.A && p.A.gender ? `（${p.A.gender}）` : ''}`,
+    `- B = ${nameB}${p.B && p.B.gender ? `（${p.B.gender}）` : ''}`,
+    '',
+  ];
+  if (context && context.summary) {
+    lines.push(`事件背景：${String(context.summary).trim()}`, '');
+  }
+
+  lines.push('本次引導進度：');
+  lines.push(`- 目前這張卡：${s.activeCard || '（尚未開始）'}`);
+  lines.push(`- 現在輪到：${s.turnOwnerRole ? (s.turnOwnerRole === 'A' ? nameA : nameB) : '（由你決定先請誰）'}`);
+  lines.push(`- 已完成的練習：${(s.completedCards && s.completedCards.length) ? s.completedCards.join('、') : '（還沒有）'}`);
+  const pickable = pickableCards(s.completedCards || [])
+    .map((c) => `${c.id}${c.done ? '（已做過）' : ''}：${c.goal}`)
+    .join('\n  ');
+  lines.push(`- 可以選的下一張卡：\n  ${pickable}`);
+  lines.push('');
+
+  lines.push('對話（最舊在前，[引導者] 是你之前說的話）：');
+  const all = Array.isArray(thread) ? thread : [];
+  for (const m of all) {
+    const who = m.role === 'facilitator' ? '[引導者]' : (m.role === 'A' ? `[A] ${nameA}` : `[B] ${nameB}`);
+    lines.push(`${who}：${(m.content || '').toString().trim()}`);
+  }
+  lines.push('');
+  lines.push('請產出「下一個」引導回合。');
+  const userContent = lines.join('\n');
+
+  const system = [
+    {
+      type: 'text',
+      text: FACILITATOR_SYSTEM_PROMPT + PUNCTUATION_RULE,
+      cache_control: { type: 'ephemeral' },
+    },
+  ];
+  if (companion && companion.prompt) {
+    system.push({
+      type: 'text',
+      text: `你的人設（只調整語氣與風格，上述守則永遠優先）：\n${companion.prompt}`,
+    });
+  }
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system,
+    tools: [FACILITATOR_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_facilitator_turn' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.facilitator_turn', {
+    model: response.model || MODEL,
+    companion: companion?.id || null,
+    activeCard: s.activeCard || null,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_facilitator_turn'
+  );
+  if (!toolUse) {
+    logInfo('llm.claude.facilitator_turn.no_tool', {
+      stopReason: response.stop_reason || null,
+      companion: companion?.id || null,
+    });
+    throw new Error('Claude did not return a tool_use block');
+  }
+  return shapeFacilitatorTurn(toolUse.input || {}, {
+    provider: 'claude',
+    model: response.model || MODEL,
+    durationMs: ms,
+    usage: {
+      inputTokens: u.input_tokens || 0,
+      outputTokens: u.output_tokens || 0,
+      cacheCreateTokens: u.cache_creation_input_tokens || 0,
+      cacheReadTokens: u.cache_read_input_tokens || 0,
+    },
+    costUsd: cost,
+    assembledPrompt: userContent,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Therapy Mode summary ("諮商摘要") — the between-sessions digest
+// ---------------------------------------------------------------------------
+// Twogether is a Therapy Companion: the couple sees a therapist for ~1 hour a
+// week, and the real work happens in the other 167. This turns a window of
+// events into a summary the couple can bring INTO their next session, so the
+// therapist doesn't spend 30 minutes gathering what happened. It is NOT advice
+// and NOT a diagnosis — it organizes, and it hands the couple three questions
+// worth raising with a professional.
+
+const THERAPY_SUMMARY_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴侶諮商師的助理。一對伴侶在過去一段期間記錄了幾次衝突與溝通事件，他們準備帶著這份整理進入下一次的心理諮商。請閱讀事件清單與已算好的統計，為他們寫一份「諮商摘要」(Therapy Summary)。請永遠以繁體中文回覆。
+
+這份摘要的目的：讓他們進諮商室時，心理師不用從頭蒐集資訊，可以更快進入真正有價值的討論。你只做「整理」，不做診斷、不下指令、不評斷對錯、不選邊站。真正的治療由合格心理師負責。
+
+請產出：
+1. overview：一句話，中性地描述這段期間他們的關係狀態或最需要被看見的模式（不責備任一方）。
+2. themes：這段期間最常出現的衝突主題，2 到 4 項；用已提供的主題統計為基礎，把它翻成人看得懂的短語（例如「家務分配」「回訊息的節奏」）。
+3. emotions：雙方這段期間最常感受到的情緒，2 到 4 項；用已提供的情緒統計為基礎。
+4. repaired：這段期間「已經成功修復」的事件（status 為 resolved），各附一句他們做對了什麼讓彼此靠近；若沒有，回傳空陣列。
+5. unresolved：這段期間「還沒解決」的事件，各附一句還卡在哪裡、可能還需要處理的點；若沒有，回傳空陣列。
+6. questions：三個「想帶去和心理師討論的問題」，具體、扣著上面的模式、用第一人稱複數（我們），讓伴侶可以直接照著問（例如「我們每次談到家務就會升溫，可以怎麼開始這個對話？」）。
+
+守則：緊扣提供的事件內容，不要編造；中立、溫柔；只使用繁體中文；遵守標點規則。
+
+回應請只呼叫 emit_therapy_summary tool，不要輸出其他文字。`;
+
+const THERAPY_SUMMARY_TOOL_SCHEMA = {
+  name: 'emit_therapy_summary',
+  description: 'Return a structured between-sessions therapy summary the couple can bring to their next counseling session.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      overview: { type: 'string', description: '一句話中性描述這段期間的關係模式' },
+      themes: {
+        type: 'array',
+        maxItems: 4,
+        items: { type: 'string', maxLength: 20, description: '一個衝突主題的人看得懂短語' },
+      },
+      emotions: {
+        type: 'array',
+        maxItems: 4,
+        items: { type: 'string', maxLength: 12, description: '一個常見情緒詞' },
+      },
+      repaired: {
+        type: 'array',
+        maxItems: 6,
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: '事件標題' },
+            insight: { type: 'string', description: '他們做對了什麼讓彼此靠近，一句話' },
+          },
+          required: ['title', 'insight'],
+        },
+      },
+      unresolved: {
+        type: 'array',
+        maxItems: 6,
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: '事件標題' },
+            note: { type: 'string', description: '還卡在哪裡、可能還需要處理的點，一句話' },
+          },
+          required: ['title', 'note'],
+        },
+      },
+      questions: {
+        type: 'array',
+        minItems: 3,
+        maxItems: 3,
+        items: { type: 'string', description: '想帶去和心理師討論的一個問題，第一人稱複數' },
+      },
+    },
+    required: ['overview', 'themes', 'emotions', 'repaired', 'unresolved', 'questions'],
+  },
+};
+
+// events: [{ title, summary, status, tags, emotions, createdAt, resolvedAt, therapyNote }]
+// stats:  { themeCounts:[{tag,count}], emotionCounts:[{emotion,count}], repairedCount, unresolvedCount }
+async function generateTherapySummary({ periodLabel, events, stats }) {
+  const evs = Array.isArray(events) ? events : [];
+  const lines = [];
+  lines.push(`期間：${periodLabel || '最近兩週'}`);
+  lines.push(`事件總數：${evs.length}（已解決 ${stats?.repairedCount ?? 0}，未解決 ${stats?.unresolvedCount ?? 0}）`, '');
+
+  const themeCounts = stats?.themeCounts || [];
+  if (themeCounts.length) {
+    lines.push('主題統計（標籤：次數）：' + themeCounts.map((t) => `${t.tag}×${t.count}`).join('、'));
+  }
+  const emotionCounts = stats?.emotionCounts || [];
+  if (emotionCounts.length) {
+    lines.push('情緒統計（情緒：次數）：' + emotionCounts.map((e) => `${e.emotion}×${e.count}`).join('、'));
+  }
+  lines.push('', '事件清單（最舊在前）：');
+  evs.forEach((e, i) => {
+    const state = e.status === 'resolved' ? '已解決' : '未解決';
+    lines.push(`${i + 1}. [${state}]《${(e.title || '未命名').toString().trim()}》`);
+    if (e.summary) lines.push(`   摘要：${e.summary.toString().trim()}`);
+    if (Array.isArray(e.tags) && e.tags.length) lines.push(`   主題：${e.tags.join('、')}`);
+    if (Array.isArray(e.emotions) && e.emotions.length) lines.push(`   情緒：${e.emotions.join('、')}`);
+    if (e.therapyNote && e.therapyNote.nextTime) lines.push(`   當時的修復重點：${e.therapyNote.nextTime}`);
+  });
+  const userContent = lines.join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1800,
+    system: [
+      {
+        type: 'text',
+        text: THERAPY_SUMMARY_SYSTEM_PROMPT + PUNCTUATION_RULE,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [THERAPY_SUMMARY_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_therapy_summary' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.therapy_summary', {
+    model: response.model || MODEL,
+    durationMs: ms,
+    eventCount: evs.length,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_therapy_summary'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input || {};
+  const cleanStr = (s) => (s || '').toString().trim();
+  const cleanList = (arr, max) =>
+    (Array.isArray(arr) ? arr : []).map(cleanStr).filter(Boolean).slice(0, max);
+  const cleanPairs = (arr, k, max) =>
+    (Array.isArray(arr) ? arr : [])
+      .filter((r) => r && r.title && r[k])
+      .map((r) => ({ title: cleanStr(r.title), [k]: cleanStr(r[k]) }))
+      .slice(0, max);
+
+  return {
+    overview: cleanStr(out.overview),
+    themes: cleanList(out.themes, 4),
+    emotions: cleanList(out.emotions, 4),
+    repaired: cleanPairs(out.repaired, 'insight', 6),
+    unresolved: cleanPairs(out.unresolved, 'note', 6),
+    questions: cleanList(out.questions, 3),
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+      assembledPrompt: userContent,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -1966,6 +2331,8 @@ module.exports = {
   generateThreadTranslations,
   generateTherapyNote,
   analyzeDraft,
+  generateTherapySummary,
+  generateFacilitatorTurn,
   // Exported for prompt-contract regression tests only.
   buildRoleplayUserContent,
 };

@@ -67,6 +67,11 @@ export default defineConfig({
         // LLM_PROVIDER=claude leaks into the test server and e2e runs bill
         // real Anthropic tokens with non-deterministic output.
         LLM_PROVIDER: 'mock',
+        // Dummy LINE creds so isConfigured()=true and webhook signature verify
+        // runs (sign+verify use the same test secret). Never the real secret —
+        // that only lives in GitHub secrets → prod. Outbound push/reply no-op.
+        LINE_CHANNEL_ID: 'test-line-channel',
+        LINE_CHANNEL_SECRET: 'test-line-secret',
         PORT: '8080'
       }
     },

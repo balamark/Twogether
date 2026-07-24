@@ -1,6 +1,16 @@
-# Twogether - 情侶親密時光記錄 App
+# Twogether — 諮商延伸工具（Therapy Companion）
 
-A modern couples app for recording intimate moments, achievements, and relationship milestones. Now built with a cost-optimized single-server architecture using Node.js + React.
+> 諮商室只有一小時，真正的關係發生在剩下的 167 個小時。
+> Twogether 幫伴侶把心理師教的方法帶回每一天。**不取代諮商，而是延伸諮商。**
+
+Twogether is a **Therapy Companion** for couples — it helps partners carry what a
+therapist teaches back into everyday life: record what happened between sessions,
+practise communication, and repair connection. It stands *beside* therapists
+rather than competing with them (the AI demonstrates and organizes; diagnosis and
+treatment stay with a licensed professional). Built on a cost-optimized
+single-server architecture using Node.js + React.
+
+See [`docs/UX_PLAYBOOK.md`](docs/UX_PLAYBOOK.md) for the binding product stances.
 
 ## ⚡ TL;DR - Get Started in 3 Commands
 
@@ -22,15 +32,32 @@ Then visit: http://localhost:8080
 
 ## Features
 
+Twogether is a **Therapy Companion** first — the therapy-extension features lead,
+and the intimacy/roleplay features are the *connection* side of the same
+relationship-health story (not hidden, just not the headline a therapist sees).
+
+**諮商延伸 · 把方法帶回日常 (Therapy extension)**
+
+- **好好說 (事件記錄)**: Log what happened between sessions so the next therapy hour starts on the real issue, not 30 minutes of recall
+- **AI 諮商師 · 引導模式**: The AI *demonstrates* how a therapist might guide the two of you — turn-based practice cards (鏡映/換位/肯定), not a verdict
+- **治療摘要 & 諮商摘要**: A structured note after each repaired conflict, plus a two-week 諮商摘要 to bring into a session
+- **情緒翻譯 · 安全踩剎車**: Translate blame into the underlying need; auto de-escalate a thread when it heats up
+- **婚姻檢查**: Each partner rates key dimensions, then reveal side-by-side with a neutral AI summary
+- **心理諮商名錄**: Book a real, licensed counselor when a topic needs professional help
+- **關係時間軸 · 統計分析**: Conflict patterns and trends over time
+
+**日常連結 · 關係的另一面 (Everyday connection)**
+
 - **親密記錄**: Log intimate moments with mood, duration, location, and photos
-- **成就系統**: Earn badges for milestones and achievements
 - **角色扮演**: Custom roleplay scripts and scenarios with predefined templates
-- **親密邀請系統**: Send and respond to intimacy requests with notifications
-- **替代選項**: Alternative intimate activities when requests are declined
-- **通知系統**: Real-time notifications for requests and responses
-- **金幣商店**: Virtual currency system for rewards
+- **親密邀請系統 & 替代選項**: Send/respond to intimacy requests; suggest alternatives when declined
+- **我們的牆**: A shared wall for photos, videos and notes to each other
+- **成就系統 & 金幣商店**: Badges for milestones and a virtual-currency reward system
+
+**基礎 (Platform)**
+
 - **配對系統**: Secure partner pairing with codes
-- **統計分析**: Weekly/monthly intimacy statistics
+- **通知系統**: Real-time notifications (in-app, Email, LINE)
 - **隱私保護**: Secure authentication and data storage
 
 ## 📝 Changelog
@@ -40,6 +67,60 @@ adds a fragment file in `changelog/`; CI compiles them into the block below —
 see `CLAUDE.md`.)
 
 <!-- changelog:begin (generated from changelog/*.md — edit those, not this) -->
+### 2026-07-24
+- **一眼看出誰在說話**：多人對話（公開問答、衝突對話、諮商室、牆）現在每位參與者的名字旁邊，都會多一顆專屬顏色的頭像圓圈。真人顯示名字的第一個字、AI 諮商師顯示自己的 emoji，同一個人到哪都是同一個顏色，不用再回頭猜這句話是誰講的。
+
+### 2026-07-20
+- **專屬心理師**: 可從心理師名錄指定一位諮商師成為你們的專屬心理師，讓他唯讀檢視你們的「牆」與「好好說話」內容（不含私密項目），更了解你們的關係脈絡；也可選擇是否開放他留言，並隨時解除。
+- **Premium 到期提前提醒**: Premium 快到期時（7 天內），會在頁面上方主動出現溫和提醒，告訴你到期日、到期後會發生什麼（AI 每日次數會回到免費上限），並提供「立即續購」一鍵延續。使用者選單也會常駐顯示 Premium 到期日，不用進到升級頁才看得到。續購後提醒會自動消失，不再重複打擾。
+- **諮商摘要多了「歷史紀錄」，舊摘要隨時點開、不重複扣 AI 次數**: 以前每次整理諮商摘要都要重新產生一份；現在「諮商摘要」卡片新增「歷史紀錄」，把你們之前選過的期間（最近兩週／最近 30 天）整理過的摘要都保存下來，依日期排列。想回顧上次帶去諮商的那份摘要，直接點開就看得到——不會重新產生、也不扣 AI 次數，還能一樣「複製給心理師」。少花 token、少等待，過去的整理成果不再一次性用完就消失。
+
+### 2026-07-19
+- **通知中心：知道另一半做了什麼**: 現在另一半的每個重要操作都會出現在你的通知中心——新增/更新愛的記錄、建立劇本、送出客製禮物、記錄週期、更新關係評估與愛的願望、發起或回覆婚姻健檢、調整共同設定與個人資料。點一下通知就能直接跳到對應的頁面，也可透過 LINE 與 Email 收到提醒（依你的通知設定）。讓彼此的每個用心，都不會被錯過。
+
+### 2026-07-18
+- **可編輯親密紀錄的時長**: 記錄／編輯親密時光時，新增「時長」欄位與快速選項（15-30分鐘、30-60分鐘、1小時以上），角色扮演帶入的預設時長現在也能自由修改。
+- **精簡劇本卡片操作**: 移除角色扮演劇本卡片上的紅色「開始」按鈕，改由「查看」進入劇本後再選擇「開始扮演 — 記入今晚」，避免誤觸直接記錄。
+
+### 2026-07-16
+- **「真實故事」升級為「好文 · 故事」，還能分享好文章**: 把原本藏在「好好說話」裡的長文〈翻譯彼此的語言〉搬進「真實故事」，和智慧故事合併成「好文 · 故事」一個地方。現在除了看伴侶們的真實故事，還能分享你讀到的好文章（純文字貼上、附上出處即可），用「全部／好文／故事」隨手切換，一起讀、一起變得更好。
+- **新定位：Twogether 是心理諮商的延伸工具，不是取代**: 全站訊息更新——「諮商室只有一小時，真正的關係發生在剩下的 167 個小時」。Twogether 幫伴侶把心理師教的方法帶回每一天。登入前的介紹頁、「心理諮商」分頁、認識 AI 諮商師的畫面，都清楚說明：AI 是日常練習的陪伴，示範心理師可能會怎麼引導雙方思考，而真正的診斷與治療仍由合格的心理師負責。我們和心理師站在同一陣線，而不是競爭。
+- **諮商摘要：把最近兩週，一鍵整理成帶去諮商的摘要**: 「心理諮商」分頁新增「諮商摘要」。選「最近兩週」或「最近 30 天」，AI 會把你們這段期間記錄的事件整理成一份摘要——最常出現的衝突主題、雙方最常感受到的情緒、已經成功修復的事件、還沒解決的事件，以及三個想帶去和心理師討論的問題。進諮商室時不用再花 30 分鐘回想發生了什麼，心理師可以更快進入真正有價值的討論。摘要兩人共享、只會產生一次（事件有變動才會重新整理，不重複扣 AI 次數），還能一鍵「複製給心理師」。這是 Twogether 作為「諮商延伸工具」的核心：諮商室只有一小時，我們幫你們用好剩下的 167 個小時。
+- **牆上貼文可設為私密**：每則貼文都能一鍵切換「只有我看得到」，對方看不到也不會收到通知；分享給對方的貼文仍可照常「匿名公開」。
+- **照片自動依方向顯示**：直式、橫式照片都會用合適的比例呈現，不再左右一大片留白，也不會裁切。
+- **自訂心情標籤**：除了預設標籤，現在可以自己輸入心情，常用的自訂標籤下次還會記得，一鍵再選。
+
+### 2026-07-15
+- **私人對話可以分享給伴侶**: 原本只有自己看得到的私人對話，現在能一鍵「讓伴侶也看得到」，一起討論這件事；分享成為共同對話後，也能像其他對話一樣選擇匿名公開到「公開問答」幫助其他伴侶。
+- **我們的牆支援照片與影片**：現在貼文除了文字，也能一次上傳最多 4 張照片或影片，甚至可以只發照片/影片不寫字，把約會與日常的畫面一起留在你們的牆上。
+
+### 2026-07-13
+- **通知語氣更溫柔：從「事件」到「情境」**: 通知文字全面調整——「伴侶開啟了一個事件」改為
+  「伴侶分享了一個情境」、「事件已解決」改為「你們一起走過了這個情境」、「希望標記為已解決」
+  改為「覺得可以一起劃下句點了」。通知是邀請彼此理解，不是誰被指控的訊號；Email、App 內
+  與 LINE 推播同步更新。
+- **記錄時光改版**: 登入後的第一頁更好上手了。月曆移到最上方成為主角，點任一天就能新增或查看紀錄，另加一顆「＋ 記錄今天」快捷鈕，一鍵記下今天。
+- **畫面更清爽**: 「健康參考（建議每週幾次）」收進標題旁的 (?) 提示，需要時再看；「關係之屋」平時收合成一行，有待辦訊號或久未登入時才自動展開，也能隨手關閉。
+
+### 2026-07-12
+- **修正：親密天數兩處數字不一致**: 「關係之屋」顯示的「已經 N 天沒有親密了」與「記錄時光」
+  下方的統計卡片，之前會差一天（一個算實際滿 24 小時、一個算跨過幾個日期）。現在兩處都以
+  你們的時區、用「跨過幾個日期」計算，數字一致了。
+- **修正：情緒翻譯打開後沒有出現、圈圈一直轉**: 之前 AI 產生翻譯後，因為訊息編號對不上而被
+  整批丟掉，導致翻譯沒存進快取、每次打開都重新產生（很慢）也看不到結果。已改用穩定的編號對應，
+  翻譯會正確顯示並快取，第二次打開就很快。也加了前後端記錄方便日後追查。
+- **修正：角色扮演劇本封面影片無法播放**: 劇本封面的影片因網頁安全政策（CSP 未設定 media-src）
+  被瀏覽器擋下。已允許影片來源，封面影片正常播放。
+- **真實故事新增「大家怎麼做」投票**: 一系列關係情境投票（例如「吵架後誰該先低頭？」
+  「另一半已讀不回，你會？」），選一個你的答案、立刻看見大家的選擇分布，還能留下你的
+  「心聲」說說為什麼這樣選。沒有標準答案，只有真實的聲音；未登入可以看，登入後就能投票、
+  留言，還沒配對也能參與。心聲一樣可以檢舉、由管理員審核。
+- **不再叫「事件」，改叫「對話」**: 好好說話裡的每個畫面（按鈕、分析、通知、常見問答）現在一致用「對話」而不是「事件」，少一點像在寫事故報告，多一點像在好好聊。
+- **LINE 通知整合**: 伴侶的重要通知（在事件中回覆、親密邀請、牆上留言、關係提醒等）現在可以
+  同步推播到你的 LINE。到「設定 → LINE 通知」點「綁定 LINE 通知」，加官方帳號為好友後把綁定碼
+  傳給它就完成綁定；之後可隨時用開關暫停，或解除綁定。與 Email 通知相同的那組重要通知，
+  現在多了一個更即時的管道。
+
 ### 2026-07-11
 - **送出前，先看看這句話會怎麼被聽見**: 事件回覆框新增「情緒檢測」。送出一句話之前，AI 會即時
   分析這句草稿：底層的情緒和強度（例如 傷心 70%、焦慮 80%）、對方可能「誤聽」成什麼 vs 其實
@@ -63,10 +144,37 @@ see `CLAUDE.md`.)
   Facebook 或 Threads，現在會顯示品牌預覽圖與說明文字，不再是一條光禿禿的網址。
 - **全新品牌 icon**: 瀏覽器分頁與 iOS 加入主畫面的圖示換成 Twogether 的雙環標誌
   （玫瑰色與鼠尾草綠漸層），取代原本的開發工具預設圖示。
+- **引導模式：AI 不再只給建議，而是帶你們「做練習」**: 事件對話新增「開始引導」。AI 諮商師會
+  像真的伴侶諮商師一樣，帶你們一步一步做練習，而不是丟一大段道理。它一次只出一張「練習卡」
+  （🪞 鏡映、🔄 換位、🫶 肯定、🎯 情緒標記、💬 需求翻譯…），指定由誰先做、給一個可以直接照著
+  說的句子開頭（例如「我聽到你說的是…」），等你完成後溫柔評分（✅ 做到了／🟡 差一點／
+  ❌ 再試一次），再換下一步。上方「今日練習」會記錄你們練過哪些技巧，還有一個「關係技巧分數」，
+  讓每次吵完都變成一次一起變好的練習。原本的「請 AI 諮商師加入」建議功能仍然保留。
 - **吵完之後，AI 幫你們寫「治療摘要」**: 把一件事標記為解決後，事件頁多了一份 AI 產生的
   「治療摘要」——不是流水帳，而是幫你們看懂這次到底發生了什麼：最大的觸發點、雙方各自「真正
   的需求」、你們落入的負向循環（一方追、一方逃⋯）、這次修復成功的地方，以及「下次相同情況
   可以先說的一句話」。兩個人看到的是同一份，只會產生一次；重新開啟討論會重新整理。
+
+### 2026-07-09
+- **真實故事：一次寫完，AI 幫你分段**: 不想照 6 步模板慢慢填？現在可以選「一次寫完，
+  AI 幫你分段」，把整個故事一次打完或貼上，AI 會幫你分成 6 段，你再確認、修改就能發表。
+  「跟著步驟寫」的引導模式也保留。
+- **「修復智慧」改叫「AI 重點整理」**: 發表後 AI 幫你抓出的重點換了更好懂的名字，
+  一看就知道是 AI 幫你整理故事的重點。
+
+### 2026-07-08
+- **全新主分頁「真實故事」：智慧故事庫上線**: 把你們最難的時刻，變成幫助其他伴侶的智慧。
+  依 6 段引導模板（背景→發生了什麼→情緒衝擊→試過什麼→轉捩點與修復→現在的我們）寫下
+  真實經歷，預設匿名發表（依「設定」的公開分享選項），還沒配對的單人用戶也能發表。
+  發表後 AI 立刻整理出重點附在故事頁；所有訪客（含未登入）都能瀏覽與搜尋，登入後可投三種票
+  （有幫助／有共鳴／修復有效）、留言鼓勵作者。
+- **本週精選與影響力統計**: 最近 7 天最被肯定的故事會釘選在「本週精選」；「我的故事」
+  會告訴你「你的故事已被閱讀 X 次、獲得 Y 個投票」。新增三枚社群徽章：說故事的人 📖、
+  智慧守護者 🏛️、修復領航員 🧭。
+- **公開問答搬新家**: 原本藏在「心理諮商」裡的公開問答移到「真實故事」分頁；
+  心理諮商分頁回歸純諮商師名錄與預約。
+- **安心機制**: 故事與留言可一鍵檢舉，AI 會在發表時自動標記激烈用語供管理員覆核；
+  被隱藏的內容立即從前台消失。
 
 ### 2026-07-07
 - **「好好說話」：兩個分頁合而為一**: 「和諧相處」與「衝突事件」合併成一個正向命名的

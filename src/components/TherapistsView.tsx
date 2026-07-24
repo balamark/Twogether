@@ -17,9 +17,14 @@ import {
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { FOCUS_AREAS, focusLabel, formatNtd } from './therapistShared';
+import { POSITIONING_ONE_LINER, POSITIONING_SUBLINE, NOT_A_SUBSTITUTE } from '../content/positioning';
 import PaymentMethodPicker from './PaymentMethodPicker';
 import { FocusFilter } from './FocusFilter';
 import TherapistProfileModal from './TherapistProfileModal';
+import TherapySummaryCard from './TherapySummaryCard';
+import DedicatedTherapistPanel from './DedicatedTherapistPanel';
+import TherapistClientsPanel from './TherapistClientsPanel';
+import ParticipantAvatar from './ParticipantAvatar';
 
 interface TherapistsViewProps {
   authState: {
@@ -77,6 +82,9 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
   const [ownProfile, setOwnProfile] = useState<OwnTherapistProfile | null>(null);
   const [showProfileEditor, setShowProfileEditor] = useState(false);
   const [showEarnings, setShowEarnings] = useState(false);
+  // Bumped when a therapist is set as dedicated (from a profile modal) so the
+  // 你們的專屬心理師 panel re-fetches.
+  const [dedicatedKey, setDedicatedKey] = useState(0);
 
   const loadOwnProfile = useCallback(async () => {
     if (!authState.isAuthenticated) { setOwnProfile(null); return; }
@@ -131,7 +139,10 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
 
   return (
     <div className="space-y-8" data-testid="therapists-view">
-      {/* Intro */}
+      {/* Intro — leads with the Therapy Companion positioning: we sit beside
+          therapists, not against them. The 167-hours one-liner + the honest
+          "not a substitute" note come from src/content/positioning.ts so every
+          surface stays in sync. */}
       <div className="text-center max-w-2xl mx-auto">
         <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
           — 心理諮商
@@ -140,9 +151,34 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
           與真人 <em className="not-italic italic text-pink-600">諮商心理師</em> 聊聊
         </h2>
         <p className="font-display italic font-light text-base text-petal-muted">
-          有些議題值得和一位受過專業訓練的人好好談。選擇一位諮商師，預約屬於你們的對話。
+          {POSITIONING_ONE_LINER}
+          <br className="hidden sm:block" />
+          {POSITIONING_SUBLINE}有些議題值得和一位受過專業訓練的人好好談——選擇一位諮商師，預約屬於你們的對話。
+        </p>
+        <p className="mt-3 font-body text-xs text-petal-muted max-w-md mx-auto leading-relaxed">
+          {NOT_A_SUBSTITUTE}
         </p>
       </div>
+
+      {/* 諮商摘要 — the between-sessions digest the couple brings INTO a session.
+          This is the Therapy Companion flagship: it sits above the directory so
+          "整理你們的近況 → 帶去和心理師談" reads as one flow. */}
+      <TherapySummaryCard
+        authState={{ isAuthenticated: authState.isAuthenticated, partnerConnected: authState.partnerConnected }}
+        showNotification={showNotification}
+      />
+
+      {/* 你們的專屬心理師 — set/manage the couple's dedicated therapist. */}
+      <DedicatedTherapistPanel
+        reloadKey={dedicatedKey}
+        isAuthenticated={authState.isAuthenticated}
+        showNotification={showNotification}
+      />
+
+      {/* 我輔導的伴侶 — only shown to a logged-in therapist. */}
+      {ownProfile && (
+        <TherapistClientsPanel showNotification={showNotification} />
+      )}
 
       {/* 公開問答 moved to the 真實故事 tab (StoriesView) — this view is the
           therapist directory only now. */}
@@ -242,6 +278,7 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
           isAuthenticated={authState.isAuthenticated}
           onClose={() => setProfileTarget(null)}
           onBook={() => { const t = profileTarget; setProfileTarget(null); setBookingTarget(t); }}
+          onDedicated={() => setDedicatedKey((k) => k + 1)}
           showNotification={showNotification}
         />
       )}
@@ -1079,7 +1116,7 @@ const ChatRoom: React.FC<{
           <div>
             <h3 className="font-display text-lg font-medium text-petal-ink">諮商室 · {consultation.therapistName}</h3>
             <p className="font-body text-xs text-petal-muted">
-              你們與諮商師的對話 — 可引用記錄過的「事件」一起討論
+              你們與諮商師的對話 — 可引用記錄過的「對話」一起討論
             </p>
           </div>
           <button onClick={onClose} className="p-1 text-petal-muted hover:text-petal-ink" aria-label="關閉">
@@ -1122,12 +1159,20 @@ const ChatRoom: React.FC<{
             thread.messages.map((m) => (
               <div key={m.id} className={`flex ${m.isMine ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[80%] ${m.isMine ? 'items-end' : 'items-start'} flex flex-col`}>
-                  <div className="font-body text-[11px] text-petal-muted mb-0.5 px-1">
-                    {m.isTherapist ? `🩺 ${m.senderName}（諮商師）` : m.senderName}
+                  <div className="flex items-center gap-1.5 mb-0.5 px-1">
+                    <ParticipantAvatar
+                      size="xs"
+                      role={m.isTherapist ? 'therapist' : 'user'}
+                      name={m.senderName}
+                      colorKey={m.senderId}
+                    />
+                    <span className="font-body text-[11px] text-petal-muted">
+                      {m.isTherapist ? `${m.senderName}（諮商師）` : m.senderName}
+                    </span>
                   </div>
                   {m.event && (
                     <div className="mb-1 px-3 py-2 rounded-lg bg-petal-cream-2 border border-petal-rule max-w-full">
-                      <div className="font-body text-[10px] uppercase tracking-wide text-petal-muted">引用事件</div>
+                      <div className="font-body text-[10px] uppercase tracking-wide text-petal-muted">引用對話</div>
                       <div className="font-body text-xs font-medium text-petal-ink">{m.event.title}</div>
                       <div className="font-body text-xs text-petal-ink-soft line-clamp-2">{m.event.summary}</div>
                     </div>
@@ -1165,7 +1210,7 @@ const ChatRoom: React.FC<{
               <button
                 onClick={() => setShowEventPicker(true)}
                 data-testid="reference-event-button"
-                title="引用事件"
+                title="引用對話"
                 className="shrink-0 p-2 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors"
               >
                 <StickyNote className="w-4 h-4" strokeWidth={1.5} />
@@ -1209,13 +1254,13 @@ const ChatRoom: React.FC<{
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 p-4" onClick={() => setShowEventPicker(false)}>
           <div className="bg-petal-cream w-full max-w-md max-h-[70vh] overflow-y-auto rounded-lg border border-petal-rule shadow-petal" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 bg-petal-cream flex items-center justify-between px-4 py-3 border-b border-petal-rule">
-              <h4 className="font-display text-base text-petal-ink">引用一個事件</h4>
+              <h4 className="font-display text-base text-petal-ink">引用一段對話</h4>
               <button onClick={() => setShowEventPicker(false)} className="text-petal-muted hover:text-petal-ink"><X className="w-4 h-4" /></button>
             </div>
             <div className="p-3 space-y-2" data-testid="event-picker">
               {events.length === 0 ? (
                 <p className="font-body text-sm text-petal-muted text-center py-6">
-                  你們還沒有記錄過事件。
+                  你們還沒有記錄過對話。
                 </p>
               ) : (
                 events.map((ev) => (

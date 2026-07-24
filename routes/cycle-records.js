@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { logInfo, logError } = require('../lib/logger');
+const { notifyPartnerAction } = require('../services/notificationService');
 
 const router = express.Router();
 
@@ -70,6 +71,12 @@ router.post('/', [
     `, [id, coupleId, userId, start_date, length_days || 5, notes || null]);
 
     logInfo('Cycle record created', { id, coupleId });
+
+    notifyPartnerAction({
+      actorId: userId,
+      type: 'cycle_record_created',
+      content: notes || (start_date ? `週期開始日：${start_date}` : null),
+    });
 
     res.status(201).json({
       success: true,
@@ -173,6 +180,12 @@ router.put('/:id', [
       values
     );
 
+    notifyPartnerAction({
+      actorId: userId,
+      type: 'cycle_record_updated',
+      content: req.body.notes || null,
+    });
+
     res.json({ success: true, message: '週期紀錄已更新' });
   } catch (error) {
     logError('Update cycle record failed', { err: error.message, stack: error.stack });
@@ -194,6 +207,8 @@ router.delete('/:id', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, message: '找不到週期紀錄或您沒有權限刪除' });
     }
+
+    notifyPartnerAction({ actorId: userId, type: 'cycle_record_deleted' });
 
     res.json({ success: true, message: '週期紀錄已刪除' });
   } catch (error) {

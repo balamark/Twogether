@@ -1,0 +1,407 @@
+import React, { useCallback, useEffect, useState } from 'react';
+import { X, Lock, Send, MessageCircle, ChevronLeft } from 'lucide-react';
+import {
+  apiService,
+  type WallPost,
+  type WallReply,
+  type EventRecord,
+  type TherapistClientCouple,
+} from '../services/api';
+import type { Notification } from './ErrorNotification';
+import { useScrollLock } from '../hooks/useScrollLock';
+import { isVideoUrl } from '../utils/script';
+import { companionName } from '../utils/aiCompanions';
+import ParticipantAvatar from './ParticipantAvatar';
+
+// A dedicated therapist's read-only (or read+comment) view of ONE client
+// couple's 牆 and 好好說話. Private items are never returned by the API, so this
+// only ever shows shared content. When the couple granted can_comment, each
+// thread gets a reply/message composer whose posts are flagged 心理師.
+interface Props {
+  client: TherapistClientCouple;
+  onClose: () => void;
+  showNotification: (n: Omit<Notification, 'id'>) => void;
+}
+
+type Tab = 'wall' | 'events';
+
+const coupleTitle = (c: TherapistClientCouple): string =>
+  c.coupleName || (c.partnerNames.length ? c.partnerNames.join(' & ') : '伴侶');
+
+const TherapistClientView: React.FC<Props> = ({ client, onClose, showNotification }) => {
+  useScrollLock(true);
+  const [tab, setTab] = useState<Tab>('wall');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
+      <div className="bg-petal-cream w-full sm:max-w-2xl h-[92vh] sm:h-[85vh] flex flex-col rounded-t-2xl sm:rounded-lg border border-petal-rule shadow-petal" data-testid="therapist-client-view">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-petal-rule">
+          <div className="min-w-0">
+            <h3 className="font-display text-lg font-medium text-petal-ink truncate">{coupleTitle(client)}</h3>
+            <p className="inline-flex items-center gap-1 font-body text-[11px] text-petal-muted">
+              <Lock className="w-3 h-3" strokeWidth={1.5} />
+              {client.canComment ? '可留言・不含私密內容' : '唯讀・不含私密內容'}
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1 text-petal-muted hover:text-petal-ink" aria-label="關閉">
+            <X className="w-5 h-5" strokeWidth={1.5} />
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex border-b border-petal-rule">
+          {(['wall', 'events'] as Tab[]).map((key) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              data-testid={`client-tab-${key}`}
+              className={`flex-1 py-2.5 font-body text-sm font-medium transition-colors ${
+                tab === key ? 'text-pink-600 border-b-2 border-pink-500' : 'text-petal-muted hover:text-petal-ink'
+              }`}
+            >
+              {key === 'wall' ? '牆' : '好好說話'}
+            </button>
+          ))}
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto">
+          {tab === 'wall' ? (
+            <ClientWall coupleId={client.coupleId} canComment={client.canComment} showNotification={showNotification} />
+          ) : (
+            <ClientEvents coupleId={client.coupleId} canComment={client.canComment} showNotification={showNotification} />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Wall tab -------------------------------------------------------------
+
+const ClientWall: React.FC<{
+  coupleId: string;
+  canComment: boolean;
+  showNotification: (n: Omit<Notification, 'id'>) => void;
+}> = ({ coupleId, canComment, showNotification }) => {
+  const [posts, setPosts] = useState<WallPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [openPostId, setOpenPostId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { posts } = await apiService.getClientWall(coupleId);
+      setPosts(posts);
+    } catch (err) {
+      showNotification({ type: 'error', title: '無法載入', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
+    } finally {
+      setLoading(false);
+    }
+  }, [coupleId, showNotification]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <p className="text-center font-body text-sm text-petal-muted py-10">載入中…</p>;
+  if (posts.length === 0) return <p className="text-center font-body text-sm text-petal-muted py-10">這對伴侶的牆上還沒有內容。</p>;
+
+  return (
+    <div className="p-4 space-y-3" data-testid="client-wall">
+      {posts.map((p) => (
+        <div key={p.id} className="rounded-lg border border-petal-rule bg-petal-cream p-4">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-body text-sm font-medium text-petal-ink">{p.author_nickname || '某人'}</span>
+            <span className="font-body text-[11px] text-petal-muted">{new Date(p.created_at).toLocaleDateString('zh-TW')}</span>
+          </div>
+          {p.mood_tag && (
+            <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-pink-50 border border-pink-200 font-body text-[11px] text-pink-700">
+              {p.mood_tag}
+            </span>
+          )}
+          {p.content && (
+            <p className="mt-1.5 font-body text-sm text-petal-ink-soft leading-relaxed whitespace-pre-wrap">{p.content}</p>
+          )}
+          {p.media && p.media.length > 0 && (
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {p.media.map((url) => (
+                <div key={url} className="aspect-video rounded-md overflow-hidden bg-petal-cream-2 border border-petal-rule flex items-center justify-center">
+                  {isVideoUrl(url) ? (
+                    <video src={url} controls className="w-full h-full object-contain" />
+                  ) : (
+                    <img src={url} alt="" className="w-full h-full object-contain" />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          <button
+            onClick={() => setOpenPostId(openPostId === p.id ? null : p.id)}
+            className="mt-2.5 inline-flex items-center gap-1 font-body text-xs text-petal-muted hover:text-petal-ink"
+            data-testid="client-wall-open-thread"
+          >
+            <MessageCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
+            {openPostId === p.id ? '收合' : `回覆串${p.reply_count > 0 ? ` (${p.reply_count})` : ''}`}
+          </button>
+          {openPostId === p.id && (
+            <WallThread coupleId={coupleId} postId={p.id} canComment={canComment} onPosted={load} showNotification={showNotification} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const WallThread: React.FC<{
+  coupleId: string;
+  postId: string;
+  canComment: boolean;
+  onPosted: () => void;
+  showNotification: (n: Omit<Notification, 'id'>) => void;
+}> = ({ coupleId, postId, canComment, onPosted, showNotification }) => {
+  const [replies, setReplies] = useState<WallReply[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { replies } = await apiService.getClientWallReplies(coupleId, postId);
+      setReplies(replies);
+    } catch {
+      /* non-fatal */
+    } finally {
+      setLoading(false);
+    }
+  }, [coupleId, postId]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const send = async () => {
+    const content = draft.trim();
+    if (!content) return;
+    try {
+      setSending(true);
+      await apiService.addClientWallReply(coupleId, postId, content);
+      setDraft('');
+      await load();
+      onPosted();
+    } catch (err) {
+      showNotification({ type: 'error', title: '留言失敗', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 pt-2 border-t border-petal-rule space-y-2">
+      {loading ? (
+        <p className="font-body text-xs text-petal-muted">載入回覆中…</p>
+      ) : replies.length === 0 ? (
+        <p className="font-body text-xs text-petal-muted">還沒有回覆。</p>
+      ) : (
+        replies.map((r) => (
+          <div key={r.id} className={`rounded-md px-3 py-1.5 ${r.is_therapist ? 'bg-pink-50 border border-pink-200' : 'bg-petal-cream-2'}`}>
+            <div className="font-body text-[11px] text-petal-muted">
+              {r.is_therapist ? `🩺 ${r.author_nickname || '心理師'}（心理師）` : r.is_ai ? 'AI 諮商師' : (r.author_nickname || '某人')}
+            </div>
+            <div className="font-body text-sm text-petal-ink">{r.content}</div>
+          </div>
+        ))
+      )}
+      {canComment && (
+        <div className="flex items-center gap-2 pt-1">
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+            placeholder="以心理師身分留言…"
+            data-testid="client-wall-reply-input"
+            className="flex-1 px-3 py-1.5 rounded-full border border-petal-rule bg-petal-cream focus:border-petal-ink focus:outline-none font-body text-sm text-petal-ink"
+          />
+          <button
+            onClick={send}
+            disabled={sending || !draft.trim()}
+            data-testid="client-wall-reply-send"
+            className="shrink-0 p-2 rounded-full bg-petal-ink text-petal-cream hover:bg-pink-700 disabled:opacity-50"
+          >
+            <Send className="w-4 h-4" strokeWidth={1.5} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// --- Events (好好說話) tab -------------------------------------------------
+
+const ClientEvents: React.FC<{
+  coupleId: string;
+  canComment: boolean;
+  showNotification: (n: Omit<Notification, 'id'>) => void;
+}> = ({ coupleId, canComment, showNotification }) => {
+  const [events, setEvents] = useState<EventRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { events } = await apiService.getClientEvents(coupleId);
+      setEvents(events);
+    } catch (err) {
+      showNotification({ type: 'error', title: '無法載入', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
+    } finally {
+      setLoading(false);
+    }
+  }, [coupleId, showNotification]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <p className="text-center font-body text-sm text-petal-muted py-10">載入中…</p>;
+  if (openId) {
+    return (
+      <ClientEventDetail
+        coupleId={coupleId}
+        eventId={openId}
+        canComment={canComment}
+        onBack={() => setOpenId(null)}
+        showNotification={showNotification}
+      />
+    );
+  }
+  if (events.length === 0) return <p className="text-center font-body text-sm text-petal-muted py-10">這對伴侶還沒有好好說話的對話。</p>;
+
+  return (
+    <div className="p-4 space-y-2" data-testid="client-events">
+      {events.map((e) => (
+        <button
+          key={e.id}
+          onClick={() => setOpenId(e.id)}
+          data-testid="client-event-row"
+          className="w-full text-left rounded-lg border border-petal-rule bg-petal-cream p-4 hover:border-petal-ink transition-colors"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-display text-base text-petal-ink truncate">{e.title}</span>
+            <span className="font-body text-[11px] text-petal-muted shrink-0">{new Date(e.createdAt).toLocaleDateString('zh-TW')}</span>
+          </div>
+          {e.summary && <p className="mt-1 font-body text-sm text-petal-ink-soft line-clamp-2">{e.summary}</p>}
+        </button>
+      ))}
+    </div>
+  );
+};
+
+const ClientEventDetail: React.FC<{
+  coupleId: string;
+  eventId: string;
+  canComment: boolean;
+  onBack: () => void;
+  showNotification: (n: Omit<Notification, 'id'>) => void;
+}> = ({ coupleId, eventId, canComment, onBack, showNotification }) => {
+  const [event, setEvent] = useState<EventRecord | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [draft, setDraft] = useState('');
+  const [sending, setSending] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { event } = await apiService.getClientEventDetail(coupleId, eventId);
+      setEvent(event);
+    } catch (err) {
+      showNotification({ type: 'error', title: '無法載入', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
+    } finally {
+      setLoading(false);
+    }
+  }, [coupleId, eventId, showNotification]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const send = async () => {
+    const content = draft.trim();
+    if (!content) return;
+    try {
+      setSending(true);
+      await apiService.addClientEventMessage(coupleId, eventId, content);
+      setDraft('');
+      await load();
+    } catch (err) {
+      showNotification({ type: 'error', title: '留言失敗', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-full" data-testid="client-event-detail">
+      <button onClick={onBack} className="flex items-center gap-1 px-4 py-2 font-body text-xs text-petal-muted hover:text-petal-ink">
+        <ChevronLeft className="w-4 h-4" strokeWidth={1.5} /> 返回列表
+      </button>
+      {loading || !event ? (
+        <p className="text-center font-body text-sm text-petal-muted py-10">載入中…</p>
+      ) : (
+        <>
+          <div className="px-4 pb-3 border-b border-petal-rule">
+            <h4 className="font-display text-lg text-petal-ink">{event.title}</h4>
+            {event.summary && <p className="mt-1 font-body text-sm text-petal-ink-soft leading-relaxed">{event.summary}</p>}
+            {event.status === 'resolved' && (
+              <span className="inline-block mt-2 px-2 py-0.5 rounded-full bg-petal-sage/15 font-body text-[11px] text-petal-sage-deep">已完成</span>
+            )}
+          </div>
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
+            {event.messages.length === 0 ? (
+              <p className="text-center font-body text-sm text-petal-muted py-6">這段對話還沒有訊息。</p>
+            ) : (
+              event.messages.map((m) => {
+                const who = m.isTherapist
+                  ? '心理師'
+                  : m.isAi
+                    ? (companionName(m.aiTherapist) ? `${companionName(m.aiTherapist)}・AI 諮商師` : 'AI 諮商師')
+                    : '伴侶';
+                return (
+                  <div key={m.id} className={`rounded-md px-3 py-1.5 ${m.isTherapist ? 'bg-pink-50 border border-pink-200' : 'bg-petal-cream-2'}`}>
+                    <div className="flex items-center gap-1.5">
+                      <ParticipantAvatar
+                        size="xs"
+                        role={m.isTherapist ? 'therapist' : m.isAi ? 'ai' : 'user'}
+                        companionId={m.aiTherapist}
+                        colorKey={m.senderId}
+                        name={who}
+                      />
+                      <span className="font-body text-[11px] text-petal-muted">{who}</span>
+                    </div>
+                    <div className="font-body text-sm text-petal-ink whitespace-pre-wrap mt-0.5">{m.content}</div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+          {canComment && event.status !== 'resolved' && (
+            <div className="border-t border-petal-rule px-4 py-3 flex items-center gap-2">
+              <input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+                placeholder="以心理師身分留言…"
+                data-testid="client-event-message-input"
+                className="flex-1 px-3.5 py-2 rounded-full border border-petal-rule bg-petal-cream focus:border-petal-ink focus:outline-none font-body text-sm text-petal-ink"
+              />
+              <button
+                onClick={send}
+                disabled={sending || !draft.trim()}
+                data-testid="client-event-message-send"
+                className="shrink-0 p-2 rounded-full bg-petal-ink text-petal-cream hover:bg-pink-700 disabled:opacity-50"
+              >
+                <Send className="w-4 h-4" strokeWidth={1.5} />
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+};
+
+export default TherapistClientView;

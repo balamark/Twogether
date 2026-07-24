@@ -78,6 +78,39 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       case 'consultation_message':
         onNavigate('therapists');
         break;
+      // Partner-action notifications (services/notificationService.js): route each
+      // to the tab where the action lives so the tap lands somewhere useful.
+      case 'love_moment_created':
+      case 'love_moment_updated':
+      case 'love_moment_deleted':
+      case 'cycle_record_created':
+      case 'cycle_record_updated':
+      case 'cycle_record_deleted':
+        onNavigate('record');
+        break;
+      case 'custom_script_created':
+      case 'custom_script_updated':
+      case 'custom_script_deleted':
+        onNavigate('roleplay');
+        break;
+      case 'custom_gift_created':
+      case 'custom_gift_updated':
+      case 'custom_gift_deleted':
+        onNavigate('shop');
+        break;
+      case 'assessment_saved':
+      case 'love_wish_created':
+      case 'love_wish_deleted':
+        onNavigate('love-language');
+        break;
+      case 'checkup_created':
+      case 'checkup_response':
+        onNavigate('conflict');
+        break;
+      case 'couple_settings_updated':
+      case 'profile_updated':
+        onNavigate('settings');
+        break;
       default:
         break;
     }

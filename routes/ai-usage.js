@@ -1,7 +1,7 @@
 const express = require('express');
 const { authenticateToken } = require('../middleware/auth');
-const { countTodayAiUsage, resolveAiLimit } = require('../lib/aiUsage');
-const { logError } = require('../lib/logger');
+const { countTodayAiUsageByKind, resolveAiLimit } = require('../lib/aiUsage');
+const { logInfo, logError } = require('../lib/logger');
 
 const router = express.Router();
 
@@ -11,8 +11,11 @@ const router = express.Router();
 router.get('/today', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-    const { tier, limit } = await resolveAiLimit(userId);
-    const used = await countTodayAiUsage(userId);
+    const { tier, limit, coupleId } = await resolveAiLimit(userId);
+    const { total: used, byKind } = await countTodayAiUsageByKind(userId);
+    // Diagnostic: surfaces tier + per-feature breakdown so a "只剩 N 次" report can
+    // be root-caused (被當 free vs 額度被哪個功能用掉) straight from Cloud Logging.
+    logInfo('ai.quota.today', { userId, coupleId, tier, limit, used, byKind });
     res.json({
       success: true,
       usage: {

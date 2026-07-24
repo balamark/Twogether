@@ -103,7 +103,7 @@ test.describe('Compose event — summary at top + editable opener', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
     await page.getByTestId('nav-tab-communicate').click();
-    await page.locator('button:has-text("建立事件")').first().click();
+    await page.locator('button:has-text("開始對話")').first().click();
     await page.getByTestId('compose-raw-input').fill('他今天早上又沒起床送小孩，超級失望');
     await page.locator('button:has-text("讓 AI 整理")').click();
     await expect(page.getByTestId('compose-event-summary')).toBeVisible({ timeout: 10000 });
@@ -114,7 +114,7 @@ test.describe('Compose event — summary at top + editable opener', () => {
 
     const summaryBlock = page.getByTestId('compose-event-summary');
     await expect(summaryBlock).toContainText(PREVIEW.summary);
-    await expect(summaryBlock).toContainText('事件簡介');
+    await expect(summaryBlock).toContainText('對話簡介');
 
     // The neutral version card shows its own (different) text.
     const neutralCard = page.locator('button:has-text("中性版")');

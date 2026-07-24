@@ -18,10 +18,20 @@ import {
   ClipboardCheck,
   Crown,
   Check,
+  Lock,
+  Bell,
+  ShieldCheck,
+  MessageSquare,
   type LucideIcon,
 } from 'lucide-react';
 import { daysSinceLastNudge } from './AchievementsView';
 import { isVideoUrl } from '../utils/script';
+import ParticipantAvatar from './ParticipantAvatar';
+import {
+  POSITIONING_ONE_LINER,
+  POSITIONING_SUBLINE,
+  NOT_A_SUBSTITUTE,
+} from '../content/positioning';
 
 interface PreviewScript {
   id: string;
@@ -63,6 +73,38 @@ const SampleCard: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     {children}
   </div>
 );
+
+// Read-only「通知中心」sample: every action your partner takes shows up here, so
+// you always know what TA just did (愛的記錄、劇本、禮物、婚姻健檢…). Static 範例 data.
+const NotificationCenterSample: React.FC = () => {
+  const rows = [
+    { emoji: '💝', title: '小晴新增了一則愛的記錄', body: '昨晚的約會好浪漫', dot: 'bg-blue-500', unread: true },
+    { emoji: '🎁', title: '小晴新增了一個客製禮物', body: '🎁 一起看電影的夜晚', dot: 'bg-blue-500', unread: true },
+    { emoji: '💑', title: '小晴發起了一次婚姻健檢', body: '打開 App 一起完成健檢', dot: 'bg-yellow-500', unread: false },
+  ];
+  return (
+    <div className="rounded-md border border-petal-rule bg-petal-cream overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-petal-rule bg-petal-cream-2">
+        <div className="flex items-center gap-1.5">
+          <Bell className="w-4 h-4 text-petal-rose-deep" strokeWidth={1.5} />
+          <span className="font-body text-xs font-medium text-petal-ink">通知中心</span>
+        </div>
+        <SampleTag />
+      </div>
+      <ul className="divide-y divide-petal-rule">
+        {rows.map((r, i) => (
+          <li key={i} className={`flex items-start gap-2.5 px-3 py-2.5 ${r.unread ? 'bg-petal-rose-soft/10' : ''}`}>
+            <span className={`mt-1.5 h-2 w-2 rounded-full ${r.dot}`} />
+            <div className="min-w-0">
+              <p className="font-body text-sm text-petal-ink">{r.emoji} {r.title}</p>
+              <p className="font-body text-xs text-petal-muted mt-0.5 truncate">{r.body}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
 
 // A read-only month calendar mockup for the 記錄時光 preview — closer to what a
 // real signed-in user sees than a plain list. Static "範例" data.
@@ -186,9 +228,17 @@ const CalendarMock: React.FC = () => {
 
   return (
     <div className="bg-petal-cream border border-petal-rule rounded-md p-4">
-      <div className="flex items-center justify-between mb-3">
-        <span className="font-display italic text-base text-petal-ink">六月</span>
-        <SampleTag />
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <span className="font-display italic text-base text-petal-ink">你們的節奏</span>
+          <p className="font-body text-[11px] text-petal-muted mt-0.5">點月曆任一天新增或查看紀錄</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-petal-ink text-petal-cream rounded-md font-display italic text-xs">
+            ＋ 記錄今天
+          </span>
+          <SampleTag />
+        </div>
       </div>
       <div className="grid grid-cols-7 gap-y-1.5 text-center">
         {['日', '一', '二', '三', '四', '五', '六'].map((d) => (
@@ -257,9 +307,9 @@ const EmotionAcceptanceSample: React.FC = () => (
         <p className="font-body text-sm text-petal-ink">「你又忘記了，我覺得自己一點都不重要。」</p>
       </div>
       <div className="rounded-md bg-white border border-petal-rule px-3 py-2">
-        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-1">② AI 整理事件＋翻成不傷人的話</div>
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-1">② AI 整理對話＋翻成不傷人的話</div>
         <div className="rounded bg-petal-cream-2 px-2 py-1.5 mb-1.5">
-          <div className="font-body text-[10px] text-petal-muted">事件簡介（中性紀錄）</div>
+          <div className="font-body text-[10px] text-petal-muted">對話簡介（中性紀錄）</div>
           <p className="font-body text-xs text-petal-ink-soft">兩人約好的紀念日晚餐，其中一方因加班忘記赴約。</p>
         </div>
         <p className="font-body text-sm text-petal-ink">「當約定被忘記時，我會覺得失落，因為我很在乎我們的相處。」</p>
@@ -411,11 +461,50 @@ const EmotionMeterSample: React.FC = () => {
   );
 };
 
+// Therapist Mode ("引導模式") read-only sample: the AI runs a turn-based
+// exercise (a "card") instead of an advice essay, then scores it — with a
+// 今日練習 scoreboard so therapy feels measurable.
+const TherapistModeSample: React.FC = () => (
+  <SampleCard>
+    <div className="flex items-center justify-between mb-3">
+      <span className="inline-flex items-center gap-1.5 font-body text-xs text-petal-rose-deep">
+        <ParticipantAvatar size="xs" role="ai" companionId="luma" name="Luma" />
+        Luma・引導者
+      </span>
+      <SampleTag />
+    </div>
+    <div className="rounded-2xl border border-petal-rose-deep/25 bg-petal-cream p-3 space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="rounded-full border border-petal-sage bg-petal-sage/20 text-petal-sage-deep px-2 py-0.5 font-body text-[11px] font-medium">🪞 鏡映</span>
+        <span className="rounded-full border border-petal-sage bg-petal-sage/20 text-petal-sage-deep px-2 py-0.5 font-body text-[11px] font-medium">✅ 做到了</span>
+      </div>
+      <p className="font-body text-sm text-petal-ink leading-relaxed">我們一次只做一小步。先不要解釋，只重複你聽到的。</p>
+      <div className="rounded-xl border border-petal-rose-deep bg-petal-rose-soft/20 px-3 py-2">
+        <div className="font-body text-[11px] font-medium text-petal-rose-deep mb-0.5">換你了</div>
+        <p className="font-body text-sm text-petal-ink">用「我聽到你說的是…」開頭，說出你聽到的。</p>
+      </div>
+    </div>
+    <div className="mt-3 rounded-xl border border-petal-rule bg-petal-cream-2 px-3 py-2">
+      <div className="flex items-center justify-between">
+        <span className="font-display italic text-sm text-petal-ink">今日練習</span>
+        <span className="font-body text-xs text-petal-muted">關係技巧分數 <span className="font-display italic text-petal-rose-deep">78%</span></span>
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 font-body text-xs text-petal-ink">
+        <span>✓ 🎯 情緒標記</span>
+        <span>✓ 🪞 鏡映</span>
+        <span className="text-petal-muted">… 🫶 肯定</span>
+      </div>
+    </div>
+  </SampleCard>
+);
+
 const ConflictFlywheelSample: React.FC = () => (
   <div className="space-y-4">
     <SafetyBannerSample />
 
     <EmotionMeterSample />
+
+    <TherapistModeSample />
 
     <EmotionAcceptanceSample />
 
@@ -491,12 +580,17 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       </>
     ),
     description:
-      '看見你們的節奏：親密時光與生理期都在一張月曆上。太久沒親密時，App 會溫柔提醒另一半多關心你。',
+      '看見你們的節奏：親密時光與生理期都在一張月曆上。太久沒親密時，App 會溫柔提醒另一半多關心你。另一半的每個操作也會出現在通知中心，讓你隨時知道 TA 做了什麼。',
     sample: (
       <>
-        <SampleStats />
-        <SampleRecordList />
         <CalendarMock />
+        <div className="mt-4">
+          <SampleStats />
+        </div>
+        <SampleRecordList />
+        <div className="mt-4">
+          <NotificationCenterSample />
+        </div>
       </>
     ),
   },
@@ -562,7 +656,10 @@ const PREVIEWS: Record<string, PreviewConfig> = {
         </div>
         <SampleCard>
           <p className="font-body text-sm text-petal-ink">你根本沒有把家庭放第一。</p>
-          <div className="font-body text-[11px] text-petal-muted mt-1.5">— 小晴</div>
+          <div className="flex items-center gap-1.5 mt-1.5">
+            <ParticipantAvatar size="xs" name="小晴" colorKey="小晴" />
+            <span className="font-body text-[11px] text-petal-muted">小晴</span>
+          </div>
           <div className="mt-1.5 rounded-xl border border-petal-rose-deep/25 bg-petal-cream-2 px-3 py-2">
             <div className="flex items-center gap-1.5 text-petal-rose-deep">
               <HeartHandshake className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -575,6 +672,101 @@ const PREVIEWS: Record<string, PreviewConfig> = {
             </div>
           </div>
         </SampleCard>
+        <SampleCard>
+          <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-petal-cream-2 text-petal-ink-soft font-body text-[9px] uppercase tracking-[0.1em]">
+              <Lock className="w-2.5 h-2.5 mr-0.5" strokeWidth={1.5} />
+              只有我看得到
+            </span>
+            <ParticipantAvatar size="xs" name="小宇" colorKey="小宇" />
+            <span className="font-body text-xs text-petal-ink">小宇</span>
+            {/* custom mood tag (自訂輸入) */}
+            <span className="font-body text-[11px] text-petal-muted">· 加班中</span>
+            <SampleTag />
+          </div>
+          <p className="font-body text-sm text-petal-ink">今天的約會超棒，留張合照 📷</p>
+          {/* Photo shown at its own aspect ratio (no forced crop / heavy border). */}
+          <div className="mt-2 rounded-md border border-petal-rule bg-petal-cream-2 overflow-hidden">
+            <img
+              src="/images/roleplay/reunion-love.png"
+              alt="範例貼文照片"
+              loading="lazy"
+              className="w-full h-auto max-h-56 object-contain"
+            />
+          </div>
+        </SampleCard>
+      </div>
+    ),
+  },
+  // 心理諮商 tab: leads with the Therapy Companion positioning — Twogether sits
+  // beside therapists, not against them. Static sample of the "between-sessions"
+  // loop + the honest "not a substitute" note (src/content/positioning.ts).
+  therapists: {
+    icon: HeartHandshake,
+    eyebrow: '心理諮商 · 延伸，而非取代',
+    title: (
+      <>
+        把心理師教的方法，<em className="not-italic font-light italic text-pink-600">帶回每一天</em>
+      </>
+    ),
+    description:
+      `${POSITIONING_ONE_LINER}${POSITIONING_SUBLINE}記錄事件、練習溝通、修復連結，下次進諮商室不用再花 30 分鐘回想發生了什麼；卡住時也能預約真人諮商師。`,
+    sample: (
+      <div className="space-y-4">
+        <SampleCard>
+          <div className="flex items-center justify-between mb-3">
+            <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
+              <HeartHandshake className="w-3.5 h-3.5 text-petal-rose-deep" />
+              一週諮商一次，剩下的 167 小時交給練習
+            </span>
+            <SampleTag />
+          </div>
+          <ol className="space-y-2.5">
+            {[
+              { n: '1', t: '好好說（事件記錄）', d: '把這週發生的事寫下來，下次諮商不用再花 30 分鐘回想。' },
+              { n: '2', t: 'AI 示範引導', d: '不是給答案，而是示範心理師可能會怎麼帶你們一步步練習。' },
+              { n: '3', t: '諮商摘要', d: '把最近兩週整理成一份摘要，帶進諮商室更快進入重點。舊摘要會保存下來，隨時點開回顧，不用重新產生、不扣 AI 次數。' },
+              { n: '4', t: '預約真人諮商師', d: '真的卡住了，挑一位受過專業訓練的人好好談。' },
+            ].map((s) => (
+              <li key={s.n} className="flex items-start gap-3 text-left">
+                <span className="shrink-0 w-6 h-6 rounded-full bg-petal-cream-2 text-pink-600 font-body text-xs flex items-center justify-center">
+                  {s.n}
+                </span>
+                <div className="min-w-0">
+                  <div className="font-body text-sm font-medium text-petal-ink">{s.t}</div>
+                  <div className="font-body text-xs text-petal-muted leading-relaxed">{s.d}</div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </SampleCard>
+
+        {/* 專屬心理師 — a couple can grant one approved therapist read (and
+            optionally comment) access to their wall + 好好說話, private items
+            excluded. */}
+        <SampleCard>
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
+              <ShieldCheck className="w-3.5 h-3.5 text-pink-500" />
+              專屬心理師
+            </span>
+            <SampleTag />
+          </div>
+          <p className="font-body text-sm text-petal-ink-soft leading-relaxed">
+            把一位諮商師設為你們的<strong className="text-petal-ink">專屬心理師</strong>，
+            他就能唯讀檢視你們的<strong className="text-petal-ink">牆</strong>與
+            <strong className="text-petal-ink">好好說話</strong>，更了解你們的關係脈絡。
+          </p>
+          <ul className="mt-2.5 space-y-1.5 font-body text-xs text-petal-muted">
+            <li className="flex items-center gap-1.5"><Lock className="w-3 h-3 text-petal-sage-deep" /> 私密內容不會被看到</li>
+            <li className="flex items-center gap-1.5"><MessageSquare className="w-3 h-3 text-pink-500" /> 可選擇是否開放心理師留言</li>
+            <li className="flex items-center gap-1.5"><HeartHandshake className="w-3 h-3 text-pink-500" /> 隨時可以解除</li>
+          </ul>
+        </SampleCard>
+
+        <p className="font-body text-xs text-petal-muted leading-relaxed text-center px-2">
+          {NOT_A_SUBSTITUTE}
+        </p>
       </div>
     ),
   },
@@ -831,8 +1023,11 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scr
           <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-4">
             歡迎使用 <em className="not-italic font-light italic text-pink-600">Twogether</em>
           </h2>
+          <p className="font-display italic font-light text-base text-petal-ink-soft mb-2 leading-relaxed">
+            {POSITIONING_ONE_LINER}
+          </p>
           <p className="font-display italic font-light text-base text-petal-muted mb-8">
-            登入以開始記錄你們的愛情時光。
+            {POSITIONING_SUBLINE}
           </p>
           <button
             onClick={onSignUp}

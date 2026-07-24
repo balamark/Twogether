@@ -4,11 +4,19 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { logDbError, errorResponseBody } = require('../lib/db-errors');
 const emailService = require('../services/emailService');
+const lineService = require('../services/lineService');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 const llmService = require('../services/llmService');
 const { checkLimit } = require('../lib/entitlements');
 const { resolveCompanion } = require('../lib/aiCompanions');
 const { resolveAiLimit, countTodayAiUsage, recordAiUsage } = require('../lib/aiUsage');
+const {
+  uploadMedia,
+  checkMediaSizes,
+  normalizeUrlList,
+  createMediaMulter,
+  wrapMulterErrors,
+} = require('../lib/media-upload');
 
 const router = express.Router();
 
@@ -17,6 +25,78 @@ const WALL_MOOD_TAGS = [
   '想念你', '需要空間', '想被抱抱', '想溝通',
   '感謝', '撒嬌', '開心', '難過', '有想法',
 ];
+
+// A wall post may carry up to this many photos/videos. Kept in sync with
+// WALL_MAX_MEDIA in src/components/WallPostComposer.tsx.
+const WALL_MAX_MEDIA = 4;
+
+// Mood tags are free-form (custom tags allowed) but capped at the DB column
+// width (mood_tag VARCHAR(32)). WALL_MOOD_TAGS above are just the preset chips.
+const MOOD_TAG_MAX = 32;
+
+// Parse a boolean form field. Multipart sends 'true'/'false' strings; JSON
+// sends real booleans — accept both, default false.
+function parseBool(val) {
+  return val === true || val === 'true';
+}
+
+// express-validator predicate: null/empty clears the tag; otherwise any string
+// up to the column width.
+function isValidMoodTag(val) {
+  return val === null || val === '' || (typeof val === 'string' && val.trim().length <= MOOD_TAG_MAX && val.trim().length > 0);
+}
+
+// Trim + null-out an incoming mood tag for storage.
+function normalizeMoodTag(val) {
+  if (typeof val !== 'string') return null;
+  const trimmed = val.trim();
+  return trimmed ? trimmed.slice(0, MOOD_TAG_MAX) : null;
+}
+
+// Multipart middleware for the `media[]` field (photos/videos). Errors become
+// actionable JSON with a wall-specific error_code. A no-op for JSON requests.
+const wallMediaUpload = wrapMulterErrors(
+  createMediaMulter({ maxFiles: WALL_MAX_MEDIA }).array('media', WALL_MAX_MEDIA),
+  { tooLargeCode: 'WALL_MEDIA_TOO_LARGE', invalidCode: 'WALL_MEDIA_INVALID' }
+);
+
+// Upload one wall media file (image or video) → public Supabase URL.
+function uploadWallMedia(file) {
+  return uploadMedia(file, { imagePrefix: 'wall-photos/', videoPrefix: 'wall-videos/' });
+}
+
+// Fetch ordered media URLs for a set of post ids → { postId: [url, ...] }.
+// Degrades to no media (rather than failing the list) if the table isn't
+// present yet, e.g. a pre-migration environment.
+async function fetchMediaForPosts(postIds) {
+  const map = {};
+  if (!postIds.length) return map;
+  try {
+    const result = await db.query(
+      `SELECT post_id, url FROM wall_post_media
+        WHERE post_id = ANY($1::uuid[])
+        ORDER BY post_id, sort_order, created_at`,
+      [postIds]
+    );
+    for (const row of result.rows) {
+      (map[row.post_id] = map[row.post_id] || []).push(row.url);
+    }
+  } catch (err) {
+    logWarn('fetchMediaForPosts failed', { err: err.message });
+  }
+  return map;
+}
+
+// Replace a post's media rows with `urls` (already ordered).
+async function replaceWallMedia(postId, urls) {
+  await db.query('DELETE FROM wall_post_media WHERE post_id = $1', [postId]);
+  for (let i = 0; i < urls.length; i++) {
+    await db.query(
+      'INSERT INTO wall_post_media (post_id, url, sort_order) VALUES ($1, $2, $3)',
+      [postId, urls[i], i]
+    );
+  }
+}
 
 router.use(authenticateToken);
 
@@ -45,6 +125,14 @@ async function notifyPartner(partnerId, type, title, content, relatedUserId, opt
   } catch (err) {
     logWarn('Failed to create notification', { type, err: err.message });
   }
+
+  // Mirror to LINE (no-ops unless the partner linked + opted in). Carry the
+  // full post/reply text (excerpted) so the push alone tells the story.
+  lineService.pushToUserIfLinked(
+    db,
+    partnerId,
+    `💌 Twogether｜${title}\n「${lineService.excerpt(content)}」\n👉 https://twogether.fun`
+  );
 
   // Fire-and-forget email to the partner. Honors per-user opt-out.
   try {
@@ -76,6 +164,8 @@ function mapPost(row) {
     author_id: row.author_id,
     author_nickname: row.author_nickname,
     reply_count: Number(row.reply_count || 0),
+    media: Array.isArray(row.media) ? row.media : [],
+    is_private: row.is_private === true,
     public_status: row.public_status || 'private',
     public_title: row.public_title || null,
     translation_enabled: row.translation_enabled === true,
@@ -92,6 +182,7 @@ function mapReply(row) {
     author_id: row.author_id,
     author_nickname: row.author_nickname,
     is_ai: row.is_ai === true,
+    is_therapist: row.is_therapist === true,
     ai_therapist: row.ai_therapist || null,
     created_at: row.created_at,
   };
@@ -108,6 +199,87 @@ async function getUserCompanion(userId) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Reusable read/write helpers — shared by the couple-member endpoints below and
+// by the dedicated-therapist endpoints in routes/therapists.js. `privateVisibleTo`
+// controls whose private posts are visible: pass a member's userId to include
+// their own private posts, or null (e.g. a therapist) to exclude ALL private
+// items. Private content is never exposed to a third party.
+// ---------------------------------------------------------------------------
+
+// List a couple's wall posts, important first then newest first.
+async function listWallPostsForCouple(coupleId, { privateVisibleTo = null } = {}) {
+  const privateClause = privateVisibleTo
+    ? '(p.is_private = false OR p.author_id = $2)'
+    : 'p.is_private = false';
+  const params = privateVisibleTo ? [coupleId, privateVisibleTo] : [coupleId];
+
+  const result = await db.query(
+    `SELECT
+       p.id, p.content, p.mood_tag, p.category, p.author_id, p.is_private,
+       p.public_status, p.public_title, p.translation_enabled,
+       p.created_at, p.updated_at,
+       u.nickname AS author_nickname,
+       (SELECT COUNT(*) FROM wall_post_replies r WHERE r.post_id = p.id) AS reply_count
+     FROM wall_posts p
+     JOIN users u ON u.id = p.author_id
+     WHERE p.couple_id = $1 AND ${privateClause}
+     ORDER BY (p.category = 'important') DESC, p.created_at DESC`,
+    params
+  );
+
+  const mediaByPost = await fetchMediaForPosts(result.rows.map((r) => r.id));
+  return result.rows.map((row) =>
+    mapPost({ ...row, media: mediaByPost[row.id] || [] })
+  );
+}
+
+// Fetch one post scoped to a couple, applying the same privacy rule. Returns the
+// raw row ({ id, translation_enabled, is_private, author_id }) or null when the
+// post doesn't belong to the couple or is a private post the viewer can't see.
+async function getWallPostForCouple(postId, coupleId, { privateVisibleTo = null } = {}) {
+  const result = await db.query(
+    `SELECT id, translation_enabled, is_private, author_id
+       FROM wall_posts WHERE id = $1 AND couple_id = $2`,
+    [postId, coupleId]
+  );
+  const post = result.rows[0];
+  if (!post) return null;
+  if (post.is_private === true && post.author_id !== privateVisibleTo) return null;
+  return post;
+}
+
+// All replies for a post (caller must have already checked post access).
+async function listRepliesForPost(postId) {
+  const result = await db.query(
+    `SELECT r.id, r.post_id, r.content, r.author_id, r.is_ai, r.is_therapist,
+            r.ai_therapist, r.created_at, u.nickname AS author_nickname
+     FROM wall_post_replies r
+     JOIN users u ON u.id = r.author_id
+     WHERE r.post_id = $1
+     ORDER BY r.created_at ASC`,
+    [postId]
+  );
+  return result.rows.map(mapReply);
+}
+
+// Insert a reply and return it hydrated with the author nickname. isTherapist
+// flags a dedicated-therapist comment so the UI can render it distinctly.
+async function insertWallReply(postId, authorId, content, { isTherapist = false } = {}) {
+  const inserted = await db.query(
+    `INSERT INTO wall_post_replies (post_id, author_id, content, is_therapist)
+     VALUES ($1, $2, $3, $4)
+     RETURNING id, post_id, content, author_id, is_ai, is_therapist, ai_therapist, created_at`,
+    [postId, authorId, content, isTherapist]
+  );
+  const reply = inserted.rows[0];
+  const enriched = await db.query(
+    `SELECT nickname AS author_nickname FROM users WHERE id = $1`,
+    [authorId]
+  );
+  return mapReply({ ...reply, author_nickname: enriched.rows[0]?.author_nickname || null });
+}
+
 // List all posts for the user's couple, important first, then newest first.
 router.get('/', async (req, res) => {
   try {
@@ -118,42 +290,61 @@ router.get('/', async (req, res) => {
       return res.json({ success: true, wall_posts: [] });
     }
 
-    const result = await db.query(
-      `SELECT
-         p.id, p.content, p.mood_tag, p.category, p.author_id,
-         p.public_status, p.public_title, p.translation_enabled,
-         p.created_at, p.updated_at,
-         u.nickname AS author_nickname,
-         (SELECT COUNT(*) FROM wall_post_replies r WHERE r.post_id = p.id) AS reply_count
-       FROM wall_posts p
-       JOIN users u ON u.id = p.author_id
-       WHERE p.couple_id = $1
-       ORDER BY (p.category = 'important') DESC, p.created_at DESC`,
-      [couple.id]
-    );
+    // Private posts are visible only to their author — the partner neither sees
+    // them here nor is notified about them.
+    const wall_posts = await listWallPostsForCouple(couple.id, { privateVisibleTo: userId });
 
-    res.json({
-      success: true,
-      wall_posts: result.rows.map(mapPost),
-    });
+    res.json({ success: true, wall_posts });
   } catch (error) {
     logDbError('Get wall posts error:', error, { user_id: req.user?.id });
     res.status(500).json(errorResponseBody('無法獲取貼文', error));
   }
 });
 
-// Create a new post and notify the partner.
+// Custom mood tags this couple has used before (excluding the preset chips), most
+// recent first. Powers the "remembered custom tags" chips in the composer so a
+// self-defined mood can be reused without retyping. No separate table — derived
+// from the mood_tags already stored on the couple's posts.
+router.get('/mood-tags', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const couple = await findCoupleForUser(userId);
+    if (!couple) return res.json({ success: true, tags: [] });
+
+    const result = await db.query(
+      `SELECT mood_tag, MAX(created_at) AS last_used
+         FROM wall_posts
+        WHERE couple_id = $1
+          AND mood_tag IS NOT NULL AND mood_tag <> ''
+          AND NOT (mood_tag = ANY($2::text[]))
+        GROUP BY mood_tag
+        ORDER BY last_used DESC
+        LIMIT 12`,
+      [couple.id, WALL_MOOD_TAGS]
+    );
+    res.json({ success: true, tags: result.rows.map((r) => r.mood_tag) });
+  } catch (error) {
+    logDbError('Get wall mood tags error:', error, { user_id: req.user?.id });
+    res.status(500).json(errorResponseBody('無法獲取心情標籤', error));
+  }
+});
+
+// Create a new post and notify the partner. Accepts multipart (with a `media[]`
+// series of up to 4 photos/videos) or plain JSON; multer is a no-op for JSON.
+// A post may be text-only, media-only, or both — but not entirely empty.
 router.post(
   '/',
+  wallMediaUpload,
   [
     body('content')
+      .optional({ nullable: true })
       .isString()
-      .isLength({ min: 1, max: 2000 })
-      .withMessage('內容必須在 1-2000 字之間'),
+      .isLength({ max: 2000 })
+      .withMessage('內容不能超過 2000 字'),
     body('mood_tag')
       .optional({ nullable: true })
-      .custom((val) => val === null || val === '' || WALL_MOOD_TAGS.includes(val))
-      .withMessage('無效的心情標籤'),
+      .custom(isValidMoodTag)
+      .withMessage('心情標籤不能超過 32 字'),
     body('category')
       .optional()
       .isIn(['important', 'general'])
@@ -179,18 +370,55 @@ router.post(
         });
       }
 
-      const content = req.body.content;
-      const moodTag = req.body.mood_tag || null;
+      const content = (req.body.content || '').trim();
+      const moodTag = normalizeMoodTag(req.body.mood_tag);
       const category = req.body.category || 'general';
+      const isPrivate = parseBool(req.body.is_private);
+      const mediaFiles = req.files || [];
+
+      // A post needs either text or at least one photo/video — a specific,
+      // actionable reason instead of a generic validation failure.
+      if (!content && mediaFiles.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: '請輸入內容，或至少上傳一張照片或影片',
+          error_code: 'WALL_POST_EMPTY',
+        });
+      }
+
+      // Per-type size cap (image 5MB / video 20MB) with a specific message.
+      const oversize = checkMediaSizes(mediaFiles, { tooLargeCode: 'WALL_MEDIA_TOO_LARGE' });
+      if (oversize) {
+        logWarn('wall.post.media_too_large', { userId, coupleId: couple.id, blocked: true });
+        return res.status(oversize.status).json(oversize.body);
+      }
+
+      logInfo('wall.post.create.attempt', {
+        userId,
+        coupleId: couple.id,
+        mediaCount: mediaFiles.length,
+        contentLen: content.length,
+      });
+
+      // Upload media (in submitted order) before inserting the post so a failed
+      // upload doesn't leave a half-formed post behind.
+      const mediaUrls = [];
+      for (const file of mediaFiles) {
+        mediaUrls.push(await uploadWallMedia(file));
+      }
 
       const inserted = await db.query(
-        `INSERT INTO wall_posts (couple_id, author_id, content, mood_tag, category)
-         VALUES ($1, $2, $3, $4, $5)
-         RETURNING id, content, mood_tag, category, author_id, created_at, updated_at`,
-        [couple.id, userId, content, moodTag, category]
+        `INSERT INTO wall_posts (couple_id, author_id, content, mood_tag, category, is_private)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id, content, mood_tag, category, author_id, is_private, created_at, updated_at`,
+        [couple.id, userId, content, moodTag, category, isPrivate]
       );
 
       const post = inserted.rows[0];
+
+      if (mediaUrls.length > 0) {
+        await replaceWallMedia(post.id, mediaUrls);
+      }
 
       // Hydrate with author nickname for client.
       const enriched = await db.query(
@@ -198,12 +426,26 @@ router.post(
         [userId]
       );
 
-      const partnerId = partnerOf(couple, userId);
-      const title = category === 'important' ? '對方留下了重要的話 ⭐' : '對方在牆上留言';
-      await notifyPartner(partnerId, 'wall_post', title, content, userId, {
-        isImportant: category === 'important',
-        senderName: enriched.rows[0]?.author_nickname || null,
+      logInfo('wall.post.create.success', {
+        userId,
+        coupleId: couple.id,
+        postId: post.id,
+        mediaCount: mediaUrls.length,
+        isPrivate,
       });
+
+      // Private posts stay with their author — the partner isn't notified.
+      if (!isPrivate) {
+        // Media-only posts have no text to preview — describe the attachment so
+        // the partner's notification still tells the story.
+        const notifyBody = content || `傳送了 ${mediaUrls.length} 個照片／影片`;
+        const partnerId = partnerOf(couple, userId);
+        const title = category === 'important' ? '對方留下了重要的話 ⭐' : '對方在牆上留言';
+        await notifyPartner(partnerId, 'wall_post', title, notifyBody, userId, {
+          isImportant: category === 'important',
+          senderName: enriched.rows[0]?.author_nickname || null,
+        });
+      }
 
       res.json({
         success: true,
@@ -212,6 +454,7 @@ router.post(
           ...post,
           author_nickname: enriched.rows[0]?.author_nickname || null,
           reply_count: 0,
+          media: mediaUrls,
         }),
       });
     } catch (error) {
@@ -221,19 +464,23 @@ router.post(
   }
 );
 
-// Edit own post.
+// Edit own post. Accepts multipart (with new `media[]` files and/or an
+// `existingMedia` JSON list of kept URLs) or plain JSON. Media is only rebuilt
+// when the request carries `existingMedia` or new files; otherwise it's left
+// untouched, mirroring the custom-script updater.
 router.put(
   '/:id',
+  wallMediaUpload,
   [
     body('content')
       .optional()
       .isString()
-      .isLength({ min: 1, max: 2000 })
-      .withMessage('內容必須在 1-2000 字之間'),
+      .isLength({ max: 2000 })
+      .withMessage('內容不能超過 2000 字'),
     body('mood_tag')
       .optional({ nullable: true })
-      .custom((val) => val === null || val === '' || WALL_MOOD_TAGS.includes(val))
-      .withMessage('無效的心情標籤'),
+      .custom(isValidMoodTag)
+      .withMessage('心情標籤不能超過 32 字'),
     body('category')
       .optional()
       .isIn(['important', 'general'])
@@ -254,7 +501,7 @@ router.put(
       const userId = req.user.id;
 
       const existing = await db.query(
-        `SELECT id FROM wall_posts WHERE id = $1 AND author_id = $2`,
+        `SELECT id, content FROM wall_posts WHERE id = $1 AND author_id = $2`,
         [postId, userId]
       );
 
@@ -265,28 +512,85 @@ router.put(
         });
       }
 
+      const newFiles = req.files || [];
+      const mediaChanged = req.body.existingMedia !== undefined || newFiles.length > 0;
+
+      // Per-type size cap on any newly uploaded files.
+      const oversize = checkMediaSizes(newFiles, { tooLargeCode: 'WALL_MEDIA_TOO_LARGE' });
+      if (oversize) {
+        logWarn('wall.post.media_too_large', { userId, postId, blocked: true });
+        return res.status(oversize.status).json(oversize.body);
+      }
+
+      // Work out the final media set (kept URLs first, then new uploads) so we
+      // can enforce the per-post cap and the not-entirely-empty rule.
+      const keptUrls = normalizeUrlList(req.body.existingMedia);
+      if (mediaChanged && keptUrls.length + newFiles.length > WALL_MAX_MEDIA) {
+        return res.status(400).json({
+          success: false,
+          message: `每則貼文最多只能上傳 ${WALL_MAX_MEDIA} 張照片或影片`,
+          error_code: 'WALL_MEDIA_LIMIT',
+        });
+      }
+
+      // Resolve what content and media the post will have AFTER this update, to
+      // block an edit that would leave the post entirely empty.
+      const finalContent =
+        req.body.content !== undefined
+          ? (req.body.content || '').trim()
+          : (existing.rows[0].content || '').trim();
+      const currentMediaCount = mediaChanged
+        ? 0
+        : ((await fetchMediaForPosts([postId]))[postId] || []).length;
+      const finalMediaCount = mediaChanged
+        ? keptUrls.length + newFiles.length
+        : currentMediaCount;
+      if (!finalContent && finalMediaCount === 0) {
+        return res.status(400).json({
+          success: false,
+          message: '請輸入內容，或至少保留一張照片或影片',
+          error_code: 'WALL_POST_EMPTY',
+        });
+      }
+
       const fields = [];
       const values = [];
       let i = 1;
 
       if (req.body.content !== undefined) {
         fields.push(`content = $${i++}`);
-        values.push(req.body.content);
+        values.push((req.body.content || '').trim());
       }
       if (req.body.mood_tag !== undefined) {
         fields.push(`mood_tag = $${i++}`);
-        values.push(req.body.mood_tag || null);
+        values.push(normalizeMoodTag(req.body.mood_tag));
       }
       if (req.body.category !== undefined) {
         fields.push(`category = $${i++}`);
         values.push(req.body.category);
       }
+      if (req.body.is_private !== undefined) {
+        fields.push(`is_private = $${i++}`);
+        values.push(parseBool(req.body.is_private));
+      }
 
+      // Rebuild media when requested. Upload new files, then persist kept URLs
+      // (in order) followed by the new uploads.
+      let finalMedia = null;
+      if (mediaChanged) {
+        const newUrls = [];
+        for (const file of newFiles) {
+          newUrls.push(await uploadWallMedia(file));
+        }
+        finalMedia = [...keptUrls, ...newUrls];
+        await replaceWallMedia(postId, finalMedia);
+        logInfo('wall.post.update.media', { userId, postId, mediaCount: finalMedia.length });
+      }
+
+      // If only media changed (no scalar fields), still touch the row so
+      // updated_at advances and we can return the fresh post.
       if (fields.length === 0) {
-        return res.status(400).json({
-          success: false,
-          message: '沒有提供有效的更新欄位',
-        });
+        fields.push(`updated_at = NOW()`);
       }
 
       values.push(postId);
@@ -294,7 +598,7 @@ router.put(
       const updated = await db.query(
         `UPDATE wall_posts SET ${fields.join(', ')}
          WHERE id = $${i}
-         RETURNING id, content, mood_tag, category, author_id, created_at, updated_at`,
+         RETURNING id, content, mood_tag, category, author_id, is_private, created_at, updated_at`,
         values
       );
 
@@ -306,6 +610,11 @@ router.put(
         [postId, userId]
       );
 
+      // Return the current media so the client can update the card in place.
+      const media = finalMedia !== null
+        ? finalMedia
+        : ((await fetchMediaForPosts([postId]))[postId] || []);
+
       res.json({
         success: true,
         message: '貼文更新成功',
@@ -313,6 +622,7 @@ router.put(
           ...post,
           author_nickname: enriched.rows[0]?.author_nickname || null,
           reply_count: enriched.rows[0]?.reply_count || 0,
+          media,
         }),
       });
     } catch (error) {
@@ -366,29 +676,18 @@ router.get('/:id/replies', async (req, res) => {
       return res.status(404).json({ success: false, message: '找不到貼文' });
     }
 
-    const access = await db.query(
-      `SELECT id, translation_enabled FROM wall_posts WHERE id = $1 AND couple_id = $2`,
-      [postId, couple.id]
-    );
-
-    if (access.rows.length === 0) {
+    // A private post (and its replies) is visible only to its author.
+    const post = await getWallPostForCouple(postId, couple.id, { privateVisibleTo: userId });
+    if (!post) {
       return res.status(404).json({ success: false, message: '找不到貼文' });
     }
 
-    const result = await db.query(
-      `SELECT r.id, r.post_id, r.content, r.author_id, r.is_ai, r.ai_therapist, r.created_at,
-              u.nickname AS author_nickname
-       FROM wall_post_replies r
-       JOIN users u ON u.id = r.author_id
-       WHERE r.post_id = $1
-       ORDER BY r.created_at ASC`,
-      [postId]
-    );
+    const replies = await listRepliesForPost(postId);
 
     res.json({
       success: true,
-      replies: result.rows.map(mapReply),
-      translation_enabled: access.rows[0].translation_enabled === true,
+      replies,
+      translation_enabled: post.translation_enabled === true,
     });
   } catch (error) {
     logDbError('List wall replies error:', error, {
@@ -427,51 +726,35 @@ router.post(
         return res.status(404).json({ success: false, message: '找不到貼文' });
       }
 
-      const postResult = await db.query(
-        `SELECT id, author_id FROM wall_posts WHERE id = $1 AND couple_id = $2`,
-        [postId, couple.id]
-      );
-
-      if (postResult.rows.length === 0) {
+      // A private post is author-only; the partner can neither see nor reply.
+      const post = await getWallPostForCouple(postId, couple.id, { privateVisibleTo: userId });
+      if (!post) {
         return res.status(404).json({ success: false, message: '找不到貼文' });
       }
 
-      const post = postResult.rows[0];
       const content = req.body.content;
-
-      const inserted = await db.query(
-        `INSERT INTO wall_post_replies (post_id, author_id, content)
-         VALUES ($1, $2, $3)
-         RETURNING id, post_id, content, author_id, created_at`,
-        [postId, userId, content]
-      );
-
-      const reply = inserted.rows[0];
-      const enriched = await db.query(
-        `SELECT nickname AS author_nickname FROM users WHERE id = $1`,
-        [userId]
-      );
+      const reply = await insertWallReply(postId, userId, content);
 
       // Notify the other person — if replier is the original author, notify
-      // partner; otherwise notify the original author.
+      // partner; otherwise notify the original author. Private posts never
+      // notify the partner (they can't see them).
       const recipientId =
         post.author_id === userId ? partnerOf(couple, userId) : post.author_id;
-      await notifyPartner(
-        recipientId,
-        'wall_reply',
-        '對方回覆了你的貼文',
-        content,
-        userId,
-        { senderName: enriched.rows[0]?.author_nickname || null }
-      );
+      if (!post.is_private) {
+        await notifyPartner(
+          recipientId,
+          'wall_reply',
+          '對方回覆了你的貼文',
+          content,
+          userId,
+          { senderName: reply.author_nickname || null }
+        );
+      }
 
       res.json({
         success: true,
         message: '回覆成功',
-        reply: mapReply({
-          ...reply,
-          author_nickname: enriched.rows[0]?.author_nickname || null,
-        }),
+        reply,
       });
     } catch (error) {
       logDbError('Create wall reply error:', error, {
@@ -497,14 +780,14 @@ router.post('/:id/ai-comment/preview', async (req, res) => {
     }
 
     const postResult = await db.query(
-      `SELECT p.id, p.content, p.mood_tag, p.author_id, u.nickname AS author_nickname
+      `SELECT p.id, p.content, p.mood_tag, p.author_id, p.is_private, u.nickname AS author_nickname
          FROM wall_posts p
          JOIN users u ON u.id = p.author_id
         WHERE p.id = $1 AND p.couple_id = $2`,
       [postId, couple.id]
     );
 
-    if (postResult.rows.length === 0) {
+    if (postResult.rows.length === 0 || (postResult.rows[0].is_private === true && postResult.rows[0].author_id !== userId)) {
       return res.status(404).json({ success: false, message: '找不到貼文' });
     }
     const post = postResult.rows[0];
@@ -593,10 +876,10 @@ router.post(
       }
 
       const postResult = await db.query(
-        `SELECT id, author_id FROM wall_posts WHERE id = $1 AND couple_id = $2`,
+        `SELECT id, author_id, is_private FROM wall_posts WHERE id = $1 AND couple_id = $2`,
         [postId, couple.id]
       );
-      if (postResult.rows.length === 0) {
+      if (postResult.rows.length === 0 || (postResult.rows[0].is_private === true && postResult.rows[0].author_id !== userId)) {
         return res.status(404).json({ success: false, message: '找不到貼文' });
       }
       const post = postResult.rows[0];
@@ -619,16 +902,19 @@ router.post(
 
       logInfo('wall.ai_comment.posted', { userId, postId, replyId: reply.id, companion: companion.id });
 
-      const recipientId =
-        post.author_id === userId ? partnerOf(couple, userId) : post.author_id;
-      await notifyPartner(
-        recipientId,
-        'wall_ai_comment',
-        `AI 諮商師 ${companion.name} 在你們的牆上留言`,
-        content,
-        userId,
-        { senderName: `AI 諮商師 ${companion.name}` }
-      );
+      // Private posts never notify the partner (they can't see the thread).
+      if (!post.is_private) {
+        const recipientId =
+          post.author_id === userId ? partnerOf(couple, userId) : post.author_id;
+        await notifyPartner(
+          recipientId,
+          'wall_ai_comment',
+          `AI 諮商師 ${companion.name} 在你們的牆上留言`,
+          content,
+          userId,
+          { senderName: `AI 諮商師 ${companion.name}` }
+        );
+      }
 
       res.json({
         success: true,
@@ -722,6 +1008,9 @@ router.get('/:id/translations', async (req, res) => {
     for (const row of cachedRows) translations[row.message_id] = row.translation;
 
     const missing = humanIds.filter((id) => !translations[id]);
+    logInfo('wall.translation.request', {
+      userId, postId, humanMessages: humanIds.length, cached: cachedRows.length, missing: missing.length,
+    });
 
     if (missing.length > 0) {
       const { tier, limit } = await resolveAiLimit(userId);
@@ -763,10 +1052,13 @@ router.get('/:id/translations', async (req, res) => {
 
       await recordAiUsage(userId, 'need_translation', postResult.rows[0].content, meta);
 
+      let saved = 0;
+      const unmatched = [];
       for (const t of result.translations || []) {
-        if (!missing.includes(t.id)) continue;
+        if (!missing.includes(t.id)) { unmatched.push(t.id); continue; }
         const payload = { emotions: t.emotions || [], need: t.need || '', rewrite: t.rewrite || '' };
         translations[t.id] = payload;
+        saved += 1;
         try {
           await db.query(
             `INSERT INTO message_need_translations (surface, message_id, couple_id, translation)
@@ -778,8 +1070,12 @@ router.get('/:id/translations', async (req, res) => {
           logWarn('save wall translation failed', { messageId: t.id, err: err.message });
         }
       }
+      logInfo('wall.translation.saved', {
+        userId, postId, requested: missing.length, returned: (result.translations || []).length, saved, unmatched,
+      });
     }
 
+    logInfo('wall.translation.respond', { userId, postId, returnedKeys: Object.keys(translations).length });
     res.json({ success: true, translations });
   } catch (error) {
     logError('Get wall translations failed', { err: error.message, stack: error.stack, post_id: req.params.id });
@@ -830,11 +1126,21 @@ router.post(
       if (!couple) return res.status(404).json({ success: false, message: '找不到貼文' });
 
       const postResult = await db.query(
-        `SELECT id, content FROM wall_posts WHERE id = $1 AND couple_id = $2`,
+        `SELECT id, content, is_private FROM wall_posts WHERE id = $1 AND couple_id = $2`,
         [req.params.id, couple.id]
       );
       if (postResult.rows.length === 0) {
         return res.status(404).json({ success: false, message: '找不到貼文' });
+      }
+      // A private post isn't shared with the partner, so it can't be published
+      // publicly either — ask the author to turn privacy off first.
+      if (postResult.rows[0].is_private === true) {
+        logInfo('wall.publish.blocked_private', { userId, postId: req.params.id, blocked: true });
+        return res.status(400).json({
+          success: false,
+          message: '這是私密貼文。請先關閉私密（分享給對方），才能匿名公開。',
+          error_code: 'WALL_PRIVATE_CANNOT_PUBLISH',
+        });
       }
       const fallback = (postResult.rows[0].content || '').slice(0, 60);
       const title = (req.body.title && req.body.title.trim()) || fallback || '我們的牆分享';
@@ -890,3 +1196,9 @@ router.post('/:id/unpublish', async (req, res) => {
 });
 
 module.exports = router;
+// Reusable helpers for the dedicated-therapist endpoints (routes/therapists.js).
+module.exports.listWallPostsForCouple = listWallPostsForCouple;
+module.exports.getWallPostForCouple = getWallPostForCouple;
+module.exports.listRepliesForPost = listRepliesForPost;
+module.exports.insertWallReply = insertWallReply;
+module.exports.notifyPartner = notifyPartner;

@@ -3,6 +3,7 @@ import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, StickyNote, 
 import SettingsView from './components/SettingsView';
 import ActivityView from './components/ActivityView';
 import UpgradeView, { BillingResultView } from './components/UpgradeView';
+import PremiumExpiryBanner from './components/PremiumExpiryBanner';
 import { BookingResultView } from './components/BookingResultView';
 import RoleplayView from './components/RoleplayView';
 import ScriptUploadModal, { type PendingScriptDraft } from './components/ScriptUploadModal';
@@ -33,7 +34,7 @@ import HelpView from './components/HelpView';
 import StoriesView from './components/StoriesView';
 import { resolveCompanion } from './utils/aiCompanions';
 import { apiService, getTokenExpiry, clearAuthStorage } from './services/api';
-import type { CycleRecord } from './services/api';
+import type { CycleRecord, BillingStatus } from './services/api';
 import { getPrimaryTimezone, formatYmdInTz, browserTz } from './utils/datetime';
 import { parseScript } from './utils/script';
 import { clientLog } from './utils/telemetry';
@@ -579,6 +580,9 @@ const LoveTimeApp = () => {
   const [showIntimacyRequestForm, setShowIntimacyRequestForm] = useState(false);
   const [showNotificationInbox, setShowNotificationInbox] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  // Couple's Premium status (tier + expiry). Fetched once on auth so the header
+  // and the proactive expiry banner can render without each re-fetching.
+  const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
 
   // Page-view analytics for the /admin Pages + Retention tabs. Only fires for
   // authenticated users — anon traffic is already covered by landing_visits.
@@ -653,6 +657,22 @@ const LoveTimeApp = () => {
       setPendingScriptTitle(stored);
       setCurrentView('roleplay');
     }
+  }, [authState.isAuthenticated]);
+
+  // Load Premium status on auth (and clear it on logout) so the header badge and
+  // the proactive expiry banner have the couple's tier + expiry. Best-effort:
+  // a failed lookup just hides the badge/banner.
+  useEffect(() => {
+    if (!authState.isAuthenticated) {
+      setBillingStatus(null);
+      return;
+    }
+    let cancelled = false;
+    apiService
+      .getBillingStatus()
+      .then((s) => { if (!cancelled) setBillingStatus(s); })
+      .catch(() => { if (!cancelled) setBillingStatus(null); });
+    return () => { cancelled = true; };
   }, [authState.isAuthenticated]);
 
   useEffect(() => {
@@ -2345,6 +2365,7 @@ const LoveTimeApp = () => {
         onShowHelp={() => setCurrentView('help')}
         onShowLoveLanguage={() => setCurrentView('love-language')}
         onShowUpgrade={() => { setUpgradeReason(null); setCurrentView('upgrade'); }}
+        billingStatus={billingStatus}
       />
       
       {/* Notification Container */}
@@ -2369,7 +2390,7 @@ const LoveTimeApp = () => {
             showNotification({
               type: 'success',
               title: '已選擇 AI 諮商師',
-              message: `${resolveCompanion(companionId).name} 之後會在事件和牆上陪你們聊`,
+              message: `${resolveCompanion(companionId).name} 之後會在對話和牆上陪你們聊`,
               duration: 5000,
             });
           }}
@@ -2549,6 +2570,16 @@ const LoveTimeApp = () => {
               </button>
             </div>
           </div>
+        )}
+
+        {/* Proactive Premium-expiry reminder — non-blocking, dismissible; shows
+            only when Premium is within 7 days of lapsing. Hidden on the upgrade
+            view itself (that page already shows expiry + a 續購 button). */}
+        {authState.isAuthenticated && currentView !== 'upgrade' && (
+          <PremiumExpiryBanner
+            status={billingStatus}
+            onRenew={() => { setUpgradeReason(null); setCurrentView('upgrade'); }}
+          />
         )}
 
         {/* Main Content */}

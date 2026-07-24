@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { HeartHandshake, Loader2, Star } from 'lucide-react';
 import { apiService } from '../services/api';
 import { AI_COMPANIONS, DEFAULT_COMPANION_ID, type AiCompanion } from '../utils/aiCompanions';
+import { NOT_A_SUBSTITUTE } from '../content/positioning';
 
 // Selectable list of AI 諮商師 companions. Shared by the onboarding modal
 // (below) and the Settings「AI 諮商師」section.
@@ -129,8 +130,11 @@ export default function AiCompanionOnboarding({
           <HeartHandshake className="w-5 h-5" />
           <h2 className="font-display text-lg text-petal-ink">認識你的 AI 諮商師</h2>
         </div>
-        <p className="text-sm text-petal-ink-soft mb-4">
+        <p className="text-sm text-petal-ink-soft mb-3">
           選一位之後最常陪你們聊的 AI 諮商師。每一位的溝通風格不同，但都受過同樣的訓練：不選邊站、幫你們把話說開。之後隨時可以在「設定」裡更換。
+        </p>
+        <p className="text-xs text-petal-muted leading-relaxed mb-4 rounded-xl bg-petal-cream-2 border border-petal-rule px-3 py-2">
+          {NOT_A_SUBSTITUTE}
         </p>
 
         <AiCompanionList selectedId={selectedId} onSelect={setSelectedId} disabled={saving} />

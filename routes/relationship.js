@@ -14,6 +14,7 @@ const { authenticateToken } = require('../middleware/auth');
 const { logDbError, errorResponseBody } = require('../lib/db-errors');
 const { logInfo, logWarn } = require('../lib/logger');
 const emailService = require('../services/emailService');
+const lineService = require('../services/lineService');
 
 const router = express.Router();
 router.use(authenticateToken);
@@ -25,14 +26,36 @@ const APPRECIATION_GAP_DAYS = 10;
 
 async function findCouple(userId) {
   const r = await db.query(
-    `SELECT id, user1_id, user2_id, created_at FROM couples WHERE user1_id = $1 OR user2_id = $1`,
+    `SELECT id, user1_id, user2_id, created_at, primary_timezone FROM couples WHERE user1_id = $1 OR user2_id = $1`,
     [userId]
   );
   return r.rows[0] || null;
 }
 
+// Elapsed 24h periods since a timestamp. Used for check-in / couple-age
+// thresholds where a rolling window is the right semantic.
 const daysBetween = (then) =>
   then == null ? null : Math.max(0, Math.floor((Date.now() - new Date(then).getTime()) / 86_400_000));
+
+// YYYY-MM-DD for a date in a specific IANA timezone.
+const ymdInTz = (date, tz) =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+
+// Calendar days between a past moment and "today" in the couple's timezone.
+// This is what users mean by「已經 N 天沒有親密了」and it MUST match the
+// frontend stats card (src/components/AchievementsView.tsx), which counts
+// calendar dates in the viewer's tz — otherwise the 關係之屋 nudge and the
+// 已經幾天沒有親密了 card disagree by one (elapsed-floor vs calendar-count).
+const calendarDaysSince = (then, tz) => {
+  if (then == null) return null;
+  const safeTz = tz || 'Asia/Taipei';
+  const lastYmd = ymdInTz(new Date(then), safeTz);
+  const todayYmd = ymdInTz(new Date(), safeTz);
+  const diff = Math.floor(
+    (Date.parse(`${todayYmd}T00:00:00Z`) - Date.parse(`${lastYmd}T00:00:00Z`)) / 86_400_000
+  );
+  return Math.max(0, diff);
+};
 
 // In-app notification without an event_id (relationship reminders aren't events).
 async function notifyReminder(userId, type, title, content) {
@@ -45,6 +68,9 @@ async function notifyReminder(userId, type, title, content) {
   } catch (err) {
     logWarn('relationship reminder notification failed', { err: err.message, type });
   }
+  // Mirror to LINE (no-ops unless linked + opted in). Reminder content is
+  // already full prose, so it rides along as-is.
+  lineService.pushToUserIfLinked(db, userId, `💗 Twogether｜${title}\n${content}\n👉 https://twogether.fun`);
 }
 
 // Returns true if a reminder of this kind hasn't been sent within the cooldown,
@@ -96,8 +122,19 @@ router.get('/summary', async (req, res) => {
       partnerId ? db.query(`SELECT nickname FROM users WHERE id = $1`, [partnerId]) : Promise.resolve({ rows: [] }),
     ]);
 
-    const daysSinceIntimacy = daysBetween(intimacy.rows[0].last);
-    const daysSinceAppreciation = daysBetween(appreciation.rows[0].last);
+    // Calendar-day count in the couple's tz so these match the 記錄時光 stats
+    // card exactly (both count dates, not elapsed 24h windows).
+    const coupleTz = couple.primary_timezone || 'Asia/Taipei';
+    const daysSinceIntimacy = calendarDaysSince(intimacy.rows[0].last, coupleTz);
+    const daysSinceAppreciation = calendarDaysSince(appreciation.rows[0].last, coupleTz);
+    logInfo('relationship.summary.days', {
+      userId,
+      coupleId,
+      coupleTz,
+      lastIntimacy: intimacy.rows[0].last,
+      daysSinceIntimacy,
+      daysSinceAppreciation,
+    });
     const positive14 = Number(pos.rows[0].n) || 0;
     const negative14 = Number(neg.rows[0].n) || 0;
     const myCheckinDays = daysBetween(myCheckin.rows[0].last);

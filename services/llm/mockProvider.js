@@ -606,6 +606,97 @@ async function analyzeDraft({ draft }) {
   };
 }
 
+// Deterministic Therapist Mode facilitator turn. Cycles through a fixed
+// exercise sequence by stepCount so a full session can be driven in tests
+// without the paid LLM. Same input → same output. Normalization goes through
+// the shared shapeFacilitatorTurn so mock and claude obey one contract.
+const { getCard: mockGetCard, shapeFacilitatorTurn } = require('../../lib/therapyCards');
+
+const MOCK_FACILITATION_SEQUENCE = [
+  { card: 'slow_down', target: 'both', instruction: '先一起深呼吸三次。準備好了，我們就開始。' },
+  { card: 'emotion_label', target: 'A', instruction: '選一個你覺得對方此刻的情緒。', quickReplies: ['😔 受傷', '😟 擔心', '😡 生氣', '😞 孤單'] },
+  { card: 'mirror', target: 'B', instruction: '先不要解釋，只重複你聽到的：「我聽到你說的是…」' },
+  { card: 'validation', target: 'A', instruction: '不需要同意，也試著說：「我可以理解你為什麼會覺得…」' },
+  { card: 'perspective_switch', target: 'B', instruction: '站在對方的角度，完成：「我想我是在告訴你…」' },
+  { card: 'need_translation', target: 'A', instruction: '把剛剛的話翻成「我需要…」。' },
+];
+
+async function generateFacilitatorTurn({ session } = {}) {
+  const startedAt = Date.now();
+  const s = session || {};
+  const step = Math.max(0, Number(s.stepCount) || 0);
+  const idx = Math.min(step, MOCK_FACILITATION_SEQUENCE.length - 1);
+  const pick = MOCK_FACILITATION_SEQUENCE[idx];
+  const done = step >= MOCK_FACILITATION_SEQUENCE.length - 1;
+
+  // Grade the previous response if the active card was evaluable.
+  const prevCard = mockGetCard(s.activeCard);
+  const evaluation = prevCard && prevCard.evaluable && s.turnOwnerRole
+    ? { verdict: 'accurate', note: '你做到了，這就是重點。' }
+    : null;
+
+  return shapeFacilitatorTurn(
+    {
+      say: done
+        ? '我看見你們願意試著聽見彼此，這已經是很重要的一步。今天先到這裡，好好抱一下。'
+        : '我們一次只做一小步。慢慢來，我在這裡陪你們。',
+      card: pick.card,
+      target: pick.target,
+      instruction: pick.instruction,
+      quickReplies: pick.quickReplies || [],
+      evaluation,
+      sessionDone: done,
+    },
+    {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+      assembledPrompt: `[mock] facilitator step ${step} → ${pick.card}`,
+    }
+  );
+}
+
+// Deterministic 諮商摘要 (between-sessions therapy summary). Derives themes /
+// emotions from the precomputed stats and splits events by status, so tests can
+// drive the endpoint without the paid LLM. Same input → same output.
+async function generateTherapySummary({ periodLabel, events, stats }) {
+  const startedAt = Date.now();
+  const evs = Array.isArray(events) ? events : [];
+  const themes = (stats?.themeCounts || []).map((t) => t.tag).filter(Boolean).slice(0, 4);
+  const emotions = (stats?.emotionCounts || []).map((e) => e.emotion).filter(Boolean).slice(0, 4);
+  const repaired = evs
+    .filter((e) => e.status === 'resolved')
+    .map((e) => ({ title: (e.title || '未命名').toString().trim(), insight: '你們願意把話說開，讓彼此靠近了一點。' }))
+    .slice(0, 6);
+  const unresolved = evs
+    .filter((e) => e.status !== 'resolved')
+    .map((e) => ({ title: (e.title || '未命名').toString().trim(), note: '這件事還沒劃下句點，可以帶去諮商裡一起看。' }))
+    .slice(0, 6);
+
+  return {
+    overview: `${periodLabel || '最近兩週'}你們記錄了 ${evs.length} 件事，最常圍繞在${themes[0] || '相處'}上。`,
+    themes,
+    emotions,
+    repaired,
+    unresolved,
+    questions: [
+      '我們每次談到同一個主題就會升溫，可以怎麼開始這個對話？',
+      '當一方想靠近、另一方想先冷靜，我們可以怎麼配合彼此的節奏？',
+      '這段期間還沒解決的事，哪一件最值得我們先一起處理？',
+    ],
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+      assembledPrompt: `[mock] therapy summary for ${evs.length} events`,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -620,4 +711,6 @@ module.exports = {
   generateThreadTranslations,
   generateTherapyNote,
   analyzeDraft,
+  generateTherapySummary,
+  generateFacilitatorTurn,
 };

@@ -14,6 +14,7 @@ const FAKE_USER = {
 const STORY = {
   id: '55555555-5555-4555-8555-555555555555',
   title: '車站接送吵架後的修復',
+  kind: 'story',
   preview: '我們交往三年，平常都約在車站碰面一起回家。',
   tags: ['行程', '誤會'],
   authorName: '匿名',
@@ -26,6 +27,10 @@ const STORY = {
 const STORY_DETAIL = {
   id: STORY.id,
   title: STORY.title,
+  kind: 'story',
+  body: null,
+  sourceUrl: null,
+  sourceAuthor: null,
   sections: {
     context: '我們交往三年，平常都約在車站碰面一起回家。',
     happened: '那天他遲到四十分鐘，見面第一句話是「你怎麼又在生氣」。',
@@ -129,6 +134,16 @@ async function seed(page: import('@playwright/test').Page, { authed = true } = {
         body: JSON.stringify({ success: true, stories: [STORY], hasMore: false, featured: [STORY] }),
       });
     }
+    if (method === 'POST' && /\/api\/stories\/article$/.test(url)) {
+      return route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          story: { id: ARTICLE.id, title: ARTICLE.title, kind: 'article' },
+        }),
+      });
+    }
     if (method === 'POST' && /\/api\/stories$/.test(url)) {
       return route.fulfill({
         status: 201,
@@ -144,6 +159,15 @@ async function seed(page: import('@playwright/test').Page, { authed = true } = {
     return route.fallback();
   });
 }
+
+const ARTICLE = {
+  id: '66666666-6666-4666-8666-666666666666',
+  title: '如何好好聽對方說話',
+  kind: 'article',
+  body: '傾聽不是等著反駁，而是真的想理解對方在說什麼。',
+  sourceUrl: 'https://example.com/listen',
+  sourceAuthor: '某心理師',
+};
 
 test.describe('真實故事 — archive UI wiring', () => {
   test('nav tab opens the archive: featured shelf + list + detail with votes', async ({ page }) => {
@@ -193,6 +217,7 @@ test.describe('真實故事 — archive UI wiring', () => {
     await page.getByTestId('nav-tab-stories').click();
 
     await page.getByTestId('story-compose-cta').click();
+    await page.getByTestId('compose-choose-story').click();
     await expect(page.getByTestId('story-compose-intro')).toBeVisible();
     await page.getByTestId('story-mode-guided').click();
 
@@ -241,6 +266,7 @@ test.describe('真實故事 — archive UI wiring', () => {
     await page.waitForLoadState('domcontentloaded');
     await page.getByTestId('nav-tab-stories').click();
     await page.getByTestId('story-compose-cta').click();
+    await page.getByTestId('compose-choose-story').click();
     await page.getByTestId('story-mode-freeform').click();
 
     await page.getByTestId('story-freeform-input').fill(
@@ -257,6 +283,74 @@ test.describe('真實故事 — archive UI wiring', () => {
     await page.getByTestId('story-title-input').fill('車站接送吵架後的修復');
     await page.getByTestId('story-submit').click();
     await expect(page.getByTestId('story-compose-done')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('share a good article (plain text) through the chooser', async ({ page }) => {
+    await seed(page);
+    let posted: Record<string, unknown> | null = null;
+    await page.route('**/api/stories/article', async (route) => {
+      posted = route.request().postDataJSON();
+      return route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, story: { id: ARTICLE.id, title: ARTICLE.title, kind: 'article' } }),
+      });
+    });
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+    await page.getByTestId('nav-tab-stories').click();
+
+    await page.getByTestId('story-compose-cta').click();
+    await page.getByTestId('compose-choose-article').click();
+    await expect(page.getByTestId('article-compose')).toBeVisible();
+
+    await page.getByTestId('article-title-input').fill(ARTICLE.title);
+    await page.getByTestId('article-body-input').fill(
+      '傾聽不是等著反駁，而是真的想理解對方在說什麼。當你願意放下防衛，好好聽對方把話說完，關係就有了空間。這需要一點練習，但每一次專注的傾聽，都是在告訴對方「你對我很重要」。'
+    );
+    await page.getByTestId('article-source-url-input').fill(ARTICLE.sourceUrl);
+    await page.getByTestId('article-source-author-input').fill(ARTICLE.sourceAuthor);
+    await page.getByTestId('article-submit').click();
+
+    await expect.poll(() => posted && (posted as { title?: string }).title, { timeout: 5000 }).toBe(ARTICLE.title);
+    expect((posted as { sourceUrl?: string }).sourceUrl).toBe(ARTICLE.sourceUrl);
+  });
+
+  test('好文 · 故事 list marks article cards and filters by kind', async ({ page }) => {
+    await seed(page);
+    let filteredKind: string | null = null;
+    // Override the list route: default returns an article card; kind filter
+    // records the requested kind.
+    await page.route('**/api/stories?*', async (route) => {
+      const url = new URL(route.request().url());
+      filteredKind = url.searchParams.get('kind');
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          stories: [{
+            ...ARTICLE,
+            preview: ARTICLE.body,
+            tags: ['溝通'],
+            authorName: '匿名',
+            votes: { helpful: 0, resonate: 0, repair_worked: 0 },
+            commentCount: 0,
+            viewCount: 0,
+            createdAt: new Date().toISOString(),
+          }],
+          hasMore: false,
+          featured: [],
+        }),
+      });
+    });
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+    await page.getByTestId('nav-tab-stories').click();
+
+    await expect(page.getByTestId('story-card').first()).toContainText('好文');
+    await page.getByTestId('story-kind-article').click();
+    await expect.poll(() => filteredKind, { timeout: 5000 }).toBe('article');
   });
 
   test('我的故事 shows the impact line', async ({ page }) => {
@@ -284,6 +378,49 @@ test.describe('真實故事 — archive UI wiring', () => {
     await page.getByTestId('nav-tab-stories').click();
     await page.getByTestId('stories-tab-qa').click();
     await expect(page.getByTestId('public-qa-view')).toBeVisible({ timeout: 10000 });
+  });
+
+  test('大家怎麼做 sub-tab: vote reveals result split', async ({ page }) => {
+    await seed(page);
+    const POLL = {
+      id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      question: '吵架後，誰該先低頭？',
+      scenario: '一場沒有對錯的爭執後⋯',
+      tags: ['溝通'],
+      totalVotes: 0,
+      myOptionId: null,
+      voiceCount: 0,
+      options: [
+        { id: 'opt-1', label: '我會先開口', votes: 0, percent: 0 },
+        { id: 'opt-2', label: '等對方先', votes: 0, percent: 0 },
+      ],
+    };
+    await page.route('**/api/polls', async (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, polls: [POLL] }) })
+    );
+    await page.route('**/api/polls/*/vote', async (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true,
+          poll: { ...POLL, totalVotes: 1, myOptionId: 'opt-1', options: [
+            { id: 'opt-1', label: '我會先開口', votes: 1, percent: 100 },
+            { id: 'opt-2', label: '等對方先', votes: 0, percent: 0 },
+          ] },
+        }),
+      })
+    );
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+    await page.getByTestId('nav-tab-stories').click();
+    await page.getByTestId('stories-tab-polls').click();
+    await expect(page.getByTestId('polls-view')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('poll-card').first()).toContainText('吵架後，誰該先低頭');
+
+    // Before voting: tappable options. After voting: result bars with %.
+    await page.getByTestId('poll-option-vote').first().click();
+    await expect(page.getByTestId('poll-option-result').first()).toContainText('100%', { timeout: 5000 });
   });
 
   test('logged-out: archive browsable, voting prompts sign-in', async ({ page }) => {

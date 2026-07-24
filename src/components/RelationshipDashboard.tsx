@@ -102,6 +102,24 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
   const [goodwillOpen, setGoodwillOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [ratioHint, setRatioHint] = useState(false);
+  // Collapse the house by default; expand only on a signal or long absence.
+  const [manualOpen, setManualOpen] = useState(false);
+  const [dismissedSeverity, setDismissedSeverity] = useState<number>(() => {
+    try { return Number(localStorage.getItem('relationshipHouseDismissed') ?? '0') || 0; } catch { return 0; }
+  });
+  // Whole days since the record page was last opened (previous session). A long
+  // gap is itself a signal worth re-surfacing the house for.
+  const [awayDays] = useState<number>(() => {
+    try {
+      const prev = localStorage.getItem('record.lastSeen');
+      if (!prev) return 0;
+      const gap = Math.floor((Date.now() - Number(prev)) / 86400000);
+      return Number.isFinite(gap) && gap > 0 ? gap : 0;
+    } catch { return 0; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('record.lastSeen', String(Date.now())); } catch { /* ignore */ }
+  }, []);
 
   const loadSummary = React.useCallback(() => {
     apiService.getRelationshipSummary().then(setSummary).catch(() => {});
@@ -128,12 +146,50 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
   const goodwillTarget = Math.max(5, neg * 5);
   const goodwillPct = Math.min(100, Math.round((pos / goodwillTarget) * 100));
 
+  // Expand only when there's a signal worth acting on, or the user is returning
+  // after a long absence (which counts as a moderate signal). Dismissing records
+  // the severity so it stays collapsed until something more urgent appears.
+  const absenceSeverity = awayDays >= 7 ? 3 : 0;
+  const signalSeverity = Math.max(top?.severity ?? 0, absenceSeverity);
+  const expanded = manualOpen || signalSeverity > dismissedSeverity;
+
+  const dismiss = () => {
+    try { localStorage.setItem('relationshipHouseDismissed', String(signalSeverity)); } catch { /* ignore */ }
+    setDismissedSeverity(signalSeverity);
+    setManualOpen(false);
+  };
+
+  if (!expanded) {
+    return (
+      <button
+        type="button"
+        onClick={() => setManualOpen(true)}
+        data-testid="relationship-dashboard-collapsed"
+        className="w-full flex items-center gap-2 bg-petal-cream border border-petal-rule rounded-2xl px-4 py-3 mb-5 text-left hover:border-petal-ink transition-colors"
+      >
+        <Home className="w-4 h-4 text-petal-rose-deep" strokeWidth={1.5} />
+        <h3 className="font-display text-sm text-petal-ink">關係之屋</h3>
+        <span className="font-body text-[11px] text-petal-muted">經營信賴與奉獻</span>
+        <span className="ml-auto font-body text-xs text-petal-muted" aria-hidden="true">›</span>
+      </button>
+    );
+  }
+
   return (
     <div className="bg-petal-cream border border-petal-rule rounded-2xl p-4 sm:p-5 mb-5" data-testid="relationship-dashboard">
       <div className="flex items-center gap-2 mb-3">
         <Home className="w-4 h-4 text-petal-rose-deep" strokeWidth={1.5} />
         <h3 className="font-display text-base text-petal-ink">關係之屋</h3>
         <span className="font-body text-[11px] text-petal-muted">經營信賴與奉獻</span>
+        <button
+          type="button"
+          onClick={dismiss}
+          data-testid="relationship-dashboard-dismiss"
+          aria-label="稍後再說"
+          className="ml-auto p-1 rounded-full text-petal-muted hover:text-petal-ink transition-colors"
+        >
+          <X className="w-4 h-4" strokeWidth={1.5} />
+        </button>
       </div>
 
       {/* Primary nudge (the single most important signal), or an all-good state */}

@@ -388,9 +388,14 @@ export interface StoryVoteCounts {
   repair_worked: number;
 }
 
+export type StoryKind = 'story' | 'article';
+
 export interface StorySummary {
   id: string;
   title: string;
+  // 'story' = guided 6-section personal story; 'article' = a plain-text good
+  // read the user shared. Both live in the same 好文 · 故事 list.
+  kind: StoryKind;
   preview: string;
   tags: string[];
   authorName: string;
@@ -426,7 +431,20 @@ export interface StoryComment {
 export interface StoryDetailData {
   id: string;
   title: string;
-  sections: StorySections;
+  kind: StoryKind;
+  // Guided-story sections (each value is null for kind='article').
+  sections: {
+    context: string | null;
+    happened: string | null;
+    impact: string | null;
+    tried: string | null;
+    repair: string | null;
+    now: string | null;
+  };
+  // Article fields (null for kind='story').
+  body: string | null;
+  sourceUrl: string | null;
+  sourceAuthor: string | null;
   tags: string[];
   authorName: string;
   isMine: boolean;
@@ -444,13 +462,87 @@ export interface MyStoriesResult {
   totals: { reads: number; votes: number; comments: number };
 }
 
+// 引導模式 (Therapist Mode) — the structured payload attached to an AI
+// facilitator turn so the frontend renders it as a therapist card, not a plain
+// bubble. Null on ordinary human messages.
+export interface TherapyCardMeta {
+  id: string;
+  label: string;
+  emoji: string;
+  color: string;
+}
+
+export interface FacilitationEvaluation {
+  verdict: 'accurate' | 'partial' | 'off';
+  note: string;
+}
+
+export interface MessageFacilitation {
+  card: string;
+  cardMeta: TherapyCardMeta | null;
+  target: 'A' | 'B' | 'both';
+  targetUserId: string | null;
+  instruction: string;
+  quickReplies: string[];
+  evaluation: FacilitationEvaluation | null;
+  // The evaluation grades the PREVIOUS exercise — this names which one.
+  evaluatedCardMeta: TherapyCardMeta | null;
+  sessionDone: boolean;
+}
+
+// Live session state + scoreboard for the 今日練習 tray and composer turn hint.
+export interface FacilitationSession {
+  status: 'active' | 'ended';
+  activeCardMeta: TherapyCardMeta | null;
+  turnOwner: string | null;
+  completedCardsMeta: TherapyCardMeta[];
+  skillScore: number | null;
+}
+
+export interface FacilitationAdvance {
+  session: FacilitationSession | null;
+  message: EventMessage | null;
+}
+
+// 真實情侶會怎麼做 (Community polls)
+export interface PollOption {
+  id: string;
+  label: string;
+  votes: number;
+  percent: number;
+}
+
+export interface PollVoice {
+  id: string;
+  body: string;
+  optionLabel: string | null;
+  authorName: string;
+  isMine: boolean;
+  createdAt: string;
+}
+
+export interface CommunityPoll {
+  id: string;
+  question: string;
+  scenario: string | null;
+  tags: string[];
+  totalVotes: number;
+  myOptionId: string | null;
+  options: PollOption[];
+  voiceCount?: number;
+  voices?: PollVoice[];
+}
+
 export interface EventMessage {
   id: string;
   eventId: string;
   senderId: string;
   content: string;
   isAi: boolean;
+  // True for a message left by the couple's dedicated (human) therapist.
+  isTherapist: boolean;
   aiTherapist: string | null;
+  facilitation: MessageFacilitation | null;
   createdAt: string;
   readAt: string | null;
   editedAt: string | null;
@@ -534,6 +626,39 @@ export interface TherapyNote {
   nextTime: string;
 }
 
+// The between-sessions 諮商摘要: a digest of a window of events the couple can
+// bring into their next counseling session.
+export interface TherapySummary {
+  overview: string;
+  themes: string[];
+  emotions: string[];
+  repaired: { title: string; insight: string }[];
+  unresolved: { title: string; note: string }[];
+  questions: string[];
+}
+
+export type TherapySummaryResult =
+  | {
+      ok: true;
+      summary: TherapySummary;
+      period: { days: number; label: string; eventCount: number };
+      cached: boolean;
+    }
+  // Expected non-error states (not paired yet / no events in window) — the UI
+  // shows a guiding empty state, not a red error toast.
+  | { ok: false; errorCode: 'NOT_PAIRED' | 'NO_EVENTS'; message: string };
+
+// A previously generated 諮商摘要 snapshot the couple can re-open for free — the
+// full summary travels with each entry so viewing an old one costs no AI credit.
+export interface TherapySummaryHistoryEntry {
+  id: string;
+  periodDays: number;
+  periodLabel: string;
+  eventCount: number | null;
+  createdAt: string;
+  summary: TherapySummary;
+}
+
 export interface CreateEventInput {
   title: string;
   summary: string;
@@ -574,6 +699,12 @@ export interface WallPost {
   author_id: string;
   author_nickname: string | null;
   reply_count: number;
+  // Ordered public URLs of attached photos/videos (empty for text-only posts).
+  // Use isVideoUrl() (src/utils/script.ts) to render <img> vs <video>.
+  media: string[];
+  // When true, only the author can see this post; the partner never sees it and
+  // isn't notified. Distinct from public_status (匿名公開 to the public Q&A).
+  is_private: boolean;
   public_status?: 'private' | 'published';
   public_title?: string | null;
   created_at: string;
@@ -587,6 +718,8 @@ export interface WallReply {
   author_id: string;
   author_nickname: string | null;
   is_ai?: boolean;
+  // True for a reply left by the couple's dedicated (human) therapist.
+  is_therapist?: boolean;
   ai_therapist?: string | null;
   created_at: string;
 }
@@ -595,12 +728,23 @@ export interface CreateWallPostInput {
   content: string;
   mood_tag?: string | null;
   category?: WallPostCategory;
+  // New photo/video files to attach (up to 4). Sent as multipart when present.
+  media?: File[];
+  // When true, only the author can see the post.
+  is_private?: boolean;
 }
 
 export interface UpdateWallPostInput {
   content?: string;
   mood_tag?: string | null;
   category?: WallPostCategory;
+  // New photo/video files to attach.
+  media?: File[];
+  // URLs of existing media to keep, in order. Presence of this field (even
+  // empty) tells the server to rebuild the media set; absence leaves it as-is.
+  existingMedia?: string[];
+  // Toggle post privacy (used by the composer and the card's quick toggle).
+  is_private?: boolean;
 }
 
 // Marketplace — public custom-script discovery + community rating
@@ -1072,6 +1216,28 @@ export interface TherapistConsultation {
 }
 
 export type MeetingProvider = 'zoom' | 'meet' | 'other';
+
+// 專屬心理師 (Dedicated therapist) — a couple's currently-linked therapist, who
+// can read their non-private wall + 好好說話 content (and comment iff canComment).
+export interface DedicatedTherapist {
+  id: string;            // couple_therapists row id
+  therapistId: string;
+  displayName: string;
+  title: string | null;
+  photoUrl: string | null;
+  canComment: boolean;
+  addedBy: string | null;
+  createdAt: string;
+}
+
+// The therapist's view of one couple who added them as dedicated therapist.
+export interface TherapistClientCouple {
+  coupleId: string;
+  coupleName: string | null;
+  partnerNames: string[];
+  canComment: boolean;
+  since: string;
+}
 
 export interface TherapistEarnings {
   introSessionsUsed: number;
@@ -1658,6 +1824,7 @@ class ApiService {
   async getStories(params: {
     q?: string;
     tag?: string;
+    kind?: StoryKind;
     sort?: 'latest' | 'helpful' | 'most_read';
     page?: number;
   } = {}): Promise<{ stories: StorySummary[]; hasMore: boolean; featured?: StorySummary[] }> {
@@ -1676,6 +1843,19 @@ class ApiService {
     sections: StorySections;
   }): Promise<{ story: { id: string; title: string }; aiInsights: { insights: StoryInsight[] } | null; aiSkipped: boolean }> {
     const response = await apiClient.post('/stories', input);
+    return response.data;
+  }
+
+  // 好文分享: share a plain-text article you found. Stored verbatim (no AI
+  // split), rides the same detail/vote/comment surface as stories.
+  async createArticle(input: {
+    title: string;
+    body: string;
+    tags: string[];
+    sourceUrl?: string;
+    sourceAuthor?: string;
+  }): Promise<{ story: { id: string; title: string; kind: StoryKind } }> {
+    const response = await apiClient.post('/stories/article', input);
     return response.data;
   }
 
@@ -1710,6 +1890,32 @@ class ApiService {
 
   async reportStoryComment(id: string, reason: string, detail?: string): Promise<void> {
     await apiClient.post(`/stories/comments/${id}/report`, { reason, detail });
+  }
+
+  // --- 真實情侶會怎麼做 (Community polls) ---
+
+  async getPolls(): Promise<CommunityPoll[]> {
+    const response = await apiClient.get('/polls');
+    return response.data.polls as CommunityPoll[];
+  }
+
+  async getPoll(id: string): Promise<CommunityPoll> {
+    const response = await apiClient.get(`/polls/${id}`);
+    return response.data.poll as CommunityPoll;
+  }
+
+  async votePoll(id: string, optionId: string): Promise<CommunityPoll> {
+    const response = await apiClient.post(`/polls/${id}/vote`, { optionId });
+    return response.data.poll as CommunityPoll;
+  }
+
+  async addPollVoice(id: string, body: string, optionId?: string | null): Promise<PollVoice> {
+    const response = await apiClient.post(`/polls/${id}/voices`, { body, optionId: optionId ?? null });
+    return response.data.voice as PollVoice;
+  }
+
+  async reportPollVoice(id: string, reason: string): Promise<void> {
+    await apiClient.post(`/polls/voices/${id}/report`, { reason });
   }
 
   // Token validation
@@ -2048,6 +2254,34 @@ class ApiService {
       console.error('Failed to update AI companion:', error);
       throw new Error((error as ApiErrorResponse)?.message || '更新 AI 諮商師失敗，請稍後再試');
     }
+  }
+
+  // --- LINE 通知整合 ---
+  async getLineStatus(): Promise<{ configured: boolean; linked: boolean; notificationsEnabled: boolean }> {
+    const res = await apiClient.get('/line/status');
+    console.info('[LINE] status', res.data);
+    return res.data;
+  }
+
+  async requestLineLinkCode(): Promise<{ code: string; ttlMinutes: number; addFriendUrl: string }> {
+    try {
+      const res = await apiClient.post('/line/link-code');
+      console.info('[LINE] link code issued', { ttlMinutes: res.data.ttlMinutes });
+      return res.data;
+    } catch (error: unknown) {
+      console.error('[LINE] link code failed', error);
+      throw new Error((error as ApiErrorResponse)?.message || '無法產生綁定碼，請稍後再試');
+    }
+  }
+
+  async setLineNotifications(enabled: boolean): Promise<void> {
+    await apiClient.put('/line/notifications', { enabled });
+    console.info('[LINE] notifications toggled', { enabled });
+  }
+
+  async unlinkLine(): Promise<void> {
+    await apiClient.post('/line/unlink');
+    console.info('[LINE] unlinked');
   }
 
   async updateUserBirthDate(birthDate: string | null): Promise<void> {
@@ -2805,9 +3039,37 @@ class ApiService {
     }
   }
 
+  // Custom (non-preset) mood tags the couple has used before, for the composer's
+  // "remembered tags" chips. Non-fatal: returns [] on error.
+  async getWallCustomMoodTags(): Promise<string[]> {
+    try {
+      const response = await apiClient.get('/wall/mood-tags');
+      return (response.data.tags || []) as string[];
+    } catch (error) {
+      console.error('Failed to fetch wall mood tags:', error);
+      return [];
+    }
+  }
+
   async createWallPost(input: CreateWallPostInput): Promise<WallPost> {
     try {
-      const response = await apiClient.post('/wall', input);
+      // Multipart path when photos/videos are attached; mirrors createCustomScript.
+      if (input.media && input.media.length > 0) {
+        const fd = new FormData();
+        fd.append('content', input.content);
+        if (input.mood_tag) fd.append('mood_tag', input.mood_tag);
+        if (input.category) fd.append('category', input.category);
+        if (input.is_private !== undefined) fd.append('is_private', String(input.is_private));
+        for (const file of input.media) fd.append('media', file);
+        const response = await apiClient.post('/wall', fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data.wall_post as WallPost;
+      }
+      // No files → plain JSON.
+      const { media: _media, ...body } = input;
+      void _media;
+      const response = await apiClient.post('/wall', body);
       return response.data.wall_post as WallPost;
     } catch (error) {
       console.error('Failed to create wall post:', error);
@@ -2817,7 +3079,29 @@ class ApiService {
 
   async updateWallPost(id: string, updates: UpdateWallPostInput): Promise<WallPost> {
     try {
-      const response = await apiClient.put(`/wall/${id}`, updates);
+      const mediaChanged =
+        (updates.media && updates.media.length > 0) || updates.existingMedia !== undefined;
+      // Multipart path when the media set changed; mirrors updateCustomScript.
+      if (mediaChanged) {
+        const fd = new FormData();
+        if (updates.content !== undefined) fd.append('content', updates.content);
+        if (updates.mood_tag !== undefined) fd.append('mood_tag', updates.mood_tag ?? '');
+        if (updates.category !== undefined) fd.append('category', updates.category);
+        if (updates.is_private !== undefined) fd.append('is_private', String(updates.is_private));
+        if (updates.existingMedia !== undefined) {
+          fd.append('existingMedia', JSON.stringify(updates.existingMedia));
+        }
+        for (const file of updates.media ?? []) fd.append('media', file);
+        const response = await apiClient.put(`/wall/${id}`, fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+        return response.data.wall_post as WallPost;
+      }
+      // No media change → plain JSON.
+      const { media: _media, existingMedia: _existingMedia, ...body } = updates;
+      void _media;
+      void _existingMedia;
+      const response = await apiClient.put(`/wall/${id}`, body);
       return response.data.wall_post as WallPost;
     } catch (error) {
       console.error('Failed to update wall post:', error);
@@ -2915,7 +3199,9 @@ class ApiService {
   // reply; only untranslated ones cost AI budget).
   async getWallTranslations(postId: string): Promise<MessageTranslationMap> {
     try {
-      const response = await apiClient.get(`/wall/${postId}/translations`);
+      // ~17s batched LLM call, over the 15s client default (see
+      // getEventTranslations). Extend so a slow thread doesn't read as failed.
+      const response = await apiClient.get(`/wall/${postId}/translations`, { timeout: 45000 });
       return (response.data.translations || {}) as MessageTranslationMap;
     } catch (error) {
       console.error('Failed to fetch wall translations:', error);
@@ -3151,7 +3437,7 @@ class ApiService {
       return this.transformEvent(response.data.event);
     } catch (error: unknown) {
       console.error('Failed to create event:', error);
-      this.throwApiError(error, '無法建立事件');
+      this.throwApiError(error, '無法建立對話');
     }
   }
 
@@ -3167,7 +3453,7 @@ class ApiService {
       return { events, total: response.data.total || 0 };
     } catch (error: unknown) {
       console.error('Failed to list events:', error);
-      this.throwApiError(error, '無法取得事件列表');
+      this.throwApiError(error, '無法取得對話列表');
     }
   }
 
@@ -3177,7 +3463,7 @@ class ApiService {
       return this.transformEvent(response.data.event);
     } catch (error: unknown) {
       console.error('Failed to fetch event:', error);
-      this.throwApiError(error, '無法取得事件詳情');
+      this.throwApiError(error, '無法取得對話詳情');
     }
   }
 
@@ -3187,7 +3473,7 @@ class ApiService {
       return this.transformEvent(response.data.event);
     } catch (error: unknown) {
       console.error('Failed to update event:', error);
-      this.throwApiError(error, '無法更新事件內容');
+      this.throwApiError(error, '無法更新對話內容');
     }
   }
 
@@ -3309,7 +3595,10 @@ class ApiService {
   // thread (cached per message; only untranslated ones cost AI budget).
   async getEventTranslations(eventId: string): Promise<MessageTranslationMap> {
     try {
-      const response = await apiClient.get(`/events/${eventId}/translations`);
+      // The batched LLM translation of a thread takes ~17s in prod, over the
+      // 15s client default — bump this call so users don't see a false
+      // "情緒翻譯失敗" while the server actually succeeds (returns 200).
+      const response = await apiClient.get(`/events/${eventId}/translations`, { timeout: 45000 });
       return (response.data.translations || {}) as MessageTranslationMap;
     } catch (error: unknown) {
       console.error('Failed to fetch event translations:', error);
@@ -3326,6 +3615,57 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to fetch therapy note:', error);
       this.throwApiError(error, '治療摘要暫時無法產生，請稍後再試');
+    }
+  }
+
+  // ---- 引導模式 (Therapist Mode) ----
+
+  // Current facilitation session state + scoreboard (null when none started).
+  async getFacilitation(eventId: string): Promise<FacilitationSession | null> {
+    try {
+      const response = await apiClient.get(`/events/${eventId}/facilitation`);
+      return (response.data.session ?? null) as FacilitationSession | null;
+    } catch (error: unknown) {
+      console.error('Failed to fetch facilitation:', error);
+      this.throwApiError(error, '無法載入引導進度，請稍後再試');
+    }
+  }
+
+  // Start (or resume) a facilitated session; returns the first therapist turn.
+  async startFacilitation(eventId: string): Promise<FacilitationAdvance> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/facilitation/start`);
+      return {
+        session: (response.data.session ?? null) as FacilitationSession | null,
+        message: response.data.message ? this.transformEventMessage(response.data.message) : null,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to start facilitation:', error);
+      this.throwApiError(error, '無法開始引導，請稍後再試');
+    }
+  }
+
+  // Advance the session after the awaited partner has replied.
+  async advanceFacilitation(eventId: string): Promise<FacilitationAdvance> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/facilitation/next`);
+      return {
+        session: (response.data.session ?? null) as FacilitationSession | null,
+        message: response.data.message ? this.transformEventMessage(response.data.message) : null,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to advance facilitation:', error);
+      this.throwApiError(error, '引導暫時無法繼續，請稍後再試');
+    }
+  }
+
+  async endFacilitation(eventId: string): Promise<FacilitationSession | null> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/facilitation/end`);
+      return (response.data.session ?? null) as FacilitationSession | null;
+    } catch (error: unknown) {
+      console.error('Failed to end facilitation:', error);
+      this.throwApiError(error, '無法結束引導，請稍後再試');
     }
   }
 
@@ -3365,7 +3705,7 @@ class ApiService {
       return this.transformEvent(response.data.event);
     } catch (error: unknown) {
       console.error('Failed to reopen event:', error);
-      this.throwApiError(error, '無法重新開啟事件');
+      this.throwApiError(error, '無法重新開啟對話');
     }
   }
 
@@ -3388,6 +3728,49 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to fetch event analytics:', error);
       this.throwApiError(error, '無法取得分析資料');
+    }
+  }
+
+  // Fetch (or generate) the between-sessions 諮商摘要 for the couple's recent
+  // events. Returns a discriminated result so the caller can distinguish the
+  // real summary from the expected "not paired" / "no events" states, which the
+  // server returns as HTTP 200 with success:false + an error_code (per CLAUDE.md
+  // — a reached quota is thrown, but these guided states are not errors).
+  async getTherapySummary(days = 14): Promise<TherapySummaryResult> {
+    try {
+      const response = await apiClient.get('/events/therapy-summary', { params: { days } });
+      const d = response.data ?? {};
+      if (d.success === false) {
+        return {
+          ok: false,
+          errorCode: (d.error_code as 'NOT_PAIRED' | 'NO_EVENTS') ?? 'NO_EVENTS',
+          message: d.message ?? '目前還沒有可整理的事件。',
+        };
+      }
+      return {
+        ok: true,
+        summary: d.summary as TherapySummary,
+        period: d.period as { days: number; label: string; eventCount: number },
+        cached: d.cached === true,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch therapy summary:', error);
+      // Quota exhaustion (429) and true failures still throw with error_code
+      // preserved, so the view can surface the specific quota message.
+      this.throwApiError(error, '諮商摘要暫時無法產生，請稍後再試');
+    }
+  }
+
+  // Past 諮商摘要 snapshots for the couple, newest first. Each entry carries its
+  // full summary so re-opening an old one is instant and costs no AI credit — the
+  // whole point is to avoid regenerating (and re-paying for) the same digest.
+  async getTherapySummaryHistory(): Promise<TherapySummaryHistoryEntry[]> {
+    try {
+      const response = await apiClient.get('/events/therapy-summary/history');
+      return (response.data?.history as TherapySummaryHistoryEntry[]) ?? [];
+    } catch (error: unknown) {
+      console.error('Failed to fetch therapy summary history:', error);
+      return [];
     }
   }
 
@@ -3514,7 +3897,9 @@ class ApiService {
       sender_id?: string;
       content?: string;
       is_ai?: boolean;
+      is_therapist?: boolean;
       ai_therapist?: string | null;
+      facilitation?: MessageFacilitation | null;
       created_at?: string;
       read_at?: string | null;
       edited_at?: string | null;
@@ -3525,7 +3910,9 @@ class ApiService {
       senderId: r.sender_id || '',
       content: r.content || '',
       isAi: r.is_ai === true,
+      isTherapist: r.is_therapist === true,
       aiTherapist: r.ai_therapist ?? null,
+      facilitation: r.facilitation ?? null,
       createdAt: r.created_at || '',
       readAt: r.read_at ?? null,
       editedAt: r.edited_at ?? null,
@@ -3687,6 +4074,141 @@ class ApiService {
     }
   }
 
+  // --- 專屬心理師 (dedicated therapist) --------------------------------------
+
+  // The caller's couple's current dedicated therapist (or null).
+  async getDedicatedTherapist(): Promise<DedicatedTherapist | null> {
+    try {
+      const response = await apiClient.get('/therapists/dedicated');
+      return (response.data?.dedicated ?? null) as DedicatedTherapist | null;
+    } catch (error: unknown) {
+      console.error('Failed to fetch dedicated therapist:', error);
+      this.throwApiError(error, '無法取得專屬心理師資訊');
+    }
+  }
+
+  // Set (or switch to) a dedicated therapist. canComment optionally grants the
+  // therapist reply/message permission. Throws with error_code NO_COUPLE /
+  // THERAPIST_NOT_AVAILABLE so the UI can show a specific reason.
+  async setDedicatedTherapist(therapistId: string, canComment = false): Promise<DedicatedTherapist> {
+    try {
+      const response = await apiClient.post('/therapists/dedicated', { therapistId, canComment });
+      return response.data?.dedicated as DedicatedTherapist;
+    } catch (error: unknown) {
+      console.error('Failed to set dedicated therapist:', error);
+      this.throwApiError(error, '設定專屬心理師失敗，請稍後再試');
+    }
+  }
+
+  // Toggle the therapist's comment permission without re-selecting them.
+  async updateDedicatedTherapistPermission(canComment: boolean): Promise<boolean> {
+    try {
+      const response = await apiClient.patch('/therapists/dedicated', { canComment });
+      return response.data?.canComment === true;
+    } catch (error: unknown) {
+      console.error('Failed to update dedicated therapist permission:', error);
+      this.throwApiError(error, '更新權限失敗，請稍後再試');
+    }
+  }
+
+  async removeDedicatedTherapist(): Promise<void> {
+    try {
+      await apiClient.delete('/therapists/dedicated');
+    } catch (error: unknown) {
+      console.error('Failed to remove dedicated therapist:', error);
+      this.throwApiError(error, '解除失敗，請稍後再試');
+    }
+  }
+
+  // --- Therapist side: my client couples ------------------------------------
+
+  async getTherapistClients(): Promise<TherapistClientCouple[]> {
+    try {
+      const response = await apiClient.get('/therapists/clients');
+      return (response.data?.clients || []) as TherapistClientCouple[];
+    } catch (error: unknown) {
+      console.error('Failed to fetch therapist clients:', error);
+      this.throwApiError(error, '無法取得個案列表');
+    }
+  }
+
+  async getClientWall(coupleId: string): Promise<{ posts: WallPost[]; canComment: boolean }> {
+    try {
+      const response = await apiClient.get(`/therapists/clients/${coupleId}/wall`);
+      return {
+        posts: (response.data?.wall_posts || []) as WallPost[],
+        canComment: response.data?.canComment === true,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch client wall:', error);
+      this.throwApiError(error, '無法取得牆內容');
+    }
+  }
+
+  async getClientWallReplies(
+    coupleId: string,
+    postId: string
+  ): Promise<{ replies: WallReply[]; translationEnabled: boolean; canComment: boolean }> {
+    try {
+      const response = await apiClient.get(`/therapists/clients/${coupleId}/wall/${postId}/replies`);
+      return {
+        replies: (response.data?.replies || []) as WallReply[],
+        translationEnabled: response.data?.translation_enabled === true,
+        canComment: response.data?.canComment === true,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch client wall replies:', error);
+      this.throwApiError(error, '無法取得回覆');
+    }
+  }
+
+  async addClientWallReply(coupleId: string, postId: string, content: string): Promise<WallReply> {
+    try {
+      const response = await apiClient.post(`/therapists/clients/${coupleId}/wall/${postId}/replies`, { content });
+      return response.data?.reply as WallReply;
+    } catch (error: unknown) {
+      console.error('Failed to add client wall reply:', error);
+      this.throwApiError(error, '留言失敗，請稍後再試');
+    }
+  }
+
+  async getClientEvents(coupleId: string): Promise<{ events: EventRecord[]; total: number; canComment: boolean }> {
+    try {
+      const response = await apiClient.get(`/therapists/clients/${coupleId}/events`);
+      return {
+        events: (response.data?.events || []).map((row: unknown) => this.transformEvent(row)),
+        total: response.data?.total || 0,
+        canComment: response.data?.canComment === true,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch client events:', error);
+      this.throwApiError(error, '無法取得對話列表');
+    }
+  }
+
+  async getClientEventDetail(coupleId: string, eventId: string): Promise<{ event: EventRecord; canComment: boolean }> {
+    try {
+      const response = await apiClient.get(`/therapists/clients/${coupleId}/events/${eventId}`);
+      return {
+        event: this.transformEvent(response.data?.event),
+        canComment: response.data?.canComment === true,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch client event detail:', error);
+      this.throwApiError(error, '無法取得對話詳情');
+    }
+  }
+
+  async addClientEventMessage(coupleId: string, eventId: string, content: string): Promise<EventMessage> {
+    try {
+      const response = await apiClient.post(`/therapists/clients/${coupleId}/events/${eventId}/messages`, { content });
+      return this.transformEventMessage(response.data?.message);
+    } catch (error: unknown) {
+      console.error('Failed to add client event message:', error);
+      this.throwApiError(error, '留言失敗，請稍後再試');
+    }
+  }
+
   async getConsultationMessages(consultationId: string): Promise<ConsultationThread> {
     try {
       const response = await apiClient.get(`/therapists/consultations/${consultationId}/messages`);
@@ -3775,6 +4297,18 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to fetch public Q&A thread:', error);
       this.throwApiError(error, '無法載入公開問答');
+    }
+  }
+
+  // Turn a private (solo) conversation into a shared one so the partner can see
+  // it — step 1 of the two-stage share flow (private → shared → 公開問答).
+  async shareEventWithPartner(eventId: string): Promise<EventRecord> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/share-with-partner`);
+      return this.transformEvent(response.data.event);
+    } catch (error: unknown) {
+      console.error('Failed to share event with partner:', error);
+      this.throwApiError(error, '分享失敗，請稍後再試');
     }
   }
 

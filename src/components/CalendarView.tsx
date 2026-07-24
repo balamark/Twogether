@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Camera, MapPin, Play, Clock, Trash2 } from 'lucide-react';
 import CalendarDatePicker from './CalendarDatePicker';
+import InfoHint from './InfoHint';
 import { AchievementsView, IntimacyStatsCards, CalendarHeatmap } from './AchievementsView';
 import RelationshipDashboard from './RelationshipDashboard';
 import { periodDateSet, fertileDateSet, predictedPeriodDateSet, addDays } from '../utils/cycle';
+import { formatYmdInTz } from '../utils/datetime';
 import { apiService } from '../services/api';
 import type { CycleRecord } from '../services/api';
 import type { IntimateRecord, AuthState, Notification } from '../App';
@@ -149,6 +151,19 @@ const CalendarView = ({
     const hours = now.getHours().toString().padStart(2, '0');
     const minutes = now.getMinutes().toString().padStart(2, '0');
     return `${hours}:${minutes}`;
+  };
+
+  // Today in the couple's primary timezone, matching the calendar's own day keys.
+  const todayYmd = () => formatYmdInTz(new Date(), primaryTimezone);
+
+  // Open the record modal pre-filled for a given day. Shared by the "記錄今天"
+  // quick button and the empty-day tap on the calendar so both behave identically.
+  const openAddModalForDate = (day: string) => {
+    setEditingRecord(null);
+    setSelectedDate(day);
+    setRecordForm({ date: day, time: getCurrentTime(), mood: '💕', notes: '', description: '', duration: '', location: '', photo: '', roleplayScript: '' });
+    setPeriodLengthInput('5');
+    setShowRecordModal(true);
   };
 
   const [recordForm, setRecordForm] = useState(() => {
@@ -387,9 +402,15 @@ const CalendarView = ({
             <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
               — A · 記錄
             </div>
-            <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05]">
-              記錄<em className="not-italic font-light italic text-pink-600">時光</em>
-            </h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05]">
+                記錄<em className="not-italic font-light italic text-pink-600">時光</em>
+              </h2>
+              <InfoHint viewId="record" />
+            </div>
+            <p className="mt-3 font-body text-sm text-petal-muted leading-relaxed max-w-md">
+              記下親密時光與心情，月曆會看見你們的節奏。
+            </p>
           </div>
           <div className="text-left md:text-right font-body text-sm text-petal-muted leading-relaxed">
             {togetherSince ? (
@@ -404,28 +425,63 @@ const CalendarView = ({
             )}
           </div>
         </div>
-        <div className="mt-6 flex flex-col md:flex-row gap-3 md:items-center">
-          <div className="flex items-center gap-3 md:flex-1">
-            <span className="font-body text-xs uppercase tracking-[0.14em] text-petal-muted">日期</span>
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="flex-1 max-w-xs px-4 py-2.5 border border-petal-rule rounded-md bg-white font-body text-sm text-petal-ink focus:outline-none focus:border-petal-rose-deep transition-colors"
-            />
+      </div>
+
+      {/* Calendar — the primary way to add & review records. Promoted to the top
+          so the first thing after login is your shared rhythm + a one-tap add. */}
+      <div>
+        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5">
+          <div>
+            <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink">
+              你們的<em className="not-italic font-light italic text-pink-600">節奏</em>
+            </h3>
+            <p className="mt-1 font-body text-sm text-petal-muted">點月曆任一天新增或查看紀錄</p>
           </div>
           <button
             data-testid="add-record-button"
-            onClick={() => {
-              setEditingRecord(null);
-              setRecordForm({date: selectedDate, time: getCurrentTime(), mood: '💕', notes: '', description: '', duration: '', location: '', photo: '', roleplayScript: ''});
-              setPeriodLengthInput('5');
-              setShowRecordModal(true);
-            }}
-            className="px-6 py-2.5 bg-petal-ink text-petal-cream rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
+            onClick={() => openAddModalForDate(todayYmd())}
+            className="self-start sm:self-auto inline-flex items-center gap-1.5 px-5 py-2.5 bg-petal-ink text-petal-cream rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
           >
-            + 為這一天添一筆
+            <span className="text-lg leading-none">＋</span> 記錄今天
           </button>
+        </div>
+        <div className="bg-white rounded-md border border-petal-rule p-5 sm:p-6">
+          <CalendarHeatmap
+            data={intimateRecords}
+            year={calendarMonth.getFullYear()}
+            month={calendarMonth.getMonth()}
+            title=""
+            showMonthLabels={true}
+            periodDates={periodDates}
+            predictedPeriodDates={predictedPeriodDates}
+            fertileDates={fertileDates}
+            onNavigate={(y, m) => setCalendarMonth(new Date(y, m, 1))}
+            onDaySelect={(day) => {
+              // A day inside a logged period opens the period-management modal
+              // so it can be reviewed and undone if it was marked by mistake.
+              const periodRec = cycleRecordByDate.get(day);
+              if (periodRec) {
+                setPeriodDayDate(day);
+                setPeriodDayRecord(periodRec);
+                return;
+              }
+              const dayRecords = recordsByDate.get(day) || [];
+              if (dayRecords.length === 0) {
+                // Empty day → open the add modal pre-filled for that day.
+                openAddModalForDate(day);
+              } else if (dayRecords.length === 1) {
+                setSelectedRecord(dayRecords[0]);
+                setShowRecordDetail(true);
+              } else {
+                setDayPickerDate(day);
+                setDayPickerRecords(
+                  dayRecords.slice().sort((a, b) =>
+                    (b.date + 'T' + b.time).localeCompare(a.date + 'T' + a.time)
+                  )
+                );
+              }
+            }}
+          />
         </div>
       </div>
 
@@ -587,6 +643,39 @@ const CalendarView = ({
                   />
                 </div>
 
+                {/* Duration — editable so the roleplay default (15-30分鐘) can be changed */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Clock className="w-4 h-4 inline mr-2" />
+                    時長 (可選)
+                  </label>
+                  <input
+                    type="text"
+                    value={recordForm.duration}
+                    onChange={(e) => setRecordForm({...recordForm, duration: e.target.value})}
+                    placeholder="例如：15-30分鐘"
+                    data-testid="record-duration-input"
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                  />
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {['15-30分鐘', '30-60分鐘', '1小時以上'].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setRecordForm({...recordForm, duration: preset})}
+                        data-testid={`record-duration-preset-${preset}`}
+                        className={`px-2.5 py-1 rounded-full border font-body text-xs transition-colors ${
+                          recordForm.duration === preset
+                            ? 'border-pink-500 bg-pink-50 text-pink-700'
+                            : 'border-petal-rule text-petal-muted hover:border-petal-ink hover:text-petal-ink'
+                        }`}
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Roleplay Script Reference */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -715,57 +804,6 @@ const CalendarView = ({
         </div>
       )}
 
-      {/* Monthly Calendar Distribution */}
-      <div>
-        <div className="flex items-baseline justify-between mb-6">
-          <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink">
-            月度<em className="not-italic font-light italic text-pink-600">記錄分佈</em>
-          </h3>
-        </div>
-        <div className="bg-white rounded-md border border-petal-rule p-5 sm:p-6">
-          <CalendarHeatmap
-            data={intimateRecords}
-            year={calendarMonth.getFullYear()}
-            month={calendarMonth.getMonth()}
-            title=""
-            showMonthLabels={true}
-            periodDates={periodDates}
-            predictedPeriodDates={predictedPeriodDates}
-            fertileDates={fertileDates}
-            onNavigate={(y, m) => setCalendarMonth(new Date(y, m, 1))}
-            onDaySelect={(day) => {
-              // A day inside a logged period opens the period-management modal
-              // so it can be reviewed and undone if it was marked by mistake.
-              const periodRec = cycleRecordByDate.get(day);
-              if (periodRec) {
-                setPeriodDayDate(day);
-                setPeriodDayRecord(periodRec);
-                return;
-              }
-              const dayRecords = recordsByDate.get(day) || [];
-              if (dayRecords.length === 0) {
-                setEditingRecord(null);
-                setSelectedDate(day);
-                // Pre-select the tapped day in the modal's calendar so there's
-                // no need to re-pick it.
-                setRecordForm(f => ({ ...f, date: day }));
-                setPeriodLengthInput('5');
-                setShowRecordModal(true);
-              } else if (dayRecords.length === 1) {
-                setSelectedRecord(dayRecords[0]);
-                setShowRecordDetail(true);
-              } else {
-                setDayPickerDate(day);
-                setDayPickerRecords(
-                  dayRecords.slice().sort((a, b) =>
-                    (b.date + 'T' + b.time).localeCompare(a.date + 'T' + a.time)
-                  )
-                );
-              }
-            }}
-          />
-        </div>
-      </div>
 
       {/* Record List */}
       <div>

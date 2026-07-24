@@ -11,11 +11,13 @@ import {
   HeartHandshake,
   HandHeart,
   Globe,
+  Users,
   RotateCcw,
   X,
   Pencil,
   NotebookPen,
   Gauge,
+  PlayCircle,
 } from 'lucide-react';
 import apiService, {
   type EventRecord,
@@ -26,6 +28,7 @@ import apiService, {
   type MessageTranslationMap,
   type TherapyNote,
   type DraftAnalysis,
+  type FacilitationSession,
 } from '../services/api';
 import ReplyStepBar from './ReplyStepBar';
 import MessageTranslationCard from './MessageTranslationCard';
@@ -33,12 +36,15 @@ import TherapyNoteCard from './TherapyNoteCard';
 import ConflictBanner from './ConflictBanner';
 import DraftEmotionMeter from './DraftEmotionMeter';
 import { detectDraftTone, draftToneHint } from '../utils/conflictState';
+import TherapistTurnCard from './TherapistTurnCard';
+import SessionProgress from './SessionProgress';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
 import { companionName, resolveCompanion } from '../utils/aiCompanions';
 import { useAiQuota } from '../hooks/useAiQuota';
 import AiQuotaHint from './AiQuotaHint';
+import ParticipantAvatar from './ParticipantAvatar';
 
 interface NotificationInput {
   type: 'success' | 'error' | 'info' | 'warning';
@@ -110,6 +116,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const [aiPreview, setAiPreview] = useState<string | null>(null);
   const [shareWarnOpen, setShareWarnOpen] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [sharePartnerOpen, setSharePartnerOpen] = useState(false);
+  const [sharingPartner, setSharingPartner] = useState(false);
   // Post-send editing: creator edits title/summary; each side edits own messages.
   const [editingHeader, setEditingHeader] = useState(false);
   const [headerTitle, setHeaderTitle] = useState('');
@@ -122,6 +130,13 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const [translationLoading, setTranslationLoading] = useState(false);
   const [therapyNote, setTherapyNote] = useState<TherapyNote | null>(null);
   const [therapyLoading, setTherapyLoading] = useState(false);
+  // 引導模式 (Therapist Mode)
+  const [facilitation, setFacilitation] = useState<FacilitationSession | null>(null);
+  const [facilitating, setFacilitating] = useState(false);
+  const [endingSession, setEndingSession] = useState(false);
+  // Quota ran out mid-session: pause auto-advance so each further reply doesn't
+  // re-fire the same warning toast. Cleared on event change / next success.
+  const [advancePaused, setAdvancePaused] = useState(false);
   const tz = useTimezone();
 
   const insertPhrase = (phrase: string) => {
@@ -228,10 +243,23 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   // server-side per message, so this only bills for still-untranslated ones.
   const loadTranslations = async () => {
     setTranslationLoading(true);
+    const startedAt = Date.now();
+    console.info('[情緒翻譯] event: loading translations…', { eventId });
     try {
       const map = await apiService.getEventTranslations(eventId);
+      const keys = Object.keys(map);
+      console.info('[情緒翻譯] event: got translations', {
+        eventId,
+        count: keys.length,
+        ms: Date.now() - startedAt,
+        keys,
+      });
+      if (keys.length === 0) {
+        console.warn('[情緒翻譯] event: empty translation map — nothing will render');
+      }
       setTranslations(map);
     } catch (err) {
+      console.error('[情緒翻譯] event: load failed', err);
       const code = (err as { error_code?: string })?.error_code;
       if (code === 'AI_DAILY_LIMIT_REACHED') {
         showNotification({
@@ -252,19 +280,24 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     }
   };
 
-  const refresh = async () => {
+  const refresh = async (opts?: { skipFacilitation?: boolean }) => {
     try {
       const data = await apiService.getEvent(eventId);
       setEvent(data);
       setTranslationEnabled(data.translationEnabled);
       setTherapyNote(data.therapyNote);
       if (data.translationEnabled) loadTranslations();
+      // Callers that just received fresh session state from a mutation response
+      // skip the refetch so it can't race-overwrite the newer value.
+      if (!opts?.skipFacilitation) {
+        apiService.getFacilitation(eventId).then(setFacilitation).catch(() => {});
+      }
       // Mark inbound unread messages as read (fire-and-forget)
       data.messages
         .filter((m) => m.senderId !== currentUserId && !m.readAt)
         .forEach((m) => apiService.markEventMessageRead(eventId, m.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : '無法取得事件詳情');
+      setError(err instanceof Error ? err.message : '無法取得對話詳情');
     }
   };
 
@@ -310,8 +343,95 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     }
   };
 
+  // 引導模式: shared handling for start + advance. Expected states (quota,
+  // resolved, unpaired, stale session) surface as warning/info with a next
+  // step; red errors are reserved for real failures.
+  const handleFacilitationError = (err: unknown, phase: 'start' | 'advance') => {
+    const code = (err as { error_code?: string })?.error_code;
+    if (code === 'AI_DAILY_LIMIT_REACHED') {
+      if (phase === 'advance') setAdvancePaused(true);
+      showNotification({
+        type: 'warning',
+        title: '今日 AI 次數已用完',
+        message: '引導練習次數已達今日上限，升級 Premium 可提高每日上限；明天會自動補上，引導也會接著繼續。',
+      });
+    } else if (code === 'NOT_PAIRED') {
+      showNotification({
+        type: 'info',
+        title: '引導模式需要兩個人',
+        message: err instanceof Error ? err.message : '先邀請另一半配對，就能一起練習。',
+      });
+    } else if (code === 'EVENT_RESOLVED') {
+      showNotification({
+        type: 'info',
+        title: '這段對話已完成',
+        message: err instanceof Error ? err.message : '如需再談可先重新開啟對話。',
+      });
+    } else if (code === 'PRIVATE_EVENT') {
+      showNotification({
+        type: 'info',
+        title: '私人對話不支援引導',
+        message: '引導模式需要兩個人一起參與，私人對話只有你看得到。',
+      });
+    } else if (code === 'NO_SESSION') {
+      // Local state is stale (e.g. the partner ended the session) — resync
+      // quietly instead of toasting.
+      apiService.getFacilitation(eventId).then(setFacilitation).catch(() => {});
+    } else {
+      showNotification({
+        type: 'error',
+        title: '引導暫時無法進行',
+        message: err instanceof Error ? err.message : '請稍後再試',
+      });
+    }
+  };
+
+  const startFacilitation = async () => {
+    setFacilitating(true);
+    try {
+      const res = await apiService.startFacilitation(eventId);
+      setFacilitation(res.session);
+      setAdvancePaused(false);
+      await refresh({ skipFacilitation: true });
+    } catch (err) {
+      handleFacilitationError(err, 'start');
+    } finally {
+      setFacilitating(false);
+      refreshQuota();
+    }
+  };
+
+  // After the awaited partner replies, fetch the therapist's next turn.
+  const advanceFacilitation = async () => {
+    setFacilitating(true);
+    try {
+      const res = await apiService.advanceFacilitation(eventId);
+      setFacilitation(res.session);
+      setAdvancePaused(false);
+      await refresh({ skipFacilitation: true });
+    } catch (err) {
+      handleFacilitationError(err, 'advance');
+    } finally {
+      setFacilitating(false);
+      refreshQuota();
+    }
+  };
+
+  const endFacilitation = async () => {
+    setEndingSession(true);
+    try {
+      const s = await apiService.endFacilitation(eventId);
+      setFacilitation(s);
+    } catch (err) {
+      showNotification({ type: 'error', title: '無法結束引導', message: err instanceof Error ? err.message : '請稍後再試' });
+    } finally {
+      setEndingSession(false);
+    }
+  };
+
   useEffect(() => {
     setLoading(true);
+    setAdvancePaused(false);
     refresh().finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
@@ -325,6 +445,12 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       setReply('');
       setDraftAnalysis(null);
       await refresh();
+      // In an active session, if the therapist was waiting on me, my reply
+      // completes the step — fetch the next facilitated turn. Skipped while
+      // paused (quota spent) so we don't re-toast on every reply.
+      const myTurn = facilitation && facilitation.status === 'active' &&
+        (facilitation.turnOwner === currentUserId || facilitation.turnOwner === null);
+      if (myTurn && !advancePaused) await advanceFacilitation();
     } catch (err) {
       showNotification({
         type: 'error',
@@ -463,6 +589,30 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     }
   };
 
+  // Step 1 of sharing: turn a private (solo) conversation into a shared one so
+  // the partner can see it. One-way; after this the 公開問答 control appears.
+  const confirmShareWithPartner = async () => {
+    setSharingPartner(true);
+    try {
+      const updated = await apiService.shareEventWithPartner(eventId);
+      setEvent((prev) => (prev ? { ...prev, isPrivate: updated.isPrivate } : prev));
+      setSharePartnerOpen(false);
+      showNotification({
+        type: 'success',
+        title: '已分享給伴侶',
+        message: '伴侶現在看得到這段對話，你們可以一起討論了。',
+      });
+    } catch (err) {
+      showNotification({
+        type: 'error',
+        title: '分享失敗',
+        message: err instanceof Error ? err.message : '請稍後再試',
+      });
+    } finally {
+      setSharingPartner(false);
+    }
+  };
+
   const unshare = async () => {
     setSharing(true);
     try {
@@ -502,7 +652,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     try {
       await apiService.confirmEventResolve(eventId);
       await refresh();
-      showNotification({ type: 'success', title: '事件已解決', message: '雙方確認完成' });
+      showNotification({ type: 'success', title: '這段對話已完成', message: '雙方確認完成' });
     } catch (err) {
       showNotification({
         type: 'error',
@@ -519,7 +669,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     try {
       await apiService.reopenEvent(eventId);
       await refresh();
-      showNotification({ type: 'success', title: '已重新開啟', message: '可以繼續討論這個事件了' });
+      showNotification({ type: 'success', title: '已重新開啟', message: '可以繼續討論這段對話了' });
     } catch (err) {
       showNotification({
         type: 'error',
@@ -538,7 +688,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     return (
       <div className="space-y-3">
         <BackButton onBack={onBack} />
-        <div className="p-6 text-center text-red-500">{error || '找不到事件'}</div>
+        <div className="p-6 text-center text-red-500">{error || '找不到對話'}</div>
       </div>
     );
   }
@@ -641,7 +791,28 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           ))}
         </div>
 
-        {/* Share to 公開問答 (anonymised, single-party toggle with warning) */}
+        {/* Private (solo) conversation → let the partner see it (step 1 of the
+            two-stage share flow). Author-only, one-way. Once shared, the 公開問答
+            control below appears. */}
+        {event.isPrivate && isAuthor && (
+          <div className="mt-4 pt-3 border-t border-petal-rule space-y-1.5">
+            <button
+              type="button"
+              data-testid="event-share-partner-button"
+              onClick={() => setSharePartnerOpen(true)}
+              className="text-xs px-3 py-1.5 rounded-full border border-petal-rose text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink inline-flex items-center gap-1.5"
+            >
+              <Users className="w-3.5 h-3.5" />
+              讓伴侶也看得到
+            </button>
+            <p className="text-[11px] text-petal-muted leading-relaxed">
+              這段對話目前只有你看得到。讓伴侶看得到後，你們就能一起討論；之後也能選擇匿名公開到「公開問答」。
+            </p>
+          </div>
+        )}
+
+        {/* Share to 公開問答 (anonymised, single-party toggle with warning). Only
+            for shared events — a private one must be shared with the partner first. */}
         {!event.isPrivate && (
           <div className="mt-4 pt-3 border-t border-petal-rule">
             {event.publicStatus === 'published' ? (
@@ -726,15 +897,57 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             // stored AI versions — when editing it, offer the other versions.
             const firstHumanMessage = event.messages.find((x) => !x.isAi);
             return event.messages.map((m) => {
+            // Therapist Mode turn: render the structured exercise card.
+            if (m.isAi && m.facilitation) {
+              const f = m.facilitation;
+              const isMyTurn = f.target === 'both' || f.targetUserId === currentUserId;
+              const label = companionName(m.aiTherapist) ? `${companionName(m.aiTherapist)}・引導者` : '引導者';
+              return (
+                <div key={m.id} className="flex justify-center">
+                  <div className="max-w-[92%] w-full">
+                    <TherapistTurnCard
+                      facilitation={f}
+                      say={m.content}
+                      companionLabel={label}
+                      companionId={m.aiTherapist}
+                      isMyTurn={isMyTurn}
+                      onQuickReply={(text) => setReply(text)}
+                    />
+                    <p className="text-[10px] text-petal-muted mt-1 text-center">{formatTime(m.createdAt, tz)}</p>
+                  </div>
+                </div>
+              );
+            }
             if (m.isAi) {
               return (
                 <div key={m.id} className="flex justify-center">
                   <div className="max-w-[92%] w-full rounded-2xl px-4 py-3 bg-petal-sage/15 border border-petal-sage/40">
                     <div className="flex items-center gap-1.5 mb-1 text-petal-sage-deep">
-                      <HeartHandshake className="w-3.5 h-3.5" />
+                      <ParticipantAvatar
+                        size="xs"
+                        role="ai"
+                        companionId={m.aiTherapist}
+                        name={companionName(m.aiTherapist) || 'AI 諮商師'}
+                      />
                       <span className="text-xs font-medium">
                         {companionName(m.aiTherapist) ? `${companionName(m.aiTherapist)}・AI 諮商師` : 'AI 諮商師'}
                       </span>
+                    </div>
+                    <p className="text-sm text-petal-ink whitespace-pre-wrap leading-relaxed">{m.content}</p>
+                    <p className="text-[10px] text-petal-muted mt-1.5">{formatTime(m.createdAt, tz)}</p>
+                  </div>
+                </div>
+              );
+            }
+            // A message from the couple's dedicated (human) therapist — centered
+            // and pink, distinct from the two partners and the AI 諮商師.
+            if (m.isTherapist) {
+              return (
+                <div key={m.id} className="flex justify-center">
+                  <div className="max-w-[92%] w-full rounded-2xl px-4 py-3 bg-pink-50 border border-pink-200">
+                    <div className="flex items-center gap-1.5 mb-1 text-pink-700">
+                      <ParticipantAvatar size="xs" role="therapist" name="專屬心理師" />
+                      <span className="text-xs font-medium">專屬心理師</span>
                     </div>
                     <p className="text-sm text-petal-ink whitespace-pre-wrap leading-relaxed">{m.content}</p>
                     <p className="text-[10px] text-petal-muted mt-1.5">{formatTime(m.createdAt, tz)}</p>
@@ -814,6 +1027,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                     <>
                       <p className="text-sm text-petal-ink whitespace-pre-wrap">{m.content}</p>
                       <p className="text-[10px] text-petal-muted mt-1 flex items-center gap-1">
+                        <ParticipantAvatar size="xs" name={speakerName} colorKey={m.senderId} />
                         <span className="font-medium text-petal-ink-soft">{speakerName}</span>
                         <span>・{formatTime(m.createdAt, tz)}</span>
                         {m.editedAt && <span>・已編輯</span>}
@@ -847,23 +1061,65 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           OUTSIDE the reply composer: it reads the thread history, it doesn't
           rewrite whatever you're typing below. */}
       {canSendMessage && (
-        <div className="flex">
-          <button
-            type="button"
-            data-testid="event-ai-counselor-button"
-            onClick={inviteAiCounselor}
-            disabled={aiInviting}
-            className="px-3 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
-            title={`請 ${myCompanion.name} 讀過你們的對話，給一段中立的建議`}
-          >
-            {aiInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
-            <span>請 {myCompanion.name} 加入</span>
-          </button>
+        <div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              data-testid="event-ai-counselor-button"
+              onClick={inviteAiCounselor}
+              disabled={aiInviting}
+              className="px-3 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
+              title={`請 ${myCompanion.name} 讀過你們的對話，給一段中立的建議`}
+            >
+              {aiInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
+              <span>請 {myCompanion.name} 加入</span>
+            </button>
+            {/* 引導模式: a facilitated session, not one-shot advice. Shown only when
+                no session is active — an active one renders its progress tray. */}
+            {(!facilitation || facilitation.status !== 'active') && (
+              <button
+                type="button"
+                data-testid="event-facilitation-start-button"
+                onClick={startFacilitation}
+                disabled={facilitating}
+                className="px-3 py-2 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
+              >
+                {facilitating ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
+                <span>開始引導</span>
+              </button>
+            )}
+          </div>
+          {/* Visible on mobile (tooltips aren't): what 開始引導 does + that both
+              buttons draw from the shared daily AI budget. */}
+          <div className="flex flex-wrap items-center justify-between gap-1 mt-1.5">
+            <p className="font-body text-xs text-petal-muted">
+              「開始引導」：{myCompanion.name} 會像諮商師一樣，一步一步帶你們做練習（會使用 AI 次數）。
+            </p>
+            <AiQuotaHint quota={quota} />
+          </div>
         </div>
+      )}
+
+      {canSendMessage && facilitation && facilitation.status === 'active' && (
+        <SessionProgress eventId={eventId} session={facilitation} onEnd={endFacilitation} ending={endingSession} />
       )}
 
       {canSendMessage && (
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-3">
+          {facilitation && facilitation.status === 'active' && (
+            <div className="mb-2 font-body text-xs space-y-0.5" data-testid="facilitation-turn-hint">
+              {advancePaused ? (
+                <span className="text-petal-muted">⏸️ 今日 AI 次數已用完，明天會自動接續引導。你們仍可自由回覆。</span>
+              ) : facilitation.turnOwner === currentUserId || facilitation.turnOwner === null ? (
+                <span className="text-petal-rose-deep">🎯 輪到你了：照著上面 {myCompanion.name} 的引導回應。</span>
+              ) : (
+                <>
+                  <span className="text-petal-muted block">⏳ 等待 {partnerNickname || '對方'} 回應這一步…</span>
+                  <span className="text-petal-muted block">你也可以先自由回覆，練習會等 {partnerNickname || '對方'} 完成這一步再繼續。</span>
+                </>
+              )}
+            </div>
+          )}
           <ReplyStepBar onInsertPhrase={insertPhrase} />
           <textarea
             data-testid="event-reply-input"
@@ -985,6 +1241,14 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
         />
       )}
 
+      {sharePartnerOpen && (
+        <ShareWithPartnerWarning
+          busy={sharingPartner}
+          onConfirm={confirmShareWithPartner}
+          onCancel={() => setSharePartnerOpen(false)}
+        />
+      )}
+
       {!event.isPrivate && event.status !== 'resolved' && (
         <ResolveControls
           event={event}
@@ -1024,7 +1288,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           <div className="flex flex-col items-center gap-2 text-center bg-petal-sage/15 border border-petal-sage/40 rounded-2xl p-4">
             <p className="text-sm text-petal-ink-soft inline-flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4 text-petal-sage-deep" />
-              這個事件已解決。如果還想再聊聊，可以重新開啟。
+              這段對話已完成。如果還想再聊聊，可以重新開啟。
             </p>
             <button
               type="button"
@@ -1151,6 +1415,54 @@ function AiCounselorPreview({
           >
             {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             貼到對話串
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ShareWithPartnerWarning({
+  busy,
+  onConfirm,
+  onCancel,
+}: {
+  busy: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  useScrollLock(true);
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" data-testid="event-share-partner-warning">
+      <div className="bg-petal-cream rounded-2xl max-w-md w-full p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Users className="w-5 h-5 text-petal-rose-deep" />
+          <h3 className="text-lg font-serif text-petal-ink">讓伴侶也看得到</h3>
+        </div>
+        <p className="text-sm text-petal-ink-soft leading-relaxed mb-2">
+          目前這段對話<span className="text-petal-ink font-medium">只有你看得到</span>。
+          分享後，<span className="text-petal-ink font-medium">伴侶會看到標題與內容</span>，你們就能一起討論這件事。
+        </p>
+        <p className="text-sm text-petal-ink-soft leading-relaxed mb-4">
+          這個動作<span className="text-petal-ink font-medium">無法復原</span>——伴侶看過就收不回了。日後如果想幫助其他人，還能再選擇匿名公開到「公開問答」。
+        </p>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-sm px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20"
+          >
+            先不要
+          </button>
+          <button
+            type="button"
+            data-testid="event-share-partner-confirm"
+            onClick={onConfirm}
+            disabled={busy}
+            className="text-sm px-4 py-2 rounded-full bg-petal-ink text-petal-cream inline-flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
+          >
+            {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
+            確定分享給伴侶
           </button>
         </div>
       </div>

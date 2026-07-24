@@ -11,6 +11,7 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { logDbError, errorResponseBody } = require('../lib/db-errors');
 const { logInfo } = require('../lib/logger');
+const { notifyPartnerAction } = require('../services/notificationService');
 
 const router = express.Router();
 router.use(authenticateToken);
@@ -94,6 +95,7 @@ router.put(
         [req.user.id, req.params.type, req.body.result.trim(), JSON.stringify(scores)]
       );
       logInfo('assessments.saved', { userId: req.user.id, type: req.params.type, result: req.body.result });
+      notifyPartnerAction({ actorId: req.user.id, type: 'assessment_saved' });
       res.json({ success: true, message: '測驗結果已儲存', assessment: toAssessment(result.rows[0]) });
     } catch (error) {
       logDbError('assessments.save', error, { userId: req.user.id, type: req.params.type });
@@ -150,6 +152,7 @@ router.post(
         [req.user.id, req.body.content.trim()]
       );
       logInfo('assessments.love_wish.added', { userId: req.user.id });
+      notifyPartnerAction({ actorId: req.user.id, type: 'love_wish_created', content: req.body.content.trim() });
       res.status(201).json({ success: true, wish: result.rows[0] });
     } catch (error) {
       logDbError('assessments.love_wishes.add', error, { userId: req.user.id });
@@ -161,7 +164,10 @@ router.post(
 // DELETE /api/assessments/love-wishes/:id — remove one of your own wishes.
 router.delete('/love-wishes/:id', [param('id').isUUID()], async (req, res) => {
   try {
-    await db.query(`DELETE FROM love_wishes WHERE id = $1 AND user_id = $2`, [req.params.id, req.user.id]);
+    const del = await db.query(`DELETE FROM love_wishes WHERE id = $1 AND user_id = $2 RETURNING id`, [req.params.id, req.user.id]);
+    if (del.rows.length > 0) {
+      notifyPartnerAction({ actorId: req.user.id, type: 'love_wish_deleted' });
+    }
     res.json({ success: true });
   } catch (error) {
     logDbError('assessments.love_wishes.delete', error, { userId: req.user.id });

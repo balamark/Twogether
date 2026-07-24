@@ -811,10 +811,10 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
               {/* (Optional) pick a related event for context */}
               <div className="space-y-2">
                 <p className="text-sm font-medium text-gray-700">
-                  選一個相關事件 <span className="text-gray-400 font-normal">（可略過）</span>
+                  選一個相關對話 <span className="text-gray-400 font-normal">（可略過）</span>
                 </p>
                 {reconcileEventsLoading ? (
-                  <p className="text-sm text-gray-400">載入事件中…</p>
+                  <p className="text-sm text-gray-400">載入對話中…</p>
                 ) : reconcileEvents.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -846,7 +846,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                   </div>
                 ) : (
                   <p className="text-sm text-gray-400">
-                    目前沒有可參考的事件，沒關係，直接挑一個強度就能產生通用的破冰開場白。
+                    目前沒有可參考的對話，沒關係，直接挑一個強度就能產生通用的破冰開場白。
                   </p>
                 )}
               </div>

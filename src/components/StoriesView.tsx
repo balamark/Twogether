@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { BookOpen, Globe, User as UserIcon } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, FileText, Globe, User as UserIcon, Vote } from 'lucide-react';
 import StoryList from './StoryList';
 import StoryDetail from './StoryDetail';
 import StoryComposeFlow from './StoryComposeFlow';
+import ArticleComposeFlow from './ArticleComposeFlow';
 import MyStories from './MyStories';
 import PublicQaView from './PublicQaView';
+import PollsView from './PollsView';
 import InfoHint from './InfoHint';
 
 // 真實故事 main tab: the public-facing community surface. Sub-tabs:
@@ -29,8 +31,15 @@ interface StoriesViewProps {
   onFindTherapist: () => void;
 }
 
-type SubTab = 'wisdom' | 'qa' | 'mine';
-type WisdomView = { kind: 'list' } | { kind: 'detail'; id: string } | { kind: 'compose' };
+type SubTab = 'wisdom' | 'polls' | 'qa' | 'mine';
+// 'wisdom' is the internal id for the merged 好文 · 故事 sub-tab (kept stable so
+// selectors/state don't churn); the visible label changed when 閱讀 merged in.
+type WisdomView =
+  | { kind: 'list' }
+  | { kind: 'detail'; id: string }
+  | { kind: 'compose-choose' } // pick: guided story vs share an article
+  | { kind: 'compose' } // guided 6-section story
+  | { kind: 'compose-article' }; // plain-text shared article
 
 export default function StoriesView({
   authState,
@@ -52,7 +61,7 @@ export default function StoriesView({
 
   const openCompose = () => {
     if (!authState.isAuthenticated) return requireLoginForCompose();
-    setWisdomView({ kind: 'compose' });
+    setWisdomView({ kind: 'compose-choose' });
   };
 
   return (
@@ -66,7 +75,7 @@ export default function StoriesView({
           <span className="align-middle ml-2"><InfoHint viewId="stories" /></span>
         </h2>
         <p className="font-display italic font-light text-base text-petal-muted">
-          把你們最難的時刻，變成幫助其他伴侶的智慧。
+          把你們最難的時刻、讀過的好文，變成幫助其他伴侶的智慧。
         </p>
       </header>
 
@@ -81,7 +90,17 @@ export default function StoriesView({
               tab === 'wisdom' ? 'bg-petal-ink text-petal-cream' : 'text-petal-ink-soft hover:text-petal-ink'
             }`}
           >
-            <BookOpen className="w-3.5 h-3.5" strokeWidth={1.5} /> 智慧故事
+            <BookOpen className="w-3.5 h-3.5" strokeWidth={1.5} /> 好文 · 故事
+          </button>
+          <button
+            type="button"
+            data-testid="stories-tab-polls"
+            onClick={() => setTab('polls')}
+            className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full font-body text-[13px] font-medium transition-colors ${
+              tab === 'polls' ? 'bg-petal-ink text-petal-cream' : 'text-petal-ink-soft hover:text-petal-ink'
+            }`}
+          >
+            <Vote className="w-3.5 h-3.5" strokeWidth={1.5} /> 大家怎麼做
           </button>
           <button
             type="button"
@@ -125,11 +144,71 @@ export default function StoriesView({
         />
       )}
 
+      {tab === 'wisdom' && wisdomView.kind === 'compose-choose' && (
+        <div className="space-y-3" data-testid="stories-compose-choose">
+          <p className="text-center text-sm text-petal-ink-soft">你想分享哪一種？</p>
+          <button
+            type="button"
+            data-testid="compose-choose-story"
+            onClick={() => setWisdomView({ kind: 'compose' })}
+            className="w-full text-left rounded-2xl border border-petal-rule bg-white hover:border-petal-rose p-4 transition"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-petal-ink">分享你們的故事</span>
+              <ArrowRight className="w-4 h-4 text-petal-muted" />
+            </div>
+            <p className="text-xs text-petal-ink-soft mt-1">依 6 個引導步驟，寫下你們走過的一段真實經歷。</p>
+          </button>
+          <button
+            type="button"
+            data-testid="compose-choose-article"
+            onClick={() => setWisdomView({ kind: 'compose-article' })}
+            className="w-full text-left rounded-2xl border border-petal-rose/60 bg-petal-rose/5 hover:border-petal-rose p-4 transition"
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-petal-ink inline-flex items-center gap-1.5">
+                <FileText className="w-4 h-4 text-petal-rose-deep" />
+                分享一篇好文章
+              </span>
+              <ArrowRight className="w-4 h-4 text-petal-muted" />
+            </div>
+            <p className="text-xs text-petal-ink-soft mt-1">看到對關係有幫助的好文？純文字貼上，分享給其他伴侶。</p>
+          </button>
+          <div className="flex justify-start pt-1">
+            <button
+              type="button"
+              onClick={() => setWisdomView({ kind: 'list' })}
+              className="px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              返回
+            </button>
+          </div>
+        </div>
+      )}
+
       {tab === 'wisdom' && wisdomView.kind === 'compose' && (
         <StoryComposeFlow
           showNickname={authState.user?.public_share_show_nickname !== false}
           onDone={(storyId) => setWisdomView({ kind: 'detail', id: storyId })}
-          onCancel={() => setWisdomView({ kind: 'list' })}
+          onCancel={() => setWisdomView({ kind: 'compose-choose' })}
+          showNotification={showNotification}
+        />
+      )}
+
+      {tab === 'wisdom' && wisdomView.kind === 'compose-article' && (
+        <ArticleComposeFlow
+          showNickname={authState.user?.public_share_show_nickname !== false}
+          onDone={(storyId) => setWisdomView({ kind: 'detail', id: storyId })}
+          onCancel={() => setWisdomView({ kind: 'compose-choose' })}
+          showNotification={showNotification}
+        />
+      )}
+
+      {tab === 'polls' && (
+        <PollsView
+          isAuthenticated={authState.isAuthenticated}
+          onRequireLogin={() => setShowAuthModal(true)}
           showNotification={showNotification}
         />
       )}
@@ -145,7 +224,7 @@ export default function StoriesView({
       {tab === 'mine' && (
         <MyStories
           onOpenStory={(id) => { setTab('wisdom'); setWisdomView({ kind: 'detail', id }); }}
-          onCompose={() => { setTab('wisdom'); setWisdomView({ kind: 'compose' }); }}
+          onCompose={() => { setTab('wisdom'); setWisdomView({ kind: 'compose-choose' }); }}
           showNotification={showNotification}
         />
       )}

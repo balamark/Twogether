@@ -142,7 +142,7 @@ export default function GettingStartedCard({
                 className="text-xs px-3 py-1.5 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-1.5"
               >
                 <MessageSquareHeart className="w-3.5 h-3.5" />
-                開啟第一個事件
+                開始第一段對話
               </button>
             </div>
           )}

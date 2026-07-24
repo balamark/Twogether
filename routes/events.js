@@ -6,11 +6,14 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const llmService = require('../services/llmService');
 const emailService = require('../services/emailService');
+const lineService = require('../services/lineService');
 const { checkLimit } = require('../lib/entitlements');
 const { resolveCompanion } = require('../lib/aiCompanions');
+const { cardMeta, applyVerdict, scoreSession } = require('../lib/therapyCards');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 const {
   countTodayAiUsage,
+  countTodayAiUsageByKind,
   resolveAiLimit,
   recordAiUsage,
 } = require('../lib/aiUsage');
@@ -76,6 +79,25 @@ async function notify(userId, type, title, content, eventId, relatedUserId, prio
   } catch (err) {
     logWarn('Event notification insert failed', { type, err: err.message });
   }
+
+  // Mirror to LINE (no-ops unless the recipient linked + opted in). Carry the
+  // actual message content so the push alone tells the story; users only open
+  // the app when the text exceeds the excerpt.
+  const EVENT_PUSH_EMOJI = {
+    event_created: '📣',
+    event_reply: '💬',
+    event_ai_comment: '🧑‍⚕️',
+    event_resolve_request: '🤝',
+    event_resolved: '✅',
+    event_reopened: '🔄',
+  };
+  const linePush = [
+    `${EVENT_PUSH_EMOJI[type] || '🔔'} Twogether｜${title}`,
+    `情境：${content}`,
+    messageContent ? `「${lineService.excerpt(messageContent)}」` : null,
+    '👉 https://twogether.fun',
+  ].filter(Boolean).join('\n');
+  lineService.pushToUserIfLinked(db, userId, linePush);
 
   // Fire-and-forget email mirroring the in-app notification. Skips silently
   // when the recipient is opted out, unconfigured, or unreachable.
@@ -233,11 +255,108 @@ function serializeMessage(row) {
     sender_id: row.sender_id,
     content: row.content,
     is_ai: row.is_ai === true,
+    is_therapist: row.is_therapist === true,
     ai_therapist: row.ai_therapist || null,
+    facilitation: row.facilitation || null,
     created_at: row.created_at,
     read_at: row.read_at,
     edited_at: row.edited_at || null,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Reusable read/write helpers — shared by the couple-member endpoints below and
+// by the dedicated-therapist endpoints in routes/therapists.js. `privateVisibleTo`
+// controls whose private events are visible: pass a member's userId to include
+// their own private events, or null (e.g. a therapist) to exclude ALL private
+// items. `viewerId` is used only to compute unread_count relative to the reader.
+// ---------------------------------------------------------------------------
+
+async function listEventsForCouple(
+  coupleId,
+  viewerId,
+  { privateVisibleTo = null, status = 'all', tag, limit = 50, offset = 0 } = {}
+) {
+  // WHERE-clause params only reference columns; viewerId is used solely by the
+  // unread_count subquery in the list query, so it is NOT part of the count
+  // query (passing an unreferenced param makes Postgres reject the bind).
+  const conds = ['e.couple_id = $1'];
+  const whereParams = [coupleId];
+  let i = 2;
+  if (privateVisibleTo) {
+    conds.push(`(e.is_private = FALSE OR e.created_by = $${i++})`);
+    whereParams.push(privateVisibleTo);
+  } else {
+    conds.push('e.is_private = FALSE');
+  }
+  if (status && status !== 'all') {
+    conds.push(`e.status = $${i++}`);
+    whereParams.push(status);
+  }
+  if (tag) {
+    conds.push(`$${i++} = ANY(e.tags)`);
+    whereParams.push(tag);
+  }
+  const where = conds.join(' AND ');
+
+  const countResult = await db.query(`SELECT COUNT(*) FROM events e WHERE ${where}`, whereParams);
+  const total = parseInt(countResult.rows[0].count, 10);
+
+  // List query appends viewerId (unread_count), then limit + offset.
+  const listParams = [...whereParams];
+  const viewerIdx = listParams.push(viewerId);
+  const limitIdx = listParams.push(parseInt(limit, 10));
+  const offsetIdx = listParams.push(parseInt(offset, 10));
+  const listResult = await db.query(
+    `SELECT e.*,
+            (SELECT content FROM event_messages m WHERE m.event_id = e.id
+               ORDER BY m.created_at DESC LIMIT 1) AS last_message_preview,
+            (SELECT COUNT(*) FROM event_messages m
+               WHERE m.event_id = e.id AND m.sender_id <> $${viewerIdx} AND m.read_at IS NULL)::int AS unread_count
+     FROM events e
+     WHERE ${where}
+     ORDER BY e.created_at DESC
+     LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+    listParams
+  );
+
+  const events = listResult.rows.map((row) =>
+    serializeEvent(row, {
+      last_message_preview: row.last_message_preview,
+      unread_count: row.unread_count || 0,
+    })
+  );
+  return { events, total };
+}
+
+// One event (with full message log) scoped to a couple, applying the privacy
+// rule. Returns a serialized event or null when it isn't visible to the viewer.
+async function getEventDetailForCouple(eventId, coupleId, { privateVisibleTo = null } = {}) {
+  const result = await db.query(
+    `SELECT * FROM events WHERE id = $1 AND couple_id = $2`,
+    [eventId, coupleId]
+  );
+  const event = result.rows[0];
+  if (!event) return null;
+  if (event.is_private && event.created_by !== privateVisibleTo) return null;
+
+  const messagesResult = await db.query(
+    `SELECT * FROM event_messages WHERE event_id = $1 ORDER BY created_at ASC`,
+    [eventId]
+  );
+  return serializeEvent(event, { messages: messagesResult.rows.map(serializeMessage) });
+}
+
+// Insert a message and bump the event's updated_at. isTherapist flags a
+// dedicated-therapist message so the UI can render it distinctly.
+async function insertEventMessage(eventId, senderId, content, { isTherapist = false } = {}) {
+  const msgResult = await db.query(
+    `INSERT INTO event_messages (event_id, sender_id, content, is_therapist)
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [eventId, senderId, content, isTherapist]
+  );
+  await db.query(`UPDATE events SET updated_at = NOW() WHERE id = $1`, [eventId]);
+  return serializeMessage(msgResult.rows[0]);
 }
 
 function sendValidationError(req, res) {
@@ -406,7 +525,9 @@ router.post(
         await notify(
           couple.partner_id,
           'event_created',
-          '伴侶開啟了一個事件',
+          // Tone guideline (playbook R2): an invitation to understand, not an
+          // incident report —「分享了一個情境」not「開啟了一個事件」.
+          '伴侶分享了一個情境',
           event.title,
           eventId,
           userId,
@@ -424,7 +545,7 @@ router.post(
       });
     } catch (err) {
       logError('Create event failed', { err: err.message, stack: err.stack });
-      res.status(500).json({ success: false, message: '建立事件失敗' });
+      res.status(500).json({ success: false, message: '建立對話失敗' });
     }
   }
 );
@@ -528,6 +649,224 @@ router.get('/analytics', async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// Therapy Mode summary ("諮商摘要") — the between-sessions digest a couple can
+// bring INTO their next counseling session. Twogether is a Therapy Companion:
+// the therapist gets ~1 hour, the couple lives the other 167 — this hands the
+// therapist a ready summary so the session starts on the real issue.
+// ---------------------------------------------------------------------------
+
+async function ensureTherapySummariesTable() {
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS therapy_summaries (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        couple_id UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
+        period_days INTEGER NOT NULL,
+        input_hash VARCHAR(64) NOT NULL,
+        summary JSONB NOT NULL,
+        event_count INTEGER,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        UNIQUE (couple_id, input_hash)
+      );
+    `);
+    // event_count added later so past summaries can list "共 N 件事件" in history.
+    await db.query(
+      `ALTER TABLE therapy_summaries ADD COLUMN IF NOT EXISTS event_count INTEGER`
+    );
+  } catch (err) {
+    logWarn('ensureTherapySummariesTable failed', { err: err.message });
+  }
+}
+
+function periodLabelFor(days) {
+  return Number(days) === 14 ? '最近兩週' : `最近 ${days} 天`;
+}
+
+// GET /api/events/therapy-summary?days=14 — aggregate the couple's events over a
+// window into a shared, cached 諮商摘要. Generated once per (couple, event-set);
+// re-opens and the partner's view are free. Regenerates when events change.
+router.get(
+  '/therapy-summary',
+  [query('days').optional().isInt({ min: 7, max: 30 }).toInt()],
+  async (req, res) => {
+    if (sendValidationError(req, res)) return;
+    try {
+      const userId = req.user.id;
+      const days = req.query.days || 14;
+      const periodLabel = days === 14 ? '最近兩週' : `最近 ${days} 天`;
+
+      const couple = await getCoupleForUser(userId);
+      if (!couple) {
+        // Solo users have no partner events to summarise — an expected state,
+        // not a failure. Guide them to pairing (playbook: three-part gate).
+        return res.status(200).json({
+          success: false,
+          error_code: 'NOT_PAIRED',
+          message: '諮商摘要會整理你們兩人一起記錄的事件。先和另一半配對，累積幾件事後就能一鍵整理成帶去諮商的摘要。',
+        });
+      }
+      const coupleId = couple.couple_id;
+
+      const evResult = await db.query(
+        `SELECT id, title, summary, status, tags, emotions,
+                created_at, resolved_at, therapy_note, content_edited_at
+           FROM events
+          WHERE couple_id = $1
+            AND is_private = FALSE
+            AND created_at >= NOW() - ($2 || ' days')::interval
+          ORDER BY created_at ASC`,
+        [coupleId, String(days)]
+      );
+      const rows = evResult.rows;
+
+      if (rows.length === 0) {
+        // Empty window is expected (info), not an error — give a next step.
+        return res.status(200).json({
+          success: false,
+          error_code: 'NO_EVENTS',
+          message: `${periodLabel}還沒有可整理的事件。在「好好說話」記錄幾件最近發生的事，這裡就會幫你們整理成一份帶去諮商的摘要。`,
+        });
+      }
+
+      // Deterministic aggregates — hand the model counts so it narrates, not tallies.
+      const themeMap = new Map();
+      const emotionMap = new Map();
+      let repairedCount = 0;
+      let unresolvedCount = 0;
+      for (const r of rows) {
+        (r.tags || []).forEach((t) => themeMap.set(t, (themeMap.get(t) || 0) + 1));
+        (r.emotions || []).forEach((e) => emotionMap.set(e, (emotionMap.get(e) || 0) + 1));
+        if (r.status === 'resolved') repairedCount += 1;
+        else unresolvedCount += 1;
+      }
+      const sortDesc = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]);
+      const themeCounts = sortDesc(themeMap).map(([tag, count]) => ({ tag, count }));
+      const emotionCounts = sortDesc(emotionMap).map(([emotion, count]) => ({ emotion, count }));
+      const stats = { themeCounts, emotionCounts, repairedCount, unresolvedCount };
+
+      // Cache key: the event set + each event's mutable markers + window. Any
+      // change (new event, resolution, edited content, a new therapy note)
+      // busts the cache so the summary stays fresh, but re-opens are free.
+      const fingerprint = rows.map((r) => [
+        r.id,
+        r.status,
+        r.content_edited_at ? new Date(r.content_edited_at).getTime() : 0,
+        r.therapy_note ? 1 : 0,
+      ]);
+      const inputHash = aiCacheHash(['therapy_summary_v1', days, fingerprint]);
+
+      await ensureTherapySummariesTable();
+      const cached = await db.query(
+        `SELECT summary FROM therapy_summaries WHERE couple_id = $1 AND input_hash = $2`,
+        [coupleId, inputHash]
+      );
+      if (cached.rows[0]) {
+        return res.json({
+          success: true,
+          summary: cached.rows[0].summary,
+          period: { days, label: periodLabel, eventCount: rows.length },
+          cached: true,
+        });
+      }
+
+      // Fresh generation costs one AI credit (same budget as the therapy note).
+      const { tier, limit } = await resolveAiLimit(userId);
+      const usedToday = await countTodayAiUsage(userId);
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      if (!limitCheck.ok) {
+        logInfo('events.therapy_summary.limit', { userId, coupleId, used: usedToday, limit, tier, blocked: true });
+        return res.status(limitCheck.status).json(limitCheck.body);
+      }
+
+      logInfo('events.therapy_summary.generate', { userId, coupleId, days, eventCount: rows.length });
+
+      const events = rows.map((r) => ({
+        title: r.title,
+        summary: r.summary,
+        status: r.status,
+        tags: r.tags || [],
+        emotions: r.emotions || [],
+        createdAt: r.created_at,
+        resolvedAt: r.resolved_at,
+        therapyNote: r.therapy_note || null,
+      }));
+
+      const result = await llmService.generateTherapySummary({ periodLabel, events, stats });
+      const meta = result._meta;
+      delete result._meta;
+
+      logInfo('events.therapy_summary.cost', {
+        userId,
+        coupleId,
+        provider: meta?.provider,
+        model: meta?.model,
+        costUsd: meta?.costUsd,
+        durationMs: meta?.durationMs,
+      });
+
+      await recordAiUsage(userId, 'therapy_summary', `${periodLabel}・${rows.length} 件`, meta);
+      // Upsert so a racing partner request collapses onto the same row.
+      await db.query(
+        `INSERT INTO therapy_summaries (couple_id, period_days, input_hash, summary, event_count)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (couple_id, input_hash)
+           DO UPDATE SET summary = EXCLUDED.summary, event_count = EXCLUDED.event_count`,
+        [coupleId, days, inputHash, JSON.stringify(result), rows.length]
+      );
+
+      res.json({
+        success: true,
+        summary: result,
+        period: { days, label: periodLabel, eventCount: rows.length },
+      });
+    } catch (err) {
+      logError('Therapy summary failed', { err: err.message, stack: err.stack });
+      res.status(500).json({ success: false, message: '諮商摘要暫時無法產生，請稍後再試' });
+    }
+  }
+);
+
+// GET /api/events/therapy-summary/history — the couple's previously generated
+// 諮商摘要 snapshots, newest first. Every distinct event-set produced a cached
+// row (see the generate route); this exposes them so either partner can re-open
+// an earlier summary — the one they took to a past session — without spending an
+// AI credit to regenerate the same thing.
+router.get('/therapy-summary/history', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const couple = await getCoupleForUser(userId);
+    if (!couple) {
+      // Not an error: solo users simply have no shared history yet.
+      return res.json({ success: true, history: [] });
+    }
+
+    await ensureTherapySummariesTable();
+    const result = await db.query(
+      `SELECT id, period_days, event_count, summary, created_at
+         FROM therapy_summaries
+        WHERE couple_id = $1
+        ORDER BY created_at DESC
+        LIMIT 50`,
+      [couple.couple_id]
+    );
+
+    const history = result.rows.map((r) => ({
+      id: r.id,
+      periodDays: r.period_days,
+      periodLabel: periodLabelFor(r.period_days),
+      eventCount: r.event_count,
+      createdAt: r.created_at,
+      summary: r.summary,
+    }));
+
+    res.json({ success: true, history });
+  } catch (err) {
+    logError('Therapy summary history failed', { err: err.message, stack: err.stack });
+    res.status(500).json({ success: false, message: '無法載入諮商摘要紀錄，請稍後再試' });
+  }
+});
+
 // List events for caller's couple
 router.get(
   '/',
@@ -546,49 +885,18 @@ router.get(
 
       const { status = 'all', tag, limit = 50, offset = 0 } = req.query;
 
-      const conds = ['e.couple_id = $1', '(e.is_private = FALSE OR e.created_by = $2)'];
-      const params = [couple.couple_id, userId];
-      let i = 3;
-      if (status !== 'all') {
-        conds.push(`e.status = $${i++}`);
-        params.push(status);
-      }
-      if (tag) {
-        conds.push(`$${i++} = ANY(e.tags)`);
-        params.push(tag);
-      }
-
-      const where = conds.join(' AND ');
-
-      const countResult = await db.query(`SELECT COUNT(*) FROM events e WHERE ${where}`, params);
-      const total = parseInt(countResult.rows[0].count, 10);
-
-      params.push(parseInt(limit, 10), parseInt(offset, 10));
-
-      const listResult = await db.query(
-        `SELECT e.*,
-                (SELECT content FROM event_messages m WHERE m.event_id = e.id
-                   ORDER BY m.created_at DESC LIMIT 1) AS last_message_preview,
-                (SELECT COUNT(*) FROM event_messages m
-                   WHERE m.event_id = e.id AND m.sender_id <> $2 AND m.read_at IS NULL)::int AS unread_count
-         FROM events e
-         WHERE ${where}
-         ORDER BY e.created_at DESC
-         LIMIT $${i++} OFFSET $${i++}`,
-        params
-      );
-
-      const events = listResult.rows.map((row) =>
-        serializeEvent(row, {
-          last_message_preview: row.last_message_preview,
-          unread_count: row.unread_count || 0,
-        })
-      );
+      const { events, total } = await listEventsForCouple(couple.couple_id, userId, {
+        privateVisibleTo: userId,
+        status,
+        tag,
+        limit,
+        offset,
+      });
 
       res.json({ success: true, events, total });
     } catch (err) {
       logError('List events failed', { err: err.message, stack: err.stack });
-      res.status(500).json({ success: false, message: '無法取得事件列表' });
+      res.status(500).json({ success: false, message: '無法取得對話列表' });
     }
   }
 );
@@ -598,25 +906,19 @@ router.get('/:id', [param('id').isUUID()], async (req, res) => {
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
-    if (access.event.is_private && access.event.created_by !== req.user.id) {
-      return res.status(403).json({ success: false, message: '此為私人事件' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
+
+    const event = await getEventDetailForCouple(req.params.id, access.coupleId, {
+      privateVisibleTo: req.user.id,
+    });
+    if (!event) {
+      return res.status(403).json({ success: false, message: '此為私人對話' });
     }
 
-    const messagesResult = await db.query(
-      `SELECT * FROM event_messages WHERE event_id = $1 ORDER BY created_at ASC`,
-      [req.params.id]
-    );
-
-    res.json({
-      success: true,
-      event: serializeEvent(access.event, {
-        messages: messagesResult.rows.map(serializeMessage),
-      }),
-    });
+    res.json({ success: true, event });
   } catch (err) {
     logError('Get event failed', { err: err.message, stack: err.stack });
-    res.status(500).json({ success: false, message: '無法取得事件詳情' });
+    res.status(500).json({ success: false, message: '無法取得對話詳情' });
   }
 });
 
@@ -643,18 +945,18 @@ router.patch(
       }
 
       const access = await assertEventAccess(req.params.id, userId);
-      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
       if (access.event.created_by !== userId) {
         return res.status(403).json({
           success: false,
-          message: '只有發起人可以編輯事件內容',
+          message: '只有發起人可以編輯對話內容',
           error_code: 'NOT_EVENT_CREATOR',
         });
       }
       if (access.event.status === 'resolved') {
         return res.status(400).json({
           success: false,
-          message: '此事件已解決，無法編輯',
+          message: '這段對話已完成，無法編輯',
           error_code: 'EVENT_RESOLVED',
         });
       }
@@ -679,7 +981,7 @@ router.patch(
       res.json({ success: true, event: serializeEvent(result.rows[0]) });
     } catch (err) {
       logError('Edit event failed', { err: err.message, stack: err.stack });
-      res.status(500).json({ success: false, message: '編輯事件失敗，請稍後再試' });
+      res.status(500).json({ success: false, message: '編輯對話失敗，請稍後再試' });
     }
   }
 );
@@ -698,18 +1000,18 @@ router.patch(
     try {
       const userId = req.user.id;
       const access = await assertEventAccess(req.params.id, userId);
-      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
       if (access.event.is_private) {
         return res.status(403).json({
           success: false,
-          message: '私人事件無法編輯訊息',
+          message: '私人對話無法編輯訊息',
           error_code: 'PRIVATE_EVENT',
         });
       }
       if (access.event.status === 'resolved') {
         return res.status(400).json({
           success: false,
-          message: '此事件已解決，無法編輯訊息',
+          message: '這段對話已完成，無法編輯訊息',
           error_code: 'EVENT_RESOLVED',
         });
       }
@@ -769,27 +1071,20 @@ router.post(
     if (sendValidationError(req, res)) return;
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
-      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
       if (access.event.is_private) {
-        return res.status(403).json({ success: false, message: '私人事件無法新增訊息' });
+        return res.status(403).json({ success: false, message: '私人對話無法新增訊息' });
       }
       if (access.event.status === 'resolved') {
-        return res.status(400).json({ success: false, message: '此事件已解決，無法新增訊息' });
+        return res.status(400).json({ success: false, message: '這段對話已完成，無法新增訊息' });
       }
 
-      const msgResult = await db.query(
-        `INSERT INTO event_messages (event_id, sender_id, content)
-         VALUES ($1, $2, $3) RETURNING *`,
-        [req.params.id, req.user.id, req.body.content]
-      );
-
-      // Touch updated_at so list ordering reflects activity
-      await db.query(`UPDATE events SET updated_at = NOW() WHERE id = $1`, [req.params.id]);
+      const message = await insertEventMessage(req.params.id, req.user.id, req.body.content);
 
       await notify(
         access.partnerId,
         'event_reply',
-        '伴侶在事件中回覆',
+        '伴侶回覆了你們的對話',
         access.event.title,
         req.params.id,
         req.user.id,
@@ -797,7 +1092,7 @@ router.post(
         req.body.content
       );
 
-      res.status(201).json({ success: true, message: serializeMessage(msgResult.rows[0]) });
+      res.status(201).json({ success: true, message });
     } catch (err) {
       logError('Post event message failed', { err: err.message, stack: err.stack });
       res.status(500).json({ success: false, message: '無法新增訊息' });
@@ -817,9 +1112,9 @@ router.post(
     if (sendValidationError(req, res)) return;
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
-      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
       if (access.event.is_private) {
-        return res.status(403).json({ success: false, message: '私人事件不支援 AI 回覆改寫' });
+        return res.status(403).json({ success: false, message: '私人對話不支援 AI 回覆改寫' });
       }
 
       const userId = req.user.id;
@@ -827,11 +1122,14 @@ router.post(
       logInfo('events.reply_rewrite.input', { userId, eventId: req.params.id, len: rawReply.length, raw: rawReply });
 
       // Shares the daily AI budget with the icebreaker (both hit the paid LLM).
-      const { tier, limit } = await resolveAiLimit(userId);
+      const { tier, limit, coupleId } = await resolveAiLimit(userId);
       const usedToday = await countTodayAiUsage(userId);
       const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
       if (!limitCheck.ok) {
-        logInfo('events.reply_rewrite.limit', { userId, used: usedToday, limit, tier, blocked: true });
+        // Include the per-kind breakdown so a block can be attributed to the
+        // right feature (改寫 vs 角色扮演 vs 諮商師…) directly from the logs.
+        const { byKind } = await countTodayAiUsageByKind(userId);
+        logInfo('events.reply_rewrite.limit', { userId, coupleId, used: usedToday, limit, tier, byKind, blocked: true });
         return res.status(limitCheck.status).json(limitCheck.body);
       }
 
@@ -977,9 +1275,9 @@ router.post(
     if (sendValidationError(req, res)) return;
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
-      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
       if (access.event.is_private) {
-        return res.status(403).json({ success: false, message: '私人事件不支援 AI 接住情緒建議' });
+        return res.status(403).json({ success: false, message: '私人對話不支援 AI 接住情緒建議' });
       }
 
       const userId = req.user.id;
@@ -1054,9 +1352,9 @@ router.post('/:id/ai-comment/preview', [param('id').isUUID()], async (req, res) 
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     if (access.event.is_private) {
-      return res.status(403).json({ success: false, message: '私人事件無法邀請 AI 諮商師' });
+      return res.status(403).json({ success: false, message: '私人對話無法邀請 AI 諮商師' });
     }
 
     const userId = req.user.id;
@@ -1134,12 +1432,12 @@ router.post(
     if (sendValidationError(req, res)) return;
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
-      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
       if (access.event.is_private) {
-        return res.status(403).json({ success: false, message: '私人事件無法新增訊息' });
+        return res.status(403).json({ success: false, message: '私人對話無法新增訊息' });
       }
       if (access.event.status === 'resolved') {
-        return res.status(400).json({ success: false, message: '此事件已解決，無法新增訊息' });
+        return res.status(400).json({ success: false, message: '這段對話已完成，無法新增訊息' });
       }
 
       const companion = await getUserCompanion(req.user.id);
@@ -1155,7 +1453,7 @@ router.post(
       await notify(
         access.partnerId,
         'event_ai_comment',
-        `AI 諮商師 ${companion.name} 在事件中留言`,
+        `AI 諮商師 ${companion.name} 在對話中留言`,
         access.event.title,
         req.params.id,
         req.user.id,
@@ -1185,9 +1483,9 @@ router.patch(
     if (sendValidationError(req, res)) return;
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
-      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
       if (access.event.is_private) {
-        return res.status(403).json({ success: false, message: '私人事件無法開啟情緒翻譯', error_code: 'PRIVATE_EVENT' });
+        return res.status(403).json({ success: false, message: '私人對話無法開啟情緒翻譯', error_code: 'PRIVATE_EVENT' });
       }
       const enabled = req.body.enabled === true;
       await db.query(`UPDATE events SET translation_enabled = $2 WHERE id = $1`, [req.params.id, enabled]);
@@ -1208,9 +1506,9 @@ router.get('/:id/translations', [param('id').isUUID()], async (req, res) => {
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     if (access.event.is_private) {
-      return res.status(403).json({ success: false, message: '私人事件無法使用情緒翻譯', error_code: 'PRIVATE_EVENT' });
+      return res.status(403).json({ success: false, message: '私人對話無法使用情緒翻譯', error_code: 'PRIVATE_EVENT' });
     }
     const userId = req.user.id;
 
@@ -1236,6 +1534,13 @@ router.get('/:id/translations', [param('id').isUUID()], async (req, res) => {
     for (const row of cachedRows) translations[row.message_id] = row.translation;
 
     const missing = humanIds.filter((id) => !translations[id]);
+    logInfo('events.translation.request', {
+      userId,
+      eventId: req.params.id,
+      humanMessages: humanIds.length,
+      cached: cachedRows.length,
+      missing: missing.length,
+    });
 
     if (missing.length > 0) {
       const { tier, limit } = await resolveAiLimit(userId);
@@ -1273,10 +1578,13 @@ router.get('/:id/translations', [param('id').isUUID()], async (req, res) => {
 
       await recordAiUsage(userId, 'need_translation', access.event.summary, meta);
 
+      let saved = 0;
+      const unmatched = [];
       for (const t of result.translations || []) {
-        if (!missing.includes(t.id)) continue;
+        if (!missing.includes(t.id)) { unmatched.push(t.id); continue; }
         const payload = { emotions: t.emotions || [], need: t.need || '', rewrite: t.rewrite || '' };
         translations[t.id] = payload;
+        saved += 1;
         try {
           await db.query(
             `INSERT INTO message_need_translations (surface, message_id, couple_id, translation)
@@ -1288,8 +1596,23 @@ router.get('/:id/translations', [param('id').isUUID()], async (req, res) => {
           logWarn('save event translation failed', { messageId: t.id, err: err.message });
         }
       }
+      // If saved < missing, some requested messages came back unusable — this is
+      // the signal for a "toggle on but nothing renders" report.
+      logInfo('events.translation.saved', {
+        userId,
+        eventId: req.params.id,
+        requested: missing.length,
+        returned: (result.translations || []).length,
+        saved,
+        unmatched,
+      });
     }
 
+    logInfo('events.translation.respond', {
+      userId,
+      eventId: req.params.id,
+      returnedKeys: Object.keys(translations).length,
+    });
     res.json({ success: true, translations });
   } catch (err) {
     logError('Get event translations failed', { err: err.message, stack: err.stack, eventId: req.params.id });
@@ -1308,14 +1631,14 @@ router.get('/:id/therapy-note', [param('id').isUUID()], async (req, res) => {
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     if (access.event.is_private) {
-      return res.status(403).json({ success: false, message: '私人事件沒有治療摘要', error_code: 'PRIVATE_EVENT' });
+      return res.status(403).json({ success: false, message: '私人對話沒有治療摘要', error_code: 'PRIVATE_EVENT' });
     }
     if (access.event.status !== 'resolved') {
       return res.status(400).json({
         success: false,
-        message: '事件解決後，AI 才會為你們整理這次衝突的治療摘要。',
+        message: '對話結束後，AI 才會為你們整理這次衝突的治療摘要。',
         error_code: 'EVENT_NOT_RESOLVED',
       });
     }
@@ -1384,7 +1707,7 @@ router.put(
     if (sendValidationError(req, res)) return;
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
-      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
 
       const result = await db.query(
         `UPDATE event_messages
@@ -1402,9 +1725,62 @@ router.put(
   }
 );
 
+// Turn a private (solo) conversation into a shared one so the partner can see
+// it. Only the author can do this, and it's one-way — once the partner can see
+// it there's no taking it back. This is the first step of the two-stage share
+// flow: private → shared (partner sees it) → optionally 匿名公開到公開問答.
+router.post('/:id/share-with-partner', [param('id').isUUID()], async (req, res) => {
+  if (sendValidationError(req, res)) return;
+  try {
+    const access = await assertEventAccess(req.params.id, req.user.id);
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
+    if (!access.event.is_private) {
+      return res.status(400).json({
+        success: false,
+        error_code: 'ALREADY_SHARED',
+        message: '這段對話伴侶已經看得到了。',
+      });
+    }
+    if (access.event.created_by !== req.user.id) {
+      return res.status(403).json({
+        success: false,
+        error_code: 'PRIVATE_EVENT_NOT_AUTHOR',
+        message: '這是對方的私人對話，只有建立者可以決定要不要讓你看得到。',
+      });
+    }
+    const result = await db.query(
+      `UPDATE events SET is_private = FALSE, updated_at = NOW() WHERE id = $1 RETURNING *`,
+      [req.params.id]
+    );
+    const event = result.rows[0];
+    // Let the partner know, mirroring a freshly-shared event's invitation tone.
+    await notify(
+      access.partnerId,
+      'event_created',
+      '伴侶分享了一個情境',
+      event.title,
+      event.id,
+      req.user.id,
+      2,
+      event.summary
+    );
+    logInfo('events.shared_with_partner', { userId: req.user.id, eventId: req.params.id });
+    res.json({
+      success: true,
+      message: '已讓伴侶看得到這段對話，你們可以一起討論了。',
+      event: serializeEvent(event),
+    });
+  } catch (err) {
+    logError('Share event with partner failed', { err: err.message, stack: err.stack, eventId: req.params.id });
+    res.status(500).json({ success: false, message: '分享失敗，請稍後再試' });
+  }
+});
+
 // Share an event thread into the public 公開問答 (anonymised, read-only). Either
 // partner can publish their couple's event; a single-party toggle with an
-// in-app warning on the client. Private events can't be shared (no shared thread).
+// in-app warning on the client. A private (solo) event must first be shared
+// with the partner (POST /:id/share-with-partner) before it can be published —
+// the public thread anonymises both participants, so it needs a shared thread.
 router.post(
   '/:id/publish',
   [param('id').isUUID(), body('title').optional().isString().isLength({ max: 200 })],
@@ -1412,9 +1788,13 @@ router.post(
     if (sendValidationError(req, res)) return;
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
-      if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+      if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
       if (access.event.is_private) {
-        return res.status(400).json({ success: false, message: '私人事件無法公開分享' });
+        return res.status(400).json({
+          success: false,
+          error_code: 'PRIVATE_EVENT',
+          message: '請先讓伴侶看得到這段對話，才能匿名公開到公開問答。',
+        });
       }
       const title = (req.body.title && req.body.title.trim()) || access.event.title;
       const result = await db.query(
@@ -1443,7 +1823,7 @@ router.post('/:id/unpublish', [param('id').isUUID()], async (req, res) => {
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     const result = await db.query(
       `UPDATE events
           SET public_status = 'private', published_at = NULL
@@ -1468,12 +1848,12 @@ router.post('/:id/resolve-request', [param('id').isUUID()], async (req, res) => 
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     if (access.event.is_private) {
-      return res.status(400).json({ success: false, message: '私人事件不需雙方確認，請使用解決 API' });
+      return res.status(400).json({ success: false, message: '私人對話不需雙方確認，請使用解決 API' });
     }
     if (access.event.status !== 'open') {
-      return res.status(400).json({ success: false, message: '事件目前無法發起解決請求' });
+      return res.status(400).json({ success: false, message: '這段對話目前無法發起解決請求' });
     }
 
     const result = await db.query(
@@ -1488,7 +1868,7 @@ router.post('/:id/resolve-request', [param('id').isUUID()], async (req, res) => 
     await notify(
       access.partnerId,
       'event_resolve_request',
-      '伴侶希望標記事件為已解決',
+      '伴侶覺得可以一起劃下句點了',
       access.event.title,
       req.params.id,
       req.user.id
@@ -1506,9 +1886,9 @@ router.post('/:id/resolve-confirm', [param('id').isUUID()], async (req, res) => 
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     if (access.event.status !== 'resolve_pending') {
-      return res.status(400).json({ success: false, message: '事件目前不在等待確認的狀態' });
+      return res.status(400).json({ success: false, message: '這段對話目前不在等待確認的狀態' });
     }
     if (access.event.resolve_requested_by === req.user.id) {
       return res.status(400).json({ success: false, message: '需由另一方確認解決' });
@@ -1524,7 +1904,7 @@ router.post('/:id/resolve-confirm', [param('id').isUUID()], async (req, res) => 
     await notify(
       access.partnerId,
       'event_resolved',
-      '事件已解決',
+      '你們一起走過了這個情境',
       access.event.title,
       req.params.id,
       req.user.id
@@ -1542,12 +1922,12 @@ router.post('/:id/reopen', [param('id').isUUID()], async (req, res) => {
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     if (access.event.is_private) {
-      return res.status(400).json({ success: false, message: '私人事件無法重新開啟' });
+      return res.status(400).json({ success: false, message: '私人對話無法重新開啟' });
     }
     if (access.event.status !== 'resolved') {
-      return res.status(400).json({ success: false, message: '只有已解決的事件可以重新開啟' });
+      return res.status(400).json({ success: false, message: '只有已解決的對話可以重新開啟' });
     }
 
     const result = await db.query(
@@ -1565,7 +1945,8 @@ router.post('/:id/reopen', [param('id').isUUID()], async (req, res) => {
     await notify(
       access.partnerId,
       'event_reopened',
-      '伴侶重新開啟了一個事件',
+      // Tone guideline: 對話 over 事件.
+      '伴侶想繼續聊聊這個情境',
       access.event.title,
       req.params.id,
       req.user.id
@@ -1575,9 +1956,387 @@ router.post('/:id/reopen', [param('id').isUUID()], async (req, res) => {
     res.json({ success: true, event: serializeEvent(result.rows[0]) });
   } catch (err) {
     logError('Reopen event failed', { err: err.message, stack: err.stack });
-    res.status(500).json({ success: false, message: '無法重新開啟事件' });
+    res.status(500).json({ success: false, message: '無法重新開啟對話' });
+  }
+});
+
+// ===========================================================================
+// Therapist Mode ("引導模式") — facilitated, turn-based therapy sessions.
+// The companion joins the event thread as a third participant, runs one small
+// exercise "card" at a time, waits for the right partner, and scores responses.
+// Additive: the one-shot "請 AI 諮商師加入" advice route above stays as-is.
+// ===========================================================================
+
+// Stable A/B roles: A = the event creator, B = the partner. Used so the model
+// (and turn tracking) can address "先請 A / 換 B" consistently.
+async function loadFacilitationPartners(event) {
+  const r = await db.query(
+    `SELECT u.id, u.nickname, u.gender
+       FROM couples c JOIN users u ON u.id IN (c.user1_id, c.user2_id)
+      WHERE c.id = $1`,
+    [event.couple_id]
+  );
+  const byId = new Map(r.rows.map((row) => [row.id, row]));
+  const a = byId.get(event.created_by) || null;
+  const bRow = r.rows.find((row) => row.id !== event.created_by) || null;
+  return {
+    A: a ? { id: a.id, name: a.nickname, gender: a.gender || null } : { id: event.created_by, name: '夥伴 A', gender: null },
+    B: bRow ? { id: bRow.id, name: bRow.nickname, gender: bRow.gender || null } : null,
+  };
+}
+
+function roleOfUser(userId, partners) {
+  if (partners.A && userId === partners.A.id) return 'A';
+  if (partners.B && userId === partners.B.id) return 'B';
+  return null;
+}
+
+function targetUserId(target, partners) {
+  if (target === 'A') return partners.A?.id || null;
+  if (target === 'B') return partners.B?.id || null;
+  return null; // 'both' → either partner may act next
+}
+
+// Recent thread as A/B/facilitator turns for the generator.
+async function loadFacilitationThread(eventId, partners, limit = 16) {
+  const r = await db.query(
+    `SELECT sender_id, content, is_ai FROM event_messages
+      WHERE event_id = $1 ORDER BY created_at DESC LIMIT $2`,
+    [eventId, limit]
+  );
+  return r.rows.reverse().map((m) => ({
+    role: m.is_ai === true ? 'facilitator' : (roleOfUser(m.sender_id, partners) || 'A'),
+    content: m.content,
+  }));
+}
+
+// Shape a session row for the frontend (scoreboard + turn state). Only what the
+// UI consumes — raw skill accounting and card-id lists stay server-side.
+function serializeSession(row) {
+  if (!row) return null;
+  return {
+    status: row.status,
+    activeCardMeta: row.active_card ? cardMeta(row.active_card) : null,
+    turnOwner: row.turn_owner || null,
+    completedCardsMeta: (row.completed_cards || []).map(cardMeta).filter(Boolean),
+    skillScore: scoreSession(row.skill_scores || {}),
+  };
+}
+
+async function getSessionRow(eventId) {
+  const r = await db.query(`SELECT * FROM event_facilitation_sessions WHERE event_id = $1`, [eventId]);
+  return r.rows[0] || null;
+}
+
+// Persist an AI facilitator turn as an event message (say = content, structured
+// turn in the facilitation JSONB) and notify the partner it's addressed to.
+async function postFacilitatorTurn(eventId, userId, companion, turn, partners) {
+  const targetId = targetUserId(turn.target, partners);
+  const payload = {
+    card: turn.card,
+    cardMeta: turn.cardMeta,
+    target: turn.target,
+    targetUserId: targetId,
+    instruction: turn.instruction,
+    quickReplies: turn.quickReplies || [],
+    evaluation: turn.evaluation || null,
+    // The evaluation grades the PREVIOUS exercise; name it so the badge can't
+    // be misread as grading the new card.
+    evaluatedCardMeta: turn.evaluatedCardMeta || null,
+    sessionDone: turn.sessionDone === true,
+  };
+  const content = turn.say || turn.instruction || '';
+  const msg = await db.query(
+    `INSERT INTO event_messages (event_id, sender_id, content, is_ai, ai_therapist, facilitation)
+     VALUES ($1, $2, $3, TRUE, $4, $5) RETURNING *`,
+    [eventId, userId, content, companion.id, JSON.stringify(payload)]
+  );
+  await db.query(`UPDATE events SET updated_at = NOW() WHERE id = $1`, [eventId]);
+  return msg.rows[0];
+}
+
+// Shared guard for the two AI-producing facilitation routes. Each rejection is
+// logged so Cloud Logging shows how often users hit these walls, not just when
+// the feature succeeds.
+async function facilitationPreflight(access, res, userId) {
+  const blocked = (reason) =>
+    logInfo('events.facilitation.blocked', { userId, eventId: access.event.id, reason });
+  if (access.event.is_private) {
+    blocked('private_event');
+    res.status(403).json({ success: false, message: '私人對話無法使用引導模式', error_code: 'PRIVATE_EVENT' });
+    return false;
+  }
+  if (access.event.status === 'resolved') {
+    blocked('event_resolved');
+    res.status(400).json({ success: false, message: '這段對話已完成，如需再談可先重新開啟對話', error_code: 'EVENT_RESOLVED' });
+    return false;
+  }
+  if (!access.partnerId) {
+    blocked('not_paired');
+    res.status(400).json({
+      success: false,
+      message: '引導模式需要兩個人一起練習。先邀請另一半配對，配對後就能一起進行；在那之前，你仍可用「請 AI 諮商師加入」聽聽建議。',
+      error_code: 'NOT_PAIRED',
+    });
+    return false;
+  }
+  return true;
+}
+
+// GET the current session state + scoreboard (null when none started).
+router.get('/:id/facilitation', [param('id').isUUID()], async (req, res) => {
+  if (sendValidationError(req, res)) return;
+  try {
+    const access = await assertEventAccess(req.params.id, req.user.id);
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
+    const row = await getSessionRow(req.params.id);
+    res.json({ success: true, session: serializeSession(row) });
+  } catch (err) {
+    logError('Get facilitation failed', { err: err.message, stack: err.stack, eventId: req.params.id });
+    res.status(500).json({ success: false, message: '無法載入引導進度，請稍後再試' });
+  }
+});
+
+// START (or resume) a facilitated session. Idempotent AND race-safe: the
+// session row is claimed (step_count = 0 marks an in-flight claim) BEFORE the
+// LLM call, so two partners tapping 開始引導 simultaneously produce one turn and
+// one charge — the loser resumes the winner's session for free.
+router.post('/:id/facilitation/start', [param('id').isUUID()], async (req, res) => {
+  if (sendValidationError(req, res)) return;
+  try {
+    const access = await assertEventAccess(req.params.id, req.user.id);
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
+    const userId = req.user.id;
+    if (!(await facilitationPreflight(access, res, userId))) return;
+
+    const { tier, limit } = await resolveAiLimit(userId);
+    const usedToday = await countTodayAiUsage(userId);
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    if (!limitCheck.ok) {
+      logInfo('events.facilitation.limit', { userId, eventId: req.params.id, used: usedToday, limit, tier, blocked: true });
+      return res.status(limitCheck.status).json(limitCheck.body);
+    }
+
+    // Claim the slot. No row back = a session row already exists.
+    let claim = (await db.query(
+      `INSERT INTO event_facilitation_sessions (event_id, status, step_count)
+       VALUES ($1, 'active', 0)
+       ON CONFLICT (event_id) DO NOTHING RETURNING *`,
+      [req.params.id]
+    )).rows[0];
+    if (!claim) {
+      const existing = await getSessionRow(req.params.id);
+      if (existing && existing.status === 'active') {
+        // Already running (or another request is mid-start): resume, no charge.
+        return res.json({ success: true, session: serializeSession(existing), message: null });
+      }
+      // Ended session: claim the restart. 0 rows = someone else just did.
+      claim = (await db.query(
+        `UPDATE event_facilitation_sessions
+            SET status = 'active', active_card = NULL, turn_owner = NULL,
+                completed_cards = '{}', skill_scores = '{}'::jsonb, step_count = 0,
+                started_at = NOW(), updated_at = NOW()
+          WHERE event_id = $1 AND status = 'ended' RETURNING *`,
+        [req.params.id]
+      )).rows[0];
+      if (!claim) {
+        const current = await getSessionRow(req.params.id);
+        return res.json({ success: true, session: serializeSession(current), message: null });
+      }
+    }
+
+    logInfo('events.facilitation.start', { userId, eventId: req.params.id });
+
+    let turn;
+    try {
+      const [partners, companion] = await Promise.all([
+        loadFacilitationPartners(access.event),
+        getUserCompanion(userId),
+      ]);
+      const thread = await loadFacilitationThread(req.params.id, partners);
+
+      turn = await llmService.generateFacilitatorTurn({
+        thread,
+        session: { activeCard: null, turnOwnerRole: null, completedCards: [], stepCount: 0 },
+        partners,
+        companion,
+        context: { summary: access.event.summary },
+      });
+      const meta = turn._meta;
+      delete turn._meta;
+
+      const turnOwner = targetUserId(turn.target, partners);
+      const status = turn.sessionDone ? 'ended' : 'active';
+      const sessionRow = (await db.query(
+        `UPDATE event_facilitation_sessions
+            SET status = $2, active_card = $3, turn_owner = $4, step_count = 1, updated_at = NOW()
+          WHERE event_id = $1 RETURNING *`,
+        [req.params.id, status, turn.card, turnOwner]
+      )).rows[0];
+
+      const aiMsg = await postFacilitatorTurn(req.params.id, userId, companion, turn, partners);
+      await recordAiUsage(userId, 'facilitation_turn', access.event.summary || '引導', meta);
+
+      logInfo('events.facilitation.cost', {
+        userId, eventId: req.params.id, phase: 'start',
+        provider: meta?.provider, model: meta?.model, costUsd: meta?.costUsd, durationMs: meta?.durationMs, card: turn.card,
+      });
+
+      await notify(
+        access.partnerId, 'event_ai_comment',
+        `${companion.name} 開始了一段引導練習`, access.event.title,
+        req.params.id, userId, 2, turn.say, companion.name
+      );
+
+      res.status(201).json({ success: true, session: serializeSession(sessionRow), message: serializeMessage(aiMsg) });
+    } catch (genErr) {
+      // Release the claim so a retry isn't stuck resuming an empty session.
+      await db.query(
+        `DELETE FROM event_facilitation_sessions WHERE event_id = $1 AND step_count = 0`,
+        [req.params.id]
+      ).catch(() => {});
+      throw genErr;
+    }
+  } catch (err) {
+    logError('Start facilitation failed', { err: err.message, stack: err.stack, eventId: req.params.id });
+    res.status(500).json({ success: false, message: '無法開始引導，請稍後再試' });
+  }
+});
+
+// ADVANCE the session: score the awaited partner's latest reply and produce the
+// next turn. Race-safe and no-op-safe: (a) when the latest thread entry is still
+// the facilitator's, nobody has responded — return current state without an LLM
+// call; (b) the step is claimed with an optimistic step_count check BEFORE the
+// LLM call, so two clients advancing simultaneously produce one turn, one charge.
+router.post('/:id/facilitation/next', [param('id').isUUID()], async (req, res) => {
+  if (sendValidationError(req, res)) return;
+  try {
+    const access = await assertEventAccess(req.params.id, req.user.id);
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
+    const userId = req.user.id;
+
+    const session = await getSessionRow(req.params.id);
+    if (!session || session.status !== 'active') {
+      return res.status(400).json({ success: false, message: '目前沒有進行中的引導', error_code: 'NO_SESSION' });
+    }
+    if (!(await facilitationPreflight(access, res, userId))) return;
+
+    const [partners, companion] = await Promise.all([
+      loadFacilitationPartners(access.event),
+      getUserCompanion(userId),
+    ]);
+    const thread = await loadFacilitationThread(req.params.id, partners);
+
+    // Only advance if the couple has actually responded since the last AI turn.
+    if (thread.length === 0 || thread[thread.length - 1].role === 'facilitator') {
+      return res.json({ success: true, session: serializeSession(session), message: null });
+    }
+
+    const { tier, limit } = await resolveAiLimit(userId);
+    const usedToday = await countTodayAiUsage(userId);
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    if (!limitCheck.ok) {
+      logInfo('events.facilitation.limit', { userId, eventId: req.params.id, used: usedToday, limit, tier, blocked: true });
+      return res.status(limitCheck.status).json(limitCheck.body);
+    }
+
+    // Claim this step: whoever bumps step_count first generates; the loser gets
+    // the winner's fresh state back instead of a second turn + second charge.
+    const claimed = (await db.query(
+      `UPDATE event_facilitation_sessions
+          SET step_count = step_count + 1, updated_at = NOW()
+        WHERE event_id = $1 AND step_count = $2 AND status = 'active' RETURNING *`,
+      [req.params.id, session.step_count]
+    )).rows[0];
+    if (!claimed) {
+      const current = await getSessionRow(req.params.id);
+      return res.json({ success: true, session: serializeSession(current), message: null });
+    }
+
+    const turnOwnerRole = session.turn_owner ? roleOfUser(session.turn_owner, partners) : null;
+    const turn = await llmService.generateFacilitatorTurn({
+      thread,
+      session: {
+        activeCard: session.active_card,
+        turnOwnerRole,
+        completedCards: session.completed_cards || [],
+        stepCount: session.step_count || 0,
+      },
+      partners,
+      companion,
+      context: { summary: access.event.summary },
+    });
+    const meta = turn._meta;
+    delete turn._meta;
+
+    // Grade the card the couple JUST practised (the session's active card), then
+    // mark it complete when the facilitator moves on to a different card.
+    // applyVerdict itself ignores non-evaluable cards.
+    let skillScores = session.skill_scores || {};
+    if (turn.evaluation && session.active_card) {
+      skillScores = applyVerdict(skillScores, session.active_card, turn.evaluation.verdict);
+      turn.evaluatedCardMeta = cardMeta(session.active_card);
+    }
+    const completed = session.completed_cards || [];
+    if (session.active_card && turn.card !== session.active_card && !completed.includes(session.active_card)) {
+      completed.push(session.active_card);
+    }
+
+    const turnOwner = targetUserId(turn.target, partners);
+    const status = turn.sessionDone ? 'ended' : 'active';
+    const sessionRow = (await db.query(
+      `UPDATE event_facilitation_sessions
+          SET status = $2, active_card = $3, turn_owner = $4, completed_cards = $5,
+              skill_scores = $6, updated_at = NOW()
+        WHERE event_id = $1 RETURNING *`,
+      [req.params.id, status, turn.card, turnOwner, completed, JSON.stringify(skillScores)]
+    )).rows[0];
+
+    const aiMsg = await postFacilitatorTurn(req.params.id, userId, companion, turn, partners);
+    await recordAiUsage(userId, 'facilitation_turn', access.event.summary || '引導', meta);
+
+    logInfo('events.facilitation.cost', {
+      userId, eventId: req.params.id, phase: 'next',
+      provider: meta?.provider, model: meta?.model, costUsd: meta?.costUsd, durationMs: meta?.durationMs,
+      card: turn.card, verdict: turn.evaluation?.verdict || null, done: turn.sessionDone,
+    });
+
+    await notify(
+      access.partnerId, 'event_ai_comment',
+      `${companion.name} 在引導練習中留言`, access.event.title,
+      req.params.id, userId, 2, turn.say, companion.name
+    );
+
+    res.status(201).json({ success: true, session: serializeSession(sessionRow), message: serializeMessage(aiMsg) });
+  } catch (err) {
+    logError('Advance facilitation failed', { err: err.message, stack: err.stack, eventId: req.params.id });
+    res.status(500).json({ success: false, message: '引導暫時無法繼續，請稍後再試' });
+  }
+});
+
+// END the session (no LLM, no quota).
+router.post('/:id/facilitation/end', [param('id').isUUID()], async (req, res) => {
+  if (sendValidationError(req, res)) return;
+  try {
+    const access = await assertEventAccess(req.params.id, req.user.id);
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
+    const row = (await db.query(
+      `UPDATE event_facilitation_sessions SET status = 'ended', updated_at = NOW()
+        WHERE event_id = $1 RETURNING *`,
+      [req.params.id]
+    )).rows[0];
+    logInfo('events.facilitation.end', { userId: req.user.id, eventId: req.params.id });
+    res.json({ success: true, session: serializeSession(row) });
+  } catch (err) {
+    logError('End facilitation failed', { err: err.message, stack: err.stack, eventId: req.params.id });
+    res.status(500).json({ success: false, message: '無法結束引導，請稍後再試' });
   }
 });
 
 module.exports = router;
 module.exports.TAG_VOCAB = TAG_VOCAB;
+// Reusable helpers for the dedicated-therapist endpoints (routes/therapists.js).
+module.exports.listEventsForCouple = listEventsForCouple;
+module.exports.getEventDetailForCouple = getEventDetailForCouple;
+module.exports.insertEventMessage = insertEventMessage;
+module.exports.notify = notify;

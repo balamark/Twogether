@@ -29,6 +29,8 @@ const eventRoutes = require('./routes/events');
 const aiCompanionRoutes = require('./routes/ai-companions');
 const aiUsageRoutes = require('./routes/ai-usage');
 const storyRoutes = require('./routes/stories');
+const pollRoutes = require('./routes/polls');
+const lineRoutes = require('./routes/line');
 const scriptFavoritesRoutes = require('./routes/script-favorites');
 const marketplaceRoutes = require('./routes/marketplace');
 const billingRoutes = require('./routes/billing');
@@ -128,6 +130,10 @@ app.use(helmet({
       // blob: is needed for URL.createObjectURL() previews (e.g. thumbnail
       // preview in the custom script upload/edit modal).
       imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
+      // Roleplay script cover videos are served from Supabase storage over
+      // https. Without an explicit media-src, <video> falls back to
+      // default-src 'self' and the browser blocks them.
+      mediaSrc: ["'self'", "data:", "blob:", "https:"],
       connectSrc: ["'self'", "https:"],
       // Allow the premium checkout form to POST to ECPay's hosted payment page.
       formAction: ["'self'", "https://payment-stage.ecpay.com.tw", "https://payment.ecpay.com.tw"]
@@ -143,7 +149,12 @@ if (['development', 'test'].includes(process.env.NODE_ENV)) {
   }));
 }
 
-app.use(bodyParser.json({ limit: '10mb' }));
+// Capture the raw JSON body so the LINE webhook can verify X-Line-Signature
+// against the exact bytes LINE signed.
+app.use(bodyParser.json({
+  limit: '10mb',
+  verify: (req, res, buf) => { req.rawBody = buf; },
+}));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
 // Establish per-request context (request id + trace id) before any logging so
@@ -190,6 +201,11 @@ app.use('/api/ai-companions', aiCompanionRoutes);
 app.use('/api/ai-usage', aiUsageRoutes);
 app.use('/api/stories', storyRoutes.router);
 app.use('/api/admin/stories', adminAuth, storyRoutes.adminRouter);
+app.use('/api/polls', pollRoutes.router);
+app.use('/api/admin/polls', adminAuth, pollRoutes.adminRouter);
+// LINE webhook (unauthenticated, signature-verified) + authed link/settings.
+app.post('/api/line/webhook', lineRoutes.webhookHandler);
+app.use('/api/line', lineRoutes.router);
 app.use('/api/script-favorites', scriptFavoritesRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 // Billing: /status + /checkout are JWT-protected inside the router; the

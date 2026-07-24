@@ -22,6 +22,11 @@ const adminRouter = express.Router();
 const VOTE_TYPES = ['helpful', 'resonate', 'repair_worked'];
 const REPORT_REASONS = ['inappropriate', 'spam', 'privacy', 'other'];
 const STORIES_PER_DAY = 3;
+const ARTICLES_PER_DAY = 5;
+// Plain-text shared-article body bounds (min high enough to be a real read,
+// max generous for a pasted long-read).
+const ARTICLE_BODY_MIN = 50;
+const ARTICLE_BODY_MAX = 8000;
 
 // Section metadata: DB column ↔ API key ↔ zh label (used in error messages).
 const SECTIONS = [
@@ -78,7 +83,10 @@ function summaryFromRow(row) {
   return {
     id: row.id,
     title: row.title,
-    preview: (row.section_context || '').slice(0, 120),
+    // Article previews come from the plain-text body; guided stories from the
+    // first template section.
+    kind: row.kind || 'story',
+    preview: (row.kind === 'article' ? (row.body || '') : (row.section_context || '')).slice(0, 120),
     tags: row.tags || [],
     authorName: row.show_nickname ? (row.author_nickname || '匿名') : '匿名',
     votes: {
@@ -101,6 +109,7 @@ router.get(
   [
     query('q').optional().isString().isLength({ max: 100 }),
     query('tag').optional().isString().isLength({ max: 16 }),
+    query('kind').optional().isIn(['story', 'article']),
     query('sort').optional().isIn(['latest', 'helpful', 'most_read']),
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 50 }),
@@ -108,7 +117,7 @@ router.get(
   async (req, res) => {
     if (sendValidationError(req, res)) return;
     try {
-      const { q, tag, sort = 'latest' } = req.query;
+      const { q, tag, kind, sort = 'latest' } = req.query;
       const page = parseInt(req.query.page || '1', 10);
       const limit = parseInt(req.query.limit || '12', 10);
       const offset = (page - 1) * limit;
@@ -121,18 +130,27 @@ router.get(
         conds.push(
           `(s.title ILIKE ${p} OR s.section_context ILIKE ${p} OR s.section_happened ILIKE ${p}
             OR s.section_impact ILIKE ${p} OR s.section_tried ILIKE ${p}
-            OR s.section_repair ILIKE ${p} OR s.section_now ILIKE ${p})`
+            OR s.section_repair ILIKE ${p} OR s.section_now ILIKE ${p}
+            OR s.body ILIKE ${p} OR s.source_author ILIKE ${p})`
         );
       }
       if (tag) {
         params.push(tag);
         conds.push(`$${params.length} = ANY(s.tags)`);
       }
+      if (kind) {
+        params.push(kind);
+        conds.push(`s.kind = $${params.length}`);
+      }
       const where = conds.join(' AND ');
 
       const orderBy = {
         latest: 's.created_at DESC',
-        helpful: '(helpful_count + resonate_count + repair_count) DESC, s.created_at DESC',
+        // Total votes = one row per vote in the joined story_votes. Must be the
+        // raw aggregate, not the SELECT aliases: Postgres resolves bare
+        // identifiers inside an ORDER BY expression as input columns, so
+        // "(helpful_count + ...)" throws `column "helpful_count" does not exist`.
+        helpful: 'COUNT(v.id) DESC, s.created_at DESC',
         most_read: 's.view_count DESC, s.created_at DESC',
       }[sort];
 
@@ -157,7 +175,9 @@ router.get(
       // time (no cron). Only on the default first page so it stays a shelf,
       // not a duplicate of filtered results.
       let featured;
-      if (page === 1 && !q && !tag) {
+      if (page === 1 && !q && !tag && !kind) {
+        // 本週精選 stays a story-only editorial shelf so a shared article can't
+        // dominate the "repair story of the week".
         const featuredResult = await db.query(
           `SELECT s.*, u.nickname AS author_nickname,
                   ${VOTE_COUNT_SELECT},
@@ -168,7 +188,7 @@ router.get(
              FROM relationship_stories s
              JOIN users u ON u.id = s.author_id
              LEFT JOIN story_votes v ON v.story_id = s.id
-            WHERE s.status = 'published'
+            WHERE s.status = 'published' AND s.kind = 'story'
             GROUP BY s.id, u.nickname
            HAVING (SELECT COUNT(*) FROM story_votes wv
                     WHERE wv.story_id = s.id AND wv.created_at >= NOW() - INTERVAL '7 days') > 0
@@ -297,6 +317,12 @@ router.get('/:id', optionalAuth, [param('id').isUUID()], async (req, res) => {
       story: {
         id: row.id,
         title: row.title,
+        kind: row.kind || 'story',
+        // Articles carry a plain-text body + optional attribution instead of
+        // the six guided sections (which are null for articles).
+        body: row.body || null,
+        sourceUrl: row.source_url || null,
+        sourceAuthor: row.source_author || null,
         sections: {
           context: row.section_context,
           happened: row.section_happened,
@@ -505,6 +531,83 @@ router.post(
     } catch (err) {
       logError('Publish story failed', { err: err.message, stack: err.stack });
       res.status(500).json({ success: false, message: '發表失敗，請稍後再試' });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Share a good article you found (好文分享): plain text, stored verbatim as
+// `body`. Rides the same list/detail/votes/comments/reports machinery as guided
+// stories (kind='article'); no AI split, no template. Post-moderation only
+// (reports + admin hide) — v1 has no LLM toxicity pre-check for articles.
+// ---------------------------------------------------------------------------
+router.post(
+  '/article',
+  authenticateToken,
+  [
+    body('title').isString().trim().isLength({ min: 4, max: 120 })
+      .withMessage('標題需在 4 到 120 字之間'),
+    body('body').isString().trim().isLength({ min: ARTICLE_BODY_MIN, max: ARTICLE_BODY_MAX })
+      .withMessage(`文章內容需在 ${ARTICLE_BODY_MIN} 到 ${ARTICLE_BODY_MAX} 字之間`),
+    body('sourceUrl').optional({ values: 'falsy' }).isURL().withMessage('原文連結格式不正確，請貼上完整網址')
+      .isLength({ max: 500 }),
+    body('sourceAuthor').optional({ values: 'falsy' }).isString().trim().isLength({ max: 120 }),
+    body('tags').optional().isArray({ max: 5 }),
+    body('tags.*').optional().isString().isLength({ min: 1, max: 16 }),
+  ],
+  async (req, res) => {
+    if (sendValidationError(req, res)) return;
+    try {
+      const userId = req.user.id;
+      const articleBody = req.body.body.toString().trim();
+
+      // Anti-spam: articles get their OWN daily cap so sharing a read doesn't
+      // consume a story slot (or vice-versa). Specific error_code so the UI can
+      // surface the exact reason (CLAUDE.md messaging rule).
+      const todayCount = await db.query(
+        `SELECT COUNT(*)::int AS n FROM relationship_stories
+          WHERE author_id = $1 AND kind = 'article'
+            AND created_at >= NOW() - INTERVAL '24 hours'
+            AND status <> 'deleted'`,
+        [userId]
+      );
+      if (todayCount.rows[0].n >= ARTICLES_PER_DAY) {
+        logInfo('article.limit', { userId, used: todayCount.rows[0].n });
+        return res.status(429).json({
+          success: false,
+          message: `每天最多分享 ${ARTICLES_PER_DAY} 篇好文，明天再回來分享吧`,
+          error_code: 'ARTICLE_DAILY_LIMIT',
+        });
+      }
+
+      // Anonymity snapshot at publish time (same rule as stories).
+      const pref = await db.query(
+        `SELECT public_share_show_nickname FROM users WHERE id = $1`,
+        [userId]
+      );
+      const showNickname = pref.rows[0]?.public_share_show_nickname !== false;
+
+      const tags = (req.body.tags || []).map((t) => t.toString().trim()).filter(Boolean).slice(0, 5);
+      const sourceUrl = (req.body.sourceUrl || '').toString().trim() || null;
+      const sourceAuthor = (req.body.sourceAuthor || '').toString().trim() || null;
+
+      const insert = await db.query(
+        `INSERT INTO relationship_stories (
+           author_id, title, kind, body, source_url, source_author, tags, show_nickname
+         ) VALUES ($1,$2,'article',$3,$4,$5,$6,$7)
+         RETURNING *`,
+        [userId, req.body.title.trim(), articleBody, sourceUrl, sourceAuthor, tags, showNickname]
+      );
+      const article = insert.rows[0];
+      logInfo('article.published', { userId, articleId: article.id, tags, showNickname, hasSource: !!sourceUrl });
+
+      res.status(201).json({
+        success: true,
+        story: { id: article.id, title: article.title, kind: 'article', createdAt: article.created_at },
+      });
+    } catch (err) {
+      logError('Publish article failed', { err: err.message, stack: err.stack });
+      res.status(500).json({ success: false, message: '分享失敗，請稍後再試' });
     }
   }
 );

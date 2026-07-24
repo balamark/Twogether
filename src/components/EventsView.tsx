@@ -79,7 +79,7 @@ export default function EventsView({
   if (!authState.isAuthenticated) {
     return (
       <div className="max-w-2xl mx-auto p-6 text-center text-petal-ink-soft">
-        <h2 className="text-2xl font-serif text-petal-ink mb-2">事件 × 由 AI 替你說</h2>
+        <h2 className="text-2xl font-serif text-petal-ink mb-2">對話 × 由 AI 替你說</h2>
         <p>請先登入才能使用此功能。</p>
       </div>
     );
@@ -117,7 +117,7 @@ export default function EventsView({
     <div className="max-w-4xl mx-auto p-4 md:p-6">
       <header className="mb-5">
         <h1 className="text-2xl md:text-3xl font-serif text-petal-ink mb-1 inline-flex items-center gap-1.5">
-          事件 × 由 AI 替你說
+          對話 × 由 AI 替你說
           <InfoHint viewId="events" />
         </h1>
         <p className="hidden sm:block text-sm text-petal-ink-soft">
@@ -134,7 +134,7 @@ export default function EventsView({
           active={view === 'compose'}
           onClick={() => setView('compose')}
           icon={Plus}
-          label="建立事件"
+          label="開始對話"
           primary
         />
         <TabButton active={view === 'analytics'} onClick={() => setView('analytics')} icon={BarChart3} label="分析" />
