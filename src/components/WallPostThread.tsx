@@ -8,6 +8,7 @@ import { useAiQuota } from '../hooks/useAiQuota';
 import AiQuotaHint from './AiQuotaHint';
 import MessageTranslationCard from './MessageTranslationCard';
 import ConflictBanner from './ConflictBanner';
+import ParticipantAvatar from './ParticipantAvatar';
 
 interface WallPostThreadProps {
   postId: string;
@@ -265,29 +266,34 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
             data-testid={`wall-reply-${reply.id}`}
           >
             <div className="flex items-start justify-between gap-2">
-              <div className="flex items-baseline gap-2">
+              <div className="flex items-center gap-2">
+                <ParticipantAvatar
+                  size="xs"
+                  role={isAi ? 'ai' : isTherapist ? 'therapist' : 'user'}
+                  companionId={reply.ai_therapist}
+                  colorKey={reply.author_id}
+                  name={
+                    isAi
+                      ? (companionName(reply.ai_therapist) || 'AI 諮商師')
+                      : isTherapist
+                        ? (reply.author_nickname || '心理師')
+                        : (reply.author_nickname || (isOwn ? '我' : '對方'))
+                  }
+                />
                 <span
                   className={
                     isAi
-                      ? 'font-display text-sm font-medium text-petal-rose-deep flex items-center gap-1'
+                      ? 'font-display text-sm font-medium text-petal-rose-deep'
                       : isTherapist
-                        ? 'font-display text-sm font-medium text-pink-700 flex items-center gap-1'
+                        ? 'font-display text-sm font-medium text-pink-700'
                         : 'font-display text-sm font-medium text-petal-ink'
                   }
                 >
-                  {isAi ? (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
-                      {companionName(reply.ai_therapist) ? `${companionName(reply.ai_therapist)}・AI 諮商師` : 'AI 諮商師'}
-                    </>
-                  ) : isTherapist ? (
-                    <>
-                      <HeartHandshake className="w-3.5 h-3.5" strokeWidth={1.5} />
-                      {reply.author_nickname ? `${reply.author_nickname}・心理師` : '專屬心理師'}
-                    </>
-                  ) : (
-                    reply.author_nickname || (isOwn ? '我' : '對方')
-                  )}
+                  {isAi
+                    ? (companionName(reply.ai_therapist) ? `${companionName(reply.ai_therapist)}・AI 諮商師` : 'AI 諮商師')
+                    : isTherapist
+                      ? (reply.author_nickname ? `${reply.author_nickname}・心理師` : '專屬心理師')
+                      : (reply.author_nickname || (isOwn ? '我' : '對方'))}
                 </span>
                 <span className="font-body text-[11px] text-petal-muted">
                   {formatTime(reply.created_at, tz)}

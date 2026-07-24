@@ -1,6 +1,7 @@
 import React from 'react';
-import { Sparkles, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import type { MessageFacilitation } from '../services/api';
+import ParticipantAvatar from './ParticipantAvatar';
 
 // One AI facilitator turn, rendered as a therapist "card" rather than a plain
 // bubble: a coloured card-label chip, what the therapist says, the one small
@@ -10,6 +11,7 @@ interface Props {
   facilitation: MessageFacilitation;
   say: string;
   companionLabel: string;
+  companionId?: string | null;
   isMyTurn: boolean;
   onQuickReply: (text: string) => void;
 }
@@ -31,15 +33,15 @@ const VERDICT: Record<string, { label: string; cls: string }> = {
   off: { label: '❌ 再試一次', cls: 'bg-petal-rose-soft/30 text-petal-rose-deep border-petal-rose-soft' },
 };
 
-const TherapistTurnCard: React.FC<Props> = ({ facilitation, say, companionLabel, isMyTurn, onQuickReply }) => {
+const TherapistTurnCard: React.FC<Props> = ({ facilitation, say, companionLabel, companionId, isMyTurn, onQuickReply }) => {
   const { cardMeta, instruction, quickReplies, evaluation, evaluatedCardMeta, sessionDone } = facilitation;
   const chip = (cardMeta && CHIP[cardMeta.color]) || CHIP.neutral;
 
   return (
     <div className="rounded-2xl border border-petal-rose-deep/25 bg-petal-cream p-4 space-y-3" data-testid="therapist-turn-card">
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="inline-flex items-center gap-1 font-body text-xs font-medium text-petal-rose-deep">
-          <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
+        <span className="inline-flex items-center gap-1.5 font-body text-xs font-medium text-petal-rose-deep">
+          <ParticipantAvatar size="xs" role="ai" companionId={companionId} name={companionLabel} />
           {companionLabel}
         </span>
         {cardMeta && (
