@@ -24,6 +24,7 @@ import TherapistProfileModal from './TherapistProfileModal';
 import TherapySummaryCard from './TherapySummaryCard';
 import DedicatedTherapistPanel from './DedicatedTherapistPanel';
 import TherapistClientsPanel from './TherapistClientsPanel';
+import ParticipantAvatar from './ParticipantAvatar';
 
 interface TherapistsViewProps {
   authState: {
@@ -1158,8 +1159,16 @@ const ChatRoom: React.FC<{
             thread.messages.map((m) => (
               <div key={m.id} className={`flex ${m.isMine ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[80%] ${m.isMine ? 'items-end' : 'items-start'} flex flex-col`}>
-                  <div className="font-body text-[11px] text-petal-muted mb-0.5 px-1">
-                    {m.isTherapist ? `🩺 ${m.senderName}（諮商師）` : m.senderName}
+                  <div className="flex items-center gap-1.5 mb-0.5 px-1">
+                    <ParticipantAvatar
+                      size="xs"
+                      role={m.isTherapist ? 'therapist' : 'user'}
+                      name={m.senderName}
+                      colorKey={m.senderId}
+                    />
+                    <span className="font-body text-[11px] text-petal-muted">
+                      {m.isTherapist ? `${m.senderName}（諮商師）` : m.senderName}
+                    </span>
                   </div>
                   {m.event && (
                     <div className="mb-1 px-3 py-2 rounded-lg bg-petal-cream-2 border border-petal-rule max-w-full">

@@ -10,6 +10,8 @@ import {
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { isVideoUrl } from '../utils/script';
+import { companionName } from '../utils/aiCompanions';
+import ParticipantAvatar from './ParticipantAvatar';
 
 // A dedicated therapist's read-only (or read+comment) view of ONE client
 // couple's 牆 and 好好說話. Private items are never returned by the API, so this
@@ -353,11 +355,24 @@ const ClientEventDetail: React.FC<{
               <p className="text-center font-body text-sm text-petal-muted py-6">這段對話還沒有訊息。</p>
             ) : (
               event.messages.map((m) => {
-                const who = m.isTherapist ? '🩺 心理師' : m.isAi ? 'AI 諮商師' : '伴侶';
+                const who = m.isTherapist
+                  ? '心理師'
+                  : m.isAi
+                    ? (companionName(m.aiTherapist) ? `${companionName(m.aiTherapist)}・AI 諮商師` : 'AI 諮商師')
+                    : '伴侶';
                 return (
                   <div key={m.id} className={`rounded-md px-3 py-1.5 ${m.isTherapist ? 'bg-pink-50 border border-pink-200' : 'bg-petal-cream-2'}`}>
-                    <div className="font-body text-[11px] text-petal-muted">{who}</div>
-                    <div className="font-body text-sm text-petal-ink whitespace-pre-wrap">{m.content}</div>
+                    <div className="flex items-center gap-1.5">
+                      <ParticipantAvatar
+                        size="xs"
+                        role={m.isTherapist ? 'therapist' : m.isAi ? 'ai' : 'user'}
+                        companionId={m.aiTherapist}
+                        colorKey={m.senderId}
+                        name={who}
+                      />
+                      <span className="font-body text-[11px] text-petal-muted">{who}</span>
+                    </div>
+                    <div className="font-body text-sm text-petal-ink whitespace-pre-wrap mt-0.5">{m.content}</div>
                   </div>
                 );
               })

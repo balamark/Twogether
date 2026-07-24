@@ -40,6 +40,7 @@ import { formatDateTime } from '../utils/datetime';
 import { companionName, resolveCompanion } from '../utils/aiCompanions';
 import { useAiQuota } from '../hooks/useAiQuota';
 import AiQuotaHint from './AiQuotaHint';
+import ParticipantAvatar from './ParticipantAvatar';
 
 interface NotificationInput {
   type: 'success' | 'error' | 'info' | 'warning';
@@ -873,6 +874,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                       facilitation={f}
                       say={m.content}
                       companionLabel={label}
+                      companionId={m.aiTherapist}
                       isMyTurn={isMyTurn}
                       onQuickReply={(text) => setReply(text)}
                     />
@@ -886,7 +888,12 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 <div key={m.id} className="flex justify-center">
                   <div className="max-w-[92%] w-full rounded-2xl px-4 py-3 bg-petal-sage/15 border border-petal-sage/40">
                     <div className="flex items-center gap-1.5 mb-1 text-petal-sage-deep">
-                      <HeartHandshake className="w-3.5 h-3.5" />
+                      <ParticipantAvatar
+                        size="xs"
+                        role="ai"
+                        companionId={m.aiTherapist}
+                        name={companionName(m.aiTherapist) || 'AI 諮商師'}
+                      />
                       <span className="text-xs font-medium">
                         {companionName(m.aiTherapist) ? `${companionName(m.aiTherapist)}・AI 諮商師` : 'AI 諮商師'}
                       </span>
@@ -904,7 +911,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 <div key={m.id} className="flex justify-center">
                   <div className="max-w-[92%] w-full rounded-2xl px-4 py-3 bg-pink-50 border border-pink-200">
                     <div className="flex items-center gap-1.5 mb-1 text-pink-700">
-                      <HeartHandshake className="w-3.5 h-3.5" />
+                      <ParticipantAvatar size="xs" role="therapist" name="專屬心理師" />
                       <span className="text-xs font-medium">專屬心理師</span>
                     </div>
                     <p className="text-sm text-petal-ink whitespace-pre-wrap leading-relaxed">{m.content}</p>
@@ -985,6 +992,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                     <>
                       <p className="text-sm text-petal-ink whitespace-pre-wrap">{m.content}</p>
                       <p className="text-[10px] text-petal-muted mt-1 flex items-center gap-1">
+                        <ParticipantAvatar size="xs" name={speakerName} colorKey={m.senderId} />
                         <span className="font-medium text-petal-ink-soft">{speakerName}</span>
                         <span>・{formatTime(m.createdAt, tz)}</span>
                         {m.editedAt && <span>・已編輯</span>}

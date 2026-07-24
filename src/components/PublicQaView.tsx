@@ -10,6 +10,7 @@ import {
 import type { Notification } from './ErrorNotification';
 import { focusLabel } from './therapistShared';
 import { FocusFilter } from './FocusFilter';
+import ParticipantAvatar from './ParticipantAvatar';
 
 // 公開問答 (Public Q&A): a read-only, anonymised browse of consultation chats
 // that both the client and therapist agreed to publish. Helps people with
@@ -250,8 +251,16 @@ const PublicQaDetail: React.FC<{
               return (
                 <div key={m.id} className={`flex ${highlighted ? 'justify-start' : 'justify-end'}`}>
                   <div className={`max-w-[82%] flex flex-col ${highlighted ? 'items-start' : 'items-end'}`}>
-                    <div className="font-body text-[11px] text-petal-muted mb-0.5 px-1">
-                      {m.isTherapist ? `🩺 ${m.senderName}（諮商師）` : m.isAi ? '💛 AI 諮商師' : m.senderName}
+                    <div className="flex items-center gap-1.5 mb-0.5 px-1">
+                      <ParticipantAvatar
+                        size="xs"
+                        role={m.isTherapist ? 'therapist' : m.isAi ? 'ai' : 'user'}
+                        name={m.isAi ? 'AI 諮商師' : m.senderName}
+                        colorKey={m.senderName}
+                      />
+                      <span className="font-body text-[11px] text-petal-muted">
+                        {m.isTherapist ? `${m.senderName}（諮商師）` : m.isAi ? 'AI 諮商師' : m.senderName}
+                      </span>
                     </div>
                     <div
                       className={`px-3.5 py-2 rounded-2xl font-body text-sm ${

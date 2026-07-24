@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { daysSinceLastNudge } from './AchievementsView';
 import { isVideoUrl } from '../utils/script';
+import ParticipantAvatar from './ParticipantAvatar';
 import {
   POSITIONING_ONE_LINER,
   POSITIONING_SUBLINE,
@@ -422,7 +423,7 @@ const TherapistModeSample: React.FC = () => (
   <SampleCard>
     <div className="flex items-center justify-between mb-3">
       <span className="inline-flex items-center gap-1.5 font-body text-xs text-petal-rose-deep">
-        <Sparkles className="w-3.5 h-3.5" />
+        <ParticipantAvatar size="xs" role="ai" companionId="luma" name="Luma" />
         Luma・引導者
       </span>
       <SampleTag />
@@ -608,7 +609,10 @@ const PREVIEWS: Record<string, PreviewConfig> = {
         </div>
         <SampleCard>
           <p className="font-body text-sm text-petal-ink">你根本沒有把家庭放第一。</p>
-          <div className="font-body text-[11px] text-petal-muted mt-1.5">— 小晴</div>
+          <div className="flex items-center gap-1.5 mt-1.5">
+            <ParticipantAvatar size="xs" name="小晴" colorKey="小晴" />
+            <span className="font-body text-[11px] text-petal-muted">小晴</span>
+          </div>
           <div className="mt-1.5 rounded-xl border border-petal-rose-deep/25 bg-petal-cream-2 px-3 py-2">
             <div className="flex items-center gap-1.5 text-petal-rose-deep">
               <HeartHandshake className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -627,6 +631,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
               <Lock className="w-2.5 h-2.5 mr-0.5" strokeWidth={1.5} />
               只有我看得到
             </span>
+            <ParticipantAvatar size="xs" name="小宇" colorKey="小宇" />
             <span className="font-body text-xs text-petal-ink">小宇</span>
             {/* custom mood tag (自訂輸入) */}
             <span className="font-body text-[11px] text-petal-muted">· 加班中</span>
