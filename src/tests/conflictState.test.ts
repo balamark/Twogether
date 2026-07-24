@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { detectConflictState, conflictSeverity } from '../utils/conflictState';
+import {
+  detectConflictState,
+  conflictSeverity,
+  detectDraftTone,
+  draftToneHint,
+} from '../utils/conflictState';
 
 const msg = (content: string, isAi = false) => ({ content, isAi });
 
@@ -82,5 +87,30 @@ describe('detectConflictState', () => {
     expect(conflictSeverity('connection')).toBeLessThan(conflictSeverity('escalation'));
     expect(conflictSeverity('escalation')).toBeLessThan(conflictSeverity('flooding'));
     expect(conflictSeverity('flooding')).toBeLessThan(conflictSeverity('crisis'));
+  });
+});
+
+describe('detectDraftTone', () => {
+  it('stays quiet on a calm draft', () => {
+    expect(detectDraftTone('我今天有點累，晚上早點休息好嗎？')).toBe('connection');
+    expect(detectDraftTone('')).toBe('connection');
+  });
+
+  it('flags a SINGLE blaming line (unlike the thread classifier)', () => {
+    expect(detectDraftTone('你從來都不聽我說話。')).toBe('escalation');
+  });
+
+  it('flags flooding on emotional overflow', () => {
+    expect(detectDraftTone('我真的受夠了！')).toBe('flooding');
+  });
+
+  it('flags crisis on divorce/harm language', () => {
+    expect(detectDraftTone('那我們乾脆離婚算了。')).toBe('crisis');
+  });
+
+  it('gives a hint for charged tones and none for connection', () => {
+    expect(draftToneHint('escalation')).not.toBe('');
+    expect(draftToneHint('crisis')).not.toBe('');
+    expect(draftToneHint('connection')).toBe('');
   });
 });

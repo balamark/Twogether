@@ -30,5 +30,6 @@ module.exports = {
   generateTherapyNote: provider.generateTherapyNote,
   generateTherapySummary: provider.generateTherapySummary,
   generateFacilitatorTurn: provider.generateFacilitatorTurn,
+  analyzeDraft: provider.analyzeDraft,
   providerName: PROVIDER_NAME,
 };

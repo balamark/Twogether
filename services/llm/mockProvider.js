@@ -562,6 +562,50 @@ async function generateTherapyNote({ eventSummary, messages }) {
   };
 }
 
+// Deterministic per-message emotion meter for a composer draft. Reuses the
+// emotion + need + toxicity lexicons. Same input → same output.
+const EMOTION_EMOJI = {
+  憤怒: '😠', 失落: '😢', 委屈: '🥺', 失望: '😔', 焦慮: '😰', 孤單: '😞',
+  疲憊: '😮‍💨', 受傷: '💔', 複雜情緒: '💭',
+};
+
+async function analyzeDraft({ draft }) {
+  if (typeof draft !== 'string' || draft.trim().length === 0) {
+    throw new Error('draft is required');
+  }
+  const startedAt = Date.now();
+  const text = draft.trim();
+  const surface = pickEmotions(text);
+  const toxicityFlags = detectToxicity(text);
+  const { need, rewrite } = pickNeed(text);
+
+  const emotions = surface.slice(0, 2).map((label, i) => ({
+    label,
+    emoji: EMOTION_EMOJI[label] || '💭',
+    intensity: i === 0 ? 70 : 45,
+  }));
+  emotions.push({ label: '不安', emoji: '😰', intensity: 60 });
+
+  return {
+    emotions: emotions.slice(0, 3),
+    partnerHears: {
+      misread: '你在怪我、你覺得我很糟。',
+      real: '你是不是快要撐不下去、需要我？',
+    },
+    need,
+    rewrite,
+    toxicityFlags,
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+      assembledPrompt: `[mock] analyze draft: ${text.slice(0, 60)}`,
+    },
+  };
+}
+
 // Deterministic Therapist Mode facilitator turn. Cycles through a fixed
 // exercise sequence by stepCount so a full session can be driven in tests
 // without the paid LLM. Same input → same output. Normalization goes through
@@ -666,6 +710,7 @@ module.exports = {
   parseScriptRoles,
   generateThreadTranslations,
   generateTherapyNote,
+  analyzeDraft,
   generateTherapySummary,
   generateFacilitatorTurn,
 };

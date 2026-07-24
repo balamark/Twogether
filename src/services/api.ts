@@ -355,6 +355,23 @@ export interface EmotionAcceptancePreview {
   toxicityFlags: string[];
 }
 
+// 即時情緒檢測 — the per-message emotion meter for a reply draft (before it is
+// sent): layered emotions, how the partner may mishear vs the real worry, the
+// need, and a rewrite that says the need instead of the attack.
+export interface DraftEmotion {
+  label: string;
+  emoji: string;
+  intensity: number;
+}
+
+export interface DraftAnalysis {
+  emotions: DraftEmotion[];
+  partnerHears: { misread: string; real: string };
+  need: string;
+  rewrite: string;
+  toxicityFlags: string[];
+}
+
 export interface AiUsageToday {
   tier: string;
   limit: number;
@@ -3495,6 +3512,28 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to preview reply rewrite:', error);
       this.throwApiError(error, '無法改寫回覆，請稍後再試');
+    }
+  }
+
+  // Analyze a reply draft before sending — the per-message emotion meter. Not
+  // persisted; cached server-side per draft so re-checking is free.
+  async analyzeDraft(eventId: string, draft: string): Promise<DraftAnalysis> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/messages/analyze-draft`, { draft });
+      const a = response.data.analysis ?? {};
+      return {
+        emotions: Array.isArray(a.emotions) ? a.emotions : [],
+        partnerHears: {
+          misread: a.partnerHears?.misread || '',
+          real: a.partnerHears?.real || '',
+        },
+        need: a.need || '',
+        rewrite: a.rewrite || '',
+        toxicityFlags: Array.isArray(a.toxicityFlags) ? a.toxicityFlags : [],
+      };
+    } catch (error: unknown) {
+      console.error('Failed to analyze draft:', error);
+      this.throwApiError(error, '情緒檢測暫時無法產生，請稍後再試');
     }
   }
 

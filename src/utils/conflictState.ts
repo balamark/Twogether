@@ -130,3 +130,30 @@ const ORDER: Record<ConflictLevel, number> = {
 export function conflictSeverity(level: ConflictLevel): number {
   return ORDER[level] ?? 0;
 }
+
+// Single-draft tone, for a free, instant hint in the composer as the writer
+// types (no LLM, no quota). Unlike the thread classifier this fires on a SINGLE
+// charged line — the whole point is to catch a hot message before it is sent.
+// 'connection' means the draft reads fine and no hint is shown.
+export function detectDraftTone(text: string): ConflictLevel {
+  if (typeof text !== 'string' || text.trim().length === 0) return 'connection';
+  if (countMatches(text, CRISIS_PATTERNS) > 0) return 'crisis';
+  if (countMatches(text, FLOODING_PATTERNS) > 0 || hasExclamationBurst(text)) return 'flooding';
+  if (countMatches(text, ESCALATION_PATTERNS) > 0) return 'escalation';
+  return 'connection';
+}
+
+// Short nudge shown under the composer when a draft reads charged. Encourages
+// (never forces) the writer to run the emotion check before sending.
+export function draftToneHint(level: ConflictLevel): string {
+  switch (level) {
+    case 'crisis':
+      return '這句話很重，送出前先深呼吸一下。要不要看看對方會怎麼聽？';
+    case 'flooding':
+      return '這句話帶著滿出來的情緒。送出前要不要先看看對方會怎麼聽？';
+    case 'escalation':
+      return '這句話帶有一點指責的語氣。送出前要不要看看對方會怎麼聽？';
+    default:
+      return '';
+  }
+}

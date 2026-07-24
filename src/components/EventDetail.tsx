@@ -16,6 +16,7 @@ import {
   X,
   Pencil,
   NotebookPen,
+  Gauge,
   PlayCircle,
 } from 'lucide-react';
 import apiService, {
@@ -26,12 +27,15 @@ import apiService, {
   type EventVersionKey,
   type MessageTranslationMap,
   type TherapyNote,
+  type DraftAnalysis,
   type FacilitationSession,
 } from '../services/api';
 import ReplyStepBar from './ReplyStepBar';
 import MessageTranslationCard from './MessageTranslationCard';
 import TherapyNoteCard from './TherapyNoteCard';
 import ConflictBanner from './ConflictBanner';
+import DraftEmotionMeter from './DraftEmotionMeter';
+import { detectDraftTone, draftToneHint } from '../utils/conflictState';
 import TherapistTurnCard from './TherapistTurnCard';
 import SessionProgress from './SessionProgress';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -105,6 +109,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const [rewritePreview, setRewritePreview] = useState<ReplyRewritePreview | null>(null);
   const [accepting, setAccepting] = useState(false);
   const [acceptancePreview, setAcceptancePreview] = useState<EmotionAcceptancePreview | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [draftAnalysis, setDraftAnalysis] = useState<DraftAnalysis | null>(null);
   const [aiInviting, setAiInviting] = useState(false);
   const [aiPosting, setAiPosting] = useState(false);
   const [aiPreview, setAiPreview] = useState<string | null>(null);
@@ -135,6 +141,34 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
 
   const insertPhrase = (phrase: string) => {
     setReply((prev) => (prev.trim().length > 0 ? `${prev}\n${phrase}` : phrase));
+  };
+
+  const requestDraftAnalysis = async () => {
+    const draft = reply.trim();
+    if (!draft) return;
+    setAnalyzing(true);
+    try {
+      const analysis = await apiService.analyzeDraft(eventId, draft);
+      setDraftAnalysis(analysis);
+    } catch (err) {
+      const code = (err as { error_code?: string })?.error_code;
+      if (code === 'AI_DAILY_LIMIT_REACHED') {
+        showNotification({
+          type: 'warning',
+          title: '今日 AI 次數已用完',
+          message: '情緒檢測次數已達今日上限，升級 Premium 可提高每日上限，或先用下方的步驟提示自己檢查。',
+        });
+      } else {
+        showNotification({
+          type: 'error',
+          title: '情緒檢測失敗',
+          message: err instanceof Error ? err.message : '請稍後再試',
+        });
+      }
+    } finally {
+      setAnalyzing(false);
+      refreshQuota();
+    }
   };
 
   const requestRewrite = async () => {
@@ -409,6 +443,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     try {
       await apiService.replyToEvent(eventId, content);
       setReply('');
+      setDraftAnalysis(null);
       await refresh();
       // In an active session, if the therapist was waiting on me, my reply
       // completes the step — fetch the next facilitated turn. Skipped while
@@ -1095,10 +1130,36 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             maxLength={2000}
             className="w-full p-2 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y"
           />
+          {/* Free, instant tone hint: when the draft reads charged, nudge the
+              writer to run the emotion check before sending (no LLM, no quota). */}
+          {(() => {
+            const tone = detectDraftTone(reply);
+            if (tone === 'connection') return null;
+            return (
+              <p
+                className="mt-1.5 font-body text-xs text-petal-rose-deep flex items-start gap-1.5"
+                data-testid="event-draft-tone-hint"
+              >
+                <Gauge className="w-3.5 h-3.5 mt-0.5 shrink-0" strokeWidth={1.5} />
+                <span>{draftToneHint(tone)}</span>
+              </p>
+            );
+          })()}
           <div className="flex justify-end mt-1.5">
             <AiQuotaHint quota={quota} />
           </div>
           <div className="flex flex-wrap justify-end gap-2 mt-1">
+            <button
+              type="button"
+              data-testid="event-draft-analyze-button"
+              onClick={requestDraftAnalysis}
+              disabled={analyzing || reply.trim().length === 0}
+              className="px-3 py-2 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:shadow-none hover:opacity-90 active:scale-[0.98] transition"
+              title="送出前，看看這句話底層的情緒、對方會怎麼聽，以及更好的說法"
+            >
+              {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gauge className="w-4 h-4" />}
+              <span>情緒檢測</span>
+            </button>
             <button
               type="button"
               data-testid="event-acceptance-button"
@@ -1133,6 +1194,17 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             </button>
           </div>
         </div>
+      )}
+
+      {draftAnalysis && (
+        <DraftEmotionMeter
+          analysis={draftAnalysis}
+          onUseRewrite={(text) => {
+            setReply(text);
+            setDraftAnalysis(null);
+          }}
+          onClose={() => setDraftAnalysis(null)}
+        />
       )}
 
       {rewritePreview && (
