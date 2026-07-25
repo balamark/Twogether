@@ -162,6 +162,9 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
           <ShieldCheck className="w-5 h-5 text-petal-sage-deep flex-shrink-0 mt-0.5" />
           <p className="text-sm text-petal-ink-soft leading-relaxed">
             你輸入的內容<strong>不會直接傳給對方</strong>，會先由 AI 協助整理。可以罵、可以抱怨、可以很火。
+            <br />
+            {/* 書寫原則：說者無心、聽者有意；先寫下來，才有機會把話說對。 */}
+            <span className="text-petal-muted">用寫的，你有時間把話說對：急切的話留在草稿裡，不會脫口而出變成傷害。</span>
           </p>
         </div>
 

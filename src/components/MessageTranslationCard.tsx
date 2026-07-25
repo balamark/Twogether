@@ -20,7 +20,11 @@ const MessageTranslationCard: React.FC<Props> = ({ translation, className }) => 
     >
       <div className="flex items-center gap-1.5 text-petal-rose-deep">
         <HeartHandshake className="w-3.5 h-3.5" strokeWidth={1.5} />
-        <span className="font-body text-[11px] font-medium">可能真正想表達的是</span>
+        <span className="font-body text-[11px] font-medium flex-1">可能真正想表達的是</span>
+        {/* 冰山原則：說出口的只是一角，這裡翻出水面下的情緒與需求。 */}
+        <span className="font-body text-[10px] uppercase tracking-[0.14em] text-petal-rose-deep/70 border border-petal-rose-deep/25 rounded-full px-1.5 py-0.5">
+          冰山
+        </span>
       </div>
       <p className="mt-1 font-body text-sm text-petal-ink leading-relaxed">「{rewrite}」</p>
       {(need || (emotions && emotions.length > 0)) && (

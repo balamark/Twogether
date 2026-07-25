@@ -827,6 +827,176 @@ router.get(
   }
 );
 
+// ---------------------------------------------------------------------------
+// 溝通模式 (communication pattern) — the cross-conflict "third party" lens
+// ---------------------------------------------------------------------------
+// A single conflict gets its own therapy note; this zooms out across several
+// resolved events to name the ONE recurring loop the couple keeps falling into,
+// gently flag the rational wrapping that hides sarcasm, and offer one small
+// exit practice. This is the "模式" design principle. On-demand (costs one AI
+// credit) and cached per (couple, resolved-event-set) so re-opens are free.
+
+// Enough resolved conflicts (with a per-event cycle) to see a *pattern*, not
+// just one fight. Below this, the empty state guides them to keep going.
+const COMMUNICATION_PATTERN_MIN_EVENTS = 2;
+
+async function ensureCommunicationPatternsTable() {
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS communication_pattern_summaries (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        couple_id UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
+        input_hash VARCHAR(64) NOT NULL,
+        summary JSONB NOT NULL,
+        event_count INTEGER,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        UNIQUE (couple_id, input_hash)
+      );
+    `);
+  } catch (err) {
+    logWarn('ensureCommunicationPatternsTable failed', { err: err.message });
+  }
+}
+
+// GET /api/events/communication-pattern — the couple's recurring 溝通模式 across
+// their recent resolved conflicts. Shared + cached; regenerates when the set of
+// resolved events (or their therapy notes) changes.
+router.get('/communication-pattern', async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const couple = await getCoupleForUser(userId);
+    if (!couple) {
+      // Solo users have no shared conflict history yet — expected, not an error.
+      return res.status(200).json({
+        success: false,
+        error_code: 'NOT_PAIRED',
+        message: '溝通模式會從你們一起說開的幾件事裡，看出反覆出現的循環。先和另一半配對，累積幾次之後就能一起看見。',
+      });
+    }
+    const coupleId = couple.couple_id;
+
+    // Only resolved, non-private events that actually produced a therapy note
+    // (which carries the per-event cycle we aggregate over).
+    const evResult = await db.query(
+      `SELECT id, title, tags, toxicity_flags, therapy_note, content_edited_at, resolved_at
+         FROM events
+        WHERE couple_id = $1
+          AND is_private = FALSE
+          AND status = 'resolved'
+          AND therapy_note IS NOT NULL
+        ORDER BY resolved_at DESC NULLS LAST
+        LIMIT 12`,
+      [coupleId]
+    );
+    const rows = evResult.rows;
+
+    if (rows.length < COMMUNICATION_PATTERN_MIN_EVENTS) {
+      // Not enough history to see a pattern yet — an expected state with a next
+      // step (playbook: empty states are mini-onboarding, not a full stop).
+      return res.status(200).json({
+        success: false,
+        error_code: 'NOT_ENOUGH_EVENTS',
+        message: `再多說開幾件事，就能看見你們的溝通模式了。目前已完成 ${rows.length} 件，累積 ${COMMUNICATION_PATTERN_MIN_EVENTS} 件（已標記解決、有治療摘要）後就會出現。`,
+        progress: { have: rows.length, need: COMMUNICATION_PATTERN_MIN_EVENTS },
+      });
+    }
+
+    // Deterministic aggregates — hand the model counts so it narrates, not tallies.
+    const stepMap = new Map();
+    const flagMap = new Map();
+    const themeMap = new Map();
+    for (const r of rows) {
+      const note = r.therapy_note || {};
+      (Array.isArray(note.cycle) ? note.cycle : []).forEach((s) => {
+        const k = (s || '').toString().trim();
+        if (k) stepMap.set(k, (stepMap.get(k) || 0) + 1);
+      });
+      (r.toxicity_flags || []).forEach((f) => flagMap.set(f, (flagMap.get(f) || 0) + 1));
+      (r.tags || []).forEach((t) => themeMap.set(t, (themeMap.get(t) || 0) + 1));
+    }
+    const sortDesc = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]);
+    const stats = {
+      cycleStepCounts: sortDesc(stepMap).map(([step, count]) => ({ step, count })),
+      toxicityCounts: sortDesc(flagMap).map(([flag, count]) => ({ flag, count })),
+      themeCounts: sortDesc(themeMap).map(([tag, count]) => ({ tag, count })),
+    };
+
+    // Cache key: the resolved-event set + each note's mutability markers. Any
+    // new resolved event or edited content busts it; re-opens are free.
+    const fingerprint = rows.map((r) => [
+      r.id,
+      r.content_edited_at ? new Date(r.content_edited_at).getTime() : 0,
+      r.therapy_note ? 1 : 0,
+    ]);
+    const inputHash = aiCacheHash(['communication_pattern_v1', fingerprint]);
+
+    await ensureCommunicationPatternsTable();
+    const cached = await db.query(
+      `SELECT summary FROM communication_pattern_summaries WHERE couple_id = $1 AND input_hash = $2`,
+      [coupleId, inputHash]
+    );
+    if (cached.rows[0]) {
+      return res.json({
+        success: true,
+        pattern: cached.rows[0].summary,
+        eventCount: rows.length,
+        cached: true,
+      });
+    }
+
+    // Fresh generation costs one AI credit (same daily budget as the icebreaker).
+    const { tier, limit } = await resolveAiLimit(userId);
+    const usedToday = await countTodayAiUsage(userId);
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    if (!limitCheck.ok) {
+      logInfo('events.communication_pattern.limit', { userId, coupleId, used: usedToday, limit, tier, blocked: true });
+      return res.status(limitCheck.status).json(limitCheck.body);
+    }
+
+    logInfo('events.communication_pattern.generate', { userId, coupleId, eventCount: rows.length });
+
+    const events = rows.map((r) => {
+      const note = r.therapy_note || {};
+      return {
+        title: r.title,
+        trigger: note.trigger || '',
+        needs: Array.isArray(note.needs) ? note.needs : [],
+        cycle: Array.isArray(note.cycle) ? note.cycle : [],
+        toxicityFlags: r.toxicity_flags || [],
+        tags: r.tags || [],
+      };
+    });
+
+    const result = await llmService.generateCommunicationPatternSummary({ events, stats });
+    const meta = result._meta;
+    delete result._meta;
+
+    logInfo('events.communication_pattern.cost', {
+      userId,
+      coupleId,
+      provider: meta?.provider,
+      model: meta?.model,
+      costUsd: meta?.costUsd,
+      durationMs: meta?.durationMs,
+    });
+
+    await recordAiUsage(userId, 'communication_pattern', `${rows.length} 件已解決事件`, meta);
+    await db.query(
+      `INSERT INTO communication_pattern_summaries (couple_id, input_hash, summary, event_count)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (couple_id, input_hash)
+         DO UPDATE SET summary = EXCLUDED.summary, event_count = EXCLUDED.event_count`,
+      [coupleId, inputHash, JSON.stringify(result), rows.length]
+    );
+
+    res.json({ success: true, pattern: result, eventCount: rows.length });
+  } catch (err) {
+    logError('Communication pattern failed', { err: err.message, stack: err.stack });
+    res.status(500).json({ success: false, message: '溝通模式暫時無法產生，請稍後再試' });
+  }
+});
+
 // GET /api/events/therapy-summary/history — the couple's previously generated
 // 諮商摘要 snapshots, newest first. Every distinct event-set produced a cached
 // row (see the generate route); this exposes them so either partner can re-open
