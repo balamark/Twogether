@@ -16,7 +16,7 @@ import ConflictView from './components/ConflictView';
 import WallView from './components/WallView';
 import EventsView from './components/EventsView';
 import TherapistsView from './components/TherapistsView';
-import LoggedOutPreview from './components/LoggedOutPreview';
+import LoggedOutPreview, { CommunicationPrinciples } from './components/LoggedOutPreview';
 import Testimonials from './components/Testimonials';
 import FeedbackView from './components/FeedbackView';
 import LoveLanguageView from './components/LoveLanguageView';
@@ -2586,6 +2586,14 @@ const LoveTimeApp = () => {
         <div className="max-w-6xl mx-auto">
           {renderView()}
         </div>
+
+        {/* Logged-out design philosophy — the three communication principles that
+            run through the whole app, so a visitor can recognise their own
+            struggle and anticipate how Twogether helps before signing up.
+            Hidden on the therapists sub-page (its own context). */}
+        {!authState.isAuthenticated && currentView !== 'therapists' && (
+          <CommunicationPrinciples onSignUp={() => setShowAuthModal(true)} />
+        )}
 
         {/* Logged-out social proof — real approved reviews, or 3 defaults until
             any exist. Hidden on the therapists sub-page (its own context). */}

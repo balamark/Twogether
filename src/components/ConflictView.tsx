@@ -450,6 +450,7 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate }: Confli
           <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-4">
             當情緒沒有被接納，人會覺得自己被否定。所以在講道理、找解法之前，先讓彼此的感受被看見、被接住。
             把心裡的情緒寫下來，AI 幫你說得不傷人；對方收到後，AI 也會教他怎麼接住你的情緒。
+            用寫的，比當下用說的更容易把話說對：急切的話留到明天，傷害留在草稿裡。
           </p>
           <button
             type="button"

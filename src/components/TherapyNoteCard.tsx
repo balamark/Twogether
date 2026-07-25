@@ -56,8 +56,9 @@ const TherapyNoteCard: React.FC<Props> = ({ note }) => {
         </Section>
       )}
 
+      {/* 模式原則：這次落入的負向循環，就是你們反覆卡住的溝通模式。 */}
       {cycle && cycle.length > 0 && (
-        <Section icon={<RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} />} title="負向循環">
+        <Section icon={<RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} />} title="你們的溝通模式（這次的負向循環）">
           <div className="flex flex-wrap items-center gap-1.5">
             {cycle.map((step, i) => (
               <React.Fragment key={i}>

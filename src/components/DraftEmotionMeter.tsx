@@ -21,6 +21,10 @@ const DraftEmotionMeter: React.FC<Props> = ({ analysis, onUseRewrite, onClose })
         <div className="flex items-center gap-1.5 text-petal-rose-deep">
           <Gauge className="w-4 h-4" strokeWidth={1.5} />
           <span className="font-display italic text-base">送出前，先看看這句話</span>
+          {/* 冰山原則：看見這句話底下的情緒與需求，再決定要不要這樣送出。 */}
+          <span className="font-body text-[10px] uppercase tracking-[0.14em] text-petal-rose-deep/70 border border-petal-rose-deep/25 rounded-full px-1.5 py-0.5">
+            冰山
+          </span>
         </div>
         <button
           type="button"

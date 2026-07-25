@@ -2317,6 +2317,139 @@ async function generateTherapySummary({ periodLabel, events, stats }) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Communication-pattern summary ("溝通模式" 第三方視角) — cross-conflict lens
+// ---------------------------------------------------------------------------
+// Single conflicts each get their own therapy note (with a per-event `cycle`).
+// This zooms out: reading several resolved events' cycles, toxicity flags and
+// themes, it names the ONE recurring loop the couple keeps falling into (like a
+// counselor who has watched them argue a few times), gently flags the rational
+// wrapping that hides sarcasm, and offers one small practice to step out of it.
+// This is the "模式" principle (see src/content/communicationPrinciples.ts).
+
+const COMMUNICATION_PATTERN_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴侶諮商師。你已經看過這對伴侶最近幾次衝突的整理筆記（每次的觸發點、真正的需求、當次的負向循環），現在請像一個看過他們吵過幾次架的第三方，幫他們看見「反覆出現的溝通模式」。請永遠以繁體中文回覆。
+
+請產出：
+1. recurringCycle：他們最常反覆落入的那一個循環，3 到 5 個很短的步驟，呈現彼此如何一來一往把對方推遠（例如：一方追問 → 另一方退縮 → 追得更急 → 更加沉默）。每步 6 字內，這是跨多次衝突「最常見」的那一種，不是某一次的流水帳。
+2. signals：1 到 3 個溫和、中立的觀察，點出容易被忽略的訊號。若資料顯示常出現諷刺、輕蔑、翻舊帳、或「總是／從來」這類絕對化語言，可以溫和說出來（例如「理性的話語底下，偶爾帶著一點酸」）。只描述現象，不評對錯、不指定是誰的錯。若沒有明顯訊號，回傳空陣列。
+3. exitTip：一個「一起跳出這個循環」的小練習或一句可以照著說的話，第一人稱、溫柔、具體可做（例如「當我發現自己開始追問，我先深呼吸，說：我不是要質問你，我只是有點慌」）。
+
+守則：緊扣提供的資料，不要編造；中立、不評斷對錯、不選邊站；把焦點放在「你們一起」跳出循環，不是誰要改；只使用繁體中文；遵守標點規則。
+
+回應請只呼叫 emit_communication_pattern tool，不要輸出其他文字。`;
+
+const COMMUNICATION_PATTERN_TOOL_SCHEMA = {
+  name: 'emit_communication_pattern',
+  description: "Return the couple's recurring communication pattern across several resolved conflicts.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      recurringCycle: {
+        type: 'array',
+        maxItems: 5,
+        items: { type: 'string', maxLength: 12, description: '循環的一步，例如「小湘 追問」' },
+      },
+      signals: {
+        type: 'array',
+        maxItems: 3,
+        items: { type: 'string', description: '一個溫和中立的觀察，不評對錯' },
+      },
+      exitTip: { type: 'string', description: '一起跳出循環的小練習或一句話，第一人稱' },
+    },
+    required: ['recurringCycle', 'signals', 'exitTip'],
+  },
+};
+
+// events: [{ title, trigger, needs, cycle, toxicityFlags, tags }] — recent
+// resolved events. stats: { cycleStepCounts, toxicityCounts, themeCounts }.
+async function generateCommunicationPatternSummary({ events, stats }) {
+  const evs = Array.isArray(events) ? events : [];
+  const lines = [];
+  lines.push(`已解決的衝突數：${evs.length}`, '');
+  const fmtCounts = (arr, key) =>
+    (arr || [])
+      .map((x) => `${x[key]}×${x.count}`)
+      .join('、') || '（無）';
+  lines.push(`常見的負向循環步驟：${fmtCounts(stats?.cycleStepCounts, 'step')}`);
+  lines.push(`出現過的語言訊號（toxicity flags）：${fmtCounts(stats?.toxicityCounts, 'flag')}`);
+  lines.push(`常見主題：${fmtCounts(stats?.themeCounts, 'tag')}`, '');
+  lines.push('每次衝突的整理筆記：');
+  evs.forEach((e, i) => {
+    lines.push(`【第 ${i + 1} 次】${e.title || '未命名'}`);
+    if (e.trigger) lines.push(`  觸發點：${e.trigger}`);
+    if (Array.isArray(e.needs) && e.needs.length) {
+      lines.push(`  真正的需求：${e.needs.map((n) => `${n.who} 需要 ${n.need}`).join('、')}`);
+    }
+    if (Array.isArray(e.cycle) && e.cycle.length) {
+      lines.push(`  當次循環：${e.cycle.join(' → ')}`);
+    }
+    if (Array.isArray(e.toxicityFlags) && e.toxicityFlags.length) {
+      lines.push(`  語言訊號：${e.toxicityFlags.join('、')}`);
+    }
+  });
+  const userContent = lines.join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1000,
+    system: [
+      {
+        type: 'text',
+        text: COMMUNICATION_PATTERN_SYSTEM_PROMPT + PUNCTUATION_RULE,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [COMMUNICATION_PATTERN_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_communication_pattern' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.communication_pattern', {
+    model: response.model || MODEL,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_communication_pattern'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input || {};
+
+  return {
+    recurringCycle: (Array.isArray(out.recurringCycle) ? out.recurringCycle : [])
+      .map((s) => (s || '').toString().trim())
+      .filter(Boolean),
+    signals: (Array.isArray(out.signals) ? out.signals : [])
+      .map((s) => (s || '').toString().trim())
+      .filter(Boolean),
+    exitTip: (out.exitTip || '').toString().trim(),
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+      assembledPrompt: userContent,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -2332,6 +2465,7 @@ module.exports = {
   generateTherapyNote,
   analyzeDraft,
   generateTherapySummary,
+  generateCommunicationPatternSummary,
   generateFacilitatorTurn,
   // Exported for prompt-contract regression tests only.
   buildRoleplayUserContent,

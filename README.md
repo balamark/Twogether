@@ -12,6 +12,15 @@ single-server architecture using Node.js + React.
 
 See [`docs/UX_PLAYBOOK.md`](docs/UX_PLAYBOOK.md) for the binding product stances.
 
+## 💛 我們怎麼幫你溝通：三個原則
+
+Twogether 幫伴侶溝通的三個核心設計理念，貫穿整個 App（文案單一來源：
+[`src/content/communicationPrinciples.ts`](src/content/communicationPrinciples.ts)）：
+
+- **冰山 · 說出口的往往只是冰山一角**：明明在氣一件小事，真正在意的卻說不出口；對方也只聽到指責，沒聽到底下的需要。Twogether 幫你看見話語底下的情緒與需求，把「你都不在乎」翻成「我需要被重視」，讓對方聽到的是需要，不是攻擊。
+- **模式 · 看見你們反覆卡住的那個循環**：一方一開口就像在攻擊，另一方立刻築起防禦，然後越吵越高。像中立的第三方，Twogether 幫你們認出反覆出現的循環（追問、退縮、追得更急、更加沉默），也點出理性包裝下的酸味，讓你們一起跳出來。
+- **書寫 · 用寫的，把話說對**：說者無心、聽者有意；當下脫口而出的話常常詞不達意，反而造成本來沒有的傷害。先寫下來，AI 幫你把話整理成對方聽得進去的版本，改到滿意再送出。
+
 ## ⚡ TL;DR - Get Started in 3 Commands
 
 ```bash
@@ -67,6 +76,10 @@ adds a fragment file in `changelog/`; CI compiles them into the block below —
 see `CLAUDE.md`.)
 
 <!-- changelog:begin (generated from changelog/*.md — edit those, not this) -->
+### 2026-07-25
+- **三個溝通原則，貫穿整個 App**: 我們把幫你們溝通的三個核心設計理念寫清楚了：冰山（說出口的往往只是冰山一角，底下才是真正的情緒與需求）、模式（看見你們反覆卡住的那個循環）、書寫（用寫的，把話說對）。未登入首頁、使用說明都會介紹，你在還沒開始前就知道 Twogether 怎麼幫你們。
+- **新功能・你們的溝通模式**: 在「說開一件事」的分析頁，Twogether 會像看過你們吵過幾次架的中立第三方，讀過最近幾件已說開的事，幫你們認出反覆出現的循環（例如：追問、退縮、追得更急、更加沉默），溫和點出理性話語底下偶爾的酸味，並給一個一起跳出循環的小練習。看見它，才有機會不再重複它。
+
 ### 2026-07-24
 - **一眼看出誰在說話**：多人對話（公開問答、衝突對話、諮商室、牆）現在每位參與者的名字旁邊，都會多一顆專屬顏色的頭像圓圈。真人顯示名字的第一個字、AI 諮商師顯示自己的 emoji，同一個人到哪都是同一個顏色，不用再回頭猜這句話是誰講的。
 

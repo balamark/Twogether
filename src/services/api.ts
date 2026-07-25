@@ -648,6 +648,26 @@ export type TherapySummaryResult =
   // shows a guiding empty state, not a red error toast.
   | { ok: false; errorCode: 'NOT_PAIRED' | 'NO_EVENTS'; message: string };
 
+// 溝通模式 (communication pattern): the cross-conflict "third party" view of the
+// ONE recurring loop the couple keeps falling into, plus gentle signals and one
+// small exit practice. See src/content/communicationPrinciples.ts (模式 principle).
+export interface CommunicationPattern {
+  recurringCycle: string[];
+  signals: string[];
+  exitTip: string;
+}
+
+export type CommunicationPatternResult =
+  | { ok: true; pattern: CommunicationPattern; eventCount: number; cached: boolean }
+  // Expected non-error states (not paired / not enough resolved events yet) — the
+  // UI shows a guiding empty state, not a red error toast.
+  | {
+      ok: false;
+      errorCode: 'NOT_PAIRED' | 'NOT_ENOUGH_EVENTS';
+      message: string;
+      progress?: { have: number; need: number };
+    };
+
 // A previously generated 諮商摘要 snapshot the couple can re-open for free — the
 // full summary travels with each entry so viewing an old one costs no AI credit.
 export interface TherapySummaryHistoryEntry {
@@ -3758,6 +3778,34 @@ class ApiService {
       // Quota exhaustion (429) and true failures still throw with error_code
       // preserved, so the view can surface the specific quota message.
       this.throwApiError(error, '諮商摘要暫時無法產生，請稍後再試');
+    }
+  }
+
+  // The couple's recurring 溝通模式 across their recent resolved conflicts. On
+  // demand (costs one AI credit) and cached server-side, so re-opens are free.
+  async getCommunicationPattern(): Promise<CommunicationPatternResult> {
+    try {
+      const response = await apiClient.get('/events/communication-pattern');
+      const d = response.data ?? {};
+      if (d.success === false) {
+        return {
+          ok: false,
+          errorCode: (d.error_code as 'NOT_PAIRED' | 'NOT_ENOUGH_EVENTS') ?? 'NOT_ENOUGH_EVENTS',
+          message: d.message ?? '再多說開幾件事，就能看見你們的溝通模式了。',
+          progress: d.progress as { have: number; need: number } | undefined,
+        };
+      }
+      return {
+        ok: true,
+        pattern: d.pattern as CommunicationPattern,
+        eventCount: Number(d.eventCount ?? 0),
+        cached: d.cached === true,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch communication pattern:', error);
+      // Quota exhaustion (429) and true failures still throw with error_code
+      // preserved, so the view can surface the specific quota message.
+      this.throwApiError(error, '溝通模式暫時無法產生，請稍後再試');
     }
   }
 

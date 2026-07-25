@@ -697,6 +697,42 @@ async function generateTherapySummary({ periodLabel, events, stats }) {
   };
 }
 
+async function generateCommunicationPatternSummary({ events, stats }) {
+  const startedAt = Date.now();
+  const evs = Array.isArray(events) ? events : [];
+  // Prefer the most frequent real cycle steps if we have them; otherwise a
+  // sensible default loop so the mock still renders something meaningful.
+  const topSteps = (stats?.cycleStepCounts || [])
+    .map((c) => c.step)
+    .filter(Boolean)
+    .slice(0, 4);
+  const recurringCycle = topSteps.length >= 3
+    ? topSteps
+    : ['一方追問', '另一方退縮', '追得更急', '更加沉默'];
+  const flags = (stats?.toxicityCounts || []).map((t) => t.flag).filter(Boolean);
+  const signals = [];
+  if (flags.includes('sarcasm') || flags.includes('contempt')) {
+    signals.push('理性的話語底下，偶爾帶著一點酸。');
+  }
+  if (flags.includes('absolute_language')) {
+    signals.push('說到激動時，容易出現「總是、從來」這類把話說死的字。');
+  }
+
+  return {
+    recurringCycle,
+    signals,
+    exitTip: '當我發現自己又開始追問，我先深呼吸，說：我不是要質問你，我只是有點慌，想靠近你。',
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+      assembledPrompt: `[mock] communication pattern for ${evs.length} events`,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -712,5 +748,6 @@ module.exports = {
   generateTherapyNote,
   analyzeDraft,
   generateTherapySummary,
+  generateCommunicationPatternSummary,
   generateFacilitatorTurn,
 };

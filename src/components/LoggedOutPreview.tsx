@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Calendar,
   MessageCircle,
@@ -32,6 +32,8 @@ import {
   POSITIONING_SUBLINE,
   NOT_A_SUBSTITUTE,
 } from '../content/positioning';
+import { COMMUNICATION_PRINCIPLES } from '../content/communicationPrinciples';
+import { trackAction } from '../utils/track';
 
 interface PreviewScript {
   id: string;
@@ -630,7 +632,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       </>
     ),
     description:
-      '這是 Twogether 的核心。先讓情緒被接住——一方寫下感受，AI 幫你說得不傷人，另一方收到後 AI 也教他怎麼接住你。被接住了，再一起看走勢、學會怎麼說，真的卡住就請 AI 或真人諮商師陪你們。',
+      '這是 Twogether 的核心，也是「用寫的，把話說對」的地方。先讓情緒被接住：一方寫下感受，AI 幫你說得不傷人，另一方收到後 AI 也教他怎麼接住你。被接住了，再一起看你們反覆卡住的溝通模式、學會怎麼說，真的卡住就請 AI 或真人諮商師陪你們。',
     sample: <ConflictFlywheelSample />,
   },
   wall: {
@@ -1067,6 +1069,155 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scr
       {/* Sign-up CTA */}
       <SignUpCta onSignUp={onSignUp} />
     </div>
+  );
+};
+
+// A small read-only "冰山" visual for the iceberg principle: the spoken words
+// sit above a waterline, the real feelings/needs below it. Pure CSS, no image
+// (so nothing to crop). Marked 範例.
+const IcebergVisual: React.FC = () => (
+  <div className="rounded-md border border-petal-rule bg-petal-cream overflow-hidden">
+    <div className="px-3 py-2 bg-white">
+      <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-0.5">
+        說出口的
+      </div>
+      <p className="font-body text-sm text-petal-ink">「你都不在乎。」</p>
+    </div>
+    <div className="flex items-center gap-2 px-3 py-1 bg-petal-cream-2 border-y border-petal-rule">
+      <span className="h-px flex-1 bg-petal-rose-deep/40" />
+      <span className="font-body text-[10px] text-petal-rose-deep">水面下</span>
+      <span className="h-px flex-1 bg-petal-rose-deep/40" />
+    </div>
+    <div className="px-3 py-2 bg-petal-rose-soft/20">
+      <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep mb-0.5">
+        底下真正想說的
+      </div>
+      <p className="font-body text-sm text-petal-ink">「我需要被重視。」</p>
+      <div className="mt-1.5 flex flex-wrap items-center gap-1">
+        <span className="inline-flex items-center rounded-full bg-petal-rose-deep/10 text-petal-rose-deep font-body text-[11px] px-2 py-0.5">
+          需要被重視
+        </span>
+        <span className="inline-flex items-center rounded-full border border-petal-rule text-petal-muted font-body text-[11px] px-2 py-0.5">
+          不安
+        </span>
+      </div>
+    </div>
+  </div>
+);
+
+// A tiny read-only "溝通模式" loop for the pattern principle.
+const PatternLoopVisual: React.FC = () => (
+  <div className="rounded-md border border-petal-rule bg-petal-cream px-3 py-2.5">
+    <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-1.5">
+      你們反覆卡住的循環
+    </div>
+    <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 font-body text-[13px] text-petal-ink">
+      <span className="rounded-full bg-white border border-petal-rule px-2 py-0.5">追問</span>
+      <span className="text-petal-rose-deep">→</span>
+      <span className="rounded-full bg-white border border-petal-rule px-2 py-0.5">退縮</span>
+      <span className="text-petal-rose-deep">→</span>
+      <span className="rounded-full bg-white border border-petal-rule px-2 py-0.5">追得更急</span>
+      <span className="text-petal-rose-deep">→</span>
+      <span className="rounded-full bg-white border border-petal-rule px-2 py-0.5">更加沉默</span>
+    </div>
+    <p className="mt-1.5 font-body text-[11px] text-petal-rose-deep">看見它，才有機會不再重複它。</p>
+  </div>
+);
+
+// A tiny read-only "書寫" before/after for the writing principle.
+const WritingVisual: React.FC = () => (
+  <div className="rounded-md border border-petal-rule bg-petal-cream overflow-hidden">
+    <div className="px-3 py-2">
+      <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-0.5">
+        你寫下的（只有你看得到）
+      </div>
+      <p className="font-body text-sm text-petal-ink">「你每次都這樣，很煩耶。」</p>
+    </div>
+    <div className="px-3 py-2 bg-petal-sage/15 border-t border-petal-rule">
+      <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-0.5">
+        AI 整理成對方聽得進去的版本
+      </div>
+      <p className="font-body text-sm text-petal-ink">「這件事一直重複發生，我有點累了，想跟你一起想個辦法。」</p>
+      <div className="font-body text-[10px] text-petal-muted mt-1">✎ 送出前都可以再改</div>
+    </div>
+  </div>
+);
+
+const PRINCIPLE_VISUALS: Record<string, React.FC> = {
+  iceberg: IcebergVisual,
+  pattern: PatternLoopVisual,
+  writing: WritingVisual,
+};
+
+/**
+ * The three communication principles (設計理念), shown to logged-out visitors on
+ * every tab so they can anticipate HOW Twogether helps them talk, and recognise
+ * their own struggle before signing up. Copy source: communicationPrinciples.ts
+ * (same source as HelpView + README). Static read-only samples marked 範例.
+ */
+export const CommunicationPrinciples: React.FC<{ onSignUp: () => void }> = ({ onSignUp }) => {
+  // R5 量測：記錄未登入訪客看到三原則區塊的曝光（一次）。
+  useEffect(() => {
+    trackAction('onboarding.principles.showroom_view');
+  }, []);
+  return (
+  <section
+    className="max-w-md mx-auto px-4 py-10 border-t border-petal-rule mt-8"
+    data-testid="communication-principles"
+  >
+    <div className="text-center mb-6">
+      <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-2">
+        — 我們怎麼幫你溝通
+      </div>
+      <h2 className="font-display text-2xl md:text-3xl font-light tracking-tight text-petal-ink leading-[1.15]">
+        三個貫穿整個 App 的<em className="not-italic font-light italic text-pink-600">溝通原則</em>
+      </h2>
+      <p className="font-body text-sm text-petal-ink-soft mt-2 max-w-sm mx-auto">
+        如果你也有下面這些困境，Twogether 就是為你們設計的。
+      </p>
+    </div>
+    <div className="space-y-5">
+      {COMMUNICATION_PRINCIPLES.map((p) => {
+        const Icon = p.icon;
+        const Visual = PRINCIPLE_VISUALS[p.id];
+        return (
+          <div
+            key={p.id}
+            data-testid={`principle-${p.id}`}
+            className="bg-petal-cream border border-petal-rule rounded-2xl p-4 shadow-petal/40"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-petal-cream-2 text-petal-rose-deep">
+                <Icon className="w-4 h-4" strokeWidth={1.5} />
+              </span>
+              <span className="font-display italic text-lg text-petal-ink flex-1 leading-tight">
+                {p.title}
+              </span>
+              <span className="font-body text-[10px] uppercase tracking-[0.16em] text-petal-rose-deep border border-petal-rose-soft bg-petal-rose-soft/20 rounded-full px-2 py-0.5">
+                {p.conceptTag}
+              </span>
+            </div>
+            <p className="font-body text-sm text-petal-ink-soft leading-relaxed">
+              <span className="text-petal-muted">如果你也常常：</span>
+              {p.struggle}
+            </p>
+            <p className="font-body text-sm text-petal-ink leading-relaxed mt-1.5 mb-2">{p.help}</p>
+            {Visual && (
+              <div>
+                <div className="flex justify-end mb-1">
+                  <SampleTag />
+                </div>
+                <Visual />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+    <div className="mt-8">
+      <SignUpCta onSignUp={onSignUp} />
+    </div>
+  </section>
   );
 };
 
