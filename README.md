@@ -76,6 +76,9 @@ adds a fragment file in `changelog/`; CI compiles them into the block below —
 see `CLAUDE.md`.)
 
 <!-- changelog:begin (generated from changelog/*.md — edit those, not this) -->
+### 2026-07-26
+- **工程師模式（Premium 彩蛋）**: 在「設定」新增一個 Premium 限定開關，一鍵把整個 App 切換成工程師的深色終端機介面，所有詞彙改用 on-call 事故處理黑話——吵架變「開 Incident」、和好變「Postmortem」、傳親密邀請變「開 Merge Request」。純好玩、隨時可關，偏好記在本機。
+
 ### 2026-07-25
 - **三個溝通原則，貫穿整個 App**: 我們把幫你們溝通的三個核心設計理念寫清楚了：冰山（說出口的往往只是冰山一角，底下才是真正的情緒與需求）、模式（看見你們反覆卡住的那個循環）、書寫（用寫的，把話說對）。未登入首頁、使用說明都會介紹，你在還沒開始前就知道 Twogether 怎麼幫你們。
 - **新功能・你們的溝通模式**: 在「說開一件事」的分析頁，Twogether 會像看過你們吵過幾次架的中立第三方，讀過最近幾件已說開的事，幫你們認出反覆出現的循環（例如：追問、退縮、追得更急、更加沉默），溫和點出理性話語底下偶爾的酸味，並給一個一起跳出循環的小練習。看見它，才有機會不再重複它。
