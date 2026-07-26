@@ -8,6 +8,9 @@ export default {
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
+  // Engineer Mode (Premium easter-egg) flips the app into a dark IDE/terminal
+  // skin by toggling `.dark` on <html>. Overrides live in src/index.css.
+  darkMode: 'class',
   theme: {
     extend: {
       // Extra-small breakpoint for phones — lets tab bars show icons only once

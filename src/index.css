@@ -50,3 +50,98 @@ body {
 .safe-pl { padding-left: env(safe-area-inset-left); }
 .safe-pr { padding-right: env(safe-area-inset-right); }
 .safe-px { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+
+/* ────────────────────────────────────────────────────────────────────────
+   Engineer Mode — Premium 限定的深色 IDE/終端機皮膚。
+   由 EngineerModeContext 在 <html> 掛上 `.dark`（深色）與 `.eng-mode`
+   （等寬標題）。因為全站顏色是硬編碼的 Tailwind utility class 而非
+   CSS 變數，這裡用高權重的 `.dark .<utility>` 覆蓋把最常見的表面 /
+   文字 / 邊框 / 漸層翻成深色，一次套用整站、不用改元件。
+   調色參考 GitHub Dark：底 #0D1117、卡面 #161B22、邊框 #30363D。
+   ──────────────────────────────────────────────────────────────────────── */
+.dark body { color: #E6EDF3; background-color: #0D1117; }
+
+/* 頁面底色 / 奶油背景 → 近黑 */
+.dark .bg-petal-cream,
+.dark .bg-pink-50,
+.dark .bg-rose-50,
+.dark .bg-purple-50,
+.dark .bg-gray-50,
+.dark .bg-lavender-bg { background-color: #0D1117 !important; }
+
+/* 卡面 / 白底 → 深灰 surface */
+.dark .bg-white,
+.dark .bg-petal-cream-2,
+.dark .bg-pink-100,
+.dark .bg-rose-100,
+.dark .bg-gray-100 { background-color: #161B22 !important; }
+
+/* 次級表面 / 淡色 chip 底 → surface-2 */
+.dark .bg-petal-rose-soft,
+.dark .bg-petal-cream-2\/40,
+.dark .bg-petal-cream-2\/50,
+.dark .bg-gray-200 { background-color: #1C2128 !important; }
+
+/* 主要 CTA（原本近黑按鈕）→ 終端機綠，深底上才跳得出來 */
+.dark .bg-petal-ink { background-color: #238636 !important; }
+
+/* 文字：主 / 次 / 靜音 */
+.dark .text-petal-ink,
+.dark .text-gray-900,
+.dark .text-gray-800 { color: #E6EDF3 !important; }
+.dark .text-petal-ink-soft,
+.dark .text-gray-700,
+.dark .text-gray-600 { color: #ADBAC7 !important; }
+.dark .text-petal-muted,
+.dark .text-gray-500,
+.dark .text-gray-400 { color: #8B949E !important; }
+
+/* 玫瑰粉強調字 → 亮一點的珊瑚，深底可讀 */
+.dark .text-pink-600,
+.dark .text-pink-700,
+.dark .text-rose-600 { color: #FF8B7E !important; }
+
+/* 邊框 / 分隔線 */
+.dark .border-petal-rule,
+.dark .border-petal-rule-soft,
+.dark .border-gray-200,
+.dark .border-gray-300,
+.dark .border { border-color: #30363D !important; }
+
+/* 漸層背景 → 深色平面（避免亮色漸層破功） */
+.dark .bg-petal-paper,
+.dark .bg-card-gradient,
+.dark .bg-lavender-bg\/50 { background-image: none !important; background-color: #161B22 !important; }
+
+/* 陰影收斂：奶油系陰影在深底會變髒 */
+.dark .shadow-lg,
+.dark .shadow-petal,
+.dark .shadow-card,
+.dark .shadow-romantic { box-shadow: 0 8px 24px -12px rgba(0,0,0,0.7) !important; }
+
+/* 表單控制項 */
+.dark input,
+.dark select,
+.dark textarea {
+  background-color: #0D1117 !important;
+  border-color: #30363D !important;
+  color: #E6EDF3 !important;
+}
+.dark input::placeholder,
+.dark textarea::placeholder { color: #6E7681 !important; }
+
+/* 深色卷軸 */
+.dark ::-webkit-scrollbar-track { background: #161B22; }
+.dark ::-webkit-scrollbar-thumb { background: #30363D; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #484F58; }
+
+/* eng-mode：標題改等寬、去掉編輯體斜體，更像 code。 */
+.eng-mode h1,
+.eng-mode h2,
+.eng-mode h3,
+.eng-mode .font-display {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, 'Cascadia Code',
+    'Noto Sans TC', monospace !important;
+  font-style: normal !important;
+  letter-spacing: -0.01em !important;
+}
