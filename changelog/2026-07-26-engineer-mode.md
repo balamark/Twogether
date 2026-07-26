@@ -1,0 +1,1 @@
+- **工程師模式（Premium 彩蛋）**: 在「設定」新增一個 Premium 限定開關，一鍵把整個 App 切換成工程師的深色終端機介面，所有詞彙改用 on-call 事故處理黑話——吵架變「開 Incident」、和好變「Postmortem」、傳親密邀請變「開 Merge Request」。純好玩、隨時可關，偏好記在本機。

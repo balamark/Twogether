@@ -40,6 +40,8 @@ import { parseScript } from './utils/script';
 import { clientLog } from './utils/telemetry';
 import { TimezoneProvider } from './contexts/TimezoneContext';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsProvider';
+import { EngineerModeProvider } from './contexts/EngineerModeProvider';
+import EngineerTextEngine from './components/EngineerTextEngine';
 import { useScrollLock } from './hooks/useScrollLock';
 import { usePageTracking } from './hooks/usePageTracking';
 
@@ -2347,6 +2349,9 @@ const LoveTimeApp = () => {
   return (
     <FeatureFlagsProvider>
     <TimezoneProvider value={primaryTimezone}>
+    <EngineerModeProvider isPremium={billingStatus?.tier === 'premium'}>
+    {/* 工程師模式的文字翻譯引擎：只在模式生效時運作，把畫面文案換成黑話。 */}
+    <EngineerTextEngine />
     <div className="min-h-screen bg-petal-cream">
       {/* Header */}
       <Header
@@ -2917,6 +2922,7 @@ const LoveTimeApp = () => {
         </div>
       )}
     </div>
+    </EngineerModeProvider>
     </TimezoneProvider>
     </FeatureFlagsProvider>
   );

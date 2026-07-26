@@ -7,6 +7,7 @@ import { resolveCompanion } from '../utils/aiCompanions';
 import { averageCycleLength, predictNextPeriodStart, ovulationWindow, computeCycleLengths } from '../utils/cycle';
 import { TIMEZONE_OPTIONS } from '../utils/timezone-options';
 import { formatYmdInTz, browserTz as getBrowserTz } from '../utils/datetime';
+import { useEngineerMode } from '../contexts/EngineerModeContext';
 
 interface Nicknames {
   partner1: string;
@@ -113,6 +114,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [newEmotion, setNewEmotion] = useState('');
   const [editingCompanion, setEditingCompanion] = useState(false);
   const [isSavingCompanion, setIsSavingCompanion] = useState(false);
+  // 工程師模式（Premium 彩蛋）— 開關與權限都由 EngineerModeContext 提供。
+  const engineer = useEngineerMode();
 
   const addMemoryQuestion = () => {
     const trimmed = newMemoryQuestion.trim();
@@ -847,6 +850,57 @@ const SettingsView: React.FC<SettingsViewProps> = ({
             {isSavingSettings ? '保存中…' : '保存設定 →'}
           </button>
         </div>
+      </div>
+
+      {/* 工程師模式（Incident Mode）— Premium 限定的趣味彩蛋。開啟後整個 App
+          變成深色 IDE 介面，文案改用 on-call 事故處理黑話。非 Premium 顯示
+          三段式 gate：為什麼被擋 + 你可以做什麼 + 下一步。 */}
+      <div
+        className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
+        data-testid="settings-engineer-mode"
+        data-no-eng
+      >
+        <h3 className="text-lg font-bold text-gray-800 mb-1 flex items-center gap-2">
+          <span>工程師模式</span>
+          <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-petal-ink text-petal-cream tracking-wide">
+            PREMIUM
+          </span>
+        </h3>
+        <p className="text-xs text-gray-500 mb-4 leading-relaxed">
+          把整個 App 切換成工程師的深色終端機介面，所有詞彙改用 on-call 事故處理的黑話——
+          吵架變成「開 Incident」、和好變成「Postmortem」、傳親密邀請變成「開 Merge Request」、
+          記錄時光變成「Commit」。純好玩，隨時可以關掉。
+        </p>
+
+        {engineer.canUse ? (
+          <label className="flex items-start justify-between gap-4 cursor-pointer">
+            <div className="flex-1">
+              <div className="text-sm font-medium text-gray-700">
+                啟用工程師模式（Incident Mode）
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {engineer.enabled ? '目前：ON ● twogether-prod ● live' : '目前：OFF'}
+              </p>
+            </div>
+            <input
+              type="checkbox"
+              data-testid="engineer-mode-toggle"
+              checked={engineer.enabled}
+              onChange={() => engineer.toggle()}
+              className="w-5 h-5 mt-1 accent-red-500"
+            />
+          </label>
+        ) : (
+          <div className="rounded-lg border border-petal-rule bg-petal-cream-2/40 p-4">
+            <div className="text-sm font-medium text-gray-700 mb-1">
+              這是 Premium 專屬的趣味功能
+            </div>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              目前你的方案還無法使用。升級 Premium 後即可解鎖——
+              從右上角選單 →「升級 Premium」完成升級，再回到這裡就能一鍵切換工程師黑話介面。
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6">
