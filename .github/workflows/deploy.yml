@@ -155,6 +155,43 @@ jobs:
           echo "🗄️ Running production database migrations..."
           npm run migrate
 
+      # App Engine caps an app at 210 versions and a new deploy fails once the
+      # cap is hit. We never pruned versions before (only container images), so
+      # they accumulated. Prune BEFORE deploying so there's always room: keep
+      # the 3 newest versions of the 'default' service and delete the rest —
+      # but never the version currently serving traffic.
+      - name: Clean up old App Engine versions (keep 3 newest)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          set +e
+          SERVICE=default
+          KEEP=3
+          echo "🧹 Pruning old '$SERVICE' versions (keeping the $KEEP newest, never the one serving traffic)..."
+          # Versions receiving traffic must never be deleted.
+          SERVING=$(gcloud app versions list --service="$SERVICE" \
+            --filter="traffic_split>0" --format="value(id)" \
+            --project=${{ env.PROJECT_ID }})
+          # All versions, newest first; skip the newest $KEEP — the rest are prune candidates.
+          CANDIDATES=$(gcloud app versions list --service="$SERVICE" \
+            --sort-by="~version.createTime" --format="value(id)" \
+            --project=${{ env.PROJECT_ID }} | tail -n +$((KEEP + 1)))
+          TO_DELETE=""
+          for v in $CANDIDATES; do
+            if echo "$SERVING" | grep -qx "$v"; then
+              echo "Skipping serving version: $v"
+              continue
+            fi
+            TO_DELETE="$TO_DELETE $v"
+          done
+          if [ -n "$TO_DELETE" ]; then
+            echo "Deleting old versions:$TO_DELETE"
+            gcloud app versions delete $TO_DELETE --service="$SERVICE" --quiet \
+              --project=${{ env.PROJECT_ID }} || echo "⚠️ Some versions could not be deleted (continuing)"
+            echo "✅ Version cleanup completed"
+          else
+            echo "ℹ️ No old versions to prune (3 or fewer exist)"
+          fi
+
       - name: Deploy to App Engine
         if: github.ref == 'refs/heads/main'
         timeout-minutes: 15
@@ -293,6 +330,37 @@ jobs:
         run: |
           echo "🗄️ Running staging database migrations..."
           npm run migrate
+
+      # Same version-cap guard as prod, scoped to the 'staging' service so PR
+      # staging deploys don't pile up toward the app's 210-version limit.
+      - name: Clean up old App Engine versions (staging, keep 3 newest)
+        run: |
+          set +e
+          SERVICE=staging
+          KEEP=3
+          echo "🧹 Pruning old '$SERVICE' versions (keeping the $KEEP newest, never the one serving traffic)..."
+          SERVING=$(gcloud app versions list --service="$SERVICE" \
+            --filter="traffic_split>0" --format="value(id)" \
+            --project=${{ env.PROJECT_ID }})
+          CANDIDATES=$(gcloud app versions list --service="$SERVICE" \
+            --sort-by="~version.createTime" --format="value(id)" \
+            --project=${{ env.PROJECT_ID }} | tail -n +$((KEEP + 1)))
+          TO_DELETE=""
+          for v in $CANDIDATES; do
+            if echo "$SERVING" | grep -qx "$v"; then
+              echo "Skipping serving version: $v"
+              continue
+            fi
+            TO_DELETE="$TO_DELETE $v"
+          done
+          if [ -n "$TO_DELETE" ]; then
+            echo "Deleting old versions:$TO_DELETE"
+            gcloud app versions delete $TO_DELETE --service="$SERVICE" --quiet \
+              --project=${{ env.PROJECT_ID }} || echo "⚠️ Some versions could not be deleted (continuing)"
+            echo "✅ Version cleanup completed"
+          else
+            echo "ℹ️ No old versions to prune (3 or fewer exist)"
+          fi
 
       - name: Deploy to App Engine (staging)
         timeout-minutes: 15
