@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Star, Send, CheckCircle2, Clock, EyeOff } from 'lucide-react';
 import { apiService } from '../services/api';
+import { useAsyncAction } from '../hooks/useAsyncAction';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -42,7 +43,6 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({ authState, showNotification
   const [hoverRating, setHoverRating] = useState(0);
   const [body, setBody] = useState('');
   const [displayName, setDisplayName] = useState(authState.user?.nickname || '');
-  const [submitting, setSubmitting] = useState(false);
   const [mine, setMine] = useState<MyFeedback[]>([]);
 
   const loadMine = async () => {
@@ -56,28 +56,13 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({ authState, showNotification
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authState.isAuthenticated]);
 
-  if (!authState.isAuthenticated) {
-    return (
-      <div className="max-w-md mx-auto py-12 text-center">
-        <h2 className="font-display text-2xl text-petal-ink mb-3">意見回饋</h2>
-        <p className="font-body text-sm text-petal-ink-soft mb-6">登入後即可分享你的使用心得。</p>
-        <button
-          onClick={() => setShowAuthModal(true)}
-          className="bg-petal-ink text-petal-cream px-7 py-3 rounded-md hover:bg-pink-700 transition-colors font-display italic"
-        >
-          立即登入 →
-        </button>
-      </div>
-    );
-  }
-
-  const handleSubmit = async () => {
+  // Declared before the early return below so the Hook runs on every render.
+  const { run: handleSubmit, pending: submitting } = useAsyncAction(async () => {
     const trimmed = body.trim();
     if (trimmed.length === 0) {
       showNotification({ type: 'warning', title: '還沒寫內容', message: '請寫下你的使用心得再送出。' });
       return;
     }
-    setSubmitting(true);
     try {
       const res = await apiService.submitFeedback({
         rating,
@@ -99,10 +84,23 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({ authState, showNotification
         title: '送出失敗',
         message: err?.message || '送出評價失敗，請稍後再試。',
       });
-    } finally {
-      setSubmitting(false);
     }
-  };
+  });
+
+  if (!authState.isAuthenticated) {
+    return (
+      <div className="max-w-md mx-auto py-12 text-center">
+        <h2 className="font-display text-2xl text-petal-ink mb-3">意見回饋</h2>
+        <p className="font-body text-sm text-petal-ink-soft mb-6">登入後即可分享你的使用心得。</p>
+        <button
+          onClick={() => setShowAuthModal(true)}
+          className="bg-petal-ink text-petal-cream px-7 py-3 rounded-md hover:bg-pink-700 transition-colors font-display italic"
+        >
+          立即登入 →
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-xl mx-auto py-6 px-4" data-testid="feedback-view">

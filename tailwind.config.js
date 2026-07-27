@@ -137,8 +137,13 @@ export default {
         'float':      'float 3s ease-in-out infinite',
         'glow':       'glow 2s ease-in-out infinite alternate',
         'scale-hover':'scale-hover 0.3s ease-in-out',
+        'toast-in':   'toast-in 0.25s ease-out',
       },
       keyframes: {
+        'toast-in': {
+          '0%':   { opacity: '0', transform: 'translateY(-12px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
         heartbeat: {
           '0%, 100%': { transform: 'scale(1)' },
           '50%':      { transform: 'scale(1.05)' },

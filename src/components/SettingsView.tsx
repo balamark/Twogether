@@ -8,6 +8,8 @@ import { averageCycleLength, predictNextPeriodStart, ovulationWindow, computeCyc
 import { TIMEZONE_OPTIONS } from '../utils/timezone-options';
 import { formatYmdInTz, browserTz as getBrowserTz } from '../utils/datetime';
 import { useEngineerMode } from '../contexts/EngineerModeContext';
+import { useAsyncAction } from '../hooks/useAsyncAction';
+import { Spinner } from './ui/Spinner';
 
 interface Nicknames {
   partner1: string;
@@ -734,6 +736,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({
       }
     }
   };
+
+  // Neither pairing button had an in-flight guard — a double-tap could generate
+  // multiple codes or fire the pairing attempt twice.
+  const { run: generateCode, pending: generatingCode } = useAsyncAction(handleGenerateCode);
+  const { run: pairWithCode, pending: pairing } = useAsyncAction(handlePairWithCode);
 
   const handleSendEmailInvitation = async () => {
     try {
@@ -1686,10 +1693,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                   </p>
                   <div className="space-y-4">
                     <button
-                      onClick={handleGenerateCode}
-                      className="w-full bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600 transition-colors"
+                      onClick={generateCode}
+                      disabled={generatingCode}
+                      className="w-full bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600 transition-colors inline-flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      生成配對碼
+                      {generatingCode && <Spinner />}
+                      {generatingCode ? '生成中…' : '生成配對碼'}
                     </button>
                     {generatedCode && (
                       <div className="p-4 bg-white rounded-lg border">
@@ -1726,10 +1735,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                           maxLength={8}
                         />
                         <button
-                          onClick={handlePairWithCode}
-                          className="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600 transition-colors"
+                          onClick={pairWithCode}
+                          disabled={pairing}
+                          className="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600 transition-colors inline-flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                          配對
+                          {pairing && <Spinner />}
+                          {pairing ? '配對中…' : '配對'}
                         </button>
                       </div>
                     </div>

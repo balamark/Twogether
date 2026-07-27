@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ArrowLeft, Send, Loader2, ShieldCheck, Link2, CheckCircle2 } from 'lucide-react';
 import { apiService } from '../services/api';
 
@@ -34,12 +34,14 @@ export default function ArticleComposeFlow({
   const [sourceAuthor, setSourceAuthor] = useState('');
   const [tagsInput, setTagsInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const submitLockRef = useRef(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const bodyLen = body.trim().length;
 
   const submit = async () => {
+    if (submitLockRef.current) return; // drop a same-tick second click
     const t = title.trim();
     if (t.length < 4) {
       setError('標題至少需要 4 個字，讓別人一眼看懂這篇在講什麼');
@@ -59,6 +61,7 @@ export default function ArticleComposeFlow({
       return;
     }
     setError(null);
+    submitLockRef.current = true;
     setSubmitting(true);
     const tags = tagsInput
       .split(/[,，\s]+/)
@@ -89,6 +92,8 @@ export default function ArticleComposeFlow({
         setError(e.message || '分享失敗，請稍後再試');
       }
       setSubmitting(false);
+    } finally {
+      submitLockRef.current = false;
     }
   };
 

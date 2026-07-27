@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useAsyncAction } from '../hooks/useAsyncAction';
 import { Send, Trash2, Sparkles, X, HeartHandshake } from 'lucide-react';
 import { apiService, type WallReply, type MessageTranslationMap } from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -37,7 +38,6 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
   const [replies, setReplies] = useState<WallReply[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState('');
-  const [sending, setSending] = useState(false);
   const [aiPreview, setAiPreview] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPosting, setAiPosting] = useState(false);
@@ -114,10 +114,9 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
     }
   };
 
-  const handleSend = async () => {
+  const { run: handleSend, pending: sending } = useAsyncAction(async () => {
     const trimmed = draft.trim();
     if (!trimmed) return;
-    setSending(true);
     try {
       const reply = await apiService.createWallPostReply(postId, trimmed);
       setReplies((prev) => {
@@ -130,10 +129,8 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
       if (translationEnabled) loadTranslations();
     } catch (err) {
       onError?.(err instanceof Error ? err.message : '回覆失敗');
-    } finally {
-      setSending(false);
     }
-  };
+  });
 
   const handleDelete = async (replyId: string) => {
     if (!confirm('確定要刪除這則回覆嗎？')) return;

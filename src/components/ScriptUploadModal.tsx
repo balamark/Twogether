@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import { X, Trash2, FileDown } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { useAsyncAction } from '../hooks/useAsyncAction';
+import { Button } from './ui/Button';
 import { detectScriptSpeakers, applySpeakerAssignments, isVideoUrl, VIDEO_MAX_BYTES } from '../utils/script';
 import { apiService } from '../services/api';
 import type { RoleplayScript } from '../App';
@@ -284,7 +286,7 @@ const ScriptUploadModal = ({
     onClose();
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const tags = scriptData.tags.split(',').map(tag => tag.trim()).filter(tag => tag);
     // Rewrite gender-assigned speaker names to [男]/[女] tokens; names left
@@ -296,7 +298,7 @@ const ScriptUploadModal = ({
     }
     const content = applySpeakerAssignments(scriptData.content, genderAssignments);
     if (isEditMode && editingScript) {
-      updateCustomScript(editingScript.id, {
+      await updateCustomScript(editingScript.id, {
         title: scriptData.title,
         category: scriptData.category,
         scenario: scriptData.scenario,
@@ -309,7 +311,7 @@ const ScriptUploadModal = ({
         isPublic,
       });
     } else {
-      addCustomScript(
+      await addCustomScript(
         scriptData.title,
         scriptData.category,
         scriptData.scenario,
@@ -321,6 +323,10 @@ const ScriptUploadModal = ({
       );
     }
   };
+
+  // The submit button had no in-flight lock — a double-click created duplicate
+  // scripts (and duplicate +200 coin grants on create).
+  const { run: submitScript, pending: submittingScript } = useAsyncAction(handleSubmit);
 
   return (
     <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -360,7 +366,7 @@ const ScriptUploadModal = ({
             </ul>
           </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={submitScript} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="script-title" className="block text-sm font-medium text-gray-700 mb-2">
@@ -714,13 +720,15 @@ const ScriptUploadModal = ({
                 取消
               </button>
             )}
-            <button
+            <Button
               type="submit"
+              loading={submittingScript}
+              loadingText={isEditMode ? '保存中…' : '上傳中…'}
               data-testid="script-upload-submit-button"
-              className="flex-1 bg-petal-ink text-petal-cream py-3 rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
+              className="flex-1 py-3 text-base"
             >
               {isEditMode ? '保存修改 →' : '上傳劇本 (+200 金幣)'}
-            </button>
+            </Button>
           </div>
           {isEditMode && editingScript && (
             <div className="pt-3 mt-2 border-t border-petal-rule">

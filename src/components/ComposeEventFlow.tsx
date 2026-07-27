@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ShieldCheck, Sparkles, ArrowLeft, ArrowRight, Send, Tag, AlertTriangle, Loader2, Pencil } from 'lucide-react';
 import apiService, {
   type IcebreakerPreview,
@@ -45,6 +45,7 @@ const VERSION_META: { key: EventVersionKey; label: string; desc: string; accent:
 
 export default function ComposeEventFlow({ onCreated, onCancel, showNotification }: ComposeEventFlowProps) {
   const [step, setStep] = useState<Step>('input');
+  const submitLockRef = useRef(false);
   const { quota, refresh: refreshQuota } = useAiQuota();
   const [rawText, setRawText] = useState('');
   const [preview, setPreview] = useState<IcebreakerPreview | null>(null);
@@ -89,6 +90,9 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
 
   const submitEvent = async () => {
     if (!preview) return;
+    // Synchronous lock: `disabled` via step alone leaves a render-race window
+    // where a fast double-click creates two events.
+    if (submitLockRef.current) return;
     const summary = summaryDraft.trim();
     if (summary.length === 0) {
       setError('對話簡介不可為空');
@@ -111,6 +115,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
       }
     }
     setError(null);
+    submitLockRef.current = true;
     setStep('submitting');
     try {
       const event = await apiService.createEvent({
@@ -143,6 +148,8 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
       const msg = err instanceof Error ? err.message : '建立對話失敗';
       setError(msg);
       setStep('select');
+    } finally {
+      submitLockRef.current = false;
     }
   };
 

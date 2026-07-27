@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Heart, Clock, Send, Sparkles, X, RefreshCw, Wand2, ThumbsUp, ThumbsDown, Check } from 'lucide-react';
 import { apiService } from '../services/api';
 import type {
@@ -332,7 +332,13 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
 
   // Thumb up posts immediately. Thumb down opens an optional reason box and
   // posts once on 送出 (so a down is one row, optionally carrying the text).
+  // A synchronous per-level lock stops a double-tap from writing duplicate
+  // feedback rows (the fire-and-forget POST had no guard).
+  const feedbackLockRef = useRef<Set<string>>(new Set());
+  const sendLockRef = useRef(false);
   const sendFeedback = function (m: RoleplayMessageSuggestion, rating: 'up' | 'down', feedbackText?: string) {
+    if (feedbackLockRef.current.has(m.level)) return;
+    feedbackLockRef.current.add(m.level);
     setFeedbackGiven((prev) => ({ ...prev, [m.level]: rating }));
     apiService.submitRoleplayMessageFeedback({
       scriptId: selectedScript?.id,
@@ -387,6 +393,10 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
   };
 
   const handleSendRequest = async function () {
+    // Ref lock closes the render-race window that `disabled={loading}` alone
+    // leaves open: two clicks in the same tick would both send an invitation.
+    if (sendLockRef.current) return;
+    sendLockRef.current = true;
     try {
       setLoading(true);
       setError(null);
@@ -423,6 +433,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
       setError(err instanceof Error ? err.message : '發送失敗');
     } finally {
       setLoading(false);
+      sendLockRef.current = false;
     }
   };
 

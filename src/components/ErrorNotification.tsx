@@ -75,7 +75,7 @@ const ErrorNotification: React.FC<ErrorNotificationProps> = ({ notification, onC
   };
 
   return (
-    <div className={`border rounded-lg p-4 shadow-lg ${getBackgroundColor()} transition-all duration-300 ease-in-out`}>
+    <div className={`border rounded-lg p-4 shadow-lg ${getBackgroundColor()} animate-toast-in transition-all duration-300 ease-in-out`}>
       <div className="flex items-start space-x-3">
         <div className="flex-shrink-0">
           {getIcon()}
@@ -122,7 +122,7 @@ export const NotificationContainer: React.FC<NotificationContainerProps> = ({ no
   if (notifications.length === 0) return null;
 
   return (
-    <div className="fixed top-4 right-4 left-4 sm:left-auto z-[60] space-y-3 sm:max-w-md w-auto pointer-events-none [&>*]:pointer-events-auto">
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] space-y-3 w-[calc(100%-2rem)] sm:max-w-md pointer-events-none [&>*]:pointer-events-auto">
       {notifications.map((notification) => (
         <ErrorNotification
           key={notification.id}

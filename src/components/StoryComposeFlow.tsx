@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Send, Loader2, Lightbulb, ShieldCheck, Tag, CheckCircle2, Sparkles } from 'lucide-react';
 import { apiService, type StorySections, type StoryInsight } from '../services/api';
 
@@ -69,6 +69,7 @@ export default function StoryComposeFlow({
   showNotification: (n: NotificationInput) => void;
 }) {
   const [step, setStep] = useState<Step>('intro');
+  const submitLockRef = useRef(false);
   const [sections, setSections] = useState<StorySections>({
     context: '', happened: '', impact: '', tried: '', repair: '', now: '',
   });
@@ -143,7 +144,11 @@ export default function StoryComposeFlow({
       setError('標題至少需要 4 個字');
       return;
     }
+    // Synchronous lock closes the double-click window that `step`-based
+    // disabling leaves open, so a story can't be published twice.
+    if (submitLockRef.current) return;
     setError(null);
+    submitLockRef.current = true;
     setStep('submitting');
     const tags = tagsInput
       .split(/[,，\s]+/)
@@ -165,6 +170,8 @@ export default function StoryComposeFlow({
       // Jump back to the offending section when the server names one.
       const idx = SECTION_STEPS.findIndex((s) => s.key === (e as { section?: string }).section);
       setStep(idx >= 0 ? idx : 'meta');
+    } finally {
+      submitLockRef.current = false;
     }
   };
 
