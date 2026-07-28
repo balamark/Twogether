@@ -76,6 +76,9 @@ adds a fragment file in `changelog/`; CI compiles them into the block below —
 see `CLAUDE.md`.)
 
 <!-- changelog:begin (generated from changelog/*.md — edit those, not this) -->
+### 2026-07-27
+- **防止重複送出、反饋更即時**: 所有送出／建立按鈕（做親密紀錄、金幣兌換、發布貼文、發送邀請等）按下後會立刻顯示「處理中…」並鎖住，手殘連點也不會再送出兩次、產生重複紀錄；成功通知也從右上角移到畫面上方置中，更容易看見。
+
 ### 2026-07-26
 - **工程師模式（Premium 彩蛋）**: 在「設定」新增一個 Premium 限定開關，一鍵把整個 App 切換成工程師的深色終端機介面，所有詞彙改用 on-call 事故處理黑話——吵架變「開 Incident」、和好變「Postmortem」、傳親密邀請變「開 Merge Request」。純好玩、隨時可關，偏好記在本機。
 
