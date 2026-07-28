@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { X, Play, Heart, Flag, Send, Trash2, EyeOff } from 'lucide-react';
 import StarRating from './StarRating';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -126,8 +126,11 @@ export default function MarketplaceScriptDetail({
     }
   };
 
+  const favLockRef = useRef(false);
   const handleFavoriteClick = async () => {
     if (!script) return;
+    if (favLockRef.current) return; // ignore rapid re-taps mid-toggle
+    favLockRef.current = true;
     try {
       await onToggleFavorite(scriptId);
       // Optimistic-ish: flip flag locally, will reconcile when parent refetches.
@@ -139,6 +142,8 @@ export default function MarketplaceScriptDetail({
         message: (err as Error)?.message || '請稍後再試',
         duration: 4000,
       });
+    } finally {
+      favLockRef.current = false;
     }
   };
 
@@ -167,7 +172,10 @@ export default function MarketplaceScriptDetail({
     }
   };
 
+  const reportLockRef = useRef(false);
   const handleReport = async () => {
+    if (reportLockRef.current) return; // one report per open
+    reportLockRef.current = true;
     try {
       await apiService.reportScript(scriptId, reportReason, reportDetail.trim() || undefined);
       setShowReport(false);
@@ -185,6 +193,8 @@ export default function MarketplaceScriptDetail({
         message: (err as Error)?.message || '請稍後再試',
         duration: 4000,
       });
+    } finally {
+      reportLockRef.current = false;
     }
   };
 

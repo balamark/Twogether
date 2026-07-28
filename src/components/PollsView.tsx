@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Users, MessageCircle, Loader2, Send, Flag, ChevronDown, ChevronUp } from 'lucide-react';
 import { apiService, type CommunityPoll, type PollVoice } from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -93,12 +93,18 @@ function PollCard({
     }
   };
 
+  // Report is fire-and-forget with no guard; lock per voice so a double-tap
+  // doesn't file duplicate reports.
+  const reportedRef = useRef<Set<string>>(new Set());
   const reportVoice = async (voiceId: string) => {
     if (!isAuthenticated) { onRequireLogin(); return; }
+    if (reportedRef.current.has(voiceId)) return;
+    reportedRef.current.add(voiceId);
     try {
       await apiService.reportPollVoice(voiceId, 'inappropriate');
       showNotification({ type: 'success', title: '已收到你的檢舉', message: '我們會盡快處理' });
     } catch (err) {
+      reportedRef.current.delete(voiceId); // allow retry on failure
       showNotification({ type: 'error', title: '檢舉失敗', message: err instanceof Error ? err.message : '請稍後再試' });
     }
   };

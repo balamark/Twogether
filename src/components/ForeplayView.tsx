@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Coins, Clock, Play, Sparkles, X } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { useAsyncAction } from '../hooks/useAsyncAction';
+import { Spinner } from './ui/Spinner';
 import { apiService } from '../services/api';
 import type { ForeplayActivity, PositionSuggestion, Notification } from '../App';
 
@@ -157,6 +159,19 @@ const ForeplayView = ({ setTotalCoins, showNotification }: ForeplayViewProps) =>
   useScrollLock(!!selectedActivity);
   useScrollLock(!!selectedPosition);
 
+  // These reward buttons award coins with no idempotency, so a double-tap used
+  // to grant coins twice. The hook's ref lock drops the second click; `earningKey`
+  // just tells us which card to spin (a human taps one at a time).
+  const [earningKey, setEarningKey] = useState<string | null>(null);
+  const { run: earnCoins } = useAsyncAction(async (key: string, fn: () => Promise<void>) => {
+    setEarningKey(key);
+    try {
+      await fn();
+    } finally {
+      setEarningKey(null);
+    }
+  });
+
   const handleTryActivity = async (activity: ForeplayActivity) => {
     const coinsEarned = activity.coins;
 
@@ -243,11 +258,12 @@ const ForeplayView = ({ setTotalCoins, showNotification }: ForeplayViewProps) =>
                   {activity.duration}
                 </span>
                 <button
-                  onClick={() => handleTryActivity(activity)}
-                  className="px-4 py-1.5 bg-petal-ink text-petal-cream rounded-full hover:bg-pink-700 transition-colors flex items-center space-x-1.5 font-display italic text-sm"
+                  onClick={() => earnCoins(`activity-${index}`, () => handleTryActivity(activity))}
+                  disabled={earningKey === `activity-${index}`}
+                  className="px-4 py-1.5 bg-petal-ink text-petal-cream rounded-full hover:bg-pink-700 transition-colors flex items-center space-x-1.5 font-display italic text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <Play className="w-3.5 h-3.5" strokeWidth={1.5} />
-                  <span>嘗試</span>
+                  {earningKey === `activity-${index}` ? <Spinner className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" strokeWidth={1.5} />}
+                  <span>{earningKey === `activity-${index}` ? '記錄中…' : '嘗試'}</span>
                 </button>
               </div>
               <button
@@ -294,10 +310,12 @@ const ForeplayView = ({ setTotalCoins, showNotification }: ForeplayViewProps) =>
                   詳細資訊
                 </button>
                 <button
-                  onClick={() => handleTryPosition(position)}
-                  className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                  onClick={() => earnCoins(`position-${index}`, () => handleTryPosition(position))}
+                  disabled={earningKey === `position-${index}`}
+                  className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors inline-flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  嘗試
+                  {earningKey === `position-${index}` && <Spinner className="w-3 h-3" />}
+                  {earningKey === `position-${index}` ? '記錄中…' : '嘗試'}
                 </button>
               </div>
             </div>
@@ -345,11 +363,12 @@ const ForeplayView = ({ setTotalCoins, showNotification }: ForeplayViewProps) =>
                   +{combo.bonusCoins} 獎勵
                 </div>
                 <button
-                  onClick={() => handleCompleteCombo(combo)}
-                  className="px-4 py-1.5 bg-petal-ink text-petal-cream rounded-full hover:bg-pink-700 transition-colors flex items-center space-x-1.5 font-display italic text-sm"
+                  onClick={() => earnCoins(`combo-${index}`, () => handleCompleteCombo(combo))}
+                  disabled={earningKey === `combo-${index}`}
+                  className="px-4 py-1.5 bg-petal-ink text-petal-cream rounded-full hover:bg-pink-700 transition-colors flex items-center space-x-1.5 font-display italic text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
-                  <span>完成組合技</span>
+                  {earningKey === `combo-${index}` ? <Spinner className="w-3.5 h-3.5" /> : <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />}
+                  <span>{earningKey === `combo-${index}` ? '記錄中…' : '完成組合技'}</span>
                 </button>
               </div>
             </div>

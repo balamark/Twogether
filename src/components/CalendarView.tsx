@@ -7,6 +7,8 @@ import RelationshipDashboard from './RelationshipDashboard';
 import { periodDateSet, fertileDateSet, predictedPeriodDateSet, addDays } from '../utils/cycle';
 import { formatYmdInTz } from '../utils/datetime';
 import { apiService } from '../services/api';
+import { useAsyncAction } from '../hooks/useAsyncAction';
+import { Button } from './ui/Button';
 import type { CycleRecord } from '../services/api';
 import type { IntimateRecord, AuthState, Notification } from '../App';
 
@@ -388,6 +390,10 @@ const CalendarView = ({
     });
   };
 
+  // Guard against double-submit: the record-save button had no in-flight lock,
+  // so a rapid double-tap created duplicate intimacy/cycle records (and coins).
+  const { run: submitRecord, pending: submittingRecord } = useAsyncAction(handleSubmitRecord);
+
   return (
     <div className="space-y-10">
       <RelationshipDashboard
@@ -718,18 +724,21 @@ const CalendarView = ({
               <div className="flex space-x-3 mt-6 pt-4 border-t border-petal-rule">
                 <button
                   onClick={() => { setShowRecordModal(false); setEditingRecord(null); }}
+                  disabled={submittingRecord}
                   data-testid="record-cancel-button"
-                  className="flex-1 px-4 py-3 border border-petal-rule text-petal-ink rounded-md hover:bg-petal-cream-2 transition-colors font-body text-sm"
+                  className="flex-1 px-4 py-3 border border-petal-rule text-petal-ink rounded-md hover:bg-petal-cream-2 transition-colors font-body text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   取消
                 </button>
-                <button
-                  onClick={handleSubmitRecord}
+                <Button
+                  onClick={submitRecord}
+                  loading={submittingRecord}
+                  loadingText={editingRecord ? '更新中…' : '保存中…'}
                   data-testid="record-submit-button"
-                  className="flex-1 px-4 py-3 bg-petal-ink text-petal-cream rounded-md hover:bg-pink-700 transition-colors font-display italic text-base"
+                  className="flex-1 px-4 py-3 text-base"
                 >
                   {editingRecord ? '更新記錄' : '保存記錄'}
-                </button>
+                </Button>
               </div>
             </div>
           </div>

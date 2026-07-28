@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X, Sparkles, Star, ImagePlus, Lock, Plus } from 'lucide-react';
 import { apiService, type WallPost, type WallPostCategory } from '../services/api';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { useAsyncAction } from '../hooks/useAsyncAction';
 import { isVideoUrl, VIDEO_MAX_BYTES } from '../utils/script';
 
 export interface WallExample {
@@ -48,7 +49,6 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
   const [moodTag, setMoodTag] = useState<string | null>(null);
   const [category, setCategory] = useState<WallPostCategory>('general');
   const [showTemplates, setShowTemplates] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Media: `existingMedia` are URLs already on the post (edit mode) the user can
   // remove; `newMedia` are freshly picked File objects to upload.
@@ -111,6 +111,36 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
   }, [newMedia]);
 
   useScrollLock(isOpen);
+
+  // useAsyncAction gives a synchronous ref lock (no double-submit) plus the
+  // `submitting` flag the button already relied on. Declared before the early
+  // return below so the Hook is called unconditionally on every render.
+  const { run: handleSubmit, pending: submitting } = useAsyncAction(async () => {
+    const totalMedia = existingMedia.length + newMedia.length;
+    if (!content.trim() && totalMedia === 0) {
+      setError('請輸入內容，或至少上傳一張照片或影片');
+      return;
+    }
+    if (content.length > MAX_CONTENT) {
+      setError(`內容不能超過 ${MAX_CONTENT} 字`);
+      return;
+    }
+    setError(null);
+    try {
+      await onSubmit({
+        content: content.trim(),
+        mood_tag: moodTag,
+        category,
+        media: newMedia,
+        is_private: isPrivate,
+        // In edit mode always send the kept list so removals are applied.
+        ...(editingPost ? { existingMedia } : {}),
+      });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '發布失敗，請稍後再試');
+    }
+  });
 
   if (!isOpen) return null;
 
@@ -175,35 +205,6 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
     setExistingMedia((prev) => prev.filter((_, i) => i !== idx));
   const removeNewMedia = (idx: number) =>
     setNewMedia((prev) => prev.filter((_, i) => i !== idx));
-
-  const handleSubmit = async () => {
-    if (!content.trim() && mediaCount === 0) {
-      setError('請輸入內容，或至少上傳一張照片或影片');
-      return;
-    }
-    if (content.length > MAX_CONTENT) {
-      setError(`內容不能超過 ${MAX_CONTENT} 字`);
-      return;
-    }
-    setSubmitting(true);
-    setError(null);
-    try {
-      await onSubmit({
-        content: content.trim(),
-        mood_tag: moodTag,
-        category,
-        media: newMedia,
-        is_private: isPrivate,
-        // In edit mode always send the kept list so removals are applied.
-        ...(editingPost ? { existingMedia } : {}),
-      });
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '發布失敗，請稍後再試');
-    } finally {
-      setSubmitting(false);
-    }
-  };
 
   return (
     <div

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Send,
@@ -104,6 +104,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const [error, setError] = useState<string | null>(null);
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
+  const sendLockRef = useRef(false);
   const [resolving, setResolving] = useState(false);
   const [rewriting, setRewriting] = useState(false);
   const [rewritePreview, setRewritePreview] = useState<ReplyRewritePreview | null>(null);
@@ -439,6 +440,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const sendReply = async () => {
     const content = reply.trim();
     if (!content) return;
+    if (sendLockRef.current) return; // drop a same-tick second click
+    sendLockRef.current = true;
     setSending(true);
     try {
       await apiService.replyToEvent(eventId, content);
@@ -459,6 +462,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       });
     } finally {
       setSending(false);
+      sendLockRef.current = false;
     }
   };
 

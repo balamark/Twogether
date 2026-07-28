@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Coins, Plus, X } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { useAsyncAction } from '../hooks/useAsyncAction';
+import { Button } from './ui/Button';
+import { Spinner } from './ui/Spinner';
 import type { CoinGift } from '../App';
 
 interface CoinShopViewProps {
@@ -39,11 +42,28 @@ const CoinShopView = ({
 
   const allGifts = [...defaultGifts, ...customGifts];
 
-  const handleAddGift = (e: React.FormEvent) => {
-    e.preventDefault();
-    addCustomGift(newGift.title, newGift.description, newGift.cost, newGift.category, newGift.icon);
-    setNewGift({ title: '', description: '', cost: 1000, category: 'service', icon: '🎁' });
-  };
+  // Both actions mutate the coin balance / create records with no backend
+  // idempotency key, so a double-click was a real duplicate-charge / duplicate-
+  // gift risk. The ref lock in useAsyncAction closes that window.
+  const { run: submitGift, pending: addingGift } = useAsyncAction(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+      await addCustomGift(newGift.title, newGift.description, newGift.cost, newGift.category, newGift.icon);
+      setNewGift({ title: '', description: '', cost: 1000, category: 'service', icon: '🎁' });
+    }
+  );
+  // The buy button is rendered per gift card, so track which one is in flight
+  // to spin only that card. The hook's ref lock still drops any concurrent
+  // second click (same or other card) so coins can't be double-spent.
+  const [purchasingId, setPurchasingId] = useState<string | null>(null);
+  const { run: buyGift } = useAsyncAction(async (gift: CoinGift) => {
+    setPurchasingId(gift.id);
+    try {
+      await purchaseGift(gift);
+    } finally {
+      setPurchasingId(null);
+    }
+  });
 
   return (
     <div className="space-y-10">
@@ -98,15 +118,16 @@ const CoinShopView = ({
             </div>
 
             <button
-              onClick={() => purchaseGift(gift)}
-              disabled={totalCoins < gift.cost}
-              className={`w-full py-2.5 rounded-md font-display italic text-base transition-colors ${
+              onClick={() => buyGift(gift)}
+              disabled={totalCoins < gift.cost || purchasingId === gift.id}
+              className={`w-full py-2.5 rounded-md font-display italic text-base transition-colors flex items-center justify-center gap-2 ${
                 totalCoins >= gift.cost
-                  ? 'bg-petal-ink text-petal-cream hover:bg-pink-700'
+                  ? 'bg-petal-ink text-petal-cream hover:bg-pink-700 disabled:opacity-40 disabled:cursor-not-allowed'
                   : 'bg-petal-cream-2 text-petal-muted cursor-not-allowed'
               }`}
             >
-              {totalCoins >= gift.cost ? '立即兌換 →' : '金幣不足'}
+              {purchasingId === gift.id && <Spinner />}
+              {totalCoins >= gift.cost ? (purchasingId === gift.id ? '兌換中…' : '立即兌換 →') : '金幣不足'}
             </button>
           </div>
         ))}
@@ -126,7 +147,7 @@ const CoinShopView = ({
               </button>
             </div>
 
-            <form onSubmit={handleAddGift} className="space-y-4">
+            <form onSubmit={submitGift} className="space-y-4">
               <div>
                 <label htmlFor="gift-title" className="block text-sm font-medium text-gray-700 mb-2">
                   禮品名稱
@@ -213,12 +234,14 @@ const CoinShopView = ({
                 </select>
               </div>
 
-              <button
+              <Button
                 type="submit"
-                className="w-full bg-petal-ink text-petal-cream py-3 rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
+                loading={addingGift}
+                loadingText="添加中…"
+                className="w-full py-3 text-base"
               >
                 添加禮品
-              </button>
+              </Button>
             </form>
           </div>
         </div>

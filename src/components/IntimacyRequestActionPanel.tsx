@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Heart, Check, Smile, Coffee, HandHeart } from 'lucide-react';
 import { apiService } from '../services/api';
 import type {
@@ -70,6 +70,7 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
   const [closing, setClosing] = useState<string>('');
 
   const [loading, setLoading] = useState(false);
+  const respondLockRef = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -85,6 +86,8 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
   }, [mode, alternativeOptions]);
 
   const handleAccept = async () => {
+    if (respondLockRef.current) return; // one response per request
+    respondLockRef.current = true;
     try {
       setLoading(true);
       setError(null);
@@ -97,6 +100,7 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
       setError(err instanceof Error ? err.message : '回應失敗');
     } finally {
       setLoading(false);
+      respondLockRef.current = false;
     }
   };
 
@@ -107,6 +111,8 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
 
   const handleSendAlternative = async () => {
     if (!canSendAlternative) return;
+    if (respondLockRef.current) return; // one response per request
+    respondLockRef.current = true;
     try {
       setLoading(true);
       setError(null);
@@ -124,6 +130,7 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
       setError(err instanceof Error ? err.message : '回應失敗');
     } finally {
       setLoading(false);
+      respondLockRef.current = false;
     }
   };
 
