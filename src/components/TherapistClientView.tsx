@@ -127,7 +127,13 @@ const ClientWall: React.FC<{
               {p.media.map((url) => (
                 <div key={url} className="aspect-video rounded-md overflow-hidden bg-petal-cream-2 border border-petal-rule flex items-center justify-center">
                   {isVideoUrl(url) ? (
-                    <video src={url} controls className="w-full h-full object-contain" />
+                    <video
+                      src={url}
+                      controls
+                      controlsList="nodownload"
+                      disablePictureInPicture
+                      className="w-full h-full object-contain"
+                    />
                   ) : (
                     <img src={url} alt="" className="w-full h-full object-contain" />
                   )}

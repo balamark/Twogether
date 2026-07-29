@@ -349,6 +349,10 @@ const WallView: React.FC<WallViewProps> = ({
                   key={`${url}-${idx}`}
                   src={url}
                   controls
+                  // The native controls menu has its own download button, which
+                  // the contextmenu block can't reach — turn it off.
+                  controlsList="nodownload"
+                  disablePictureInPicture
                   playsInline
                   preload="metadata"
                   onLoadedMetadata={(e) =>

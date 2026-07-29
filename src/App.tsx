@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, StickyNote, Trash2, Pencil, HeartHandshake, Crown, BookOpen } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import ActivityView from './components/ActivityView';
@@ -38,6 +38,7 @@ import type { CycleRecord, BillingStatus } from './services/api';
 import { getPrimaryTimezone, formatYmdInTz, browserTz } from './utils/datetime';
 import { parseScript } from './utils/script';
 import { clientLog } from './utils/telemetry';
+import { useMediaProtection } from './hooks/useMediaProtection';
 import { TimezoneProvider } from './contexts/TimezoneContext';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsProvider';
 import { EngineerModeProvider } from './contexts/EngineerModeProvider';
@@ -1378,6 +1379,31 @@ const LoveTimeApp = () => {
       setNotifications(prev => prev.filter(n => n.id !== id));
     }, notification.duration || 5000);
   };
+
+  // Photos/videos are not downloadable (see hooks/useMediaProtection). Say so
+  // once per tab session — a right-click that silently does nothing reads as a
+  // broken page, so the first attempt gets an explanation instead of silence.
+  // Held in refs so the document listeners register once instead of on every
+  // render (showNotification is re-created each render).
+  const mediaBlockNotifiedRef = useRef(false);
+  const mediaBlockCtxRef = useRef({ show: showNotification, view: currentView });
+  mediaBlockCtxRef.current = { show: showNotification, view: currentView };
+
+  useMediaProtection(
+    useCallback(() => {
+      console.debug('[media-protection] blocked save attempt');
+      if (mediaBlockNotifiedRef.current) return;
+      mediaBlockNotifiedRef.current = true;
+      const { show, view } = mediaBlockCtxRef.current;
+      clientLog('media_protection.blocked', { view });
+      show({
+        type: 'info',
+        title: '照片受保護',
+        message:
+          '這裡的照片只屬於你們，已關閉右鍵儲存與拖曳下載。想留存的話，請用你自己手邊的原始檔案。',
+      });
+    }, []),
+  );
 
   // Optimistic toggle for roleplay script favorites — flips local set first,
   // rolls back and notifies on API failure.

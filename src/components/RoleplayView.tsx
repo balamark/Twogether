@@ -1459,8 +1459,11 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               <video
                 src={lightboxPhotos[lightboxIndex]}
                 onClick={(e) => e.stopPropagation()}
-                // Full-screen viewer gets full playback controls + sound.
+                // Full-screen viewer gets full playback controls + sound, minus
+                // the native download button (see hooks/useMediaProtection).
                 controls
+                controlsList="nodownload"
+                disablePictureInPicture
                 autoPlay
                 playsInline
                 className="block max-h-full max-w-full w-auto h-auto object-contain cursor-default"
