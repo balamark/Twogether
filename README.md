@@ -76,6 +76,9 @@ adds a fragment file in `changelog/`; CI compiles them into the block below —
 see `CLAUDE.md`.)
 
 <!-- changelog:begin (generated from changelog/*.md — edit those, not this) -->
+### 2026-07-29
+- **工程師模式看得清楚了**: 修好深色模式下部分區塊「淺底配淺字」看不見的問題——通知中心的未讀通知、成功／錯誤／警告提示、衝突提醒橫幅等，現在都是深色底配亮色字，未讀通知也還是看得出來是未讀。
+
 ### 2026-07-27
 - **防止重複送出、反饋更即時**: 所有送出／建立按鈕（做親密紀錄、金幣兌換、發布貼文、發送邀請等）按下後會立刻顯示「處理中…」並鎖住，手殘連點也不會再送出兩次、產生重複紀錄；成功通知也從右上角移到畫面上方置中，更容易看見。
 
