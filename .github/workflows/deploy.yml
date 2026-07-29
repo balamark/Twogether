@@ -87,6 +87,9 @@ jobs:
       - name: Validate admin dashboard inline script
         run: npm run check:admin
 
+      - name: Validate Engineer Mode dark-theme contrast
+        run: npm run check:contrast
+
       - name: Set up test database and run tests
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/twogether_test

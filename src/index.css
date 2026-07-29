@@ -130,6 +130,160 @@ body {
 .dark input::placeholder,
 .dark textarea::placeholder { color: #6E7681 !important; }
 
+/* ────────────────────────────────────────────────────────────────────────
+   語意色面板（藍=資訊 / 綠=成功 / 琥珀=警告 / 紅=錯誤 / 橘=嚴重 / 紫=特殊）。
+
+   這些面板在淺色模式是「淺底 + 深字」。深色模式只翻了上面的 text-gray-*，
+   底色卻沒翻 → 變成淺底配被翻白的文字，整塊看不見（通知中心的未讀列就是
+   這樣壞的：bg-blue-50 + text-gray-900）。所以底色、文字、邊框要整組翻面。
+   配色取 GitHub Dark 的 subtle（底）/ fg（字）/ muted（框）三件組。
+
+   注意：不能用 [class*="bg-amber-50"] 這種子字串選擇器偷懶——它會誤中
+   bg-amber-500。透明度變體一律逐一寫跳脫選擇器（.bg-amber-50\/60）。
+   新增淺色面板時 `npm run check:contrast` 會檢查這裡有沒有漏。
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* 資訊（blue / sky / indigo） */
+.dark .bg-blue-50,
+.dark .bg-sky-50\/40,
+.dark .bg-sky-50\/60 { background-color: #121D2F !important; }
+.dark .bg-sky-100\/80,
+.dark .bg-indigo-50\/80 { background-color: #172B4D !important; }
+.dark .text-blue-600,
+.dark .text-blue-700,
+.dark .text-blue-800,
+.dark .text-sky-800,
+.dark .text-indigo-700,
+.dark .text-indigo-900 { color: #58A6FF !important; }
+.dark .border-blue-200,
+.dark .border-sky-100,
+.dark .border-sky-200,
+.dark .border-sky-200\/50,
+.dark .border-sky-300,
+.dark .border-indigo-100 { border-color: rgba(56,139,253,0.4) !important; }
+
+/* 成功（green / emerald / lime） */
+.dark .bg-green-50,
+.dark .bg-emerald-50,
+.dark .bg-emerald-50\/60,
+.dark .bg-lime-50 { background-color: #12261E !important; }
+.dark .bg-green-100,
+.dark .bg-emerald-100\/80 { background-color: #17301F !important; }
+.dark .text-green-600,
+.dark .text-green-700,
+.dark .text-green-800,
+.dark .text-emerald-700,
+.dark .text-emerald-800,
+.dark .text-lime-700 { color: #3FB950 !important; }
+.dark .border-green-200,
+.dark .border-emerald-200,
+.dark .border-lime-200 { border-color: rgba(46,160,67,0.4) !important; }
+
+/* 警告（yellow / amber） */
+.dark .bg-yellow-50,
+.dark .bg-yellow-50\/40,
+.dark .bg-amber-50,
+.dark .bg-amber-50\/40,
+.dark .bg-amber-50\/50,
+.dark .bg-amber-50\/60,
+.dark .bg-amber-50\/70 { background-color: #272115 !important; }
+.dark .bg-yellow-100,
+.dark .bg-yellow-200,
+.dark .bg-amber-100,
+.dark .bg-amber-100\/80 { background-color: #2E2617 !important; }
+.dark .text-yellow-600,
+.dark .text-yellow-700,
+.dark .text-yellow-800,
+.dark .text-amber-600,
+.dark .text-amber-700,
+.dark .text-amber-800,
+.dark .text-amber-900 { color: #D29922 !important; }
+.dark .border-yellow-200,
+.dark .border-amber-100,
+.dark .border-amber-200,
+.dark .border-amber-200\/50,
+.dark .border-amber-200\/60,
+.dark .border-amber-300 { border-color: rgba(187,128,9,0.4) !important; }
+
+/* 錯誤（red） */
+.dark .bg-red-50 { background-color: #25171C !important; }
+.dark .bg-red-100 { background-color: #2D181D !important; }
+.dark .text-red-600,
+.dark .text-red-700,
+.dark .text-red-800 { color: #F85149 !important; }
+.dark .border-red-200 { border-color: rgba(248,81,73,0.4) !important; }
+
+/* 嚴重（orange） */
+.dark .bg-orange-50,
+.dark .bg-orange-50\/60 { background-color: #21160F !important; }
+.dark .bg-orange-100\/80 { background-color: #2A1B10 !important; }
+.dark .text-orange-700,
+.dark .text-orange-800,
+.dark .text-orange-900 { color: #DB6D28 !important; }
+.dark .border-orange-200,
+.dark .border-orange-200\/50 { border-color: rgba(219,109,40,0.4) !important; }
+
+/* 特殊（violet） */
+.dark .bg-violet-50\/60 { background-color: #1E1729 !important; }
+.dark .bg-violet-100\/80 { background-color: #251C33 !important; }
+.dark .text-violet-800 { color: #A371F7 !important; }
+.dark .border-violet-200,
+.dark .border-violet-200\/50 { border-color: rgba(163,113,247,0.4) !important; }
+
+/* 中性（stone）——當一般表面用 */
+.dark .bg-stone-50 { background-color: #161B22 !important; }
+.dark .bg-stone-200\/70 { background-color: #1C2128 !important; }
+.dark .text-stone-800 { color: #E6EDF3 !important; }
+.dark .border-stone-300 { border-color: #30363D !important; }
+
+/* ────────────────────────────────────────────────────────────────────────
+   Soft Petal 主題色的淺色面板。pink/rose/purple 在 tailwind.config.js 被
+   換成奶油＋玫瑰色，所以它們的 50/100/200 一樣是淺底。這裡翻成偏暖的深色，
+   讓玫瑰調性在深色模式下還在（不至於整站只剩 GitHub 藍灰）。
+   ──────────────────────────────────────────────────────────────────────── */
+.dark .bg-pink-50\/30,
+.dark .bg-pink-50\/60,
+.dark .bg-rose-50\/60,
+.dark .bg-petal-rose-soft\/10,
+.dark .bg-petal-rose-soft\/20,
+.dark .bg-petal-rose-soft\/25,
+.dark .bg-petal-rose-soft\/30,
+.dark .bg-petal-rose-soft\/40,
+.dark .bg-petal-rose-soft\/50,
+.dark .bg-petal-rose-soft\/60 { background-color: #231A1C !important; }
+.dark .bg-pink-100\/80,
+.dark .bg-rose-100\/80,
+.dark .bg-pink-200 { background-color: #2E2124 !important; }
+.dark .text-pink-800,
+.dark .text-rose-700,
+.dark .text-rose-800,
+.dark .text-rose-900 { color: #FF8B7E !important; }
+.dark .border-pink-100,
+.dark .border-pink-200,
+.dark .border-pink-300,
+.dark .border-rose-200 { border-color: rgba(212,147,138,0.4) !important; }
+
+/* purple 其實是鼠尾草綠（見 tailwind.config.js）——深底上提亮一階。 */
+.dark .text-purple-600 { color: #A8B89E !important; }
+
+/* ────────────────────────────────────────────────────────────────────────
+   半透明的淺色面／分隔實色。bg-white/80 之類疊在內容上當「毛玻璃」卡面，
+   沒翻的話同樣是淺底淺字。低透明度（/15、/25）原本是壓在圖片上的薄膜，
+   保留成白色薄膜就好，翻成實色反而會蓋掉照片。
+   ──────────────────────────────────────────────────────────────────────── */
+.dark .bg-white\/70,
+.dark .bg-white\/80,
+.dark .bg-white\/85,
+.dark .bg-white\/90,
+.dark .bg-petal-cream\/95 { background-color: #161B22 !important; }
+.dark .bg-white\/15,
+.dark .bg-white\/25,
+.dark .bg-petal-cream\/20 { background-color: rgba(255,255,255,0.10) !important; }
+.dark .bg-petal-cream-2\/30,
+.dark .bg-petal-cream-2\/60 { background-color: #1C2128 !important; }
+.dark .bg-petal-rule,
+.dark .bg-petal-muted { background-color: #30363D !important; }
+
 /* 深色卷軸 */
 .dark ::-webkit-scrollbar-track { background: #161B22; }
 .dark ::-webkit-scrollbar-thumb { background: #30363D; }
