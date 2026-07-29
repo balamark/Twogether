@@ -10,6 +10,11 @@ import AiQuotaHint from './AiQuotaHint';
 import MessageTranslationCard from './MessageTranslationCard';
 import ConflictBanner from './ConflictBanner';
 import ParticipantAvatar from './ParticipantAvatar';
+import MarkdownContent from './MarkdownContent';
+
+// Reply length cap. Kept in sync with the backend validator in routes/wall.js
+// and the DB CHECK on wall_post_replies.content.
+const MAX_REPLY = 3000;
 
 interface WallPostThreadProps {
   postId: string;
@@ -307,9 +312,10 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
                 </button>
               )}
             </div>
-            <div className="mt-1 font-body text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">
-              {reply.content}
-            </div>
+            <MarkdownContent
+              content={reply.content}
+              className="mt-1 font-body text-sm text-petal-ink leading-relaxed"
+            />
             {translationEnabled && !isAi && !isTherapist && translations[reply.id] && (
               <MessageTranslationCard translation={translations[reply.id]} />
             )}
@@ -345,9 +351,10 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
               <Sparkles className="w-4 h-4" strokeWidth={1.5} />
               {myCompanion.name}（AI 諮商師）的建議（僅你看得到，貼出後對方才會看到）
             </div>
-            <div className="font-body text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">
-              {aiPreview}
-            </div>
+            <MarkdownContent
+              content={aiPreview}
+              className="font-body text-sm text-petal-ink leading-relaxed"
+            />
             <div className="flex items-center gap-2 pt-1">
               <button
                 type="button"
@@ -379,8 +386,8 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           rows={2}
-          maxLength={1000}
-          placeholder="回覆⋯"
+          maxLength={MAX_REPLY}
+          placeholder="回覆⋯（支援 Markdown）"
           className="flex-1 bg-white border border-petal-rule rounded-md px-3 py-2 font-body text-sm text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y"
           data-testid={`wall-reply-input-${postId}`}
           onKeyDown={(e) => {

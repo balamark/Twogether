@@ -23,6 +23,7 @@ import {
 import type { Notification } from './ErrorNotification';
 import WallPostComposer, { type WallExample } from './WallPostComposer';
 import WallPostThread from './WallPostThread';
+import MarkdownContent from './MarkdownContent';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatRelativeOrDate } from '../utils/datetime';
 import { isVideoUrl } from '../utils/script';
@@ -322,9 +323,10 @@ const WallView: React.FC<WallViewProps> = ({
         </div>
 
         {post.content && (
-          <div className="font-body text-[15px] text-petal-ink leading-relaxed whitespace-pre-wrap">
-            {post.content}
-          </div>
+          <MarkdownContent
+            content={post.content}
+            className="font-body text-[15px] text-petal-ink leading-relaxed"
+          />
         )}
 
         {(post.media?.length ?? 0) > 0 && (

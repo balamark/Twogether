@@ -27,6 +27,7 @@ import {
 import { daysSinceLastNudge } from './AchievementsView';
 import { isVideoUrl } from '../utils/script';
 import ParticipantAvatar from './ParticipantAvatar';
+import MarkdownContent from './MarkdownContent';
 import {
   POSITIONING_ONE_LINER,
   POSITIONING_SUBLINE,
@@ -686,7 +687,11 @@ const PREVIEWS: Record<string, PreviewConfig> = {
             <span className="font-body text-[11px] text-petal-muted">· 加班中</span>
             <SampleTag />
           </div>
-          <p className="font-body text-sm text-petal-ink">今天的約會超棒，留張合照 📷</p>
+          {/* Wall posts now render Markdown — show bold + a list in the sample. */}
+          <MarkdownContent
+            content={'今天的約會**超棒** 📷\n\n- 一起去看了海\n- 吃了想吃很久的那家餐廳'}
+            className="font-body text-sm text-petal-ink"
+          />
           {/* Photo shown at its own aspect ratio (no forced crop / heavy border). */}
           <div className="mt-2 rounded-md border border-petal-rule bg-petal-cream-2 overflow-hidden">
             <img

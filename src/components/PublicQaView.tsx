@@ -11,6 +11,7 @@ import type { Notification } from './ErrorNotification';
 import { focusLabel } from './therapistShared';
 import { FocusFilter } from './FocusFilter';
 import ParticipantAvatar from './ParticipantAvatar';
+import MarkdownContent from './MarkdownContent';
 
 // 公開問答 (Public Q&A): a read-only, anonymised browse of consultation chats
 // that both the client and therapist agreed to publish. Helps people with
@@ -271,7 +272,7 @@ const PublicQaDetail: React.FC<{
                             : 'bg-petal-cream-2 text-petal-ink rounded-br-sm'
                       }`}
                     >
-                      {m.body}
+                      <MarkdownContent content={m.body} />
                     </div>
                   </div>
                 </div>

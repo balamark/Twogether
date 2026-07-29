@@ -339,8 +339,8 @@ router.post(
     body('content')
       .optional({ nullable: true })
       .isString()
-      .isLength({ max: 2000 })
-      .withMessage('內容不能超過 2000 字'),
+      .isLength({ max: 6000 })
+      .withMessage('內容不能超過 6000 字'),
     body('mood_tag')
       .optional({ nullable: true })
       .custom(isValidMoodTag)
@@ -475,8 +475,8 @@ router.put(
     body('content')
       .optional()
       .isString()
-      .isLength({ max: 2000 })
-      .withMessage('內容不能超過 2000 字'),
+      .isLength({ max: 6000 })
+      .withMessage('內容不能超過 6000 字'),
     body('mood_tag')
       .optional({ nullable: true })
       .custom(isValidMoodTag)
@@ -704,8 +704,8 @@ router.post(
   [
     body('content')
       .isString()
-      .isLength({ min: 1, max: 1000 })
-      .withMessage('回覆內容必須在 1-1000 字之間'),
+      .isLength({ min: 1, max: 3000 })
+      .withMessage('回覆內容必須在 1-3000 字之間'),
   ],
   async (req, res) => {
     try {
@@ -857,8 +857,8 @@ router.post(
   [
     body('content')
       .isString()
-      .isLength({ min: 1, max: 1000 })
-      .withMessage('AI 留言內容必須在 1-1000 字之間'),
+      .isLength({ min: 1, max: 3000 })
+      .withMessage('AI 留言內容必須在 1-3000 字之間'),
   ],
   async (req, res) => {
     try {

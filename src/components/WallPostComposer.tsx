@@ -31,7 +31,7 @@ interface WallPostComposerProps {
   initialTemplate?: WallExample | null;
 }
 
-const MAX_CONTENT = 2000;
+const MAX_CONTENT = 6000;
 // Max photos/videos per post. Kept in sync with WALL_MAX_MEDIA in routes/wall.js.
 const WALL_MAX_MEDIA = 4;
 const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
@@ -287,8 +287,9 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
               className="w-full bg-white border border-petal-rule rounded-md px-4 py-3 font-body text-sm text-petal-ink placeholder:text-petal-muted leading-relaxed focus:outline-none focus:border-petal-rose-deep resize-y"
               data-testid="wall-composer-content"
             />
-            <div className="mt-1 text-right font-body text-[11px] text-petal-muted">
-              {content.length} / {MAX_CONTENT}
+            <div className="mt-1 flex items-center justify-between font-body text-[11px] text-petal-muted">
+              <span>支援 Markdown（**粗體**、# 標題、- 清單、[連結]）</span>
+              <span>{content.length} / {MAX_CONTENT}</span>
             </div>
           </div>
 
