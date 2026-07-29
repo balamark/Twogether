@@ -21,6 +21,7 @@
     "lint": "eslint .",
     "changelog": "node scripts/build-changelog.mjs",
     "check:admin": "node scripts/check-admin-inline-script.js",
+    "check:contrast": "node scripts/check-dark-contrast.js",
     "migrate": "node scripts/migrate.js migrate",
     "migrate:status": "node scripts/migrate.js status"
   },
