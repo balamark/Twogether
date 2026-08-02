@@ -40,8 +40,20 @@ const TRANSLATION = {
   rewrite: '我最近很沒有安全感，希望家庭能被放在更重要的位置。',
 };
 
+// What GET /wall/:id/translations answers. Tests override this to exercise the
+// empty and partial batches that the model produces when it runs out of output
+// tokens on a thread of long comments.
+let translationsBody: Record<string, unknown>;
+
 test.describe('Wall thread — 情緒翻譯 lens', () => {
   test.beforeEach(async ({ page }) => {
+    translationsBody = {
+      success: true,
+      translations: { [REPLY_ID]: TRANSLATION },
+      requested: 1,
+      translated: 1,
+      partial: false,
+    };
     await page.addInitScript((user) => {
       localStorage.setItem('authToken', 'fake-jwt');
       localStorage.setItem('authUser', JSON.stringify(user));
@@ -115,7 +127,7 @@ test.describe('Wall thread — 情緒翻譯 lens', () => {
         return route.fulfill({
           status: 200,
           contentType: 'application/json',
-          body: JSON.stringify({ success: true, translations: { [REPLY_ID]: TRANSLATION } }),
+          body: JSON.stringify(translationsBody),
         });
       }
 
@@ -161,5 +173,74 @@ test.describe('Wall thread — 情緒翻譯 lens', () => {
     await expect(card).toContainText('可能真正想表達的是');
     await expect(card).toContainText('我最近很沒有安全感');
     await expect(card).toContainText('需要安全感');
+    // A complete batch says nothing extra.
+    await expect(page.getByTestId(`wall-translation-notice-${POST_ID}`)).toHaveCount(0);
+  });
+
+  // The reported bug: on a thread of long comments the model was cut off mid
+  // tool_use, the server answered 200 with an empty map, and the UI rendered
+  // nothing at all — no card, no error, no explanation.
+  test('an empty batch explains itself and offers a retry', async ({ page }) => {
+    translationsBody = {
+      success: true,
+      translations: {},
+      requested: 3,
+      translated: 0,
+      partial: true,
+      error_code: 'TRANSLATION_EMPTY',
+      message: '這串對話比較長，AI 這次沒能完成情緒翻譯（沒有扣用今日額度）。請按「重試」，通常再試一次就會成功。',
+    };
+
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    const wallNav = page.locator('button:has-text("我們的牆")').first();
+    await wallNav.waitFor({ state: 'visible', timeout: 15000 });
+    await wallNav.click();
+
+    const toggle = page.getByTestId(`wall-post-thread-toggle-${POST_ID}`);
+    await toggle.waitFor({ state: 'visible', timeout: 10000 });
+    await toggle.click();
+    await expect(page.getByText('你根本沒有把家庭放第一。')).toBeVisible({ timeout: 10000 });
+
+    await page.getByTestId(`wall-translation-toggle-${POST_ID}`).click();
+
+    const notice = page.getByTestId(`wall-translation-notice-${POST_ID}`);
+    await expect(notice).toBeVisible({ timeout: 10000 });
+    await expect(notice).toContainText('沒能完成情緒翻譯');
+    await expect(notice.getByRole('button', { name: '重試' })).toBeVisible();
+    // No card, but never silence.
+    await expect(page.getByTestId('message-translation')).toHaveCount(0);
+  });
+
+  test('a partial batch still renders what came back, plus a notice', async ({ page }) => {
+    translationsBody = {
+      success: true,
+      translations: { [REPLY_ID]: TRANSLATION },
+      requested: 3,
+      translated: 1,
+      partial: true,
+      error_code: 'TRANSLATION_PARTIAL',
+      message: '已完成 1 / 3 則，較長的留言這次沒翻完。按「重試」可補齊其餘幾則。',
+    };
+
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    const wallNav = page.locator('button:has-text("我們的牆")').first();
+    await wallNav.waitFor({ state: 'visible', timeout: 15000 });
+    await wallNav.click();
+
+    const toggle = page.getByTestId(`wall-post-thread-toggle-${POST_ID}`);
+    await toggle.waitFor({ state: 'visible', timeout: 10000 });
+    await toggle.click();
+    await expect(page.getByText('你根本沒有把家庭放第一。')).toBeVisible({ timeout: 10000 });
+
+    await page.getByTestId(`wall-translation-toggle-${POST_ID}`).click();
+
+    await expect(page.getByTestId('message-translation')).toBeVisible({ timeout: 10000 });
+    const notice = page.getByTestId(`wall-translation-notice-${POST_ID}`);
+    await expect(notice).toBeVisible();
+    await expect(notice).toContainText('已完成 1 / 3 則');
   });
 });

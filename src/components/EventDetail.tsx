@@ -96,6 +96,10 @@ function formatTime(iso: string, tz: string) {
   }
 }
 
+// Matches the event_messages CHECK constraint and the route validator
+// (database/migrations/029_events.sql, routes/events.js POST /:id/messages).
+const REPLY_MAX_CHARS = 2000;
+
 export default function EventDetail({ eventId, currentUserId, companionId, myNickname, partnerNickname, onBack, showNotification }: EventDetailProps) {
   const myCompanion = resolveCompanion(companionId);
   const { quota, refresh: refreshQuota } = useAiQuota();
@@ -103,6 +107,10 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reply, setReply] = useState('');
+  // Applied rewrites, inserted phrases and the emotion-meter suggestion all set
+  // the draft directly, bypassing the textarea's maxLength — so guard on the
+  // composed value, not on typing.
+  const replyOver = reply.length > REPLY_MAX_CHARS;
   const [sending, setSending] = useState(false);
   const sendLockRef = useRef(false);
   const [resolving, setResolving] = useState(false);
@@ -129,6 +137,9 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const [translationEnabled, setTranslationEnabled] = useState(false);
   const [translations, setTranslations] = useState<MessageTranslationMap>({});
   const [translationLoading, setTranslationLoading] = useState(false);
+  // Kept after the toast fades so an unfinished batch stays explained on screen.
+  const [translationNotice, setTranslationNotice] =
+    useState<{ code?: string; message: string } | null>(null);
   const [therapyNote, setTherapyNote] = useState<TherapyNote | null>(null);
   const [therapyLoading, setTherapyLoading] = useState(false);
   // 引導模式 (Therapist Mode)
@@ -188,6 +199,14 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           title: '今日 AI 次數已用完',
           message: '明天會自動補上；升級 Premium 可提高每日上限。你也可以直接送出自己寫的版本。',
         });
+      } else if (code === 'REWRITE_TOO_LONG') {
+        // Expected for a very long draft — the model ran out of room to return
+        // three full-length versions. Tell them how to get unstuck.
+        showNotification({
+          type: 'warning',
+          title: 'AI 改寫沒完成',
+          message: err instanceof Error ? err.message : '請縮短草稿，或分成兩則分開改寫送出。',
+        });
       } else {
         showNotification({
           type: 'error',
@@ -203,8 +222,19 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
 
   const applyRewriteVersion = (key: EventVersionKey) => {
     if (!rewritePreview) return;
-    setReply(rewritePreview.versions[key]);
+    const text = rewritePreview.versions[key];
+    setReply(text);
     setRewritePreview(null);
+    // The rewrite matches the draft's length and warm adds a sentence on top of
+    // firm, so a long draft can come back over the cap. Say so now rather than
+    // letting the send button look broken.
+    if (text.length > REPLY_MAX_CHARS) {
+      showNotification({
+        type: 'info',
+        title: '這個版本超過字數上限',
+        message: `這個版本 ${text.length} 字，超過 ${REPLY_MAX_CHARS} 字上限，請刪掉 ${text.length - REPLY_MAX_CHARS} 字再送出，或分成兩則送出。`,
+      });
+    }
   };
 
   const requestAcceptance = async () => {
@@ -244,21 +274,35 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   // server-side per message, so this only bills for still-untranslated ones.
   const loadTranslations = async () => {
     setTranslationLoading(true);
+    setTranslationNotice(null);
     const startedAt = Date.now();
     console.info('[情緒翻譯] event: loading translations…', { eventId });
     try {
-      const map = await apiService.getEventTranslations(eventId);
-      const keys = Object.keys(map);
+      const res = await apiService.getEventTranslations(eventId);
+      const keys = Object.keys(res.translations);
       console.info('[情緒翻譯] event: got translations', {
         eventId,
         count: keys.length,
+        requested: res.requested,
+        translated: res.translated,
         ms: Date.now() - startedAt,
         keys,
       });
-      if (keys.length === 0) {
-        console.warn('[情緒翻譯] event: empty translation map — nothing will render');
+      // Always render what did come back; a partial batch still helps.
+      setTranslations(res.translations);
+      setTranslationNotice(res.message ? { code: res.error_code, message: res.message } : null);
+      if (res.message) {
+        console.warn('[情緒翻譯] event: incomplete batch', {
+          eventId, code: res.error_code, requested: res.requested, translated: res.translated,
+        });
+        // A batch the model couldn't finish is an expected degraded state with
+        // a next step, not a red failure.
+        showNotification({
+          type: res.translated === 0 ? 'warning' : 'info',
+          title: res.translated === 0 ? '情緒翻譯這次沒完成' : '情緒翻譯完成一部分',
+          message: res.message,
+        });
       }
-      setTranslations(map);
     } catch (err) {
       console.error('[情緒翻譯] event: load failed', err);
       const code = (err as { error_code?: string })?.error_code;
@@ -893,6 +937,23 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               />
             </button>
           </div>
+          {/* An unfinished batch has to stay explained on screen: the toast
+              disappears, but the missing cards do not. */}
+          {translationEnabled && translationNotice && !translationLoading && (
+            <div
+              data-testid="event-translation-notice"
+              className="flex items-start justify-between gap-2 bg-petal-cream-2 border border-petal-rule rounded-xl px-3 py-2"
+            >
+              <p className="text-[11px] text-petal-ink-soft leading-relaxed">{translationNotice.message}</p>
+              <button
+                type="button"
+                onClick={loadTranslations}
+                className="text-[11px] text-petal-rose-deep hover:underline shrink-0 whitespace-nowrap"
+              >
+                重試
+              </button>
+            </div>
+          )}
           {event.messages.length === 0 && (
             <p className="text-sm text-petal-ink-soft text-center py-4">尚無訊息</p>
           )}
@@ -981,9 +1042,26 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                         value={editingMessageText}
                         onChange={(e) => setEditingMessageText(e.target.value)}
                         rows={4}
-                        maxLength={2000}
+                        maxLength={REPLY_MAX_CHARS}
                         className="w-full p-2 rounded-xl border border-petal-rule bg-white text-sm text-petal-ink focus:outline-none focus:border-petal-rose-deep resize-y"
                       />
+                      {/* Swapping in a stored version sets the value directly,
+                          so this can exceed the cap the same way a reply can. */}
+                      <div className="flex justify-end mt-1">
+                        <span
+                          data-testid="event-message-edit-counter"
+                          className={`font-body text-[11px] ${
+                            editingMessageText.length > REPLY_MAX_CHARS ? 'text-red-600' : 'text-petal-muted'
+                          }`}
+                        >
+                          {editingMessageText.length} / {REPLY_MAX_CHARS}
+                        </span>
+                      </div>
+                      {editingMessageText.length > REPLY_MAX_CHARS && (
+                        <p className="mt-1 font-body text-xs text-red-600">
+                          超過 {editingMessageText.length - REPLY_MAX_CHARS} 字，請刪減後再儲存。
+                        </p>
+                      )}
                       {canSwapVersion && (
                         <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
                           <span className="text-[10px] text-petal-muted">改用當時的其他版本：</span>
@@ -1019,7 +1097,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                           type="button"
                           data-testid="event-message-edit-save"
                           onClick={saveMessageEdit}
-                          disabled={savingEdit}
+                          disabled={savingEdit || editingMessageText.length > REPLY_MAX_CHARS}
                           className="px-3 py-1 rounded-full bg-petal-ink text-petal-cream text-xs inline-flex items-center gap-1.5 disabled:opacity-50"
                         >
                           {savingEdit && <Loader2 className="w-3 h-3 animate-spin" />}
@@ -1131,9 +1209,25 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             onChange={(e) => setReply(e.target.value)}
             placeholder="回覆…"
             rows={2}
-            maxLength={2000}
+            maxLength={REPLY_MAX_CHARS}
             className="w-full p-2 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y"
           />
+          {/* maxLength only limits typing — an applied AI rewrite or an
+              inserted phrase sets the value directly and can land over the
+              cap. Show the count so the disabled send button is explainable. */}
+          <div className="flex justify-end mt-1">
+            <span
+              data-testid="event-reply-counter"
+              className={`font-body text-[11px] ${replyOver ? 'text-red-600' : 'text-petal-muted'}`}
+            >
+              {reply.length} / {REPLY_MAX_CHARS}
+            </span>
+          </div>
+          {replyOver && (
+            <p data-testid="event-reply-over-hint" className="mt-1 font-body text-xs text-red-600">
+              這則留言 {reply.length} / {REPLY_MAX_CHARS} 字，請刪掉 {reply.length - REPLY_MAX_CHARS} 字，或分成兩則送出。
+            </p>
+          )}
           {/* Free, instant tone hint: when the draft reads charged, nudge the
               writer to run the emotion check before sending (no LLM, no quota). */}
           {(() => {
@@ -1190,7 +1284,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               type="button"
               data-testid="event-reply-send-button"
               onClick={sendReply}
-              disabled={sending || reply.trim().length === 0}
+              disabled={sending || reply.trim().length === 0 || replyOver}
               className="px-4 py-2 rounded-full bg-petal-ink text-petal-cream font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:shadow-none hover:opacity-90 active:scale-[0.98] transition"
             >
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

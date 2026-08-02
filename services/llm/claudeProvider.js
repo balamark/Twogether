@@ -13,7 +13,7 @@
 //   returns a 500 — falling back to the mock would silently hide outages.
 
 const Anthropic = require('@anthropic-ai/sdk');
-const { logInfo } = require('../../lib/logger');
+const { logInfo, logWarn } = require('../../lib/logger');
 const { pickableCards, CARD_IDS, shapeFacilitatorTurn } = require('../../lib/therapyCards');
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
@@ -218,6 +218,47 @@ const REPLY_REWRITE_TOOL_SCHEMA = {
     required: ['versions', 'toxicityFlags'],
   },
 };
+
+// The rewrite prompt forbids shortening ("草稿長就改寫得長…不要刪節"), and warm is
+// firm plus a sentence, so a max-length 2000-char draft needs room for three
+// full-length zh-TW versions. 4096 was not enough: generation stopped mid
+// tool_use, the JSON never parsed, and the user got three blank cards.
+const REWRITE_MAX_TOKENS = 8192;
+
+function rewriteTooLongError(truncated) {
+  // Same code either way (the UI handles it as one recoverable case), but say
+  // which one actually happened so the suggested fix is the right one.
+  const err = new Error(
+    truncated
+      ? '草稿太長，AI 改寫沒能完成。請縮短草稿，或分成兩則分開改寫送出。'
+      : 'AI 這次沒能產出完整的改寫版本。請再試一次，或稍微調整草稿後重試。'
+  );
+  err.error_code = 'REWRITE_TOO_LONG';
+  err.status = 422;
+  return err;
+}
+
+// Pull the three versions out of a rewrite response. Reports truncation and any
+// blank version instead of quietly substituting '' — a blank version is never a
+// usable answer, and silently returning one is what hid this bug.
+function parseRewriteResponse(response) {
+  const truncated = response?.stop_reason === 'max_tokens';
+  const toolUse = (response?.content || []).find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_reply_rewrite'
+  );
+  if (!toolUse) {
+    if (truncated) return { out: {}, versions: { neutral: '', firm: '', warm: '' }, truncated: true, blank: ['neutral', 'firm', 'warm'] };
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input || {};
+  const versions = {
+    neutral: (out.versions?.neutral || '').trim(),
+    firm: (out.versions?.firm || '').trim(),
+    warm: (out.versions?.warm || '').trim(),
+  };
+  const blank = Object.keys(versions).filter((k) => !versions[k]);
+  return { out, versions, truncated, blank };
+}
 
 // ---------------------------------------------------------------------------
 // Roleplay invitation messages
@@ -522,7 +563,7 @@ async function rewriteReply({ rawReply, eventSummary, recentMessages, createdByS
   const startedAt = Date.now();
   const response = await getClient().messages.create({
     model: MODEL,
-    max_tokens: 4096,
+    max_tokens: REWRITE_MAX_TOKENS,
     system: [
       {
         type: 'text',
@@ -548,18 +589,21 @@ async function rewriteReply({ rawReply, eventSummary, recentMessages, createdByS
     costUsd: cost,
   });
 
-  const toolUse = response.content.find((b) => b.type === 'tool_use' && b.name === 'emit_reply_rewrite');
-  if (!toolUse) {
-    throw new Error('Claude did not return a tool_use block');
+  const parsed = parseRewriteResponse(response);
+  if (parsed.truncated || parsed.blank.length > 0) {
+    logWarn('llm.claude.reply_rewrite.truncated', {
+      draftChars: rawReply.trim().length,
+      outputTokens: u.output_tokens || 0,
+      maxTokens: REWRITE_MAX_TOKENS,
+      stopReason: response.stop_reason,
+      blank: parsed.blank,
+    });
+    throw rewriteTooLongError(parsed.truncated);
   }
-  const out = toolUse.input;
+  const out = parsed.out;
 
   return {
-    versions: {
-      neutral: out.versions?.neutral || '',
-      firm: out.versions?.firm || '',
-      warm: out.versions?.warm || '',
-    },
+    versions: parsed.versions,
     toxicityFlags: out.toxicityFlags || [],
     _meta: {
       provider: 'claude',
@@ -1545,7 +1589,11 @@ const THREAD_TRANSLATION_TOOL_SCHEMA = {
               },
             },
             need: { type: 'string', maxLength: 20, description: '核心需求詞，例如 安全感 / 被重視 / 被陪伴' },
-            rewrite: { type: 'string', description: '第一人稱「可能真正想表達的是」翻譯，1 到 2 句' },
+            // maxLength matters: without it the model matches the length of the
+            // source message, and a thread of long comments overran max_tokens —
+            // which truncated the whole tool_use JSON and dropped every
+            // translation silently. The prompt already asks for 1 to 2 sentences.
+            rewrite: { type: 'string', maxLength: 120, description: '第一人稱「可能真正想表達的是」翻譯，1 到 2 句' },
           },
           required: ['ref', 'need', 'rewrite'],
         },
@@ -1555,78 +1603,44 @@ const THREAD_TRANSLATION_TOOL_SCHEMA = {
   },
 };
 
-// messages: [{ id, speaker: '[A]'|'[B]'|nickname, content }] — the full thread
-//   for context. targetIds: which message ids to actually translate (the ones
-//   not yet cached). context: { summary } optional topic to ground the model.
-async function generateThreadTranslations({ messages, targetIds, context }) {
-  const all = Array.isArray(messages) ? messages : [];
-  const wanted = Array.isArray(targetIds) && targetIds.length > 0
-    ? targetIds
-    : all.map((m) => m.id);
-  if (wanted.length === 0) {
-    return { translations: [], _meta: { provider: 'claude', model: MODEL, durationMs: 0, usage: {}, costUsd: 0 } };
-  }
+// Output budget for one translation batch. A single item costs roughly 200
+// output tokens (3 emotions + need + a rewrite capped at 120 chars), so 6
+// targets fit inside 4096 with a wide margin.
+const TRANSLATION_MAX_TOKENS = 4096;
+const TRANSLATION_CHUNK_SIZE = 6;
+const TRANSLATION_CONCURRENCY = 3;
+// Messages that are only context for this chunk get clipped: a wall post can be
+// 6000 chars, and resending every one of them in full on every chunk is what
+// makes this call slow and expensive. Targets always go in whole.
+const TRANSLATION_CONTEXT_CHARS = 300;
 
-  // Relabel messages with short integer refs (#1, #2…) for the model, and keep
-  // a ref→real-id map. Models echo small integers reliably; full UUIDs they do
-  // not, which silently dropped every translation before.
-  const refToId = new Map();
-  const idToRef = new Map();
-  all.forEach((m, i) => {
-    const ref = i + 1;
-    refToId.set(ref, m.id);
-    idToRef.set(m.id, ref);
-  });
-  const wantedRefs = wanted.map((id) => idToRef.get(id)).filter((r) => r != null);
+// Split target refs into batches small enough that the model's reply cannot
+// overrun max_tokens. Exported for tests.
+function chunkTargets(refs, size = TRANSLATION_CHUNK_SIZE) {
+  const list = Array.isArray(refs) ? refs : [];
+  const step = Math.max(1, size);
+  const out = [];
+  for (let i = 0; i < list.length; i += step) out.push(list.slice(i, i + step));
+  return out;
+}
 
-  const lines = [];
-  if (context && context.summary) {
-    lines.push(`事件背景（僅供理解氛圍，不要複述）：${String(context.summary).trim()}`, '');
-  }
-  lines.push('完整對話（最舊在前，每行標了編號與發話者）：');
-  all.forEach((m, i) => {
-    lines.push(`#${i + 1} ${m.speaker || '某人'}：${(m.content || '').toString().trim()}`);
-  });
-  lines.push('');
-  lines.push(`請只翻譯以下編號的訊息：${wantedRefs.map((r) => `#${r}`).join('、')}`);
-  const userContent = lines.join('\n');
-
-  const startedAt = Date.now();
-  const response = await getClient().messages.create({
-    model: MODEL,
-    max_tokens: 2048,
-    system: [
-      {
-        type: 'text',
-        text: THREAD_TRANSLATION_SYSTEM_PROMPT + PUNCTUATION_RULE,
-        cache_control: { type: 'ephemeral' },
-      },
-    ],
-    tools: [THREAD_TRANSLATION_TOOL_SCHEMA],
-    tool_choice: { type: 'tool', name: 'emit_thread_translations' },
-    messages: [{ role: 'user', content: userContent }],
-  });
-
-  const ms = Date.now() - startedAt;
-  const u = response.usage || {};
-  const cost = estimateCostUSD(response.model || MODEL, u);
-  logInfo('llm.claude.need_translation', {
-    model: response.model || MODEL,
-    requested: wanted.length,
-    durationMs: ms,
-    inputTokens: u.input_tokens || 0,
-    outputTokens: u.output_tokens || 0,
-    cacheCreate: u.cache_creation_input_tokens || 0,
-    cacheRead: u.cache_read_input_tokens || 0,
-    costUsd: cost,
-  });
-
-  const toolUse = response.content.find(
+// Pull the translations out of one Claude response and map short refs back to
+// real message ids. Returns `truncated` so callers can tell "the model had
+// nothing to say" apart from "the model was cut off mid-JSON" — the latter used
+// to look identical and silently produced zero translations. Exported for tests.
+function parseTranslationResponse(response, refToId) {
+  const truncated = response?.stop_reason === 'max_tokens';
+  const toolUse = (response?.content || []).find(
     (b) => b.type === 'tool_use' && b.name === 'emit_thread_translations'
   );
   if (!toolUse) {
+    // A truncated response can stop before any complete block exists. That is a
+    // known, recoverable state (the caller retries smaller), not a provider bug.
+    if (truncated) return { translations: [], truncated: true, returnedRefs: [] };
     throw new Error('Claude did not return a tool_use block');
   }
+  // When generation stops mid tool_use the partial JSON is unparseable, so the
+  // API hands back an empty/partial input rather than the array we asked for.
   const out = toolUse.input || {};
   const rawList = Array.isArray(out.translations) ? out.translations : [];
   const translations = rawList
@@ -1649,29 +1663,186 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
     })
     .filter(Boolean);
 
-  // Surface ref-matching health so a silent "nothing rendered" is debuggable.
-  const returnedRefs = rawList.map((t) => t?.ref);
-  logInfo('llm.claude.need_translation.map', {
-    requestedRefs: wantedRefs,
-    returnedRefs,
-    matched: translations.length,
-    unmatched: rawList.length - translations.length,
+  return { translations, truncated, returnedRefs: rawList.map((t) => t?.ref) };
+}
+
+// Run `worker` over `items` with at most `limit` in flight. Chunks are
+// independent calls, so overlapping them keeps a long thread inside the 45s
+// client timeout instead of adding ~17s per chunk.
+async function mapWithConcurrency(items, limit, worker) {
+  const results = new Array(items.length);
+  let cursor = 0;
+  const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+    while (cursor < items.length) {
+      const i = cursor;
+      cursor += 1;
+      results[i] = await worker(items[i], i);
+    }
   });
+  await Promise.all(runners);
+  return results;
+}
+
+// messages: [{ id, speaker: '[A]'|'[B]'|nickname, content }] — the full thread
+//   for context. targetIds: which message ids to actually translate (the ones
+//   not yet cached). context: { summary } optional topic to ground the model.
+async function generateThreadTranslations({ messages, targetIds, context }) {
+  const all = Array.isArray(messages) ? messages : [];
+  const wanted = Array.isArray(targetIds) && targetIds.length > 0
+    ? targetIds
+    : all.map((m) => m.id);
+  if (wanted.length === 0) {
+    return {
+      translations: [],
+      _meta: {
+        provider: 'claude', model: MODEL, durationMs: 0, usage: {}, costUsd: 0,
+        chunks: 0, truncatedChunks: 0, requested: 0, returned: 0, truncated: false,
+      },
+    };
+  }
+
+  // Relabel messages with short integer refs (#1, #2…) for the model, and keep
+  // a ref→real-id map. Models echo small integers reliably; full UUIDs they do
+  // not, which silently dropped every translation before.
+  const refToId = new Map();
+  const idToRef = new Map();
+  all.forEach((m, i) => {
+    const ref = i + 1;
+    refToId.set(ref, m.id);
+    idToRef.set(m.id, ref);
+  });
+  const wantedRefs = wanted.map((id) => idToRef.get(id)).filter((r) => r != null);
+
+  // The thread is rendered per chunk: this chunk's targets in full, everything
+  // else clipped to keep the input (and the latency) down.
+  const buildUserContent = (chunkRefs) => {
+    const targetSet = new Set(chunkRefs);
+    const lines = [];
+    if (context && context.summary) {
+      lines.push(`事件背景（僅供理解氛圍，不要複述）：${String(context.summary).trim()}`, '');
+    }
+    lines.push('完整對話（最舊在前，每行標了編號與發話者）：');
+    all.forEach((m, i) => {
+      const ref = i + 1;
+      const text = (m.content || '').toString().trim();
+      const body = targetSet.has(ref) || text.length <= TRANSLATION_CONTEXT_CHARS
+        ? text
+        : `${text.slice(0, TRANSLATION_CONTEXT_CHARS)}…（略）`;
+      lines.push(`#${ref} ${m.speaker || '某人'}：${body}`);
+    });
+    lines.push('');
+    lines.push(`請只翻譯以下編號的訊息：${chunkRefs.map((r) => `#${r}`).join('、')}`);
+    return lines.join('\n');
+  };
+
+  const startedAt = Date.now();
+  const usageTotal = { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 };
+  let costTotal = 0;
+  let callCount = 0;
+  let truncatedChunks = 0;
+  let lastModel = MODEL;
+  const prompts = [];
+
+  // One request for one batch of refs. Returns whatever parsed plus whether the
+  // model was cut off, so the caller can retry that batch smaller.
+  const callChunk = async (chunkRefs) => {
+    const userContent = buildUserContent(chunkRefs);
+    prompts.push(userContent);
+    const callStartedAt = Date.now();
+    const response = await getClient().messages.create({
+      model: MODEL,
+      max_tokens: TRANSLATION_MAX_TOKENS,
+      system: [
+        {
+          type: 'text',
+          text: THREAD_TRANSLATION_SYSTEM_PROMPT + PUNCTUATION_RULE,
+          cache_control: { type: 'ephemeral' },
+        },
+      ],
+      tools: [THREAD_TRANSLATION_TOOL_SCHEMA],
+      tool_choice: { type: 'tool', name: 'emit_thread_translations' },
+      messages: [{ role: 'user', content: userContent }],
+    });
+
+    const ms = Date.now() - callStartedAt;
+    const u = response.usage || {};
+    const cost = estimateCostUSD(response.model || MODEL, u);
+    callCount += 1;
+    lastModel = response.model || MODEL;
+    usageTotal.inputTokens += u.input_tokens || 0;
+    usageTotal.outputTokens += u.output_tokens || 0;
+    usageTotal.cacheCreateTokens += u.cache_creation_input_tokens || 0;
+    usageTotal.cacheReadTokens += u.cache_read_input_tokens || 0;
+    costTotal += cost || 0;
+    logInfo('llm.claude.need_translation', {
+      model: lastModel,
+      requested: chunkRefs.length,
+      durationMs: ms,
+      inputTokens: u.input_tokens || 0,
+      outputTokens: u.output_tokens || 0,
+      cacheCreate: u.cache_creation_input_tokens || 0,
+      cacheRead: u.cache_read_input_tokens || 0,
+      costUsd: cost,
+    });
+
+    const parsed = parseTranslationResponse(response, refToId);
+    logInfo('llm.claude.need_translation.map', {
+      requestedRefs: chunkRefs,
+      returnedRefs: parsed.returnedRefs,
+      matched: parsed.translations.length,
+      unmatched: parsed.returnedRefs.length - parsed.translations.length,
+      truncated: parsed.truncated,
+    });
+    return parsed;
+  };
+
+  // Chunks are sized so this should not happen; if it does, halve the batch once
+  // rather than returning nothing.
+  const translateChunk = async (chunkRefs) => {
+    const parsed = await callChunk(chunkRefs);
+    if (!parsed.truncated) return parsed.translations;
+
+    truncatedChunks += 1;
+    logWarn('llm.claude.need_translation.truncated', {
+      refs: chunkRefs,
+      maxTokens: TRANSLATION_MAX_TOKENS,
+      matched: parsed.translations.length,
+    });
+    if (chunkRefs.length < 2) return parsed.translations;
+
+    const mid = Math.ceil(chunkRefs.length / 2);
+    const halves = await Promise.all([
+      callChunk(chunkRefs.slice(0, mid)),
+      callChunk(chunkRefs.slice(mid)),
+    ]);
+    halves.forEach((h) => { if (h.truncated) truncatedChunks += 1; });
+    const retried = halves.flatMap((h) => h.translations);
+    // Keep whichever attempt produced more, so a retry can never lose ground.
+    return retried.length >= parsed.translations.length ? retried : parsed.translations;
+  };
+
+  const chunks = chunkTargets(wantedRefs, TRANSLATION_CHUNK_SIZE);
+  const perChunk = await mapWithConcurrency(chunks, TRANSLATION_CONCURRENCY, translateChunk);
+
+  // Later chunks win on the (impossible in practice) duplicate ref.
+  const byId = new Map();
+  perChunk.flat().forEach((t) => byId.set(t.id, t));
+  const translations = [...byId.values()];
 
   return {
     translations,
     _meta: {
       provider: 'claude',
-      model: response.model || MODEL,
-      durationMs: ms,
-      usage: {
-        inputTokens: u.input_tokens || 0,
-        outputTokens: u.output_tokens || 0,
-        cacheCreateTokens: u.cache_creation_input_tokens || 0,
-        cacheReadTokens: u.cache_read_input_tokens || 0,
-      },
-      costUsd: cost,
-      assembledPrompt: userContent,
+      model: lastModel,
+      durationMs: Date.now() - startedAt,
+      usage: usageTotal,
+      costUsd: costTotal,
+      chunks: callCount,
+      truncatedChunks,
+      truncated: truncatedChunks > 0,
+      requested: wantedRefs.length,
+      returned: translations.length,
+      assembledPrompt: prompts.join('\n\n---\n\n'),
     },
   };
 }
@@ -2469,4 +2640,10 @@ module.exports = {
   generateFacilitatorTurn,
   // Exported for prompt-contract regression tests only.
   buildRoleplayUserContent,
+  // Exported so the max_tokens truncation paths can be tested without a live
+  // API call (getClient caches a module-level client and is not injectable).
+  chunkTargets,
+  parseTranslationResponse,
+  parseRewriteResponse,
+  TRANSLATION_CHUNK_SIZE,
 };

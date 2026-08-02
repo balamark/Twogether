@@ -30,8 +30,13 @@ const FAKE_EVENT = {
   messages: [],
 };
 
+// Set by the over-length test so /preview-rewrite answers with a warm version
+// that exceeds the 2000-char cap on an event message.
+let overLongWarm = false;
+
 test.describe('Event reply — step-bar and AI rewrite', () => {
   test.beforeEach(async ({ page }) => {
+    overLongWarm = false;
     // Pre-seed auth so the app loads as an authenticated + paired user.
     await page.addInitScript((user) => {
       localStorage.setItem('authToken', 'fake-jwt');
@@ -117,7 +122,11 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
               versions: {
                 neutral: '中性版：我這邊看到家事分配的部分有點失衡，想一起看看怎麼安排。',
                 firm: '堅定版：我覺得目前的家事分配讓我有點累，希望我們可以一起調整。',
-                warm: '善意版：我有點累，希望我們可以一起聊聊家事的安排，也想聽你的想法。',
+                // The rewrite matches the draft's length, so a long draft can
+                // come back over the 2000-char message cap.
+                warm: overLongWarm
+                  ? `善意版：${'我有點累，希望我們可以一起聊聊家事的安排。'.repeat(100)}`
+                  : '善意版：我有點累，希望我們可以一起聊聊家事的安排，也想聽你的想法。',
               },
               toxicityFlags: [],
             },
@@ -197,6 +206,50 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
     await page.getByTestId('event-reply-rewrite-apply-neutral').click();
     await expect(page.getByTestId('event-reply-rewrite-modal')).toHaveCount(0);
     await expect(replyInput).toHaveValue(/中性版：我這邊看到家事分配/);
+    // A normal-length draft is sendable and the counter is not an alarm.
+    await expect(page.getByTestId('event-reply-counter')).toBeVisible();
+    await expect(page.getByTestId('event-reply-over-hint')).toHaveCount(0);
+    await expect(page.getByTestId('event-reply-send-button')).toBeEnabled();
+  });
+
+  // applyRewriteVersion sets the draft directly, bypassing the textarea's
+  // maxLength. Sending it used to 400 with a bare "驗證失敗", surfacing as an
+  // unexplainable 「送出失敗」 — with no counter anywhere to hint at the cause.
+  test('an over-length applied rewrite is explained, not silently unsendable', async ({ page }) => {
+    overLongWarm = true;
+
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    const eventsNav = page.getByTestId('nav-tab-communicate');
+    await eventsNav.waitFor({ state: 'visible', timeout: 15000 });
+    await eventsNav.click();
+
+    const eventCard = page.locator('text=今晚的家事').first();
+    await eventCard.waitFor({ state: 'visible', timeout: 10000 });
+    await eventCard.click();
+
+    const replyInput = page.getByTestId('event-reply-input');
+    await replyInput.waitFor({ state: 'visible', timeout: 10000 });
+    await replyInput.fill('我覺得家事分配讓我有點累。');
+
+    await page.getByTestId('event-reply-rewrite-button').click();
+    await expect(page.getByTestId('event-reply-rewrite-modal')).toBeVisible({ timeout: 10000 });
+    await page.getByTestId('event-reply-rewrite-apply-warm').click();
+    await expect(page.getByTestId('event-reply-rewrite-modal')).toHaveCount(0);
+
+    // The counter turns red, the hint says exactly how much to cut, and send is
+    // blocked up front instead of failing after a round trip.
+    const hint = page.getByTestId('event-reply-over-hint');
+    await expect(hint).toBeVisible();
+    await expect(hint).toContainText('請刪掉');
+    await expect(page.getByTestId('event-reply-counter')).toHaveClass(/text-red-600/);
+    await expect(page.getByTestId('event-reply-send-button')).toBeDisabled();
+
+    // Trimming back under the cap clears the block.
+    await replyInput.fill('我覺得家事分配讓我有點累，想一起調整。');
+    await expect(page.getByTestId('event-reply-over-hint')).toHaveCount(0);
+    await expect(page.getByTestId('event-reply-send-button')).toBeEnabled();
   });
 
   test('invite the AI 諮商師 into the event thread', async ({ page }) => {

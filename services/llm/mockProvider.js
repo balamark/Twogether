@@ -517,6 +517,12 @@ async function generateThreadTranslations({ messages, targetIds }) {
       durationMs: Date.now() - startedAt,
       usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
       costUsd: 0,
+      // Same shape as the Claude provider so routes can read these uniformly.
+      chunks: 1,
+      truncatedChunks: 0,
+      truncated: false,
+      requested: wanted.size,
+      returned: translations.length,
       assembledPrompt: `[mock] translate ${translations.length} of ${all.length} messages`,
     },
   };

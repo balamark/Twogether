@@ -10,6 +10,7 @@ const llmService = require('../services/llmService');
 const { checkLimit } = require('../lib/entitlements');
 const { resolveCompanion } = require('../lib/aiCompanions');
 const { resolveAiLimit, countTodayAiUsage, recordAiUsage } = require('../lib/aiUsage');
+const { translationStatus } = require('../lib/translationStatus');
 const {
   uploadMedia,
   checkMediaSizes,
@@ -1008,6 +1009,10 @@ router.get('/:id/translations', async (req, res) => {
     for (const row of cachedRows) translations[row.message_id] = row.translation;
 
     const missing = humanIds.filter((id) => !translations[id]);
+    // Reported back so the client can tell "nothing to do" apart from "asked
+    // for 5, got 0" — the latter must never render as silence.
+    let requested = 0;
+    let translated = 0;
     logInfo('wall.translation.request', {
       userId, postId, humanMessages: humanIds.length, cached: cachedRows.length, missing: missing.length,
     });
@@ -1050,8 +1055,6 @@ router.get('/:id/translations', async (req, res) => {
         durationMs: meta?.durationMs,
       });
 
-      await recordAiUsage(userId, 'need_translation', postResult.rows[0].content, meta);
-
       let saved = 0;
       const unmatched = [];
       for (const t of result.translations || []) {
@@ -1072,11 +1075,27 @@ router.get('/:id/translations', async (req, res) => {
       }
       logInfo('wall.translation.saved', {
         userId, postId, requested: missing.length, returned: (result.translations || []).length, saved, unmatched,
+        truncated: meta?.truncated === true,
       });
+
+      // Only bill the shared daily AI budget for work the user can actually
+      // see. A batch that came back empty (model truncated mid tool_use) used
+      // to burn a unit and cache nothing, so every retry cost another one.
+      if (saved > 0) {
+        await recordAiUsage(userId, 'need_translation', postResult.rows[0].content, meta);
+      } else {
+        logWarn('wall.translation.empty', {
+          userId, postId, requested: missing.length, truncated: meta?.truncated === true,
+        });
+      }
+      requested = missing.length;
+      translated = saved;
     }
 
-    logInfo('wall.translation.respond', { userId, postId, returnedKeys: Object.keys(translations).length });
-    res.json({ success: true, translations });
+    logInfo('wall.translation.respond', {
+      userId, postId, returnedKeys: Object.keys(translations).length, requested, translated,
+    });
+    res.json({ success: true, translations, ...translationStatus(requested, translated) });
   } catch (error) {
     logError('Get wall translations failed', { err: error.message, stack: error.stack, post_id: req.params.id });
     res.status(500).json({ success: false, message: '情緒翻譯暫時無法產生，請稍後再試' });
