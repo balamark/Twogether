@@ -647,6 +647,25 @@ const PREVIEWS: Record<string, PreviewConfig> = {
     description: '在牆上貼下想對彼此說的話，你選的 AI 諮商師（例如 Luma）也會適時給予溫柔的建議。開啟「情緒翻譯」後，AI 還會把每句指責翻成底層的需求，讓對方聽到的不是攻擊，而是需要。',
     sample: (
       <div className="space-y-2.5">
+        {/* 從範本開始 — short starter templates so a blank page never stops you.
+            Read-only strip mirroring the composer's template chips. */}
+        <div className="bg-petal-cream-2 border border-petal-rule rounded-xl px-3 py-2">
+          <div className="flex items-center gap-1.5 mb-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-petal-rose-deep" strokeWidth={1.5} />
+            <span className="font-body text-xs text-petal-ink">不知道怎麼開頭？從範本開始</span>
+            <SampleTag />
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {['謝謝你今天…', '我需要一點空間', '今天想被抱抱'].map((t) => (
+              <span
+                key={t}
+                className="inline-flex items-center rounded-full border border-petal-rule bg-petal-cream text-petal-ink-soft font-body text-[11px] px-2.5 py-1"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
         <div className="flex items-center justify-between gap-2 bg-petal-cream-2 border border-petal-rule rounded-xl px-3 py-2">
           <div className="flex items-center gap-1.5">
             <HeartHandshake className="w-4 h-4 text-petal-rose-deep" strokeWidth={1.5} />

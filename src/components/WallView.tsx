@@ -61,6 +61,9 @@ const WallView: React.FC<WallViewProps> = ({
 }) => {
   const userId = authState.user?.id;
   const tutorialKey = `wall_tutorial_seen_${userId || 'anon'}`;
+  // Remembers that the composer's 「從範本開始」 panel has already been met, so
+  // it stops auto-expanding and stops eating the top of the composer.
+  const templatesSeenKey = `wall_templates_seen_${userId || 'anon'}`;
   const tz = useTimezone();
 
   const [posts, setPosts] = useState<WallPost[]>([]);
@@ -467,38 +470,52 @@ const WallView: React.FC<WallViewProps> = ({
     );
   };
 
-  const renderDemoCard = () => {
-    const demo = defaultWallExamples[0];
-    if (!demo) return null;
+  // Empty state: a few *short* examples to skim, not one long wall of text.
+  // Tapping one opens the composer pre-filled with it.
+  const DEMO_COUNT = 3;
+
+  const renderDemoCards = () => {
+    const demos = defaultWallExamples.slice(0, DEMO_COUNT);
+    if (demos.length === 0) return null;
     return (
-      <div
-        className="bg-petal-cream-2/40 rounded-md p-5 border border-dashed border-petal-rule"
-        data-testid="wall-demo-card"
-      >
-        <div className="flex items-center gap-2 mb-2">
-          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-petal-sage/30 text-petal-ink-soft font-body text-[10px] uppercase tracking-[0.12em]">
-            範例
-          </span>
-          <span className="font-display text-base font-medium text-petal-ink">
-            {demo.title}
-          </span>
+      <div className="space-y-3" data-testid="wall-demo-card">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {demos.map((demo) => (
+            <button
+              key={demo.id}
+              type="button"
+              onClick={() => openComposer({ template: demo })}
+              className="text-left bg-petal-cream-2/40 rounded-md p-4 border border-dashed border-petal-rule hover:border-petal-rose hover:bg-petal-cream-2/70 transition-colors"
+              data-testid={`wall-demo-use-template-${demo.id}`}
+            >
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-petal-sage/30 text-petal-ink-soft font-body text-[10px] uppercase tracking-[0.12em]">
+                  範例
+                </span>
+                <span className="font-body text-[10px] uppercase tracking-[0.1em] text-petal-muted">
+                  {demo.mood_tag}
+                </span>
+              </div>
+              <div className="font-display text-sm font-medium text-petal-ink mb-1">
+                {demo.title}
+              </div>
+              <div className="font-body text-xs text-petal-ink-soft leading-relaxed whitespace-pre-wrap line-clamp-4">
+                {demo.content}
+              </div>
+              <div className="mt-3 font-display italic text-xs text-petal-rose-deep">
+                用這個開始 →
+              </div>
+            </button>
+          ))}
         </div>
-        <div className="font-body text-sm text-petal-ink-soft leading-relaxed whitespace-pre-wrap line-clamp-6">
-          {demo.content}
-        </div>
-        <div className="mt-4 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => openComposer({ template: demo })}
-            className="bg-petal-ink text-petal-cream px-4 py-2 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors"
-            data-testid="wall-demo-use-template"
-          >
-            用這個範本開始
-          </button>
-          <span className="font-body text-[11px] text-petal-muted">
-            這只是示範 — 寫了第一則之後就會消失。
-          </span>
-        </div>
+        <p className="font-body text-[11px] text-petal-muted">
+          這些只是示範 — 寫了第一則之後就會消失。
+          {defaultWallExamples.length > DEMO_COUNT && (
+            <>
+              {' '}還有 {defaultWallExamples.length - DEMO_COUNT} 則範本，在「新貼文」裡看得到。
+            </>
+          )}
+        </p>
       </div>
     );
   };
@@ -607,10 +624,10 @@ const WallView: React.FC<WallViewProps> = ({
               strokeWidth={1.2}
             />
             <p className="font-display italic font-light text-base text-petal-muted">
-              還沒有貼文 — 看看下面的範例，或寫下你的第一則。
+              還沒有貼文 — 挑一則範例改成你的話，或直接寫下你的第一則。
             </p>
           </div>
-          {renderDemoCard()}
+          {renderDemoCards()}
         </div>
       ) : filteredPosts.length === 0 ? (
         <div className="text-center py-12 font-body text-sm text-petal-muted">
@@ -651,6 +668,7 @@ const WallView: React.FC<WallViewProps> = ({
         examples={defaultWallExamples}
         editingPost={editingPost}
         initialTemplate={initialTemplate}
+        templatesSeenKey={templatesSeenKey}
       />
 
       {shareWarnPost && (

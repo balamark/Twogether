@@ -29,7 +29,27 @@ interface WallPostComposerProps {
   examples: WallExample[];
   editingPost?: WallPost | null;
   initialTemplate?: WallExample | null;
+  /**
+   * localStorage key used to remember that the user already knows about the
+   * 「從範本開始」 section. Once set, the section opens collapsed (one line)
+   * instead of pushing the writing area down every single time.
+   */
+  templatesSeenKey?: string;
 }
+
+// Whether this user has already met the 「從範本開始」 section. Once they have
+// (collapsed it, used a template, or published a post), the section opens
+// collapsed to a single line so the writing area stays at the top.
+const hasSeenTemplates = (key?: string) => {
+  if (typeof window === 'undefined' || !key) return false;
+  return !!localStorage.getItem(key);
+};
+
+const rememberTemplatesSeen = (key: string | undefined, seen: boolean) => {
+  if (typeof window === 'undefined' || !key) return;
+  if (seen) localStorage.setItem(key, '1');
+  else localStorage.removeItem(key);
+};
 
 const MAX_CONTENT = 6000;
 // Max photos/videos per post. Kept in sync with WALL_MAX_MEDIA in routes/wall.js.
@@ -44,6 +64,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
   examples,
   editingPost = null,
   initialTemplate = null,
+  templatesSeenKey,
 }) => {
   const [content, setContent] = useState('');
   const [moodTag, setMoodTag] = useState<string | null>(null);
@@ -62,6 +83,8 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
   const [customTags, setCustomTags] = useState<string[]>([]);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customInput, setCustomInput] = useState('');
+
+  const markTemplatesSeen = (seen: boolean) => rememberTemplatesSeen(templatesSeenKey, seen);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -85,13 +108,13 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
       setCategory('general');
       setExistingMedia([]);
       setIsPrivate(false);
-      setShowTemplates(true);
+      setShowTemplates(!hasSeenTemplates(templatesSeenKey));
     }
     setNewMedia([]);
     setShowCustomInput(false);
     setCustomInput('');
     setError(null);
-  }, [isOpen, editingPost, initialTemplate]);
+  }, [isOpen, editingPost, initialTemplate, templatesSeenKey]);
 
   // Load the couple's remembered custom mood tags when the composer opens.
   useEffect(() => {
@@ -136,6 +159,8 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
         // In edit mode always send the kept list so removals are applied.
         ...(editingPost ? { existingMedia } : {}),
       });
+      // They've written one — no need to pitch the templates panel again.
+      markTemplatesSeen(true);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : '發布失敗，請稍後再試');
@@ -161,6 +186,15 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
     setMoodTag(template.mood_tag);
     setCategory(template.category);
     setShowTemplates(false);
+    markTemplatesSeen(true);
+  };
+
+  // Collapsing means "I know where these are" — remembered, so next time the
+  // composer opens straight into writing. Expanding again undoes that.
+  const toggleTemplates = () => {
+    const next = !showTemplates;
+    setShowTemplates(next);
+    markTemplatesSeen(!next);
   };
 
   const applyCustomTag = () => {
@@ -234,15 +268,22 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
             <div>
               <button
                 type="button"
-                onClick={() => setShowTemplates((v) => !v)}
-                className="flex items-center text-petal-ink-soft hover:text-petal-ink font-body text-[11px] uppercase tracking-[0.18em] mb-3"
+                onClick={toggleTemplates}
+                aria-expanded={showTemplates}
+                data-testid="wall-composer-templates-toggle"
+                className={`flex items-center text-petal-ink-soft hover:text-petal-ink font-body text-[11px] uppercase tracking-[0.18em] ${
+                  showTemplates ? 'mb-3' : ''
+                }`}
               >
                 <Sparkles className="w-3.5 h-3.5 mr-2 text-petal-rose-deep" strokeWidth={1.5} />
-                從範本開始 ({examples.length})
+                {showTemplates ? '從範本開始' : '沒靈感？看看範本'} ({examples.length})
                 <span className="ml-2 text-[10px]">{showTemplates ? '▾' : '▸'}</span>
               </button>
               {showTemplates && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <>
+                {/* Capped + scrollable: even fully expanded, the templates
+                    never push 「想說的話」 off the screen. */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
                   {examples.map((tpl) => (
                     <button
                       key={tpl.id}
@@ -270,6 +311,17 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                     </button>
                   ))}
                 </div>
+                <div className="mt-2 text-right">
+                  <button
+                    type="button"
+                    onClick={toggleTemplates}
+                    data-testid="wall-composer-templates-dismiss"
+                    className="font-body text-[11px] text-petal-muted hover:text-petal-ink underline underline-offset-2"
+                  >
+                    我自己寫就好，下次別自動展開
+                  </button>
+                </div>
+                </>
               )}
             </div>
           )}
