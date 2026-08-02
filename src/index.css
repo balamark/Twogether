@@ -291,7 +291,8 @@ video {
 .dark .bg-white\/25,
 .dark .bg-petal-cream\/20 { background-color: rgba(255,255,255,0.10) !important; }
 .dark .bg-petal-cream-2\/30,
-.dark .bg-petal-cream-2\/60 { background-color: #1C2128 !important; }
+.dark .bg-petal-cream-2\/60,
+.dark .bg-petal-cream-2\/70 { background-color: #1C2128 !important; }
 .dark .bg-petal-rule,
 .dark .bg-petal-muted { background-color: #30363D !important; }
 
