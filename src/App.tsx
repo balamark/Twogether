@@ -389,10 +389,57 @@ const WALL_MOOD_TAGS = [
 ] as const;
 
 // Built-in starter examples shown in the composer's "從範本開始" section and
-// as a demo card when the wall is empty. The first entry is the framework
-// the user wrote — a meta-communication template for "how I want to be
-// responded to when you approach me and I'm tired."
+// as demo cards when the wall is empty.
+//
+// Order matters: the short, one-glance templates come first (the empty-state
+// demo cards show the first few, and a wall of text scares people off), with
+// the long meta-communication framework last for whoever wants it.
 const defaultWallExamples: WallExample[] = [
+  {
+    id: 'example-thanks-today',
+    title: '謝謝你今天…',
+    category: 'general',
+    mood_tag: '感謝',
+    content: `謝謝你今天＿＿＿（一件很小的事）。
+
+那個當下我覺得＿＿＿，想讓你知道我有看見。`,
+  },
+  {
+    id: 'example-need-space',
+    title: '我需要一點空間，不是不愛你',
+    category: 'general',
+    mood_tag: '需要空間',
+    content: `我現在有點滿，需要自己安靜一下。
+
+這跟你沒有關係，也不是生你的氣。＿＿＿（大概多久）之後我會來找你。`,
+  },
+  {
+    id: 'example-want-hug',
+    title: '今天想被抱抱',
+    category: 'general',
+    mood_tag: '想被抱抱',
+    content: `今天有點累，不用問我發生什麼事，抱我一下就好。
+
+如果可以，＿＿＿（例如：晚上一起躺著看個影片）。`,
+  },
+  {
+    id: 'example-missing-you',
+    title: '想念你的一個瞬間',
+    category: 'general',
+    mood_tag: '想念你',
+    content: `今天＿＿＿（在哪裡／做什麼）的時候突然想到你。
+
+想到的是＿＿＿。`,
+  },
+  {
+    id: 'example-small-request',
+    title: '有一件小事，想拜託你',
+    category: 'important',
+    mood_tag: '想溝通',
+    content: `我想拜託你的是：＿＿＿（具體、做得到的一件事）。
+
+因為這樣我會覺得＿＿＿。不急著現在回答，你想一下再跟我說。`,
+  },
   {
     id: 'example-affirm-alternative',
     title: '當我累了又被靠近時，我希望你這樣回應我',
