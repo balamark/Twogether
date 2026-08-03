@@ -28,6 +28,7 @@ import IntimacyRequestsHistory from './components/IntimacyRequestsHistory';
 import IntimacyRequestForm from './components/IntimacyRequestForm';
 import NotificationInbox from './components/NotificationInbox';
 import PairingInvitationHandler from './components/PairingInvitationHandler';
+import { PairingInviteShare } from './components/PairingInviteShare';
 import AiCompanionOnboarding from './components/AiCompanionPicker';
 import GettingStartedCard from './components/GettingStartedCard';
 import HelpView from './components/HelpView';
@@ -45,6 +46,28 @@ import { EngineerModeProvider } from './contexts/EngineerModeProvider';
 import EngineerTextEngine from './components/EngineerTextEngine';
 import { useScrollLock } from './hooks/useScrollLock';
 import { usePageTracking } from './hooks/usePageTracking';
+
+// The accept link for a just-sent pairing invite, surfaced so the inviter can
+// share it directly (LINE, copy/paste) rather than relying on the email
+// arriving in the partner's inbox rather than their spam folder.
+interface PairingInviteState {
+  link: string;
+  email: string;
+  emailSent: boolean;
+}
+
+const buildPairingInviteState = (
+  result: { invitation?: { token?: string; emailSent?: boolean } } | undefined,
+  email: string
+): PairingInviteState | null => {
+  const token = result?.invitation?.token;
+  if (!token) return null;
+  return {
+    link: `${window.location.origin}/pairing/accept?token=${encodeURIComponent(token)}`,
+    email,
+    emailSent: result?.invitation?.emailSent !== false,
+  };
+};
 
 export interface IntimateRecord {
   id: number;
@@ -614,6 +637,9 @@ const LoveTimeApp = () => {
   const [pairingPromptEmail, setPairingPromptEmail] = useState('');
   const [pairingPromptSending, setPairingPromptSending] = useState(false);
   const [pairingPromptSent, setPairingPromptSent] = useState(false);
+  // The accept link for the invite just sent, so the new user can pass it
+  // along over LINE instead of waiting on an email that may be filtered.
+  const [pairingPromptInvite, setPairingPromptInvite] = useState<PairingInviteState | null>(null);
 
   // Funnel top-of-funnel beacon. Fires once per browser tab session when an
   // unauthenticated visitor reaches the app, so the /admin dashboard can count
@@ -2511,14 +2537,23 @@ const LoveTimeApp = () => {
             </div>
 
             {pairingPromptSent ? (
-              <div className="text-center py-4">
-                <p className="font-display italic text-petal-sage-deep mb-1">邀請已寄出</p>
-                <p className="font-body text-sm text-petal-muted mb-4">請通知伴侶查看信箱 — 連結 7 天內有效。</p>
+              <div className="py-2">
+                <p className="font-display italic text-petal-sage-deep mb-1 text-center">邀請已寄出</p>
+                <p className="font-body text-sm text-petal-muted mb-4 text-center">連結 7 天內有效。</p>
+                {pairingPromptInvite && (
+                  <PairingInviteShare
+                    link={pairingPromptInvite.link}
+                    recipientEmail={pairingPromptInvite.email}
+                    emailSent={pairingPromptInvite.emailSent}
+                    className="mb-4"
+                  />
+                )}
                 <button
                   onClick={() => {
                     setShowPairingPrompt(false);
                     setPairingPromptSent(false);
                     setPairingPromptEmail('');
+                    setPairingPromptInvite(null);
                   }}
                   className="font-body text-sm text-petal-muted hover:text-petal-ink transition-colors"
                 >
@@ -2541,7 +2576,8 @@ const LoveTimeApp = () => {
                         (async () => {
                           setPairingPromptSending(true);
                           try {
-                            await apiService.sendPairingInvitation({ recipientEmail: pairingPromptEmail.trim() });
+                            const result = await apiService.sendPairingInvitation({ recipientEmail: pairingPromptEmail.trim() });
+                            setPairingPromptInvite(buildPairingInviteState(result, pairingPromptEmail.trim()));
                             setPairingPromptSent(true);
                           } catch (err) {
                             showNotification({ type: 'error', title: '發送失敗', message: (err as Error)?.message || '請稍後再試', duration: 6000 });
@@ -2558,7 +2594,8 @@ const LoveTimeApp = () => {
                     if (!pairingPromptEmail.trim()) return;
                     setPairingPromptSending(true);
                     try {
-                      await apiService.sendPairingInvitation({ recipientEmail: pairingPromptEmail.trim() });
+                      const result = await apiService.sendPairingInvitation({ recipientEmail: pairingPromptEmail.trim() });
+                      setPairingPromptInvite(buildPairingInviteState(result, pairingPromptEmail.trim()));
                       setPairingPromptSent(true);
                     } catch (err) {
                       showNotification({ type: 'error', title: '發送失敗', message: (err as Error)?.message || '請稍後再試', duration: 6000 });

@@ -18,10 +18,13 @@ env_variables:
   SUPABASE_URL: $_SUPABASE_URL
   SUPABASE_ANON_KEY: $_SUPABASE_ANON_KEY
   SUPABASE_SERVICE_ROLE_KEY: $_SUPABASE_SERVICE_ROLE_KEY
-  # Email configuration
+  # Email configuration (services/emailService.js — nodemailer over SMTP).
+  # EMAIL_FROM must be an address on the brand domain (e.g.
+  # "Twogether <hello@twogether.fun>") so SPF/DKIM/DMARC align with the
+  # twogether.fun links inside the mail — a mismatch is what sent pairing
+  # invites to spam. See docs/EMAIL_DELIVERABILITY.md.
   EMAIL_FROM: $_EMAIL_FROM
-  EMAIL_PASS: $_EMAIL_PASS
-  RESEND_API_KEY: $_RESEND_API_KEY
+  EMAIL_REPLY_TO: $_EMAIL_REPLY_TO
   SMTP_HOST: $_SMTP_HOST
   SMTP_PORT: $_SMTP_PORT
   SMTP_SECURE: $_SMTP_SECURE

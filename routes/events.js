@@ -113,6 +113,7 @@ async function notify(userId, type, title, content, eventId, relatedUserId, prio
     await emailService.sendEventNotification({
       senderName,
       recipientEmail: recipient.email,
+      recipientUserId: recipient.id,
       eventTitle: content,
       type,
       messageContent,

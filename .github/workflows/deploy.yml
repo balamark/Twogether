@@ -205,8 +205,7 @@ jobs:
           _SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           _SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           _EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-          _EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
-          _RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          _EMAIL_REPLY_TO: ${{ secrets.EMAIL_REPLY_TO }}
           _SMTP_HOST: ${{ secrets.SMTP_HOST }}
           _SMTP_PORT: ${{ secrets.SMTP_PORT }}
           _SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
@@ -373,8 +372,7 @@ jobs:
           _STAGING_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.STAGING_SUPABASE_SERVICE_ROLE_KEY }}
           _JWT_SECRET: ${{ secrets.JWT_SECRET }}
           _EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
-          _EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
-          _RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          _EMAIL_REPLY_TO: ${{ secrets.EMAIL_REPLY_TO }}
           _SMTP_HOST: ${{ secrets.SMTP_HOST }}
           _SMTP_PORT: ${{ secrets.SMTP_PORT }}
           _SMTP_SECURE: ${{ secrets.SMTP_SECURE }}

@@ -1182,6 +1182,7 @@ router.put('/:id/respond', [
         await emailService.sendIntimacyResponseNotification({
           receiverName: receiverRow.rows[0]?.nickname || null,
           senderEmail: sender.email,
+          senderUserId: sender.id,
           response,
           responseMessage: response_message || '',
         });

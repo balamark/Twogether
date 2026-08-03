@@ -35,6 +35,7 @@ import {
 } from '../content/positioning';
 import { COMMUNICATION_PRINCIPLES } from '../content/communicationPrinciples';
 import { trackAction } from '../utils/track';
+import { PairingInviteShare } from './PairingInviteShare';
 
 interface PreviewScript {
   id: string;
@@ -573,6 +574,23 @@ const PRICING_PERKS = [
   '情侶雙方同步享有，無須各自付費',
 ];
 
+// Pairing is the gateway to every shared feature, so the showroom previews it
+// too: invite by email, then hand the partner the same link over LINE if the
+// mail is slow. Non-interactive here (sample), like every other sample.
+const PairingInviteSample: React.FC = () => (
+  <div className="space-y-2">
+    <div className="flex items-center justify-between">
+      <span className="font-body text-xs text-petal-muted">邀請伴侶加入</span>
+      <SampleTag />
+    </div>
+    <PairingInviteShare
+      sample
+      link="https://twogether.fun/pairing/accept?token=example"
+      recipientEmail="partner@example.com"
+    />
+  </div>
+);
+
 const PREVIEWS: Record<string, PreviewConfig> = {
   record: {
     icon: Calendar,
@@ -593,6 +611,9 @@ const PREVIEWS: Record<string, PreviewConfig> = {
         <SampleRecordList />
         <div className="mt-4">
           <NotificationCenterSample />
+        </div>
+        <div className="mt-4">
+          <PairingInviteSample />
         </div>
       </>
     ),

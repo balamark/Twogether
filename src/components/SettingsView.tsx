@@ -3,6 +3,7 @@ import { User, Users, CheckCircle, Trash2 } from 'lucide-react';
 import { apiService, type CycleRecord } from '../services/api';
 import { AiCompanionList } from './AiCompanionPicker';
 import LineNotificationSettings from './LineNotificationSettings';
+import { PairingInviteShare } from './PairingInviteShare';
 import { resolveCompanion } from '../utils/aiCompanions';
 import { averageCycleLength, predictNextPeriodStart, ovulationWindow, computeCycleLengths } from '../utils/cycle';
 import { TIMEZONE_OPTIONS } from '../utils/timezone-options';
@@ -201,6 +202,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const [recipientEmail, setRecipientEmail] = useState('');
   const [invitationMessage, setInvitationMessage] = useState('');
   const [isSendingInvitation, setIsSendingInvitation] = useState(false);
+  // Accept link for the invite just sent, so the user can pass it along
+  // directly when the email is slow or filtered.
+  const [sentInvite, setSentInvite] = useState<{ link: string; email: string; emailSent: boolean } | null>(null);
 
   const getApiErrorCode = (err: unknown) => {
     const typed = err as ApiErrorResponse & { data?: ApiError; error_code?: string };
@@ -773,7 +777,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         message: invitationMessage.trim() || undefined
       };
 
-      await apiService.sendPairingInvitation(invitationData);
+      const result = await apiService.sendPairingInvitation(invitationData);
+      const token = result?.invitation?.token;
 
       showNotification({
         type: 'success',
@@ -781,6 +786,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
         message: `已向 ${recipientEmail} 發送配對邀請，請等待對方接受`,
         duration: 8000
       });
+
+      if (token) {
+        setSentInvite({
+          link: `${window.location.origin}/pairing/accept?token=${encodeURIComponent(token)}`,
+          email: recipientEmail.trim(),
+          emailSent: result?.invitation?.emailSent !== false,
+        });
+      }
 
       // Clear the form
       setRecipientEmail('');
@@ -1683,6 +1696,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                     >
                       {isSendingInvitation ? '發送中…' : '發送邀請 →'}
                     </button>
+
+                    {sentInvite && (
+                      <PairingInviteShare
+                        link={sentInvite.link}
+                        recipientEmail={sentInvite.email}
+                        emailSent={sentInvite.emailSent}
+                      />
+                    )}
                   </div>
                 </div>
 

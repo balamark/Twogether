@@ -156,6 +156,7 @@ async function notifyPartnerAction({ actorId, type, content = null, priority } =
         await emailService.sendPartnerActionNotification({
           senderName: actorNickname,
           recipientEmail: recipient.email,
+          recipientUserId: recipient.id,
           title,
           content: body,
         });

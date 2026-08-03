@@ -16,10 +16,10 @@ env_variables:
   # plumbed because nothing in the backend reads it.
   SUPABASE_URL: $_STAGING_SUPABASE_URL
   SUPABASE_SERVICE_ROLE_KEY: $_STAGING_SUPABASE_SERVICE_ROLE_KEY
-  # Email — shared with prod (staging emails go through same Gmail/Resend)
+  # Email — shares prod's SMTP credentials and sender domain; only the links
+  # differ (FRONTEND_URL below points at staging).
   EMAIL_FROM: $_EMAIL_FROM
-  EMAIL_PASS: $_EMAIL_PASS
-  RESEND_API_KEY: $_RESEND_API_KEY
+  EMAIL_REPLY_TO: $_EMAIL_REPLY_TO
   SMTP_HOST: $_SMTP_HOST
   SMTP_PORT: $_SMTP_PORT
   SMTP_SECURE: $_SMTP_SECURE
