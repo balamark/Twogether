@@ -16,6 +16,38 @@ body {
   box-sizing: border-box;
 }
 
+/* iOS Safari auto-zooms the whole page when you focus a form control whose
+   computed font-size is under 16px. Once zoomed, `position: fixed` overlays are
+   painted against the layout viewport but hit-tested against the visual
+   viewport — the two drift apart, so taps land a little above or below the
+   finger and small buttons stop responding entirely. Inside a modal that is
+   catastrophic: focusing one 14px textarea misaligns every button around it.
+
+   Raising the form-control floor to 16px is the only fix that doesn't cost the
+   user something. Do NOT reach for `maximum-scale=1` / `user-scalable=no` in
+   the viewport meta instead — that kills pinch-zoom (an accessibility
+   regression) and Safari has ignored it since iOS 10 anyway.
+
+   Scoped to the `sm` breakpoint so desktop typography is untouched, and
+   checkbox/radio/range are excluded — they render no text, so a larger
+   font-size would only inflate their box.
+
+   The `:not()` chains aren't decoration: a bare `textarea` selector (0,0,1)
+   loses to Tailwind's `.text-sm` (0,1,0), so the rule would silently do
+   nothing. Each `:not([attr])` adds attribute-level specificity, putting these
+   above the utility classes they need to override.
+
+   A control that is *already* 16px or larger never triggers the zoom, so
+   anything deliberately bigger can opt out with `data-keep-font` rather than
+   being clamped down to 16px. */
+@media (max-width: 640px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([data-keep-font]),
+  textarea:not([data-keep-font]),
+  select:not([data-keep-font]) {
+    font-size: 16px;
+  }
+}
+
 /* Photos/videos are not downloadable. `-webkit-touch-callout` is the only thing
    that suppresses iOS Safari's long-press "儲存影像" sheet (it never fires a
    `contextmenu` event); the right-click and drag halves live in

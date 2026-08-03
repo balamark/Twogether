@@ -409,6 +409,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleDeleteCycleRecord = async (id: string) => {
     if (!onCycleRecordsChange) return;
+    if (!window.confirm('確定要刪除這筆週期紀錄嗎？刪除後無法復原。')) return;
     const previous = cycleRecords;
     onCycleRecordsChange(cycleRecords.filter(r => r.id !== id));
     try {

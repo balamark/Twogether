@@ -57,7 +57,7 @@ export default function PetalSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label={ariaLabel}
-        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-petal-rule bg-white hover:border-petal-rose transition-colors focus:outline-none focus:border-petal-rose-deep"
+        className="inline-flex items-center gap-1.5 px-3 py-2 min-h-[40px] rounded-full border border-petal-rule bg-white hover:border-petal-rose transition-colors focus:outline-none focus:border-petal-rose-deep"
       >
         {icon}
         <span className="font-body text-[13px] text-petal-ink">
@@ -88,7 +88,7 @@ export default function PetalSelect({
                       setOpen(false);
                     }}
                     data-testid={optionTestIdPrefix ? `${optionTestIdPrefix}-option-${opt.value}` : undefined}
-                    className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 text-left font-body text-[13px] transition-colors ${
+                    className={`w-full flex items-center justify-between gap-2 px-3 py-2.5 min-h-[44px] text-left font-body text-[13px] transition-colors ${
                       isSelected
                         ? 'bg-petal-rose-soft text-petal-rose-deep'
                         : 'text-petal-ink hover:bg-petal-cream-2'

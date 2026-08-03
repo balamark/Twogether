@@ -6,6 +6,7 @@ import { AchievementsView, IntimacyStatsCards, CalendarHeatmap } from './Achieve
 import RelationshipDashboard from './RelationshipDashboard';
 import { periodDateSet, fertileDateSet, predictedPeriodDateSet, addDays } from '../utils/cycle';
 import { formatYmdInTz } from '../utils/datetime';
+import { useScrollLock } from '../hooks/useScrollLock';
 import { apiService } from '../services/api';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { Button } from './ui/Button';
@@ -232,6 +233,9 @@ const CalendarView = ({
   const [periodDayDate, setPeriodDayDate] = useState<string | null>(null);
   const [periodDayRecord, setPeriodDayRecord] = useState<CycleRecord | null>(null);
   const [deletingPeriod, setDeletingPeriod] = useState(false);
+  // Both modals are `fixed inset-0`; lock the page behind them so taps inside
+  // aren't offset on iOS.
+  useScrollLock(showRecordModal || !!periodDayRecord);
 
   const cycleEnabled = !!authState.user?.cycle_tracking_enabled;
   const periodDates = React.useMemo(() => cycleEnabled ? periodDateSet(cycleRecords) : undefined, [cycleEnabled, cycleRecords]);
@@ -252,6 +256,9 @@ const CalendarView = ({
 
   const handleDeletePeriod = async () => {
     if (!periodDayRecord) return;
+    // Sits directly beside 關閉 in a two-up row — an off-target tap shouldn't
+    // silently drop the record.
+    if (!window.confirm('確定要取消這次月經紀錄嗎？刪除後無法復原。')) return;
     setDeletingPeriod(true);
     try {
       await apiService.deleteCycleRecord(periodDayRecord.id);

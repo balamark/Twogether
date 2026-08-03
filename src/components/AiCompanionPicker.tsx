@@ -3,6 +3,7 @@ import { HeartHandshake, Loader2, Star } from 'lucide-react';
 import { apiService } from '../services/api';
 import { AI_COMPANIONS, DEFAULT_COMPANION_ID, type AiCompanion } from '../utils/aiCompanions';
 import { NOT_A_SUBSTITUTE } from '../content/positioning';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 // Selectable list of AI 諮商師 companions. Shared by the onboarding modal
 // (below) and the Settings「AI 諮商師」section.
@@ -106,6 +107,10 @@ export default function AiCompanionOnboarding({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Without this the page keeps scrolling behind the overlay on iOS, which
+  // shifts where taps land inside it.
+  useScrollLock(true);
 
   const save = async () => {
     setSaving(true);

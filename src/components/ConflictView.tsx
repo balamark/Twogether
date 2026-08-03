@@ -985,9 +985,13 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate }: Confli
     <MarriageCheckup showNotification={showNotification} partnerConnected={partnerConnected} />
 
     {/* Pause Mode — full-screen guided flow */}
+    {/* Scroll the inner container, not the fixed layer: a `position: fixed`
+        element that scrolls its own content is hit-tested against the visual
+        viewport while it's painted against the layout viewport on iOS, which
+        makes taps land offset from the finger. */}
     {pauseStep !== null && (
-      <div className="fixed inset-0 z-50 bg-petal-cream overflow-y-auto">
-        <div className="max-w-2xl mx-auto px-5 sm:px-8 py-8 min-h-screen flex flex-col">
+      <div className="fixed inset-0 z-50 bg-petal-cream flex flex-col">
+        <div className="w-full max-w-2xl mx-auto px-5 sm:px-8 py-8 flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col safe-pb">
           {/* Top bar */}
           <div className="flex items-start justify-between mb-8">
             <div>

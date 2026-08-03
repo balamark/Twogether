@@ -27,6 +27,7 @@ import MarkdownContent from './MarkdownContent';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatRelativeOrDate } from '../utils/datetime';
 import { isVideoUrl } from '../utils/script';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 interface WallViewProps {
   authState: {
@@ -199,6 +200,9 @@ const WallView: React.FC<WallViewProps> = ({
   // rolls back on failure.
   const togglePrivacy = async (post: WallPost) => {
     const next = !post.is_private;
+    // Private → shared is a one-way disclosure: once TA has seen it, hiding it
+    // again doesn't undo that. The other direction is safe, so it stays instant.
+    if (!next && !confirm('要把這則貼文分享給TA嗎？\n\nTA會立刻看得到，之後再設回私密也收不回來了。')) return;
     setPrivacyBusyId(post.id);
     setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, is_private: next } : p)));
     try {
@@ -222,6 +226,9 @@ const WallView: React.FC<WallViewProps> = ({
 
   // Share to 公開問答 (anonymised). Single-party toggle with a warning dialog.
   const [shareWarnPost, setShareWarnPost] = useState<WallPost | null>(null);
+  // Both of these render `fixed inset-0` overlays; without the lock the page
+  // scrolls behind them on iOS and taps inside land offset.
+  useScrollLock(!!shareWarnPost || !!lightboxUrl);
   const [sharingId, setSharingId] = useState<string | null>(null);
 
   const confirmShare = async (post: WallPost) => {
@@ -303,23 +310,28 @@ const WallView: React.FC<WallViewProps> = ({
               · {formatTime(post.created_at, tz)}
             </span>
           </div>
+          {/* 44px targets with a real gap between them: these two used to be
+              ~26px icons 4px apart, so a slightly-off tap meant for 編輯 landed
+              on 刪除. The separator keeps the destructive one visually and
+              physically apart from the one people actually reach for. */}
           {isOwn && (
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => openComposer({ editing: post })}
-                className="p-1.5 text-petal-muted hover:text-petal-ink transition-colors"
+                className="p-2.5 min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-md text-petal-muted hover:text-petal-ink hover:bg-petal-cream-2 transition-colors"
                 aria-label="編輯"
               >
-                <Pencil className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <Pencil className="w-4 h-4" strokeWidth={1.5} />
               </button>
+              <span aria-hidden className="w-px h-5 bg-petal-rule" />
               <button
                 type="button"
                 onClick={() => handleDelete(post)}
-                className="p-1.5 text-petal-muted hover:text-petal-rose-deep transition-colors"
+                className="p-2.5 min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-md text-petal-muted hover:text-petal-rose-deep hover:bg-petal-cream-2 transition-colors"
                 aria-label="刪除"
               >
-                <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <Trash2 className="w-4 h-4" strokeWidth={1.5} />
               </button>
             </div>
           )}

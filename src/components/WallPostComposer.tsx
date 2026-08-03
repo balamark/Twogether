@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { X, Sparkles, Star, ImagePlus, Lock, Plus } from 'lucide-react';
 import { apiService, type WallPost, type WallPostCategory } from '../services/api';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -76,6 +76,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
   const [existingMedia, setExistingMedia] = useState<string[]>([]);
   const [newMedia, setNewMedia] = useState<File[]>([]);
   const [newMediaPreviews, setNewMediaPreviews] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   // Privacy: when on, only the author can see this post.
   const [isPrivate, setIsPrivate] = useState(false);
   // Custom mood tags: the couple's previously-used non-preset tags, plus an
@@ -170,6 +171,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
   if (!isOpen) return null;
 
   const mediaCount = existingMedia.length + newMedia.length;
+  const atMediaCap = mediaCount >= WALL_MAX_MEDIA;
 
   const presetSet = new Set(moodTags);
   // Custom chips = remembered tags + the current selection if it's a custom one
@@ -241,14 +243,23 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
     setNewMedia((prev) => prev.filter((_, i) => i !== idx));
 
   return (
+    // The backdrop must NOT be the scroll container. A `position: fixed`
+    // element that scrolls its own content is the shape iOS Safari gets wrong:
+    // while `useScrollLock` pins the body with `position: fixed`, WebKit paints
+    // fixed content against the layout viewport but hit-tests it against the
+    // visual viewport, so taps land offset from the finger. Scrolling an
+    // ordinary inner panel instead (the pattern every other modal here uses —
+    // see CalendarView.tsx / EventDetail.tsx) removes that failure mode.
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-petal-ink/40 backdrop-blur-sm px-4 py-8 overflow-y-auto"
-      onClick={onClose}
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-petal-ink/40 backdrop-blur-sm px-4 py-8"
+      // Only a tap on the backdrop itself closes; taps inside the panel bubble
+      // up here too, and losing a half-written post to a stray tap is the worst
+      // outcome in this modal.
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
       data-testid="wall-composer-backdrop"
     >
       <div
-        className="bg-petal-cream w-full max-w-2xl rounded-2xl shadow-xl border border-petal-rule my-auto"
-        onClick={(e) => e.stopPropagation()}
+        className="bg-petal-cream w-full max-w-2xl rounded-2xl shadow-xl border border-petal-rule max-h-[min(90vh,calc(100dvh-80px))] overflow-y-auto overscroll-contain safe-pb"
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-petal-rule">
           <h2 className="font-display text-2xl font-light tracking-tight text-petal-ink">
@@ -256,7 +267,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
           </h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-md hover:bg-petal-cream-2 transition-colors"
+            className="p-2.5 min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-md hover:bg-petal-cream-2 transition-colors"
             aria-label="關閉"
           >
             <X className="w-5 h-5 text-petal-ink-soft" strokeWidth={1.5} />
@@ -349,27 +360,35 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
             <label className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-2 block">
               照片／影片（可選，最多 {WALL_MAX_MEDIA} 個）
             </label>
-            <label
-              className={`inline-flex items-center gap-2 px-3 py-2 rounded-md border border-petal-rule font-body text-xs text-petal-ink-soft transition-colors ${
-                mediaCount >= WALL_MAX_MEDIA
-                  ? 'opacity-50 cursor-not-allowed'
-                  : 'cursor-pointer hover:border-petal-rose-deep hover:text-petal-ink'
-              }`}
+            {/* A real button driving the input via ref, not a <label> wrapping
+                a `display: none` input. The nested-label form re-dispatches the
+                click onto the hidden input, and WebKit can drop the user
+                activation on that second dispatch — which makes the file picker
+                silently never open. CalendarView.tsx uses this same pattern. */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={atMediaCap}
+              data-testid="wall-composer-media-button"
+              className="inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-md border border-petal-rule font-body text-sm text-petal-ink-soft transition-colors disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:border-petal-rose-deep enabled:hover:text-petal-ink"
             >
               <ImagePlus className="w-4 h-4" strokeWidth={1.5} />
               新增照片／影片
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
-                multiple
-                onChange={handleAddMedia}
-                disabled={mediaCount >= WALL_MAX_MEDIA}
-                className="hidden"
-                data-testid="wall-composer-media-input"
-              />
-            </label>
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+              multiple
+              onChange={handleAddMedia}
+              disabled={atMediaCap}
+              className="hidden"
+              data-testid="wall-composer-media-input"
+            />
             <p className="mt-1 font-body text-[11px] text-petal-muted">
-              照片每張最大 {Math.round(IMAGE_MAX_BYTES / (1024 * 1024))}MB、影片最大 {Math.round(VIDEO_MAX_BYTES / (1024 * 1024))}MB
+              {atMediaCap
+                ? `已達 ${WALL_MAX_MEDIA} 個上限，先移除一個才能再加。`
+                : `照片每張最大 ${Math.round(IMAGE_MAX_BYTES / (1024 * 1024))}MB、影片最大 ${Math.round(VIDEO_MAX_BYTES / (1024 * 1024))}MB`}
             </p>
 
             {mediaCount > 0 && (
@@ -391,9 +410,9 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                       type="button"
                       onClick={() => removeExistingMedia(idx)}
                       aria-label="移除"
-                      className="absolute top-1 right-1 w-5 h-5 inline-flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                      className="absolute top-1 right-1 w-8 h-8 inline-flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
                     >
-                      <X className="w-3 h-3" strokeWidth={2} />
+                      <X className="w-4 h-4" strokeWidth={2} />
                     </button>
                   </div>
                 ))}
@@ -416,9 +435,9 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                         type="button"
                         onClick={() => removeNewMedia(idx)}
                         aria-label="移除"
-                        className="absolute top-1 right-1 w-5 h-5 inline-flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
+                        className="absolute top-1 right-1 w-8 h-8 inline-flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
                       >
-                        <X className="w-3 h-3" strokeWidth={2} />
+                        <X className="w-4 h-4" strokeWidth={2} />
                       </button>
                     </div>
                   );
@@ -439,7 +458,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                     key={tag}
                     type="button"
                     onClick={() => setMoodTag(active ? null : tag)}
-                    className={`px-3 py-1 rounded-full border font-body text-[12px] transition-colors ${
+                    className={`px-3.5 py-2 min-h-[40px] rounded-full border font-body text-[13px] transition-colors ${
                       active
                         ? 'bg-petal-ink text-petal-cream border-petal-ink'
                         : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
@@ -469,14 +488,14 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                   }}
                   placeholder="自訂心情…"
                   data-testid="wall-composer-custom-mood-input"
-                  className="px-3 py-1 rounded-full border border-petal-ink bg-white font-body text-[12px] text-petal-ink placeholder:text-petal-muted focus:outline-none w-28"
+                  className="px-3.5 py-2 min-h-[40px] rounded-full border border-petal-ink bg-white font-body text-[13px] text-petal-ink placeholder:text-petal-muted focus:outline-none w-32"
                 />
               ) : (
                 <button
                   type="button"
                   onClick={() => setShowCustomInput(true)}
                   data-testid="wall-composer-custom-mood-add"
-                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full border border-dashed border-petal-rule font-body text-[12px] text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors"
+                  className="inline-flex items-center gap-1 px-3.5 py-2 min-h-[40px] rounded-full border border-dashed border-petal-rule font-body text-[13px] text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors"
                 >
                   <Plus className="w-3 h-3" strokeWidth={2} />
                   自訂
