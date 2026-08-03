@@ -40,6 +40,7 @@ const assessmentRoutes = require('./routes/assessments');
 const relationshipRoutes = require('./routes/relationship');
 const marriageCheckupRoutes = require('./routes/marriage-checkups');
 const activityRoutes = require('./routes/activity');
+const emailRoutes = require('./routes/email');
 const adminRoutes = require('./routes/admin');
 
 // Import database and middleware
@@ -226,6 +227,10 @@ app.use('/api/assessments', assessmentRoutes);
 app.use('/api/relationship', relationshipRoutes);
 app.use('/api/marriage-checkups', marriageCheckupRoutes);
 app.use('/api/activity', activityRoutes);
+// Unsubscribe links from the List-Unsubscribe header + mail footers. Public by
+// design — mail clients fire these with no session, authenticated only by the
+// signed token in the URL (lib/emailUnsubscribe.js).
+app.use('/api/email', emailRoutes);
 
 // Admin funnel dashboard. The public router (POST /api/track/landing) is the
 // anonymous beacon fired from the frontend on the logged-out landing render.

@@ -45,17 +45,25 @@ These are used for deploying to Google Cloud Platform:
 
 ### Email Configuration
 
+Mail goes out over SMTP via nodemailer (`services/emailService.js`). The
+sender domain must be one you've verified with the provider — see
+`docs/EMAIL_DELIVERABILITY.md` for the DNS records.
+
 8. **EMAIL_FROM**
-   - Description: Email address for sending notifications
-   - Example: `noreply@yourdomain.com`
+   - Description: The `From:` address on every outgoing mail
+   - Example: `Twogether <hello@twogether.fun>`
+   - Must be on a domain verified with your provider (SPF/DKIM/DMARC), or
+     mail lands in spam. Unset falls back to `SMTP_USER`.
 
-9. **EMAIL_PASS**
-   - Description: Email service password/app password
-   - Note: Use app-specific password for Gmail
+9. **EMAIL_REPLY_TO** (optional)
+   - Description: Where replies land
+   - Example: `support@twogether.fun`
+   - Pairing invites override this with the inviter's own address.
 
-10. **RESEND_API_KEY** (if using Resend)
-    - Description: Resend API key for email delivery
-    - Found in: Resend Dashboard → API Keys
+10. **SMTP_HOST / SMTP_PORT / SMTP_SECURE / SMTP_USER / SMTP_PASS**
+    - Description: SMTP transport credentials
+    - Resend: `smtp.resend.com`, `587`, `starttls`, user is the literal
+      string `resend`, pass is an API key from Resend Dashboard → API Keys
 
 ### CORS Configuration
 

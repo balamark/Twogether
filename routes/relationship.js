@@ -190,6 +190,7 @@ router.get('/summary', async (req, res) => {
           emailService.sendRelationshipReminder({
             recipientEmail: recipient.email,
             recipientName: recipient.nickname,
+            recipientUserId: recipient.id,
             kind,
             days: daysSinceIntimacy,
           });

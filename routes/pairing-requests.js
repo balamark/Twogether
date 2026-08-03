@@ -47,7 +47,13 @@ const handleCreateInvite = async (req, res, typeOverride = null) => {
     if (inviteType === 'email') {
       try {
         if (emailService.isConfigured()) {
-          await emailService.sendPairingInvitation(senderName, recipientEmail, invitation.token, message);
+          await emailService.sendPairingInvitation({
+            senderName,
+            senderEmail,
+            recipientEmail,
+            token: invitation.token,
+            customMessage: message,
+          });
           logInfo('Pairing invitation email sent', { kind: 'pairing_invite' });
         } else {
           logWarn('Email service not configured; invitation saved without email', { kind: 'pairing_invite' });
@@ -303,7 +309,7 @@ router.post('/:token/resend', authenticateToken, async (req, res) => {
     const userId = req.user.id;
 
     const result = await db.query(`
-      SELECT pr.recipient_email, pr.message, u.nickname as sender_nickname
+      SELECT pr.recipient_email, pr.message, u.nickname as sender_nickname, u.email as sender_email
       FROM pairing_requests pr
       JOIN users u ON pr.sender_id = u.id
       WHERE pr.token = $1 AND pr.sender_id = $2 AND pr.status = 'pending' AND pr.type = 'email'
@@ -326,7 +332,13 @@ router.post('/:token/resend', authenticateToken, async (req, res) => {
     }
 
     const invite = result.rows[0];
-    await emailService.sendPairingInvitation(invite.sender_nickname, invite.recipient_email, token, invite.message);
+    await emailService.sendPairingInvitation({
+      senderName: invite.sender_nickname,
+      senderEmail: invite.sender_email,
+      recipientEmail: invite.recipient_email,
+      token,
+      customMessage: invite.message,
+    });
 
     return res.json({
       success: true,

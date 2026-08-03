@@ -10,10 +10,24 @@ require('dotenv').config();
 const nodemailer = require('nodemailer');
 
 function maskEmail(addr) {
-  if (!addr || typeof addr !== 'string' || !addr.includes('@')) return '(unset)';
+  if (!addr || typeof addr !== 'string') return '(unset)';
+  // Some providers use a fixed non-email SMTP login (Resend's is literally
+  // "resend"). Those aren't secrets and aren't addresses — show them as-is.
+  if (!addr.includes('@')) return addr;
   const [user, domain] = addr.split('@');
   const head = user.slice(0, 1);
   return `${head}${'*'.repeat(Math.max(user.length - 1, 1))}@${domain}`;
+}
+
+// Mirrors EmailService._fromAddress() so this script exercises the same
+// sender the app would actually use.
+function fromAddress(smtpUser) {
+  const configured = (process.env.EMAIL_FROM || '').trim();
+  if (configured) {
+    const angled = configured.match(/<([^>]+)>/);
+    return (angled ? angled[1] : configured).trim();
+  }
+  return smtpUser;
 }
 
 function maskSecret(secret) {
@@ -50,6 +64,8 @@ async function main() {
   console.log(`  secure: ${cfg.secure}`);
   console.log(`  user:   ${maskEmail(cfg.user)}`);
   console.log(`  pass:   ${maskSecret(cfg.pass)}`);
+  console.log(`  from:   ${maskEmail(fromAddress(cfg.user))}${process.env.EMAIL_FROM ? '' : '  (EMAIL_FROM unset — falling back to SMTP_USER)'}`);
+  console.log(`  reply:  ${maskEmail(process.env.EMAIL_REPLY_TO)}`);
   console.log('');
 
   if (!cfg.host || !cfg.user || !cfg.pass) {
@@ -79,10 +95,13 @@ async function main() {
   if (args.to) {
     try {
       const info = await transporter.sendMail({
-        from: `"Twogether SMTP verify" <${cfg.user}>`,
+        from: `"Twogether SMTP verify" <${fromAddress(cfg.user)}>`,
+        replyTo: (process.env.EMAIL_REPLY_TO || '').trim() || undefined,
         to: args.to,
         subject: 'Twogether SMTP verification',
-        text: 'If you see this, the SMTP credentials in your .env are working.',
+        text: 'If you see this, the SMTP credentials in your .env are working.\n\n'
+          + 'Open this message\'s raw source and confirm SPF, DKIM and DMARC all\n'
+          + 'say PASS, and that the DKIM domain matches the From: domain.',
       });
       console.log(`OK    — test email sent to ${maskEmail(args.to)} (messageId=${info.messageId}).`);
     } catch (err) {

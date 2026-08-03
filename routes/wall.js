@@ -147,6 +147,7 @@ async function notifyPartner(partnerId, type, title, content, relatedUserId, opt
     await emailService.sendWallPostNotification({
       senderName,
       recipientEmail: partner.email,
+      recipientUserId: partner.id,
       isImportant: !!opts.isImportant,
       isReply: type === 'wall_reply',
       content,

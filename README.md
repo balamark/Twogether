@@ -76,6 +76,11 @@ adds a fragment file in `changelog/`; CI compiles them into the block below —
 see `CLAUDE.md`.)
 
 <!-- changelog:begin (generated from changelog/*.md — edit those, not this) -->
+### 2026-08-03
+- **配對邀請不再石沉大海**: 邀請信改由 Twogether 自己的網域寄出（不再借用個人 Gmail 信箱），並補上 SPF／DKIM／DMARC 與一鍵退訂標頭，大幅降低被丟進垃圾郵件的機率。信件內容也重寫成一封簡短的個人邀請，回信會直接回到邀請人手上。
+- **寄出邀請後可以直接傳連結**: 送出邀請後會顯示配對連結，一鍵複製或直接用 LINE 傳給另一半 — 不用再乾等信件送達，也不必請對方翻垃圾信箱。
+- **通知信可以一鍵退訂**: 伴侶動態通知信新增退訂連結，點一下就停止，不必先登入。帳號驗證、重設密碼、購買收據等重要信件仍會照常寄出。
+
 ### 2026-08-02
 - **情緒翻譯**: 修正長篇留言的對話開啟情緒翻譯後整片空白的問題，現在能完整翻譯完。萬一沒翻完也會直接說明並提供「重試」，而且不會白扣今日 AI 額度。
 - **AI 改寫**: 草稿太長時不再回傳空白版本，會明確告訴你需要縮短草稿或分成兩則。
@@ -386,7 +391,10 @@ see `CLAUDE.md`.)
 ## 📧 Email 通知
 
 Email 由 `services/emailService.js` 統一寄送，所有信件共用 `_activityEmailHtml`
-模板（簡潔表頭 + 引言區塊 + 單一 CTA）。
+模板（簡潔表頭 + 引言區塊 + 單一 CTA），寄件人來自 `EMAIL_FROM`。
+
+> 📮 **送達率**：寄件網域必須與信中連結的網域一致，否則信件會被判為垃圾郵件。
+> SPF / DKIM / DMARC 的設定步驟見 **[docs/EMAIL_DELIVERABILITY.md](docs/EMAIL_DELIVERABILITY.md)**。
 
 ### 會發送 Email 的功能
 
@@ -395,8 +403,8 @@ Email 由 `services/emailService.js` 統一寄送，所有信件共用 `_activit
 | 帳號註冊（歡迎 + 驗證） | 使用者完成註冊 | `🎉 歡迎加入 Twogether！請驗證你的 Email` | 否（交易型） |
 | 重寄驗證信 | 使用者於提示橫幅按「重新寄送驗證信」 | `🎉 歡迎加入 Twogether！請驗證你的 Email` | 否（交易型，限流 60 秒） |
 | 重設密碼 | 登入頁「忘記密碼？」送出 | `🔑 重設你的 Twogether 密碼` | 否（交易型，連結 1 小時有效） |
-| 配對邀請 | 以 Email 邀請伴侶 / 重寄 | `💕 {名字} 邀請你加入 Twogether！` | 否（交易型） |
-| 配對成功 | 對方接受配對邀請 | `🎉 {名字} 接受了你的配對邀請！` | 否（交易型） |
+| 配對邀請 | 以 Email 邀請伴侶 / 重寄 | `{名字} 邀請你一起用 Twogether` | 否（交易型，`Reply-To` 為邀請人本人） |
+| 配對成功 | 對方接受配對邀請 | `{名字} 接受了你的配對邀請` | 否（交易型） |
 | 傳訊息給伴侶（含和解訊息） | 伴侶送出訊息／邀請 | `💌 {名字} 傳了一則訊息給你` | ⚠️ 否（直接寄給伴侶） |
 | 邀請回應（接受／婉拒） | 伴侶回應你的訊息 | 接受／婉拒通知 | 是 |
 | 親密互動洞察提醒（Nudge） | 主動寄出提醒 | `💞 {名字} 想和你聊聊彼此的親密時光` | ⚠️ 否（直接寄給伴侶） |
@@ -422,6 +430,12 @@ Email 由 `services/emailService.js` 統一寄送，所有信件共用 `_activit
 > 「Email 通知」開關存於 `users.email_notifications_enabled`（設定頁可調），
 > 控制牆上、事件、邀請回應。標記 ⚠️ 的兩種（傳訊息、洞察提醒）目前會繞過此開關
 > 直接寄給伴侶。Email 驗證採**軟性**機制：未驗證仍可使用 App，只顯示提示橫幅。
+
+> 受開關控制的通知信都帶 RFC 8058 一鍵退訂標頭（`List-Unsubscribe` +
+> `List-Unsubscribe-Post`），指向 `GET|POST /api/email/unsubscribe?t=<簽章 token>`
+> （`routes/email.js`）— 免登入，點一下就把 `email_notifications_enabled` 設為
+> `false`。token 由 `lib/emailUnsubscribe.js` 以 `JWT_SECRET` 做 HMAC，無狀態、
+> 不需額外資料表。交易型信件沒有可退訂的訂閱，只帶 `mailto:` 形式。
 
 ## Tech Stack
 
@@ -718,9 +732,17 @@ NODE_ENV=production
 PORT=8080
 CORS_ORIGIN=http://localhost:5174
 
-# Email (optional, for notifications)
-RESEND_API_KEY=your-resend-api-key
-EMAIL_FROM=Twogether <no-reply@example.com>
+# Email (services/emailService.js — nodemailer over SMTP).
+# Production uses Resend so mail is DKIM-signed for twogether.fun.
+# EMAIL_FROM must be on a domain verified with your provider, or invites
+# land in spam. Setup guide: docs/EMAIL_DELIVERABILITY.md
+SMTP_HOST=smtp.resend.com
+SMTP_PORT=587
+SMTP_SECURE=starttls
+SMTP_USER=resend                 # literal string for Resend, not an address
+SMTP_PASS=your-resend-api-key
+EMAIL_FROM=Twogether <hello@twogether.fun>
+EMAIL_REPLY_TO=support@twogether.fun
 
 # Admin funnel dashboard (gates /admin and /api/admin/*)
 ADMIN_PASSWORD=pick-a-long-random-password
@@ -987,8 +1009,10 @@ gcloud logging read \
 
 ### Verifying SMTP credentials locally
 
-Before deploying a new `SMTP_PASS`, confirm the credential works against
-Gmail without sending any user-facing email:
+Before deploying a new `SMTP_PASS`, confirm the credential works against the
+SMTP provider without sending any user-facing email. The script also prints
+the `From:` / `Reply-To:` it resolved from `EMAIL_FROM` / `EMAIL_REPLY_TO`,
+so you can catch a misconfigured sender before it costs you deliverability:
 
 ```bash
 # Auth check only (TLS handshake + AUTH)
@@ -999,13 +1023,16 @@ node scripts/verify-smtp.js --to you@example.com
 ```
 
 The script never prints the password (only a length + first/last char) and
-exits non-zero on failure.
+exits non-zero on failure. When the test email arrives, open its raw source
+and confirm SPF/DKIM/DMARC all say `PASS` **and** that the DKIM domain
+matches the `From:` domain — see
+[docs/EMAIL_DELIVERABILITY.md](docs/EMAIL_DELIVERABILITY.md).
 
-> ⚠️ **Production note**: Updating `SMTP_PASS` in the GitHub secret only
-> takes effect on the *next* `gcloud app deploy` — App Engine env vars are
-> substituted from `_SMTP_PASS` at deploy time. After rotating the
-> credential, push to `main` (or run the deploy workflow manually) before
-> expecting prod emails to start flowing.
+> ⚠️ **Production note**: Updating `SMTP_PASS` (or `EMAIL_FROM`, or any
+> other secret) in GitHub only takes effect on the *next* `gcloud app deploy`
+> — App Engine env vars are substituted from `_SMTP_PASS` etc. at deploy
+> time. After rotating a credential, push to `main` (or run the deploy
+> workflow manually) before expecting prod emails to start flowing.
 
 ## 💰 Cost Breakdown & Optimization
 

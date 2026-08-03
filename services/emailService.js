@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const { logInfo, logWarn, logError } = require('../lib/logger');
+const { signUnsubscribeToken } = require('../lib/emailUnsubscribe');
 
 // Standard fields included with every SMTP-related log entry so that future
 // queries like `jsonPayload.code="EAUTH"` find them in a single hop.
@@ -56,141 +57,73 @@ class EmailService {
     return this.transporter !== null;
   }
 
-  async sendPairingInvitation(senderName, recipientEmail, token, customMessage = '') {
+  // The invite a new user sends their partner. This is the one email that has
+  // to survive an unforgiving spam filter: it goes to someone with no prior
+  // relationship to us, from an address they've never seen. So it's written as
+  // a short personal note rather than a product pitch — no feature grid, no
+  // marketing gradients, one link — and it sets Reply-To to the inviter, which
+  // is both the strongest "a real person sent this" signal to the filter and
+  // genuinely useful to the recipient.
+  async sendPairingInvitation({ senderName, senderEmail, recipientEmail, token, customMessage = '' }) {
     if (!this.isConfigured()) {
       throw new Error('Email service is not configured');
     }
 
-    const frontendUrl = process.env.FRONTEND_URL || 'https://twogether.fun';
-    const acceptUrl = `${frontendUrl}/pairing/accept?token=${token}`;
+    const acceptUrl = `${this._appBaseUrl()}/pairing/accept?token=${encodeURIComponent(token)}`;
+    const displayName = senderName || '你的伴侶';
+    const safeSender = this._escape(displayName);
+    const safeMessage = this._escape(customMessage || '').slice(0, 600);
 
-    const htmlContent = `
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Twogether 配對邀請</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5; }
-        .container { max-width: 600px; margin: 0 auto; background-color: white; }
-        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px 20px; text-align: center; }
-        .header h1 { margin: 0; font-size: 28px; font-weight: 300; }
-        .content { padding: 40px 20px; }
-        .invitation-card { background: linear-gradient(135deg, #ffeaa7 0%, #fab1a0 100%); padding: 30px; border-radius: 15px; margin: 20px 0; text-align: center; }
-        .invitation-card h2 { margin: 0 0 15px 0; color: #2d3436; font-size: 24px; }
-        .sender-name { color: #e17055; font-weight: bold; font-size: 20px; }
-        .custom-message { background: white; padding: 30px; border-radius: 10px; margin: 20px 0; color: #2d3436; border-left: 4px solid #e17055; }
-        .custom-message-text { font-size: 20px; line-height: 1.6; font-weight: 500; margin-top: 10px; }
-        .custom-message-label { font-size: 14px; color: #636e72; font-weight: normal; }
-        .cta-button { display: inline-block; background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); color: white; text-decoration: none; padding: 15px 30px; border-radius: 25px; font-weight: bold; margin: 20px 0; box-shadow: 0 4px 15px rgba(0, 184, 148, 0.3); transition: transform 0.2s; }
-        .cta-button:hover { transform: translateY(-2px); }
-        .footer { background-color: #2d3436; color: white; padding: 20px; text-align: center; font-size: 14px; }
-        .warning { background: #fdcb6e; padding: 15px; border-radius: 8px; margin: 20px 0; color: #2d3436; }
-        .features { display: flex; justify-content: space-around; margin: 30px 0; flex-wrap: wrap; }
-        .feature { text-align: center; flex: 1; min-width: 150px; margin: 10px; }
-        .feature-icon { font-size: 30px; margin-bottom: 10px; }
-        @media (max-width: 600px) {
-            .features { flex-direction: column; }
-            .content { padding: 20px 15px; }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>💕 Twogether</h1>
-            <p>愛情記錄 · 親密時光 · 共創回憶</p>
-        </div>
-
-        <div class="content">
-            <div class="invitation-card">
-                <h2>🎉 你收到了一個配對邀請！</h2>
-                <p><span class="sender-name">${senderName}</span> 邀請你成為 Twogether 的情侶伴侶</p>
-            </div>
-
-            ${customMessage ? `
-            <div class="custom-message">
-                <div class="custom-message-label">個人訊息：</div>
-                <div class="custom-message-text">"${customMessage}"</div>
-            </div>
-            ` : ''}
-
-            <div class="features">
-                <div class="feature">
-                    <div class="feature-icon">📅</div>
-                    <p><strong>愛情日曆</strong><br>記錄每個美好時刻</p>
-                </div>
-                <div class="feature">
-                    <div class="feature-icon">🏆</div>
-                    <p><strong>成就系統</strong><br>見證愛情里程碑</p>
-                </div>
-                <div class="feature">
-                    <div class="feature-icon">🎮</div>
-                    <p><strong>情趣遊戲</strong><br>增進彼此感情</p>
-                </div>
-            </div>
-
-            <div style="text-align: center;">
-                <a href="${acceptUrl}" class="cta-button">
-                    ❤️ 接受邀請並開始我們的愛情之旅
-                </a>
-            </div>
-
-            <div class="warning">
-                <strong>⏰ 注意：</strong>這個邀請將在 7 天後過期。請盡快回應！
-            </div>
-
-            <p style="color: #636e72; font-size: 14px; text-align: center;">
-                如果你無法點擊按鈕，請複製以下連結到瀏覽器：<br>
-                <code style="background: #f8f9fa; padding: 5px; border-radius: 3px;">${acceptUrl}</code>
-            </p>
-        </div>
-
-        <div class="footer">
-            <p>© 2024 Twogether - 專為情侶打造的愛情記錄應用</p>
-            <p style="font-size: 12px; opacity: 0.8;">
-                這封郵件是因為有人使用你的電子郵件地址發送配對邀請而寄送。<br>
-                如果你不想收到此類郵件，請忽略這封信。
-            </p>
-        </div>
-    </div>
-</body>
-</html>
+    const bodyHtml = `
+      <p><strong>${safeSender}</strong> 想邀請你一起用 <strong>Twogether</strong> —
+         一個只有你們兩個人的空間，用來記錄相處的時光、聊聊心裡的話。</p>
+      ${safeMessage ? `
+      <p style="color:#636e72;font-size:14px;margin-bottom:6px;">${safeSender} 想對你說：</p>
+      <div class="quote">${safeMessage.replace(/\n/g, '<br>')}</div>` : ''}
+      <p>點下面的按鈕就可以接受邀請並建立帳號，過程不用一分鐘。</p>
+      <p style="color:#636e72;font-size:14px;">如果按鈕無法點擊，請複製以下連結到瀏覽器：<br>
+        <code style="background:#f8f9fa;padding:4px 6px;border-radius:4px;word-break:break-all;">${acceptUrl}</code>
+      </p>
+      <p style="color:#636e72;font-size:14px;">這個邀請連結會在 7 天後失效。</p>
     `;
 
-    const textContent = `
-Twogether 配對邀請
+    const htmlContent = this._activityEmailHtml({
+      headerEmoji: '💌',
+      headerTitle: `${safeSender} 邀請你加入 Twogether`,
+      headerSubtitle: '接受邀請，開始你們的共同紀錄',
+      bodyHtml,
+      ctaLabel: '接受邀請',
+      ctaUrl: acceptUrl,
+    });
 
-${senderName} 邀請你成為 Twogether 的情侶伴侶！
-
-${customMessage ? `個人訊息："${customMessage}"` : ''}
-
-Twogether 是專為情侶打造的應用程式，讓你們可以：
-• 記錄每個美好的愛情時刻
-• 追蹤關係中的重要里程碑
-• 通過情趣遊戲增進感情
-
-要接受這個邀請，請點擊以下連結：
-${acceptUrl}
-
-注意：這個邀請將在 7 天後過期。
-
----
-© 2024 Twogether
-如果你不想收到此類郵件，請忽略這封信。
-    `;
+    const textContent = [
+      `${displayName} 想邀請你一起用 Twogether —`,
+      '一個只有你們兩個人的空間，用來記錄相處的時光、聊聊心裡的話。',
+      '',
+      ...(customMessage ? [`${displayName} 想對你說：`, customMessage, ''] : []),
+      '接受邀請並建立帳號：',
+      acceptUrl,
+      '',
+      '這個邀請連結會在 7 天後失效。',
+      '',
+      `如果你不認識 ${displayName}，直接忽略這封信就好，我們不會再寄信給你。`,
+    ].join('\n');
 
     const mailOptions = {
-      from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+      from: this._from(),
+      // Replies go to the person who actually sent the invite, not to us.
+      replyTo: senderEmail || this._replyTo(),
       to: recipientEmail,
-      subject: `💕 ${senderName} 邀請你加入 Twogether！`,
+      subject: `${displayName} 邀請你一起用 Twogether`,
+      // The recipient has no account, so there's no subscription to cancel —
+      // only the mailto form applies here.
+      headers: this._unsubscribeHeaders(null),
       text: textContent,
       html: htmlContent,
     };
 
     try {
-      const result = await this.transporter.sendMail(mailOptions);
+      const result = await this._send(mailOptions);
       logInfo('Pairing invitation sent', { kind: 'pairing_invite' });
       return result;
     } catch (error) {
@@ -204,62 +137,37 @@ ${acceptUrl}
       throw new Error('Email service is not configured');
     }
 
-    const frontendUrl = process.env.FRONTEND_URL || 'https://twogether.fun';
+    const safeAccepter = this._escape(accepterName || '你的伴侶');
+    const htmlContent = this._activityEmailHtml({
+      headerEmoji: '🎉',
+      headerTitle: '配對成功',
+      headerSubtitle: '你們的共同空間開好了',
+      bodyHtml: `
+      <p><strong>${safeAccepter}</strong> 接受了你的配對邀請！</p>
+      <p>你們現在可以一起記錄相處的時光、聊聊心裡的話了。</p>
+    `,
+      ctaLabel: '開始使用 Twogether',
+    });
 
-    const htmlContent = `
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>配對成功通知</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 0; background-color: #f5f5f5; }
-        .container { max-width: 600px; margin: 0 auto; background-color: white; }
-        .header { background: linear-gradient(135deg, #00b894 0%, #00cec9 100%); color: white; padding: 40px 20px; text-align: center; }
-        .content { padding: 40px 20px; text-align: center; }
-        .success-card { background: linear-gradient(135deg, #a8e6cf 0%, #88d8c0 100%); padding: 30px; border-radius: 15px; margin: 20px 0; }
-        .success-icon { font-size: 60px; margin-bottom: 20px; }
-        .cta-button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; padding: 15px 30px; border-radius: 25px; font-weight: bold; margin: 20px 0; }
-        .footer { background-color: #2d3436; color: white; padding: 20px; text-align: center; font-size: 14px; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>🎉 配對成功！</h1>
-        </div>
-
-        <div class="content">
-            <div class="success-card">
-                <div class="success-icon">💕</div>
-                <h2>太棒了！</h2>
-                <p><strong>${accepterName}</strong> 已經接受了你的配對邀請！</p>
-                <p>你們現在可以一起使用 Twogether 記錄美好的愛情時光了。</p>
-            </div>
-
-            <a href="${frontendUrl}" class="cta-button">
-                🚀 立即開始使用 Twogether
-            </a>
-        </div>
-
-        <div class="footer">
-            <p>© 2024 Twogether - 見證你們的愛情故事</p>
-        </div>
-    </div>
-</body>
-</html>
-    `;
+    const textContent = [
+      `${accepterName || '你的伴侶'} 接受了你的配對邀請！`,
+      '',
+      '你們現在可以一起記錄相處的時光、聊聊心裡的話了。',
+      '',
+      this._appBaseUrl(),
+    ].join('\n');
 
     const mailOptions = {
-      from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+      from: this._from(),
+      replyTo: this._replyTo(),
       to: originalSenderEmail,
-      subject: `🎉 ${accepterName} 接受了你的配對邀請！`,
+      subject: `${accepterName || '你的伴侶'} 接受了你的配對邀請`,
+      text: textContent,
       html: htmlContent,
     };
 
     try {
-      const result = await this.transporter.sendMail(mailOptions);
+      const result = await this._send(mailOptions);
       logInfo('Pairing accepted email sent', { kind: 'pairing_accepted' });
       return result;
     } catch (error) {
@@ -343,7 +251,8 @@ ${acceptUrl}
     ].join('\n');
 
     const mailOptions = {
-      from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+      from: this._from(),
+      replyTo: this._replyTo(),
       to: recipientEmail,
       subject: `💌 ${senderName || '你的伴侶'} 傳了一則訊息給你`,
       text: textContent,
@@ -351,7 +260,7 @@ ${acceptUrl}
     };
 
     try {
-      const result = await this.transporter.sendMail(mailOptions);
+      const result = await this._send(mailOptions);
       logInfo('Intimacy request email sent', { kind: 'intimacy_request' });
       return result;
     } catch (error) {
@@ -501,7 +410,8 @@ ${acceptUrl}
     ];
 
     const mailOptions = {
-      from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+      from: this._from(),
+      replyTo: this._replyTo(),
       to: partnerEmail,
       subject: `💞 ${safeSender} 想和你聊聊彼此的親密時光`,
       text: textContentLines.join('\n'),
@@ -509,7 +419,7 @@ ${acceptUrl}
     };
 
     try {
-      const result = await this.transporter.sendMail(mailOptions);
+      const result = await this._send(mailOptions);
       logInfo('Intimacy nudge email sent', { kind: 'intimacy_nudge' });
       return result;
     } catch (error) {
@@ -526,7 +436,7 @@ ${acceptUrl}
     if (!userId) return null;
     try {
       const result = await db.query(
-        `SELECT u.email, u.nickname, u.email_notifications_enabled
+        `SELECT u.id, u.email, u.nickname, u.email_notifications_enabled
            FROM couples c
            JOIN users u ON u.id = CASE
              WHEN c.user1_id = $1 THEN c.user2_id ELSE c.user1_id END
@@ -536,7 +446,7 @@ ${acceptUrl}
       );
       const row = result.rows[0];
       if (!row || !row.email_notifications_enabled || !row.email) return null;
-      return { email: row.email, nickname: row.nickname };
+      return { id: row.id, email: row.email, nickname: row.nickname };
     } catch (err) {
       logWarn('getPartnerEmailIfOptedIn failed', { err: err.message });
       return null;
@@ -550,13 +460,13 @@ ${acceptUrl}
     if (!userId) return null;
     try {
       const result = await db.query(
-        `SELECT email, nickname, email_notifications_enabled
+        `SELECT id, email, nickname, email_notifications_enabled
            FROM users WHERE id = $1`,
         [userId]
       );
       const row = result.rows[0];
       if (!row || !row.email_notifications_enabled || !row.email) return null;
-      return { email: row.email, nickname: row.nickname };
+      return { id: row.id, email: row.email, nickname: row.nickname };
     } catch (err) {
       logWarn('getUserEmailIfOptedIn failed', { err: err.message });
       return null;
@@ -566,7 +476,7 @@ ${acceptUrl}
   // Relationship-cultivation reminder (check-in due / intimacy gap / appreciation
   // gap). Fired from GET /api/relationship/summary when a signal is overdue and
   // past its cooldown. Respects the email opt-in (caller uses getUserEmailIfOptedIn).
-  async sendRelationshipReminder({ recipientEmail, recipientName, kind, days }) {
+  async sendRelationshipReminder({ recipientEmail, recipientName, recipientUserId = null, kind, days }) {
     if (!this.isConfigured() || !recipientEmail) return;
     const name = this._escape(recipientName || '');
     const map = {
@@ -587,17 +497,20 @@ ${acceptUrl}
       },
     };
     const m = map[kind] || map.checkin_due;
+    const unsubscribeUrl = this._unsubscribeUrl(recipientUserId);
     const html = this._activityEmailHtml({
       headerEmoji: m.emoji, headerTitle: m.title, headerSubtitle: m.subtitle,
-      bodyHtml: m.body, ctaLabel: m.cta,
+      bodyHtml: m.body, ctaLabel: m.cta, unsubscribeUrl,
     });
     try {
-      await this.transporter.sendMail({
-        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+      await this._send({
+        from: this._from(),
+        replyTo: this._replyTo(),
         to: recipientEmail,
         subject: `${m.emoji} ${m.title}`,
+        headers: this._unsubscribeHeaders(recipientUserId),
         html,
-        text: `${m.title}\n\n登入 Twogether 查看。`,
+        text: `${m.title}\n\n登入 Twogether 查看。\n\n不想收到通知信？${unsubscribeUrl || '請在應用內調整通知設定。'}`,
       });
     } catch (err) {
       logWarn('sendRelationshipReminder failed', { err: err.message, kind });
@@ -606,8 +519,11 @@ ${acceptUrl}
 
   // Shared lightweight HTML wrapper used by the partner-activity emails so
   // we don't repeat 100 lines of CSS per template.
-  _activityEmailHtml({ headerEmoji, headerTitle, headerSubtitle, bodyHtml, ctaLabel = '💕 打開 Twogether 查看', ctaUrl }) {
+  _activityEmailHtml({ headerEmoji, headerTitle, headerSubtitle, bodyHtml, ctaLabel = '💕 打開 Twogether 查看', ctaUrl, unsubscribeUrl }) {
     const frontendUrl = ctaUrl || process.env.FRONTEND_URL || 'https://twogether.fun';
+    const footerOptOut = unsubscribeUrl
+      ? `<p>不想再收到這類通知信？<a href="${unsubscribeUrl}" style="color:#dfe6e9;">點此退訂</a>，或在應用內調整通知設定。</p>`
+      : '<p>如果你不想收到此類郵件，請在應用內調整通知設定。</p>';
     return `
 <!DOCTYPE html>
 <html lang="zh-TW">
@@ -641,12 +557,75 @@ ${acceptUrl}
       </div>
     </div>
     <div class="footer">
-      <p>© 2024 Twogether</p>
-      <p>如果你不想收到此類郵件，請在應用內調整通知設定。</p>
+      <p>© ${new Date().getFullYear()} Twogether</p>
+      ${footerOptOut}
     </div>
   </div>
 </body>
 </html>`;
+  }
+
+  // The bare address every outgoing mail is sent from. Prefer EMAIL_FROM (a
+  // brand-domain address like hello@twogether.fun, which is what makes
+  // SPF/DKIM/DMARC align with the twogether.fun links inside the mail); fall
+  // back to the SMTP login so existing deployments keep working unchanged.
+  // EMAIL_FROM accepts either "addr@host" or "Name <addr@host>" — the display
+  // name is supplied per-call so brand vs. therapist mail stay distinguishable.
+  _fromAddress() {
+    const configured = (process.env.EMAIL_FROM || '').trim();
+    if (configured) {
+      const angled = configured.match(/<([^>]+)>/);
+      return (angled ? angled[1] : configured).trim();
+    }
+    return process.env.SMTP_USER;
+  }
+
+  _from(displayName = 'Twogether 愛情助手') {
+    return `"${displayName}" <${this._fromAddress()}>`;
+  }
+
+  // Where replies land. Unset → nodemailer omits the header entirely.
+  _replyTo() {
+    return (process.env.EMAIL_REPLY_TO || '').trim() || undefined;
+  }
+
+  // The HTTP one-click unsubscribe URL for a given recipient, or null when we
+  // can't sign one (no user id, or JWT_SECRET missing).
+  _unsubscribeUrl(recipientUserId) {
+    const token = signUnsubscribeToken(recipientUserId);
+    if (!token) return null;
+    return `${this._appBaseUrl()}/api/email/unsubscribe?t=${encodeURIComponent(token)}`;
+  }
+
+  // List-Unsubscribe headers. Gmail and Yahoo downrank bulk senders that
+  // don't offer one-click unsubscribe (RFC 8058), so every opt-in-gated
+  // notification carries the HTTP form; transactional mail (verification,
+  // password reset, receipts, pairing invites to non-users) can only offer
+  // the mailto form since there's no subscription to cancel.
+  _unsubscribeHeaders(recipientUserId) {
+    const mailto = `<mailto:${this._fromAddress()}?subject=unsubscribe>`;
+    const url = this._unsubscribeUrl(recipientUserId);
+    if (!url) return { 'List-Unsubscribe': mailto };
+    return {
+      'List-Unsubscribe': `<${url}>, ${mailto}`,
+      'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+    };
+  }
+
+  // Strip CR/LF from a value destined for a mail header. Nicknames are only
+  // length-validated (routes/auth.js), so a newline in one would otherwise be
+  // interpolated straight into a Subject and could inject extra headers.
+  _headerSafe(value = '') {
+    return String(value).replace(/[\r\n]+/g, ' ').trim();
+  }
+
+  // Single choke point for every outgoing mail, so header sanitising can't be
+  // forgotten by a future template.
+  async _send(mailOptions) {
+    return this.transporter.sendMail({
+      ...mailOptions,
+      subject: this._headerSafe(mailOptions.subject),
+    });
   }
 
   _escape(text = '') {
@@ -658,7 +637,7 @@ ${acceptUrl}
       .replace(/'/g, '&#39;');
   }
 
-  async sendWallPostNotification({ senderName, recipientEmail, isImportant = false, isReply = false, content = '' }) {
+  async sendWallPostNotification({ senderName, recipientEmail, recipientUserId = null, isImportant = false, isReply = false, content = '' }) {
     if (!this.isConfigured()) return;
     if (!recipientEmail) return;
 
@@ -678,11 +657,13 @@ ${acceptUrl}
       <div class="quote">${safeContent.replace(/\n/g, '<br>')}</div>
       <p style="color: #636e72; font-size: 14px;">登入 Twogether 查看完整內容並回覆。</p>
     `;
+    const unsubscribeUrl = this._unsubscribeUrl(recipientUserId);
     const html = this._activityEmailHtml({
       headerEmoji: isImportant ? '⭐' : '💌',
       headerTitle,
       headerSubtitle: '你的伴侶想和你分享一些事',
       bodyHtml,
+      unsubscribeUrl,
     });
 
     const text = [
@@ -690,13 +671,16 @@ ${acceptUrl}
       content || '',
       '',
       '打開 Twogether 查看完整內容。',
+      unsubscribeUrl ? `\n不想收到通知信？${unsubscribeUrl}` : '',
     ].join('\n');
 
     try {
-      await this.transporter.sendMail({
-        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+      await this._send({
+        from: this._from(),
+        replyTo: this._replyTo(),
         to: recipientEmail,
         subject,
+        headers: this._unsubscribeHeaders(recipientUserId),
         text,
         html,
       });
@@ -711,7 +695,7 @@ ${acceptUrl}
   // email through here so we don't need a bespoke template per type. `title` is the
   // already-composed headline ("💝 小明新增了一則愛的記錄"); `content` is the detail line.
   // Best-effort and gated upstream by getUserEmailIfOptedIn.
-  async sendPartnerActionNotification({ senderName, recipientEmail, title, content = '' }) {
+  async sendPartnerActionNotification({ senderName, recipientEmail, recipientUserId = null, title, content = '' }) {
     if (!this.isConfigured()) return;
     if (!recipientEmail) return;
 
@@ -724,11 +708,13 @@ ${acceptUrl}
       <div class="quote">${safeContent.replace(/\n/g, '<br>')}</div>
       <p style="color: #636e72; font-size: 14px;">登入 Twogether 查看，並在通知中心看到 TA 的所有動態。</p>
     `;
+    const unsubscribeUrl = this._unsubscribeUrl(recipientUserId);
     const html = this._activityEmailHtml({
       headerEmoji: '🔔',
       headerTitle: cleanTitle,
       headerSubtitle: '你的另一半剛剛做了一些事',
       bodyHtml,
+      unsubscribeUrl,
     });
 
     const text = [
@@ -736,13 +722,16 @@ ${acceptUrl}
       content || '',
       '',
       '打開 Twogether 查看完整內容。',
+      unsubscribeUrl ? `\n不想收到通知信？${unsubscribeUrl}` : '',
     ].join('\n');
 
     try {
-      await this.transporter.sendMail({
-        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+      await this._send({
+        from: this._from(),
+        replyTo: this._replyTo(),
         to: recipientEmail,
         subject: cleanTitle,
+        headers: this._unsubscribeHeaders(recipientUserId),
         text,
         html,
       });
@@ -783,8 +772,9 @@ ${acceptUrl}
     ].filter(Boolean).join('\n');
 
     try {
-      await this.transporter.sendMail({
-        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+      await this._send({
+        from: this._from(),
+        replyTo: this._replyTo(),
         to: partnerEmail,
         subject: '💛 Twogether 溫柔提醒',
         text,
@@ -796,7 +786,7 @@ ${acceptUrl}
     }
   }
 
-  async sendEventNotification({ senderName, recipientEmail, eventTitle = '', type, messageContent = '', aiName = null }) {
+  async sendEventNotification({ senderName, recipientEmail, recipientUserId = null, eventTitle = '', type, messageContent = '', aiName = null }) {
     if (!this.isConfigured()) return;
     if (!recipientEmail) return;
 
@@ -830,11 +820,13 @@ ${acceptUrl}
       <div class="quote">${safeMessage.replace(/\n/g, '<br>')}</div>` : ''}
       <p style="color: #636e72; font-size: 14px;">登入 Twogether 一起看看、聊聊。</p>
     `;
+    const unsubscribeUrl = this._unsubscribeUrl(recipientUserId);
     const html = this._activityEmailHtml({
       headerEmoji: meta.emoji,
       headerTitle: meta.headline,
       headerSubtitle: type === 'event_ai_comment' ? `由 ${safeSender} 邀請` : safeSender,
       bodyHtml,
+      unsubscribeUrl,
     });
 
     const text = [
@@ -843,13 +835,16 @@ ${acceptUrl}
       ...(messageContent ? ['', `${messageLabel}：`, String(messageContent).slice(0, 600)] : []),
       '',
       '打開 Twogether 一起看看、聊聊。',
+      unsubscribeUrl ? `\n不想收到通知信？${unsubscribeUrl}` : '',
     ].join('\n');
 
     try {
-      await this.transporter.sendMail({
-        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+      await this._send({
+        from: this._from(),
+        replyTo: this._replyTo(),
         to: recipientEmail,
         subject: meta.subject,
+        headers: this._unsubscribeHeaders(recipientUserId),
         text,
         html,
       });
@@ -902,8 +897,9 @@ ${acceptUrl}
     ].join('\n');
 
     try {
-      await this.transporter.sendMail({
-        from: `"Twogether 心理諮商" <${process.env.SMTP_USER}>`,
+      await this._send({
+        from: this._from('Twogether 心理諮商'),
+        replyTo: this._replyTo(),
         to: recipientEmail,
         subject: '🩺 請驗證你的 Email · Twogether 諮商師申請',
         text,
@@ -915,7 +911,7 @@ ${acceptUrl}
     }
   }
 
-  async sendIntimacyResponseNotification({ receiverName, senderEmail, response, responseMessage = '' }) {
+  async sendIntimacyResponseNotification({ receiverName, senderEmail, senderUserId = null, response, responseMessage = '' }) {
     if (!this.isConfigured()) return;
     if (!senderEmail) return;
 
@@ -935,11 +931,13 @@ ${acceptUrl}
          ${safeMessage ? `<div class="quote">${safeMessage.replace(/\n/g, '<br>')}</div>` : ''}
          <p style="color: #636e72; font-size: 14px;">沒關係，再找一個合適的時刻溝通也很好。</p>`;
 
+    const unsubscribeUrl = this._unsubscribeUrl(senderUserId);
     const html = this._activityEmailHtml({
       headerEmoji: accepted ? '💕' : '💌',
       headerTitle,
       headerSubtitle: accepted ? '你們的時光就要開始了' : '溫柔地給彼此空間',
       bodyHtml,
+      unsubscribeUrl,
     });
 
     const text = [
@@ -949,13 +947,16 @@ ${acceptUrl}
       responseMessage ? `訊息：${responseMessage}` : '',
       '',
       '打開 Twogether 查看詳情。',
+      unsubscribeUrl ? `\n不想收到通知信？${unsubscribeUrl}` : '',
     ].filter(Boolean).join('\n');
 
     try {
-      await this.transporter.sendMail({
-        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+      await this._send({
+        from: this._from(),
+        replyTo: this._replyTo(),
         to: senderEmail,
         subject,
+        headers: this._unsubscribeHeaders(senderUserId),
         text,
         html,
       });
@@ -1010,8 +1011,9 @@ ${acceptUrl}
     ].join('\n');
 
     try {
-      await this.transporter.sendMail({
-        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+      await this._send({
+        from: this._from(),
+        replyTo: this._replyTo(),
         to: recipientEmail,
         subject: '🎉 歡迎加入 Twogether！請驗證你的 Email',
         text,
@@ -1064,8 +1066,9 @@ ${acceptUrl}
     ].join('\n');
 
     try {
-      await this.transporter.sendMail({
-        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+      await this._send({
+        from: this._from(),
+        replyTo: this._replyTo(),
         to: recipientEmail,
         subject: '🔑 重設你的 Twogether 密碼',
         text,
@@ -1120,8 +1123,9 @@ ${acceptUrl}
     ].join('\n');
 
     try {
-      await this.transporter.sendMail({
-        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+      await this._send({
+        from: this._from(),
+        replyTo: this._replyTo(),
         to: recipientEmail,
         subject: '✉️ 確認你的新 Twogether 登入 Email',
         text,
@@ -1172,8 +1176,9 @@ ${acceptUrl}
     ].join('\n');
 
     try {
-      await this.transporter.sendMail({
-        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+      await this._send({
+        from: this._from(),
+        replyTo: this._replyTo(),
         to: recipientEmail,
         subject: '🔔 有人要求變更你的 Twogether 登入 Email',
         text,
@@ -1241,8 +1246,9 @@ ${acceptUrl}
     ].join('\n');
 
     try {
-      await this.transporter.sendMail({
-        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+      await this._send({
+        from: this._from(),
+        replyTo: this._replyTo(),
         to: recipientEmail,
         subject: '🧾 Twogether Premium 購買收據',
         text,
@@ -1286,8 +1292,9 @@ ${acceptUrl}
     ].join('\n');
 
     try {
-      await this.transporter.sendMail({
-        from: `"Twogether 心理諮商" <${process.env.SMTP_USER}>`,
+      await this._send({
+        from: this._from('Twogether 心理諮商'),
+        replyTo: this._replyTo(),
         to: recipientEmail,
         subject: `🗓️ ${clientName || '有人'} 向你預約了諮商`,
         text,
@@ -1328,8 +1335,9 @@ ${acceptUrl}
     ].join('\n');
 
     try {
-      await this.transporter.sendMail({
-        from: `"Twogether 心理諮商" <${process.env.SMTP_USER}>`,
+      await this._send({
+        from: this._from('Twogether 心理諮商'),
+        replyTo: this._replyTo(),
         to: recipientEmail,
         subject: '🗓️ 你的諮商預約已送出',
         text,
@@ -1387,8 +1395,9 @@ ${acceptUrl}
     ].join('\n');
 
     try {
-      await this.transporter.sendMail({
-        from: `"Twogether 愛情助手" <${process.env.SMTP_USER}>`,
+      await this._send({
+        from: this._from(),
+        replyTo: this._replyTo(),
         to: recipientEmail,
         subject: `💌 ${sharerName || '你的伴侶'} 想和你試試「${scriptTitle || '一個劇本'}」`,
         text,
