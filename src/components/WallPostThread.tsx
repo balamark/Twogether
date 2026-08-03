@@ -49,22 +49,40 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
   const [translationEnabled, setTranslationEnabled] = useState(false);
   const [translations, setTranslations] = useState<MessageTranslationMap>({});
   const [translationLoading, setTranslationLoading] = useState(false);
+  // Kept after the toast fades so an unfinished batch stays explained on screen.
+  const [translationNotice, setTranslationNotice] =
+    useState<{ code?: string; message: string } | null>(null);
   const tz = useTimezone();
 
   // Load the emotion/need translations for the thread's human replies. Cached
   // server-side per reply, so this only bills for still-untranslated messages.
   const loadTranslations = async () => {
     setTranslationLoading(true);
+    setTranslationNotice(null);
     const startedAt = Date.now();
     console.info('[情緒翻譯] wall: loading translations…', { postId });
     try {
-      const map = await apiService.getWallTranslations(postId);
-      const keys = Object.keys(map);
-      console.info('[情緒翻譯] wall: got translations', { postId, count: keys.length, ms: Date.now() - startedAt, keys });
-      if (keys.length === 0) {
-        console.warn('[情緒翻譯] wall: empty translation map — nothing will render');
+      const res = await apiService.getWallTranslations(postId);
+      const keys = Object.keys(res.translations);
+      console.info('[情緒翻譯] wall: got translations', {
+        postId, count: keys.length, requested: res.requested, translated: res.translated,
+        ms: Date.now() - startedAt, keys,
+      });
+      // Always render what did come back; a partial batch still helps.
+      setTranslations(res.translations);
+      setTranslationNotice(res.message ? { code: res.error_code, message: res.message } : null);
+      if (res.message) {
+        console.warn('[情緒翻譯] wall: incomplete batch', {
+          postId, code: res.error_code, requested: res.requested, translated: res.translated,
+        });
+        // A batch the model couldn't finish is an expected degraded state with
+        // a next step, not a red failure.
+        onNotify?.({
+          type: res.translated === 0 ? 'warning' : 'info',
+          title: res.translated === 0 ? '情緒翻譯這次沒完成' : '情緒翻譯完成一部分',
+          message: res.message,
+        });
       }
-      setTranslations(map);
     } catch (err) {
       console.error('[情緒翻譯] wall: load failed', err);
       const code = (err as { error_code?: string })?.error_code;
@@ -245,6 +263,24 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
                 translationEnabled ? 'translate-x-4' : 'translate-x-0.5'
               }`}
             />
+          </button>
+        </div>
+      )}
+
+      {/* An unfinished batch has to stay explained on screen: the toast
+          disappears, but the missing cards do not. */}
+      {!loading && translationEnabled && translationNotice && !translationLoading && (
+        <div
+          data-testid={`wall-translation-notice-${postId}`}
+          className="flex items-start justify-between gap-2 bg-petal-cream-2 border border-petal-rule rounded-xl px-3 py-2"
+        >
+          <p className="font-body text-[11px] text-petal-ink-soft leading-relaxed">{translationNotice.message}</p>
+          <button
+            type="button"
+            onClick={loadTranslations}
+            className="font-body text-[11px] text-petal-rose-deep hover:underline shrink-0 whitespace-nowrap"
+          >
+            重試
           </button>
         </div>
       )}

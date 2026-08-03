@@ -572,6 +572,23 @@ const LoveTimeApp = () => {
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [roleplayFilter, setRoleplayFilter] = useState('all');
   const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  // Notification system. Declared up here so the effects below can depend on it.
+  //
+  // Stable identity matters: consumers put this in useCallback/useEffect deps
+  // (e.g. WallView.loadPosts), so a new function each render made showing any
+  // toast refetch the wall and remount open threads — which threw away their
+  // loaded 情緒翻譯. Only setNotifications is used, and that is already stable.
+  const showNotification = useCallback((notification: Omit<Notification, 'id'>) => {
+    const id = Date.now().toString();
+    const newNotification = { ...notification, id };
+    setNotifications(prev => [...prev, newNotification]);
+
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, notification.duration || 5000);
+  }, []);
+
   const [totalCoins, setTotalCoins] = useState(0);
   const [customGifts, setCustomGifts] = useState<CoinGift[]>([]);
   const [authState, setAuthState] = useState<AuthState>({
@@ -1151,7 +1168,7 @@ const LoveTimeApp = () => {
     };
     window.addEventListener('auth:session-expired', handleSessionExpired);
     return () => window.removeEventListener('auth:session-expired', handleSessionExpired);
-  }, []);
+  }, [showNotification]);
 
   // src/services/api.ts dispatches `billing:limit-reached` on a 429 with one of
   // our freemium cap error_codes. Send the user to the Upgrade view with the
@@ -1405,7 +1422,7 @@ const LoveTimeApp = () => {
     };
 
     loadAuthenticatedData();
-  }, [isAuthenticated, authUser, partnerConnected]); // Re-run when auth user changes
+  }, [isAuthenticated, authUser, partnerConnected, showNotification]); // Re-run when auth user changes
 
   // Note: Intimate records are now persisted in the backend, no localStorage needed
 
@@ -1415,17 +1432,6 @@ const LoveTimeApp = () => {
   // Backend is the source of truth for nicknames, customGifts, customScripts,
   // and totalCoins. They are never cached in localStorage — see /api/* loaders
   // in the authenticated-data effect below.
-
-  // Notification system
-  const showNotification = (notification: Omit<Notification, 'id'>) => {
-    const id = Date.now().toString();
-    const newNotification = { ...notification, id };
-    setNotifications(prev => [...prev, newNotification]);
-
-    setTimeout(() => {
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    }, notification.duration || 5000);
-  };
 
   // Photos/videos are not downloadable (see hooks/useMediaProtection). Say so
   // once per tab session — a right-click that silently does nothing reads as a

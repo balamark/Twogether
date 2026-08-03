@@ -17,6 +17,7 @@ const {
   resolveAiLimit,
   recordAiUsage,
 } = require('../lib/aiUsage');
+const { translationStatus } = require('../lib/translationStatus');
 
 const router = express.Router();
 
@@ -362,7 +363,15 @@ async function insertEventMessage(eventId, senderId, content, { isTherapist = fa
 function sendValidationError(req, res) {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    res.status(400).json({ success: false, message: '驗證失敗', errors: errors.array() });
+    // Prefer a validator's own .withMessage() text so the user learns what is
+    // actually wrong (e.g. an over-length reply) instead of a bare "驗證失敗".
+    const list = errors.array();
+    const specific = list.find((e) => e.msg && e.msg !== 'Invalid value');
+    res.status(400).json({
+      success: false,
+      message: specific ? specific.msg : '驗證失敗',
+      errors: list,
+    });
     return true;
   }
   return false;
@@ -1236,7 +1245,11 @@ router.patch(
 // Post reply to an event
 router.post(
   '/:id/messages',
-  [param('id').isUUID(), body('content').isString().isLength({ min: 1, max: 2000 })],
+  [
+    param('id').isUUID(),
+    body('content').isString().isLength({ min: 1, max: 2000 })
+      .withMessage('訊息需在 1–2000 字之間，請刪減後再送出，或分成兩則送出'),
+  ],
   async (req, res) => {
     if (sendValidationError(req, res)) return;
     try {
@@ -1351,6 +1364,15 @@ router.post(
       await recordAiUsage(userId, 'reply_rewrite', rawReply, meta);
       res.json({ success: true, preview });
     } catch (err) {
+      // A draft too long to rewrite inside one response is an expected state
+      // with a next step, not an outage — keep its specific reason and code so
+      // the UI can tell the user what to do instead of "AI 改寫失敗".
+      if (err.error_code === 'REWRITE_TOO_LONG') {
+        logWarn('events.reply_rewrite.too_long', {
+          userId: req.user.id, eventId: req.params.id, draftChars: (req.body.rawReply || '').length,
+        });
+        return res.status(422).json({ success: false, message: err.message, error_code: err.error_code });
+      }
       logError('Reply rewrite preview failed', { err: err.message, stack: err.stack });
       res.status(500).json({ success: false, message: 'AI 改寫失敗，請稍後再試' });
     }
@@ -1597,7 +1619,11 @@ router.post('/:id/ai-comment/preview', [param('id').isUUID()], async (req, res) 
 // partners. author_id = the inviting partner; is_ai flags it as a counselor msg.
 router.post(
   '/:id/ai-comment',
-  [param('id').isUUID(), body('content').isString().isLength({ min: 1, max: 2000 })],
+  [
+    param('id').isUUID(),
+    body('content').isString().isLength({ min: 1, max: 2000 })
+      .withMessage('訊息需在 1–2000 字之間，請刪減後再送出，或分成兩則送出'),
+  ],
   async (req, res) => {
     if (sendValidationError(req, res)) return;
     try {
@@ -1704,6 +1730,10 @@ router.get('/:id/translations', [param('id').isUUID()], async (req, res) => {
     for (const row of cachedRows) translations[row.message_id] = row.translation;
 
     const missing = humanIds.filter((id) => !translations[id]);
+    // Reported back so the client can tell "nothing to do" apart from "asked
+    // for 5, got 0" — the latter must never render as silence.
+    let requested = 0;
+    let translated = 0;
     logInfo('events.translation.request', {
       userId,
       eventId: req.params.id,
@@ -1746,8 +1776,6 @@ router.get('/:id/translations', [param('id').isUUID()], async (req, res) => {
         durationMs: meta?.durationMs,
       });
 
-      await recordAiUsage(userId, 'need_translation', access.event.summary, meta);
-
       let saved = 0;
       const unmatched = [];
       for (const t of result.translations || []) {
@@ -1775,15 +1803,34 @@ router.get('/:id/translations', [param('id').isUUID()], async (req, res) => {
         returned: (result.translations || []).length,
         saved,
         unmatched,
+        truncated: meta?.truncated === true,
       });
+
+      // Only bill the shared daily AI budget for work the user can actually
+      // see. A batch that came back empty (model truncated mid tool_use) used
+      // to burn a unit and cache nothing, so every retry cost another one.
+      if (saved > 0) {
+        await recordAiUsage(userId, 'need_translation', access.event.summary, meta);
+      } else {
+        logWarn('events.translation.empty', {
+          userId,
+          eventId: req.params.id,
+          requested: missing.length,
+          truncated: meta?.truncated === true,
+        });
+      }
+      requested = missing.length;
+      translated = saved;
     }
 
     logInfo('events.translation.respond', {
       userId,
       eventId: req.params.id,
       returnedKeys: Object.keys(translations).length,
+      requested,
+      translated,
     });
-    res.json({ success: true, translations });
+    res.json({ success: true, translations, ...translationStatus(requested, translated) });
   } catch (err) {
     logError('Get event translations failed', { err: err.message, stack: err.stack, eventId: req.params.id });
     res.status(500).json({ success: false, message: '情緒翻譯暫時無法產生，請稍後再試' });

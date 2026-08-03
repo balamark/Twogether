@@ -616,6 +616,37 @@ export interface MessageTranslation {
 // Keyed by message id.
 export type MessageTranslationMap = Record<string, MessageTranslation>;
 
+// A translation fetch reports how many messages it asked the model for versus
+// how many came back usable, so an empty or partial batch can be explained to
+// the user instead of rendering as silence. `requested` counts only the
+// still-uncached messages, so a fully cached thread reports 0/0.
+export interface MessageTranslationResult {
+  translations: MessageTranslationMap;
+  requested: number;
+  translated: number;
+  partial: boolean;
+  error_code?: string;
+  message?: string;
+}
+
+// Normalize a /translations response. A body without the counts (nothing was
+// generated this request, so there is nothing to report) is treated as complete
+// rather than as a silent failure.
+function toTranslationResult(body: unknown): MessageTranslationResult {
+  const data = (body || {}) as Partial<MessageTranslationResult>;
+  const translations = (data.translations || {}) as MessageTranslationMap;
+  const requested = typeof data.requested === 'number' ? data.requested : 0;
+  const translated = typeof data.translated === 'number' ? data.translated : requested;
+  return {
+    translations,
+    requested,
+    translated,
+    partial: data.partial === true,
+    error_code: data.error_code,
+    message: data.message,
+  };
+}
+
 // 治療摘要 (Therapy Note) — the structured post-conflict summary for a resolved
 // event. Shared to both partners, generated once.
 export interface TherapyNote {
@@ -3217,12 +3248,12 @@ class ApiService {
 
   // Emotion/need translation for every human reply in a wall thread (cached per
   // reply; only untranslated ones cost AI budget).
-  async getWallTranslations(postId: string): Promise<MessageTranslationMap> {
+  async getWallTranslations(postId: string): Promise<MessageTranslationResult> {
     try {
       // ~17s batched LLM call, over the 15s client default (see
       // getEventTranslations). Extend so a slow thread doesn't read as failed.
       const response = await apiClient.get(`/wall/${postId}/translations`, { timeout: 45000 });
-      return (response.data.translations || {}) as MessageTranslationMap;
+      return toTranslationResult(response.data);
     } catch (error) {
       console.error('Failed to fetch wall translations:', error);
       throw error;
@@ -3613,13 +3644,13 @@ class ApiService {
 
   // Fetch the emotion/need translation for every human message in an event
   // thread (cached per message; only untranslated ones cost AI budget).
-  async getEventTranslations(eventId: string): Promise<MessageTranslationMap> {
+  async getEventTranslations(eventId: string): Promise<MessageTranslationResult> {
     try {
       // The batched LLM translation of a thread takes ~17s in prod, over the
       // 15s client default — bump this call so users don't see a false
       // "情緒翻譯失敗" while the server actually succeeds (returns 200).
       const response = await apiClient.get(`/events/${eventId}/translations`, { timeout: 45000 });
-      return (response.data.translations || {}) as MessageTranslationMap;
+      return toTranslationResult(response.data);
     } catch (error: unknown) {
       console.error('Failed to fetch event translations:', error);
       this.throwApiError(error, '情緒翻譯暫時無法產生，請稍後再試');
