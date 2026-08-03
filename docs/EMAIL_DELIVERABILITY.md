@@ -89,6 +89,49 @@ Actions`），由 `.github/workflows/deploy.yml` 對應成 `_SMTP_*` / `_EMAIL_*
 `EMAIL_FROM` 沒設時，程式會退回舊行為（用 `SMTP_USER` 當寄件人），所以切換過程不會
 中斷寄信 — 但在 `EMAIL_FROM` 設好之前，垃圾信問題不會消失。
 
+## 三之二、讓 @twogether.fun 收得到信
+
+**在 Resend 驗證網域只讓你「寄」，不讓你「收」。** 這是兩件完全獨立的事：
+
+- `EMAIL_FROM=hello@twogether.fun` — **不需要**真的存在這個信箱。寄信只要求
+  網域通過驗證，`hello@` 只是一個標籤。
+- `EMAIL_REPLY_TO=support@twogether.fun` — **必須**是真的收得到信的地址，
+  否則使用者按回覆之後信會退回，而他會以為你已讀不回。
+
+目前 `twogether.fun` 的根網域**沒有 MX 記錄**，代表任何寄到 `@twogether.fun`
+的信都會直接退信。確認方式：
+
+```bash
+dig MX twogether.fun +short     # 沒有輸出 = 收不到信
+```
+
+要讓 `support@twogether.fun` 真的能用，選一個做：
+
+### 選項 A：ImprovMX（免費，約 5 分鐘）
+
+轉寄服務，把 `support@twogether.fun` 收到的信自動轉到你的 Gmail。
+
+1. 到 <https://improvmx.com> 輸入 `twogether.fun` 和你的 Gmail
+2. 到 GoDaddy DNS 加它給的兩筆 **MX**（加在**根網域** `@`，不是 `send`）：
+   `mx1.improvmx.com`（priority 10）、`mx2.improvmx.com`（priority 20）
+3. 加一筆根網域 TXT：`v=spf1 include:spf.improvmx.com ~all`
+
+> 這不會影響 Resend — Resend 的 MX 在 `send.twogether.fun` 子網域上，
+> 兩者各自獨立，不會互相覆蓋。
+
+### 選項 B：GoDaddy Email Forwarding
+
+GoDaddy 後台就有轉寄功能（部分方案要另外付費，看你的網域方案含不含）。
+設定 `support@twogether.fun` → 你的 Gmail 即可，DNS 由 GoDaddy 自動處理。
+
+### 選項 C：暫時先用你的個人信箱
+
+`EMAIL_REPLY_TO` 直接填你的 Gmail。立刻可用、不會退信，代價是你的私人地址會
+出現在每封交易信的 `Reply-To` 標頭上。
+
+> 注意：配對邀請信不受這個設定影響 — 它的 `Reply-To` 一律是**邀請人本人**的
+> 地址，所以伴侶按回覆是回給邀請他的人，不是回給你。
+
 ## 四、驗證
 
 1. **SMTP 連線與寄件人**
