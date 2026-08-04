@@ -31,6 +31,22 @@ const WALL_MOOD_TAGS = [
 // WALL_MAX_MEDIA in src/components/WallPostComposer.tsx.
 const WALL_MAX_MEDIA = 4;
 
+// One-tap acknowledgements ("心意回應"). Reading a post without answering it is
+// the loneliest outcome on the wall, so the reader gets a response that costs
+// one tap. Only the KEY is stored; emoji/label live here and in WALL_REACTIONS
+// (src/components/WallView.tsx) — keep the two lists in sync.
+const WALL_REACTIONS = {
+  hug: { emoji: '🫂', label: '抱抱' },
+  understand: { emoji: '💛', label: '我懂' },
+  thanks: { emoji: '🙏', label: '謝謝你說' },
+  later: { emoji: '⏳', label: '晚點好好回你' },
+};
+
+// Ceiling on one batched read-receipt call. The wall isn't paginated, so a long
+// wall scrolled quickly can queue a lot of ids at once; the client chunks and
+// anything beyond this is simply reported on the next flush.
+const WALL_READ_BATCH_MAX = 100;
+
 // Mood tags are free-form (custom tags allowed) but capped at the DB column
 // width (mood_tag VARCHAR(32)). WALL_MOOD_TAGS above are just the preset chips.
 const MOOD_TAG_MAX = 32;
@@ -84,6 +100,46 @@ async function fetchMediaForPosts(postIds) {
     }
   } catch (err) {
     logWarn('fetchMediaForPosts failed', { err: err.message });
+  }
+  return map;
+}
+
+// Fetch read receipts for a set of post ids → { postId: [{ user_id, read_at }] }.
+// Same graceful degradation as fetchMediaForPosts: a pre-migration environment
+// serves a wall with no read state rather than failing the list outright.
+async function fetchReadsForPosts(postIds) {
+  const map = {};
+  if (!postIds.length) return map;
+  try {
+    const result = await db.query(
+      `SELECT post_id, user_id, read_at FROM wall_post_reads
+        WHERE post_id = ANY($1::uuid[])`,
+      [postIds]
+    );
+    for (const row of result.rows) {
+      (map[row.post_id] = map[row.post_id] || []).push(row);
+    }
+  } catch (err) {
+    logWarn('fetchReadsForPosts failed', { err: err.message });
+  }
+  return map;
+}
+
+// Fetch reactions for a set of post ids → { postId: [{ user_id, reaction, created_at }] }.
+async function fetchReactionsForPosts(postIds) {
+  const map = {};
+  if (!postIds.length) return map;
+  try {
+    const result = await db.query(
+      `SELECT post_id, user_id, reaction, created_at FROM wall_post_reactions
+        WHERE post_id = ANY($1::uuid[])`,
+      [postIds]
+    );
+    for (const row of result.rows) {
+      (map[row.post_id] = map[row.post_id] || []).push(row);
+    }
+  } catch (err) {
+    logWarn('fetchReactionsForPosts failed', { err: err.message });
   }
   return map;
 }
@@ -157,7 +213,52 @@ async function notifyPartner(partnerId, type, title, content, relatedUserId, opt
   }
 }
 
+// Tell the author their partner tapped a 心意回應. Deliberately NOT routed
+// through notifyPartner: that helper always fans out to email, and emailing
+// every one-tap chip is how a kind gesture turns into spam. In-app + LINE only.
+async function notifyReaction(authorId, reactorId, reactionKey) {
+  if (!authorId || authorId === reactorId) return;
+  const meta = WALL_REACTIONS[reactionKey];
+  if (!meta) return;
+
+  const title = '對方回應了你的貼文';
+  const content = `TA 給了你一個「${meta.label}」${meta.emoji}`;
+
+  try {
+    await db.query(
+      `INSERT INTO notifications (
+         user_id, notification_type, title, content, related_user_id, priority
+       ) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [authorId, 'wall_reaction', title, content, reactorId, 1]
+    );
+  } catch (err) {
+    logWarn('Failed to create reaction notification', { err: err.message });
+  }
+
+  lineService.pushToUserIfLinked(
+    db,
+    authorId,
+    `💌 Twogether｜${title}\n「${content}」\n👉 https://twogether.fun`
+  );
+}
+
+// Digest the raw read rows for one post into "has the partner seen this?".
+// Anyone who isn't the author counts as the partner here — a couple is two
+// people, and a therapist never reaches this path (private posts are excluded
+// and therapist views pass no viewer).
+function partnerReadAt(reads, authorId) {
+  let latest = null;
+  for (const r of reads || []) {
+    if (r.user_id === authorId) continue;
+    if (!latest || new Date(r.read_at) > new Date(latest)) latest = r.read_at;
+  }
+  return latest;
+}
+
 function mapPost(row) {
+  const reactions = row.reactions || [];
+  const mine = reactions.find((r) => row.viewer_id && r.user_id === row.viewer_id);
+  const theirs = reactions.find((r) => r.user_id !== row.author_id);
   return {
     id: row.id,
     content: row.content,
@@ -168,6 +269,13 @@ function mapPost(row) {
     reply_count: Number(row.reply_count || 0),
     media: Array.isArray(row.media) ? row.media : [],
     is_private: row.is_private === true,
+    // When the partner last saw this post (null = not yet). Only meaningful on
+    // the author's own shared posts; the UI hides it everywhere else.
+    partner_read_at: partnerReadAt(row.reads, row.author_id),
+    // The partner's one-tap acknowledgement, and the viewer's own — both
+    // pre-digested here so the UI doesn't have to work out who is who.
+    partner_reaction: theirs ? { reaction: theirs.reaction, created_at: theirs.created_at } : null,
+    my_reaction: mine ? mine.reaction : null,
     public_status: row.public_status || 'private',
     public_title: row.public_title || null,
     translation_enabled: row.translation_enabled === true,
@@ -209,8 +317,10 @@ async function getUserCompanion(userId) {
 // items. Private content is never exposed to a third party.
 // ---------------------------------------------------------------------------
 
-// List a couple's wall posts, important first then newest first.
-async function listWallPostsForCouple(coupleId, { privateVisibleTo = null } = {}) {
+// List a couple's wall posts, important first then newest first. `viewerId`
+// identifies whose "my_reaction" to resolve; the therapist path passes none and
+// gets null there.
+async function listWallPostsForCouple(coupleId, { privateVisibleTo = null, viewerId = null } = {}) {
   const privateClause = privateVisibleTo
     ? '(p.is_private = false OR p.author_id = $2)'
     : 'p.is_private = false';
@@ -230,9 +340,20 @@ async function listWallPostsForCouple(coupleId, { privateVisibleTo = null } = {}
     params
   );
 
-  const mediaByPost = await fetchMediaForPosts(result.rows.map((r) => r.id));
+  const postIds = result.rows.map((r) => r.id);
+  const [mediaByPost, readsByPost, reactionsByPost] = await Promise.all([
+    fetchMediaForPosts(postIds),
+    fetchReadsForPosts(postIds),
+    fetchReactionsForPosts(postIds),
+  ]);
   return result.rows.map((row) =>
-    mapPost({ ...row, media: mediaByPost[row.id] || [] })
+    mapPost({
+      ...row,
+      media: mediaByPost[row.id] || [],
+      reads: readsByPost[row.id] || [],
+      reactions: reactionsByPost[row.id] || [],
+      viewer_id: viewerId,
+    })
   );
 }
 
@@ -294,7 +415,10 @@ router.get('/', async (req, res) => {
 
     // Private posts are visible only to their author — the partner neither sees
     // them here nor is notified about them.
-    const wall_posts = await listWallPostsForCouple(couple.id, { privateVisibleTo: userId });
+    const wall_posts = await listWallPostsForCouple(couple.id, {
+      privateVisibleTo: userId,
+      viewerId: userId,
+    });
 
     res.json({ success: true, wall_posts });
   } catch (error) {
@@ -328,6 +452,129 @@ router.get('/mood-tags', async (req, res) => {
   } catch (error) {
     logDbError('Get wall mood tags error:', error, { user_id: req.user?.id });
     res.status(500).json(errorResponseBody('無法獲取心情標籤', error));
+  }
+});
+
+// Batch-mark the partner's posts as read. The client reports a post only once
+// it has actually been scrolled into view for a moment, so 已讀 means "TA really
+// saw this one", not "TA opened the wall". Silent by design: being read is not
+// an event worth notifying anyone about.
+router.post('/read', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const ids = Array.isArray(req.body?.post_ids) ? req.body.post_ids : [];
+    if (!ids.length) return res.json({ success: true, marked: 0 });
+
+    const couple = await findCoupleForUser(userId);
+    if (!couple) return res.json({ success: true, marked: 0 });
+
+    // The INSERT ... SELECT is the access check: only posts in the caller's
+    // couple, not authored by them, and never private ones (which the partner
+    // can't see at all). ON CONFLICT keeps the FIRST read as the honest time.
+    const result = await db.query(
+      `INSERT INTO wall_post_reads (post_id, user_id)
+       SELECT p.id, $1
+         FROM wall_posts p
+        WHERE p.id = ANY($2::uuid[])
+          AND p.couple_id = $3
+          AND p.author_id <> $1
+          AND p.is_private = false
+       ON CONFLICT (post_id, user_id) DO NOTHING
+       RETURNING post_id`,
+      [userId, ids.slice(0, WALL_READ_BATCH_MAX), couple.id]
+    );
+
+    if (result.rowCount) {
+      logInfo('wall.read.marked', { user_id: userId, count: result.rowCount });
+    }
+    res.json({ success: true, marked: result.rowCount });
+  } catch (error) {
+    logDbError('Mark wall posts read error:', error, { user_id: req.user?.id });
+    res.status(500).json(errorResponseBody('無法更新已讀狀態', error));
+  }
+});
+
+// Set or clear the caller's one-tap 心意回應 on the partner's post. Passing null,
+// or the key that's already stored, clears it (tap-to-toggle).
+router.put('/:id/reaction', async (req, res) => {
+  try {
+    const postId = req.params.id;
+    const userId = req.user.id;
+    const raw = req.body?.reaction;
+    const reaction = raw === null || raw === undefined || raw === '' ? null : String(raw);
+
+    if (reaction !== null && !WALL_REACTIONS[reaction]) {
+      logWarn('wall.reaction.invalid', { user_id: userId, post_id: postId, reaction });
+      return res.status(400).json({
+        success: false,
+        error_code: 'WALL_REACTION_INVALID',
+        message: '這個回應已經不支援了，請重新選一個心意。',
+      });
+    }
+
+    const couple = await findCoupleForUser(userId);
+    if (!couple) return res.status(404).json({ success: false, message: '找不到貼文' });
+
+    const post = await getWallPostForCouple(postId, couple.id, { privateVisibleTo: userId });
+    if (!post) return res.status(404).json({ success: false, message: '找不到貼文' });
+
+    if (post.author_id === userId) {
+      return res.status(400).json({
+        success: false,
+        error_code: 'WALL_REACTION_OWN_POST',
+        message: '這是你自己的貼文，心意回應是留給另一半的。你可以直接補一則回覆。',
+      });
+    }
+
+    const existing = await db.query(
+      'SELECT reaction FROM wall_post_reactions WHERE post_id = $1 AND user_id = $2',
+      [postId, userId]
+    );
+    const current = existing.rows[0]?.reaction || null;
+    // Tapping the active chip again means "take it back".
+    const next = reaction === null || reaction === current ? null : reaction;
+
+    if (next === null) {
+      await db.query(
+        'DELETE FROM wall_post_reactions WHERE post_id = $1 AND user_id = $2',
+        [postId, userId]
+      );
+    } else {
+      await db.query(
+        `INSERT INTO wall_post_reactions (post_id, user_id, reaction)
+         VALUES ($1, $2, $3)
+         ON CONFLICT (post_id, user_id)
+         DO UPDATE SET reaction = EXCLUDED.reaction, created_at = NOW()`,
+        [postId, userId, next]
+      );
+    }
+
+    logInfo('wall.reaction.set', {
+      user_id: userId, post_id: postId, reaction: next, cleared: next === null,
+    });
+
+    // Only a newly given reaction is worth a ping — taking one back isn't, and
+    // re-tapping the same chip never reaches here (it clears instead).
+    if (next !== null) await notifyReaction(post.author_id, userId, next);
+
+    const refreshed = await fetchReactionsForPosts([postId]);
+    const rows = refreshed[postId] || [];
+    const mine = rows.find((r) => r.user_id === userId);
+    const theirs = rows.find((r) => r.user_id !== post.author_id);
+
+    res.json({
+      success: true,
+      my_reaction: mine ? mine.reaction : null,
+      partner_reaction: theirs
+        ? { reaction: theirs.reaction, created_at: theirs.created_at }
+        : null,
+    });
+  } catch (error) {
+    logDbError('Set wall reaction error:', error, {
+      user_id: req.user?.id,
+      post_id: req.params.id,
+    });
+    res.status(500).json(errorResponseBody('無法送出心意回應', error));
   }
 });
 
