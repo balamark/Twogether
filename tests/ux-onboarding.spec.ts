@@ -11,9 +11,24 @@ const BASE_USER = {
   selected_therapist: 'luma',
 };
 
+/** One pending invite row as /my-invitations returns it (snake_case, raw). */
+function pendingInviteRow(daysLeft: number) {
+  return {
+    id: '44444444-4444-4444-4444-444444444444',
+    recipient_email: 'partner@example.com',
+    message: null,
+    status: 'pending',
+    created_at: new Date().toISOString(),
+    expires_at: new Date(Date.now() + daysLeft * 24 * 60 * 60 * 1000).toISOString(),
+    type: 'email',
+    short_code: null,
+    token: 'tok-abc123',
+  };
+}
+
 async function seed(
   page: import('@playwright/test').Page,
-  { paired }: { paired: boolean }
+  { paired, invitations }: { paired: boolean; invitations?: unknown[] }
 ) {
   await page.addInitScript(
     ({ user, paired: isPaired }) => {
@@ -31,6 +46,7 @@ async function seed(
     },
     { user: BASE_USER, paired }
   );
+
 
   await page.route('**/api/**', async (route) =>
     route.fulfill({
@@ -84,6 +100,17 @@ async function seed(
     }
     return route.fallback();
   });
+
+  // Registered last so it wins over the `**/api/**` catch-all (Playwright gives
+  // priority to the most recently registered matching route) — the pairing
+  // reminder banner needs a real invitation list, not the generic stub.
+  await page.route('**/api/pairing-requests/my-invitations', async (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ success: true, invitations: invitations ?? [] }),
+    })
+  );
 }
 
 test.describe('UX onboarding surfaces', () => {
@@ -122,6 +149,67 @@ test.describe('UX onboarding surfaces', () => {
     // An alternative navigates away from the gate (love-language view).
     await gate.locator('button', { hasText: '愛的語言測驗' }).click();
     await expect(page.getByTestId('solo-mode-gate')).toHaveCount(0);
+  });
+
+  test('unpaired users get a standing pairing reminder whose CTA opens the invite modal', async ({ page }) => {
+    await seed(page, { paired: false });
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    const banner = page.getByTestId('pairing-reminder-banner');
+    await expect(banner).toBeVisible({ timeout: 10000 });
+    await expect(banner).toHaveAttribute('data-state', 'none');
+    await expect(banner).toContainText('你還沒和另一半配對');
+
+    // The CTA re-arms the once-dismissed pairing modal.
+    await page.getByTestId('pairing-reminder-invite').click();
+    await expect(page.getByPlaceholder('partner@example.com')).toBeVisible();
+  });
+
+  test('pairing reminder snoozes on dismiss and stays hidden after reload', async ({ page }) => {
+    await seed(page, { paired: false });
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    await expect(page.getByTestId('pairing-reminder-banner')).toBeVisible({ timeout: 10000 });
+    await page.getByTestId('pairing-reminder-dismiss').click();
+    await expect(page.getByTestId('pairing-reminder-banner')).toHaveCount(0);
+
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.getByTestId('pairing-reminder-banner')).toHaveCount(0);
+  });
+
+  test('a pending invite turns the reminder into a waiting state with resend', async ({ page }) => {
+    await seed(page, { paired: false, invitations: [pendingInviteRow(5)] });
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    const banner = page.getByTestId('pairing-reminder-banner');
+    await expect(banner).toBeVisible({ timeout: 10000 });
+    await expect(banner).toHaveAttribute('data-state', 'pending');
+    await expect(banner).toContainText('partner@example.com');
+    await expect(banner).toContainText('還在等 TA 接受');
+    await expect(page.getByTestId('pairing-reminder-resend')).toBeVisible();
+
+    // The share panel hands over the same accept link built from the token.
+    await page.getByTestId('pairing-reminder-share').click();
+    await expect(banner).toContainText('/pairing/accept?token=tok-abc123');
+  });
+
+  test('a near-expiry invite overrides the snooze', async ({ page }) => {
+    await seed(page, { paired: false, invitations: [pendingInviteRow(1)] });
+    await page.addInitScript(() => {
+      localStorage.setItem(
+        'pairingReminderSnoozedUntil',
+        new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
+      );
+    });
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    // Snoozed, but the link dies in a day — the user needs to know now.
+    await expect(page.getByTestId('pairing-reminder-banner')).toBeVisible({ timeout: 10000 });
   });
 
   test('help view opens from the user menu and expands sections', async ({ page }) => {

@@ -68,6 +68,7 @@ Twogether 是一個「情侶關係經營」App：記錄親密時光、用 AI 把
 `EventsView.tsx:81` 未配對時整頁只顯示配對提示。牆、親密邀請同樣。
 未配對用戶唯一能做的事（私人事件、愛的語言測驗、瀏覽劇本、公開問答）**沒有被
 主動告知**。另外邀請發出後，等待狀態的可見性弱（對方裝了沒？連結失效了嗎？）。
+→ 由 P0-3（單人模式 gate）與 P1-4（常駐配對提醒橫幅，含邀請狀態與重新寄送）解決。
 
 ### D4｜空狀態是句號，不是引導
 - `EventHistoryList.tsx:98`：「目前還沒有事件。」——沒有按鈕、沒有價值說明。
@@ -140,9 +141,14 @@ LoggedOutPreview 的素材）②「邀請另一半」主 CTA ③「配對前你�
 （例：事件送出後→「對方回覆前，可以先看看『如何接住TA的情緒』」）。
 用 localStorage 記 first-time flags，只出現一次。
 
-### P1-4（未完成）配對邀請狀態可見性
-Header 或儀表板顯示「邀請等待中」徽章（含重新發送）；後端允許無 couple 的
-私人事件（schema 改動）。由 P0-3 移轉過來。
+### P1-4（部分完成）配對邀請狀態可見性
+「邀請等待中」狀態 ✅ done 2026-08-04：實作成常駐橫幅而非 Header 徽章
+（`src/components/PairingReminderBanner.tsx`，掛在 `App.tsx` 既有的橫幅插槽）。
+未配對時常駐顯示，兩種狀態：①還沒邀請 → 價值說明 +「邀請另一半」/「用配對碼配對」
+②已寄出 → 收件者 + 連結剩餘天數 +「重新寄送」/「傳連結給 TA」。
+✕ 是 7 天 snooze（`pairingReminderSnoozedUntil`）而非永久關閉；邀請 2 天內到期
+時覆蓋 snooze 強制顯示。量測見 `onboarding.pairing_reminder.*`。
+**仍未完成**：後端允許無 couple 的私人事件（schema 改動）。
 
 ### P1-5（未完成）引導模式（Therapist Mode）前端量測
 2026-07-11 出貨的「開始引導」/今日練習 tray 目前只有後端 logInfo
@@ -225,6 +231,7 @@ activity 記錄）時補上：開始引導點擊、快速回覆 chip 點擊、tr
 | AI 標點與風格 | `services/llm/claudeProvider.js` 的 `PUNCTUATION_RULE` |
 | 設計 token | `tailwind.config.js`（petal 色票）；圖片永不裁切（CLAUDE.md） |
 | 按鈕樣式基準 | 實色=可點、40% 透明=disabled（2026-07-06 改版後的慣例） |
+| 未配對提醒與邀請狀態 | `src/components/PairingReminderBanner.tsx` + `src/utils/pairingReminder.ts`（snooze/到期判斷）；邀請連結組法 `src/utils/pairingLink.ts` |
 
 ---
 

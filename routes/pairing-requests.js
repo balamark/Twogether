@@ -340,6 +340,8 @@ router.post('/:token/resend', authenticateToken, async (req, res) => {
       customMessage: invite.message,
     });
 
+    logInfo('pairing.invite.resent', { userId, recipientEmail: invite.recipient_email });
+
     return res.json({
       success: true,
       message: '邀請已重新發送'
@@ -355,8 +357,12 @@ router.get('/my-invitations', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
 
+    // `token` is included so the sender can rebuild the accept link (and hit
+    // the resend route) after a reload — they already see the full accept URL
+    // in PairingInviteShare right after creating the invite, and the row is
+    // scoped to sender_id, so this exposes nothing new to anyone else.
     const result = await db.query(`
-      SELECT id, recipient_email, message, status, created_at, expires_at, type, short_code
+      SELECT id, recipient_email, message, status, created_at, expires_at, type, short_code, token
       FROM pairing_requests
       WHERE sender_id = $1
       ORDER BY created_at DESC

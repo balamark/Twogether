@@ -81,7 +81,8 @@ events") repelled people who weren't fighting. → fixed by P1-1 (merged into
 `EventsView` showed only "pair first". The things an unpaired user COULD do
 (private events, love-language quiz, browse scripts, public Q&A) were never
 surfaced. Invite status (did they install? did the link expire?) had weak
-visibility. → largely fixed by P0-3; invite-status badge still open (P1-4).
+visibility. → fixed by P0-3 (solo-mode gates) and P1-4 (the standing pairing
+reminder banner, which surfaces invite status and resend).
 
 ### D4 | Empty states were full stops, not guides
 "No events yet." with no button, no value line. Empty states are where every
@@ -120,7 +121,8 @@ the right screen".
 
 ### P0-3 Unpaired gates become "solo mode" ✅ done 2026-07-07
 (events gate rebuilt; "private events without a couple" needs a backend schema
-change and the "invite pending" badge moved to P1-4 — both still open.)
+change and the "invite pending" badge moved to P1-4 — the badge shipped
+2026-08-04 as a banner, the schema change is still open.)
 Spec: gated views show ① what the feature does for the two of you ② an
 "invite your partner" CTA ③ a list of things you can do solo right now
 (love-language quiz, public Q&A, browse scripts).
@@ -150,9 +152,16 @@ One-time (localStorage-flagged) tips: first event sent → "while waiting, try
 如何接住TA的情緒"; first record → pairing nudge (unpaired) or wall suggestion
 (paired).
 
-### P1-4 (open) Pairing-invite status visibility
-A "invite pending" badge (header or dashboard) with resend; and allow private
-events without a couple row (backend schema change). Carried over from P0-3.
+### P1-4 (partly done) Pairing-invite status visibility
+"Invite pending" status ✅ done 2026-08-04, shipped as a standing banner rather
+than a header badge (`src/components/PairingReminderBanner.tsx`, mounted in the
+existing banner slot in `App.tsx`). Always present while unpaired, in two
+states: ① no invite yet → value line + "invite your partner" / "use a pairing
+code" ② invite sent → recipient, days until the link expires, "resend" /
+"send the link to them". The ✕ is a 7-day snooze (`pairingReminderSnoozedUntil`)
+rather than a permanent dismiss, and an invite expiring within 2 days overrides
+the snooze. Measurement: `onboarding.pairing_reminder.*`.
+**Still open**: allow private events without a couple row (backend schema change).
 
 ### P2 (recorded, deliberately not doing)
 - Interactive replay tour (decided against in §6 Q3 — high maintenance).
@@ -244,6 +253,7 @@ measurement counts as unfinished.
 | AI punctuation & style | `PUNCTUATION_RULE` in `services/llm/claudeProvider.js` |
 | Design tokens | `tailwind.config.js` (petal palette); never crop images (CLAUDE.md) |
 | Button convention | solid fill = clickable, 40% opacity = disabled (since 2026-07-06) |
+| Unpaired reminder & invite status | `src/components/PairingReminderBanner.tsx` + `src/utils/pairingReminder.ts` (snooze / expiry rules); invite link builder `src/utils/pairingLink.ts` |
 
 ---
 

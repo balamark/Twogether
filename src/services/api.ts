@@ -130,6 +130,18 @@ interface PairingInvitationResponse {
   };
 }
 
+/** One row of the inviter's own sent-invitation history (GET /my-invitations). */
+export interface PairingInvitationSummary {
+  id: string;
+  token?: string;
+  recipientEmail: string;
+  status: 'pending' | 'accepted' | 'rejected' | 'expired';
+  createdAt: string;
+  expiresAt: string;
+  type?: string;
+  shortCode?: string;
+}
+
 interface AcceptPairingInvitationResponse {
   success: boolean;
   message: string;
@@ -2195,6 +2207,43 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to get pairing invitation:', error);
       this.throwApiError(error, '無法獲取配對邀請詳情');
+    }
+  }
+
+  /** The invites this user has sent, newest first. Rows come back snake_cased. */
+  async getMyPairingInvitations(): Promise<PairingInvitationSummary[]> {
+    try {
+      const response = await apiClient.get('/pairing-requests/my-invitations');
+      const rows = (response.data as { invitations?: unknown[] })?.invitations;
+      if (!Array.isArray(rows)) return [];
+      return rows.map((row) => {
+        const r = row as Record<string, unknown>;
+        return {
+          id: String(r.id ?? ''),
+          token: r.token as string | undefined,
+          recipientEmail: String(r.recipient_email ?? ''),
+          status: (r.status as PairingInvitationSummary['status']) ?? 'pending',
+          createdAt: String(r.created_at ?? ''),
+          expiresAt: String(r.expires_at ?? ''),
+          type: r.type as string | undefined,
+          shortCode: r.short_code as string | undefined,
+        };
+      });
+    } catch (error: unknown) {
+      console.error('Failed to get my pairing invitations:', error);
+      this.throwApiError(error, '無法獲取配對邀請狀態');
+    }
+  }
+
+  async resendPairingInvitation(token: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await apiClient.post(`/pairing-requests/${token}/resend`);
+      return response.data;
+    } catch (error: unknown) {
+      console.error('Failed to resend pairing invitation:', error);
+      // Keep error_code intact — the banner branches on EMAIL_NOT_CONFIGURED
+      // vs INVITATION_NOT_FOUND to tell the user what to do next.
+      this.throwApiError(error, '重新寄送邀請失敗');
     }
   }
 

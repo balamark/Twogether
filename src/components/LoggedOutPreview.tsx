@@ -36,6 +36,7 @@ import {
 import { COMMUNICATION_PRINCIPLES } from '../content/communicationPrinciples';
 import { trackAction } from '../utils/track';
 import { PairingInviteShare } from './PairingInviteShare';
+import PairingReminderBanner from './PairingReminderBanner';
 
 interface PreviewScript {
   id: string;
@@ -591,6 +592,25 @@ const PairingInviteSample: React.FC = () => (
   </div>
 );
 
+// Until you're paired, the app keeps a standing reminder (with the invite
+// button) at the top of every page instead of asking once and going quiet.
+// Shown here in its "還沒邀請" state; non-interactive like every other sample.
+const PairingReminderSample: React.FC = () => (
+  <div className="space-y-2">
+    <div className="flex items-center justify-between">
+      <span className="font-body text-xs text-petal-muted">未配對時的常駐提醒</span>
+      <SampleTag />
+    </div>
+    <PairingReminderBanner
+      sample
+      invite={null}
+      onInvite={() => {}}
+      onUseCode={() => {}}
+      onResend={async () => {}}
+    />
+  </div>
+);
+
 const PREVIEWS: Record<string, PreviewConfig> = {
   record: {
     icon: Calendar,
@@ -611,6 +631,9 @@ const PREVIEWS: Record<string, PreviewConfig> = {
         <SampleRecordList />
         <div className="mt-4">
           <NotificationCenterSample />
+        </div>
+        <div className="mt-4">
+          <PairingReminderSample />
         </div>
         <div className="mt-4">
           <PairingInviteSample />

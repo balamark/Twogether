@@ -29,13 +29,16 @@ import IntimacyRequestForm from './components/IntimacyRequestForm';
 import NotificationInbox from './components/NotificationInbox';
 import PairingInvitationHandler from './components/PairingInvitationHandler';
 import { PairingInviteShare } from './components/PairingInviteShare';
+import PairingReminderBanner from './components/PairingReminderBanner';
 import AiCompanionOnboarding from './components/AiCompanionPicker';
 import GettingStartedCard from './components/GettingStartedCard';
 import HelpView from './components/HelpView';
 import StoriesView from './components/StoriesView';
 import { resolveCompanion } from './utils/aiCompanions';
 import { apiService, getTokenExpiry, clearAuthStorage } from './services/api';
-import type { CycleRecord, BillingStatus } from './services/api';
+import type { CycleRecord, BillingStatus, PairingInvitationSummary } from './services/api';
+import { buildPairingAcceptLink } from './utils/pairingLink';
+import { pickPendingInvite } from './utils/pairingReminder';
 import { getPrimaryTimezone, formatYmdInTz, browserTz } from './utils/datetime';
 import { parseScript } from './utils/script';
 import { clientLog } from './utils/telemetry';
@@ -63,7 +66,7 @@ const buildPairingInviteState = (
   const token = result?.invitation?.token;
   if (!token) return null;
   return {
-    link: `${window.location.origin}/pairing/accept?token=${encodeURIComponent(token)}`,
+    link: buildPairingAcceptLink(token),
     email,
     emailSent: result?.invitation?.emailSent !== false,
   };
@@ -640,6 +643,9 @@ const LoveTimeApp = () => {
   // The accept link for the invite just sent, so the new user can pass it
   // along over LINE instead of waiting on an email that may be filtered.
   const [pairingPromptInvite, setPairingPromptInvite] = useState<PairingInviteState | null>(null);
+  // Newest still-pending invite this user sent, for the reminder banner. null
+  // means nothing pending (never invited, or every invite expired/answered).
+  const [pendingPairingInvite, setPendingPairingInvite] = useState<PairingInvitationSummary | null>(null);
 
   // Funnel top-of-funnel beacon. Fires once per browser tab session when an
   // unauthenticated visitor reaches the app, so the /admin dashboard can count
@@ -957,6 +963,68 @@ const LoveTimeApp = () => {
       setShowPairingPrompt(false);
     }
   }, [authState.isAuthenticated, authState.partnerConnected, pairingPromptDismissed, needsCompanionPick]);
+
+  // Pending-invite lookup for the reminder banner. Only runs while unpaired —
+  // once paired the banner is gone and the answer stops mattering. A failure
+  // just leaves the banner in its "還沒邀請" state; it must never block the UI.
+  const refreshPendingPairingInvite = useCallback(async () => {
+    if (!authState.isAuthenticated || authState.partnerConnected) {
+      setPendingPairingInvite(null);
+      return;
+    }
+    try {
+      const invitations = await apiService.getMyPairingInvitations();
+      setPendingPairingInvite(pickPendingInvite(invitations));
+    } catch {
+      setPendingPairingInvite(null);
+    }
+  }, [authState.isAuthenticated, authState.partnerConnected]);
+
+  useEffect(() => {
+    refreshPendingPairingInvite();
+  }, [refreshPendingPairingInvite]);
+
+  const handleResendPairingInvite = useCallback(
+    async (token: string) => {
+      try {
+        await apiService.resendPairingInvitation(token);
+        showNotification({
+          type: 'success',
+          title: '邀請已重新寄出',
+          message: '請提醒另一半看一下信箱，也記得看垃圾郵件與促銷分頁。',
+          duration: 6000,
+        });
+      } catch (err) {
+        const e = err as Error & { error_code?: string };
+        // Each failure mode gets its own next step (CLAUDE.md): a mail outage
+        // is a warning with a workaround, a dead invite needs a fresh one.
+        if (e?.error_code === 'EMAIL_NOT_CONFIGURED') {
+          showNotification({
+            type: 'warning',
+            title: '目前無法寄信',
+            message: '寄信服務暫時不可用。請按「傳連結給 TA」複製連結，直接傳給另一半。',
+            duration: 8000,
+          });
+        } else if (e?.error_code === 'INVITATION_NOT_FOUND') {
+          setPendingPairingInvite(null);
+          showNotification({
+            type: 'warning',
+            title: '這個邀請已失效',
+            message: '邀請已被接受、取消或過期。請重新邀請另一半。',
+            duration: 8000,
+          });
+        } else {
+          showNotification({
+            type: 'error',
+            title: '重新寄送失敗',
+            message: e?.message || '請稍後再試，或按「傳連結給 TA」直接把連結傳過去。',
+            duration: 6000,
+          });
+        }
+      }
+    },
+    [showNotification]
+  );
 
   const handlePartnerConnect = async (partnerCode: string) => {
     try {
@@ -2579,6 +2647,9 @@ const LoveTimeApp = () => {
                             const result = await apiService.sendPairingInvitation({ recipientEmail: pairingPromptEmail.trim() });
                             setPairingPromptInvite(buildPairingInviteState(result, pairingPromptEmail.trim()));
                             setPairingPromptSent(true);
+                            // Flip the reminder banner to its 等待中 state
+                            // without needing a reload.
+                            refreshPendingPairingInvite();
                           } catch (err) {
                             showNotification({ type: 'error', title: '發送失敗', message: (err as Error)?.message || '請稍後再試', duration: 6000 });
                           } finally {
@@ -2597,6 +2668,7 @@ const LoveTimeApp = () => {
                       const result = await apiService.sendPairingInvitation({ recipientEmail: pairingPromptEmail.trim() });
                       setPairingPromptInvite(buildPairingInviteState(result, pairingPromptEmail.trim()));
                       setPairingPromptSent(true);
+                      refreshPendingPairingInvite();
                     } catch (err) {
                       showNotification({ type: 'error', title: '發送失敗', message: (err as Error)?.message || '請稍後再試', duration: 6000 });
                     } finally {
@@ -2700,6 +2772,22 @@ const LoveTimeApp = () => {
           <PremiumExpiryBanner
             status={billingStatus}
             onRenew={() => { setUpgradeReason(null); setCurrentView('upgrade'); }}
+          />
+        )}
+
+        {/* Standing 未配對 reminder — non-blocking, snoozes for 7 days. Hidden
+            on 設定 (its own pairing panel lives there) and while the pairing
+            modal is up, so we never stack two asks for the same thing. */}
+        {authState.isAuthenticated && !partnerConnected && currentView !== 'settings' && !showPairingPrompt && !showPairingInvitation && (
+          <PairingReminderBanner
+            invite={pendingPairingInvite}
+            onInvite={() => {
+              localStorage.removeItem('pairingPromptDismissed');
+              setPairingPromptDismissed(false);
+              setShowPairingPrompt(true);
+            }}
+            onUseCode={() => setCurrentView('settings')}
+            onResend={handleResendPairingInvite}
           />
         )}
 
