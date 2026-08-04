@@ -44,6 +44,15 @@ export default defineConfig({
       name: 'Mobile Chrome',
       use: { ...devices['Pixel 5'] },
     },
+    {
+      // The iOS tap-offset class of bug only manifests in WebKit, so the specs
+      // guarding it need a real WebKit run. Running all 40+ specs twice isn't
+      // worth the CI minutes, hence the testMatch — keep this list to the specs
+      // that actually assert mobile-Safari-specific behaviour.
+      name: 'Mobile Safari',
+      use: { ...devices['iPhone 13'] },
+      testMatch: /(wall-media-ui|wall-media-edit-ui|mobile-tap-ergonomics|destructive-action-guards)\.spec\.ts/,
+    },
   ],
 
   globalSetup: './tests/global-setup.ts',

@@ -108,6 +108,7 @@ export default function MarketplaceScriptDetail({
   };
 
   const handleDeleteRating = async () => {
+    if (!window.confirm('確定要刪除你的評分與評論嗎？刪除後無法復原。')) return;
     setSubmitting(true);
     try {
       await apiService.deleteScriptRating(scriptId);

@@ -117,12 +117,16 @@ test.describe('Wall — attach a photo', () => {
     await page.locator('button:has-text("新貼文")').first().click();
     await page.getByTestId('wall-composer-content').fill('今天的約會超棒');
 
-    // Attach a photo via the hidden file input; the preview grid should appear.
-    await page.getByTestId('wall-composer-media-input').setInputFiles({
-      name: 'photo.png',
-      mimeType: 'image/png',
-      buffer: PNG,
-    });
+    // Drive the picker by CLICKING THE REAL BUTTON, not by calling
+    // setInputFiles on the hidden input. setInputFiles bypasses the button
+    // entirely, so it passes even when the button is completely dead — which is
+    // exactly how a broken 新增照片／影片 shipped. waitForEvent('filechooser')
+    // times out unless the click really opened the picker.
+    const [chooser] = await Promise.all([
+      page.waitForEvent('filechooser'),
+      page.getByTestId('wall-composer-media-button').click(),
+    ]);
+    await chooser.setFiles({ name: 'photo.png', mimeType: 'image/png', buffer: PNG });
     await expect(page.getByTestId('wall-composer-media-grid')).toBeVisible({ timeout: 5000 });
 
     // Submit and confirm the new card renders the media as an <img>.
