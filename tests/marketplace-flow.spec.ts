@@ -60,7 +60,9 @@ async function loginIfNeeded(page: Page) {
 
   const closeBtn = page.getByTestId('auth-modal-close-button');
   if (await closeBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-    await closeBtn.click();
+    // The modal auto-closes on a successful login, so it can detach between
+    // the isVisible check and this click — tolerate it already being gone.
+    await closeBtn.click({ timeout: 2000 }).catch(() => {});
   } else {
     await page.keyboard.press('Escape');
   }
