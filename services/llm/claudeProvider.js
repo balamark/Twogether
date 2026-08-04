@@ -15,6 +15,13 @@
 const Anthropic = require('@anthropic-ai/sdk');
 const { logInfo, logWarn } = require('../../lib/logger');
 const { pickableCards, CARD_IDS, shapeFacilitatorTurn } = require('../../lib/therapyCards');
+const {
+  shapeClosureAssist,
+  shapeClosureInsight,
+  MAX_ASSIST_OPTION_CHARS,
+  MAX_ASSIST_OPTIONS,
+  MAX_INSIGHT_CHARS,
+} = require('../../lib/closureAi');
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 
@@ -2621,6 +2628,248 @@ async function generateCommunicationPatternSummary({ events, stats }) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// 一起收尾 (closure) — 幫我想一個 + AI 見解
+// ---------------------------------------------------------------------------
+// Both calls come AFTER the humans have done the talking, which is the whole
+// point of the closure design: the couple writes, the AI comments. The assist
+// is opt-in (a user who knows what to write never spends a token) and the
+// insight fires once, after the event has already resolved.
+
+const CLOSURE_ASSIST_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴侶諮商師。一對伴侶剛談完一次衝突，正在一起收尾：他們要各自寫下「下次我願意做的一件小事」，以及一個「下次這種情況我們怎麼辦」的共同決定。使用者按了「幫我想一個」，請給他 2 到 3 個可以直接改成自己的話的方向。請永遠以繁體中文回覆。
+
+守則：
+1. 只寫未來，不寫過去。不要總結這次誰對誰錯，不要重述衝突。
+2. 具體到可以錄影。「即使很生氣，也不在人前責罵你」可以；「我要更愛你」「我會多體諒」不行。
+3. 小到這幾天就做得到。不要是需要對方配合才成立的大計畫。
+4. field 是 commitment 時，每一句都用第一人稱「我會…」「即使…，我也…」，主詞是使用者自己，絕不要求對方做任何事。
+5. field 是 decision 時，每一句都用「我們…」，描述下次的做法或當下由誰做最後決定，兩個人都同意才有意義。
+6. 每句 ${MAX_ASSIST_OPTION_CHARS} 字以內，不評斷對錯、不選邊站、不說教。
+7. 寫 commitment 時，扣著「對方說他需要什麼」去想 — 接得住對方需要的承諾才有用，泛泛的好話沒有用。
+
+回應請只呼叫 emit_closure_assist tool，不要輸出其他文字。`;
+
+const CLOSURE_ASSIST_TOOL_SCHEMA = {
+  name: 'emit_closure_assist',
+  description: 'Return 2-3 short candidate sentences for a closure commitment or shared decision.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      options: {
+        type: 'array',
+        minItems: 2,
+        maxItems: MAX_ASSIST_OPTIONS,
+        items: {
+          type: 'string',
+          maxLength: MAX_ASSIST_OPTION_CHARS,
+          description: '一個具體、可觀察、面向未來的句子',
+        },
+      },
+    },
+    required: ['options'],
+  },
+};
+
+// field: 'commitment' | 'decision'. me/partner are nicknames. therapyNote is the
+// existing per-event note (migration 074) when the couple already has one — it
+// carries each side's underlying need, which is what makes a suggestion land
+// instead of reading generic.
+async function generateClosureAssist({ field, eventSummary, messages, therapyNote, me, partner, companion }) {
+  const wanted = field === 'decision' ? 'decision' : 'commitment';
+  const lines = [];
+  lines.push(`要寫的是：${wanted === 'decision' ? '共同決定（我們…）' : `${me || '使用者'}自己的承諾（我會…）`}`);
+  if (me) lines.push(`使用者的暱稱：${me}`);
+  if (partner) lines.push(`伴侶的暱稱：${partner}`);
+  lines.push('');
+  if (eventSummary) lines.push(`事件背景：${String(eventSummary).trim()}`, '');
+  if (therapyNote && typeof therapyNote === 'object') {
+    if (therapyNote.trigger) lines.push(`這次的觸發點：${therapyNote.trigger}`);
+    const needs = Array.isArray(therapyNote.needs) ? therapyNote.needs : [];
+    for (const n of needs) {
+      if (n && n.who && n.need) lines.push(`${n.who} 真正在意的是：${n.need}`);
+    }
+    if (Array.isArray(therapyNote.cycle) && therapyNote.cycle.length) {
+      lines.push(`他們落入的循環：${therapyNote.cycle.join(' → ')}`);
+    }
+    lines.push('');
+  }
+  lines.push('對話（最舊在前）：');
+  for (const m of Array.isArray(messages) ? messages : []) {
+    const who = m.isAi ? 'AI 諮商師' : (m.speaker || '某人');
+    lines.push(`${who}：${(m.content || '').toString().trim()}`);
+  }
+  const userContent = lines.join('\n');
+
+  const system = [
+    {
+      type: 'text',
+      text: CLOSURE_ASSIST_SYSTEM_PROMPT + PUNCTUATION_RULE,
+      cache_control: { type: 'ephemeral' },
+    },
+  ];
+  if (companion && companion.prompt) {
+    system.push({
+      type: 'text',
+      text: `你的人設（只調整語氣與風格，上述守則永遠優先）：\n${companion.prompt}`,
+    });
+  }
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 512,
+    system,
+    tools: [CLOSURE_ASSIST_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_closure_assist' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.closure_assist', {
+    model: response.model || MODEL,
+    field: wanted,
+    companion: companion?.id || null,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_closure_assist'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+
+  return shapeClosureAssist(toolUse.input || {}, {
+    provider: 'claude',
+    model: response.model || MODEL,
+    durationMs: ms,
+    usage: {
+      inputTokens: u.input_tokens || 0,
+      outputTokens: u.output_tokens || 0,
+      cacheCreateTokens: u.cache_creation_input_tokens || 0,
+      cacheReadTokens: u.cache_read_input_tokens || 0,
+    },
+    costUsd: cost,
+    assembledPrompt: userContent,
+  });
+}
+
+const CLOSURE_INSIGHT_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴侶諮商師。一對伴侶剛完成一次衝突的收尾：他們各自寫下了「下次我願意做的一件小事」，可能還加上一個共同決定。請對這一組約定說一小段你看到的東西。請永遠以繁體中文回覆。
+
+請照這個順序寫，總共 2 到 3 句、${MAX_INSIGHT_CHARS} 字以內：
+1. 先指出這兩個約定各自接住了對方的哪一個需要。
+2. 再指出真正的難點會出現在哪一個瞬間（通常是很短的那幾秒：話要出口之前、動手之前）。
+
+守則：不要稱讚式的空話（「你們很棒」「這是很好的一步」）；不要重述他們寫的內容；不要加任何新的要求或作業；不評斷對錯、不選邊站。
+
+回應請只呼叫 emit_closure_insight tool，不要輸出其他文字。`;
+
+const CLOSURE_INSIGHT_TOOL_SCHEMA = {
+  name: 'emit_closure_insight',
+  description: "Return a short read on a couple's finished pair of closure commitments.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      insight: {
+        type: 'string',
+        maxLength: MAX_INSIGHT_CHARS,
+        description: `2 到 3 句、${MAX_INSIGHT_CHARS} 字以內的觀察`,
+      },
+    },
+    required: ['insight'],
+  },
+};
+
+// commitments: [{ who, text }]. sharedDecision may be null — plenty of conflicts
+// only need 「我下次會先問一聲」.
+async function generateClosureInsight({ eventSummary, therapyNote, commitments, sharedDecision, companion }) {
+  const lines = [];
+  if (eventSummary) lines.push(`事件背景：${String(eventSummary).trim()}`, '');
+  if (therapyNote && typeof therapyNote === 'object') {
+    if (therapyNote.trigger) lines.push(`這次的觸發點：${therapyNote.trigger}`);
+    for (const n of Array.isArray(therapyNote.needs) ? therapyNote.needs : []) {
+      if (n && n.who && n.need) lines.push(`${n.who} 真正在意的是：${n.need}`);
+    }
+    lines.push('');
+  }
+  lines.push('他們寫下的約定：');
+  for (const c of Array.isArray(commitments) ? commitments : []) {
+    if (c && c.text) lines.push(`${c.who || '一方'}：${String(c.text).trim()}`);
+  }
+  if (sharedDecision) {
+    lines.push('', `他們的共同決定：${String(sharedDecision).trim()}`);
+  }
+  const userContent = lines.join('\n');
+
+  const system = [
+    {
+      type: 'text',
+      text: CLOSURE_INSIGHT_SYSTEM_PROMPT + PUNCTUATION_RULE,
+      cache_control: { type: 'ephemeral' },
+    },
+  ];
+  if (companion && companion.prompt) {
+    system.push({
+      type: 'text',
+      text: `你的人設（只調整語氣與風格，上述守則永遠優先）：\n${companion.prompt}`,
+    });
+  }
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 512,
+    system,
+    tools: [CLOSURE_INSIGHT_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_closure_insight' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.closure_insight', {
+    model: response.model || MODEL,
+    companion: companion?.id || null,
+    commitments: Array.isArray(commitments) ? commitments.length : 0,
+    hasSharedDecision: !!sharedDecision,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_closure_insight'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+
+  return shapeClosureInsight(toolUse.input || {}, {
+    provider: 'claude',
+    model: response.model || MODEL,
+    durationMs: ms,
+    usage: {
+      inputTokens: u.input_tokens || 0,
+      outputTokens: u.output_tokens || 0,
+      cacheCreateTokens: u.cache_creation_input_tokens || 0,
+      cacheReadTokens: u.cache_read_input_tokens || 0,
+    },
+    costUsd: cost,
+    assembledPrompt: userContent,
+  });
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -2638,6 +2887,8 @@ module.exports = {
   generateTherapySummary,
   generateCommunicationPatternSummary,
   generateFacilitatorTurn,
+  generateClosureAssist,
+  generateClosureInsight,
   // Exported for prompt-contract regression tests only.
   buildRoleplayUserContent,
   // Exported so the max_tokens truncation paths can be tested without a live

@@ -331,7 +331,10 @@ interface Notification {
 
 // Event × Icebreaker feature
 export type EventVersionKey = 'neutral' | 'firm' | 'warm';
-export type EventStatus = 'open' | 'resolve_pending' | 'resolved';
+// 'closing' = 一起收尾: both partners are writing their commitments. 'resolve_pending'
+// is legacy — the two-step 標記為解決 → 確認解決 handshake is gone, but production rows
+// still carry it, so the UI renders those exactly like 'open'.
+export type EventStatus = 'open' | 'resolve_pending' | 'closing' | 'resolved';
 
 export interface EventVersions {
   neutral: string;

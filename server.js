@@ -31,6 +31,7 @@ const customScriptsRoutes = require('./routes/custom-scripts');
 const customGiftsRoutes = require('./routes/custom-gifts');
 const wallRoutes = require('./routes/wall');
 const eventRoutes = require('./routes/events');
+const eventClosureRoutes = require('./routes/event-closure');
 const aiCompanionRoutes = require('./routes/ai-companions');
 const aiUsageRoutes = require('./routes/ai-usage');
 const storyRoutes = require('./routes/stories');
@@ -202,6 +203,10 @@ app.use('/api/pairing-requests', pairingRequestRoutes);
 app.use('/api/custom-scripts', customScriptsRoutes);
 app.use('/api/custom-gifts', customGiftsRoutes);
 app.use('/api/wall', wallRoutes);
+// 一起收尾 lives in its own router but shares the /api/events prefix (the
+// closure IS a step of an event). Mounted BEFORE the events router so its
+// /:id/closure/* paths are matched first rather than falling into /:id.
+app.use('/api/events', eventClosureRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/ai-companions', aiCompanionRoutes);
 app.use('/api/ai-usage', aiUsageRoutes);

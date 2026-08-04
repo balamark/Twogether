@@ -31,6 +31,8 @@ module.exports = {
   generateTherapySummary: provider.generateTherapySummary,
   generateCommunicationPatternSummary: provider.generateCommunicationPatternSummary,
   generateFacilitatorTurn: provider.generateFacilitatorTurn,
+  generateClosureAssist: provider.generateClosureAssist,
+  generateClosureInsight: provider.generateClosureInsight,
   analyzeDraft: provider.analyzeDraft,
   providerName: PROVIDER_NAME,
 };

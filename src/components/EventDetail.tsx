@@ -16,6 +16,7 @@ import {
   X,
   Pencil,
   NotebookPen,
+  Sprout,
   Gauge,
   PlayCircle,
 } from 'lucide-react';
@@ -68,13 +69,16 @@ interface EventDetailProps {
 
 function statusPill(status: EventStatus) {
   switch (status) {
+    // 'resolve_pending' is a legacy row from the retired 標記為解決 handshake.
+    // It behaves like 'open' everywhere: same pill, same 一起收尾 bar.
     case 'open':
-      return <span className="text-xs px-2 py-0.5 rounded-full bg-petal-rose/30 text-petal-ink">未解決</span>;
     case 'resolve_pending':
+      return <span className="text-xs px-2 py-0.5 rounded-full bg-petal-rose/30 text-petal-ink">未解決</span>;
+    case 'closing':
       return (
-        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 inline-flex items-center gap-1">
-          <Clock className="w-3 h-3" />
-          等待確認
+        <span className="text-xs px-2 py-0.5 rounded-full bg-petal-sage/20 text-petal-ink inline-flex items-center gap-1">
+          <Sprout className="w-3 h-3" />
+          收尾中
         </span>
       );
     case 'resolved':
