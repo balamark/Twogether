@@ -178,28 +178,62 @@ test.describe('Mobile tap ergonomics', () => {
     await page.getByTestId('wall-composer-templates-toggle').click();
 
     const modal = page.getByTestId('wall-composer-backdrop');
-    const chips = ['想念你', '需要空間', '想被抱抱', '想溝通'].map((t) =>
-      modal.locator('button').filter({ hasText: new RegExp(`^${t}$`) }).first(),
-    );
+    const MOODS = ['想念你', '需要空間', '想被抱抱', '想溝通'];
+
+    // Wait for the chip row to fully settle before measuring: every chip
+    // rendered, then web fonts loaded and two frames painted. A font swap
+    // changes chip widths — which changes how the flex row wraps — so measuring
+    // mid-swap could momentarily read two stacked chips as overlapping. That
+    // (plus the interleaved scrolling below) was the CI flake, not a real
+    // layout bug.
+    for (const t of MOODS) {
+      await expect(
+        modal.locator('button').filter({ hasText: new RegExp(`^${t}$`) }).first(),
+      ).toBeVisible();
+    }
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    });
 
     // Geometry, not activation. `click()` always hits the centre of the box it
     // resolved, so "click a chip, assert that chip selected" can never fail and
     // proves nothing about mis-taps. What actually decides whether an offset
     // finger hits the neighbour is how the boxes are laid out, so assert that:
     // every chip is tall enough, and no two overlap.
-    const boxes = [];
-    for (const chip of chips) {
-      await chip.scrollIntoViewIfNeeded();
-      const box = await chip.boundingBox();
-      expect(box).not.toBeNull();
+    //
+    // Read all four rects in a single layout pass. The earlier version measured
+    // them one at a time with scrollIntoViewIfNeeded() between reads; each
+    // boundingBox() is viewport-relative, so a scroll between two reads shifted
+    // their coordinates and could fabricate an overlap that isn't on screen.
+    const boxes = await modal.evaluate((root, moods) => {
+      const norm = (s: string | null) => (s || '').trim();
+      return moods.map((t) => {
+        const matches = Array.from(root.querySelectorAll('button')).filter(
+          (b) => norm(b.textContent) === t,
+        );
+        // Prefer a laid-out button over a hidden duplicate (e.g. a collapsed
+        // template chip with the same text), so we never measure a 0-size box.
+        const btn =
+          matches.find((b) => {
+            const r = b.getBoundingClientRect();
+            return r.width > 0 && r.height > 0;
+          }) || matches[0];
+        if (!btn) return null;
+        const r = btn.getBoundingClientRect();
+        return { x: r.x, y: r.y, width: r.width, height: r.height };
+      });
+    }, MOODS);
+
+    boxes.forEach((box, i) => {
+      expect(box, `chip ${i} (${MOODS[i]}) not found`).not.toBeNull();
       expect(box!.height).toBeGreaterThanOrEqual(MIN_TARGET_PX);
-      boxes.push(box!);
-    }
+    });
 
     for (let i = 0; i < boxes.length; i++) {
       for (let j = i + 1; j < boxes.length; j++) {
-        const a = boxes[i];
-        const b = boxes[j];
+        const a = boxes[i]!;
+        const b = boxes[j]!;
         const overlapX = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
         const overlapY = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
         expect(
