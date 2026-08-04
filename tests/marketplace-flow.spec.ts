@@ -35,7 +35,7 @@ async function loginIfNeeded(page: Page) {
     localStorage.setItem('pairingPromptDismissed', 'true');
   });
   await page.goto('/');
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(2000);
 
   const loginButton = page.getByTestId('header-auth-button');
@@ -64,7 +64,7 @@ async function loginIfNeeded(page: Page) {
   } else {
     await page.keyboard.press('Escape');
   }
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(2000);
 }
 
@@ -75,7 +75,9 @@ async function gotoRoleplay(page: Page) {
   await page.waitForTimeout(1500);
 }
 
-test.describe('Marketplace — public script sharing + ratings + favorites', () => {
+// Serial: publishing, rating and favoriting all mutate the same shared script
+// state on the server, so these can't safely interleave.
+test.describe.serial('Marketplace — public script sharing + ratings + favorites', () => {
   test.beforeEach(async ({ page }) => {
     await loginIfNeeded(page);
     await gotoRoleplay(page);

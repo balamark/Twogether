@@ -18,8 +18,29 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : undefined,
+  /* Playwright's default is 30s, which several specs quietly outgrew: they
+     drive real sign-up/upload flows against a live server and a cold Vite dev
+     build, so a single `page.reload()` can eat most of the budget. They only
+     stayed green because CI retries twice — locally, with retries off, they
+     fail. Raising the floor makes the suite honest instead of retry-dependent.
+     Specs that need longer still call test.setTimeout() themselves. */
+  timeout: 60 * 1000,
+  expect: {
+    /* Matches the 15s waits several specs already pass explicitly. */
+    timeout: 10 * 1000,
+  },
+  /* One worker everywhere, not just on CI. The DB-backed specs (custom-script,
+     marketplace-flow, roleplay-favorites, user-journey, …) all drive the single
+     shared account global-setup seeds, and several mutate the same script /
+     favorite rows. `fullyParallel` runs different FILES concurrently, so with
+     more than one worker those files corrupt each other's state — which is
+     exactly why marketplace-flow already deletes its scripts in afterEach "to
+     keep the parallel roleplay-favorites suite from flaking".
+
+     Pinning to 1 makes local runs match CI, so a failure locally is a real
+     failure rather than a collision artifact. The proper fix is per-file test
+     accounts; until then, correctness beats wall-clock. */
+  workers: 1,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */

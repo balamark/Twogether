@@ -14,7 +14,7 @@ async function loginIfNeeded(page: Page) {
     localStorage.setItem('roleplayOpen:collection', '1');
   });
   await page.goto('/');
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(2000);
 
   const loginButton = page.getByTestId('header-auth-button');
@@ -43,7 +43,7 @@ async function loginIfNeeded(page: Page) {
   } else {
     await page.keyboard.press('Escape');
   }
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
   await page.waitForTimeout(2000);
 }
 
@@ -51,7 +51,9 @@ async function loginIfNeeded(page: Page) {
 // Used because built-in ids are stable across runs (custom UUIDs are not).
 const KNOWN_SCRIPT_ID = 'fan-idol-backstage';
 
-test.describe('Roleplay favorites — couple-shared 我的最愛劇本', () => {
+// Serial: favorites are couple-shared server state keyed by script id, and both
+// tests toggle the same known script.
+test.describe.serial('Roleplay favorites — couple-shared 我的最愛劇本', () => {
   test.beforeEach(async ({ page }) => {
     await loginIfNeeded(page);
     const roleplayTab = page.getByTestId('nav-tab-roleplay');
@@ -79,7 +81,7 @@ test.describe('Roleplay favorites — couple-shared 我的最愛劇本', () => {
 
     // 3. Reload — favorite persists from the backend, still under 我的最愛.
     await page.reload();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await page.getByTestId('nav-tab-roleplay').click();
     await page.waitForTimeout(1500);
     await page.getByTestId('roleplay-filter-favorites').click();
