@@ -22,13 +22,16 @@ const TEST_SCRIPT = {
 // are only used for read-only content assertions (toasts, headings whose
 // text *is* the contract being verified). See plan: "look-at-recent-commit".
 
-test.describe('Custom Script Upload and Persistence', () => {
+// Serial: these tests upload scripts to the shared test account and then assert
+// on that account's script list, so interleaving them under `fullyParallel`
+// makes one test see another's uploads.
+test.describe.serial('Custom Script Upload and Persistence', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
       localStorage.setItem('pairingPromptDismissed', 'true');
     });
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(2000);
 
     // Handle login if required
@@ -74,7 +77,7 @@ test.describe('Custom Script Upload and Persistence', () => {
       }
       await page.waitForTimeout(1000);
 
-      await page.waitForLoadState('networkidle');
+      await page.waitForLoadState('domcontentloaded');
       await page.waitForTimeout(2000);
     }
   });
@@ -183,7 +186,7 @@ test.describe('Custom Script Upload and Persistence', () => {
 
     // Reload the page
     await page.reload();
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(3000);
 
     // Navigate back to roleplay section
