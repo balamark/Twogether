@@ -230,10 +230,16 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
     }
     const room = WALL_MAX_MEDIA - mediaCount;
     if (room <= 0) {
-      setError(`每則貼文最多只能上傳 ${WALL_MAX_MEDIA} 張照片或影片`);
+      setError(`每則貼文最多 ${WALL_MAX_MEDIA} 個，先移除一個才能再加。`);
       return;
     }
     setError(null);
+    // Taking only what fits used to happen silently — the extra files just
+    // vanished with no explanation. Say which ones didn't make it.
+    if (picked.length > room) {
+      const dropped = picked.slice(room).map((f) => f.name).join('、');
+      setError(`每則貼文最多 ${WALL_MAX_MEDIA} 個，這次只加入了前 ${room} 個。未加入：${dropped}`);
+    }
     setNewMedia((prev) => [...prev, ...picked.slice(0, room)]);
   };
 
@@ -386,9 +392,9 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
               data-testid="wall-composer-media-input"
             />
             <p className="mt-1 font-body text-[11px] text-petal-muted">
-              {atMediaCap
-                ? `已達 ${WALL_MAX_MEDIA} 個上限，先移除一個才能再加。`
-                : `照片每張最大 ${Math.round(IMAGE_MAX_BYTES / (1024 * 1024))}MB、影片最大 ${Math.round(VIDEO_MAX_BYTES / (1024 * 1024))}MB`}
+              {atMediaCap && `已達 ${WALL_MAX_MEDIA} 個上限，先移除一個才能再加。`}
+              {atMediaCap && <br />}
+              {`照片每張最大 ${Math.round(IMAGE_MAX_BYTES / (1024 * 1024))}MB、影片最大 ${Math.round(VIDEO_MAX_BYTES / (1024 * 1024))}MB`}
             </p>
 
             {mediaCount > 0 && (

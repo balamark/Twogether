@@ -527,9 +527,16 @@ router.put(
       // can enforce the per-post cap and the not-entirely-empty rule.
       const keptUrls = normalizeUrlList(req.body.existingMedia);
       if (mediaChanged && keptUrls.length + newFiles.length > WALL_MAX_MEDIA) {
+        logWarn('wall.post.media_limit', {
+          userId,
+          postId,
+          kept: keptUrls.length,
+          added: newFiles.length,
+          blocked: true,
+        });
         return res.status(400).json({
           success: false,
-          message: `每則貼文最多只能上傳 ${WALL_MAX_MEDIA} 張照片或影片`,
+          message: `每則貼文最多 ${WALL_MAX_MEDIA} 個，先移除一個才能再加。`,
           error_code: 'WALL_MEDIA_LIMIT',
         });
       }

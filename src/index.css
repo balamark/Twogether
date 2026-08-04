@@ -40,7 +40,9 @@ body {
    A control that is *already* 16px or larger never triggers the zoom, so
    anything deliberately bigger can opt out with `data-keep-font` rather than
    being clamped down to 16px. */
-@media (max-width: 640px) {
+/* 639.98px, not 640px: Tailwind's `sm:` is min-width 640px, so both would
+   apply at exactly 640. */
+@media (max-width: 639.98px) {
   input:not([type='checkbox']):not([type='radio']):not([type='range']):not([data-keep-font]),
   textarea:not([data-keep-font]),
   select:not([data-keep-font]) {

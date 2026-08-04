@@ -95,6 +95,7 @@ async function stubAuth(page: Page) {
 /** Every visible form control in `root` must be >= 16px, or iOS will zoom. */
 async function expectNoAutoZoomTriggers(root: Locator, label: string) {
   const controls = await root.locator('input, textarea, select').all();
+  let measured = 0;
   for (const control of controls) {
     if (!(await control.isVisible())) continue;
     const [fontSize, describe] = await Promise.all([
@@ -109,7 +110,11 @@ async function expectNoAutoZoomTriggers(root: Locator, label: string) {
       `${label}: ${describe} is ${fontSize}px — under ${MIN_FONT_PX}px iOS Safari ` +
         `auto-zooms on focus, which offsets every tap in this modal`,
     ).toBeGreaterThanOrEqual(MIN_FONT_PX);
+    measured += 1;
   }
+  // Without this the loop is green when it matched nothing — a renamed testid
+  // or a modal that failed to open would report a pass having asserted zero.
+  expect(measured, `${label}: no form controls were measured`).toBeGreaterThan(0);
 }
 
 test.describe('Mobile tap ergonomics', () => {
@@ -130,22 +135,35 @@ test.describe('Mobile tap ergonomics', () => {
     const modal = page.getByTestId('wall-composer-backdrop');
     await expect(modal).toBeVisible();
 
+    // Collapse the templates panel: its cards contain the same mood words as
+    // the chips, so `has-text` would otherwise match a ~100px card instead of
+    // the ~40px chip and the size assertions would measure the wrong element.
+    await page.getByTestId('wall-composer-templates-toggle').click();
+
+    // Open the custom-mood input so it's in the DOM — at text-[13px] it's the
+    // control most at risk from the 16px floor, and it only mounts on demand.
+    await page.getByTestId('wall-composer-custom-mood-add').click();
+    await expect(page.getByTestId('wall-composer-custom-mood-input')).toBeVisible();
+
     await expectNoAutoZoomTriggers(modal, 'wall composer');
 
-    // The controls the user actually reported missing.
-    for (const testid of ['wall-composer-media-button', 'wall-composer-custom-mood-add']) {
-      const box = await page.getByTestId(testid).boundingBox();
-      expect(box, `${testid} has no box`).not.toBeNull();
-      expect(box!.height, `${testid} is only ${box!.height}px tall`).toBeGreaterThanOrEqual(
-        MIN_TARGET_PX,
-      );
-    }
+    // The control the user actually reported missing.
+    const mediaBox = await page.getByTestId('wall-composer-media-button').boundingBox();
+    expect(mediaBox, 'media button has no box').not.toBeNull();
+    expect(
+      mediaBox!.height,
+      `media button is only ${mediaBox!.height}px tall`,
+    ).toBeGreaterThanOrEqual(MIN_TARGET_PX);
 
     // Mood chips sit in a dense row — an offset tap on an undersized chip picks
-    // the neighbour instead.
-    const chip = modal.locator('button:has-text("想念你")').first();
+    // the neighbour instead. Exact-text match so this can't resolve to a
+    // template card or any other ancestor that merely contains the word.
+    const chip = modal.locator('button').filter({ hasText: /^想念你$/ }).first();
+    await expect(chip).toBeVisible();
     const chipBox = await chip.boundingBox();
-    expect(chipBox!.height).toBeGreaterThanOrEqual(MIN_TARGET_PX);
+    expect(chipBox!.height, `mood chip is only ${chipBox!.height}px tall`).toBeGreaterThanOrEqual(
+      MIN_TARGET_PX,
+    );
   });
 
   test('tapping a mood chip selects that chip and not its neighbour', async ({ page }) => {
@@ -159,24 +177,37 @@ test.describe('Mobile tap ergonomics', () => {
     // the bottom of the phone viewport (tap() can't reach what's off-screen).
     await page.getByTestId('wall-composer-templates-toggle').click();
 
-    // Scope to the modal: the wall behind it has demo template cards whose text
-    // also contains these mood words.
     const modal = page.getByTestId('wall-composer-backdrop');
-    const target = modal.locator('button:has-text("想被抱抱")').first();
-    await target.scrollIntoViewIfNeeded();
-    await expect(target).toBeVisible();
-    // click(), not tap(): under mobile emulation Playwright checks tap targets
-    // against the visual viewport and won't follow a scroll inside the modal
-    // panel, so tap() flakes here for reasons that have nothing to do with the
-    // app. The assertion below — that only the intended chip activates — is
-    // what this test is actually for.
-    await target.click();
-
-    // Selected chips flip to the filled ink style; the neighbours must not.
-    await expect(target).toHaveClass(/bg-petal-ink/);
-    await expect(modal.locator('button:has-text("需要空間")').first()).not.toHaveClass(
-      /bg-petal-ink/,
+    const chips = ['想念你', '需要空間', '想被抱抱', '想溝通'].map((t) =>
+      modal.locator('button').filter({ hasText: new RegExp(`^${t}$`) }).first(),
     );
+
+    // Geometry, not activation. `click()` always hits the centre of the box it
+    // resolved, so "click a chip, assert that chip selected" can never fail and
+    // proves nothing about mis-taps. What actually decides whether an offset
+    // finger hits the neighbour is how the boxes are laid out, so assert that:
+    // every chip is tall enough, and no two overlap.
+    const boxes = [];
+    for (const chip of chips) {
+      await chip.scrollIntoViewIfNeeded();
+      const box = await chip.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.height).toBeGreaterThanOrEqual(MIN_TARGET_PX);
+      boxes.push(box!);
+    }
+
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const a = boxes[i];
+        const b = boxes[j];
+        const overlapX = Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x);
+        const overlapY = Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y);
+        expect(
+          overlapX > 0 && overlapY > 0,
+          `chips ${i} and ${j} overlap — an offset tap would be ambiguous`,
+        ).toBe(false);
+      }
+    }
   });
 
   test('the scrolling panel is not the fixed layer itself', async ({ page }) => {
@@ -187,11 +218,25 @@ test.describe('Mobile tap ergonomics', () => {
     await page.locator('button:has-text("新貼文")').first().click();
 
     // A `position: fixed` element that scrolls its own content is the shape iOS
-    // mis-hit-tests. The backdrop must stay unscrollable; an inner panel scrolls.
-    const backdropOverflow = await page
-      .getByTestId('wall-composer-backdrop')
-      .evaluate((n) => getComputedStyle(n).overflowY);
-    expect(backdropOverflow).not.toBe('auto');
-    expect(backdropOverflow).not.toBe('scroll');
+    // mis-hit-tests. Assert the whole shape, not just the absence of overflow:
+    // a "fix" that dropped `position: fixed`, or that removed the panel's
+    // max-height (making long posts unreachable), would pass a negative-only
+    // check while being a worse bug.
+    const shape = await page.getByTestId('wall-composer-backdrop').evaluate((backdrop) => {
+      const panel = backdrop.firstElementChild as HTMLElement;
+      const b = getComputedStyle(backdrop);
+      const p = getComputedStyle(panel);
+      return {
+        backdropPosition: b.position,
+        backdropOverflowY: b.overflowY,
+        panelOverflowY: p.overflowY,
+        panelMaxHeight: p.maxHeight,
+      };
+    });
+
+    expect(shape.backdropPosition).toBe('fixed');
+    expect(['auto', 'scroll']).not.toContain(shape.backdropOverflowY);
+    expect(shape.panelOverflowY).toBe('auto');
+    expect(shape.panelMaxHeight).not.toBe('none');
   });
 });

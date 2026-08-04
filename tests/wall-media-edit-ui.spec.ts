@@ -168,6 +168,10 @@ test.describe('Wall — editing a post with media', () => {
     expect(sent.contentType).toContain('multipart/form-data');
     expect(sent.body).toContain('existingMedia');
     expect(sent.body).toContain('extra.png');
+    // The kept photo must actually survive. Without this, a regression that
+    // sends `existingMedia: []` — silently wiping every existing photo on edit,
+    // the worst realistic failure here — would still pass.
+    expect(sent.body).toContain('reunion-love.png');
   });
 
   test('removing an existing photo drops it from the kept list', async ({ page }) => {
@@ -186,8 +190,10 @@ test.describe('Wall — editing a post with media', () => {
 
     const sent = captured[captured.length - 1];
     expect(sent.body).toContain('existingMedia');
-    // The removed one must not survive into the kept list.
+    // The removed one must not survive into the kept list…
     expect(sent.body).not.toContain('reunion-love.png');
+    // …and the other one must, or "removes everything" would pass this too.
+    expect(sent.body).toContain('first-date.png');
   });
 
   test('at the 4-item cap the button is disabled and says why', async ({ page }) => {

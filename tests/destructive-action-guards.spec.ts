@@ -153,7 +153,12 @@ test.describe('Destructive actions survive a slightly-off tap', () => {
     await page.locator('[aria-label="刪除"]').first().click();
 
     expect(asked, 'delete fired without asking').toContain('刪除');
-    expect(calls.filter((c) => c.method === 'DELETE')).toHaveLength(0);
+    // Give a would-be DELETE time to actually reach the route handler — reading
+    // the array the instant click() returns would pass even if the guard were
+    // removed.
+    await expect
+      .poll(() => calls.filter((c) => c.method === 'DELETE').length, { timeout: 3000 })
+      .toBe(0);
     await expect(page.locator('text=一則不該被誤刪的貼文')).toBeVisible();
   });
 
@@ -170,8 +175,13 @@ test.describe('Destructive actions survive a slightly-off tap', () => {
 
     await page.getByTestId(`wall-privacy-toggle-${POST_ID}`).click();
 
-    // Private → shared is a one-way disclosure and must be confirmed.
-    expect(asked, 'privacy flipped without asking').not.toBe('');
-    expect(calls.filter((c) => c.method === 'PUT' || c.method === 'PATCH')).toHaveLength(0);
+    // Private → shared is a one-way disclosure and must be confirmed. Assert the
+    // real message, not merely that *some* dialog appeared.
+    expect(asked, 'privacy flipped without asking').toContain('分享給TA');
+    await expect
+      .poll(() => calls.filter((c) => c.method === 'PUT' || c.method === 'PATCH').length, {
+        timeout: 3000,
+      })
+      .toBe(0);
   });
 });

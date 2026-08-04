@@ -256,9 +256,11 @@ const CalendarView = ({
 
   const handleDeletePeriod = async () => {
     if (!periodDayRecord) return;
-    // Sits directly beside 關閉 in a two-up row — an off-target tap shouldn't
-    // silently drop the record.
-    if (!window.confirm('確定要取消這次月經紀錄嗎？刪除後無法復原。')) return;
+    // No confirm() here on purpose: the modal this button lives in already IS
+    // the confirmation step (it shows the record and asks 「標記錯了嗎？」), and
+    // a native dialog stacked on a fixed overlay would be a second blocking
+    // modal. The off-target-tap risk is handled by sizing instead — see the
+    // button row below.
     setDeletingPeriod(true);
     try {
       await apiService.deleteCycleRecord(periodDayRecord.id);
@@ -798,11 +800,14 @@ const CalendarView = ({
                 標記錯了嗎？可以取消這次的月經紀錄。
               </p>
 
-              <div className="flex space-x-3 mt-6 pt-4 border-t border-petal-rule">
+              {/* 關閉 is the safe default and gets the wider share; the
+                  destructive one is separated so an off-target tap on a phone
+                  lands on nothing rather than on 取消這次月經. */}
+              <div className="flex gap-4 mt-6 pt-4 border-t border-petal-rule">
                 <button
                   onClick={() => { setPeriodDayRecord(null); setPeriodDayDate(null); }}
                   data-testid="period-day-dismiss-button"
-                  className="flex-1 px-4 py-3 border border-petal-rule text-petal-ink rounded-md hover:bg-petal-cream-2 transition-colors font-body text-sm"
+                  className="flex-[2] px-4 py-3 min-h-[44px] border border-petal-rule text-petal-ink rounded-md hover:bg-petal-cream-2 transition-colors font-body text-sm"
                 >
                   關閉
                 </button>
@@ -810,7 +815,7 @@ const CalendarView = ({
                   onClick={handleDeletePeriod}
                   disabled={deletingPeriod}
                   data-testid="period-day-delete-button"
-                  className="flex-1 px-4 py-3 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-display italic text-base disabled:opacity-60"
+                  className="flex-1 px-4 py-3 min-h-[44px] bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-display italic text-base disabled:opacity-60"
                 >
                   {deletingPeriod ? '移除中…' : '取消這次月經'}
                 </button>

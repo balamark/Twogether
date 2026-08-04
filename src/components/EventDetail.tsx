@@ -698,8 +698,9 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   };
 
   const handleResolveConfirm = async () => {
-    // This is the one-way door: confirming closes the event for both people.
-    if (!window.confirm('確定要把這個事件標記為已解決嗎？\n\n雙方都同意之後就會結案。')) return;
+    // This is the one-way door: the partner already asked, so this click IS the
+    // second agreement and closes the event immediately.
+    if (!window.confirm('確定要把這個事件標記為已解決嗎？\n\n確認後就會結案。')) return;
     setResolving(true);
     try {
       await apiService.confirmEventResolve(eventId);
