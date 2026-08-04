@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { supportEmail as SUPPORT_EMAIL } from '../lib/supportContact.json';
 
 // P0 onboarding surfaces (docs/UX_PLAYBOOK.md): getting-started checklist,
 // solo-mode gate for unpaired users, help view, and the events empty-state CTA.
@@ -223,6 +224,10 @@ test.describe('UX onboarding surfaces', () => {
     await expect(page.getByTestId('help-view')).toBeVisible({ timeout: 10000 });
     await page.getByTestId('help-section-events').click();
     await expect(page.getByTestId('help-view')).toContainText('我寫的原始內容對方會看到嗎');
+
+    // Payment/refund questions need a human, not a FAQ entry — the official
+    // support mailbox has to be reachable from here.
+    await expect(page.getByTestId('help-support-email')).toContainText(SUPPORT_EMAIL);
   });
 
   test('empty events list offers a compose CTA that opens the flow', async ({ page }) => {

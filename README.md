@@ -1181,4 +1181,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Support
 
-For support, email support@twogether.app or create an issue in this repository.
+For support, email support@twogether.fun or create an issue in this repository.
+(The address lives in `lib/supportContact.json` — change it there, not here or in
+`public/pricing.html`.)

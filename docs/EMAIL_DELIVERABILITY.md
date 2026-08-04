@@ -124,10 +124,15 @@ dig MX twogether.fun +short     # 沒有輸出 = 收不到信
 GoDaddy 後台就有轉寄功能（部分方案要另外付費，看你的網域方案含不含）。
 設定 `support@twogether.fun` → 你的 Gmail 即可，DNS 由 GoDaddy 自動處理。
 
-### 選項 C：暫時先用你的個人信箱
+### 選項 C：暫時先用你的個人信箱（不建議）
 
 `EMAIL_REPLY_TO` 直接填你的 Gmail。立刻可用、不會退信，代價是你的私人地址會
 出現在每封交易信的 `Reply-To` 標頭上。
+
+`support@twogether.fun` 現在是**對外公告**的官方客服信箱（公開在 `/pricing`
+的交易條件頁，以及 App 內的「使用說明」「意見回饋」，來源
+`lib/supportContact.json`），所以請優先做選項 A 或 B 讓它真的收得到信，
+別讓公告地址和 `Reply-To` 各指一邊。
 
 > 注意：配對邀請信不受這個設定影響 — 它的 `Reply-To` 一律是**邀請人本人**的
 > 地址，所以伴侶按回覆是回給邀請他的人，不是回給你。

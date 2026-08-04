@@ -384,7 +384,10 @@
           <div class="note">
             <strong>客服聯絡方式</strong><br />
             如對方案內容、付款或退費有任何疑問，歡迎來信，我們將儘速回覆。<br />
-            Email：<a href="mailto:wangmark510@gmail.com">wangmark510@gmail.com</a><br />
+            <!-- The support-email placeholder below is substituted by server.js
+                 when this page is served; the address itself lives in
+                 lib/supportContact.json. Don't hardcode it here. -->
+            Email：<a href="mailto:{{SUPPORT_EMAIL}}">{{SUPPORT_EMAIL}}</a><br />
             服務名稱：Twogether（情侶親密追蹤應用）
           </div>
         </div>
