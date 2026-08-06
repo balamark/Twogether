@@ -37,6 +37,7 @@ import { COMMUNICATION_PRINCIPLES } from '../content/communicationPrinciples';
 import { trackAction } from '../utils/track';
 import { PairingInviteShare } from './PairingInviteShare';
 import PairingReminderBanner from './PairingReminderBanner';
+import { ReceiptDocument } from './PurchaseReceipts';
 
 interface PreviewScript {
   id: string;
@@ -567,6 +568,27 @@ const PRICING_PLANS: { days: number; amount: number; perDay: string; featured?: 
   { days: 365, amount: 790, perDay: '約每天 NT$2.2' },
 ];
 
+// Every payment issues a numbered electronic receipt (lib/receipts.js). The
+// showroom previews the actual document so visitors can see what they'd get for
+// expense claims before signing up. Static sample — no auth'd fetch.
+const SAMPLE_RECEIPT = {
+  receiptNo: 'TG-20260801-A1B2C3',
+  itemLabel: 'Twogether Premium 90 天',
+  amount: 240,
+  currency: 'TWD',
+  provider: 'newebpay' as const,
+  tradeNo: '26080110134567',
+  invoiceNo: null,
+  buyerEmail: 'sample@twogether.fun',
+  buyerName: '範例使用者',
+  buyerTitle: null,
+  buyerTaxId: null,
+  issuedAt: '2026-08-01T10:13:00+08:00',
+  sellerName: 'Twogether（個人賣家）',
+  sellerTaxId: null,
+  sellerContact: 'support@twogether.fun',
+};
+
 const PRICING_PERKS = [
   '每日 AI 整理／改寫次數大幅提升',
   '無限建立自訂角色扮演劇本',
@@ -1056,6 +1078,20 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scr
               </li>
             ))}
           </ul>
+        </div>
+
+        {/* Receipt sample: what every paid transaction produces. */}
+        <div className="mb-8" data-testid="pricing-receipt-sample">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-body text-xs text-petal-muted">每筆付款都會開立電子收據</span>
+            <SampleTag />
+          </div>
+          <div className="rounded-md border border-petal-rule bg-petal-cream overflow-hidden">
+            <ReceiptDocument receipt={SAMPLE_RECEIPT} />
+          </div>
+          <p className="mt-2 font-body text-xs text-petal-muted text-center">
+            收據會寄到你的信箱，也能在 App 內「購買紀錄與收據」隨時查看、列印報帳。
+          </p>
         </div>
 
         <SignUpCta onSignUp={onSignUp} />

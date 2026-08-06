@@ -1191,7 +1191,7 @@ class EmailService {
   }
 
   // Purchase receipt after a successful Premium payment. Sent to the buyer.
-  async sendPaymentReceiptEmail({ recipientEmail, nickname, planLabel, amountTwd, days, orderNo, paidAt, expiresAt }) {
+  async sendPaymentReceiptEmail({ recipientEmail, nickname, planLabel, amountTwd, days, orderNo, receiptNo, receiptTitle, receiptTaxId, paidAt, expiresAt }) {
     if (!this.isConfigured()) {
       logWarn('Email service not configured; skipping receipt email', { kind: 'payment_receipt' });
       return;
@@ -1203,11 +1203,17 @@ class EmailService {
       try { return new Date(d).toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' }); }
       catch { return String(d ?? ''); }
     };
+    // 收據編號 is the buyer's purchase document number (lib/receipts.js). It
+    // leads the table because that's what they'd quote when claiming expenses
+    // or contacting support; 抬頭/統編 only appear when they asked for them.
     const rows = [
+      ...(receiptNo ? [['收據編號', this._escape(receiptNo)]] : []),
       ['方案', this._escape(planLabel || 'Premium')],
       ['天數', `${days} 天`],
       ['金額', `NT$ ${amountTwd}`],
       ['訂單編號', this._escape(orderNo || '')],
+      ...(receiptTitle ? [['收據抬頭', this._escape(receiptTitle)]] : []),
+      ...(receiptTaxId ? [['統一編號', this._escape(receiptTaxId)]] : []),
       ['付款時間', fmtDate(paidAt || Date.now())],
       ['有效期限至', fmtDate(expiresAt)],
     ].map(([k, v]) => `
@@ -1222,6 +1228,10 @@ class EmailService {
         ${rows}
       </table>
       <p style="color:#636e72;font-size:14px;">Premium 為情侶共用，你的伴侶也會一起享有。如需協助請回覆 support 信箱。</p>
+      <p style="color:#8a7e72;font-size:12px;line-height:1.6;">
+        本信件即為本次交易的電子收據，可於 App 內「升級 Premium → 購買紀錄與收據」隨時查看與列印。
+        本服務目前由個人賣家經營，尚未辦理稅籍登記，故不開立統一發票；完成登記後將改以電子發票開立。
+      </p>
     `;
     const html = this._activityEmailHtml({
       headerEmoji: '🧾',
@@ -1235,13 +1245,18 @@ class EmailService {
     const text = [
       `${nickname || '你好'}，感謝你升級 Twogether Premium！`,
       '',
+      ...(receiptNo ? [`收據編號：${receiptNo}`] : []),
       `方案：${planLabel || 'Premium'}（${days} 天）`,
       `金額：NT$ ${amountTwd}`,
       `訂單編號：${orderNo || ''}`,
+      ...(receiptTitle ? [`收據抬頭：${receiptTitle}`] : []),
+      ...(receiptTaxId ? [`統一編號：${receiptTaxId}`] : []),
       `付款時間：${fmtDate(paidAt || Date.now())}`,
       `有效期限至：${fmtDate(expiresAt)}`,
       '',
       'Premium 為情侶共用，你的伴侶也會一起享有。',
+      '本信件即為本次交易的電子收據，也可於 App 內「升級 Premium → 購買紀錄與收據」查看與列印。',
+      '本服務目前由個人賣家經營，尚未辦理稅籍登記，故不開立統一發票。',
       '— Twogether',
     ].join('\n');
 

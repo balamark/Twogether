@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Sparkles, Check, Crown, Ticket } from 'lucide-react';
+import { Sparkles, Check, Crown, Ticket, ChevronDown } from 'lucide-react';
 import { apiService, type BillingStatus, type BillingPlan, type PaymentProvider } from '../services/api';
 import PaymentMethodPicker from './PaymentMethodPicker';
+import PurchaseReceipts from './PurchaseReceipts';
 
 type Notify = (n: { type: 'success' | 'error' | 'info' | 'warning'; title: string; message: string; duration?: number }) => void;
 
@@ -39,6 +40,11 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
   const [provider, setProvider] = useState<PaymentProvider>('ecpay');
   const [couponCode, setCouponCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
+  // Optional receipt details (報帳用). Collapsed by default — most buyers don't
+  // need a 抬頭/統編, and the receipt issues fine without them.
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [receiptTitle, setReceiptTitle] = useState('');
+  const [receiptTaxId, setReceiptTaxId] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -64,10 +70,24 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
       showNotification?.({ type: 'info', title: '尚未配對', message: '完成情侶配對後即可升級 Premium', duration: 5000 });
       return;
     }
+    // Catch the bad 統編 here rather than letting the gateway redirect happen
+    // and the buyer discover it on a receipt they can't use.
+    const taxId = receiptTaxId.trim();
+    if (taxId && !/^\d{8}$/.test(taxId)) {
+      showNotification?.({
+        type: 'warning',
+        title: '統一編號格式有誤',
+        message: '統一編號需為 8 位數字。若不需要抬頭或統編，留空即可繼續付款。',
+        duration: 6000,
+      });
+      setReceiptOpen(true);
+      return;
+    }
+
     setCheckoutPlan(plan);
     try {
       // On success the browser navigates to the gateway and this view unmounts.
-      await apiService.startCheckout(plan, provider);
+      await apiService.startCheckout(plan, provider, { title: receiptTitle, taxId });
     } catch (err) {
       setCheckoutPlan(null);
       showNotification?.({ type: 'error', title: '無法付款', message: (err as Error)?.message || '請稍後再試', duration: 6000 });
@@ -170,6 +190,58 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
         <PaymentMethodPicker value={provider} onChange={setProvider} disabled={checkoutPlan !== null} />
       </div>
 
+      {/* Optional receipt details.付款完成後每筆交易都會開立電子收據，這裡只是
+          讓需要報帳的人加上抬頭／統編。 */}
+      <div className="mb-6">
+        <button
+          type="button"
+          onClick={() => setReceiptOpen((v) => !v)}
+          data-testid="receipt-details-toggle"
+          className="flex items-center gap-1.5 font-body text-xs text-petal-muted hover:text-petal-ink transition-colors"
+        >
+          <ChevronDown
+            className={`w-3.5 h-3.5 transition-transform ${receiptOpen ? 'rotate-180' : ''}`}
+            strokeWidth={1.5}
+          />
+          需要收據抬頭或統一編號？（報帳用，可留空）
+        </button>
+
+        {receiptOpen && (
+          <div className="mt-3 rounded-md border border-petal-rule bg-petal-cream p-4 space-y-3" data-testid="receipt-details">
+            <p className="font-body text-xs text-petal-muted leading-relaxed">
+              付款完成後會自動開立電子收據並寄到你的信箱，收據也會列在下方的購買紀錄裡。
+              本服務目前為個人賣家，尚未辦理稅籍登記，因此不開立統一發票。
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="font-body text-xs text-petal-ink-soft">收據抬頭</span>
+                <input
+                  type="text"
+                  value={receiptTitle}
+                  onChange={(e) => setReceiptTitle(e.target.value)}
+                  maxLength={100}
+                  placeholder="例：王小明 或 某某有限公司"
+                  data-testid="receipt-title-input"
+                  className="mt-1 w-full px-3 py-2 border border-petal-rule rounded-md focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink bg-white"
+                />
+              </label>
+              <label className="block">
+                <span className="font-body text-xs text-petal-ink-soft">統一編號</span>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={receiptTaxId}
+                  onChange={(e) => setReceiptTaxId(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                  placeholder="8 位數字"
+                  data-testid="receipt-tax-id-input"
+                  className="mt-1 w-full px-3 py-2 border border-petal-rule rounded-md focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink bg-white tracking-wider"
+                />
+              </label>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Plans */}
       {loading ? (
         <div className="text-center py-10 font-body text-sm text-petal-muted">載入中…</div>
@@ -245,9 +317,24 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
         </div>
       </div>
 
+      {/* Purchase history + the electronic receipt issued for each payment. */}
+      <div className="mt-4">
+        <PurchaseReceipts showNotification={showNotification} />
+      </div>
+
       <p className="mt-6 text-center font-body text-xs text-petal-muted flex items-center justify-center space-x-1.5">
         <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
         <span>支援信用卡、LINE Pay、ATM 與超商 · 由綠界 ECPay 或藍新金流安全付款 · 一次性購買，不自動續約</span>
+      </p>
+      <p className="mt-2 text-center font-body text-xs text-petal-muted">
+        每筆付款都會開立電子收據並寄到你的信箱 ·{' '}
+        <a
+          href="/pricing"
+          className="text-pink-600 hover:text-pink-700 underline underline-offset-2"
+          data-testid="upgrade-policy-link"
+        >
+          交易條件、退費與收據說明
+        </a>
       </p>
     </div>
   );

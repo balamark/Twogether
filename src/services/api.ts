@@ -905,6 +905,49 @@ export interface BillingStatus {
 // Which Taiwanese payment gateway to route a checkout through.
 export type PaymentProvider = 'ecpay' | 'newebpay';
 
+// Optional buyer details printed on the electronic receipt (報帳用). Both are
+// free-form opt-ins — most buyers leave them blank.
+export interface ReceiptDetails {
+  title?: string;   // 收據抬頭
+  taxId?: string;   // 統一編號 (8 digits)
+}
+
+// A paid transaction in "我的購買紀錄" — Premium passes and paid therapist
+// sessions share this shape.
+export interface PaymentOrderRecord {
+  orderNo: string;
+  source: 'premium' | 'session';
+  itemLabel: string;
+  amount: number;
+  status: 'pending' | 'paid' | 'failed' | string;
+  provider: PaymentProvider | null;
+  paymentMethod: string | null;
+  createdAt: string;
+  paidAt: string | null;
+  receiptNo: string | null;
+  receiptIssuedAt: string | null;
+  invoiceNo: string | null;
+}
+
+// The issued electronic receipt document itself (lib/receipts.js).
+export interface PaymentReceipt {
+  receiptNo: string;
+  itemLabel: string;
+  amount: number;
+  currency: string;
+  provider: PaymentProvider | null;
+  tradeNo: string | null;
+  invoiceNo: string | null;
+  buyerEmail: string | null;
+  buyerName: string | null;
+  buyerTitle: string | null;
+  buyerTaxId: string | null;
+  issuedAt: string;
+  sellerName: string;
+  sellerTaxId: string | null;
+  sellerContact: string;
+}
+
 // Builds a hidden form and POSTs it to the gateway's hosted checkout — a
 // full-page navigation, exactly how both ECPay and NewebPay expect the redirect.
 export const submitGatewayForm = (actionUrl: string, params: Record<string, string>): void => {
@@ -4084,9 +4127,20 @@ class ApiService {
   // Creates an order and redirects the browser to the chosen gateway's hosted
   // checkout (ECPay or NewebPay). Resolves only if the redirect could not be
   // initiated (otherwise the page navigates away).
-  async startCheckout(plan: BillingPlan['id'], provider: PaymentProvider = 'ecpay'): Promise<void> {
+  async startCheckout(
+    plan: BillingPlan['id'],
+    provider: PaymentProvider = 'ecpay',
+    receipt?: ReceiptDetails
+  ): Promise<void> {
     try {
-      const response = await apiClient.post('/billing/checkout', { plan, provider });
+      const response = await apiClient.post('/billing/checkout', {
+        plan,
+        provider,
+        // Omitted entirely when blank so the backend's optional validators
+        // don't see empty strings.
+        ...(receipt?.title?.trim() ? { receipt_title: receipt.title.trim() } : {}),
+        ...(receipt?.taxId?.trim() ? { receipt_tax_id: receipt.taxId.trim() } : {}),
+      });
       const { action_url, params } = response.data || {};
       if (!action_url || !params) {
         throw new Error('付款資料異常，請稍後再試');
@@ -4095,6 +4149,61 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to start checkout:', error);
       this.throwApiError(error, '無法建立付款，請稍後再試');
+    }
+  }
+
+  // The signed-in user's own paid orders (Premium passes + therapist sessions)
+  // and the electronic receipt issued for each.
+  async getBillingOrders(): Promise<PaymentOrderRecord[]> {
+    try {
+      const response = await apiClient.get('/billing/orders');
+      const rows = Array.isArray(response.data?.orders) ? response.data.orders : [];
+      return rows.map((o: Record<string, unknown>) => ({
+        orderNo: String(o.order_no ?? ''),
+        source: o.source === 'session' ? 'session' : 'premium',
+        itemLabel: String(o.item_label ?? ''),
+        amount: Number(o.amount) || 0,
+        status: String(o.status ?? ''),
+        provider: (o.provider as PaymentProvider) ?? null,
+        paymentMethod: (o.payment_method as string) ?? null,
+        createdAt: String(o.created_at ?? ''),
+        paidAt: (o.paid_at as string) ?? null,
+        receiptNo: (o.receipt_no as string) ?? null,
+        receiptIssuedAt: (o.receipt_issued_at as string) ?? null,
+        invoiceNo: (o.invoice_no as string) ?? null,
+      }));
+    } catch (error: unknown) {
+      console.error('Failed to fetch billing orders:', error);
+      this.throwApiError(error, '無法取得購買紀錄，請稍後再試');
+    }
+  }
+
+  // One issued receipt, for the printable view. Throws with error_code
+  // RECEIPT_NOT_FOUND when the number doesn't belong to this buyer.
+  async getReceipt(receiptNo: string): Promise<PaymentReceipt> {
+    try {
+      const response = await apiClient.get(`/billing/receipts/${encodeURIComponent(receiptNo)}`);
+      const r = response.data?.receipt || {};
+      return {
+        receiptNo: String(r.receipt_no ?? ''),
+        itemLabel: String(r.item_label ?? ''),
+        amount: Number(r.amount) || 0,
+        currency: String(r.currency ?? 'TWD'),
+        provider: (r.provider as PaymentProvider) ?? null,
+        tradeNo: r.trade_no ?? null,
+        invoiceNo: r.invoice_no ?? null,
+        buyerEmail: r.buyer_email ?? null,
+        buyerName: r.buyer_name ?? null,
+        buyerTitle: r.buyer_title ?? null,
+        buyerTaxId: r.buyer_tax_id ?? null,
+        issuedAt: String(r.issued_at ?? ''),
+        sellerName: String(r.seller_name ?? 'Twogether'),
+        sellerTaxId: r.seller_tax_id ?? null,
+        sellerContact: String(r.seller_contact ?? ''),
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch receipt:', error);
+      this.throwApiError(error, '無法取得收據，請稍後再試');
     }
   }
 

@@ -23,6 +23,7 @@ const { uploadToSupabase } = require('../lib/supabase-storage');
 const emailService = require('../services/emailService');
 const ecpay = require('../lib/ecpay');
 const newebpay = require('../lib/newebpay');
+const receipts = require('../lib/receipts');
 const qaPool = require('../lib/qaPool');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 // Reusable read/write helpers for a dedicated therapist's view of a couple's
@@ -2108,6 +2109,28 @@ router.post('/consultations/:id/pay', authenticateToken, async (req, res) => {
 // signature, matched the order, confirmed it isn't already paid, and confirmed
 // the amount. gatewayTradeNo = the gateway's own trade id.
 async function markSessionPaid(order, { gatewayTradeNo, paymentMethod, rawPayload }) {
+  // Buyer + product snapshot for the receipt document. Read outside the
+  // transaction so a slow lookup never holds the gateway's ack open; a missing
+  // row just leaves those fields NULL on the receipt.
+  let buyer = { email: null, nickname: null };
+  let therapistName = '';
+  try {
+    const info = await db.query(
+      `SELECT u.email, u.nickname, t.display_name
+         FROM session_payment_orders o
+         LEFT JOIN users u ON u.id = o.payer_id
+         LEFT JOIN therapists t ON t.id = o.therapist_id
+        WHERE o.id = $1`,
+      [order.id]
+    );
+    if (info.rows[0]) {
+      buyer = { email: info.rows[0].email, nickname: info.rows[0].nickname };
+      therapistName = info.rows[0].display_name || '';
+    }
+  } catch (err) {
+    logWarn('session.receipt.buyer_lookup_failed', { merchantTradeNo: order.merchant_trade_no, err: err.message });
+  }
+
   await db.transaction(async (client) => {
     await client.query(`
       UPDATE session_payment_orders
@@ -2120,6 +2143,21 @@ async function markSessionPaid(order, { gatewayTradeNo, paymentMethod, rawPayloa
              price_twd = $2, fee_rate = $3, platform_fee_twd = $4, therapist_net_twd = $5
        WHERE id = $1
     `, [order.consultation_id, order.amount, order.fee_rate, order.platform_fee, order.therapist_net]);
+
+    // Every paid transaction gets a numbered electronic receipt, same as the
+    // Premium passes — issued in the same transaction as the paid flag so the
+    // two can't diverge. See lib/receipts.js and docs/PAYMENT_MODEL.zh-TW.md.
+    await receipts.issueReceipt(client, {
+      source: 'session',
+      orderId: order.id,
+      userId: order.payer_id,
+      buyerEmail: buyer.email,
+      buyerName: buyer.nickname,
+      itemLabel: therapistName ? `視訊諮商 — ${therapistName}` : '視訊諮商預約',
+      amount: order.amount,
+      provider: order.provider,
+      tradeNo: gatewayTradeNo || null,
+    });
   });
   logInfo('session.callback.paid', {
     merchantTradeNo: order.merchant_trade_no,

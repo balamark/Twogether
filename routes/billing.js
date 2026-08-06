@@ -6,6 +6,7 @@ const { authenticateToken } = require('../middleware/auth');
 const { getCoupleIdForUser, getCoupleTier, getActiveExpiry } = require('../lib/entitlements');
 const ecpay = require('../lib/ecpay');
 const newebpay = require('../lib/newebpay');
+const receipts = require('../lib/receipts');
 const emailService = require('../services/emailService');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 
@@ -56,6 +57,85 @@ router.get('/status', authenticateToken, async (req, res) => {
   } catch (err) {
     logError('Billing status failed', { err: err.message, stack: err.stack });
     res.status(500).json({ success: false, message: '無法取得訂閱狀態' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// The signed-in user's own purchase history + the electronic receipt issued for
+// each paid order. Covers BOTH money flows (Premium passes and paid therapist
+// video sessions) so "我的購買紀錄" is one list, not two.
+//
+// Scoped to the buyer, not the couple: a receipt can carry the buyer's 抬頭 /
+// 統一編號, which is their data to share, not their partner's to read.
+// ---------------------------------------------------------------------------
+router.get('/orders', authenticateToken, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT o.merchant_trade_no, o.amount, o.status, o.provider, o.payment_method,
+              o.created_at, o.paid_at, 'premium' AS source, o.plan AS item_key,
+              r.receipt_no, r.issued_at AS receipt_issued_at, r.invoice_no
+         FROM payment_orders o
+         LEFT JOIN payment_receipts r ON r.source = 'premium' AND r.order_id = o.id
+        WHERE o.created_by = $1
+        UNION ALL
+       SELECT s.merchant_trade_no, s.amount, s.status, s.provider, s.payment_method,
+              s.created_at, s.paid_at, 'session' AS source, NULL AS item_key,
+              r.receipt_no, r.issued_at AS receipt_issued_at, r.invoice_no
+         FROM session_payment_orders s
+         LEFT JOIN payment_receipts r ON r.source = 'session' AND r.order_id = s.id
+        WHERE s.payer_id = $1
+        ORDER BY created_at DESC
+        LIMIT 100`,
+      [req.user.id]
+    );
+
+    res.json({
+      success: true,
+      orders: result.rows.map((o) => ({
+        order_no: o.merchant_trade_no,
+        source: o.source,
+        // Premium orders resolve to the catalog label; session orders are all
+        // the same product (a booked video session).
+        item_label: o.source === 'premium' ? PLANS[o.item_key]?.label || o.item_key : '視訊諮商預約',
+        amount: Number(o.amount),
+        status: o.status,
+        provider: o.provider,
+        payment_method: o.payment_method,
+        created_at: o.created_at,
+        paid_at: o.paid_at,
+        receipt_no: o.receipt_no,
+        receipt_issued_at: o.receipt_issued_at,
+        invoice_no: o.invoice_no,
+      })),
+    });
+  } catch (err) {
+    logError('Billing orders failed', { err: err.message, stack: err.stack });
+    res.status(500).json({ success: false, message: '無法取得購買紀錄，請稍後再試' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// One electronic receipt, for the printable/downloadable view. Only the buyer
+// can fetch their own receipt.
+// ---------------------------------------------------------------------------
+router.get('/receipts/:receiptNo', authenticateToken, async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT * FROM payment_receipts WHERE receipt_no = $1 AND user_id = $2`,
+      [String(req.params.receiptNo || '').trim(), req.user.id]
+    );
+    const row = result.rows[0];
+    if (!row) {
+      return res.status(404).json({
+        success: false,
+        message: '找不到這張收據，請確認收據編號，或從購買紀錄重新開啟',
+        error_code: 'RECEIPT_NOT_FOUND',
+      });
+    }
+    res.json({ success: true, receipt: receipts.formatReceipt(row) });
+  } catch (err) {
+    logError('Billing receipt fetch failed', { err: err.message, stack: err.stack });
+    res.status(500).json({ success: false, message: '無法取得收據，請稍後再試' });
   }
 });
 
@@ -174,11 +254,32 @@ router.post(
   [
     body('plan').isIn(Object.keys(PLANS)).withMessage('無效的方案'),
     body('provider').optional().isIn(['ecpay', 'newebpay']).withMessage('無效的付款方式'),
+    // Optional receipt details (報帳用). Empty string = "no title given", which
+    // is the common case, so both are optional and blank-tolerant.
+    body('receipt_title')
+      .optional({ values: 'falsy' })
+      .isString()
+      .trim()
+      .isLength({ max: 100 })
+      .withMessage('收據抬頭請控制在 100 字以內'),
+    body('receipt_tax_id')
+      .optional({ values: 'falsy' })
+      .isString()
+      .trim()
+      .matches(/^\d{8}$/)
+      .withMessage('統一編號需為 8 位數字'),
   ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ success: false, message: '驗證失敗', errors: errors.array() });
+      // Surface the specific reason (抬頭太長／統編格式) — a bare "驗證失敗"
+      // leaves the buyer with no idea which field to fix.
+      return res.status(400).json({
+        success: false,
+        message: errors.array()[0]?.msg || '付款資料有誤，請確認後再試',
+        error_code: 'CHECKOUT_INVALID_INPUT',
+        errors: errors.array(),
+      });
     }
 
     const provider = req.body.provider === 'newebpay' ? 'newebpay' : 'ecpay';
@@ -205,9 +306,19 @@ router.post(
       const merchantTradeNo = genMerchantTradeNo();
 
       await db.query(
-        `INSERT INTO payment_orders (couple_id, created_by, merchant_trade_no, plan, amount, status, provider)
-         VALUES ($1, $2, $3, $4, $5, 'pending', $6)`,
-        [coupleId, req.user.id, merchantTradeNo, req.body.plan, plan.amount, provider]
+        `INSERT INTO payment_orders (couple_id, created_by, merchant_trade_no, plan, amount, status,
+                                     provider, receipt_title, receipt_tax_id)
+         VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8)`,
+        [
+          coupleId,
+          req.user.id,
+          merchantTradeNo,
+          req.body.plan,
+          plan.amount,
+          provider,
+          receipts.normalizeTitle(req.body.receipt_title),
+          receipts.normalizeTaxId(req.body.receipt_tax_id),
+        ]
       );
 
       const base = appBaseUrl();
@@ -265,8 +376,24 @@ async function grantPaidOrder(order, { gatewayTradeNo, paymentMethod, rawPayload
     return false;
   }
 
+  // Buyer snapshot for the receipt document. Read before the transaction so a
+  // slow/missing user row can never hold the gateway's ack open.
+  let buyer = { email: null, nickname: null };
+  if (order.created_by) {
+    try {
+      const buyerRes = await db.query('SELECT email, nickname FROM users WHERE id = $1', [order.created_by]);
+      if (buyerRes.rows[0]) buyer = buyerRes.rows[0];
+    } catch (err) {
+      logWarn('billing.receipt.buyer_lookup_failed', {
+        merchantTradeNo: order.merchant_trade_no,
+        err: err.message,
+      });
+    }
+  }
+
   // All values are bound parameters; the GREATEST/COALESCE handles the "no
   // active pass" case ($4 = NULL → starts now).
+  let receipt = null;
   await db.transaction(async (client) => {
     const expiryRow = await client.query(
       `SELECT MAX(expires_at) AS max_exp FROM couple_entitlements
@@ -289,6 +416,22 @@ async function grantPaidOrder(order, { gatewayTradeNo, paymentMethod, rawPayload
         WHERE id = $1`,
       [order.id, gatewayTradeNo || null, paymentMethod || null, rawPayload]
     );
+
+    // Purchase document. Issued in the same transaction as the grant so a paid
+    // order without a receipt (or the reverse) is not a state we can reach.
+    receipt = await receipts.issueReceipt(client, {
+      source: 'premium',
+      orderId: order.id,
+      userId: order.created_by,
+      buyerEmail: buyer.email,
+      buyerName: buyer.nickname,
+      buyerTitle: order.receipt_title,
+      buyerTaxId: order.receipt_tax_id,
+      itemLabel: plan.label,
+      amount: order.amount,
+      provider: order.provider,
+      tradeNo: gatewayTradeNo || null,
+    });
   });
 
   logInfo('billing.callback.granted', {
@@ -303,21 +446,21 @@ async function grantPaidOrder(order, { gatewayTradeNo, paymentMethod, rawPayload
   // idempotent ack the gateway needs, so it's fully wrapped and awaited-free.
   (async () => {
     try {
-      if (!order.created_by) return;
-      const buyer = await db.query('SELECT email, nickname FROM users WHERE id = $1', [order.created_by]);
-      const b = buyer.rows[0];
-      if (!b?.email) return;
+      if (!buyer.email) return;
       const entRow = await db.query(
         'SELECT expires_at FROM couple_entitlements WHERE order_id = $1 ORDER BY expires_at DESC LIMIT 1',
         [order.id]
       );
       await emailService.sendPaymentReceiptEmail({
-        recipientEmail: b.email,
-        nickname: b.nickname,
+        recipientEmail: buyer.email,
+        nickname: buyer.nickname,
         planLabel: plan.label,
         amountTwd: order.amount,
         days: plan.days,
         orderNo: order.merchant_trade_no,
+        receiptNo: receipt?.receipt_no || null,
+        receiptTitle: receipt?.buyer_title || null,
+        receiptTaxId: receipt?.buyer_tax_id || null,
         paidAt: new Date(),
         expiresAt: entRow.rows[0]?.expires_at || null,
       });

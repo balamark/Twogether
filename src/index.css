@@ -345,3 +345,25 @@ video {
   font-style: normal !important;
   letter-spacing: -0.01em !important;
 }
+
+/* ────────────────────────────────────────────────────────────────────────
+   列印電子收據：收據 modal 打開時（<body class="printing-receipt">），列印只
+   輸出收據本身，其餘 App 介面全部隱藏。visibility 而非 display，才不會讓
+   收據所在的容器一起被抽掉版面。
+   ──────────────────────────────────────────────────────────────────────── */
+@media print {
+  body.printing-receipt * { visibility: hidden; }
+  body.printing-receipt #receipt-print-area,
+  body.printing-receipt #receipt-print-area * { visibility: visible; }
+  body.printing-receipt #receipt-print-area {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    max-height: none;
+    overflow: visible;
+    border: none;
+    box-shadow: none;
+    background: #fff;
+  }
+  body.printing-receipt .receipt-no-print { display: none !important; }
+}
