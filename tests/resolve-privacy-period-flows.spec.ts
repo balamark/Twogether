@@ -1,10 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
 
-// Happy-path coverage for three consequential actions that had none: the
-// two-party 標記為解決 handshake, the wall card's privacy toggle, and deleting a
-// logged period. destructive-action-guards.spec.ts covers what happens when the
-// user backs out of the confirmation; this covers what happens when they don't,
-// i.e. that the actions still actually work now that they're gated.
+// Happy-path coverage for three consequential actions that had none: entering
+// 一起收尾 (which replaced the two-party 標記為解決 handshake in Batch 1 of the
+// Event Resolution Framework v2), the wall card's privacy toggle, and deleting
+// a logged period. destructive-action-guards.spec.ts covers what happens when
+// the user backs out of the confirmation; this covers what happens when they
+// don't, i.e. that the actions still actually work now that they're gated.
 
 const FAKE_USER = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -88,7 +89,7 @@ async function seedAuth(page: Page) {
   });
 }
 
-// ───────────────────────────── 標記為解決 ─────────────────────────────
+// ───────────────────────────── 一起收尾 (closure entry) ─────────────────────
 
 function makeEvent(over: Record<string, unknown> = {}) {
   return {
@@ -119,9 +120,34 @@ function makeEvent(over: Record<string, unknown> = {}) {
   };
 }
 
+function makeClosure(over: Record<string, unknown> = {}) {
+  return {
+    eventId: EVENT_ID,
+    status: 'collecting',
+    eventStatus: 'closing',
+    startedBy: FAKE_USER.id,
+    startedAt: new Date().toISOString(),
+    deadlineAt: new Date(Date.now() + 72 * 3600 * 1000).toISOString(),
+    canFinalizeAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+    finalizedAt: null,
+    therapyNote: null,
+    insight: null,
+    insightAt: null,
+    me: { userId: FAKE_USER.id, status: 'pending', submittedAt: null, reviewedAt: null, commitment: null },
+    partner: { userId: PARTNER_ID, nickname: 'B', status: 'pending', submittedAt: null, reviewedAt: null, commitment: null },
+    sharedDecision: null,
+    sharedDecisionBy: null,
+    sharedDecisionStatus: 'pending_review',
+    sharedDecisionNote: null,
+    canCancel: true,
+    ...over,
+  };
+}
+
 async function seedEvent(page: Page, initial: ReturnType<typeof makeEvent>) {
   const calls: Call[] = [];
   let current = initial;
+  let closure = makeClosure();
 
   await page.route('**/api/events*', async (route) => {
     const req = route.request();
@@ -146,31 +172,27 @@ async function seedEvent(page: Page, initial: ReturnType<typeof makeEvent>) {
     return route.fallback();
   });
 
-  // The two handshake endpoints advance the stored event so the subsequent
-  // refresh() renders the next state, like the real backend.
-  await page.route(`**/api/events/${EVENT_ID}/resolve-request`, async (route) => {
+  // One tap flips the event to 'closing' and materialises a closure row.
+  await page.route(`**/api/events/${EVENT_ID}/closure/start`, async (route) => {
     calls.push({ method: route.request().method(), url: route.request().url(), body: '' });
-    current = {
-      ...current,
-      status: 'resolve_pending',
-      resolve_requested_by: FAKE_USER.id,
-      resolve_requested_at: new Date().toISOString(),
-    };
+    current = { ...current, status: 'closing' };
+    closure = makeClosure();
     return route.fulfill({
-      status: 200,
+      status: 201,
       contentType: 'application/json',
-      body: JSON.stringify({ success: true, event: current }),
+      body: JSON.stringify({ success: true, created: true, closure }),
     });
   });
 
-  await page.route(`**/api/events/${EVENT_ID}/resolve-confirm`, async (route) => {
-    calls.push({ method: route.request().method(), url: route.request().url(), body: '' });
-    current = { ...current, status: 'resolved', resolved_at: new Date().toISOString() };
-    return route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ success: true, event: current }),
-    });
+  await page.route(`**/api/events/${EVENT_ID}/closure`, async (route) => {
+    if (route.request().method() === 'GET') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ success: true, closure }),
+      });
+    }
+    return route.fallback();
   });
 
   return { calls, current: () => current };
@@ -183,36 +205,36 @@ async function openEventDetail(page: Page) {
   await page.locator('text=接送小孩的分工').first().click();
 }
 
-test.describe('標記為解決 — the two-party handshake', () => {
-  test('confirming the request moves the event to resolve_pending', async ({ page }) => {
+test.describe('一起收尾 — closure entry (replaces the retired 標記為解決 handshake)', () => {
+  test('the 一起收尾 bar is visible on an open event and starts the ceremony', async ({ page }) => {
     test.setTimeout(60000);
     await seedAuth(page);
     const { calls } = await seedEvent(page, makeEvent());
-    const dialog = acceptConfirm(page);
     await openEventDetail(page);
 
-    const button = page.locator('button:has-text("標記為解決")');
-    await expect(button).toBeVisible({ timeout: 10000 });
-    await button.click();
+    const bar = page.getByTestId('event-close-together-bar');
+    await expect(bar).toBeVisible({ timeout: 10000 });
+    // The legacy 標記為解決 button is gone.
+    await expect(page.locator('button:has-text("標記為解決")')).toHaveCount(0);
 
-    // It must ask first, and say that the partner has to agree.
-    expect(dialog.message()).toContain('已解決');
+    await page.getByTestId('event-close-together-button').click();
+    await expect(page.getByTestId('close-together-modal')).toBeVisible({ timeout: 5000 });
+    await page.getByTestId('close-together-confirm').click();
+
     await expect
-      .poll(() => calls.filter((c) => c.url.endsWith('/resolve-request')).length, {
-        timeout: 10000,
-      })
+      .poll(() => calls.filter((c) => c.url.endsWith('/closure/start')).length, { timeout: 10000 })
       .toBe(1);
-
-    // Requester's side now shows the waiting state, not a resolved event.
-    // Match the full sentence: a status-feed heading uses the same prefix.
-    await expect(page.locator('text=已發起解決請求，等待對方確認')).toBeVisible({ timeout: 10000 });
+    // The closure panel takes over; the composer must disappear during closing.
+    await expect(page.getByTestId('event-closure-panel')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('closure-commitment-input')).toBeVisible();
   });
 
-  test('a request from the partner can be confirmed, closing the event', async ({ page }) => {
+  test('legacy resolve_pending events show the same 一起收尾 bar (no 確認解決 button)', async ({ page }) => {
     test.setTimeout(60000);
     await seedAuth(page);
-    // Partner asked; we're the one who confirms — this is the one-way door.
-    const { calls } = await seedEvent(
+    // A production row from the retired two-step handshake — treated exactly
+    // like 'open' now, so the entry point is 一起收尾, not the old 確認 button.
+    await seedEvent(
       page,
       makeEvent({
         status: 'resolve_pending',
@@ -220,41 +242,27 @@ test.describe('標記為解決 — the two-party handshake', () => {
         resolve_requested_at: new Date().toISOString(),
       }),
     );
-    const dialog = acceptConfirm(page);
     await openEventDetail(page);
 
-    const confirmButton = page
-      .locator('button')
-      .filter({ hasText: /確認|已解決|解決/ })
-      .first();
-    await expect(confirmButton).toBeVisible({ timeout: 10000 });
-    await confirmButton.click();
-
-    expect(dialog.message()).toContain('已解決');
-    await expect
-      .poll(() => calls.filter((c) => c.url.endsWith('/resolve-confirm')).length, {
-        timeout: 10000,
-      })
-      .toBe(1);
+    await expect(page.getByTestId('event-close-together-bar')).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('button:has-text("確認解決")')).toHaveCount(0);
+    await expect(page.locator('button:has-text("標記為解決")')).toHaveCount(0);
   });
 
-  test('the requester does not get a self-confirm button', async ({ page }) => {
+  test('the 取消收尾 button is always visible while closing', async ({ page }) => {
     test.setTimeout(60000);
     await seedAuth(page);
-    // We asked — only the partner may confirm, or one person could close a
-    // shared event alone.
-    await seedEvent(
-      page,
-      makeEvent({
-        status: 'resolve_pending',
-        resolve_requested_by: FAKE_USER.id,
-        resolve_requested_at: new Date().toISOString(),
-      }),
-    );
+    // Enter the panel directly with an event already in closing state.
+    await seedEvent(page, makeEvent({ status: 'closing' }));
     await openEventDetail(page);
 
-    await expect(page.locator('text=已發起解決請求，等待對方確認')).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('button:has-text("標記為解決")')).toHaveCount(0);
+    await expect(page.getByTestId('event-closure-panel')).toBeVisible({ timeout: 10000 });
+    // The reply composer must be hidden during closing (see
+    // feedback_closing_hides_composer). Its testid is on the composer wrapper's
+    // 送出 button — asserting absence via the send button proves it.
+    await expect(page.locator('button:has-text("送出")')).toHaveCount(0);
+    // 取消收尾 is the escape hatch and must be present.
+    await expect(page.getByTestId('closure-cancel-link')).toBeVisible();
   });
 });
 
