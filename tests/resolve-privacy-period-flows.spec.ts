@@ -258,9 +258,12 @@ test.describe('一起收尾 — closure entry (replaces the retired 標記為解
 
     await expect(page.getByTestId('event-closure-panel')).toBeVisible({ timeout: 10000 });
     // The reply composer must be hidden during closing (see
-    // feedback_closing_hides_composer). Its testid is on the composer wrapper's
-    // 送出 button — asserting absence via the send button proves it.
-    await expect(page.locator('button:has-text("送出")')).toHaveCount(0);
+    // feedback_closing_hides_composer). Check the specific testids — a broad
+    // "送出" text match would false-positive on the closure composer's own
+    // 送出我的約定 button, which lives INSIDE the panel.
+    await expect(page.getByTestId('event-reply-input')).toHaveCount(0);
+    await expect(page.getByTestId('event-ai-counselor-button')).toHaveCount(0);
+    await expect(page.getByTestId('event-facilitation-start-button')).toHaveCount(0);
     // 取消收尾 is the escape hatch and must be present.
     await expect(page.getByTestId('closure-cancel-link')).toBeVisible();
   });
