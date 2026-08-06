@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   Send,
   CheckCircle2,
-  Clock,
   Tag,
   Loader2,
   Lock,
@@ -46,6 +45,10 @@ import { companionName, resolveCompanion } from '../utils/aiCompanions';
 import { useAiQuota } from '../hooks/useAiQuota';
 import AiQuotaHint from './AiQuotaHint';
 import ParticipantAvatar from './ParticipantAvatar';
+import CloseTogetherBar from './closure/CloseTogetherBar';
+import CloseTogetherModal from './closure/CloseTogetherModal';
+import ClosurePanel from './closure/ClosurePanel';
+import ClosureSummaryCard from './closure/ClosureSummaryCard';
 
 interface NotificationInput {
   type: 'success' | 'error' | 'info' | 'warning';
@@ -118,6 +121,12 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const [sending, setSending] = useState(false);
   const sendLockRef = useRef(false);
   const [resolving, setResolving] = useState(false);
+  // 一起收尾 (Batch 1) — only the confirm sheet's boolean lives here; the panel
+  // owns the closure fetch and every mutation. The summary card is kept in
+  // sync with the event refresh in the resolved block below.
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+  const [closureSummary, setClosureSummary] = useState<import('../services/api').EventClosure | null>(null);
+  const [retryingInsight, setRetryingInsight] = useState(false);
   const [rewriting, setRewriting] = useState(false);
   const [rewritePreview, setRewritePreview] = useState<ReplyRewritePreview | null>(null);
   const [accepting, setAccepting] = useState(false);
@@ -678,22 +687,17 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     }
   };
 
-  const handleResolveRequest = async () => {
-    // Sends a request the partner sees immediately — worth one tap to confirm.
-    if (!window.confirm('要送出「已解決」的請求給TA嗎？\n\nTA會收到通知，需要TA確認之後這個事件才會結案。')) return;
+  const handleCloseTogether = async () => {
     setResolving(true);
     try {
-      await apiService.requestEventResolve(eventId);
+      await apiService.startEventClosure(eventId);
+      setCloseConfirmOpen(false);
       await refresh();
-      showNotification({
-        type: 'success',
-        title: '已發起解決請求',
-        message: '等待對方確認',
-      });
     } catch (err) {
+      const code = (err as { error_code?: string })?.error_code;
       showNotification({
-        type: 'error',
-        title: '操作失敗',
+        type: code === 'NOT_PAIRED' || code === 'PRIVATE_EVENT' ? 'info' : 'error',
+        title: '無法開始一起收尾',
         message: err instanceof Error ? err.message : '請稍後再試',
       });
     } finally {
@@ -701,23 +705,47 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     }
   };
 
-  const handleResolveConfirm = async () => {
-    // This is the one-way door: the partner already asked, so this click IS the
-    // second agreement and closes the event immediately.
-    if (!window.confirm('確定要把這個事件標記為已解決嗎？\n\n確認後就會結案。')) return;
-    setResolving(true);
+  // Only fetch the summary once the event has actually resolved. Fires again on
+  // refresh() so a manual insight retry is reflected.
+  useEffect(() => {
+    if (event?.status !== 'resolved' || event.isPrivate) {
+      setClosureSummary(null);
+      return;
+    }
+    let cancelled = false;
+    apiService
+      .getEventClosure(eventId)
+      .then((c) => {
+        if (!cancelled) setClosureSummary(c);
+      })
+      .catch((err) => {
+        // A legacy resolved event has no closure row; that's fine, just don't
+        // render the summary card. Any other error we quietly log.
+        const code = (err as { error_code?: string })?.error_code;
+        if (code && code !== 'EVENT_NOT_CLOSING') {
+          console.warn('[closure] summary fetch failed', code);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [event?.status, event?.isPrivate, eventId]);
+
+  const handleRetryInsight = async () => {
+    setRetryingInsight(true);
     try {
-      await apiService.confirmEventResolve(eventId);
-      await refresh();
-      showNotification({ type: 'success', title: '這段對話已完成', message: '雙方確認完成' });
+      const next = await apiService.retryClosureInsight(eventId);
+      setClosureSummary(next);
     } catch (err) {
+      const code = (err as { error_code?: string })?.error_code;
       showNotification({
-        type: 'error',
-        title: '操作失敗',
+        type: code === 'AI_DAILY_LIMIT_REACHED' ? 'warning' : 'error',
+        title: code === 'AI_DAILY_LIMIT_REACHED' ? '今日 AI 次數已用完' : '暫時無法產生見解',
         message: err instanceof Error ? err.message : '請稍後再試',
       });
     } finally {
-      setResolving(false);
+      setRetryingInsight(false);
+      refreshQuota();
     }
   };
 
@@ -751,7 +779,11 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   }
 
   const isAuthor = event.createdBy === currentUserId;
-  const canSendMessage = !event.isPrivate && event.status !== 'resolved';
+  // Once we're in 一起收尾, hide the entire reply composer + AI-invite row so
+  // the closure ceremony has the screen to itself. Users who need to say one
+  // more thing tap 取消收尾 to reopen the discussion first.
+  const canSendMessage = !event.isPrivate && event.status !== 'resolved' && event.status !== 'closing';
+  const canFacilitate = canSendMessage;
 
   return (
     <div className="space-y-4">
@@ -1169,8 +1201,10 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               <span>請 {myCompanion.name} 加入</span>
             </button>
             {/* 引導模式: a facilitated session, not one-shot advice. Shown only when
-                no session is active — an active one renders its progress tray. */}
-            {(!facilitation || facilitation.status !== 'active') && (
+                no session is active — an active one renders its progress tray.
+                Hidden during 收尾: the couple is finishing an existing
+                discussion, not starting a new practice. */}
+            {canFacilitate && (!facilitation || facilitation.status !== 'active') && (
               <button
                 type="button"
                 data-testid="event-facilitation-start-button"
@@ -1359,18 +1393,45 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
         />
       )}
 
-      {!event.isPrivate && event.status !== 'resolved' && (
-        <ResolveControls
-          event={event}
-          currentUserId={currentUserId}
+      {!event.isPrivate && (event.status === 'open' || event.status === 'resolve_pending') && (
+        <CloseTogetherBar
+          onStart={() => setCloseConfirmOpen(true)}
           busy={resolving}
-          onRequest={handleResolveRequest}
-          onConfirm={handleResolveConfirm}
+        />
+      )}
+
+      {closeConfirmOpen && (
+        <CloseTogetherModal
+          busy={resolving}
+          partnerNickname={partnerNickname}
+          onConfirm={handleCloseTogether}
+          onCancel={() => setCloseConfirmOpen(false)}
+        />
+      )}
+
+      {!event.isPrivate && event.status === 'closing' && (
+        <ClosurePanel
+          eventId={eventId}
+          partnerNickname={partnerNickname}
+          quota={quota}
+          refreshQuota={refreshQuota}
+          onResolved={() => refresh()}
+          onCancelled={() => refresh()}
+          showNotification={showNotification}
         />
       )}
 
       {!event.isPrivate && event.status === 'resolved' && (
         <div className="space-y-3">
+          {closureSummary && (
+            <ClosureSummaryCard
+              closure={closureSummary}
+              myNickname={myNickname}
+              partnerNickname={partnerNickname}
+              retryingInsight={retryingInsight}
+              onRetryInsight={handleRetryInsight}
+            />
+          )}
           {therapyNote ? (
             <TherapyNoteCard note={therapyNote} />
           ) : (
@@ -1415,60 +1476,6 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       )}
     </div>
   );
-}
-
-function ResolveControls({
-  event,
-  currentUserId,
-  busy,
-  onRequest,
-  onConfirm,
-}: {
-  event: EventRecord;
-  currentUserId: string;
-  busy: boolean;
-  onRequest: () => void;
-  onConfirm: () => void;
-}) {
-  if (event.status === 'open') {
-    return (
-      <div className="flex justify-end">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onRequest}
-          className="px-4 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2 disabled:opacity-50"
-        >
-          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-          標記為解決
-        </button>
-      </div>
-    );
-  }
-  if (event.status === 'resolve_pending') {
-    if (event.resolveRequestedBy === currentUserId) {
-      return (
-        <div className="text-center text-sm text-petal-ink-soft bg-amber-50 border border-amber-200 rounded-2xl p-3 inline-flex items-center gap-2 justify-center w-full">
-          <Clock className="w-4 h-4 text-amber-700" />
-          已發起解決請求，等待對方確認…
-        </div>
-      );
-    }
-    return (
-      <div className="flex justify-end">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onConfirm}
-          className="px-4 py-2 rounded-full bg-petal-sage-deep text-petal-cream inline-flex items-center gap-2 disabled:opacity-50"
-        >
-          {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-          確認解決
-        </button>
-      </div>
-    );
-  }
-  return null;
 }
 
 function AiCounselorPreview({

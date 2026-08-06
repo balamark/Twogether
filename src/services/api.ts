@@ -621,6 +621,60 @@ export interface EventRecord {
   messages: EventMessage[];
 }
 
+// 一起收尾 (event closure). Batch 1 of the Event Resolution Framework v2.
+// Shape mirrors serializeClosure() in routes/event-closure.js — a partner's
+// commitment is server-side null until I've submitted mine, so consumers can
+// tell "not shared yet" (null) apart from "shared, empty" without any client
+// gating.
+export type ClosurePhase = 'collecting' | 'finalized' | 'abandoned';
+export type ClosureParticipantStatus = 'pending' | 'submitted' | 'skipped' | 'auto_skipped';
+export type ClosureReviewStatus = 'pending_review' | 'agreed' | 'change_requested';
+export type CommitmentStatus = 'draft' | 'active' | 'completed' | 'reneged';
+export type ClosureAssistField = 'commitment' | 'decision';
+export type ClosureReviewTarget = 'commitment' | 'decision';
+export type ClosureReviewVerdict = 'agree' | 'request_change';
+
+export interface ClosureCommitment {
+  id: string;
+  ownerId: string;
+  text: string;
+  status: CommitmentStatus;
+  reviewStatus: ClosureReviewStatus;
+  reviewNote: string | null;
+  reviewedAt: string | null;
+  dueAt: string | null;
+}
+
+export interface ClosureParticipant {
+  userId: string;
+  status: ClosureParticipantStatus;
+  submittedAt: string | null;
+  reviewedAt?: string | null;
+  commitment: ClosureCommitment | null;
+  nickname?: string;
+}
+
+export interface EventClosure {
+  eventId: string;
+  status: ClosurePhase;
+  eventStatus: EventStatus;
+  startedBy: string;
+  startedAt: string;
+  deadlineAt: string;
+  canFinalizeAt: string | null;
+  finalizedAt: string | null;
+  therapyNote: TherapyNote | null;
+  insight: string | null;
+  insightAt: string | null;
+  me: ClosureParticipant;
+  partner: ClosureParticipant;
+  sharedDecision: string | null;
+  sharedDecisionBy: string | null;
+  sharedDecisionStatus: ClosureReviewStatus;
+  sharedDecisionNote: string | null;
+  canCancel: boolean;
+}
+
 // 情緒翻譯 (emotion / need translation) for a single message.
 export interface MessageTranslation {
   emotions: { label: string; intensity: number }[];
@@ -3798,6 +3852,125 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to confirm event resolve:', error);
       this.throwApiError(error, '無法確認解決');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 一起收尾 — closure ceremony (Batch 1)
+  // ---------------------------------------------------------------------------
+  // Every closure error carries an actionable error_code the UI branches on.
+  // We deliberately throw the enriched error rather than swallowing it so
+  // ClosurePanel can render specific copy per code.
+
+  async startEventClosure(id: string): Promise<{ created: boolean; closure: EventClosure }> {
+    try {
+      const response = await apiClient.post(`/events/${id}/closure/start`);
+      console.log('[closure] start', { eventId: id, created: response.data?.created });
+      return { created: !!response.data?.created, closure: response.data.closure };
+    } catch (error: unknown) {
+      console.error('[closure] start failed', error);
+      this.throwApiError(error, '無法開始一起收尾，請稍後再試');
+    }
+  }
+
+  async getEventClosure(id: string): Promise<EventClosure> {
+    try {
+      const response = await apiClient.get(`/events/${id}/closure`);
+      return response.data.closure;
+    } catch (error: unknown) {
+      console.error('[closure] fetch failed', error);
+      this.throwApiError(error, '無法取得收尾狀態');
+    }
+  }
+
+  async closureAssist(id: string, field: ClosureAssistField): Promise<{ options: string[] }> {
+    try {
+      const response = await apiClient.post(`/events/${id}/closure/assist`, { field });
+      console.log('[closure] assist', { eventId: id, field, count: response.data?.options?.length });
+      return { options: Array.isArray(response.data?.options) ? response.data.options : [] };
+    } catch (error: unknown) {
+      console.error('[closure] assist failed', error);
+      this.throwApiError(error, '幫我想一個暫時無法使用');
+    }
+  }
+
+  async submitClosure(
+    id: string,
+    payload: { commitment: string; sharedDecision?: string | null }
+  ): Promise<EventClosure> {
+    try {
+      const body: Record<string, unknown> = { commitment: payload.commitment };
+      if (payload.sharedDecision !== undefined) body.sharedDecision = payload.sharedDecision;
+      const response = await apiClient.post(`/events/${id}/closure/submit`, body);
+      console.log('[closure] submit', { eventId: id, hasDecision: !!payload.sharedDecision });
+      return response.data.closure;
+    } catch (error: unknown) {
+      console.error('[closure] submit failed', error);
+      this.throwApiError(error, '無法送出你的約定');
+    }
+  }
+
+  async reviewClosure(
+    id: string,
+    payload: { target: ClosureReviewTarget; verdict: ClosureReviewVerdict; note?: string | null }
+  ): Promise<EventClosure> {
+    try {
+      const body: Record<string, unknown> = { target: payload.target, verdict: payload.verdict };
+      if (payload.note !== undefined && payload.note !== null && payload.note !== '') {
+        body.note = payload.note;
+      }
+      const response = await apiClient.post(`/events/${id}/closure/review`, body);
+      console.log('[closure] review', { eventId: id, target: payload.target, verdict: payload.verdict });
+      return response.data.closure;
+    } catch (error: unknown) {
+      console.error('[closure] review failed', error);
+      this.throwApiError(error, '無法送出你的回應');
+    }
+  }
+
+  async skipClosure(id: string, reason?: string | null): Promise<EventClosure> {
+    try {
+      const body: Record<string, unknown> = {};
+      if (reason) body.reason = reason;
+      const response = await apiClient.post(`/events/${id}/closure/skip`, body);
+      console.log('[closure] skip', { eventId: id });
+      return response.data.closure;
+    } catch (error: unknown) {
+      console.error('[closure] skip failed', error);
+      this.throwApiError(error, '無法跳過');
+    }
+  }
+
+  async cancelClosure(id: string): Promise<{ event: EventRecord }> {
+    try {
+      const response = await apiClient.post(`/events/${id}/closure/cancel`);
+      console.log('[closure] cancel', { eventId: id });
+      return { event: this.transformEvent(response.data.event) };
+    } catch (error: unknown) {
+      console.error('[closure] cancel failed', error);
+      this.throwApiError(error, '無法取消一起收尾');
+    }
+  }
+
+  async finalizeClosure(id: string): Promise<EventClosure> {
+    try {
+      const response = await apiClient.post(`/events/${id}/closure/finalize`);
+      console.log('[closure] finalize', { eventId: id });
+      return response.data.closure;
+    } catch (error: unknown) {
+      console.error('[closure] finalize failed', error);
+      this.throwApiError(error, '無法先這樣完成');
+    }
+  }
+
+  async retryClosureInsight(id: string): Promise<EventClosure> {
+    try {
+      const response = await apiClient.post(`/events/${id}/closure/insight`);
+      console.log('[closure] insight retry', { eventId: id });
+      return response.data.closure;
+    } catch (error: unknown) {
+      console.error('[closure] insight retry failed', error);
+      this.throwApiError(error, '無法重新產生見解');
     }
   }
 

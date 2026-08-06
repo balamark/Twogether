@@ -404,6 +404,40 @@ const TherapyNoteSample: React.FC = () => (
   </SampleCard>
 );
 
+// Batch 1 一起收尾 read-only sample. Shows the closure summary card as it
+// appears after both partners have written and reviewed — commitments in the
+// couple's own words, the shared decision, and the AI's short 見解. Static, no
+// fetches, mirrors ClosureSummaryCard layout.
+const CloseTogetherSample: React.FC = () => (
+  <SampleCard>
+    <div className="flex items-center justify-between mb-3">
+      <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
+        <NotebookPen className="w-3.5 h-3.5 text-petal-sage-deep" />
+        一起收尾：各自寫下「下次我願意做的一件小事」
+      </span>
+      <SampleTag />
+    </div>
+    <div className="space-y-2">
+      <div className="bg-petal-cream-2 border border-petal-rule rounded-xl p-2.5">
+        <div className="font-body text-[11px] text-petal-muted mb-0.5">小晴的約定</div>
+        <div className="font-body text-sm text-petal-ink">即使很生氣，也不在孩子面前說你</div>
+      </div>
+      <div className="bg-petal-cream-2 border border-petal-rule rounded-xl p-2.5">
+        <div className="font-body text-[11px] text-petal-muted mb-0.5">阿哲的約定</div>
+        <div className="font-body text-sm text-petal-ink">要動孩子之前，我會先問你一聲</div>
+      </div>
+      <div className="bg-petal-cream-2 border border-petal-rule rounded-xl p-2.5">
+        <div className="font-body text-[11px] text-petal-muted mb-0.5">我們一起決定</div>
+        <div className="font-body text-sm text-petal-ink">孩子睡著後若沒有立即危險，就不移動</div>
+      </div>
+      <div className="rounded-md bg-petal-sage/15 border border-petal-sage/40 px-3 py-2">
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-0.5">小小的觀察</div>
+        <p className="font-body text-sm text-petal-ink">你們都選擇「當著孩子面的克制」，聽起來共同關心的是孩子看到的畫面。</p>
+      </div>
+    </div>
+  </SampleCard>
+);
+
 // Stage 0 safety-check read-only sample: when a thread heats up, AI names what
 // is happening and offers a pause instead of taking sides.
 const SafetyBannerSample: React.FC = () => (
@@ -514,6 +548,8 @@ const ConflictFlywheelSample: React.FC = () => (
     <EmotionAcceptanceSample />
 
     <TherapyNoteSample />
+
+    <CloseTogetherSample />
 
     {/* Mini trend analysis */}
     <SampleCard>
