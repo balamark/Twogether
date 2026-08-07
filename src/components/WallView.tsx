@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import InfoHint from './InfoHint';
 import {
   Plus,
@@ -14,11 +14,14 @@ import {
   Globe,
   Loader2,
   Lock,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import {
   apiService,
   type WallPost,
   type WallPostCategory,
+  type WallReactionKey,
 } from '../services/api';
 import type { Notification } from './ErrorNotification';
 import WallPostComposer, { type WallExample } from './WallPostComposer';
@@ -50,8 +53,32 @@ const FILTER_TABS: { id: WallFilter; label: string; icon: string }[] = [
   { id: 'mood', label: '帶心情', icon: '💭' },
 ];
 
+// One-tap acknowledgements. Keys must match WALL_REACTIONS in routes/wall.js.
+// These exist because a bare 已讀 makes silence louder: the reader needs a way
+// to say "I saw it, I'm with you" that costs one tap, not a written reply.
+const WALL_REACTIONS: { key: WallReactionKey; emoji: string; label: string }[] = [
+  { key: 'hug', emoji: '🫂', label: '抱抱' },
+  { key: 'understand', emoji: '💛', label: '我懂' },
+  { key: 'thanks', emoji: '🙏', label: '謝謝你說' },
+  { key: 'later', emoji: '⏳', label: '晚點好好回你' },
+];
+
+const reactionMeta = (key: WallReactionKey | null | undefined) =>
+  WALL_REACTIONS.find((r) => r.key === key) || null;
+
+// A post counts as read once it has been on screen for this long — long enough
+// that 已讀 means "TA actually read it", not "TA scrolled past at speed".
+const READ_DWELL_MS = 1000;
+// Ids collected during that window are reported in one batched call.
+const READ_FLUSH_MS = 800;
+
 const formatTime = (iso: string, tz: string) =>
   formatRelativeOrDate(iso, tz, { year: 'numeric', month: 'short', day: 'numeric' });
+
+// Read receipts / reactions are recent-by-nature — a relative time ("3 小時前")
+// reads better here than the post's absolute date.
+const formatShortTime = (iso: string, tz: string) =>
+  formatRelativeOrDate(iso, tz, { month: 'short', day: 'numeric' });
 
 const WallView: React.FC<WallViewProps> = ({
   authState,
@@ -81,10 +108,142 @@ const WallView: React.FC<WallViewProps> = ({
   // photos get portrait slots instead of a fixed 16:9 that pillarboxes them.
   const [mediaRatios, setMediaRatios] = useState<Record<string, number>>({});
   const [privacyBusyId, setPrivacyBusyId] = useState<string | null>(null);
+  const [reactionBusyId, setReactionBusyId] = useState<string | null>(null);
   const [showTutorial, setShowTutorial] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return !localStorage.getItem(tutorialKey);
   });
+
+  // --- Read receipts -------------------------------------------------------
+  // A post is reported as read only after it has genuinely been on screen for
+  // READ_DWELL_MS. Opening the wall tab must not mark a week-old post 已讀 that
+  // the partner never scrolled to — the whole point of the indicator is that
+  // the author can trust it.
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  // Ids already sent, so re-renders and re-scrolls don't re-report them.
+  const reportedRef = useRef<Set<string>>(new Set());
+  // Ids that have finished their dwell and are waiting for the next batch.
+  const pendingRef = useRef<Set<string>>(new Set());
+  // Per-post dwell timers, cleared if the post leaves the viewport early.
+  const dwellTimersRef = useRef<Map<string, number>>(new Map());
+  const flushTimerRef = useRef<number | null>(null);
+
+  const flushReads = useCallback(async () => {
+    const ids = [...pendingRef.current];
+    if (!ids.length) return;
+    pendingRef.current.clear();
+    // Mark them as reported up front so an in-flight batch can't be duplicated
+    // by a scroll that happens while it's still open.
+    ids.forEach((id) => reportedRef.current.add(id));
+    const marked = await apiService.markWallPostsRead(ids);
+    // Reflect it locally so the partner's own view stays consistent without a
+    // refetch. (The indicator itself only renders on the author's side.)
+    if (marked > 0) {
+      const now = new Date().toISOString();
+      setPosts((prev) =>
+        prev.map((p) => (ids.includes(p.id) && !p.partner_read_at ? { ...p, partner_read_at: now } : p))
+      );
+    }
+  }, []);
+
+  const scheduleFlush = useCallback(() => {
+    if (flushTimerRef.current !== null) window.clearTimeout(flushTimerRef.current);
+    flushTimerRef.current = window.setTimeout(() => {
+      flushTimerRef.current = null;
+      flushReads();
+    }, READ_FLUSH_MS);
+  }, [flushReads]);
+
+  // Built on first use rather than in an effect, so a card that mounts in the
+  // same commit as the observer still gets observed.
+  const ensureObserver = useCallback(() => {
+    if (observerRef.current) return observerRef.current;
+    if (typeof IntersectionObserver === 'undefined') return null;
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        const timers = dwellTimersRef.current;
+        for (const entry of entries) {
+          const id = (entry.target as HTMLElement).dataset.postId;
+          if (!id) continue;
+          if (entry.isIntersecting) {
+            if (timers.has(id) || reportedRef.current.has(id)) continue;
+            timers.set(
+              id,
+              window.setTimeout(() => {
+                timers.delete(id);
+                pendingRef.current.add(id);
+                scheduleFlush();
+              }, READ_DWELL_MS)
+            );
+          } else {
+            // Scrolled away before the dwell finished — that isn't reading.
+            const timer = timers.get(id);
+            if (timer !== undefined) {
+              window.clearTimeout(timer);
+              timers.delete(id);
+            }
+          }
+        }
+      },
+      { threshold: 0.5 }
+    );
+    return observerRef.current;
+  }, [scheduleFlush]);
+
+  // Tear everything down on unmount: a pending dwell or flush must not fire
+  // into a component that's gone.
+  useEffect(
+    () => () => {
+      observerRef.current?.disconnect();
+      observerRef.current = null;
+      dwellTimersRef.current.forEach((t) => window.clearTimeout(t));
+      dwellTimersRef.current.clear();
+      if (flushTimerRef.current !== null) window.clearTimeout(flushTimerRef.current);
+    },
+    []
+  );
+
+  // Ref callback for a post card — only the partner's shared posts get one.
+  // The returned cleanup (React 19) unobserves a card that filtering removed.
+  const readObserverRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (!node) return;
+      const observer = ensureObserver();
+      if (!observer) return;
+      observer.observe(node);
+      return () => observer.unobserve(node);
+    },
+    [ensureObserver]
+  );
+
+  // --- Reactions -----------------------------------------------------------
+  // Optimistic: the chip fills instantly (one tap should feel instant), and
+  // rolls back with the server's own message if the write fails.
+  const toggleReaction = async (post: WallPost, key: WallReactionKey) => {
+    const previous = post.my_reaction ?? null;
+    const next = previous === key ? null : key;
+    setReactionBusyId(post.id);
+    setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, my_reaction: next } : p)));
+    try {
+      const result = await apiService.setWallPostReaction(post.id, next);
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === post.id
+            ? { ...p, my_reaction: result.my_reaction, partner_reaction: result.partner_reaction }
+            : p
+        )
+      );
+    } catch (err) {
+      setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, my_reaction: previous } : p)));
+      showNotification({
+        type: 'error',
+        title: '心意沒有送出',
+        message: err instanceof Error ? err.message : '請稍後再試一次。',
+      });
+    } finally {
+      setReactionBusyId(null);
+    }
+  };
 
   const loadPosts = useCallback(async () => {
     setLoading(true);
@@ -270,10 +429,19 @@ const WallView: React.FC<WallViewProps> = ({
       (isOwn ? nicknames.partner1 : nicknames.partner2) ||
       '對方';
     const isImportant = post.category === 'important';
+    // Only the partner's shared posts are worth tracking: a private post never
+    // reaches them, and reading your own post means nothing.
+    const tracksRead = !isOwn && !post.is_private;
+    // The author sees the read state only where it can be true — a shared post,
+    // with someone on the other side to read it.
+    const showsReadState = isOwn && !post.is_private && authState.partnerConnected;
+    const partnerReaction = reactionMeta(post.partner_reaction?.reaction);
 
     return (
       <div
         key={post.id}
+        ref={tracksRead ? readObserverRef : undefined}
+        data-post-id={post.id}
         className={`bg-white rounded-md p-5 border transition-colors ${
           isImportant
             ? 'border-petal-rose-deep/40 ring-1 ring-petal-rose-deep/20'
@@ -404,11 +572,83 @@ const WallView: React.FC<WallViewProps> = ({
           </div>
         )}
 
-        <div className="mt-3 flex items-center gap-4">
+        {/* The author's payoff: the partner's one-tap answer, right on the card.
+            This is what stops 已讀 from being a dead end. */}
+        {isOwn && partnerReaction && (
+          <div
+            className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-petal-rose-soft/50 px-3 py-1"
+            data-testid={`wall-partner-reaction-${post.id}`}
+          >
+            <span aria-hidden>{partnerReaction.emoji}</span>
+            <span className="font-body text-xs text-petal-rose-deep">
+              {authState.partnerConnected ? `${nicknames.partner2 || '對方'}給了你一個「${partnerReaction.label}」` : `「${partnerReaction.label}」`}
+            </span>
+            {post.partner_reaction && (
+              <span className="font-body text-[11px] text-petal-muted">
+                · {formatShortTime(post.partner_reaction.created_at, tz)}
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Reader side: answering shouldn't require finding words. One tap says
+            "I saw it, I'm here" — far better than a silent 已讀. */}
+        {!isOwn && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            {WALL_REACTIONS.map(({ key, emoji, label }) => {
+              const active = post.my_reaction === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => toggleReaction(post, key)}
+                  disabled={reactionBusyId === post.id}
+                  aria-pressed={active}
+                  data-testid={`wall-reaction-${key}-${post.id}`}
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-body text-[11px] transition-colors disabled:opacity-50 ${
+                    active
+                      ? 'bg-petal-rose-soft/50 text-petal-rose-deep'
+                      : 'border border-petal-rule text-petal-ink-soft hover:border-petal-rose hover:text-petal-ink'
+                  }`}
+                >
+                  <span aria-hidden>{emoji}</span>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Wraps as a whole (gap-y) rather than breaking a label mid-word: this
+            row is at capacity on a phone once the read state joins it. */}
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+          {/* Did TA see it? Answering that is the difference between "ignored"
+              and "hasn't opened the app yet". */}
+          {showsReadState && (
+            <span
+              data-testid={`wall-read-indicator-${post.id}`}
+              className={`flex items-center gap-1.5 font-body text-xs whitespace-nowrap ${
+                post.partner_read_at ? 'text-petal-sage-deep' : 'text-petal-muted'
+              }`}
+            >
+              {post.partner_read_at ? (
+                <>
+                  <Eye className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
+                  已讀 · {formatShortTime(post.partner_read_at, tz)}
+                </>
+              ) : (
+                <>
+                  <EyeOff className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
+                  對方還沒看到
+                </>
+              )}
+            </span>
+          )}
+
           <button
             type="button"
             onClick={() => setExpandedPostId(isExpanded ? null : post.id)}
-            className="flex items-center gap-1.5 text-petal-ink-soft hover:text-petal-ink font-body text-xs"
+            className="flex items-center gap-1.5 text-petal-ink-soft hover:text-petal-ink font-body text-xs whitespace-nowrap"
             data-testid={`wall-post-thread-toggle-${post.id}`}
           >
             <MessageCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -428,7 +668,7 @@ const WallView: React.FC<WallViewProps> = ({
               onClick={() => togglePrivacy(post)}
               disabled={privacyBusyId === post.id}
               data-testid={`wall-privacy-toggle-${post.id}`}
-              className="flex items-center gap-1.5 text-petal-ink-soft hover:text-petal-ink font-body text-xs disabled:opacity-50"
+              className="flex items-center gap-1.5 text-petal-ink-soft hover:text-petal-ink font-body text-xs whitespace-nowrap disabled:opacity-50"
             >
               {privacyBusyId === post.id ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -448,7 +688,7 @@ const WallView: React.FC<WallViewProps> = ({
               onClick={() => unshare(post)}
               disabled={sharingId === post.id}
               data-testid={`wall-unshare-${post.id}`}
-              className="flex items-center gap-1.5 text-petal-sage-deep hover:text-petal-ink font-body text-xs disabled:opacity-50"
+              className="flex items-center gap-1.5 text-petal-sage-deep hover:text-petal-ink font-body text-xs whitespace-nowrap disabled:opacity-50"
             >
               {sharingId === post.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" strokeWidth={1.5} />}
               已公開・取消
@@ -458,7 +698,7 @@ const WallView: React.FC<WallViewProps> = ({
               type="button"
               onClick={() => setShareWarnPost(post)}
               data-testid={`wall-share-${post.id}`}
-              className="flex items-center gap-1.5 text-petal-ink-soft hover:text-petal-ink font-body text-xs"
+              className="flex items-center gap-1.5 text-petal-ink-soft hover:text-petal-ink font-body text-xs whitespace-nowrap"
             >
               <Globe className="w-3.5 h-3.5" strokeWidth={1.5} />
               匿名公開
