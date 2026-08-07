@@ -55,7 +55,7 @@ export default function ClosureWaitingCard({
             data-testid="closure-finalize-button"
             disabled={finalizing}
             onClick={onFinalize}
-            className="px-3 py-1.5 rounded-full bg-petal-sage-deep text-white text-xs font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
+            className="px-3 py-1.5 rounded-full bg-petal-sage-deeper text-white text-xs font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
           >
             {finalizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
             先這樣完成

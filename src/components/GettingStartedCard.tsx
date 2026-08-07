@@ -90,7 +90,7 @@ export default function GettingStartedCard({
                 type="button"
                 onClick={onPickCompanion}
                 data-testid="getting-started-pick-companion"
-                className="text-xs px-3 py-1.5 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-1.5"
+                className="text-xs px-3 py-1.5 rounded-full bg-petal-sage-deeper text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-1.5"
               >
                 <HeartHandshake className="w-3.5 h-3.5" />
                 去選擇
