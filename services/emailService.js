@@ -806,6 +806,11 @@ class EmailService {
       event_resolve_request:{ emoji: '🤝', headline: '伴侶覺得可以一起劃下句點了', subject: `🤝 ${senderName || '你的伴侶'} 覺得這個情境可以劃下句點了` },
       event_resolved:       { emoji: '✅', headline: '你們一起走過了這個情境',     subject: `✅ 你們一起走過了這個情境` },
       event_reopened:       { emoji: '🔄', headline: '伴侶想繼續聊聊這個情境',     subject: `🔄 ${senderName || '你的伴侶'} 想繼續聊聊這個情境` },
+      // 一起收尾 (migration 083). Invitation, never verdict — nobody is being
+      // told they were wrong, they're being asked to write down one small thing.
+      event_closing_started:      { emoji: '🤝', headline: '伴侶想和你一起想想下次怎麼做', subject: `🤝 ${senderName || '你的伴侶'} 想和你一起想想下次怎麼做` },
+      event_closure_partner_ready:{ emoji: '📝', headline: '伴侶寫好了下次願意做的事',     subject: `📝 ${senderName || '你的伴侶'} 寫好了下次願意做的事` },
+      event_closure_done:         { emoji: '🌱', headline: '你們一起定下了下次的約定',     subject: '🌱 你們一起定下了下次的約定' },
     }[type] || { emoji: '🔔', headline: '有新的對話更新', subject: '🔔 有新的對話更新' };
 
     const labelSuffix = type === 'event_created' ? '想說的話' : '的回覆';

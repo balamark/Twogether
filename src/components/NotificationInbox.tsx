@@ -61,10 +61,15 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       case 'wall_reply':
         onNavigate('wall');
         break;
+      // The three 一起收尾 types land here too: the closure panel (or the summary
+      // card, once it's finished) is on the event itself.
       case 'event_created':
       case 'event_reply':
       case 'event_resolve_request':
       case 'event_resolved':
+      case 'event_closing_started':
+      case 'event_closure_partner_ready':
+      case 'event_closure_done':
         if (notification.eventId) {
           onNavigate('events', notification.eventId);
         } else {

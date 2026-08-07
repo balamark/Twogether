@@ -739,6 +739,63 @@ async function generateCommunicationPatternSummary({ events, stats }) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// 一起收尾 (closure) — deterministic 幫我想一個 + AI 見解
+// ---------------------------------------------------------------------------
+// e2e drives the entire closing → resolved machine through this provider, so
+// both functions are fixed-output: option strings keyed only off `field`, one
+// fixed insight. Same shared shapers as claudeProvider — if the contract ever
+// changes, both move together or neither does.
+const { shapeClosureAssist, shapeClosureInsight } = require('../../lib/closureAi');
+
+const MOCK_CLOSURE_OPTIONS = {
+  commitment: [
+    '即使很生氣，也不在人前說你',
+    '要動孩子之前，我會先問你',
+    '覺得你判斷錯了，我回房再說',
+  ],
+  decision: [
+    '沒有立即危險就先不移動孩子',
+    '當下由陪在旁邊的人做決定',
+    '有一方喊暫停就先停十分鐘',
+  ],
+};
+
+async function generateClosureAssist({ field } = {}) {
+  const startedAt = Date.now();
+  const wanted = field === 'decision' ? 'decision' : 'commitment';
+  return shapeClosureAssist(
+    { options: MOCK_CLOSURE_OPTIONS[wanted] },
+    {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+      assembledPrompt: `[mock] closure assist for ${wanted}`,
+    }
+  );
+}
+
+async function generateClosureInsight({ commitments, sharedDecision } = {}) {
+  const startedAt = Date.now();
+  const list = Array.isArray(commitments) ? commitments : [];
+  return shapeClosureInsight(
+    {
+      insight:
+        '你們兩個約定剛好對上了彼此最在意的地方，一個接住不想被誤解，一個接住不想一個人承擔。真正要練的是當下那三秒鐘，先問一句，再決定。',
+    },
+    {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+      assembledPrompt: `[mock] closure insight for ${list.length} commitments${sharedDecision ? ' + decision' : ''}`,
+    }
+  );
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -756,4 +813,6 @@ module.exports = {
   generateTherapySummary,
   generateCommunicationPatternSummary,
   generateFacilitatorTurn,
+  generateClosureAssist,
+  generateClosureInsight,
 };

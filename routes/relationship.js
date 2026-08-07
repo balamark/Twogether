@@ -113,7 +113,10 @@ router.get('/summary', async (req, res) => {
         [coupleId]
       ),
       db.query(`SELECT COUNT(*) AS n FROM events WHERE couple_id = $1 AND created_at >= NOW() - INTERVAL '14 days'`, [coupleId]),
-      db.query(`SELECT COUNT(*) AS n FROM events WHERE couple_id = $1 AND status <> 'resolved' AND is_private = FALSE`, [coupleId]),
+      // 'closing' is NOT an open conflict — the couple is mid-收尾 writing their
+      // commitments for it. Counting it here would tell them 「還有 1 個未解決的
+      // 衝突」 in 關係之屋 during the very ceremony that resolves it.
+      db.query(`SELECT COUNT(*) AS n FROM events WHERE couple_id = $1 AND status NOT IN ('resolved','closing') AND is_private = FALSE`, [coupleId]),
       db.query(`SELECT MAX(created_at) AS last FROM relationship_checkins WHERE user_id = $1`, [userId]),
       db.query(`SELECT MAX(created_at) AS last FROM relationship_checkins WHERE couple_id = $1`, [coupleId]),
       partnerId

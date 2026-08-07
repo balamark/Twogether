@@ -59,3 +59,8 @@ debug-*.png
 
 # Supabase CLI local cache (not project config)
 supabase/.temp/
+
+# Local Playwright runner overrides (e.g. pointing executablePath at a
+# preinstalled browser when the Playwright CDN isn't reachable). Machine
+# -specific by definition — never commit one.
+pw.local.config.ts

@@ -5,6 +5,11 @@ const helmet = require('helmet');
 const bodyParser = require('body-parser');
 const session = require('express-session');
 const path = require('path');
+const fs = require('fs');
+
+// Official customer-support address. Single source of truth shared with the
+// React app via src/content/supportContact.ts — change it in one place.
+const { supportEmail: SUPPORT_EMAIL } = require('./lib/supportContact.json');
 
 // PostgreSQL session store for production
 const pgSession = require('connect-pg-simple')(session);
@@ -26,6 +31,7 @@ const customScriptsRoutes = require('./routes/custom-scripts');
 const customGiftsRoutes = require('./routes/custom-gifts');
 const wallRoutes = require('./routes/wall');
 const eventRoutes = require('./routes/events');
+const eventClosureRoutes = require('./routes/event-closure');
 const aiCompanionRoutes = require('./routes/ai-companions');
 const aiUsageRoutes = require('./routes/ai-usage');
 const storyRoutes = require('./routes/stories');
@@ -197,6 +203,10 @@ app.use('/api/pairing-requests', pairingRequestRoutes);
 app.use('/api/custom-scripts', customScriptsRoutes);
 app.use('/api/custom-gifts', customGiftsRoutes);
 app.use('/api/wall', wallRoutes);
+// 一起收尾 lives in its own router but shares the /api/events prefix (the
+// closure IS a step of an event). Mounted BEFORE the events router so its
+// /:id/closure/* paths are matched first rather than falling into /:id.
+app.use('/api/events', eventClosureRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/ai-companions', aiCompanionRoutes);
 app.use('/api/ai-usage', aiUsageRoutes);
@@ -246,9 +256,25 @@ app.get('/admin', adminAuth, adminRoutes.htmlHandler);
 // auth, so this explicit route (registered before the static/catch-all) serves
 // a self-contained static page that is always public. Prices here MUST stay in
 // sync with the PLANS catalog in routes/billing.js.
-app.get(['/pricing', '/membership', '/plans'], (req, res) => {
+//
+// The page carries a {{SUPPORT_EMAIL}} placeholder instead of a hardcoded
+// address so the support mailbox lives in exactly one place
+// (lib/supportContact.json) for both this page and the React app. Rendered once
+// and cached — the file never changes at runtime.
+//
+// '/pricing.html' is in the path list on purpose: Vite copies public/ verbatim
+// into dist/, so dist/pricing.html still holds the raw placeholder. Registering
+// here (before the static middleware below) means that copy can never be served
+// — same shadowing pattern as the /robots.txt route.
+let pricingHtmlCache = null;
+app.get(['/pricing', '/membership', '/plans', '/pricing.html'], (req, res) => {
+  if (!pricingHtmlCache) {
+    pricingHtmlCache = fs
+      .readFileSync(path.join(__dirname, 'public', 'pricing.html'), 'utf8')
+      .replace(/\{\{SUPPORT_EMAIL\}\}/g, SUPPORT_EMAIL);
+  }
   res.setHeader('Cache-Control', 'no-cache');
-  res.sendFile(path.join(__dirname, 'public', 'pricing.html'));
+  res.type('html').send(pricingHtmlCache);
 });
 
 // Public, no-login therapist recruitment / sign-up page. The SPA gates most

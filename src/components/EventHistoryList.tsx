@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Tag, CheckCircle2, Clock, Lock, MessageSquareHeart } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Tag, CheckCircle2, Sprout, Lock, MessageSquareHeart } from 'lucide-react';
 import apiService, { type EventRecord, type EventStatus } from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
@@ -7,28 +7,33 @@ import { formatDateTime } from '../utils/datetime';
 interface EventHistoryListProps {
   onOpenEvent: (id: string) => void;
   currentUserId: string;
-  filterStatus?: Exclude<EventStatus, 'resolved'> | null;
   hideFilters?: boolean;
   // Empty-state CTA: jump straight into the compose flow.
   onCompose?: () => void;
 }
 
+// 'resolve_pending' is deliberately absent: nothing produces it any more, and a
+// filter chip that can only ever match legacy rows is noise. Those rows still
+// list under 未解決 (see statusPill).
 const STATUS_OPTIONS: { value: EventStatus | 'all'; label: string }[] = [
   { value: 'all', label: '全部' },
   { value: 'open', label: '未解決' },
-  { value: 'resolve_pending', label: '等待確認' },
+  { value: 'closing', label: '收尾中' },
   { value: 'resolved', label: '已解決' },
 ];
 
 function statusPill(status: EventStatus) {
   switch (status) {
+    // 'resolve_pending' is a legacy row from the retired 標記為解決 handshake and
+    // reads as 未解決 — exactly how the detail view treats it too.
     case 'open':
-      return <span className="text-xs px-2 py-0.5 rounded-full bg-petal-rose/30 text-petal-ink">未解決</span>;
     case 'resolve_pending':
+      return <span className="text-xs px-2 py-0.5 rounded-full bg-petal-rose/30 text-petal-ink">未解決</span>;
+    case 'closing':
       return (
-        <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 inline-flex items-center gap-1">
-          <Clock className="w-3 h-3" />
-          等待確認
+        <span className="text-xs px-2 py-0.5 rounded-full bg-petal-sage/20 text-petal-ink inline-flex items-center gap-1">
+          <Sprout className="w-3 h-3" />
+          收尾中
         </span>
       );
     case 'resolved':
@@ -53,14 +58,13 @@ function formatDate(iso: string, tz: string) {
 export default function EventHistoryList({
   onOpenEvent,
   currentUserId,
-  filterStatus,
   hideFilters,
   onCompose,
 }: EventHistoryListProps) {
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState<EventStatus | 'all'>(filterStatus ?? 'all');
+  const [status, setStatus] = useState<EventStatus | 'all'>('all');
   const tz = useTimezone();
 
   useEffect(() => {
@@ -83,18 +87,13 @@ export default function EventHistoryList({
     };
   }, [status]);
 
-  const visibleEvents = useMemo(() => {
-    if (!filterStatus) return events;
-    return events.filter((e) => e.status !== 'resolved');
-  }, [events, filterStatus]);
-
   if (loading) {
     return <div className="p-8 text-center text-petal-ink-soft">載入中…</div>;
   }
   if (error) {
     return <div className="p-6 text-center text-red-500">{error}</div>;
   }
-  if (visibleEvents.length === 0) {
+  if (events.length === 0) {
     return (
       <div
         className="bg-white border border-petal-rule-soft rounded-2xl p-8 text-center text-petal-ink-soft"
@@ -142,7 +141,7 @@ export default function EventHistoryList({
         </div>
       )}
 
-      {visibleEvents.map((event) => (
+      {events.map((event) => (
         <button
           key={event.id}
           type="button"

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Home, Heart, Sparkles, ShieldCheck, Send, StickyNote, TrendingUp, X, Loader2, HelpCircle, History } from 'lucide-react';
 import { apiService, type RelationshipSummary, type GoodwillGroup, type RelationshipCheckin } from '../services/api';
 import { daysSinceLastNudge } from './AchievementsView';
+import { useScrollLock } from '../hooks/useScrollLock';
 
 interface NotificationInput {
   type: 'success' | 'error' | 'info' | 'warning';
@@ -322,6 +323,7 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
 
 // Itemised breakdown behind the goodwill meter: what adds (+) / costs (−) and why.
 const GoodwillModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  useScrollLock(true);
   const [data, setData] = useState<{ positive: GoodwillGroup[]; negative: GoodwillGroup[] } | null>(null);
   useEffect(() => {
     apiService.getGoodwillBreakdown().then(setData).catch(() => setData({ positive: [], negative: [] }));
@@ -389,6 +391,7 @@ const PILLARS: { key: 'trust' | 'commitment' | 'connection'; label: string }[] =
 
 // View past 本週關係檢視 results — both partners' scores + notes over time.
 const CheckinHistoryModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  useScrollLock(true);
   const [items, setItems] = useState<RelationshipCheckin[] | null>(null);
   useEffect(() => {
     apiService.getCheckins().then(setItems).catch(() => setItems([]));
@@ -446,6 +449,7 @@ const CheckinModal: React.FC<{
   showNotification: (n: NotificationInput) => void;
   onSaved: () => void;
 }> = ({ onClose, showNotification, onSaved }) => {
+  useScrollLock(true);
   const [scores, setScores] = useState({ trust: 0, commitment: 0, connection: 0 });
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);

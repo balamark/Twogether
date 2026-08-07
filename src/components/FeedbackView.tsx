@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Star, Send, CheckCircle2, Clock, EyeOff } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useAsyncAction } from '../hooks/useAsyncAction';
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '../content/supportContact';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -113,6 +114,13 @@ const FeedbackView: React.FC<FeedbackViewProps> = ({ authState, showNotification
         </h2>
         <p className="font-body text-sm text-petal-ink-soft">
           你的回饋會經過審核，通過後會顯示在首頁「聽聽其他用戶怎麼說」。
+        </p>
+        <p className="font-body text-sm text-petal-ink-soft mt-1.5" data-testid="feedback-support-email">
+          這裡是公開的使用心得。付款、退費或帳號等私人問題，請來信客服{' '}
+          <a href={SUPPORT_MAILTO} className="text-pink-600 underline underline-offset-2">
+            {SUPPORT_EMAIL}
+          </a>
+          。
         </p>
       </div>
 

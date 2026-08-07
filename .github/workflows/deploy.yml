@@ -114,7 +114,9 @@ jobs:
           npm run test:ci
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
+        # webkit is needed by the "Mobile Safari" project, which runs the specs
+        # guarding the iOS tap-offset / file-picker behaviour.
+        run: npx playwright install --with-deps chromium webkit
 
       - name: Run Playwright tests
         env:

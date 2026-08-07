@@ -1,12 +1,10 @@
 const express = require('express');
 const crypto = require('crypto');
-const { body, param, query, validationResult } = require('express-validator');
+const { body, param, query } = require('express-validator');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const llmService = require('../services/llmService');
-const emailService = require('../services/emailService');
-const lineService = require('../services/lineService');
 const { checkLimit } = require('../lib/entitlements');
 const { resolveCompanion } = require('../lib/aiCompanions');
 const { cardMeta, applyVerdict, scoreSession } = require('../lib/therapyCards');
@@ -18,6 +16,21 @@ const {
   recordAiUsage,
 } = require('../lib/aiUsage');
 const { translationStatus } = require('../lib/translationStatus');
+// Access checks, serializers and the notification fan-out live in lib/ so the
+// closure router (and later Playbook / follow-up) can use them without
+// requiring this router back. Re-exported at the bottom of this file — the
+// dedicated-therapist endpoints import them from here.
+const {
+  getCoupleForUser,
+  assertEventAccess,
+  serializeEvent,
+  serializeMessage,
+  sendValidationError,
+} = require('../lib/eventAccess');
+const { notify } = require('../lib/eventNotify');
+// 一起收尾. The closure router deliberately does NOT require this file back, so
+// this single direction stays cycle-free.
+const { enterClosing, sweepOverdueClosures } = require('./event-closure');
 
 const router = express.Router();
 
@@ -40,89 +53,6 @@ const VERSION_KEYS = ['neutral', 'firm', 'warm'];
 let REPLY_PROMPT_LOG_REMAINING = Number(
   process.env.REPLY_REWRITE_LOG_PROMPT_N || 20
 );
-
-async function ensureNotificationsTable() {
-  // Mirrors the lazy creation in routes/intimacy-requests.js but adds an
-  // optional event_id column so we can wire event notifications to a row.
-  try {
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS notifications (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        notification_type VARCHAR(50) NOT NULL,
-        title VARCHAR(200) NOT NULL,
-        content TEXT NOT NULL,
-        intimacy_request_id UUID REFERENCES intimacy_requests(id) ON DELETE CASCADE,
-        related_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-        is_read BOOLEAN NOT NULL DEFAULT FALSE,
-        read_at TIMESTAMP WITH TIME ZONE,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        priority INTEGER NOT NULL DEFAULT 1
-      );
-    `);
-    await db.query(`
-      ALTER TABLE notifications
-        ADD COLUMN IF NOT EXISTS event_id UUID REFERENCES events(id) ON DELETE CASCADE
-    `);
-  } catch (err) {
-    logWarn('ensureNotificationsTable failed', { err: err.message });
-  }
-}
-
-async function notify(userId, type, title, content, eventId, relatedUserId, priority = 2, messageContent = null, aiName = null) {
-  try {
-    await ensureNotificationsTable();
-    await db.query(
-      `INSERT INTO notifications (user_id, notification_type, title, content, event_id, related_user_id, priority)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [userId, type, title, content, eventId, relatedUserId || null, priority]
-    );
-  } catch (err) {
-    logWarn('Event notification insert failed', { type, err: err.message });
-  }
-
-  // Mirror to LINE (no-ops unless the recipient linked + opted in). Carry the
-  // actual message content so the push alone tells the story; users only open
-  // the app when the text exceeds the excerpt.
-  const EVENT_PUSH_EMOJI = {
-    event_created: '📣',
-    event_reply: '💬',
-    event_ai_comment: '🧑‍⚕️',
-    event_resolve_request: '🤝',
-    event_resolved: '✅',
-    event_reopened: '🔄',
-  };
-  const linePush = [
-    `${EVENT_PUSH_EMOJI[type] || '🔔'} Twogether｜${title}`,
-    `情境：${content}`,
-    messageContent ? `「${lineService.excerpt(messageContent)}」` : null,
-    '👉 https://twogether.fun',
-  ].filter(Boolean).join('\n');
-  lineService.pushToUserIfLinked(db, userId, linePush);
-
-  // Fire-and-forget email mirroring the in-app notification. Skips silently
-  // when the recipient is opted out, unconfigured, or unreachable.
-  try {
-    const recipient = await emailService.getUserEmailIfOptedIn(db, userId);
-    if (!recipient) return;
-    let senderName = null;
-    if (relatedUserId) {
-      const r = await db.query(`SELECT nickname FROM users WHERE id = $1`, [relatedUserId]);
-      senderName = r.rows[0]?.nickname || null;
-    }
-    await emailService.sendEventNotification({
-      senderName,
-      recipientEmail: recipient.email,
-      recipientUserId: recipient.id,
-      eventTitle: content,
-      type,
-      messageContent,
-      aiName,
-    });
-  } catch (err) {
-    logWarn('Event notification email failed', { type, err: err.message });
-  }
-}
 
 // The inviting user's chosen AI companion persona (falls back to Luma).
 async function getUserCompanion(userId) {
@@ -190,80 +120,6 @@ async function saveAiCache(eventId, userId, kind, inputHash, response) {
   } catch (err) {
     logWarn('saveAiCache failed', { kind, err: err.message });
   }
-}
-
-async function getCoupleForUser(userId) {
-  const result = await db.query(
-    `SELECT c.id AS couple_id,
-            CASE WHEN c.user1_id = $1 THEN c.user2_id ELSE c.user1_id END AS partner_id
-     FROM couples c
-     WHERE (c.user1_id = $1 OR c.user2_id = $1) AND c.user2_id IS NOT NULL`,
-    [userId]
-  );
-  return result.rows[0] || null;
-}
-
-async function assertEventAccess(eventId, userId) {
-  const result = await db.query(
-    `SELECT e.*,
-            CASE WHEN c.user1_id = $2 THEN c.user2_id ELSE c.user1_id END AS partner_id
-     FROM events e
-     JOIN couples c ON c.id = e.couple_id
-     WHERE e.id = $1
-       AND (c.user1_id = $2 OR c.user2_id = $2)`,
-    [eventId, userId]
-  );
-  if (result.rows.length === 0) return null;
-  const row = result.rows[0];
-  return { event: row, coupleId: row.couple_id, partnerId: row.partner_id };
-}
-
-function serializeEvent(row, extras = {}) {
-  return {
-    id: row.id,
-    couple_id: row.couple_id,
-    created_by: row.created_by,
-    title: row.title,
-    summary: row.summary,
-    emotions: row.emotions || [],
-    tags: row.tags || [],
-    toxicity_flags: row.toxicity_flags || [],
-    versions: {
-      neutral: row.ai_neutral,
-      firm: row.ai_firm,
-      warm: row.ai_warm,
-    },
-    selected_version: row.selected_version,
-    is_private: row.is_private,
-    content_edited_at: row.content_edited_at || null,
-    public_status: row.public_status || 'private',
-    public_title: row.public_title || null,
-    status: row.status,
-    translation_enabled: row.translation_enabled === true,
-    therapy_note: row.therapy_note || null,
-    resolve_requested_by: row.resolve_requested_by,
-    resolve_requested_at: row.resolve_requested_at,
-    resolved_at: row.resolved_at,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    ...extras,
-  };
-}
-
-function serializeMessage(row) {
-  return {
-    id: row.id,
-    event_id: row.event_id,
-    sender_id: row.sender_id,
-    content: row.content,
-    is_ai: row.is_ai === true,
-    is_therapist: row.is_therapist === true,
-    ai_therapist: row.ai_therapist || null,
-    facilitation: row.facilitation || null,
-    created_at: row.created_at,
-    read_at: row.read_at,
-    edited_at: row.edited_at || null,
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -359,23 +215,6 @@ async function insertEventMessage(eventId, senderId, content, { isTherapist = fa
   );
   await db.query(`UPDATE events SET updated_at = NOW() WHERE id = $1`, [eventId]);
   return serializeMessage(msgResult.rows[0]);
-}
-
-function sendValidationError(req, res) {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    // Prefer a validator's own .withMessage() text so the user learns what is
-    // actually wrong (e.g. an over-length reply) instead of a bare "驗證失敗".
-    const list = errors.array();
-    const specific = list.find((e) => e.msg && e.msg !== 'Invalid value');
-    res.status(400).json({
-      success: false,
-      message: specific ? specific.msg : '驗證失敗',
-      errors: list,
-    });
-    return true;
-  }
-  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -585,7 +424,9 @@ router.get('/analytics', async (req, res) => {
       `SELECT
          SUM(CASE WHEN created_at >= NOW() - INTERVAL '7 days'  THEN 1 ELSE 0 END) AS last7,
          SUM(CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN 1 ELSE 0 END) AS last30,
-         SUM(CASE WHEN status = 'resolved' AND created_at >= NOW() - INTERVAL '30 days' THEN 1 ELSE 0 END) AS resolved30,
+         -- 'closing' counts as resolved here: reaching 收尾 IS resolving, and the
+         -- rate shouldn't dip while a couple is mid-ceremony.
+         SUM(CASE WHEN status IN ('resolved','closing') AND created_at >= NOW() - INTERVAL '30 days' THEN 1 ELSE 0 END) AS resolved30,
          SUM(CASE WHEN created_at >= NOW() - INTERVAL '30 days' THEN 1 ELSE 0 END) AS total30
        FROM events WHERE couple_id = $1`,
       [coupleId]
@@ -747,7 +588,10 @@ router.get(
       for (const r of rows) {
         (r.tags || []).forEach((t) => themeMap.set(t, (themeMap.get(t) || 0) + 1));
         (r.emotions || []).forEach((e) => emotionMap.set(e, (emotionMap.get(e) || 0) + 1));
-        if (r.status === 'resolved') repairedCount += 1;
+        // 收尾中 counts as repaired — a therapist reading this summary shouldn't
+        // be told a conflict is unresolved while the couple is writing their
+        // commitments for it.
+        if (r.status === 'resolved' || r.status === 'closing') repairedCount += 1;
         else unresolvedCount += 1;
       }
       const sortDesc = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]);
@@ -886,14 +730,15 @@ router.get('/communication-pattern', async (req, res) => {
     }
     const coupleId = couple.couple_id;
 
-    // Only resolved, non-private events that actually produced a therapy note
-    // (which carries the per-event cycle we aggregate over).
+    // Only finished (resolved or 收尾中), non-private events that actually
+    // produced a therapy note — which carries the per-event cycle we aggregate
+    // over. The note now exists during 'closing', so include it.
     const evResult = await db.query(
       `SELECT id, title, tags, toxicity_flags, therapy_note, content_edited_at, resolved_at
          FROM events
         WHERE couple_id = $1
           AND is_private = FALSE
-          AND status = 'resolved'
+          AND status IN ('resolved','closing')
           AND therapy_note IS NOT NULL
         ORDER BY resolved_at DESC NULLS LAST
         LIMIT 12`,
@@ -1051,7 +896,7 @@ router.get('/therapy-summary/history', async (req, res) => {
 router.get(
   '/',
   [
-    query('status').optional().isIn(['open', 'resolve_pending', 'resolved', 'all']),
+    query('status').optional().isIn(['open', 'resolve_pending', 'closing', 'resolved', 'all']),
     query('tag').optional().isString(),
     query('limit').optional().isInt({ min: 1, max: 100 }),
     query('offset').optional().isInt({ min: 0 }),
@@ -1074,6 +919,13 @@ router.get(
       });
 
       res.json({ success: true, events, total });
+
+      // Lazy 72h auto-finalize sweep, fire-and-forget AFTER responding — there
+      // is no cron in this app, so it rides the endpoint everyone hits when
+      // they open 好好說話 (same pattern as the relationship reminders). Without
+      // it a closure whose second partner never returns strands the event in
+      // 'closing' and silently corrupts every resolved count.
+      sweepOverdueClosures();
     } catch (err) {
       logError('List events failed', { err: err.message, stack: err.stack });
       res.status(500).json({ success: false, message: '無法取得對話列表' });
@@ -1133,10 +985,14 @@ router.patch(
           error_code: 'NOT_EVENT_CREATOR',
         });
       }
-      if (access.event.status === 'resolved') {
+      // Also blocked during 收尾: your partner is writing a commitment based on
+      // what this event says, so the premise can't shift under them.
+      if (access.event.status === 'resolved' || access.event.status === 'closing') {
         return res.status(400).json({
           success: false,
-          message: '這段對話已完成，無法編輯',
+          message: access.event.status === 'closing'
+            ? '你們正在收尾，先一起完成約定。想改內容可以重新開啟討論。'
+            : '這段對話已完成，無法編輯',
           error_code: 'EVENT_RESOLVED',
         });
       }
@@ -1188,11 +1044,13 @@ router.patch(
           error_code: 'PRIVATE_EVENT',
         });
       }
-      if (access.event.status === 'resolved') {
+      if (access.event.status === 'resolved' || access.event.status === 'closing') {
         return res.status(400).json({
           success: false,
-          message: '這段對話已完成，無法編輯訊息',
-          error_code: 'EVENT_RESOLVED',
+          message: access.event.status === 'closing'
+            ? '你們正在收尾，先一起完成約定。想改訊息可以重新開啟討論。'
+            : '這段對話已完成，無法編輯訊息',
+          error_code: access.event.status === 'closing' ? 'EVENT_CLOSING' : 'EVENT_RESOLVED',
         });
       }
 
@@ -1842,9 +1700,13 @@ router.get('/:id/translations', [param('id').isUUID()], async (req, res) => {
 // 治療摘要 (Therapy Note) — post-conflict structured summary
 // ---------------------------------------------------------------------------
 
-// Return the therapy note for a resolved event. Generated once (the first
-// partner to open the resolved event triggers it) and stored on the event, so
-// both partners read the same note and re-opens cost nothing.
+// Return the therapy note for a finished event. Generated once (the first
+// partner to open it triggers it) and stored on the event, so both partners
+// read the same note and re-opens cost nothing.
+//
+// 'closing' is allowed as well as 'resolved': the 一起收尾 panel renders its
+// recap block ("這次你們各自在意的是…") straight from this note, which is what
+// keeps opening 收尾 free of any new AI call.
 router.get('/:id/therapy-note', [param('id').isUUID()], async (req, res) => {
   if (sendValidationError(req, res)) return;
   try {
@@ -1853,10 +1715,10 @@ router.get('/:id/therapy-note', [param('id').isUUID()], async (req, res) => {
     if (access.event.is_private) {
       return res.status(403).json({ success: false, message: '私人對話沒有治療摘要', error_code: 'PRIVATE_EVENT' });
     }
-    if (access.event.status !== 'resolved') {
+    if (access.event.status !== 'resolved' && access.event.status !== 'closing') {
       return res.status(400).json({
         success: false,
-        message: '對話結束後，AI 才會為你們整理這次衝突的治療摘要。',
+        message: '先按「一起收尾」，AI 才會為你們整理這次衝突的治療摘要。',
         error_code: 'EVENT_NOT_RESOLVED',
       });
     }
@@ -2061,81 +1923,67 @@ router.post('/:id/unpublish', [param('id').isUUID()], async (req, res) => {
   }
 });
 
-// One side requests "mark as resolved"
-router.post('/:id/resolve-request', [param('id').isUUID()], async (req, res) => {
+// Retired: the two-step 標記為解決 → 確認解決 handshake. Both endpoints now do the
+// same thing as the one-tap 一起收尾 bar, and stay mounted for one release only
+// so an unrefreshed tab doesn't 404 mid-flow. Delete them in a follow-up.
+//
+// The handshake was what made 收尾 feel like a negotiation you could lose.
+// Entering closure is not a verdict about who was right, it's an invitation to
+// write something down, so it needs no confirmation from the other side.
+async function legacyResolveToClosing(req, res) {
   if (sendValidationError(req, res)) return;
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
     if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
     if (access.event.is_private) {
-      return res.status(400).json({ success: false, message: '私人對話不需雙方確認，請使用解決 API' });
+      return res.status(403).json({
+        success: false,
+        message: '私人對話沒有收尾流程。想和伴侶一起定下下次的約定，可以先把它改成雙方都看得到的對話。',
+        error_code: 'PRIVATE_EVENT',
+      });
     }
-    if (access.event.status !== 'open') {
-      return res.status(400).json({ success: false, message: '這段對話目前無法發起解決請求' });
+    if (!access.partnerId) {
+      return res.status(400).json({
+        success: false,
+        message: '收尾需要兩個人一起寫。先邀請另一半配對，配對之後就能一起定下下次的約定。',
+        error_code: 'NOT_PAIRED',
+      });
+    }
+    if (access.event.status === 'resolved') {
+      return res.status(400).json({
+        success: false,
+        message: '你們已經完成這次收尾了。想再補上約定可以先重新開啟討論。',
+        error_code: 'CLOSURE_ALREADY_FINALIZED',
+      });
     }
 
-    const result = await db.query(
-      `UPDATE events
-         SET status = 'resolve_pending',
-             resolve_requested_by = $2,
-             resolve_requested_at = NOW()
-       WHERE id = $1 RETURNING *`,
-      [req.params.id, req.user.id]
-    );
+    const { created } = await enterClosing(access, req.user.id);
+    logInfo('events.closure.start', { userId: req.user.id, eventId: req.params.id, created, via: 'legacy_resolve' });
 
-    await notify(
-      access.partnerId,
-      'event_resolve_request',
-      '伴侶覺得可以一起劃下句點了',
-      access.event.title,
-      req.params.id,
-      req.user.id
-    );
+    if (created) {
+      const nickname = (await db.query(`SELECT nickname FROM users WHERE id = $1`, [req.user.id])).rows[0]?.nickname || '伴侶';
+      await notify(
+        access.partnerId,
+        'event_closing_started',
+        `${nickname} 想和你一起想想下次怎麼做`,
+        access.event.title,
+        req.params.id,
+        req.user.id
+      );
+    }
 
-    res.json({ success: true, event: serializeEvent(result.rows[0]) });
+    const fresh = (await db.query(`SELECT * FROM events WHERE id = $1`, [req.params.id])).rows[0];
+    res.json({ success: true, event: serializeEvent(fresh) });
   } catch (err) {
-    logError('Resolve-request failed', { err: err.message, stack: err.stack });
-    res.status(500).json({ success: false, message: '無法發起解決請求' });
+    logError('Legacy resolve → closing failed', { err: err.message, stack: err.stack, eventId: req.params.id });
+    res.status(500).json({ success: false, message: '無法開始收尾，請稍後再試' });
   }
-});
+}
 
-// The other side confirms — flips to resolved
-router.post('/:id/resolve-confirm', [param('id').isUUID()], async (req, res) => {
-  if (sendValidationError(req, res)) return;
-  try {
-    const access = await assertEventAccess(req.params.id, req.user.id);
-    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
-    if (access.event.status !== 'resolve_pending') {
-      return res.status(400).json({ success: false, message: '這段對話目前不在等待確認的狀態' });
-    }
-    if (access.event.resolve_requested_by === req.user.id) {
-      return res.status(400).json({ success: false, message: '需由另一方確認解決' });
-    }
+router.post('/:id/resolve-request', [param('id').isUUID()], legacyResolveToClosing);
+router.post('/:id/resolve-confirm', [param('id').isUUID()], legacyResolveToClosing);
 
-    const result = await db.query(
-      `UPDATE events
-         SET status = 'resolved', resolved_at = NOW()
-       WHERE id = $1 RETURNING *`,
-      [req.params.id]
-    );
-
-    await notify(
-      access.partnerId,
-      'event_resolved',
-      '你們一起走過了這個情境',
-      access.event.title,
-      req.params.id,
-      req.user.id
-    );
-
-    res.json({ success: true, event: serializeEvent(result.rows[0]) });
-  } catch (err) {
-    logError('Resolve-confirm failed', { err: err.message, stack: err.stack });
-    res.status(500).json({ success: false, message: '無法確認解決' });
-  }
-});
-
-// Re-open a resolved event so the couple can keep discussing it.
+// Re-open a finished (or mid-收尾) event so the couple can keep discussing it.
 router.post('/:id/reopen', [param('id').isUUID()], async (req, res) => {
   if (sendValidationError(req, res)) return;
   try {
@@ -2144,21 +1992,34 @@ router.post('/:id/reopen', [param('id').isUUID()], async (req, res) => {
     if (access.event.is_private) {
       return res.status(400).json({ success: false, message: '私人對話無法重新開啟' });
     }
-    if (access.event.status !== 'resolved') {
-      return res.status(400).json({ success: false, message: '只有已解決的對話可以重新開啟' });
+    if (access.event.status !== 'resolved' && access.event.status !== 'closing') {
+      return res.status(400).json({ success: false, message: '只有已解決或收尾中的對話可以重新開啟' });
     }
 
-    const result = await db.query(
-      `UPDATE events
-         SET status = 'open',
-             resolved_at = NULL,
-             resolve_requested_by = NULL,
-             resolve_requested_at = NULL,
-             therapy_note = NULL,
-             updated_at = NOW()
-       WHERE id = $1 RETURNING *`,
-      [req.params.id]
-    );
+    const result = await db.transaction(async (client) => {
+      // Abandon any closure and drop the half-written drafts, but leave ACTIVE
+      // commitments alone: reopening a discussion shouldn't void a promise the
+      // couple already made and is already being followed up on.
+      await client.query(
+        `UPDATE event_closures SET status = 'abandoned', updated_at = NOW()
+          WHERE event_id = $1 AND status = 'collecting'`,
+        [req.params.id]
+      );
+      await client.query(`DELETE FROM commitments WHERE event_id = $1 AND status = 'draft'`, [req.params.id]);
+      await client.query(`DELETE FROM event_closure_participants WHERE event_id = $1`, [req.params.id]);
+
+      return client.query(
+        `UPDATE events
+           SET status = 'open',
+               resolved_at = NULL,
+               resolve_requested_by = NULL,
+               resolve_requested_at = NULL,
+               therapy_note = NULL,
+               updated_at = NOW()
+         WHERE id = $1 RETURNING *`,
+        [req.params.id]
+      );
+    });
 
     await notify(
       access.partnerId,
@@ -2287,6 +2148,17 @@ async function facilitationPreflight(access, res, userId) {
   if (access.event.status === 'resolved') {
     blocked('event_resolved');
     res.status(400).json({ success: false, message: '這段對話已完成，如需再談可先重新開啟對話', error_code: 'EVENT_RESOLVED' });
+    return false;
+  }
+  // Replies stay open during 收尾 — only the guided-session machinery pauses,
+  // so a half-finished practice can't fight the closure form for the same turn.
+  if (access.event.status === 'closing') {
+    blocked('event_closing');
+    res.status(400).json({
+      success: false,
+      message: '你們正在收尾，先一起完成約定；還想再練習可以重新開啟對話。',
+      error_code: 'EVENT_CLOSING',
+    });
     return false;
   }
   if (!access.partnerId) {

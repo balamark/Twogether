@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ChevronDown, ChevronUp, LifeBuoy, MessageSquarePlus } from 'lucide-react';
 import { FEATURE_INTROS } from '../content/featureIntros';
 import { COMMUNICATION_PRINCIPLES } from '../content/communicationPrinciples';
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '../content/supportContact';
 
 // 使用說明（docs/UX_PLAYBOOK.md P0-4）：per-tab FAQ from the single source in
 // src/content/featureIntros.ts. Reachable from the user menu. Opens with the
@@ -20,6 +21,13 @@ export default function HelpView({ onFeedback }: { onFeedback?: () => void }) {
         </div>
         <p className="text-sm text-petal-ink-soft">
           每個分頁在做什麼、常見的問題。找不到答案時，歡迎用「意見回饋」告訴我們。
+        </p>
+        <p className="text-sm text-petal-ink-soft mt-1" data-testid="help-support-email">
+          付款、退費或帳號問題，請直接來信客服{' '}
+          <a href={SUPPORT_MAILTO} className="text-petal-rose-deep underline underline-offset-2">
+            {SUPPORT_EMAIL}
+          </a>
+          。
         </p>
       </header>
 
