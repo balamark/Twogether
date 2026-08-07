@@ -78,7 +78,7 @@ export default function PartnerReviewCard({
                 data-testid="closure-review-agree"
                 disabled={busy}
                 onClick={() => submitReview('commitment', 'agree')}
-                className="text-sm px-3 py-1.5 rounded-full bg-petal-sage-deep text-white font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
+                className="text-sm px-3 py-1.5 rounded-full bg-petal-sage-deeper text-white font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
               >
                 {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                 就這樣
@@ -101,7 +101,7 @@ export default function PartnerReviewCard({
                   type="button"
                   disabled={busy}
                   onClick={() => submitReview('commitment', 'request_change')}
-                  className="text-sm px-3 py-1.5 rounded-full bg-petal-sage-deep text-white font-medium disabled:opacity-50"
+                  className="text-sm px-3 py-1.5 rounded-full bg-petal-sage-deeper text-white font-medium disabled:opacity-50"
                 >
                   {busy ? '送出中⋯' : '送出建議'}
                 </button>
@@ -140,7 +140,7 @@ export default function PartnerReviewCard({
                 type="button"
                 disabled={busy}
                 onClick={() => submitReview('decision', 'agree')}
-                className="text-sm px-3 py-1.5 rounded-full bg-petal-sage-deep text-white font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
+                className="text-sm px-3 py-1.5 rounded-full bg-petal-sage-deeper text-white font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
               >
                 {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                 就這樣
