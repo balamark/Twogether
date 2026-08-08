@@ -1884,12 +1884,17 @@ class ApiService {
     }
   }
 
-  async updateCoins(amount: number): Promise<void> {
+  // `idempotencyKey`: a UUID identifying one earn/spend intent. Passing it lets
+  // the server dedupe a retried or double-submitted request (it grants once),
+  // which is what makes it safe for callers to credit optimistically instead of
+  // blocking the button for the whole round-trip.
+  async updateCoins(amount: number, idempotencyKey?: string): Promise<void> {
     try {
       await apiClient.post('/coins/transaction', {
         amount: Math.abs(amount),
         transaction_type: amount > 0 ? 'earn' : 'spend',
         description: amount > 0 ? '記錄愛的時光' : '購買禮品',
+        ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
       });
     } catch (error) {
       console.error('Failed to update coins:', error);

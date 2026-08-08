@@ -6,6 +6,14 @@ import { Spinner } from './ui/Spinner';
 import { apiService } from '../services/api';
 import type { ForeplayActivity, PositionSuggestion, Notification } from '../App';
 
+// A UUID per coin-earn intent, sent as the idempotency key so a retried or
+// duplicated grant is deduped server-side. Falls back to a random string where
+// crypto.randomUUID is unavailable (older/insecure contexts, jsdom in tests).
+const newIdemKey = (): string =>
+  typeof crypto !== 'undefined' && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
 // Foreplay Activities
 const foreplayActivities: ForeplayActivity[] = [
   {
@@ -159,9 +167,9 @@ const ForeplayView = ({ setTotalCoins, showNotification }: ForeplayViewProps) =>
   useScrollLock(!!selectedActivity);
   useScrollLock(!!selectedPosition);
 
-  // These reward buttons award coins with no idempotency, so a double-tap used
-  // to grant coins twice. The hook's ref lock drops the second click; `earningKey`
-  // just tells us which card to spin (a human taps one at a time).
+  // `earningKey` marks which card is mid-persist (spinner/disable). The hook's
+  // ref lock still drops a synchronous double-click; the coin endpoint's
+  // idempotency key (migration 085) covers any duplicate that slips past it.
   const [earningKey, setEarningKey] = useState<string | null>(null);
   const { run: earnCoins } = useAsyncAction(async (key: string, fn: () => Promise<void>) => {
     setEarningKey(key);
@@ -172,23 +180,21 @@ const ForeplayView = ({ setTotalCoins, showNotification }: ForeplayViewProps) =>
     }
   });
 
-  // NOTE (playbook §R7 exception): these do NOT fire-and-forget. Coin grants
-  // have no server-side idempotency, so the `earnCoins` lock must stay held for
-  // the whole round-trip to block a double-tap double-grant — awaiting the API
-  // before releasing is the point. Local credit is kept even on failure so a
-  // network blip never swallows a coin the user earned.
-  const handleTryActivity = async (activity: ForeplayActivity) => {
+  // Credit + notify instantly (playbook §R7), then persist in the background.
+  // Safe to be optimistic now that /coins/transaction is idempotent: the key
+  // makes a retried/duplicated grant a no-op server-side, so a slow network or
+  // a timeout that actually succeeded can't double-credit. The local credit is
+  // kept even if the sync fails — a network blip shouldn't swallow an earned
+  // coin. Returns the persist promise so earnCoins holds the card disabled for
+  // its duration (a second, cheaper guard against rapid re-taps).
+  const persistCoins = (coinsEarned: number): Promise<void> =>
+    apiService.updateCoins(coinsEarned, newIdemKey()).catch((error) => {
+      console.warn('Failed to persist coins via API, kept local credit:', error);
+    });
+
+  const handleTryActivity = (activity: ForeplayActivity): Promise<void> => {
     const coinsEarned = activity.coins;
-
-    // Update coins via backend API
-    try {
-      await apiService.updateCoins(coinsEarned);
-      setTotalCoins(prev => prev + coinsEarned);
-    } catch (error) {
-      console.warn('Failed to update coins via API, using local update only:', error);
-      setTotalCoins(prev => prev + coinsEarned);
-    }
-
+    setTotalCoins(prev => prev + coinsEarned);
     showNotification({
       type: 'success',
       title: `已嘗試 ${activity.title}！`,
@@ -196,20 +202,12 @@ const ForeplayView = ({ setTotalCoins, showNotification }: ForeplayViewProps) =>
       coins: coinsEarned,
       duration: 4000
     });
+    return persistCoins(coinsEarned);
   };
 
-  const handleTryPosition = async (position: PositionSuggestion) => {
+  const handleTryPosition = (position: PositionSuggestion): Promise<void> => {
     const coinsEarned = position.coins;
-
-    // Update coins via backend API
-    try {
-      await apiService.updateCoins(coinsEarned);
-      setTotalCoins(prev => prev + coinsEarned);
-    } catch (error) {
-      console.warn('Failed to update coins via API, using local update only:', error);
-      setTotalCoins(prev => prev + coinsEarned);
-    }
-
+    setTotalCoins(prev => prev + coinsEarned);
     showNotification({
       type: 'success',
       title: `已嘗試 ${position.name}！`,
@@ -217,19 +215,12 @@ const ForeplayView = ({ setTotalCoins, showNotification }: ForeplayViewProps) =>
       coins: coinsEarned,
       duration: 4000
     });
+    return persistCoins(coinsEarned);
   };
 
-  const handleCompleteCombo = async (combo: typeof comboSuggestions[number]) => {
+  const handleCompleteCombo = (combo: typeof comboSuggestions[number]): Promise<void> => {
     const coinsEarned = combo.bonusCoins;
-
-    try {
-      await apiService.updateCoins(coinsEarned);
-      setTotalCoins(prev => prev + coinsEarned);
-    } catch (error) {
-      console.warn('Failed to update coins via API, using local update only:', error);
-      setTotalCoins(prev => prev + coinsEarned);
-    }
-
+    setTotalCoins(prev => prev + coinsEarned);
     showNotification({
       type: 'success',
       title: `組合技達成 — ${combo.name}！`,
@@ -237,6 +228,7 @@ const ForeplayView = ({ setTotalCoins, showNotification }: ForeplayViewProps) =>
       coins: coinsEarned,
       duration: 5000,
     });
+    return persistCoins(coinsEarned);
   };
 
   return (

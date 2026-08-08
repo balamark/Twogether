@@ -358,6 +358,33 @@ class TestRunner {
       // Expect either 200 (if implemented) or appropriate status for placeholder
       this.assertTrue(response.status === 200 || response.status >= 400, 'Should return valid response status');
     });
+
+    // A repeated earn carrying the same idempotency_key must grant only once
+    // (migration 085). This is what lets the client credit optimistically and
+    // still be safe against a retry / a timeout that actually succeeded.
+    await this.test('Coin Transaction Idempotency', async () => {
+      const before = await this.makeRequest('GET', '/coins/balance');
+      if (before.status !== 200 || typeof before.data.balance !== 'number') {
+        return; // No couple / balance unavailable in this env — nothing to assert.
+      }
+      const startBalance = before.data.balance;
+      const key = `test-idem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const payload = { amount: 7, transaction_type: 'earn', description: 'Idempotency test', idempotency_key: key };
+
+      const first = await this.makeRequest('POST', '/coins/transaction', payload);
+      if (first.status !== 200) return; // Earn not grantable in this env — skip strict check.
+      this.assertTrue(!first.data.deduped, 'First grant should not be flagged deduped');
+
+      const second = await this.makeRequest('POST', '/coins/transaction', payload);
+      this.assertStatus(second, 200, 'Repeat with same key should still succeed (idempotent)');
+      this.assertTrue(second.data.deduped === true, 'Repeat with same key should be deduped');
+
+      const after = await this.makeRequest('GET', '/coins/balance');
+      this.assertTrue(
+        after.data.balance === startBalance + 7,
+        `Balance should rise by 7 once, not twice (delta ${after.data.balance - startBalance})`
+      );
+    });
   }
 
   async testAchievements() {
