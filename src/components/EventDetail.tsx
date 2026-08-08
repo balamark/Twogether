@@ -1200,7 +1200,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               data-testid="event-ai-counselor-button"
               onClick={inviteAiCounselor}
               disabled={aiInviting}
-              className="px-3 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
+              className="px-3 py-2 rounded-full bg-petal-sage-deeper text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
               title={`請 ${myCompanion.name} 讀過你們的對話，給一段中立的建議`}
             >
               {aiInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
@@ -1454,7 +1454,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 data-testid="event-therapy-note-button"
                 disabled={therapyLoading}
                 onClick={loadTherapyNote}
-                className="px-4 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2 disabled:opacity-50"
+                className="px-4 py-2 rounded-full bg-petal-sage-deeper text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2 disabled:opacity-50"
               >
                 {therapyLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <NotebookPen className="w-4 h-4" />}
                 {therapyLoading ? '整理中⋯' : '產生治療摘要'}
@@ -1472,7 +1472,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               data-testid="event-reopen-button"
               disabled={resolving}
               onClick={handleReopen}
-              className="px-4 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2 disabled:opacity-50"
+              className="px-4 py-2 rounded-full bg-petal-sage-deeper text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2 disabled:opacity-50"
             >
               {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
               重新開啟討論
@@ -1534,7 +1534,7 @@ function AiCounselorPreview({
             data-testid="event-ai-counselor-post"
             onClick={onPost}
             disabled={posting}
-            className="text-sm px-4 py-2 rounded-full bg-petal-sage-deep text-petal-cream inline-flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
+            className="text-sm px-4 py-2 rounded-full bg-petal-sage-deeper text-petal-cream inline-flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
           >
             {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
             貼到對話串

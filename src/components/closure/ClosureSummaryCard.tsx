@@ -106,7 +106,7 @@ export default function ClosureSummaryCard({
               type="button"
               disabled={retryingInsight}
               onClick={onRetryInsight}
-              className="text-xs px-3 py-1.5 rounded-full bg-petal-sage-deep text-white font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
+              className="text-xs px-3 py-1.5 rounded-full bg-petal-sage-deeper text-white font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
             >
               {retryingInsight ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
               再試一次

@@ -107,6 +107,15 @@ export default function ClosurePanel({
     setAssisting(field);
     try {
       const { options } = await apiService.closureAssist(eventId, field);
+      if (!options.length) {
+        // A 200 with no options is an expected miss, not an error: tell the
+        // user what happened and what they can do, so the button never looks dead.
+        showNotification({
+          type: 'info',
+          title: 'AI 這次沒想到合適的句子',
+          message: '請再按一次「幫我想一個」，或直接自己寫一句就好。',
+        });
+      }
       return options;
     } catch (err) {
       const code = (err as { error_code?: string })?.error_code;

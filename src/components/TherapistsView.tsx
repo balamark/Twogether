@@ -722,7 +722,7 @@ const ConsultationSessionActions: React.FC<{
     if (c.paymentStatus === 'paid') {
       return c.meetingUrl ? (
         <a href={c.meetingUrl} target="_blank" rel="noopener noreferrer" data-testid="join-meeting-link"
-          className="mt-3 mr-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-petal-sage-deep text-white hover:opacity-90 transition-opacity font-body text-xs font-medium">
+          className="mt-3 mr-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-petal-sage-deepertext-white hover:opacity-90 transition-opacity font-body text-xs font-medium">
           <Video className="w-3.5 h-3.5" strokeWidth={1.5} /> 加入{MEETING_LABEL[c.meetingProvider || 'other']}視訊
         </a>
       ) : (

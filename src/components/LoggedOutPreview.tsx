@@ -22,6 +22,7 @@ import {
   Bell,
   ShieldCheck,
   MessageSquare,
+  Eye,
   type LucideIcon,
 } from 'lucide-react';
 import { daysSinceLastNudge } from './AchievementsView';
@@ -724,9 +725,27 @@ const PREVIEWS: Record<string, PreviewConfig> = {
         留下你們的<em className="not-italic font-light italic text-pink-600">悄悄話</em>
       </>
     ),
-    description: '在牆上貼下想對彼此說的話，你選的 AI 諮商師（例如 Luma）也會適時給予溫柔的建議。開啟「情緒翻譯」後，AI 還會把每句指責翻成底層的需求，讓對方聽到的不是攻擊，而是需要。',
+    description: '在牆上貼下想對彼此說的話，你選的 AI 諮商師（例如 Luma）也會適時給予溫柔的建議。貼文看得到「TA 已讀」，對方也能一鍵回你一個「抱抱」，不用硬擠出一段話。開啟「情緒翻譯」後，AI 還會把每句指責翻成底層的需求，讓對方聽到的不是攻擊，而是需要。',
     sample: (
       <div className="space-y-2.5">
+        {/* 已讀 + 一鍵心意回應 — the answer to 「TA 看了卻什麼都沒說」. */}
+        <SampleCard>
+          <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+            <ParticipantAvatar size="xs" name="小晴" colorKey="小晴" />
+            <span className="font-body text-xs text-petal-ink">小晴</span>
+            <span className="font-body text-[11px] text-petal-muted">· 想被抱抱</span>
+            <SampleTag />
+          </div>
+          <p className="font-body text-sm text-petal-ink">今天真的好累，可是又說不上為什麼。</p>
+          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-petal-rose-soft/50 px-3 py-1">
+            <span aria-hidden>🫂</span>
+            <span className="font-body text-xs text-petal-rose-deep">小宇給了你一個「抱抱」</span>
+          </div>
+          <div className="mt-2 flex items-center gap-1.5 text-petal-sage-deep">
+            <Eye className="w-3.5 h-3.5" strokeWidth={1.5} />
+            <span className="font-body text-xs">已讀 · 3 小時前</span>
+          </div>
+        </SampleCard>
         {/* 從範本開始 — short starter templates so a blank page never stops you.
             Read-only strip mirroring the composer's template chips. */}
         <div className="bg-petal-cream-2 border border-petal-rule rounded-xl px-3 py-2">

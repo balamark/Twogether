@@ -820,6 +820,10 @@ export interface EventAnalyticsData {
 
 export type WallPostCategory = 'important' | 'general';
 
+// One-tap acknowledgements on a wall post. Keys must match WALL_REACTIONS in
+// routes/wall.js; the emoji/label pairing lives in src/components/WallView.tsx.
+export type WallReactionKey = 'hug' | 'understand' | 'thanks' | 'later';
+
 export interface WallPost {
   id: string;
   content: string;
@@ -834,6 +838,13 @@ export interface WallPost {
   // When true, only the author can see this post; the partner never sees it and
   // isn't notified. Distinct from public_status (匿名公開 to the public Q&A).
   is_private: boolean;
+  // When the partner last saw this post (null = not yet). Only rendered on the
+  // author's own shared posts — a private post never reaches the partner.
+  partner_read_at?: string | null;
+  // The non-author's 心意回應 on this post, and the viewer's own. Pre-digested
+  // server-side so the UI doesn't have to work out who is who.
+  partner_reaction?: { reaction: WallReactionKey; created_at: string } | null;
+  my_reaction?: WallReactionKey | null;
   public_status?: 'private' | 'published';
   public_title?: string | null;
   created_at: string;
@@ -3215,6 +3226,34 @@ class ApiService {
       console.error('Failed to fetch wall mood tags:', error);
       return [];
     }
+  }
+
+  // Report partner posts the viewer has actually scrolled past. Non-fatal by
+  // design: a read receipt that fails is not worth a toast, and the next flush
+  // (or the next visit) reports the same ids again.
+  async markWallPostsRead(postIds: string[]): Promise<number> {
+    if (!postIds.length) return 0;
+    try {
+      const response = await apiClient.post('/wall/read', { post_ids: postIds });
+      return Number(response.data?.marked || 0);
+    } catch (error) {
+      console.error('Failed to mark wall posts read:', error);
+      return 0;
+    }
+  }
+
+  // Set (or clear, with null) the viewer's one-tap 心意回應 on a partner's post.
+  // Throws so the caller can roll back its optimistic state and surface the
+  // server's specific message — the interceptor preserves error_code.
+  async setWallPostReaction(
+    postId: string,
+    reaction: WallReactionKey | null
+  ): Promise<{ my_reaction: WallReactionKey | null; partner_reaction: { reaction: WallReactionKey; created_at: string } | null }> {
+    const response = await apiClient.put(`/wall/${postId}/reaction`, { reaction });
+    return {
+      my_reaction: (response.data?.my_reaction ?? null) as WallReactionKey | null,
+      partner_reaction: response.data?.partner_reaction ?? null,
+    };
   }
 
   async createWallPost(input: CreateWallPostInput): Promise<WallPost> {

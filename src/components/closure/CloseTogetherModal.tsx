@@ -57,7 +57,7 @@ export default function CloseTogetherModal({
             data-testid="close-together-confirm"
             disabled={busy}
             onClick={onConfirm}
-            className="text-sm px-4 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
+            className="text-sm px-4 py-2 rounded-full bg-petal-sage-deeper text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
           >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sprout className="w-4 h-4" />}
             開始

@@ -66,6 +66,9 @@ export default {
           'rose-deep':'#B86E64',
           sage:      '#A8B89E',
           'sage-deep':'#7D8F75',
+          // Vivid, higher-contrast sage for primary buttons — the muted
+          // sage-deep read as disabled on cream. White text clears WCAG-AA.
+          'sage-deeper':'#556B47',
           ink:       '#2A2520',
           'ink-soft':'#5A4F45',
           muted:     '#8A7E72',

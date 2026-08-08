@@ -1,22 +1,8 @@
 import { useState } from 'react';
-import { Send, Loader2, Sparkles, CircleCheck, CircleX } from 'lucide-react';
+import { Send, Loader2, Sparkles } from 'lucide-react';
 import AiQuotaHint from '../AiQuotaHint';
 import AssistOptions from './AssistOptions';
 import type { AiUsageToday, ClosureAssistField } from '../../services/api';
-
-// Two ✓ / two ✗ examples chosen from the plan §1.2 wireframes — the ✗ ones
-// show what NOT to write (blame, absolute promises) more clearly than any prose
-// rule ever could.
-const COMMITMENT_EXAMPLES = {
-  good: [
-    '即使很生氣，也不在人前責罵你',
-    '要動孩子之前，我會先問你一聲',
-  ],
-  bad: [
-    '你要多聽我說話',
-    '以後我絕對不會再生氣',
-  ],
-};
 
 // Batch 1's minimums mirror routes/event-closure.js MIN/MAX_COMMITMENT_CHARS.
 const MIN_CHARS = 4;
@@ -107,7 +93,7 @@ export default function CommitmentComposer({
               data-testid="closure-assist-button"
               disabled={assisting === 'commitment'}
               onClick={() => runAssist('commitment')}
-              className="px-3 py-1.5 rounded-full bg-petal-sage-deep text-white text-xs font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
+              className="px-3 py-1.5 rounded-full bg-petal-sage-deeper text-white text-xs font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
             >
               {assisting === 'commitment' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
               幫我想一個
@@ -120,25 +106,6 @@ export default function CommitmentComposer({
           onPick={(text) => setCommitment(text)}
           onDismiss={() => setCommitmentAssist([])}
         />
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-          <div className="bg-petal-sage/10 border border-petal-sage/30 rounded-lg p-2">
-            <p className="text-petal-sage-deep font-medium inline-flex items-center gap-1">
-              <CircleCheck className="w-3.5 h-3.5" /> 這樣寫比較好
-            </p>
-            <ul className="mt-1 space-y-0.5 text-petal-ink-soft">
-              {COMMITMENT_EXAMPLES.good.map((s) => <li key={s}>· {s}</li>)}
-            </ul>
-          </div>
-          <div className="bg-petal-rose/10 border border-petal-rose/30 rounded-lg p-2">
-            <p className="text-petal-rose-deep font-medium inline-flex items-center gap-1">
-              <CircleX className="w-3.5 h-3.5" /> 這樣容易變成指責
-            </p>
-            <ul className="mt-1 space-y-0.5 text-petal-ink-soft">
-              {COMMITMENT_EXAMPLES.bad.map((s) => <li key={s}>· {s}</li>)}
-            </ul>
-          </div>
-        </div>
       </section>
 
       <section className="bg-white border border-petal-sage/40 rounded-2xl p-4 space-y-3">
@@ -166,7 +133,7 @@ export default function CommitmentComposer({
             data-testid="closure-decision-assist-button"
             disabled={assisting === 'decision'}
             onClick={() => runAssist('decision')}
-            className="px-3 py-1.5 rounded-full bg-petal-sage-deep/80 text-white text-xs font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
+            className="px-3 py-1.5 rounded-full bg-petal-sage-deeper/90 text-white text-xs font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
           >
             {assisting === 'decision' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
             幫我想一個
@@ -205,7 +172,7 @@ export default function CommitmentComposer({
           data-testid="closure-submit-button"
           disabled={!commitmentValid || busy}
           onClick={submit}
-          className="px-4 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
+          className="px-4 py-2 rounded-full bg-petal-sage-deeper text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
         >
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           {revising ? '更新我的約定' : '送出我的約定'}
