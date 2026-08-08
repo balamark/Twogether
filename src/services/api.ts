@@ -3050,6 +3050,7 @@ class ApiService {
         if (script.isPublic !== undefined) fd.append('isPublic', String(script.isPublic));
         const response = await apiClient.post('/custom-scripts', fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: uploadTimeoutFor(script.photos),
         });
         return response.data.custom_script;
       }
@@ -3097,6 +3098,7 @@ class ApiService {
         for (const p of updates.photos ?? []) fd.append('photos', p);
         const response = await apiClient.put(`/custom-scripts/${id}`, fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: uploadTimeoutFor(updates.photos ?? []),
         });
         return response.data.custom_script;
       }
@@ -4428,6 +4430,7 @@ class ApiService {
       form.append(kind, file);
       const response = await apiClient.post(`/therapists/upload-${kind}`, form, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: uploadTimeoutFor([file]),
       });
       return response.data?.url as string;
     } catch (error: unknown) {
