@@ -1048,6 +1048,20 @@ const apiClient = axios.create({
   },
 });
 
+// The default 15s timeout is fine for JSON requests but far too short for a
+// multipart upload: a wall post can carry up to 4 files (images ≤5MB, videos
+// ≤20MB each), and on a mobile connection those bytes take much longer than
+// 15s to leave the device. When axios gives up first, the upload usually still
+// completes server-side — the user gets a false "network failed" while the post
+// actually posts. Scale the timeout with the payload (min 60s), with a generous
+// ceiling for the worst case (~4 videos).
+const uploadTimeoutFor = (files: readonly File[]): number => {
+  const totalBytes = files.reduce((sum, f) => sum + (f.size || 0), 0);
+  // Budget ~1s per 40KB (~320kbps effective) on top of a 60s floor.
+  const scaled = 60000 + Math.ceil(totalBytes / (40 * 1024)) * 1000;
+  return Math.min(scaled, 300000); // cap at 5 min
+};
+
 // Reject anything that isn't shaped like a JWT before it can poison
 // localStorage and trigger the malformed-token 403/401 loop on every
 // subsequent request. Also persists the server-supplied expiry so the
@@ -1206,7 +1220,30 @@ apiClient.interceptors.response.use(
       apiError.data = data;
       throw apiError;
     } else if (error.request) {
-      // Network error
+      // No response came back. Two very different situations land here, and
+      // conflating them is what made photo uploads look like they'd failed
+      // when they hadn't: a real network failure vs. the client giving up on
+      // a request that the server is still (successfully) processing.
+      //
+      // Axios aborts a request that outruns its `timeout` with
+      // code 'ECONNABORTED' (older) / 'ETIMEDOUT' (newer). For a large
+      // multipart upload on a slow connection the bytes often finish arriving
+      // and the post is created server-side *after* we've already stopped
+      // waiting — so telling the user "網絡連接失敗" is both wrong and likely to
+      // make them re-post a duplicate. Surface it as its own TIMEOUT code with
+      // a message that says the action may have gone through.
+      const isTimeout =
+        error.code === 'ECONNABORTED' ||
+        error.code === 'ETIMEDOUT' ||
+        /timeout/i.test(error.message || '');
+      if (isTimeout) {
+        const timeoutError = new Error(
+          '連線逾時。你的操作可能已經送出——請重新整理確認，先不要重複送出以免重複。'
+        ) as Error & { error_code?: string };
+        timeoutError.error_code = 'TIMEOUT';
+        throw timeoutError;
+      }
+      // Genuine network error (request left, nothing came back, not a timeout).
       const networkError = new Error('網絡連接失敗，請檢查網絡連接') as Error & { error_code?: string };
       networkError.error_code = 'NETWORK_ERROR';
       throw networkError;
@@ -1872,12 +1909,17 @@ class ApiService {
     }
   }
 
-  async updateCoins(amount: number): Promise<void> {
+  // `idempotencyKey`: a UUID identifying one earn/spend intent. Passing it lets
+  // the server dedupe a retried or double-submitted request (it grants once),
+  // which is what makes it safe for callers to credit optimistically instead of
+  // blocking the button for the whole round-trip.
+  async updateCoins(amount: number, idempotencyKey?: string): Promise<void> {
     try {
       await apiClient.post('/coins/transaction', {
         amount: Math.abs(amount),
         transaction_type: amount > 0 ? 'earn' : 'spend',
         description: amount > 0 ? '記錄愛的時光' : '購買禮品',
+        ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
       });
     } catch (error) {
       console.error('Failed to update coins:', error);
@@ -3038,6 +3080,7 @@ class ApiService {
         if (script.isPublic !== undefined) fd.append('isPublic', String(script.isPublic));
         const response = await apiClient.post('/custom-scripts', fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: uploadTimeoutFor(script.photos),
         });
         return response.data.custom_script;
       }
@@ -3085,6 +3128,7 @@ class ApiService {
         for (const p of updates.photos ?? []) fd.append('photos', p);
         const response = await apiClient.put(`/custom-scripts/${id}`, fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: uploadTimeoutFor(updates.photos ?? []),
         });
         return response.data.custom_script;
       }
@@ -3284,6 +3328,7 @@ class ApiService {
         for (const file of input.media) fd.append('media', file);
         const response = await apiClient.post('/wall', fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: uploadTimeoutFor(input.media),
         });
         return response.data.wall_post as WallPost;
       }
@@ -3315,6 +3360,7 @@ class ApiService {
         for (const file of updates.media ?? []) fd.append('media', file);
         const response = await apiClient.put(`/wall/${id}`, fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: uploadTimeoutFor(updates.media ?? []),
         });
         return response.data.wall_post as WallPost;
       }
@@ -4429,6 +4475,7 @@ class ApiService {
       form.append(kind, file);
       const response = await apiClient.post(`/therapists/upload-${kind}`, form, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: uploadTimeoutFor([file]),
       });
       return response.data?.url as string;
     } catch (error: unknown) {

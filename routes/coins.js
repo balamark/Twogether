@@ -3,7 +3,7 @@ const { body, validationResult } = require('express-validator');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
-const { logInfo, logError } = require('../lib/logger');
+const { logInfo, logWarn, logError } = require('../lib/logger');
 
 const router = express.Router();
 
@@ -351,7 +351,14 @@ router.post('/transaction', [
     .withMessage('交易類型必須是 earn 或 spend'),
   body('description')
     .isLength({ min: 1, max: 200 })
-    .withMessage('描述必須在1-200個字符之間')
+    .withMessage('描述必須在1-200個字符之間'),
+  // Optional client-generated idempotency key (a UUID per user intent). When
+  // present, a retried/duplicated request with the same key grants only once.
+  body('idempotency_key')
+    .optional({ nullable: true })
+    .isString()
+    .isLength({ min: 1, max: 128 })
+    .withMessage('idempotency_key 格式錯誤')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -364,7 +371,7 @@ router.post('/transaction', [
     }
 
     const userId = req.user.id;
-    const { amount, transaction_type, description } = req.body;
+    const { amount, transaction_type, description, idempotency_key } = req.body;
 
     // Find user's couple
     const coupleResult = await db.query(
@@ -401,11 +408,17 @@ router.post('/transaction', [
       }
     }
 
-    // Record transaction
+    // Record transaction. When an idempotency key is supplied, ON CONFLICT
+    // makes a repeat of the same intent a no-op instead of a second grant —
+    // the arbiter is the partial unique index from migration 085, so the WHERE
+    // predicate must match it for inference. A null key never conflicts (each
+    // keyless row inserts as before).
     const transactionId = uuidv4();
-    await db.query(`
-      INSERT INTO coin_transactions (id, couple_id, amount, transaction_type, description, transaction_date, earned_from, spent_on)
-      VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)
+    const insertResult = await db.query(`
+      INSERT INTO coin_transactions (id, couple_id, amount, transaction_type, description, transaction_date, earned_from, spent_on, idempotency_key)
+      VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8)
+      ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
+      RETURNING id
     `, [
       transactionId,
       coupleId,
@@ -413,8 +426,14 @@ router.post('/transaction', [
       transaction_type,
       description,
       transaction_type === 'earn' ? description : null,
-      transaction_type === 'spend' ? description : null
+      transaction_type === 'spend' ? description : null,
+      idempotency_key || null
     ]);
+
+    // A key was given but nothing inserted → this exact request already ran.
+    // Return success idempotently (with the balance that already reflects it)
+    // so a client retry is a harmless no-op, never a double grant or an error.
+    const deduped = !!idempotency_key && insertResult.rows.length === 0;
 
     // Get updated balance
     const balanceResult = await db.query(`
@@ -425,14 +444,19 @@ router.post('/transaction', [
     const newBalance = parseInt(balanceResult.rows[0].balance);
 
     const action = transaction_type === 'earn' ? '獲得' : '花費';
-    logInfo('Coin transaction', { coupleId, action, amount, description });
+    if (deduped) {
+      logWarn('Coin transaction deduped by idempotency key', { coupleId, action, amount, idempotency_key });
+    } else {
+      logInfo('Coin transaction', { coupleId, action, amount, description });
+    }
 
     res.json({
       success: true,
       message: `${action} ${amount} 金幣`,
       amount,
       transaction_type,
-      new_balance: newBalance
+      new_balance: newBalance,
+      deduped
     });
 
   } catch (error) {

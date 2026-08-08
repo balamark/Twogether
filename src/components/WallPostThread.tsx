@@ -157,14 +157,18 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
 
   const handleDelete = async (replyId: string) => {
     if (!confirm('確定要刪除這則回覆嗎？')) return;
+    // Optimistic (playbook §R7): drop the reply immediately, restore on failure.
+    const snapshot = replies;
+    setReplies((prev) => {
+      const next = prev.filter((r) => r.id !== replyId);
+      onReplyCountChange?.(next.length);
+      return next;
+    });
     try {
       await apiService.deleteWallPostReply(replyId);
-      setReplies((prev) => {
-        const next = prev.filter((r) => r.id !== replyId);
-        onReplyCountChange?.(next.length);
-        return next;
-      });
     } catch (err) {
+      setReplies(snapshot);
+      onReplyCountChange?.(snapshot.length);
       onError?.(err instanceof Error ? err.message : '刪除失敗');
     }
   };

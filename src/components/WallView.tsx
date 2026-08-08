@@ -289,34 +289,56 @@ const WallView: React.FC<WallViewProps> = ({
     is_private: boolean;
     existingMedia?: string[];
   }) => {
-    if (editingPost) {
-      const updated = await apiService.updateWallPost(editingPost.id, input);
-      setPosts((prev) =>
-        prev.map((p) => (p.id === updated.id ? { ...updated, reply_count: p.reply_count } : p))
-      );
-      showNotification({
-        type: 'success',
-        title: '已更新',
-        message: '貼文已儲存',
-      });
-    } else {
-      const created = await apiService.createWallPost(input);
-      setPosts((prev) => [created, ...prev]);
-      showNotification({
-        type: 'success',
-        title: '已發布',
-        message: '對方會收到通知',
-      });
+    try {
+      if (editingPost) {
+        const updated = await apiService.updateWallPost(editingPost.id, input);
+        setPosts((prev) =>
+          prev.map((p) => (p.id === updated.id ? { ...updated, reply_count: p.reply_count } : p))
+        );
+        showNotification({
+          type: 'success',
+          title: '已更新',
+          message: '貼文已儲存',
+        });
+      } else {
+        const created = await apiService.createWallPost(input);
+        setPosts((prev) => [created, ...prev]);
+        showNotification({
+          type: 'success',
+          title: '已發布',
+          message: '對方會收到通知',
+        });
+      }
+    } catch (err) {
+      // A media upload that outran the client timeout usually still finished
+      // server-side, so re-posting would create a duplicate. Instead of letting
+      // the composer show a red "failed", reload the wall so the post that did
+      // go through appears, and tell the user calmly what happened.
+      const code = (err as { error_code?: string })?.error_code;
+      if (code === 'TIMEOUT') {
+        await loadPosts();
+        showNotification({
+          type: 'warning',
+          title: editingPost ? '儲存時間較長' : '上傳時間較長',
+          message: '網路較慢，內容可能已送出。已為你重新整理牆面——若已出現就不用再送一次。',
+        });
+        return; // resolve so the composer closes without an error
+      }
+      throw err; // real failure → composer surfaces it inline for a retry
     }
   };
 
   const handleDelete = async (post: WallPost) => {
     if (!confirm('確定要刪除這則貼文嗎？所有回覆也會一起刪除。')) return;
+    // Optimistic (playbook §R7): remove it from the wall immediately so the tap
+    // feels instant; restore the exact list and notify if the server rejects it.
+    const snapshot = posts;
+    setPosts((prev) => prev.filter((p) => p.id !== post.id));
+    if (expandedPostId === post.id) setExpandedPostId(null);
     try {
       await apiService.deleteWallPost(post.id);
-      setPosts((prev) => prev.filter((p) => p.id !== post.id));
-      if (expandedPostId === post.id) setExpandedPostId(null);
     } catch (err) {
+      setPosts(snapshot);
       showNotification({
         type: 'error',
         title: '刪除失敗',
