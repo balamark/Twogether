@@ -244,6 +244,13 @@ async function loadAndSerialize(access, userId) {
 // returns the existing closure rather than resetting the deadline. Deliberately
 // does NOT set resolved_at — the event is not resolved yet, and every metric
 // keyed on resolved_at must stay honest about that.
+//
+// A closure row outlives its closure: /reopen leaves an 'abandoned' row behind
+// and a finished one stays 'finalized'. So the upsert RESETS a row that is no
+// longer collecting — otherwise the second 一起收尾 on the same event runs
+// against a stale row and submit rejects forever with CLOSURE_ALREADY_FINALIZED.
+// The `WHERE status <> 'collecting'` is what keeps the idempotent re-tap from
+// resetting a live deadline.
 async function enterClosing(access, userId) {
   const eventId = access.event.id;
   return db.transaction(async (client) => {
@@ -259,7 +266,20 @@ async function enterClosing(access, userId) {
     await client.query(
       `INSERT INTO event_closures (event_id, couple_id, started_by, deadline_at)
        VALUES ($1, $2, $3, NOW() + ($4 || ' hours')::interval)
-       ON CONFLICT (event_id) DO NOTHING`,
+       ON CONFLICT (event_id) DO UPDATE
+          SET status                 = 'collecting',
+              started_by             = EXCLUDED.started_by,
+              started_at             = NOW(),
+              deadline_at            = EXCLUDED.deadline_at,
+              finalized_at           = NULL,
+              insight                = NULL,
+              insight_at             = NULL,
+              shared_decision        = NULL,
+              shared_decision_by     = NULL,
+              shared_decision_status = 'none',
+              shared_decision_note   = NULL,
+              updated_at             = NOW()
+        WHERE event_closures.status <> 'collecting'`,
       [eventId, access.coupleId, userId, String(CLOSURE_DEADLINE_HOURS)]
     );
     await client.query(
@@ -415,14 +435,9 @@ async function afterFinalize(access, userId, result, { notifyPartner = true } = 
       eventId,
       userId
     );
-    await notify(
-      access.partnerId,
-      'event_resolved',
-      '你們一起走過了這個情境',
-      access.event.title,
-      eventId,
-      userId
-    );
+    // Deliberately NOT also firing 'event_resolved'. The closure IS the
+    // resolution, and sending both gave the partner two inbox rows, two LINE
+    // pushes and two emails for one event.
   }
   await writeClosureInsight(eventId, userId);
   return result;
@@ -435,7 +450,18 @@ async function afterFinalize(access, userId, result, { notifyPartner = true } = 
 // 好好說話), same pattern as the relationship reminders. An absent partner is
 // marked 'auto_skipped', never 'skipped' — they didn't decline, they just
 // weren't there, and the copy the user eventually sees must not blame them.
-async function sweepOverdueClosures() {
+// Rides GET /api/events, which every user hits on opening 好好說話, so without a
+// gate it runs on literally every request — 20 closures' worth of queries each
+// time. Once every few minutes per process is plenty for a 72h deadline.
+// Disabled under test so the sweep spec can drive it off a single GET without
+// racing a throttle set by an earlier request in the same serial run.
+const SWEEP_MIN_INTERVAL_MS = process.env.NODE_ENV === 'test' ? 0 : 5 * 60 * 1000;
+let lastSweepAt = 0;
+
+async function sweepOverdueClosures({ force = false } = {}) {
+  const now = Date.now();
+  if (!force && now - lastSweepAt < SWEEP_MIN_INTERVAL_MS) return;
+  lastSweepAt = now;
   try {
     const due = await db.query(
       `SELECT event_id FROM event_closures
@@ -451,7 +477,11 @@ async function sweepOverdueClosures() {
           RETURNING user_id`,
         [eventId]
       );
-      const result = await maybeFinalizeClosure(eventId);
+      // force: past the deadline the clock is the authority, not the state
+      // machine. Without it a closure where both submitted but neither reviewed
+      // flips zero rows above, still trips NOT_TERMINAL_EXISTS, and sits in
+      // 'closing' forever — re-occupying the LIMIT 20 window on every sweep.
+      const result = await maybeFinalizeClosure(eventId, { force: true });
       if (result) {
         logInfo('events.closure.auto_finalize', {
           eventId,
@@ -628,7 +658,9 @@ router.post(
     body('sharedDecision').optional({ nullable: true }).isString().trim().isLength({ max: MAX_COMMITMENT_CHARS }),
   ],
   async (req, res) => {
-    if (sendValidationError(req, res)) return;
+    // A too-short commitment is an expected state on the way to writing a good
+    // one, not a failure — the code lets the client show it as a warning.
+    if (sendValidationError(req, res, 'COMMITMENT_TOO_SHORT')) return;
     try {
       const access = await loadClosureContext(req, res);
       if (!access) return;
@@ -653,6 +685,15 @@ router.post(
 
       const text = String(req.body.commitment).trim();
       const decision = req.body.sharedDecision ? String(req.body.sharedDecision).trim() : null;
+
+      // Read the prior wording before the upsert overwrites it — a re-submit
+      // that actually changes the text has to send the partner back to Screen 5
+      // (see below), and afterwards there is no way to tell what it used to say.
+      const priorText = (await db.query(
+        `SELECT text FROM commitments
+          WHERE event_id = $1 AND owner_id = $2 AND status IN ('draft','active')`,
+        [eventId, userId]
+      )).rows[0]?.text ?? null;
 
       // The partial unique index (event_id, owner_id) WHERE status IN
       // ('draft','active') makes this a clean upsert — a double-tap updates one
@@ -692,6 +733,21 @@ router.post(
           RETURNING *`,
         [eventId, userId]
       )).rows[0];
+
+      // The upsert above already reset MY commitment's review_status, but the
+      // partner's own reviewed_at lives on a different table. Without clearing
+      // it too, they stay terminal and the closure can finalize with them never
+      // having seen the revised wording. Only on a real edit — re-sending the
+      // same text must not drag them back to Screen 5.
+      const textChanged = priorText !== null && priorText !== text;
+      if (textChanged && access.partnerId) {
+        await db.query(
+          `UPDATE event_closure_participants
+              SET reviewed_at = NULL, updated_at = NOW()
+            WHERE event_id = $1 AND user_id = $2 AND reviewed_at IS NOT NULL`,
+          [eventId, access.partnerId]
+        );
+      }
 
       logInfo('events.closure.submit', {
         userId, eventId, hasDecision: !!decision, resubmit: !!participant?.reviewed_at,
@@ -772,12 +828,25 @@ router.post(
           });
         }
       } else {
-        await db.query(
+        const updated = await db.query(
           `UPDATE event_closures
               SET shared_decision_status = $2, shared_decision_note = $3, updated_at = NOW()
-            WHERE event_id = $1 AND shared_decision IS NOT NULL`,
+            WHERE event_id = $1 AND shared_decision IS NOT NULL
+            RETURNING event_id`,
           [eventId, verdict === 'agree' ? 'agreed' : 'change_requested', note]
         );
+        // The WHERE silently matched nothing when there is no shared decision,
+        // and reviewed_at was set anyway below — so posting {target:'decision'}
+        // on a decision-less closure marked you terminal without ever showing
+        // you your partner's commitment. That is precisely what
+        // CLOSURE_NEEDS_YOUR_PART exists to prevent, from the other side.
+        if (updated.rows.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: '這次收尾還沒有共同決定可以回應。',
+            error_code: 'CLOSURE_NOT_STARTED',
+          });
+        }
       }
 
       await db.query(
@@ -873,6 +942,44 @@ router.post('/:id/closure/cancel', [param('id').isUUID()], async (req, res) => {
   }
 });
 
+// ABANDON — the same 取消收尾 intent as cancel, but for after someone has
+// already written. Cancel refuses then (it would delete a partner's work is the
+// fear), and the client used to fall back to POST /events/:id/reopen — which
+// also nulls therapy_note, silently destroying the AI summary the couple had
+// just earned. 取消收尾 and 重新開啟 are different intents, so they get different
+// endpoints: this one drops only the DRAFT commitments (nothing is 'active'
+// during closing, so nothing durable is lost) and leaves therapy_note and every
+// resolved-* column alone.
+router.post('/:id/closure/abandon', [param('id').isUUID()], async (req, res) => {
+  if (sendValidationError(req, res)) return;
+  try {
+    const access = await loadClosureContext(req, res);
+    if (!access) return;
+    const userId = req.user.id;
+    const eventId = access.event.id;
+
+    await db.transaction(async (client) => {
+      await client.query(
+        `UPDATE event_closures SET status = 'abandoned', updated_at = NOW()
+          WHERE event_id = $1 AND status = 'collecting'`,
+        [eventId]
+      );
+      await client.query(`DELETE FROM commitments WHERE event_id = $1 AND status = 'draft'`, [eventId]);
+      await client.query(`DELETE FROM event_closure_participants WHERE event_id = $1`, [eventId]);
+      await client.query(
+        `UPDATE events SET status = 'open', updated_at = NOW() WHERE id = $1 AND status = 'closing'`,
+        [eventId]
+      );
+    });
+
+    logInfo('events.closure.abandon', { userId, eventId });
+    res.json({ success: true, message: '好，先繼續聊。想收尾的時候隨時可以再按一次。' });
+  } catch (err) {
+    logError('Closure abandon failed', { err: err.message, stack: err.stack, eventId: req.params.id });
+    res.status(500).json({ success: false, message: '無法回到討論，請稍後再試' });
+  }
+});
+
 // FINALIZE — Screen 4's 「先這樣完成」 valve. Allowed only when my own part is
 // done AND ≥24h have passed, so an impatient partner can't stampede the other
 // within a day of asking, but also isn't held for three days.
@@ -952,8 +1059,12 @@ router.post('/:id/closure/insight', [param('id').isUUID()], async (req, res) => 
         error_code: 'CLOSURE_NOT_STARTED',
       });
     }
+    // Every other closure endpoint answers with the serialized closure and the
+    // client re-renders from it wholesale. This one used to answer
+    // { success, insight }, so a *successful* retry set closureSummary to
+    // undefined and unmounted the whole summary card.
     if (closure.insight?.text) {
-      return res.json({ success: true, insight: closure.insight.text });
+      return res.json({ success: true, closure: await loadAndSerialize(access, userId) });
     }
 
     const { tier, limit } = await resolveAiLimit(userId);
@@ -972,7 +1083,7 @@ router.post('/:id/closure/insight', [param('id').isUUID()], async (req, res) => 
         error_code: 'CLOSURE_INSIGHT_UNAVAILABLE',
       });
     }
-    res.json({ success: true, insight });
+    res.json({ success: true, closure: await loadAndSerialize(access, userId) });
   } catch (err) {
     logError('Closure insight failed', { err: err.message, stack: err.stack, eventId: req.params.id });
     res.status(500).json({ success: false, message: '無法取得 AI 見解，請稍後再試' });

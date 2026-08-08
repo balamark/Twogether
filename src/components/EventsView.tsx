@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Sparkles, BarChart3, ListChecks, Plus } from 'lucide-react';
+import { Sparkles, BarChart3, ChevronLeft, Plus } from 'lucide-react';
 import EventHistoryList from './EventHistoryList';
 import ComposeEventFlow from './ComposeEventFlow';
 import EventDetail from './EventDetail';
@@ -33,6 +33,10 @@ interface EventsViewProps {
   showNotification: (notification: NotificationInput) => void;
   initialEventId?: string | null;
   onInitialEventConsumed?: () => void;
+  // Lets a caller land on a specific sub-view — 接住情緒's CTA means "write one
+  // now", and dropping the user on the list made them hunt for 開始對話.
+  initialSubView?: EventsSubView | null;
+  onInitialSubViewConsumed?: () => void;
   // Solo-mode gate wiring (unpaired users).
   onInvitePartner?: () => void;
   onNavigate?: (view: string) => void;
@@ -43,6 +47,8 @@ export default function EventsView({
   showNotification,
   initialEventId,
   onInitialEventConsumed,
+  initialSubView,
+  onInitialSubViewConsumed,
   onInvitePartner,
   onNavigate,
 }: EventsViewProps) {
@@ -65,6 +71,15 @@ export default function EventsView({
     }
   }, [initialEventId, onInitialEventConsumed]);
 
+  // Same consume-once pattern as initialEventId, so coming back to 說開一件事
+  // later doesn't drop you into the composer again.
+  useEffect(() => {
+    if (initialSubView) {
+      setView(initialSubView);
+      onInitialSubViewConsumed?.();
+    }
+  }, [initialSubView, onInitialSubViewConsumed]);
+
   const openDetail = (id: string) => {
     setSelectedEventId(id);
     setView('detail');
@@ -79,7 +94,7 @@ export default function EventsView({
   if (!authState.isAuthenticated) {
     return (
       <div className="max-w-2xl mx-auto p-6 text-center text-petal-ink-soft">
-        <h2 className="text-2xl font-serif text-petal-ink mb-2">對話 × 由 AI 替你說</h2>
+        <h2 className="text-2xl font-serif text-petal-ink mb-2">說開一件事</h2>
         <p>請先登入才能使用此功能。</p>
       </div>
     );
@@ -115,39 +130,59 @@ export default function EventsView({
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6">
-      <header className="mb-5">
-        <h1 className="text-2xl md:text-3xl font-serif text-petal-ink mb-1 inline-flex items-center gap-1.5">
-          對話 × 由 AI 替你說
-          <InfoHint viewId="events" />
+      {/* Same editorial header pattern as ConflictView (eyebrow + font-display +
+          italic sub-line) so the two halves of 好好說話 read as one feature
+          rather than two apps. Title matches the sub-tab chip you tapped. */}
+      <header className="border-b border-petal-rule pb-7 mb-7">
+        <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+          — 說開
+        </div>
+        <h1 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
+          說開<em className="not-italic font-light italic text-pink-600">一件事</em>
+          <span className="align-middle ml-2"><InfoHint viewId="events" /></span>
         </h1>
-        <p className="hidden sm:block text-sm text-petal-ink-soft">
-          當下情緒不會直接送出。AI 會協助你把感受整理成三種「由 AI 替你說」的版本，由你選擇要不要送出。
-        </p>
-        <p className="sm:hidden text-sm text-petal-ink-soft">
-          AI 會幫你把當下情緒整理成幾種可送出的版本。
+        <p className="font-display italic font-light text-base text-petal-muted">
+          當下情緒不會直接送出 — AI 幫你整理成對方聽得進去的版本，由你決定要不要送。
         </p>
       </header>
 
-      <nav className="flex flex-wrap gap-2 mb-5 border-b border-petal-rule pb-3">
-        <TabButton active={view === 'list'} onClick={() => setView('list')} icon={ListChecks} label="歷史" />
-        <TabButton
-          active={view === 'compose'}
-          onClick={() => setView('compose')}
-          icon={Plus}
-          label="開始對話"
-          primary
-        />
-        <TabButton active={view === 'analytics'} onClick={() => setView('analytics')} icon={BarChart3} label="分析" />
-      </nav>
-
       <div>
         {view === 'list' && (
-          <EventHistoryList
-            key={refreshKey}
-            onOpenEvent={openDetail}
-            currentUserId={authState.user?.id || ''}
-            onCompose={() => setView('compose')}
-          />
+          <>
+            {/* The 歷史／開始對話／分析 row was a third row of pills before any
+                content on a 390px screen. 開始對話 is the primary action, so it
+                belongs in the list header; 分析 is rare enough to be an icon. */}
+            <div className="flex items-center justify-between gap-2 mb-4">
+              <h2 className="font-serif text-lg text-petal-ink">歷史對話</h2>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  data-testid="events-analytics-button"
+                  aria-label="分析"
+                  title="分析"
+                  onClick={() => setView('analytics')}
+                  className="p-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 transition-colors"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  data-testid="events-compose-button"
+                  onClick={() => setView('compose')}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-petal-rose-deep text-white text-sm font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition"
+                >
+                  <Plus className="w-4 h-4" />
+                  開始對話
+                </button>
+              </div>
+            </div>
+            <EventHistoryList
+              key={refreshKey}
+              onOpenEvent={openDetail}
+              currentUserId={authState.user?.id || ''}
+              onCompose={() => setView('compose')}
+            />
+          </>
         )}
         {view === 'compose' && (
           <ComposeEventFlow
@@ -167,31 +202,23 @@ export default function EventsView({
             showNotification={showNotification}
           />
         )}
-        {view === 'analytics' && <EventAnalytics />}
+        {view === 'analytics' && (
+          <>
+            {/* Without the tab row there is no other way back from 分析. */}
+            <button
+              type="button"
+              data-testid="events-analytics-back"
+              onClick={() => setView('list')}
+              className="mb-4 inline-flex items-center gap-1.5 text-sm text-petal-ink-soft hover:text-petal-ink"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              回到歷史對話
+            </button>
+            <EventAnalytics />
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-interface TabButtonProps {
-  active: boolean;
-  onClick: () => void;
-  icon: typeof Sparkles;
-  label: string;
-  primary?: boolean;
-}
-
-function TabButton({ active, onClick, icon: Icon, label, primary }: TabButtonProps) {
-  const base = 'flex items-center gap-2 px-4 py-2 rounded-full text-sm transition-colors border';
-  const cls = active
-    ? 'bg-petal-ink text-petal-cream border-petal-ink'
-    : primary
-      ? 'bg-petal-rose-soft text-petal-ink border-petal-rose'
-      : 'bg-transparent text-petal-ink border-petal-rule hover:bg-petal-sage/20';
-  return (
-    <button type="button" onClick={onClick} className={`${base} ${cls}`}>
-      <Icon className="w-4 h-4" />
-      <span>{label}</span>
-    </button>
-  );
-}

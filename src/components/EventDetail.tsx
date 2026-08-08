@@ -720,9 +720,11 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       })
       .catch((err) => {
         // A legacy resolved event has no closure row; that's fine, just don't
-        // render the summary card. Any other error we quietly log.
+        // render the summary card. The route answers CLOSURE_NOT_STARTED for
+        // that case — EVENT_NOT_CLOSING is a different gate and never comes back
+        // here, so every legacy event used to log a warning.
         const code = (err as { error_code?: string })?.error_code;
-        if (code && code !== 'EVENT_NOT_CLOSING') {
+        if (code && code !== 'CLOSURE_NOT_STARTED') {
           console.warn('[closure] summary fetch failed', code);
         }
       });
@@ -735,7 +737,11 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     setRetryingInsight(true);
     try {
       const next = await apiService.retryClosureInsight(eventId);
-      setClosureSummary(next);
+      // The route returns the whole serialized closure (it used to return only
+      // { insight }, so a SUCCESSFUL retry set this to undefined and unmounted
+      // the card). Guard anyway — blanking the summary is the worst outcome here.
+      if (next) setClosureSummary(next);
+      else await refresh();
     } catch (err) {
       const code = (err as { error_code?: string })?.error_code;
       showNotification({

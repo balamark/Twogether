@@ -65,11 +65,11 @@ export const ENGINEER_LEXICON: Record<string, string> = {
   '月經': '排程維護 (maintenance window)',
 
   // ── 好好說話 → 說開一件事 / Events ─────────────────────────
-  '對話 × 由 AI 替你說': 'AI 事故協調員 × 幫你擬 incident 說明',
+  '歷史對話': 'Ticket 列表',
   '請先登入才能使用此功能。': '需先 auth login 才能存取此端點。',
 
   // ── 好好說話 → 接住情緒・檢查 / Conflict ────────────────────
-  '和諧相處': '系統穩定度 SLA',
+  '接住情緒': '事故 ack ● 先收下警報',
   '被接住的那一刻，修復才開始': 'ack 事故的那一刻，修復才開始',
   '雙方衝突時的應對工具': '雙方發生 conflict 時的 rollback 工具',
   '冷靜連結模式': 'Circuit Breaker 熔斷降溫',

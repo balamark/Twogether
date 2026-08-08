@@ -376,6 +376,144 @@ test.describe.serial('一起收尾 — the closure state machine over HTTP', () 
     expect(commitments.rows.map((r) => r.status)).toEqual(['active']);
   });
 
+  test('一起收尾 can be started again after a reopen', async () => {
+    const eventId = await createEvent(ctxA, '同一件事又發生了');
+
+    await ctxA.post(`${API}/events/${eventId}/closure/start`);
+    await ctxA.post(`${API}/events/${eventId}/closure/submit`, {
+      data: { commitment: '我會記得把鑰匙放回原位' },
+    });
+    await ctxB.post(`${API}/events/${eventId}/reopen`);
+
+    // reopen leaves an 'abandoned' row behind. The second 一起收尾 used to insert
+    // ON CONFLICT DO NOTHING against it, flipping the event to 'closing' with a
+    // dead closure — every submit after that failed with CLOSURE_ALREADY_FINALIZED
+    // and the sweep skipped it, so the event was stuck forever.
+    const restart = await ctxA.post(`${API}/events/${eventId}/closure/start`);
+    expect(restart.ok()).toBeTruthy();
+
+    const reset = await withDb((c) =>
+      c.query(
+        `SELECT status, finalized_at, insight, shared_decision_status
+           FROM event_closures WHERE event_id = $1`,
+        [eventId]
+      )
+    );
+    expect(reset.rows[0].status).toBe('collecting');
+    expect(reset.rows[0].finalized_at).toBeNull();
+    expect(reset.rows[0].insight).toBeNull();
+    expect(reset.rows[0].shared_decision_status).toBe('none');
+
+    const submitAgain = await ctxA.post(`${API}/events/${eventId}/closure/submit`, {
+      data: { commitment: '進門我會先把鑰匙掛上' },
+    });
+    expect(submitAgain.ok()).toBeTruthy();
+
+    // ...but the reset must not fire on an idempotent re-tap of a LIVE closure,
+    // or either partner could silently push the 72h deadline out forever.
+    const before = await withDb((c) =>
+      c.query(`SELECT deadline_at FROM event_closures WHERE event_id = $1`, [eventId])
+    );
+    const retap = await ctxB.post(`${API}/events/${eventId}/closure/start`);
+    expect(retap.status()).toBe(200);
+    const after = await withDb((c) =>
+      c.query(`SELECT deadline_at, status FROM event_closures WHERE event_id = $1`, [eventId])
+    );
+    expect(after.rows[0].deadline_at.getTime()).toBe(before.rows[0].deadline_at.getTime());
+    // And the re-tap didn't wipe the commitment that was already written.
+    const survived = await withDb((c) =>
+      c.query(`SELECT text FROM commitments WHERE event_id = $1`, [eventId])
+    );
+    expect(survived.rows.map((r) => r.text)).toEqual(['進門我會先把鑰匙掛上']);
+  });
+
+  test('取消收尾 after someone has written keeps the therapy note', async () => {
+    const eventId = await createEvent(ctxA, '晚歸沒有先說一聲');
+
+    // The couple discussed and earned an AI therapy note before收尾 began.
+    const note = { summary: '你們都在意的是「有沒有被放在心上」。', companion: 'mock' };
+    await withDb((c) =>
+      c.query(`UPDATE events SET therapy_note = $2 WHERE id = $1`, [eventId, JSON.stringify(note)])
+    );
+
+    await ctxA.post(`${API}/events/${eventId}/closure/start`);
+    await ctxA.post(`${API}/events/${eventId}/closure/submit`, {
+      data: { commitment: '會晚回家我會先傳個訊息' },
+    });
+
+    // cancel refuses now (someone has written), which is what used to push the
+    // client onto /reopen — and /reopen nulls therapy_note. 取消收尾 and 重新開啟
+    // are different intents, so abandon exists to mean only the first one.
+    const refused = await ctxB.post(`${API}/events/${eventId}/closure/cancel`);
+    expect(refused.status()).toBe(400);
+
+    const abandon = await ctxB.post(`${API}/events/${eventId}/closure/abandon`);
+    expect(abandon.ok()).toBeTruthy();
+
+    const event = await withDb((c) =>
+      c.query(`SELECT status, therapy_note, resolved_at FROM events WHERE id = $1`, [eventId])
+    );
+    expect(event.rows[0].status).toBe('open');
+    expect(event.rows[0].therapy_note).toEqual(note);
+    expect(event.rows[0].resolved_at).toBeNull();
+
+    const closure = await withDb((c) =>
+      c.query(`SELECT status FROM event_closures WHERE event_id = $1`, [eventId])
+    );
+    expect(closure.rows[0].status).toBe('abandoned');
+
+    // Only the drafts go. Nothing is 'active' during closing, so nothing durable
+    // was lost.
+    const commitments = await withDb((c) =>
+      c.query(`SELECT status FROM commitments WHERE event_id = $1`, [eventId])
+    );
+    expect(commitments.rows.length).toBe(0);
+  });
+
+  test('the sweep rescues a closure where both submitted but neither reviewed', async () => {
+    const eventId = await createEvent(ctxA, '誰去接小孩');
+
+    await ctxA.post(`${API}/events/${eventId}/closure/start`);
+    await ctxA.post(`${API}/events/${eventId}/closure/submit`, {
+      data: { commitment: '接送安排我會前一天就確認' },
+    });
+    await ctxB.post(`${API}/events/${eventId}/closure/submit`, {
+      data: { commitment: '臨時有事我會早點跟你說' },
+    });
+
+    // Neither reviews. The sweep's auto-skip only touches 'pending' rows, so it
+    // flips nothing here — without force the finalize claim kept failing
+    // NOT_TERMINAL_EXISTS and the event sat in 'closing' past its deadline
+    // forever, re-occupying the LIMIT 20 window on every sweep.
+    const stillClosing = await withDb((c) =>
+      c.query(`SELECT status FROM events WHERE id = $1`, [eventId])
+    );
+    expect(stillClosing.rows[0].status).toBe('closing');
+
+    await withDb((c) =>
+      c.query(`UPDATE event_closures SET deadline_at = NOW() - INTERVAL '1 hour' WHERE event_id = $1`, [eventId])
+    );
+    await ctxA.get(`${API}/events`);
+
+    await expect
+      .poll(
+        async () => {
+          const r = await withDb((c) => c.query(`SELECT status FROM events WHERE id = $1`, [eventId]));
+          return r.rows[0].status;
+        },
+        { timeout: 10000 }
+      )
+      .toBe('resolved');
+
+    // Past the deadline the clock is the authority, but both promises still
+    // count — forcing the finish must not throw away what they wrote.
+    const commitments = await withDb((c) =>
+      c.query(`SELECT status FROM commitments WHERE event_id = $1`, [eventId])
+    );
+    expect(commitments.rows.length).toBe(2);
+    for (const row of commitments.rows) expect(row.status).toBe('active');
+  });
+
   test('a private (solo) event has no closure flow', async () => {
     const res = await ctxA.post(`${API}/events`, {
       data: {

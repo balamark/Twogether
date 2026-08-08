@@ -24,6 +24,27 @@ export default function ClosureSummaryCard({
   const partnerLabel = partnerNickname || '對方';
   const myCommitment = closure.me.commitment;
   const partnerCommitment = closure.partner.commitment;
+  // Both skipped: there are no commitments, so writeClosureInsight bails with
+  // `no_commitments` and there is nothing for a retry to work from. Rendering
+  // empty sections plus a retry that can never succeed is worse than saying so.
+  const bothSkipped = !myCommitment && !partnerCommitment;
+
+  if (bothSkipped) {
+    return (
+      <div
+        data-testid="event-closure-summary"
+        className="bg-petal-sage/15 border border-petal-sage/40 rounded-2xl p-4 space-y-2"
+      >
+        <div className="flex items-center gap-2">
+          <Sprout className="w-4 h-4 text-petal-sage-deep" />
+          <h4 className="font-serif text-petal-ink text-base">這次你們都先跳過了</h4>
+        </div>
+        <p className="text-sm text-petal-ink-soft leading-relaxed" data-testid="closure-both-skipped">
+          這次你們都先跳過了，隨時可以重新開啟討論再補上約定。
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -36,8 +57,14 @@ export default function ClosureSummaryCard({
       </div>
 
       <div className="space-y-2">
+        {/* The note on MY commitment is what my partner said about me — the more
+            important of the two to surface, and it used to be dropped. */}
         {myCommitment && (
-          <CommitmentCard commitment={myCommitment} ownerLabel={myLabel} />
+          <CommitmentCard
+            commitment={myCommitment}
+            ownerLabel={myLabel}
+            reviewNote={myCommitment.reviewNote}
+          />
         )}
         {partnerCommitment && (
           <CommitmentCard

@@ -618,6 +618,9 @@ export interface EventRecord {
   lastMessagePreview: string | null;
   translationEnabled: boolean;
   therapyNote: TherapyNote | null;
+  // Only the list endpoint computes this, so it is undefined elsewhere rather
+  // than a misleading `false`. True means the 收尾 is waiting on ME.
+  closurePendingMe?: boolean;
   messages: EventMessage[];
 }
 
@@ -629,7 +632,13 @@ export interface EventRecord {
 export type ClosurePhase = 'collecting' | 'finalized' | 'abandoned';
 export type ClosureParticipantStatus = 'pending' | 'submitted' | 'skipped' | 'auto_skipped';
 export type ClosureReviewStatus = 'pending_review' | 'agreed' | 'change_requested';
-export type CommitmentStatus = 'draft' | 'active' | 'completed' | 'reneged';
+// The shared decision has its own lifecycle: it starts 'none' (nobody proposed
+// one) and becomes 'proposed' the moment someone writes it — NOT 'pending_review',
+// which is the *commitment* review vocabulary. Conflating the two is what made
+// the decision permanently unreviewable.
+export type SharedDecisionStatus = 'none' | 'proposed' | 'change_requested' | 'agreed';
+// Mirrors commitments_status_valid in migration 083.
+export type CommitmentStatus = 'draft' | 'active' | 'completed' | 'skipped' | 'replaced';
 export type ClosureAssistField = 'commitment' | 'decision';
 export type ClosureReviewTarget = 'commitment' | 'decision';
 export type ClosureReviewVerdict = 'agree' | 'request_change';
@@ -670,7 +679,7 @@ export interface EventClosure {
   partner: ClosureParticipant;
   sharedDecision: string | null;
   sharedDecisionBy: string | null;
-  sharedDecisionStatus: ClosureReviewStatus;
+  sharedDecisionStatus: SharedDecisionStatus;
   sharedDecisionNote: string | null;
   canCancel: boolean;
 }
@@ -3835,25 +3844,10 @@ class ApiService {
     }
   }
 
-  async requestEventResolve(id: string): Promise<EventRecord> {
-    try {
-      const response = await apiClient.post(`/events/${id}/resolve-request`);
-      return this.transformEvent(response.data.event);
-    } catch (error: unknown) {
-      console.error('Failed to request event resolve:', error);
-      this.throwApiError(error, '無法發起解決請求');
-    }
-  }
-
-  async confirmEventResolve(id: string): Promise<EventRecord> {
-    try {
-      const response = await apiClient.post(`/events/${id}/resolve-confirm`);
-      return this.transformEvent(response.data.event);
-    } catch (error: unknown) {
-      console.error('Failed to confirm event resolve:', error);
-      this.throwApiError(error, '無法確認解決');
-    }
-  }
+  // The old 標記為解決 → 確認解決 handshake had a client method per step. 一起收尾
+  // replaced both and they had zero callers left. The backend keeps its
+  // /resolve-request and /resolve-confirm aliases for old clients still in the
+  // wild; there is no reason for this one to call them.
 
   // ---------------------------------------------------------------------------
   // 一起收尾 — closure ceremony (Batch 1)
@@ -3865,8 +3859,12 @@ class ApiService {
   async startEventClosure(id: string): Promise<{ created: boolean; closure: EventClosure }> {
     try {
       const response = await apiClient.post(`/events/${id}/closure/start`);
-      console.log('[closure] start', { eventId: id, created: response.data?.created });
-      return { created: !!response.data?.created, closure: response.data.closure };
+      // "Did I start this, or join one already running?" is signalled by
+      // 201-vs-200 only — there is no `created` field in the body, so reading
+      // one made this always false.
+      const created = response.status === 201;
+      console.log('[closure] start', { eventId: id, created });
+      return { created, closure: response.data.closure };
     } catch (error: unknown) {
       console.error('[closure] start failed', error);
       this.throwApiError(error, '無法開始一起收尾，請稍後再試');
@@ -3941,14 +3939,30 @@ class ApiService {
     }
   }
 
-  async cancelClosure(id: string): Promise<{ event: EventRecord }> {
+  // Cancel is only allowed while NOBODY has written, so it deletes the closure
+  // row outright and answers { success, message } — there is no event body to
+  // read, and no closure left to serialize.
+  async cancelClosure(id: string): Promise<void> {
     try {
-      const response = await apiClient.post(`/events/${id}/closure/cancel`);
+      await apiClient.post(`/events/${id}/closure/cancel`);
       console.log('[closure] cancel', { eventId: id });
-      return { event: this.transformEvent(response.data.event) };
     } catch (error: unknown) {
       console.error('[closure] cancel failed', error);
       this.throwApiError(error, '無法取消一起收尾');
+    }
+  }
+
+  // 取消收尾 once someone HAS written. Distinct from cancelClosure (which the
+  // server refuses at that point) and, crucially, from reopenEvent — /reopen
+  // nulls therapy_note, so routing this intent there silently destroyed the AI
+  // summary the couple had just earned. This drops only draft commitments.
+  async abandonClosure(id: string): Promise<void> {
+    try {
+      await apiClient.post(`/events/${id}/closure/abandon`);
+      console.log('[closure] abandon', { eventId: id });
+    } catch (error: unknown) {
+      console.error('[closure] abandon failed', error);
+      this.throwApiError(error, '無法回到討論，請稍後再試');
     }
   }
 
@@ -4159,6 +4173,7 @@ class ApiService {
       last_message_preview?: string | null;
       translation_enabled?: boolean;
       therapy_note?: TherapyNote | null;
+      closure_pending_me?: boolean;
       messages?: unknown[];
     };
     return {
@@ -4190,6 +4205,7 @@ class ApiService {
       lastMessagePreview: r.last_message_preview ?? null,
       translationEnabled: r.translation_enabled === true,
       therapyNote: r.therapy_note ?? null,
+      closurePendingMe: r.closure_pending_me,
       messages: Array.isArray(r.messages) ? r.messages.map((m) => this.transformEventMessage(m)) : [],
     };
   }

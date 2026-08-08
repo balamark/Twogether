@@ -553,6 +553,9 @@ const LoveTimeApp = () => {
     typeof window !== 'undefined' && window.location.pathname.startsWith('/booking/result')
   );
   const [pendingEventId, setPendingEventId] = useState<string | null>(null);
+  // Set when another view means "write one now" (接住情緒's CTA) so 說開一件事
+  // opens on the composer instead of the history list. Consumed once.
+  const [pendingEventsCompose, setPendingEventsCompose] = useState(false);
   const [pendingScriptTitle, setPendingScriptTitle] = useState<string | null>(null);
   const [intimateRecords, setIntimateRecords] = useState<IntimateRecord[]>([]);
   const [cycleRecords, setCycleRecords] = useState<CycleRecord[]>([]);
@@ -2322,41 +2325,50 @@ const LoveTimeApp = () => {
         const communicateSub = currentView === 'conflict' ? 'harmony' : 'events';
         return (
           <div>
-            <div className="max-w-4xl mx-auto px-4 md:px-6 pt-2 flex gap-2" role="tablist" aria-label="好好說話">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={communicateSub === 'events'}
-                data-testid="communicate-subtab-events"
-                onClick={() => setCurrentView('events')}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
-                  communicateSub === 'events'
-                    ? 'bg-petal-ink text-petal-cream border-petal-ink'
-                    : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
-                }`}
-              >
-                說開一件事
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={communicateSub === 'harmony'}
-                data-testid="communicate-subtab-harmony"
-                onClick={() => setCurrentView('conflict')}
-                className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
-                  communicateSub === 'harmony'
-                    ? 'bg-petal-ink text-petal-cream border-petal-ink'
-                    : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
-                }`}
-              >
-                接住情緒・檢查
-              </button>
+            {/* Sticky so the way back to the other sub-view survives a scroll.
+                ConflictView's own section nav sits at top-[52px] and stacks
+                under this row rather than replacing it. */}
+            <div className="sticky top-0 z-30 bg-petal-cream/95 backdrop-blur-sm border-b border-petal-rule">
+              <div className="max-w-4xl mx-auto px-4 md:px-6 py-2 flex gap-2" role="tablist" aria-label="好好說話">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={communicateSub === 'events'}
+                  data-testid="communicate-subtab-events"
+                  onClick={() => setCurrentView('events')}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
+                    communicateSub === 'events'
+                      ? 'bg-petal-ink text-petal-cream border-petal-ink'
+                      : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
+                  }`}
+                >
+                  說開一件事
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={communicateSub === 'harmony'}
+                  data-testid="communicate-subtab-harmony"
+                  onClick={() => setCurrentView('conflict')}
+                  className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
+                    communicateSub === 'harmony'
+                      ? 'bg-petal-ink text-petal-cream border-petal-ink'
+                      : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
+                  }`}
+                >
+                  接住情緒・檢查
+                </button>
+              </div>
             </div>
             {communicateSub === 'harmony' ? (
               <ConflictView
                 showNotification={showNotification}
                 partnerConnected={partnerConnected}
                 onNavigate={setCurrentView}
+                onComposeEvent={() => {
+                  setPendingEventsCompose(true);
+                  setCurrentView('events');
+                }}
               />
             ) : (
               <EventsView
@@ -2364,6 +2376,8 @@ const LoveTimeApp = () => {
                 showNotification={showNotification}
                 initialEventId={pendingEventId}
                 onInitialEventConsumed={() => setPendingEventId(null)}
+                initialSubView={pendingEventsCompose ? 'compose' : null}
+                onInitialSubViewConsumed={() => setPendingEventsCompose(false)}
                 onInvitePartner={() => {
                   localStorage.removeItem('pairingPromptDismissed');
                   setPairingPromptDismissed(false);

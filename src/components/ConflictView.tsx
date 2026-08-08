@@ -11,13 +11,16 @@ interface ConflictViewProps {
   partnerConnected: boolean;
   // Navigate to another top-level view (e.g. the 衝突事件 emotion flow).
   onNavigate?: (view: string) => void;
+  // Jump to 說開一件事 *and* open the composer. Plain onNavigate('events')
+  // lands on the history list, leaving the user to hunt for 開始對話.
+  onComposeEvent?: () => void;
 }
 
 // Conflict / harmony view with the multi-step "pause mode" flow. Defined at
 // module scope (not inside App) so its identity is stable across App re-renders
 // — a nested definition would remount on every render and reset the pause-mode
 // step, timer, and per-phrase send state mid-flow. See issue #41.
-const ConflictView = ({ showNotification, partnerConnected, onNavigate }: ConflictViewProps) => {
+const ConflictView = ({ showNotification, partnerConnected, onNavigate, onComposeEvent }: ConflictViewProps) => {
   // Pause mode — multi-step flow for couples already in a heated argument.
   // Step 1: emotion selection · Step 2: safety phrase · Step 3: enforced
   // turn-taking with 90s timer · Step 4: closing affirmation.
@@ -400,10 +403,12 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate }: Confli
   <div className="space-y-10">
     <div className="border-b border-petal-rule pb-7">
       <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-        — 和諧
+        — 接住
       </div>
+      {/* Title matches the sub-tab chip you tapped (接住情緒・檢查) — before this
+          the chip said one thing and the page said 和諧相處. */}
       <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
-        和諧<em className="not-italic font-light italic text-pink-600">相處</em>
+        接住<em className="not-italic font-light italic text-pink-600">情緒</em>
         <span className="align-middle ml-2"><InfoHint viewId="conflict" /></span>
       </h2>
       <p className="font-display italic font-light text-base text-petal-muted">
@@ -411,10 +416,12 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate }: Confli
       </p>
     </div>
 
-    {/* Sticky section nav — quick jumps within 和諧相處 */}
+    {/* Sticky section nav — quick jumps within 接住情緒. Sits at top-[52px] so
+        it stacks *below* 好好說話's sticky sub-tab row (App.tsx) instead of
+        replacing it; otherwise one scroll hid the way back to 說開一件事. */}
     <nav
       aria-label="頁面區塊"
-      className="sticky top-0 z-30 -mt-6 -mx-4 px-4 py-2.5 bg-petal-cream/95 backdrop-blur-sm border-b border-petal-rule"
+      className="sticky top-[52px] z-20 -mt-6 -mx-4 px-4 py-2.5 bg-petal-cream/95 backdrop-blur-sm border-b border-petal-rule"
     >
       <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1">
         {sectionNav.map((s) => (
@@ -454,7 +461,12 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate }: Confli
           </p>
           <button
             type="button"
-            onClick={() => onNavigate?.('events')}
+            data-testid="conflict-compose-event"
+            onClick={() => {
+              console.log('[conflict] compose event CTA → 說開一件事 composer');
+              if (onComposeEvent) onComposeEvent();
+              else onNavigate?.('events');
+            }}
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-petal-ink text-petal-cream font-body text-sm font-medium hover:bg-pink-700 transition-colors"
           >
             <HandHeart className="w-4 h-4" strokeWidth={1.75} />

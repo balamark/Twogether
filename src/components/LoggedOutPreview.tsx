@@ -679,7 +679,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
   },
   conflict: {
     icon: MessageCircle,
-    eyebrow: '和諧相處',
+    eyebrow: '接住情緒',
     title: (
       <>
         吵架了？AI 幫你<em className="not-italic font-light italic text-pink-600">先開口</em>
