@@ -37,6 +37,8 @@ export default function CommitmentComposer({
   onSkip,
   busy,
   assisting,
+  revising = false,
+  onCancelRevise,
 }: {
   initialCommitment: string;
   initialDecision: string;
@@ -47,6 +49,10 @@ export default function CommitmentComposer({
   onSkip: () => void;
   busy: boolean;
   assisting: ClosureAssistField | null;
+  // Re-opened over Screen 4/5 to change an already-submitted commitment. Skip
+  // is meaningless then (I've already written), so the footer swaps.
+  revising?: boolean;
+  onCancelRevise?: () => void;
 }) {
   const [commitment, setCommitment] = useState(initialCommitment);
   const [decision, setDecision] = useState(initialDecision);
@@ -68,7 +74,7 @@ export default function CommitmentComposer({
   };
 
   return (
-    <div className="space-y-3" data-testid="event-closure-panel">
+    <div className="space-y-3" data-testid="closure-composer-screen">
       <section className="bg-white border border-petal-sage/40 rounded-2xl p-4 space-y-3">
         <div>
           <h4 className="font-serif text-petal-ink text-base">① 下次我願意做的一件小事</h4>
@@ -86,7 +92,14 @@ export default function CommitmentComposer({
           className="w-full text-sm bg-petal-cream border border-petal-rule rounded-xl px-3 py-2 focus:outline-none focus:border-petal-sage-deep"
         />
         <div className="flex items-center justify-between text-xs">
-          <span className="text-petal-ink-soft">{trimmed.length}/{MAX_CHARS}</span>
+          {/* 送出我的約定 is disabled under 4 chars. Without saying so, the button
+              just looks broken. */}
+          <span className="text-petal-ink-soft" data-testid="closure-commitment-counter">
+            {trimmed.length}/{MAX_CHARS}
+            {!commitmentValid && trimmed.length < MIN_CHARS && (
+              <span className="ml-1.5 text-petal-rose-deep">至少 {MIN_CHARS} 個字才能送出</span>
+            )}
+          </span>
           <div className="flex items-center gap-2">
             <AiQuotaHint quota={quota} />
             <button
@@ -144,9 +157,13 @@ export default function CommitmentComposer({
           rows={2}
           className="w-full text-sm bg-petal-cream border border-petal-rule rounded-xl px-3 py-2 focus:outline-none focus:border-petal-sage-deep"
         />
-        <div className="flex items-center justify-end">
+        {/* Same quota hint as ①: both buttons spend from the same daily budget,
+            so hiding it on one of them makes the limit feel arbitrary. */}
+        <div className="flex items-center justify-end gap-2">
+          <AiQuotaHint quota={quota} />
           <button
             type="button"
+            data-testid="closure-decision-assist-button"
             disabled={assisting === 'decision'}
             onClick={() => runAssist('decision')}
             className="px-3 py-1.5 rounded-full bg-petal-sage-deep/80 text-white text-xs font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
@@ -164,14 +181,25 @@ export default function CommitmentComposer({
       </section>
 
       <div className="flex items-center justify-between">
-        <button
-          type="button"
-          data-testid="closure-skip-link"
-          onClick={onSkip}
-          className="text-xs text-petal-ink-soft underline underline-offset-2 hover:text-petal-ink"
-        >
-          先不寫，跳過這次
-        </button>
+        {revising ? (
+          <button
+            type="button"
+            data-testid="closure-revise-cancel"
+            onClick={onCancelRevise}
+            className="text-xs text-petal-ink-soft underline underline-offset-2 hover:text-petal-ink"
+          >
+            不改了
+          </button>
+        ) : (
+          <button
+            type="button"
+            data-testid="closure-skip-link"
+            onClick={onSkip}
+            className="text-xs text-petal-ink-soft underline underline-offset-2 hover:text-petal-ink"
+          >
+            先不寫，跳過這次
+          </button>
+        )}
         <button
           type="button"
           data-testid="closure-submit-button"
@@ -180,7 +208,7 @@ export default function CommitmentComposer({
           className="px-4 py-2 rounded-full bg-petal-sage-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
         >
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          送出我的約定
+          {revising ? '更新我的約定' : '送出我的約定'}
         </button>
       </div>
     </div>

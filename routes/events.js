@@ -170,7 +170,24 @@ async function listEventsForCouple(
             (SELECT content FROM event_messages m WHERE m.event_id = e.id
                ORDER BY m.created_at DESC LIMIT 1) AS last_message_preview,
             (SELECT COUNT(*) FROM event_messages m
-               WHERE m.event_id = e.id AND m.sender_id <> $${viewerIdx} AND m.read_at IS NULL)::int AS unread_count
+               WHERE m.event_id = e.id AND m.sender_id <> $${viewerIdx} AND m.read_at IS NULL)::int AS unread_count,
+            -- Whose turn is it? A 收尾中 row waiting on me looks identical to one
+            -- waiting on my partner without this, which is the single biggest
+            -- reason the ceremony stalls. Mirrors NOT_TERMINAL_EXISTS in
+            -- routes/event-closure.js, scoped to the viewer: I still owe
+            -- something if I haven't written, or if I've written and my partner
+            -- has too but I haven't read theirs yet.
+            (e.status = 'closing' AND EXISTS (
+               SELECT 1 FROM event_closure_participants p
+                WHERE p.event_id = e.id AND p.user_id = $${viewerIdx}
+                  AND (
+                    p.status = 'pending'
+                    OR (p.status = 'submitted' AND p.reviewed_at IS NULL AND EXISTS (
+                          SELECT 1 FROM event_closure_participants q
+                           WHERE q.event_id = e.id AND q.user_id <> p.user_id
+                             AND q.status = 'submitted'))
+                  )
+            )) AS closure_pending_me
      FROM events e
      WHERE ${where}
      ORDER BY e.created_at DESC

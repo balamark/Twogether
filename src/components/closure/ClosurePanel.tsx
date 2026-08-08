@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, RotateCcw } from 'lucide-react';
 import apiService, {
   type EventClosure,
@@ -44,8 +44,10 @@ export default function ClosurePanel({
   const [busy, setBusy] = useState(false);
   const [assisting, setAssisting] = useState<ClosureAssistField | null>(null);
   const [skipOpen, setSkipOpen] = useState(false);
-  const [skipSuppressed, setSkipSuppressed] = useState(false); // R4: 稍後再說 doesn't re-fire this session
   const [cancelling, setCancelling] = useState(false);
+  // submit is re-submittable while collecting, so after writing you must still
+  // be able to go back and change your wording.
+  const [revising, setRevising] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -74,14 +76,24 @@ export default function ClosurePanel({
     }
   }, [eventId, onResolved, onCancelled, showNotification]);
 
+  // `refresh` closes over three parent callbacks, so its identity changes on
+  // every parent render unless EVERY ancestor memoizes — which is a promise no
+  // caller can reliably keep. Depending on it directly re-fired GET /closure on
+  // each render of EventDetail. Route the effects through a ref instead: the
+  // fetch is then tied to the event id, which is what actually decides it.
+  const refreshRef = useRef(refresh);
   useEffect(() => {
-    refresh();
+    refreshRef.current = refresh;
   }, [refresh]);
 
   useEffect(() => {
-    const onFocus = () => refresh();
+    refreshRef.current();
+  }, [eventId]);
+
+  useEffect(() => {
+    const onFocus = () => refreshRef.current();
     const onVis = () => {
-      if (document.visibilityState === 'visible') refresh();
+      if (document.visibilityState === 'visible') refreshRef.current();
     };
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVis);
@@ -89,7 +101,7 @@ export default function ClosurePanel({
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVis);
     };
-  }, [refresh]);
+  }, []);
 
   const runAssist = async (field: ClosureAssistField): Promise<string[]> => {
     setAssisting(field);
@@ -126,6 +138,7 @@ export default function ClosurePanel({
         sharedDecision: decision,
       });
       setClosure(next);
+      setRevising(false);
       if (next.eventStatus === 'resolved') await onResolved();
       showNotification({
         type: 'success',
@@ -166,10 +179,10 @@ export default function ClosurePanel({
     }
   };
 
-  const openSkip = () => {
-    if (skipSuppressed) return;
-    setSkipOpen(true);
-  };
+  // An explicit tap always opens. Playbook R4 is about modals that AUTO-fire —
+  // suppressing this one after a 再想一下 turned 先不寫，跳過這次 into a dead
+  // button for the rest of the session.
+  const openSkip = () => setSkipOpen(true);
 
   const handleSkip = async (reason: string | null) => {
     setBusy(true);
@@ -202,9 +215,13 @@ export default function ClosurePanel({
       if (next.eventStatus === 'resolved') await onResolved();
     } catch (err) {
       const code = (err as { error_code?: string })?.error_code;
+      // "暫時還不能結束" is only true for the expected too-early/not-ready gates.
+      // A 500 is a failure, and titling it as a gate sends the user off waiting
+      // for a clock that was never the problem.
+      const expected = code === 'CLOSURE_FINALIZE_TOO_EARLY' || code === 'CLOSURE_NEEDS_YOUR_PART';
       showNotification({
-        type: code === 'CLOSURE_FINALIZE_TOO_EARLY' ? 'info' : 'error',
-        title: '暫時還不能結束',
+        type: expected ? 'info' : 'error',
+        title: expected ? '暫時還不能結束' : '無法完成收尾',
         message: err instanceof Error ? err.message : '請稍後再試',
       });
     } finally {
@@ -212,19 +229,19 @@ export default function ClosurePanel({
     }
   };
 
-  // 取消收尾 always available while the ceremony is in progress. If nothing
-  // has been written yet, use /closure/cancel (clean rollback). Once anyone
-  // has submitted, /closure/cancel refuses with CLOSURE_ALREADY_STARTED — the
-  // right escape is /events/:id/reopen, which abandons the closure and drops
-  // the draft commitments (there are no 'active' rows yet during closing, so
-  // nothing durable is lost).
+  // 取消收尾 always available while the ceremony is in progress. If nothing has
+  // been written yet, /closure/cancel is a clean rollback. Once anyone has
+  // submitted it refuses with CLOSURE_ALREADY_STARTED, and the escape is
+  // /closure/abandon — NOT /events/:id/reopen, which also nulls therapy_note and
+  // so silently deleted the AI summary the couple had just earned. Both closure
+  // endpoints drop only draft commitments; nothing is 'active' during closing.
   const handleCancel = async () => {
     setCancelling(true);
     try {
       if (closure?.canCancel) {
         await apiService.cancelClosure(eventId);
       } else {
-        await apiService.reopenEvent(eventId);
+        await apiService.abandonClosure(eventId);
       }
       await onCancelled();
     } catch (err) {
@@ -254,18 +271,26 @@ export default function ClosurePanel({
   const iSubmitted = closure.me.status === 'submitted';
   const partnerSubmitted = closure.partner.status === 'submitted';
   const iReviewed = !!closure.me.reviewedAt;
+  // The shared decision's un-reviewed state is 'proposed' (submit writes it);
+  // 'pending_review' is the commitment vocabulary and the server never sends it
+  // here, so this clause used to be permanently false and Screen 5 never opened
+  // for a decision on its own.
   const partnerHasSomethingToReview =
     (closure.partner.commitment && closure.partner.commitment.reviewStatus === 'pending_review') ||
-    (closure.sharedDecision && closure.sharedDecisionStatus === 'pending_review');
+    (closure.sharedDecision && closure.sharedDecisionStatus === 'proposed');
 
   // Screen 5 wins as soon as partner has submitted AND I still owe a review;
   // otherwise Screen 4 (waiting) shows post-submit and Screen 2 (composer)
-  // shows pre-submit.
-  const showReview = iSubmitted && partnerSubmitted && !iReviewed && partnerHasSomethingToReview;
-  const showWaiting = iSubmitted && !showReview;
+  // shows pre-submit. Revising re-opens the composer over whichever it'd be.
+  const showReview =
+    iSubmitted && partnerSubmitted && !iReviewed && !!partnerHasSomethingToReview && !revising;
+  const showWaiting = iSubmitted && !showReview && !revising;
 
   return (
-    <div className="space-y-3">
+    // The panel wrapper is the ONLY carrier of this id — the composer and the
+    // review card used to repeat it, so a locator for it matched 2–3 nodes and
+    // strict-mode assertions became ambiguous. Each screen has its own id.
+    <div className="space-y-3" data-testid="event-closure-panel">
       {/* 收尾中 recap header — mirrors the therapy note above the composer so the
           couple can see WHAT they were talking about while writing. TherapyNote
           has no plain summary; the trigger + next-time line is what best
@@ -293,6 +318,7 @@ export default function ClosurePanel({
           partnerNickname={partnerNickname}
           busy={busy}
           onReview={handleReview}
+          onRevise={() => setRevising(true)}
         />
       )}
       {showWaiting && (
@@ -302,10 +328,10 @@ export default function ClosurePanel({
           deadlineAt={closure.deadlineAt}
           finalizing={busy}
           onFinalize={handleFinalize}
-          onSkip={openSkip}
+          onRevise={() => setRevising(true)}
         />
       )}
-      {!iSubmitted && (
+      {(!iSubmitted || revising) && (
         <CommitmentComposer
           initialCommitment={closure.me.commitment?.text || ''}
           initialDecision={closure.sharedDecision || ''}
@@ -316,6 +342,8 @@ export default function ClosurePanel({
           onSkip={openSkip}
           busy={busy}
           assisting={assisting}
+          revising={revising}
+          onCancelRevise={() => setRevising(false)}
         />
       )}
 
@@ -345,10 +373,10 @@ export default function ClosurePanel({
           partnerNickname={partnerNickname}
           busy={busy}
           onConfirm={handleSkip}
-          onCancel={() => {
-            setSkipOpen(false);
-            setSkipSuppressed(true); // don't re-fire this session (playbook R4)
-          }}
+          // Just close it. Nothing auto-opens this modal, so there is no
+          // re-fire to suppress — and suppressing it made 先不寫，跳過這次 a dead
+          // button for the rest of the session after one 再想一下.
+          onCancel={() => setSkipOpen(false)}
         />
       )}
     </div>
