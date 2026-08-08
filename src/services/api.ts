@@ -2,6 +2,18 @@ import axios from 'axios';
 import { formatYmdInTz, browserTz } from '../utils/datetime';
 import { setLastRequestId } from '../utils/telemetry';
 
+// Opt a single request OUT of the global `billing:limit-reached` → paywall
+// redirect on a 429. For calls where the AI is an optional convenience rather
+// than the feature itself (e.g. the closure composer's 幫我想一個: the user's
+// commitment is theirs to write with or without AI), hijacking them to the
+// upgrade view mid-flow destroys their in-progress work. Those callers pass
+// `{ skipBillingRedirect: true }` and handle the 429 locally instead.
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    skipBillingRedirect?: boolean;
+  }
+}
+
 // API Configuration - Always use relative URLs for single server
 const API_BASE_URL = '/api';
 
@@ -1160,7 +1172,11 @@ apiClient.interceptors.response.use(
         // Usage-cap hit. If it's one of our freemium caps, broadcast a global
         // event so the app can show the upgrade paywall; still throw so the
         // calling code can stop its own flow. Non-billing 429s (if any) just throw.
-        if (BILLING_LIMIT_CODES.has(errorCode) && typeof window !== 'undefined') {
+        // A caller can opt out of the redirect (skipBillingRedirect) when the
+        // capped AI call is optional and losing the current screen would cost
+        // the user in-progress work — they handle the 429 locally instead.
+        const skipRedirect = error.config?.skipBillingRedirect === true;
+        if (BILLING_LIMIT_CODES.has(errorCode) && !skipRedirect && typeof window !== 'undefined') {
           window.dispatchEvent(
             new CustomEvent('billing:limit-reached', {
               detail: { error_code: errorCode, message: errorMessage },
@@ -3922,7 +3938,15 @@ class ApiService {
 
   async closureAssist(id: string, field: ClosureAssistField): Promise<{ options: string[] }> {
     try {
-      const response = await apiClient.post(`/events/${id}/closure/assist`, { field });
+      // skipBillingRedirect: a quota-exhausted 幫我想一個 must NOT yank the user
+      // to the paywall — that unmounts the composer and loses the commitment
+      // they were typing. ClosurePanel catches AI_DAILY_LIMIT_REACHED and shows
+      // a warning toast ("你仍然可以自己寫") instead. See the interceptor.
+      const response = await apiClient.post(
+        `/events/${id}/closure/assist`,
+        { field },
+        { skipBillingRedirect: true }
+      );
       console.log('[closure] assist', { eventId: id, field, count: response.data?.options?.length });
       return { options: Array.isArray(response.data?.options) ? response.data.options : [] };
     } catch (error: unknown) {

@@ -28,7 +28,7 @@ test.describe('一起收尾 — 幫我想一個 quota', () => {
     await expect(page.getByTestId('ai-quota-hint').first()).toContainText('還剩 7 次');
   });
 
-  test('a spent quota is a warning plus the paywall, and the ceremony survives it', async ({
+  test('a spent quota is a local warning — the composer stays put, no paywall hijack', async ({
     page,
   }) => {
     test.setTimeout(60000);
@@ -42,6 +42,7 @@ test.describe('一起收尾 — 幫我想一個 quota', () => {
     await expect(page.getByTestId('ai-quota-hint').first()).toContainText('今日 AI 次數已用完');
     await expect(page.getByTestId('closure-assist-button')).toBeEnabled();
 
+    // Type first, so we can prove the 429 doesn't cost the draft.
     await page.getByTestId('closure-commitment-input').fill('要動孩子之前，我會先問你一聲');
     await page.getByTestId('closure-assist-button').click();
 
@@ -52,20 +53,17 @@ test.describe('一起收尾 — 幫我想一個 quota', () => {
     await expect(toast).toContainText('你仍然可以自己寫');
     await expect(page.locator('.bg-red-50')).toHaveCount(0);
 
-    // Any freemium 429 also fires `billing:limit-reached` in the api
-    // interceptor, and App answers it by switching to the upgrade view — the
-    // paywall lives in one place for every capped feature. So the ceremony is
-    // left behind here, with the typed (never-sent) draft. Asserted because it
-    // IS the behaviour, not because it's ideal.
-    await expect(page.getByText('升級 Twogether Premium')).toBeVisible();
-
-    // Coming back, the ceremony is exactly where it was and finishing without
-    // AI still works — the quota never blocks writing your own commitment.
-    await page.getByTestId('nav-tab-communicate').click();
-    await page.locator('text=接送小孩的分工').first().click();
+    // The whole point of skipBillingRedirect: a capped 幫我想一個 in the closure
+    // composer is handled LOCALLY. The user is NOT thrown to the upgrade view,
+    // the composer stays mounted, and their typed draft survives.
+    await expect(page.getByText('升級 Twogether Premium')).toHaveCount(0);
     await expect(page.getByTestId('closure-composer-screen')).toBeVisible();
+    await expect(page.getByTestId('closure-commitment-input')).toHaveValue(
+      '要動孩子之前，我會先問你一聲',
+    );
 
-    await page.getByTestId('closure-commitment-input').fill('出門前十分鐘我會先叫你一聲');
+    // And finishing without AI still works — the quota never blocks writing
+    // your own commitment.
     await expect(page.getByTestId('closure-submit-button')).toBeEnabled();
     await page.getByTestId('closure-submit-button').click();
     await expect(page.getByTestId('closure-waiting-card')).toBeVisible();

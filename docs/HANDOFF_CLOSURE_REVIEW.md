@@ -89,14 +89,16 @@ must be free, `closing` never sets `resolved_at`). Additionally:
 - **`SWEEP_MIN_INTERVAL_MS` is 0 under `NODE_ENV=test`.** The throttle would
   otherwise make sweep assertions depend on which earlier test in the serial run
   happened to warm it.
-- **A 429 on 幫我想一個 navigates you OUT of the ceremony.** Any freemium cap
-  code (`AI_DAILY_LIMIT_REACHED`) makes the api interceptor dispatch
-  `billing:limit-reached`, and `App.tsx:1273` answers it with
-  `setCurrentView('upgrade')` — app-wide, not closure-specific. So the warning
-  toast fires *and* the paywall replaces the composer, losing the typed draft.
-  `events-closure-quota.spec.ts` asserts this because it is what happens; the
-  plan assumed the composer stayed. Changing it means exempting some callers
-  from the global dispatch — a product decision, not a bug fix.
+- **A 429 on 幫我想一個 is handled locally now (fixed).** A freemium cap
+  (`AI_DAILY_LIMIT_REACHED`) normally makes the api interceptor dispatch
+  `billing:limit-reached`, which `App.tsx:1273` answers with
+  `setCurrentView('upgrade')` — app-wide. That used to yank the closure composer
+  off-screen and lose the typed commitment. `closureAssist` now passes
+  `{ skipBillingRedirect: true }` (see the axios config augmentation + the 429
+  branch in the interceptor), so the ceremony's optional AI call is caught in
+  `ClosurePanel` and shown as a warning toast instead. If you add another AI
+  call inside a flow where losing the screen would cost in-progress work, pass
+  the same flag and handle the 429 where you make the call.
 - **`abandon` vs `cancel` vs `reopen` are three different intents.** `cancel`
   deletes the closure row before anyone writes; `abandon` marks it `abandoned`
   and drops only `draft` commitments; `reopen` is the event-level action that
