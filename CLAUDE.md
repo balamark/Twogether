@@ -80,5 +80,14 @@ FAQ+(?) help system, visible AI quota). Non-negotiables from it:
   unpaired, quota, and unverified states alike.
 - **Max 6 main nav tabs**; new features go into existing tabs or the user menu.
   Tab names must pass the elevator test or carry a (?) hint.
+- **Submit returns instantly** (playbook §R7): pressing a button hands control
+  back to the user immediately; the network round-trip runs in the background.
+  Default to **optimistic update** for reversible/low-stakes actions (toggles,
+  reactions, mark-read, delete) — update local state first, roll back + notify on
+  failure. Uploads/content-creation use a non-blocking upload that treats a
+  timeout as "maybe succeeded" (never a red error that invites a duplicate).
+  Only truly block when the result IS what the user is waiting for or money/auth
+  is involved (login, pairing, payment, AI generation). Background failures always
+  raise a notification; only interrupt for money, destructive, or auth decisions.
 - **One blocking modal at a time**; priority order lives in the playbook §R4.
   Every modal needs a "稍後再說" that doesn't re-fire the same session.
