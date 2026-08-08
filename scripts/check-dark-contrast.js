@@ -31,8 +31,14 @@ const PALETTES = [
 // Light surfaces: the 50/100/200 shades, white (incl. `/opacity` variants), and the
 // pale Soft Petal tokens. `-300` is excluded — it's already mid-tone enough to carry
 // dark ink, and the Soft Petal 300s are used as accents, not surfaces.
+//
+// `petal-sage` and `petal-rose` count as surfaces ONLY at low opacity: `bg-petal-sage`
+// at full strength is a mid-tone accent that carries dark ink fine, but `bg-petal-sage/20`
+// is a pale panel that needs a dark override (this is how ~90 sage-tinted panels stayed
+// invisible in Engineer Mode — the check simply wasn't looking at them).
 const LIGHT_BG = new RegExp(
-  `\\bbg-(?:(?:${PALETTES})-(?:50|100|200)|white|petal-(?:cream-2|cream|rose-soft|rule|muted))(?:\\/\\d+)?\\b`,
+  `\\bbg-(?:(?:(?:${PALETTES})-(?:50|100|200)|white|petal-(?:cream-2|cream|rose-soft|rule|muted))(?:\\/\\d+)?` +
+    `|petal-(?:sage|rose)\\/(?:[1-9]|[1-3]\\d))\\b`,
   'g'
 );
 

@@ -5,6 +5,12 @@ import type { MessageTranslation } from '../services/api';
 // The 情緒翻譯 (emotion/need translation) shown under a message when the shared
 // lens is on. It reframes an attack into the underlying need so the other
 // partner reads a need, not a blow: 可能真正想表達的是：「…」. Read-only.
+//
+// This is NOT a speaker — it is an annotation hanging off the message above it.
+// It used to be a filled card (`bg-petal-cream-2`), which on the wall was the
+// exact same surface as the AI 諮商師 reply, so the two read as two voices. Now
+// it carries no fill at all: a dashed left rail + indent says "this belongs to
+// the message above" without competing with anyone's bubble.
 interface Props {
   translation: MessageTranslation;
   className?: string;
@@ -15,7 +21,7 @@ const MessageTranslationCard: React.FC<Props> = ({ translation, className }) => 
   if (!rewrite) return null;
   return (
     <div
-      className={`mt-1.5 rounded-xl border border-petal-rose-deep/25 bg-petal-cream-2 px-3 py-2 ${className || ''}`}
+      className={`mt-1.5 border-l-2 border-dashed border-petal-rose-deep/35 pl-3 py-0.5 ${className || ''}`}
       data-testid="message-translation"
     >
       <div className="flex items-center gap-1.5 text-petal-rose-deep">

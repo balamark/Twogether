@@ -10,10 +10,10 @@ import { getCompanion } from '../utils/aiCompanions';
 export type ParticipantRole = 'user' | 'ai' | 'therapist';
 
 // Curated Soft Petal palette for human speakers. Deep enough that a white initial
-// stays legible; picked to stay distinct from one another and from the fixed
-// AI (sage) / therapist (pink) slots.
+// stays legible; picked to stay distinct from one another and from Luma's fixed
+// brand-rose slot — rose-deep (#B86E64) is deliberately NOT in this list, or a
+// human's avatar would read as the AI 諮商師 (see src/utils/threadRoles.ts).
 const HUMAN_COLORS = [
-  '#B86E64', // rose-deep
   '#7D8F75', // sage-deep
   '#A9713F', // clay
   '#6E8299', // dusty blue
@@ -69,7 +69,7 @@ const ParticipantAvatar: React.FC<ParticipantAvatarProps> = ({
     const emoji = getCompanion(companionId)?.emoji || '💛';
     return (
       <span
-        className={`${base} bg-petal-sage/25 border border-petal-sage/50`}
+        className={`${base} bg-petal-rose-soft/50 border border-petal-rose-soft`}
         role="img"
         aria-label={name || 'AI 諮商師'}
         data-testid="participant-avatar"
@@ -82,7 +82,7 @@ const ParticipantAvatar: React.FC<ParticipantAvatarProps> = ({
   if (role === 'therapist') {
     return (
       <span
-        className={`${base} bg-pink-100 border border-pink-200`}
+        className={`${base} bg-white border border-petal-rule`}
         role="img"
         aria-label={name || '諮商師'}
         data-testid="participant-avatar"

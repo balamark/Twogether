@@ -245,6 +245,42 @@ activity 記錄）時補上：開始引導點擊、快速回覆 chip 點擊、tr
 - 用 `useAsyncAction` 取得同步防連點鎖（避免重複送出），但 `pending` 只用來顯示，
   不該讓可樂觀化的動作退回「按鈕變灰乾等」。
 
+### R8 對話視覺文法：三個座位、一個品牌色（2026-08-08 新增，預設規範）
+
+Twogether 不是多人聊天室，是一個被引導的關係空間。一條時間軸上同時有兩個伴侶、
+AI 諮商師、引導練習 —— 兩方對話好懂，三方開始吃力，四方就亂。**解法不是「一個角色
+一個顏色」**：顏色一旦被角色用光，未來的語意色（生氣 / 難過 / 肯定 / 警告 / 成功 /
+衝突）就沒有空間，情緒產品會變成 dashboard；而且只靠顏色分辨角色不符合 accessibility。
+
+> **位置辨識誰，Label 辨識角色，Component 辨識行為，顏色只做輔助。**
+
+單一事實來源：`src/utils/threadRoles.ts`（`SEAT` / `SEAT_ALIGN` / `ROLE_STYLE` /
+`threadRole()` / `counselorLabel()`）。**不要在元件裡自己寫三元式決定泡泡底色** ——
+那正是「同一個 AI 諮商師在牆上是奶油、在好好說話裡是鼠尾草」的成因。
+
+| 座位 | 誰 | 視覺 |
+|---|---|---|
+| 右 | 我 | 中性泡泡 `bg-petal-cream-2` + 頭像 + 名字 |
+| 左 | 對方 | 中性泡泡 `bg-white border-petal-rule` + 頭像 + 名字 |
+| 中 | 中立第三方 | AI 諮商師拿**全站唯一的品牌淡色**（`bg-petal-rose-soft/25`）；真人心理師中性底 + 🩺 |
+| 全寬 | 系統 | 不畫泡泡：icon + 分隔線（`ConflictBanner`、引導標記） |
+
+不可違反的幾條：
+
+- **人不佔色相。** 兩個伴侶都是中性的，誰在說話由左右 + 頭像 + 名字決定。玫瑰淡色
+  只屬於 AI 諮商師；鼠尾草 / 琥珀 / 橘留給語意（做到了 / 注意 / 衝突）。
+- **中間座位是產品語言。** 諮商師不站在任何一方，所以坐在兩個人中間 —— 不要把他
+  改成靠左的第三個泡泡。
+- **引導是 mode 不是角色。** 引導與諮商師是同一個 Luma：同色、同頭像，靠 🧭 icon、
+  `Luma・引導` label 與獨立的練習介面（`GuideSessionView`）區分。**不要為引導新增
+  第四個角色或第四個顏色。**
+- **不是發言者的東西不要長得像泡泡。** 情緒翻譯是掛在訊息下的註解（虛線內縮、無填
+  色，見 `MessageTranslationCard`）；系統訊息是全寬分隔線。
+- **規則講一次就好。** 第一次進對話用 `ThreadRoleLegend` 說明三個座位，關掉後不再
+  出現（R4）；不要在每則訊息上加重視覺提示。
+- **深色模式要一起顧。** 新增任何淺色底都要在 `src/index.css` 的 Engineer Mode 區塊
+  補 `.dark` 覆寫，`npm run check:contrast` 會擋。
+
 ---
 
 ## §5 單一事實來源地圖（改 UX 前先查這張表）
@@ -257,6 +293,7 @@ activity 記錄）時補上：開始引導點擊、快速回覆 chip 點擊、tr
 | AI 諮商師人設 | `lib/aiCompanions.js`（後端）+ `src/utils/aiCompanions.ts`（顯示） |
 | AI 標點與風格 | `services/llm/claudeProvider.js` 的 `PUNCTUATION_RULE` |
 | 設計 token | `tailwind.config.js`（petal 色票）；圖片永不裁切（CLAUDE.md） |
+| 對話角色配色與座位 | `src/utils/threadRoles.ts`（見 §4 R8）；引導專注層 `src/components/GuideSessionView.tsx` |
 | 按鈕樣式基準 | 實色=可點、40% 透明=disabled（2026-07-06 改版後的慣例） |
 | 未配對提醒與邀請狀態 | `src/components/PairingReminderBanner.tsx` + `src/utils/pairingReminder.ts`（snooze/到期判斷）；邀請連結組法 `src/utils/pairingLink.ts` |
 

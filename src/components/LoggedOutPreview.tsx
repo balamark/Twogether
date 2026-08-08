@@ -13,6 +13,7 @@ import {
   HeartHandshake,
   HandHeart,
   Hand,
+  Compass,
   NotebookPen,
   Gauge,
   ClipboardCheck,
@@ -506,14 +507,17 @@ const EmotionMeterSample: React.FC = () => {
 // 今日練習 scoreboard so therapy feels measurable.
 const TherapistModeSample: React.FC = () => (
   <SampleCard>
+    {/* 引導是 Luma 的第二種 mode，不是第四個角色 —— 靠 🧭 與版型分辨，不靠顏色。
+        真實 app 裡這一整段會抽離到全螢幕專注層（GuideSessionView）。 */}
     <div className="flex items-center justify-between mb-3">
       <span className="inline-flex items-center gap-1.5 font-body text-xs text-petal-rose-deep">
         <ParticipantAvatar size="xs" role="ai" companionId="luma" name="Luma" />
-        Luma・引導者
+        <Compass className="w-3.5 h-3.5" strokeWidth={1.5} />
+        Luma・引導
       </span>
       <SampleTag />
     </div>
-    <div className="rounded-2xl border border-petal-rose-deep/25 bg-petal-cream p-3 space-y-2">
+    <div className="rounded-2xl border border-petal-rule bg-white shadow-sm p-3 space-y-2">
       <div className="flex items-center gap-2">
         <span className="rounded-full border border-petal-sage bg-petal-sage/20 text-petal-sage-deep px-2 py-0.5 font-body text-[11px] font-medium">🪞 鏡映</span>
         <span className="rounded-full border border-petal-sage bg-petal-sage/20 text-petal-sage-deep px-2 py-0.5 font-body text-[11px] font-medium">✅ 做到了</span>
@@ -538,9 +542,55 @@ const TherapistModeSample: React.FC = () => (
   </SampleCard>
 );
 
+// 三方對話的空間規則：左邊是對方、右邊是我、中間是諮商師。多人對話難讀的地方不是
+// 顏色不夠，而是不知道規則 —— 講一次，之後空間本身就會替我們說話。
+const ThreeSeatSample: React.FC = () => (
+  <SampleCard>
+    <div className="flex items-center justify-between mb-3">
+      <span className="font-body text-xs text-petal-muted">誰在說話，看位置就知道</span>
+      <SampleTag />
+    </div>
+    <div className="space-y-2">
+      <div className="flex justify-start">
+        <div className="max-w-[80%] rounded-2xl px-3.5 py-2 bg-white border border-petal-rule">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <ParticipantAvatar size="xs" name="小晴" colorKey="小晴" />
+            <span className="font-body text-[11px] text-petal-muted">小晴</span>
+          </div>
+          <p className="font-body text-sm text-petal-ink">我覺得你根本沒有在聽我說話。</p>
+        </div>
+      </div>
+      <div className="flex justify-end">
+        <div className="max-w-[80%] rounded-2xl px-3.5 py-2 bg-petal-cream-2 border border-petal-rule-soft">
+          <div className="flex items-center gap-1.5 mb-0.5 justify-end">
+            <span className="font-body text-[11px] text-petal-muted">我</span>
+          </div>
+          <p className="font-body text-sm text-petal-ink">我其實有在聽。</p>
+        </div>
+      </div>
+      <div className="flex justify-center">
+        <div className="max-w-[92%] w-full rounded-2xl px-3.5 py-2 bg-petal-rose-soft/25 border border-petal-rose-soft">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <ParticipantAvatar size="xs" role="ai" companionId="luma" name="Luma" />
+            <span className="font-body text-[11px] font-medium text-petal-rose-deep">Luma・AI 諮商師</span>
+          </div>
+          <p className="font-body text-sm text-petal-ink">
+            我想在這裡停一下。你們現在都在描述「對方做了什麼」。
+          </p>
+        </div>
+      </div>
+    </div>
+    <p className="font-body text-[11px] text-petal-muted mt-2.5 leading-relaxed">
+      左邊是對方、右邊是你、中間是 Luma —— 諮商師不站在任何一方，所以坐在你們兩個中間。
+    </p>
+  </SampleCard>
+);
+
 const ConflictFlywheelSample: React.FC = () => (
   <div className="space-y-4">
     <SafetyBannerSample />
+
+    <ThreeSeatSample />
 
     <EmotionMeterSample />
 
@@ -781,7 +831,9 @@ const PREVIEWS: Record<string, PreviewConfig> = {
             <ParticipantAvatar size="xs" name="小晴" colorKey="小晴" />
             <span className="font-body text-[11px] text-petal-muted">小晴</span>
           </div>
-          <div className="mt-1.5 rounded-xl border border-petal-rose-deep/25 bg-petal-cream-2 px-3 py-2">
+          {/* 情緒翻譯不是發言者，是掛在上面那句話底下的註解 —— 所以沒有填色，
+              只有一條虛線把它接回原句（同 MessageTranslationCard）。 */}
+          <div className="mt-1.5 border-l-2 border-dashed border-petal-rose-deep/35 pl-3 py-0.5">
             <div className="flex items-center gap-1.5 text-petal-rose-deep">
               <HeartHandshake className="w-3.5 h-3.5" strokeWidth={1.5} />
               <span className="font-body text-[11px] font-medium">可能真正想表達的是</span>

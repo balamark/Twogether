@@ -11,6 +11,7 @@ import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { isVideoUrl } from '../utils/script';
 import { companionName } from '../utils/aiCompanions';
+import { ROLE_STYLE } from '../utils/threadRoles';
 import ParticipantAvatar from './ParticipantAvatar';
 
 // A dedicated therapist's read-only (or read+comment) view of ONE client
@@ -208,7 +209,16 @@ const WallThread: React.FC<{
         <p className="font-body text-xs text-petal-muted">還沒有回覆。</p>
       ) : (
         replies.map((r) => (
-          <div key={r.id} className={`rounded-md px-3 py-1.5 ${r.is_therapist ? 'bg-pink-50 border border-pink-200' : 'bg-petal-cream-2'}`}>
+          <div
+            key={r.id}
+            className={`rounded-md px-3 py-1.5 ${
+              r.is_therapist
+                ? ROLE_STYLE.therapist.surface
+                : r.is_ai
+                  ? ROLE_STYLE.counselor.surface
+                  : ROLE_STYLE.partner.surface
+            }`}
+          >
             <div className="font-body text-[11px] text-petal-muted">
               {r.is_therapist ? `🩺 ${r.author_nickname || '心理師'}（心理師）` : r.is_ai ? 'AI 諮商師' : (r.author_nickname || '某人')}
             </div>
@@ -367,7 +377,16 @@ const ClientEventDetail: React.FC<{
                     ? (companionName(m.aiTherapist) ? `${companionName(m.aiTherapist)}・AI 諮商師` : 'AI 諮商師')
                     : '伴侶';
                 return (
-                  <div key={m.id} className={`rounded-md px-3 py-1.5 ${m.isTherapist ? 'bg-pink-50 border border-pink-200' : 'bg-petal-cream-2'}`}>
+                  <div
+                    key={m.id}
+                    className={`rounded-md px-3 py-1.5 ${
+                      m.isTherapist
+                        ? ROLE_STYLE.therapist.surface
+                        : m.isAi
+                          ? ROLE_STYLE.counselor.surface
+                          : ROLE_STYLE.partner.surface
+                    }`}
+                  >
                     <div className="flex items-center gap-1.5">
                       <ParticipantAvatar
                         size="xs"

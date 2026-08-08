@@ -133,18 +133,53 @@ test.describe('Event thread — 引導模式 (Therapist Mode)', () => {
     await startBtn.waitFor({ state: 'visible', timeout: 10000 });
     await startBtn.click();
 
+    // 引導不再是對話裡的一張卡片，而是自己的全螢幕專注層 —— 按下「開始引導」
+    // 就直接帶進去（使用者剛主動觸發，不算打擾）。
+    const layer = page.getByTestId('guide-session-view');
+    await expect(layer).toBeVisible({ timeout: 10000 });
+
     // Therapist card renders with the mirror exercise.
     const card = page.getByTestId('therapist-turn-card');
-    await expect(card).toBeVisible({ timeout: 10000 });
+    await expect(card).toBeVisible();
     await expect(card).toContainText('鏡映');
     await expect(card).toContainText('我聽到你說的是');
 
-    // Scoreboard tray + turn hint.
-    await expect(page.getByTestId('session-progress')).toContainText('今日練習');
-    await expect(page.getByTestId('facilitation-turn-hint')).toBeVisible();
+    // Scoreboard tray + turn hint — both live inside the focus layer now.
+    await expect(layer.getByTestId('session-progress')).toContainText('今日練習');
+    await expect(layer.getByTestId('facilitation-turn-hint')).toBeVisible();
 
-    // Quick-reply chip prefills the composer.
+    // Quick-reply chip prefills the focus layer's own composer.
     await page.getByTestId('therapist-quick-reply').first().click();
-    await expect(page.getByTestId('event-reply-input')).toHaveValue('我聽到你說的是…');
+    await expect(page.getByTestId('guide-reply-input')).toHaveValue('我聽到你說的是…');
+  });
+
+  test('leaving the guide layer keeps the practice reachable from the timeline', async ({ page }) => {
+    await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
+
+    await page.getByTestId('nav-tab-communicate').click();
+    await page.locator('text=今晚回不回家').first().click();
+
+    const startBtn = page.getByTestId('event-facilitation-start-button');
+    await startBtn.waitFor({ state: 'visible', timeout: 10000 });
+    await startBtn.click();
+
+    const layer = page.getByTestId('guide-session-view');
+    await expect(layer).toBeVisible({ timeout: 10000 });
+
+    // 「回到對話」只關掉圖層，練習還在進行中。
+    await page.getByTestId('guide-session-back').click();
+    await expect(layer).toBeHidden();
+
+    // 時間軸上留下一條全寬的引導標記，點了回到練習。
+    const marker = page.getByTestId('guide-timeline-marker').first();
+    await expect(marker).toBeVisible();
+    await expect(marker).toContainText('引導練習');
+    await marker.click();
+    await expect(layer).toBeVisible();
+
+    // 對話那一側也留了一顆入口。
+    await page.getByTestId('guide-session-back').click();
+    await expect(page.getByTestId('guide-session-open')).toBeVisible();
   });
 });

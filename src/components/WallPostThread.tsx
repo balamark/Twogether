@@ -5,6 +5,7 @@ import { apiService, type WallReply, type MessageTranslationMap } from '../servi
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatRelativeOrDate } from '../utils/datetime';
 import { companionName, resolveCompanion } from '../utils/aiCompanions';
+import { ROLE_STYLE, counselorLabel } from '../utils/threadRoles';
 import { useAiQuota } from '../hooks/useAiQuota';
 import AiQuotaHint from './AiQuotaHint';
 import MessageTranslationCard from './MessageTranslationCard';
@@ -299,10 +300,12 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
           <div
             key={reply.id}
             className={
+              // 牆是討論串不是時間軸，沒有左右座位可用 —— 所以人一律中性列，
+              // 只有 Luma 拿品牌淡色卡片，跟「好好說話」的中間座位對應。
               isAi
-                ? 'pl-4 border-l-2 border-petal-rose-deep/40 bg-petal-cream-2 rounded-r-md py-2 pr-2'
+                ? `${ROLE_STYLE.counselor.surface} rounded-xl py-2.5 px-3`
                 : isTherapist
-                  ? 'pl-4 border-l-2 border-pink-400 bg-pink-50/60 rounded-r-md py-2 pr-2'
+                  ? `${ROLE_STYLE.therapist.surface} rounded-xl py-2.5 px-3`
                   : 'pl-4 border-l-2 border-petal-rule'
             }
             data-testid={`wall-reply-${reply.id}`}
@@ -323,16 +326,16 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
                   }
                 />
                 <span
-                  className={
+                  className={`font-display text-sm font-medium ${
                     isAi
-                      ? 'font-display text-sm font-medium text-petal-rose-deep'
+                      ? ROLE_STYLE.counselor.label
                       : isTherapist
-                        ? 'font-display text-sm font-medium text-pink-700'
-                        : 'font-display text-sm font-medium text-petal-ink'
-                  }
+                        ? ROLE_STYLE.therapist.label
+                        : ROLE_STYLE.self.label
+                  }`}
                 >
                   {isAi
-                    ? (companionName(reply.ai_therapist) ? `${companionName(reply.ai_therapist)}・AI 諮商師` : 'AI 諮商師')
+                    ? counselorLabel(companionName(reply.ai_therapist))
                     : isTherapist
                       ? (reply.author_nickname ? `${reply.author_nickname}・心理師` : '專屬心理師')
                       : (reply.author_nickname || (isOwn ? '我' : '對方'))}
@@ -384,10 +387,10 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
           </div>
         ) : (
           <div
-            className="border border-petal-rose-deep/30 bg-petal-cream-2 rounded-md p-3 space-y-2"
+            className={`${ROLE_STYLE.counselor.surface} rounded-xl p-3 space-y-2`}
             data-testid={`wall-ai-preview-${postId}`}
           >
-            <div className="flex items-center gap-1.5 text-petal-rose-deep font-display text-sm font-medium">
+            <div className={`flex items-center gap-1.5 font-display text-sm font-medium ${ROLE_STYLE.counselor.label}`}>
               <Sparkles className="w-4 h-4" strokeWidth={1.5} />
               {myCompanion.name}（AI 諮商師）的建議（僅你看得到，貼出後對方才會看到）
             </div>

@@ -127,6 +127,22 @@ video {
 .dark .bg-petal-cream-2\/50,
 .dark .bg-gray-200 { background-color: #1C2128 !important; }
 
+/* 淡鼠尾草底（語意色：做到了 / 觀察 / 成功）。這些一直沒有深色覆寫，於是在
+   Engineer Mode 下是「淡綠底 + 被翻成近白的字」＝ 看不見。鼠尾草在深色裡改用
+   帶綠的深色 surface，語意留在文字與邊框上。 */
+.dark .bg-petal-sage\/10,
+.dark .bg-petal-sage\/15,
+.dark .bg-petal-sage\/20,
+.dark .bg-petal-sage\/25,
+.dark .bg-petal-sage\/30 { background-color: #17251C !important; }
+
+/* 淡玫瑰底同理 —— 與 .bg-petal-rose-soft/* 的深色底一致。 */
+.dark .bg-petal-rose\/5,
+.dark .bg-petal-rose\/10,
+.dark .bg-petal-rose\/15,
+.dark .bg-petal-rose\/20,
+.dark .bg-petal-rose\/30 { background-color: #231A1C !important; }
+
 /* 主要 CTA（原本近黑按鈕）→ 終端機綠，深底上才跳得出來 */
 .dark .bg-petal-ink { background-color: #238636 !important; }
 

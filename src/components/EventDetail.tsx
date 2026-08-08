@@ -18,6 +18,7 @@ import {
   Sprout,
   Gauge,
   PlayCircle,
+  Compass,
 } from 'lucide-react';
 import apiService, {
   type EventRecord,
@@ -34,14 +35,15 @@ import ReplyStepBar from './ReplyStepBar';
 import MessageTranslationCard from './MessageTranslationCard';
 import TherapyNoteCard from './TherapyNoteCard';
 import ConflictBanner from './ConflictBanner';
+import ThreadRoleLegend from './ThreadRoleLegend';
 import DraftEmotionMeter from './DraftEmotionMeter';
 import { detectDraftTone, draftToneHint } from '../utils/conflictState';
-import TherapistTurnCard from './TherapistTurnCard';
-import SessionProgress from './SessionProgress';
+import GuideSessionView from './GuideSessionView';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
 import { companionName, resolveCompanion } from '../utils/aiCompanions';
+import { SEAT, SEAT_ALIGN, ROLE_STYLE, bubbleClass, counselorLabel } from '../utils/threadRoles';
 import { useAiQuota } from '../hooks/useAiQuota';
 import AiQuotaHint from './AiQuotaHint';
 import ParticipantAvatar from './ParticipantAvatar';
@@ -162,6 +164,9 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   // Quota ran out mid-session: pause auto-advance so each further reply doesn't
   // re-fire the same warning toast. Cleared on event change / next success.
   const [advancePaused, setAdvancePaused] = useState(false);
+  // 引導的專注層。開著不代表 session 進行中（可以回頭看已結束的練習），關掉也不會
+  // 結束 session —— 只有「結束引導」會。
+  const [guideOpen, setGuideOpen] = useState(false);
   const tz = useTimezone();
 
   const insertPhrase = (phrase: string) => {
@@ -451,6 +456,9 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       setFacilitation(res.session);
       setAdvancePaused(false);
       await refresh({ skipFacilitation: true });
+      // 使用者剛按下「開始引導」，直接帶進專注層不算打擾。之後的回合就不自動開了，
+      // 只在時間軸上留標記，由使用者決定什麼時候回去練習。
+      setGuideOpen(true);
     } catch (err) {
       handleFacilitationError(err, 'start');
     } finally {
@@ -480,6 +488,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     try {
       const s = await apiService.endFacilitation(eventId);
       setFacilitation(s);
+      // 練習結束就回到對話 —— 時間軸上的標記還在，隨時可以回頭看。
+      setGuideOpen(false);
     } catch (err) {
       showNotification({ type: 'error', title: '無法結束引導', message: err instanceof Error ? err.message : '請稍後再試' });
     } finally {
@@ -490,6 +500,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   useEffect(() => {
     setLoading(true);
     setAdvancePaused(false);
+    setGuideOpen(false);
     refresh().finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
@@ -791,6 +802,14 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const canSendMessage = !event.isPrivate && event.status !== 'resolved' && event.status !== 'closing';
   const canFacilitate = canSendMessage;
 
+  // 引導專注層需要的資料：最新一則引導回合，以及現在輪到誰。turnOwner 為 null 表示
+  // 這一步是給兩個人的，所以也算輪到我。
+  const latestGuideTurn = [...event.messages].reverse().find((m) => m.isAi && m.facilitation) || null;
+  const isMyFacilitationTurn =
+    !!facilitation &&
+    facilitation.status === 'active' &&
+    (facilitation.turnOwner === currentUserId || facilitation.turnOwner === null);
+
   return (
     <div className="space-y-4">
       <BackButton onBack={onBack} />
@@ -948,6 +967,11 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
         <ConflictBanner messages={event.messages} threadKey={`event:${event.id}`} />
       )}
 
+      {/* 三方對話的空間規則，第一次講一次就好。私密對話沒有第三方，不需要圖例。 */}
+      {!event.isPrivate && (
+        <ThreadRoleLegend companionName={myCompanion.name} partnerName={partnerNickname || undefined} />
+      )}
+
       {!event.isPrivate && (
         <section className="bg-petal-cream border border-petal-rule rounded-2xl p-4 space-y-3">
           {/* 情緒翻譯 lens toggle — shared across both partners. Turns each
@@ -1012,32 +1036,38 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             // stored AI versions — when editing it, offer the other versions.
             const firstHumanMessage = event.messages.find((x) => !x.isAi);
             return event.messages.map((m) => {
-            // Therapist Mode turn: render the structured exercise card.
+            // 引導回合不佔時間軸的座位 —— 它是一件「要做的事」，整個活在專注層裡
+            // （GuideSessionView）。這裡只留一條全寬的系統標記，點了就打開練習。
+            // 四個發言者擠在一條時間軸上正是原本難讀的原因。
             if (m.isAi && m.facilitation) {
               const f = m.facilitation;
-              const isMyTurn = f.target === 'both' || f.targetUserId === currentUserId;
-              const label = companionName(m.aiTherapist) ? `${companionName(m.aiTherapist)}・引導者` : '引導者';
+              const meta = f.cardMeta;
               return (
-                <div key={m.id} className="flex justify-center">
-                  <div className="max-w-[92%] w-full">
-                    <TherapistTurnCard
-                      facilitation={f}
-                      say={m.content}
-                      companionLabel={label}
-                      companionId={m.aiTherapist}
-                      isMyTurn={isMyTurn}
-                      onQuickReply={(text) => setReply(text)}
-                    />
-                    <p className="text-[10px] text-petal-muted mt-1 text-center">{formatTime(m.createdAt, tz)}</p>
-                  </div>
-                </div>
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => setGuideOpen(true)}
+                  data-testid="guide-timeline-marker"
+                  className="w-full flex items-center gap-3 py-1.5 group"
+                >
+                  <span className="h-px flex-1 bg-petal-rule-soft" />
+                  <span className="inline-flex items-center gap-1.5 font-body text-[11px] text-petal-muted group-hover:text-petal-rose-deep transition-colors">
+                    <Compass className="w-3.5 h-3.5" strokeWidth={1.5} />
+                    引導練習
+                    {meta ? ` · ${meta.emoji} ${meta.label}` : ''}
+                    {f.sessionDone ? ' ✓' : ''}
+                  </span>
+                  <span className="h-px flex-1 bg-petal-rule-soft" />
+                </button>
               );
             }
+            // 中間座位：Luma。全場唯一帶品牌淡色的說話者 —— 不站在任何一方，
+            // 站在兩個人中間。
             if (m.isAi) {
               return (
-                <div key={m.id} className="flex justify-center">
-                  <div className="max-w-[92%] w-full rounded-2xl px-4 py-3 bg-petal-sage/15 border border-petal-sage/40">
-                    <div className="flex items-center gap-1.5 mb-1 text-petal-sage-deep">
+                <div key={m.id} className={`flex ${SEAT_ALIGN[SEAT.counselor]}`}>
+                  <div className={bubbleClass('counselor')}>
+                    <div className={`flex items-center gap-1.5 mb-1 ${ROLE_STYLE.counselor.label}`}>
                       <ParticipantAvatar
                         size="xs"
                         role="ai"
@@ -1045,7 +1075,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                         name={companionName(m.aiTherapist) || 'AI 諮商師'}
                       />
                       <span className="text-xs font-medium">
-                        {companionName(m.aiTherapist) ? `${companionName(m.aiTherapist)}・AI 諮商師` : 'AI 諮商師'}
+                        {counselorLabel(companionName(m.aiTherapist))}
                       </span>
                     </div>
                     <p className="text-sm text-petal-ink whitespace-pre-wrap leading-relaxed">{m.content}</p>
@@ -1054,13 +1084,13 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 </div>
               );
             }
-            // A message from the couple's dedicated (human) therapist — centered
-            // and pink, distinct from the two partners and the AI 諮商師.
+            // 真人心理師也坐中間（他同樣是中立第三方），但他是人，所以不吃色相 ——
+            // 靠 🩺 頭像與名字和 Luma 分辨。
             if (m.isTherapist) {
               return (
-                <div key={m.id} className="flex justify-center">
-                  <div className="max-w-[92%] w-full rounded-2xl px-4 py-3 bg-pink-50 border border-pink-200">
-                    <div className="flex items-center gap-1.5 mb-1 text-pink-700">
+                <div key={m.id} className={`flex ${SEAT_ALIGN[SEAT.therapist]}`}>
+                  <div className={bubbleClass('therapist')}>
+                    <div className={`flex items-center gap-1.5 mb-1 ${ROLE_STYLE.therapist.label}`}>
                       <ParticipantAvatar size="xs" role="therapist" name="專屬心理師" />
                       <span className="text-xs font-medium">專屬心理師</span>
                     </div>
@@ -1078,11 +1108,14 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               m.id === firstHumanMessage?.id &&
               event.createdBy === currentUserId &&
               Object.values(event.versions || {}).some((v) => (v || '').trim().length > 0);
+            // 兩個人都是中性泡泡：誰在說話由左右座位 + 頭像 + 名字決定，不各佔一個
+            // 色相 —— 色相留給 Luma（品牌）與語意（做到了／注意／衝突）。
+            const seat = mine ? 'self' : 'partner';
             return (
-              <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+              <div key={m.id} className={`flex ${SEAT_ALIGN[SEAT[seat]]}`}>
                 <div
-                  className={`${isEditing ? 'w-full max-w-[92%]' : 'max-w-[80%]'} rounded-2xl px-4 py-2 ${
-                    mine ? 'bg-petal-rose/20' : 'bg-petal-sage/15'
+                  className={`${isEditing ? 'w-full max-w-[92%]' : ROLE_STYLE[seat].width} rounded-2xl px-4 py-2 ${
+                    ROLE_STYLE[seat].surface
                   }`}
                 >
                   {isEditing ? (
@@ -1234,26 +1267,34 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
         </div>
       )}
 
+      {/* 引導進行中：對話這邊只留一顆入口，練習本身在專注層裡。進度、輪到誰、
+          快速回應都跟著搬過去，免得對話區被練習的零件塞滿。 */}
       {canSendMessage && facilitation && facilitation.status === 'active' && (
-        <SessionProgress eventId={eventId} session={facilitation} onEnd={endFacilitation} ending={endingSession} />
+        <button
+          type="button"
+          onClick={() => setGuideOpen(true)}
+          data-testid="guide-session-open"
+          className="w-full flex items-center justify-between gap-2 bg-petal-rose-soft/25 border border-petal-rose-soft rounded-2xl px-4 py-3 text-left hover:bg-petal-rose-soft/40 active:scale-[0.99] transition"
+        >
+          <span className="min-w-0">
+            <span className="flex items-center gap-1.5 font-body text-sm font-medium text-petal-rose-deep">
+              <Compass className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+              引導練習進行中
+            </span>
+            <span className="block font-body text-xs text-petal-ink-soft mt-0.5 truncate">
+              {advancePaused
+                ? '今日 AI 次數已用完，明天會自動接續'
+                : isMyFacilitationTurn
+                  ? `🎯 輪到你了 · ${myCompanion.name} 在等你這一步`
+                  : `⏳ 等待 ${partnerNickname || '對方'} 回應這一步`}
+            </span>
+          </span>
+          <span className="font-body text-xs text-petal-rose-deep shrink-0">開啟 →</span>
+        </button>
       )}
 
       {canSendMessage && (
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-3">
-          {facilitation && facilitation.status === 'active' && (
-            <div className="mb-2 font-body text-xs space-y-0.5" data-testid="facilitation-turn-hint">
-              {advancePaused ? (
-                <span className="text-petal-muted">⏸️ 今日 AI 次數已用完，明天會自動接續引導。你們仍可自由回覆。</span>
-              ) : facilitation.turnOwner === currentUserId || facilitation.turnOwner === null ? (
-                <span className="text-petal-rose-deep">🎯 輪到你了：照著上面 {myCompanion.name} 的引導回應。</span>
-              ) : (
-                <>
-                  <span className="text-petal-muted block">⏳ 等待 {partnerNickname || '對方'} 回應這一步…</span>
-                  <span className="text-petal-muted block">你也可以先自由回覆，練習會等 {partnerNickname || '對方'} 完成這一步再繼續。</span>
-                </>
-              )}
-            </div>
-          )}
           <ReplyStepBar onInsertPhrase={insertPhrase} />
           <textarea
             data-testid="event-reply-input"
@@ -1479,6 +1520,32 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             </button>
           </div>
         </div>
+      )}
+
+      {/* 引導的專注層。掛在最後，跟其他 fixed inset-0 圖層並列。session 可能已經
+          結束（或後端不再回傳），但只要時間軸上還有引導標記就要能點回去看。 */}
+      {(facilitation || latestGuideTurn) && (
+        <GuideSessionView
+          open={guideOpen}
+          onClose={() => setGuideOpen(false)}
+          eventId={eventId}
+          session={facilitation}
+          turn={latestGuideTurn?.facilitation ?? null}
+          turnSay={latestGuideTurn?.content ?? ''}
+          companionLabel={counselorLabel(companionName(latestGuideTurn?.aiTherapist) || myCompanion.name, 'guide')}
+          companionId={latestGuideTurn?.aiTherapist ?? companionId}
+          companionShortName={myCompanion.name}
+          partnerName={partnerNickname || '對方'}
+          isMyTurn={isMyFacilitationTurn}
+          advancePaused={advancePaused}
+          reply={reply}
+          onReplyChange={setReply}
+          onSend={sendReply}
+          sending={sending}
+          maxChars={REPLY_MAX_CHARS}
+          onEnd={endFacilitation}
+          ending={endingSession}
+        />
       )}
     </div>
   );

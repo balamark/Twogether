@@ -12,6 +12,7 @@ import { focusLabel } from './therapistShared';
 import { FocusFilter } from './FocusFilter';
 import ParticipantAvatar from './ParticipantAvatar';
 import MarkdownContent from './MarkdownContent';
+import { ROLE_STYLE } from '../utils/threadRoles';
 
 // 公開問答 (Public Q&A): a read-only, anonymised browse of consultation chats
 // that both the client and therapist agreed to publish. Helps people with
@@ -275,12 +276,12 @@ const PublicQaDetail: React.FC<{
                       </span>
                     </div>
                     <div
-                      className={`px-3.5 py-2 rounded-2xl font-body text-sm ${
+                      className={`px-3.5 py-2 rounded-2xl font-body text-sm text-petal-ink ${
                         m.isTherapist
-                          ? 'bg-pink-100 text-petal-ink rounded-bl-sm'
+                          ? `${ROLE_STYLE.therapist.surface} rounded-bl-sm`
                           : m.isAi
-                            ? 'bg-petal-sage/20 text-petal-ink rounded-bl-sm'
-                            : 'bg-petal-cream-2 text-petal-ink rounded-br-sm'
+                            ? `${ROLE_STYLE.counselor.surface} rounded-bl-sm`
+                            : `${ROLE_STYLE.self.surface} rounded-br-sm`
                       }`}
                     >
                       <MarkdownContent content={m.body} />
