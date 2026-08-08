@@ -25,6 +25,7 @@ import TherapySummaryCard from './TherapySummaryCard';
 import DedicatedTherapistPanel from './DedicatedTherapistPanel';
 import TherapistClientsPanel from './TherapistClientsPanel';
 import ParticipantAvatar from './ParticipantAvatar';
+import { ROLE_STYLE } from '../utils/threadRoles';
 
 interface TherapistsViewProps {
   authState: {
@@ -1182,8 +1183,8 @@ const ChatRoom: React.FC<{
                       m.isMine
                         ? 'bg-petal-ink text-petal-cream rounded-br-sm'
                         : m.isTherapist
-                          ? 'bg-pink-100 text-petal-ink rounded-bl-sm'
-                          : 'bg-petal-cream-2 text-petal-ink rounded-bl-sm'
+                          ? `${ROLE_STYLE.therapist.surface} text-petal-ink rounded-bl-sm`
+                          : `${ROLE_STYLE.partner.surface} text-petal-ink rounded-bl-sm`
                     }`}
                   >
                     {m.body}

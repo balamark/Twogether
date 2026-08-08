@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, Compass } from 'lucide-react';
 import type { MessageFacilitation } from '../services/api';
 import ParticipantAvatar from './ParticipantAvatar';
 
@@ -7,6 +7,12 @@ import ParticipantAvatar from './ParticipantAvatar';
 // bubble: a coloured card-label chip, what the therapist says, the one small
 // instruction, optional quick-reply chips, and (when the last response was
 // graded) an evaluation badge.
+//
+// This is 引導 — Luma's second conversational mode, not a fourth speaker. What
+// marks it out is the 🧭 icon, the label, and this component's shape, NOT a
+// colour of its own (see src/utils/threadRoles.ts). `variant="focus"` is the
+// full-screen practice layer (GuideSessionView); `inline` is the preview shown
+// inside a conversation.
 interface Props {
   facilitation: MessageFacilitation;
   say: string;
@@ -14,12 +20,15 @@ interface Props {
   companionId?: string | null;
   isMyTurn: boolean;
   onQuickReply: (text: string) => void;
+  variant?: 'focus' | 'inline';
 }
 
 // Card accent by colour key (see lib/therapyCards.js). Petal-family accents so
 // the chips sit inside the app's warm soft-petal system (amber stays: it's the
 // one warm hue the palette lacks); kept light so the card reads as a gentle
-// prompt, not an alert.
+// prompt, not an alert. These are SEMANTIC colours (exercise type / grade) —
+// exactly the budget that collapsing the speaker roles onto one brand tint
+// freed up, so don't repurpose them for roles.
 const CHIP: Record<string, string> = {
   rose: 'bg-petal-rose-soft/30 border-petal-rose-soft text-petal-rose-deep',
   sage: 'bg-petal-sage/20 border-petal-sage text-petal-sage-deep',
@@ -33,15 +42,29 @@ const VERDICT: Record<string, { label: string; cls: string }> = {
   off: { label: '❌ 再試一次', cls: 'bg-petal-rose-soft/30 text-petal-rose-deep border-petal-rose-soft' },
 };
 
-const TherapistTurnCard: React.FC<Props> = ({ facilitation, say, companionLabel, companionId, isMyTurn, onQuickReply }) => {
+const TherapistTurnCard: React.FC<Props> = ({
+  facilitation,
+  say,
+  companionLabel,
+  companionId,
+  isMyTurn,
+  onQuickReply,
+  variant = 'focus',
+}) => {
   const { cardMeta, instruction, quickReplies, evaluation, evaluatedCardMeta, sessionDone } = facilitation;
   const chip = (cardMeta && CHIP[cardMeta.color]) || CHIP.neutral;
+  // In the focus layer the page itself is cream, so the card has to lift off it.
+  const shell =
+    variant === 'focus'
+      ? 'bg-white border-petal-rule shadow-sm'
+      : 'bg-petal-rose-soft/25 border-petal-rose-soft';
 
   return (
-    <div className="rounded-2xl border border-petal-rose-deep/25 bg-petal-cream p-4 space-y-3" data-testid="therapist-turn-card">
+    <div className={`rounded-2xl border p-4 space-y-3 ${shell}`} data-testid="therapist-turn-card">
       <div className="flex items-center gap-2 flex-wrap">
         <span className="inline-flex items-center gap-1.5 font-body text-xs font-medium text-petal-rose-deep">
           <ParticipantAvatar size="xs" role="ai" companionId={companionId} name={companionLabel} />
+          <Compass className="w-3.5 h-3.5" strokeWidth={1.5} />
           {companionLabel}
         </span>
         {cardMeta && (
