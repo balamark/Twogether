@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { ArrowLeft, Compass, Loader2, Send } from 'lucide-react';
 import type { FacilitationSession, MessageFacilitation } from '../services/api';
 import TherapistTurnCard from './TherapistTurnCard';
@@ -72,7 +73,15 @@ const GuideSessionView: React.FC<Props> = ({
   const active = session?.status === 'active';
   const stepNumber = session ? session.completedCardsMeta.length + (session.activeCardMeta ? 1 : 0) : 0;
 
-  return (
+  // Portal to <body>. Mounted inline inside EventDetail's tree, a `fixed inset-0`
+  // layer does NOT fill the viewport — measured at y=16 / h=711 in a 727px
+  // viewport, so a strip of the conversation shows above it. An empty
+  // `position: fixed` probe in the same parent reproduces it exactly, so some
+  // ancestor is scoping the containing block; every other `fixed inset-0`
+  // overlay in EventDetail inherits the same offset. Attaching to <body>
+  // sidesteps it (the same probe on <body> measures y=0 / h=727) without
+  // rewriting the ancestor chain the whole app depends on.
+  return createPortal(
     <div className="fixed inset-0 z-50 bg-petal-cream flex flex-col" data-testid="guide-session-view">
       <div className="w-full max-w-2xl mx-auto px-5 sm:px-8 py-6 flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col safe-pb">
         {/* Top bar — 「回到對話」而不是「×」：關掉的是圖層，不是練習。 */}
@@ -182,7 +191,8 @@ const GuideSessionView: React.FC<Props> = ({
             : '這次練習已經結束。想再練一次，回到對話按「開始引導」。'}
         </p>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
