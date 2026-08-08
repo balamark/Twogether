@@ -200,11 +200,22 @@ const PublicQaDetail: React.FC<{
       return;
     }
     if (!thread) return;
+    // Optimistic (playbook §R7): flip the mark and count instantly so the tap
+    // feels immediate; reconcile with the server's truth on success, roll back
+    // and notify on failure.
+    const prev = thread;
+    const optimistic = {
+      ...thread,
+      hasVoted: !thread.hasVoted,
+      helpfulCount: Math.max(0, thread.helpfulCount + (thread.hasVoted ? -1 : 1)),
+    };
+    setThread(optimistic);
+    setVoting(true);
     try {
-      setVoting(true);
       const res = await apiService.votePublicQa(thread.id);
-      setThread({ ...thread, hasVoted: res.voted, helpfulCount: res.helpfulCount });
+      setThread((cur) => (cur ? { ...cur, hasVoted: res.voted, helpfulCount: res.helpfulCount } : cur));
     } catch (err) {
+      setThread(prev);
       showNotification({ type: 'error', title: '操作失敗', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
     } finally {
       setVoting(false);

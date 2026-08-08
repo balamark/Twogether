@@ -83,15 +83,29 @@ export default function StoryDetail({
       showNotification({ type: 'info', title: '這是你的故事', message: '不能為自己的故事投票，把機會留給被你幫助的人' });
       return;
     }
+    // Optimistic (playbook §R7): flip the vote and its count instantly, then
+    // reconcile with the server's authoritative counts; roll back on failure.
+    const prev = story;
+    const alreadyVoted = story.myVotes.includes(type);
+    setStory({
+      ...story,
+      votes: { ...story.votes, [type]: Math.max(0, (story.votes[type] ?? 0) + (alreadyVoted ? -1 : 1)) },
+      myVotes: alreadyVoted ? story.myVotes.filter((v) => v !== type) : [...story.myVotes, type],
+    });
     setVoting(true);
     try {
       const res = await apiService.voteStory(story.id, type);
-      setStory({
-        ...story,
-        votes: res.counts,
-        myVotes: res.voted ? [...story.myVotes, type] : story.myVotes.filter((v) => v !== type),
+      setStory((cur) => {
+        if (!cur) return cur;
+        const base = cur.myVotes.filter((v) => v !== type);
+        return {
+          ...cur,
+          votes: res.counts,
+          myVotes: res.voted ? [...base, type] : base,
+        };
       });
     } catch (err) {
+      setStory(prev);
       showNotification({ type: 'error', title: '投票失敗', message: err instanceof Error ? err.message : '請稍後再試' });
     } finally {
       setVoting(false);

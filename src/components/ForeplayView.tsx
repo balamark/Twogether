@@ -172,6 +172,11 @@ const ForeplayView = ({ setTotalCoins, showNotification }: ForeplayViewProps) =>
     }
   });
 
+  // NOTE (playbook §R7 exception): these do NOT fire-and-forget. Coin grants
+  // have no server-side idempotency, so the `earnCoins` lock must stay held for
+  // the whole round-trip to block a double-tap double-grant — awaiting the API
+  // before releasing is the point. Local credit is kept even on failure so a
+  // network blip never swallows a coin the user earned.
   const handleTryActivity = async (activity: ForeplayActivity) => {
     const coinsEarned = activity.coins;
 

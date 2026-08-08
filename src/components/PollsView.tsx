@@ -45,11 +45,28 @@ function PollCard({
       return;
     }
     if (voting) return;
+    // Optimistic (playbook §R7): show the result bars immediately by recording
+    // the pick locally and shifting the tallies, then reconcile with the
+    // server's authoritative counts; roll back on failure.
+    const prev = poll;
+    const prevOptionId = poll.myOptionId;
+    const options = poll.options.map((o) => {
+      if (o.id === optionId) return { ...o, votes: o.votes + (prevOptionId === o.id ? 0 : 1) };
+      if (o.id === prevOptionId) return { ...o, votes: Math.max(0, o.votes - 1) };
+      return o;
+    });
+    setPoll({
+      ...poll,
+      myOptionId: optionId,
+      totalVotes: poll.totalVotes + (prevOptionId ? 0 : 1),
+      options,
+    });
     setVoting(true);
     try {
       const updated = await apiService.votePoll(poll.id, optionId);
-      setPoll({ ...updated, voiceCount: poll.voiceCount, voices: poll.voices });
+      setPoll((p) => ({ ...updated, voiceCount: p.voiceCount, voices: p.voices }));
     } catch (err) {
+      setPoll(prev);
       showNotification({ type: 'error', title: '投票失敗', message: err instanceof Error ? err.message : '請稍後再試' });
     } finally {
       setVoting(false);

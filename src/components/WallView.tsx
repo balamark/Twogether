@@ -330,11 +330,15 @@ const WallView: React.FC<WallViewProps> = ({
 
   const handleDelete = async (post: WallPost) => {
     if (!confirm('確定要刪除這則貼文嗎？所有回覆也會一起刪除。')) return;
+    // Optimistic (playbook §R7): remove it from the wall immediately so the tap
+    // feels instant; restore the exact list and notify if the server rejects it.
+    const snapshot = posts;
+    setPosts((prev) => prev.filter((p) => p.id !== post.id));
+    if (expandedPostId === post.id) setExpandedPostId(null);
     try {
       await apiService.deleteWallPost(post.id);
-      setPosts((prev) => prev.filter((p) => p.id !== post.id));
-      if (expandedPostId === post.id) setExpandedPostId(null);
     } catch (err) {
+      setPosts(snapshot);
       showNotification({
         type: 'error',
         title: '刪除失敗',
