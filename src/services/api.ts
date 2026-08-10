@@ -18,6 +18,19 @@ declare module 'axios' {
 const API_BASE_URL = '/api';
 
 // Types
+
+// 快速回應 on a 親密記錄. Keys must match MOMENT_REACTIONS in
+// routes/love-moments.js — only the key travels, never the emoji or the label.
+export type MomentReactionKey = 'love' | 'sweet' | 'fire' | 'hug' | 'memorable';
+
+// One person's response to one record: a chip, a sentence, or both.
+export interface MomentResponse {
+  reaction: MomentReactionKey | null;
+  note: string | null;
+  nickname: string | null;
+  updated_at: string;
+}
+
 interface IntimateRecord {
   id: number;
   apiId?: string;
@@ -34,6 +47,11 @@ interface IntimateRecord {
   roleplayScript?: string;
   coinsEarned?: number;
   activityType?: string;
+  recordedById?: string;
+  recordedByNickname?: string;
+  // Pre-digested by the backend so the UI doesn't have to work out who is who.
+  myResponse?: MomentResponse | null;
+  partnerResponse?: MomentResponse | null;
 }
 
 interface ApiIntimateRecord {
@@ -49,6 +67,9 @@ interface ApiIntimateRecord {
   roleplay_script?: string;
   coins_earned?: number;
   activity_type?: string;
+  recorded_by?: { id?: string; nickname?: string };
+  my_response?: MomentResponse | null;
+  partner_response?: MomentResponse | null;
 }
 
 export interface CycleRecord {
@@ -1616,6 +1637,21 @@ class ApiService {
     }
   }
 
+  // Set, change or clear the caller's 快速回應 on a record. A partial update:
+  // send only the field you're changing. Throws so the caller can roll back its
+  // optimistic state and surface the server's specific message — the
+  // interceptor preserves error_code.
+  async setIntimateRecordResponse(
+    momentId: string,
+    patch: { reaction?: MomentReactionKey | null; note?: string | null }
+  ): Promise<{ my_response: MomentResponse | null; partner_response: MomentResponse | null }> {
+    const response = await apiClient.put(`/love-moments/${momentId}/response`, patch);
+    return {
+      my_response: response.data?.my_response ?? null,
+      partner_response: response.data?.partner_response ?? null,
+    };
+  }
+
   async createIntimateRecord(record: Omit<IntimateRecord, 'id' | 'timestamp'>): Promise<IntimateRecord> {
     try {
       // Validate required fields
@@ -2199,6 +2235,10 @@ class ApiService {
       roleplayScript: apiRecord.roleplay_script || '',
       coinsEarned: apiRecord.coins_earned || 0,
       activityType: apiRecord.activity_type || 'intimate',
+      recordedById: apiRecord.recorded_by?.id,
+      recordedByNickname: apiRecord.recorded_by?.nickname,
+      myResponse: apiRecord.my_response ?? null,
+      partnerResponse: apiRecord.partner_response ?? null,
     };
   }
 

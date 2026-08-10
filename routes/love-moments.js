@@ -3,13 +3,101 @@ const { body, validationResult } = require('express-validator');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
-const { logInfo, logError } = require('../lib/logger');
-const { notifyPartnerAction } = require('../services/notificationService');
+const { logInfo, logWarn, logError } = require('../lib/logger');
+const { logDbError, errorResponseBody } = require('../lib/db-errors');
+const { notifyPartnerAction, getPartnerId } = require('../services/notificationService');
+const lineService = require('../services/lineService');
 
 const router = express.Router();
 
+// 快速回應 — a record used to be a row nobody could answer. Now each person may
+// leave one tap and one sentence on it. Only the KEY is stored; emoji/label live
+// here and in MOMENT_REACTIONS (src/components/MomentResponseBar.tsx) — keep the
+// two lists in sync.
+const MOMENT_REACTIONS = {
+  love: { emoji: '❤️', label: '愛你' },
+  sweet: { emoji: '🥰', label: '好甜' },
+  fire: { emoji: '🔥', label: '意猶未盡' },
+  hug: { emoji: '🫂', label: '想再抱一次' },
+  memorable: { emoji: '✨', label: '很難忘' },
+};
+
+// A quick response is a reply, not a diary entry — long thoughts belong in the
+// record's own 備註. Matches the note column width in migration 086.
+const NOTE_MAX = 80;
+
 // All love moment routes require authentication
 router.use(authenticateToken);
+
+// Fetch quick responses for a set of moment ids → { momentId: [row, ...] }.
+// Degrades to no responses (rather than failing the list) if the table isn't
+// present yet, e.g. a pre-migration environment.
+async function fetchResponsesForMoments(momentIds) {
+  const map = {};
+  if (!momentIds.length) return map;
+  try {
+    const result = await db.query(
+      `SELECT r.moment_id, r.user_id, r.reaction, r.note, r.updated_at,
+              u.nickname
+         FROM love_moment_responses r
+         JOIN users u ON u.id = r.user_id
+        WHERE r.moment_id = ANY($1::uuid[])`,
+      [momentIds]
+    );
+    for (const row of result.rows) {
+      (map[row.moment_id] = map[row.moment_id] || []).push(row);
+    }
+  } catch (err) {
+    logWarn('Failed to fetch love moment responses', { err: err.message });
+  }
+  return map;
+}
+
+// Digest the raw rows for one moment into "mine" and "theirs". Unlike the wall,
+// this keys off the VIEWER rather than the author: both partners can respond to
+// a moment, including whoever recorded it.
+function digestResponses(rows, viewerId) {
+  const shape = (r) => (r
+    ? { reaction: r.reaction, note: r.note, nickname: r.nickname, updated_at: r.updated_at }
+    : null);
+  const list = rows || [];
+  return {
+    my_response: shape(list.find((r) => r.user_id === viewerId)),
+    partner_response: shape(list.find((r) => r.user_id !== viewerId)),
+  };
+}
+
+// Tell the other half their record got answered. Deliberately NOT routed
+// through notifyPartnerAction: that helper always fans out to email, and
+// emailing every one-tap chip is how a kind gesture turns into spam.
+// In-app + LINE only.
+async function notifyResponse(actorId, actorNickname, next) {
+  try {
+    const partnerId = await getPartnerId(actorId);
+    if (!partnerId) return;
+
+    const who = actorNickname || 'TA';
+    const title = '對方回應了你們的記錄';
+    const content = next.note
+      ? `${who} 說：「${next.note}」`
+      : `${who} 給了這則記錄一個「${MOMENT_REACTIONS[next.reaction].label}」${MOMENT_REACTIONS[next.reaction].emoji}`;
+
+    await db.query(
+      `INSERT INTO notifications (
+         user_id, notification_type, title, content, related_user_id, priority
+       ) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [partnerId, 'love_moment_response', title, content, actorId, 1]
+    );
+
+    lineService.pushToUserIfLinked(
+      db,
+      partnerId,
+      `💌 Twogether｜${title}\n「${content}」\n👉 https://twogether.fun`
+    );
+  } catch (err) {
+    logWarn('Failed to notify love moment response', { err: err.message });
+  }
+}
 
 // Create love moment
 router.post('/', [
@@ -186,6 +274,10 @@ router.get('/', async (req, res) => {
       LIMIT $${paramIndex++} OFFSET $${paramIndex++}
     `, queryParams);
 
+    // One batched read for the whole page's 快速回應, digested per moment so the
+    // UI never has to work out who is who.
+    const responsesByMoment = await fetchResponsesForMoments(result.rows.map(r => r.id));
+
     const loveMoments = result.rows.map(row => ({
       id: row.id,
       moment_date: row.moment_date,
@@ -200,7 +292,8 @@ router.get('/', async (req, res) => {
       recorded_by: {
         id: row.recorded_by_id,
         nickname: row.recorded_by_nickname
-      }
+      },
+      ...digestResponses(responsesByMoment[row.id], userId)
     }));
 
     res.json({
@@ -251,6 +344,7 @@ router.get('/:id', async (req, res) => {
     }
 
     const moment = result.rows[0];
+    const responsesByMoment = await fetchResponsesForMoments([moment.id]);
 
     res.json({
       success: true,
@@ -268,7 +362,8 @@ router.get('/:id', async (req, res) => {
         recorded_by: {
           id: moment.recorded_by_id,
           nickname: moment.recorded_by_nickname
-        }
+        },
+        ...digestResponses(responsesByMoment[moment.id], userId)
       }
     });
 
@@ -278,6 +373,125 @@ router.get('/:id', async (req, res) => {
       success: false,
       message: '獲取愛情時刻失敗'
     });
+  }
+});
+
+// Set, change or clear the caller's 快速回應 on a record. A partial update:
+// a field absent from the body is left as it was, so tapping a chip never wipes
+// the sentence the same person already left (and vice versa).
+router.put('/:id/response', async (req, res) => {
+  const userId = req.user.id;
+  const momentId = req.params.id;
+
+  try {
+    const hasReaction = Object.prototype.hasOwnProperty.call(req.body || {}, 'reaction');
+    const hasNote = Object.prototype.hasOwnProperty.call(req.body || {}, 'note');
+
+    const rawReaction = req.body?.reaction;
+    const reaction = rawReaction === null || rawReaction === undefined || rawReaction === ''
+      ? null
+      : String(rawReaction);
+
+    if (reaction !== null && !MOMENT_REACTIONS[reaction]) {
+      logWarn('love_moment.response.invalid', { user_id: userId, moment_id: momentId, reaction });
+      return res.status(400).json({
+        success: false,
+        error_code: 'MOMENT_REACTION_INVALID',
+        message: '這個回應已經不支援了，請重新選一個心意。',
+      });
+    }
+
+    const rawNote = req.body?.note;
+    const note = typeof rawNote === 'string' ? rawNote.trim() : null;
+
+    if (note && [...note].length > NOTE_MAX) {
+      logWarn('love_moment.response.note_too_long', {
+        user_id: userId, moment_id: momentId, length: [...note].length,
+      });
+      return res.status(400).json({
+        success: false,
+        error_code: 'MOMENT_NOTE_TOO_LONG',
+        message: `一句話回應最多 ${NOTE_MAX} 字。想說更多的話，寫進這則記錄的備註裡更適合。`,
+      });
+    }
+
+    // Same visibility rule as GET /:id — your own record, or one belonging to
+    // your couple. A miss is a 404 either way so ids can't be probed.
+    const access = await db.query(`
+      SELECT lm.id
+        FROM love_moments lm
+        LEFT JOIN couples c ON lm.couple_id = c.id
+       WHERE lm.id = $1 AND (
+         lm.recorded_by = $2 OR
+         (c.id IS NOT NULL AND (c.user1_id = $2 OR c.user2_id = $2))
+       )
+    `, [momentId, userId]);
+
+    if (access.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error_code: 'LOVE_MOMENT_NOT_FOUND',
+        message: '找不到這則記錄，它可能已經被刪除了。',
+      });
+    }
+
+    const existing = await db.query(
+      'SELECT reaction, note FROM love_moment_responses WHERE moment_id = $1 AND user_id = $2',
+      [momentId, userId]
+    );
+    const current = existing.rows[0] || { reaction: null, note: null };
+
+    // Tapping the chip that's already lit means "take it back".
+    let nextReaction = current.reaction;
+    if (hasReaction) {
+      nextReaction = reaction === null || reaction === current.reaction ? null : reaction;
+    }
+    let nextNote = current.note;
+    if (hasNote) {
+      nextNote = note || null;
+    }
+
+    const cleared = nextReaction === null && nextNote === null;
+
+    if (cleared) {
+      // Never store an empty row — that's what the CHECK in migration 086 guards.
+      await db.query(
+        'DELETE FROM love_moment_responses WHERE moment_id = $1 AND user_id = $2',
+        [momentId, userId]
+      );
+    } else {
+      await db.query(
+        `INSERT INTO love_moment_responses (moment_id, user_id, reaction, note)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (moment_id, user_id)
+         DO UPDATE SET reaction = EXCLUDED.reaction,
+                       note = EXCLUDED.note,
+                       updated_at = NOW()`,
+        [momentId, userId, nextReaction, nextNote]
+      );
+    }
+
+    logInfo('love_moment.response.set', {
+      user_id: userId,
+      moment_id: momentId,
+      reaction: nextReaction,
+      has_note: !!nextNote,
+      cleared,
+    });
+
+    // Only something newly given is worth a ping — taking a response back isn't,
+    // and neither is re-saving what was already there.
+    const changed = nextReaction !== current.reaction || nextNote !== current.note;
+    if (!cleared && changed) {
+      await notifyResponse(userId, req.user.nickname, { reaction: nextReaction, note: nextNote });
+    }
+
+    const refreshed = await fetchResponsesForMoments([momentId]);
+    res.json({ success: true, ...digestResponses(refreshed[momentId], userId) });
+
+  } catch (error) {
+    logDbError('Set love moment response error:', error, { user_id: userId, moment_id: momentId });
+    res.status(500).json(errorResponseBody('無法送出回應，請稍後再試一次。', error));
   }
 });
 

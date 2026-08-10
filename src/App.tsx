@@ -27,6 +27,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import IntimacyRequestsHistory from './components/IntimacyRequestsHistory';
 import IntimacyRequestForm from './components/IntimacyRequestForm';
 import NotificationInbox from './components/NotificationInbox';
+import MomentResponseBar from './components/MomentResponseBar';
 import PairingInvitationHandler from './components/PairingInvitationHandler';
 import { PairingInviteShare } from './components/PairingInviteShare';
 import PairingReminderBanner from './components/PairingReminderBanner';
@@ -36,7 +37,7 @@ import HelpView from './components/HelpView';
 import StoriesView from './components/StoriesView';
 import { resolveCompanion } from './utils/aiCompanions';
 import { apiService, getTokenExpiry, clearAuthStorage } from './services/api';
-import type { CycleRecord, BillingStatus, PairingInvitationSummary } from './services/api';
+import type { CycleRecord, BillingStatus, PairingInvitationSummary, MomentResponse, MomentReactionKey } from './services/api';
 import { buildPairingAcceptLink } from './utils/pairingLink';
 import { pickPendingInvite } from './utils/pairingReminder';
 import { getPrimaryTimezone, formatYmdInTz, browserTz } from './utils/datetime';
@@ -88,6 +89,11 @@ export interface IntimateRecord {
   roleplayScript?: string;
   coinsEarned?: number;
   activityType?: string;
+  recordedById?: string;
+  recordedByNickname?: string;
+  // 快速回應 — pre-digested by the backend into "mine" and "theirs".
+  myResponse?: MomentResponse | null;
+  partnerResponse?: MomentResponse | null;
 }
 
 interface Nicknames {
@@ -1793,6 +1799,67 @@ const LoveTimeApp = () => {
     }
   };
 
+  // --- 快速回應 -------------------------------------------------------------
+  // Optimistic (playbook §R7): the chip fills and the sentence lands the moment
+  // you tap, and rolls back with the server's own message if the write fails.
+  // Lives here because `intimateRecords` and `showNotification` do.
+  const setRecordResponse = useCallback(async (
+    record: IntimateRecord,
+    patch: { reaction?: MomentReactionKey | null; note?: string | null }
+  ) => {
+    if (!record.apiId) {
+      showNotification({
+        type: 'warning',
+        title: '記錄還在同步',
+        message: '這則記錄還沒同步完成，重新整理頁面後就能回應了。',
+        duration: 5000,
+      });
+      return;
+    }
+
+    const previous = record.myResponse ?? null;
+    // Mirror the server's toggle/clear rules so the chip reacts instantly.
+    const nextReaction = patch.reaction === undefined
+      ? previous?.reaction ?? null
+      : (patch.reaction === null || patch.reaction === previous?.reaction ? null : patch.reaction);
+    const nextNote = patch.note === undefined
+      ? previous?.note ?? null
+      : (patch.note?.trim() || null);
+    const optimistic: MomentResponse | null = nextReaction === null && nextNote === null
+      ? null
+      : {
+          reaction: nextReaction,
+          note: nextNote,
+          nickname: previous?.nickname ?? null,
+          updated_at: new Date().toISOString(),
+        };
+
+    const apply = (fields: Partial<IntimateRecord>) =>
+      setIntimateRecords(prev => prev.map(r => (r.id === record.id ? { ...r, ...fields } : r)));
+
+    apply({ myResponse: optimistic });
+    try {
+      const result = await apiService.setIntimateRecordResponse(record.apiId, patch);
+      apply({ myResponse: result.my_response, partnerResponse: result.partner_response });
+    } catch (error) {
+      apply({ myResponse: previous });
+      showNotification({
+        type: 'error',
+        title: '回應沒有送出',
+        message: error instanceof Error ? error.message : '請稍後再試一次。',
+        duration: 5000,
+      });
+    }
+  }, [showNotification]);
+
+  // Opens the pairing invite prompt. Shared by the onboarding card and the
+  // 快速回應 gate, which both need the same "invite TA" way out.
+  const openPairingPrompt = useCallback(() => {
+    localStorage.removeItem('pairingPromptDismissed');
+    setPairingPromptDismissed(false);
+    setShowPairingPrompt(true);
+  }, []);
+
   const handleDeleteRecord = async (record: IntimateRecord) => {
     try {
       if (!record.apiId) {
@@ -2254,11 +2321,7 @@ const LoveTimeApp = () => {
             paired={partnerConnected}
             hasFirstEntry={intimateRecords.length > 0 || localStorage.getItem('gettingStartedEventOpened') === 'true'}
             onPickCompanion={() => setShowCompanionOnboarding(true)}
-            onInvitePartner={() => {
-              localStorage.removeItem('pairingPromptDismissed');
-              setPairingPromptDismissed(false);
-              setShowPairingPrompt(true);
-            }}
+            onInvitePartner={openPairingPrompt}
             onAddRecord={() => setShowRecordModal(true)}
             onOpenEvents={() => {
               localStorage.setItem('gettingStartedEventOpened', 'true');
@@ -2294,6 +2357,8 @@ const LoveTimeApp = () => {
             daysTogether={daysTogether}
             primaryTimezone={primaryTimezone}
             onNudgePartner={partnerConnected ? () => setShowIntimacyRequestForm(true) : undefined}
+            setRecordResponse={setRecordResponse}
+            partnerNickname={nicknames.partner2 || '對方'}
           />
           </div>
         );
@@ -3091,6 +3156,21 @@ const LoveTimeApp = () => {
                     </p>
                   </div>
                 )}
+
+                <div>
+                  <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">快速回應</h4>
+                  <MomentResponseBar
+                    // `selectedRecord` is a snapshot taken when the modal opened,
+                    // so read the live row for the parts that change under it.
+                    record={intimateRecords.find(r => r.id === selectedRecord.id) ?? selectedRecord}
+                    partnerConnected={partnerConnected}
+                    partnerNickname={nicknames.partner2 || '對方'}
+                    variant="detail"
+                    onRespond={setRecordResponse}
+                    onInvitePartner={() => { setShowRecordDetail(false); openPairingPrompt(); }}
+                    timezone={primaryTimezone}
+                  />
+                </div>
               </div>
             </div>
           </div>
