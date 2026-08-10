@@ -10,7 +10,8 @@ import { useScrollLock } from '../hooks/useScrollLock';
 import { apiService } from '../services/api';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { Button } from './ui/Button';
-import type { CycleRecord } from '../services/api';
+import MomentResponseBar from './MomentResponseBar';
+import type { CycleRecord, MomentReactionKey } from '../services/api';
 import type { IntimateRecord, AuthState, Notification } from '../App';
 
 // Image compression helper — pure, canvas-based. Co-located here since the
@@ -104,6 +105,12 @@ interface CalendarViewProps {
     activityType?: string,
   ) => Promise<void>;
   showNotification: (notification: Omit<Notification, 'id'>) => void;
+  /** Sends a 快速回應 (chip and/or sentence) on a record. Optimistic; see App.tsx. */
+  setRecordResponse: (
+    record: IntimateRecord,
+    patch: { reaction?: MomentReactionKey | null; note?: string | null }
+  ) => Promise<void>;
+  partnerNickname: string;
   showRecordDetails: (recordId: number) => void;
   openDeleteConfirm: (record: IntimateRecord) => void;
   defaultRoleplayScripts: { title: string }[];
@@ -138,6 +145,8 @@ const CalendarView = ({
   setCurrentView,
   addIntimateRecord,
   showNotification,
+  setRecordResponse,
+  partnerNickname,
   showRecordDetails,
   openDeleteConfirm,
   defaultRoleplayScripts,
@@ -836,7 +845,9 @@ const CalendarView = ({
             共 <b className="not-italic font-normal text-petal-ink">{intimateRecords.length}</b> 次
           </span>
         </div>
-        <div className="max-h-[28rem] overflow-y-auto overflow-x-hidden">
+        {/* Taller than it used to be: each row now carries a 快速回應 strip
+            (~190px vs ~130px), and at 28rem only two records stayed in view. */}
+        <div className="max-h-[36rem] overflow-y-auto overflow-x-hidden">
           {(() => {
             const filtered = intimateRecords
               .slice()
@@ -900,9 +911,21 @@ const CalendarView = ({
                     <img
                       src={record.photo}
                       alt="記憶照片"
-                      className="mt-3 w-24 h-24 rounded-md object-cover border border-petal-rule"
+                      className="mt-3 w-24 h-24 rounded-md object-contain bg-petal-cream-2 border border-petal-rule"
                     />
                   )}
+                  {/* One tap is all it takes to answer a record — no need to
+                      open it first. Every control inside stops propagation so
+                      the row's own onClick doesn't fire. */}
+                  <MomentResponseBar
+                    record={record}
+                    partnerConnected={authState.partnerConnected}
+                    partnerNickname={partnerNickname}
+                    variant="row"
+                    onRespond={setRecordResponse}
+                    onOpenDetail={(r) => showRecordDetails(r.id)}
+                    timezone={primaryTimezone}
+                  />
                 </div>
                 <div className="flex items-start pt-1">
                   <button

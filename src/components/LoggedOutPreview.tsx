@@ -187,13 +187,25 @@ const SampleStats: React.FC = () => {
   );
 };
 
-// Sample of the 親密記錄 history list, showing the new「距上次相隔 N 天」gap
-// badge that now sits beside each record's date in the real view.
+// Sample of the 親密記錄 history list, showing the「距上次相隔 N 天」gap badge
+// beside each record's date and the 快速回應 strip below it — one tap or one
+// short sentence, so a record isn't a row nobody can answer.
 const SampleRecordList: React.FC = () => {
   const rows = [
-    { date: '6月28日', mood: '😊', note: '一起看了場電影', gap: 5 },
-    { date: '6月23日', mood: '🥰', note: '週末小旅行', gap: 12 },
-    { date: '6月11日', mood: '😌', note: null as string | null, gap: null as number | null },
+    {
+      date: '6月28日', mood: '😊', note: '一起看了場電影', gap: 5,
+      response: { emoji: '❤️', who: '小美', text: '那天真的好放鬆' } as { emoji: string; who: string; text: string } | null,
+    },
+    { date: '6月23日', mood: '🥰', note: '週末小旅行', gap: 12, response: null },
+    { date: '6月11日', mood: '😌', note: null as string | null, gap: null as number | null, response: null },
+  ];
+  // Static mirror of MOMENT_REACTIONS (src/components/MomentResponseBar.tsx).
+  const chips = [
+    { emoji: '❤️', label: '愛你' },
+    { emoji: '🥰', label: '好甜' },
+    { emoji: '🔥', label: '意猶未盡' },
+    { emoji: '🫂', label: '想再抱一次' },
+    { emoji: '✨', label: '很難忘' },
   ];
   return (
     <div className="mb-4">
@@ -205,7 +217,7 @@ const SampleRecordList: React.FC = () => {
         {rows.map((r, i) => (
           <div key={i} className="flex items-start gap-3 p-3">
             <span className="text-base leading-none opacity-70 mt-0.5">{r.mood}</span>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="font-display italic font-light text-xs text-petal-muted">
                 {r.date}
                 {r.gap !== null && (
@@ -214,6 +226,31 @@ const SampleRecordList: React.FC = () => {
               </div>
               {r.note && (
                 <p className="font-body text-[13px] text-petal-ink leading-snug mt-0.5">{r.note}</p>
+              )}
+              {r.response && (
+                <div className="mt-2 inline-flex items-baseline gap-1.5 rounded-full bg-petal-rose-soft/50 px-2.5 py-1 max-w-full">
+                  <span aria-hidden>{r.response.emoji}</span>
+                  <span className="font-body text-[11px] text-petal-rose-deep truncate">
+                    {r.response.who}：{r.response.text}
+                  </span>
+                </div>
+              )}
+              {i === 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {chips.map((c, ci) => (
+                    <span
+                      key={c.label}
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-body text-[10px] ${
+                        ci === 0
+                          ? 'bg-petal-rose-soft/50 text-petal-rose-deep'
+                          : 'border border-petal-rule text-petal-ink-soft'
+                      }`}
+                    >
+                      <span aria-hidden>{c.emoji}</span>
+                      {c.label}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
           </div>
@@ -708,7 +745,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       </>
     ),
     description:
-      '看見你們的節奏：親密時光與生理期都在一張月曆上。太久沒親密時，App 會溫柔提醒另一半多關心你。另一半的每個操作也會出現在通知中心，讓你隨時知道 TA 做了什麼。',
+      '看見你們的節奏：親密時光與生理期都在一張月曆上。記下的每段時光都能互相回應——點一下表情，或留一句短短的話。太久沒親密時，App 會溫柔提醒另一半多關心你。另一半的每個操作也會出現在通知中心，讓你隨時知道 TA 做了什麼。',
     sample: (
       <>
         <CalendarMock />

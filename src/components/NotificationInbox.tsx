@@ -59,6 +59,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
     switch (notification.notificationType) {
       case 'wall_post':
       case 'wall_reply':
+      case 'wall_reaction':
         onNavigate('wall');
         break;
       // The three 一起收尾 types land here too: the closure panel (or the summary
@@ -88,6 +89,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       case 'love_moment_created':
       case 'love_moment_updated':
       case 'love_moment_deleted':
+      case 'love_moment_response':
       case 'cycle_record_created':
       case 'cycle_record_updated':
       case 'cycle_record_deleted':
