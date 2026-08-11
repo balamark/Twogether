@@ -7,12 +7,15 @@ import type { IntimateRecord } from '../App';
 // routes/love-moments.js. These exist because a record used to be a row nobody
 // could answer: the moment belongs to both people, but only one of them ever
 // got to say anything about it.
-const MOMENT_REACTIONS: { key: MomentReactionKey; emoji: string; label: string }[] = [
-  { key: 'love', emoji: '❤️', label: '愛你' },
-  { key: 'sweet', emoji: '🥰', label: '好甜' },
-  { key: 'fire', emoji: '🔥', label: '意猶未盡' },
-  { key: 'hug', emoji: '🫂', label: '想再抱一次' },
-  { key: 'memorable', emoji: '✨', label: '很難忘' },
+//
+// Words, not emoji. A row of coloured capsules turned every record into a
+// control panel; four plain words sit inside the card's own typography and only
+// the chosen one takes on any colour at all.
+const MOMENT_REACTIONS: { key: MomentReactionKey; label: string }[] = [
+  { key: 'love', label: '愛你' },
+  { key: 'fire', label: '意猶未盡' },
+  { key: 'hug', label: '想再抱一次' },
+  { key: 'memorable', label: '很難忘' },
 ];
 
 const reactionMeta = (key: MomentReactionKey | null | undefined) =>
@@ -32,8 +35,6 @@ interface MomentResponseBarProps {
   variant: 'row' | 'detail';
   /** Sends a partial update. Resolves once the server has reconciled. */
   onRespond: (record: IntimateRecord, patch: MomentResponsePatch) => Promise<void>;
-  /** Row variant only: jump into the detail modal to write a sentence. */
-  onOpenDetail?: (record: IntimateRecord) => void;
   /** Detail variant only: CTA for the unpaired gate. */
   onInvitePartner?: () => void;
   timezone: string;
@@ -45,7 +46,6 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
   partnerNickname,
   variant,
   onRespond,
-  onOpenDetail,
   onInvitePartner,
   timezone,
 }) => {
@@ -103,9 +103,14 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
 
   const toggleReaction = (key: MomentReactionKey) => send({ reaction: key });
 
+  // One quiet line, and only four things in it. The underline is reserved for
+  // "this one is chosen" — nothing else in this row is allowed to wear it.
+  // There is deliberately no 說一句 link here: at 390px the list row gives this
+  // strip 254px, which the four words fill, and tapping anywhere else on the
+  // record already opens the detail view where the sentence gets written.
   const chips = (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {MOMENT_REACTIONS.map(({ key, emoji, label }) => {
+    <div className="flex flex-wrap items-center gap-x-4">
+      {MOMENT_REACTIONS.map(({ key, label }) => {
         const active = mine?.reaction === key;
         return (
           <button
@@ -114,16 +119,17 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
             onClick={(e) => { stop(e); void toggleReaction(key); }}
             disabled={busy}
             aria-pressed={active}
-            aria-label={label}
             data-testid={`moment-reaction-${key}-${record.id}`}
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-body text-[11px] transition-colors disabled:opacity-50 ${
-              active
-                ? 'bg-petal-rose-soft/50 text-petal-rose-deep'
-                : 'border border-petal-rule text-petal-ink-soft hover:border-petal-rose hover:text-petal-ink'
+            // py-2 is for the finger, not the eye: a bare word is an easy tap
+            // to miss. The rule goes on the inner span so it hugs the text
+            // instead of floating below the padding.
+            className={`py-2 font-body text-[13px] transition-colors disabled:opacity-50 ${
+              active ? 'text-petal-rose-deep' : 'text-petal-ink-soft hover:text-petal-ink'
             }`}
           >
-            <span aria-hidden>{emoji}</span>
-            {label}
+            <span className={active ? 'border-b border-petal-rose-deep pb-0.5' : ''}>
+              {label}
+            </span>
           </button>
         );
       })}
@@ -138,7 +144,6 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
         className="inline-flex items-baseline gap-1.5 rounded-full bg-petal-rose-soft/50 px-3 py-1 max-w-full"
         data-testid={testId}
       >
-        {meta && <span aria-hidden>{meta.emoji}</span>}
         <span className="font-body text-xs text-petal-rose-deep truncate">
           {response.note ? `${who}：${response.note}` : `${who}給了一個「${meta?.label ?? '心意'}」`}
         </span>
@@ -152,27 +157,18 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
   const theirName = theirs?.nickname || partnerNickname || '對方';
 
   if (variant === 'row') {
+    // No onClick={stop} on the wrapper: only the four words swallow the tap.
+    // Everywhere else here — the gaps, the saved-response pill — falls through
+    // to the row and opens the record, which is where a sentence gets written.
     return (
-      <div className="mt-3 space-y-2" onClick={stop}>
+      <div className="mt-2 space-y-1.5">
         {(theirs || mine) && (
           <div className="flex flex-wrap gap-1.5">
             {theirs && responsePill(theirs, theirName, `moment-response-partner-${record.id}`)}
             {mine?.note && responsePill(mine, '你', `moment-response-mine-${record.id}`)}
           </div>
         )}
-        <div className="flex flex-wrap items-center gap-1.5">
-          {chips}
-          {onOpenDetail && (
-            <button
-              type="button"
-              onClick={(e) => { stop(e); onOpenDetail(record); }}
-              data-testid={`moment-response-say-${record.id}`}
-              className="font-body text-[11px] text-petal-muted hover:text-petal-rose-deep underline underline-offset-2 transition-colors"
-            >
-              {mine?.note ? '改一句' : '＋ 說一句'}
-            </button>
-          )}
-        </div>
+        {chips}
       </div>
     );
   }
@@ -259,9 +255,9 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
           type="button"
           onClick={() => setEditingNote(true)}
           data-testid={`moment-note-open-${record.id}`}
-          className="font-body text-xs text-petal-muted hover:text-petal-rose-deep underline underline-offset-2 transition-colors"
+          className="font-body text-[13px] text-petal-muted hover:text-petal-rose-deep transition-colors"
         >
-          ＋ 說一句（{NOTE_MAX} 字以內）
+          說一句（{NOTE_MAX} 字以內）
         </button>
       )}
     </div>

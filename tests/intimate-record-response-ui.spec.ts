@@ -17,6 +17,7 @@ const COUPLE_ID = '33333333-3333-3333-3333-333333333333';
 
 const MINE = 'aaaaaaaa-0000-0000-0000-000000000001';
 const THEIRS = 'bbbbbbbb-0000-0000-0000-000000000002';
+const RETIRED = 'cccccccc-0000-0000-0000-000000000003';
 
 // src/services/api.ts derives the React key / testid suffix from the UUID by
 // hex-parsing its first 8 hex digits (transformApiRecord). Mirror that here so
@@ -51,6 +52,19 @@ const MOMENTS = [
     },
   },
   baseMoment(THEIRS, PARTNER_ID),
+  {
+    // A response stored under a key that has since been retired ('sweet' was
+    // dropped when the chips lost their emoji). The whitelist lives in JS, so
+    // old rows outlive it — the card must still render, falling back to 心意.
+    ...baseMoment(RETIRED, PARTNER_ID),
+    description: '記錄 舊的回應',
+    partner_response: {
+      reaction: 'sweet',
+      note: null,
+      nickname: 'B',
+      updated_at: '2026-08-02T09:00:00.000Z',
+    },
+  },
 ];
 
 const seedAuth = (paired: boolean) => async (page: import('@playwright/test').Page) => {
@@ -171,6 +185,16 @@ test.describe('親密記錄 — 快速回應', () => {
     await openRecords(page);
 
     await expect(page.getByTestId(`moment-response-partner-${localId(MINE)}`)).toContainText('那天真的好放鬆');
+  });
+
+  test('a response stored under a retired key still renders', async ({ page }) => {
+    test.setTimeout(60000);
+    await seedAuth(true)(page);
+    await openRecords(page);
+
+    // No chip exists for 'sweet' any more, so the label lookup returns null and
+    // the copy has to fall back rather than print "undefined" or blow up.
+    await expect(page.getByTestId(`moment-response-partner-${localId(RETIRED)}`)).toContainText('心意');
   });
 
   test('a failed write rolls the chip back', async ({ page }) => {

@@ -11,15 +11,15 @@ const lineService = require('../services/lineService');
 const router = express.Router();
 
 // 快速回應 — a record used to be a row nobody could answer. Now each person may
-// leave one tap and one sentence on it. Only the KEY is stored; emoji/label live
-// here and in MOMENT_REACTIONS (src/components/MomentResponseBar.tsx) — keep the
-// two lists in sync.
+// leave one tap and one sentence on it. Only the KEY is stored; the zh-TW label
+// lives here and in MOMENT_REACTIONS (src/components/MomentResponseBar.tsx) —
+// keep the two lists in sync. No emoji: the label carries the meaning, and the
+// record card stays quiet enough to read.
 const MOMENT_REACTIONS = {
-  love: { emoji: '❤️', label: '愛你' },
-  sweet: { emoji: '🥰', label: '好甜' },
-  fire: { emoji: '🔥', label: '意猶未盡' },
-  hug: { emoji: '🫂', label: '想再抱一次' },
-  memorable: { emoji: '✨', label: '很難忘' },
+  love: '愛你',
+  fire: '意猶未盡',
+  hug: '想再抱一次',
+  memorable: '很難忘',
 };
 
 // A quick response is a reply, not a diary entry — long thoughts belong in the
@@ -80,7 +80,7 @@ async function notifyResponse(actorId, actorNickname, next) {
     const title = '對方回應了你們的記錄';
     const content = next.note
       ? `${who} 說：「${next.note}」`
-      : `${who} 給了這則記錄一個「${MOMENT_REACTIONS[next.reaction].label}」${MOMENT_REACTIONS[next.reaction].emoji}`;
+      : `${who} 給了這則記錄一個「${MOMENT_REACTIONS[next.reaction]}」`;
 
     await db.query(
       `INSERT INTO notifications (

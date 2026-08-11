@@ -188,25 +188,19 @@ const SampleStats: React.FC = () => {
 };
 
 // Sample of the 親密記錄 history list, showing the「距上次相隔 N 天」gap badge
-// beside each record's date and the 快速回應 strip below it — one tap or one
+// beside each record's date and the 快速回應 line below it — one tap or one
 // short sentence, so a record isn't a row nobody can answer.
 const SampleRecordList: React.FC = () => {
   const rows = [
     {
       date: '6月28日', mood: '😊', note: '一起看了場電影', gap: 5,
-      response: { emoji: '❤️', who: '小美', text: '那天真的好放鬆' } as { emoji: string; who: string; text: string } | null,
+      response: { who: '小美', text: '那天真的好放鬆' } as { who: string; text: string } | null,
     },
     { date: '6月23日', mood: '🥰', note: '週末小旅行', gap: 12, response: null },
     { date: '6月11日', mood: '😌', note: null as string | null, gap: null as number | null, response: null },
   ];
   // Static mirror of MOMENT_REACTIONS (src/components/MomentResponseBar.tsx).
-  const chips = [
-    { emoji: '❤️', label: '愛你' },
-    { emoji: '🥰', label: '好甜' },
-    { emoji: '🔥', label: '意猶未盡' },
-    { emoji: '🫂', label: '想再抱一次' },
-    { emoji: '✨', label: '很難忘' },
-  ];
+  const chips = ['愛你', '意猶未盡', '想再抱一次', '很難忘'];
   return (
     <div className="mb-4">
       <div className="flex items-center justify-between mb-2">
@@ -229,25 +223,23 @@ const SampleRecordList: React.FC = () => {
               )}
               {r.response && (
                 <div className="mt-2 inline-flex items-baseline gap-1.5 rounded-full bg-petal-rose-soft/50 px-2.5 py-1 max-w-full">
-                  <span aria-hidden>{r.response.emoji}</span>
                   <span className="font-body text-[11px] text-petal-rose-deep truncate">
                     {r.response.who}：{r.response.text}
                   </span>
                 </div>
               )}
               {i === 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {chips.map((c, ci) => (
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3">
+                  {chips.map((label, ci) => (
                     <span
-                      key={c.label}
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-body text-[10px] ${
+                      key={label}
+                      className={`font-body text-[11px] ${
                         ci === 0
-                          ? 'bg-petal-rose-soft/50 text-petal-rose-deep'
-                          : 'border border-petal-rule text-petal-ink-soft'
+                          ? 'text-petal-rose-deep border-b border-petal-rose-deep pb-0.5'
+                          : 'text-petal-ink-soft'
                       }`}
                     >
-                      <span aria-hidden>{c.emoji}</span>
-                      {c.label}
+                      {label}
                     </span>
                   ))}
                 </div>

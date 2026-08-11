@@ -915,15 +915,15 @@ const CalendarView = ({
                     />
                   )}
                   {/* One tap is all it takes to answer a record — no need to
-                      open it first. Every control inside stops propagation so
-                      the row's own onClick doesn't fire. */}
+                      open it first. The four words stop propagation so the
+                      row's own onClick doesn't fire; everything else here still
+                      opens the record. */}
                   <MomentResponseBar
                     record={record}
                     partnerConnected={authState.partnerConnected}
                     partnerNickname={partnerNickname}
                     variant="row"
                     onRespond={setRecordResponse}
-                    onOpenDetail={(r) => showRecordDetails(r.id)}
                     timezone={primaryTimezone}
                   />
                 </div>

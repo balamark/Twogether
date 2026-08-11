@@ -20,8 +20,8 @@ const API_BASE_URL = '/api';
 // Types
 
 // 快速回應 on a 親密記錄. Keys must match MOMENT_REACTIONS in
-// routes/love-moments.js — only the key travels, never the emoji or the label.
-export type MomentReactionKey = 'love' | 'sweet' | 'fire' | 'hug' | 'memorable';
+// routes/love-moments.js — only the key travels, never the zh-TW label.
+export type MomentReactionKey = 'love' | 'fire' | 'hug' | 'memorable';
 
 // One person's response to one record: a chip, a sentence, or both.
 export interface MomentResponse {
