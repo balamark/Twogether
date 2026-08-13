@@ -52,8 +52,8 @@ function uploadScriptPhoto(file) {
   });
 }
 
-// Enforce per-type size caps (image 5MB / video 20MB), keeping this surface's
-// own error_code so the UI can surface exactly why.
+// Enforce the shared per-type size caps, keeping this surface's own error_code
+// so the UI can surface exactly why.
 function checkMediaSizes(files) {
   return checkMediaSizesShared(files, { tooLargeCode: 'SCRIPT_MEDIA_TOO_LARGE' });
 }
@@ -261,7 +261,7 @@ router.post('/', scriptPhotoUpload, [
       });
     }
 
-    // Per-type size cap (image 5MB / video 20MB).
+    // Per-type size cap (see IMAGE_MAX_BYTES / VIDEO_MAX_BYTES).
     const oversize = checkMediaSizes(photoFiles);
     if (oversize) {
       logWarn('custom_scripts.media_too_large', { userId, blocked: true });

@@ -3,7 +3,7 @@ import { X, Trash2, FileDown } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { Button } from './ui/Button';
-import { detectScriptSpeakers, applySpeakerAssignments, isVideoUrl, VIDEO_MAX_BYTES } from '../utils/script';
+import { detectScriptSpeakers, applySpeakerAssignments, isVideoUrl, IMAGE_MAX_BYTES, VIDEO_MAX_BYTES, mediaLimitMb } from '../utils/script';
 import { apiService } from '../services/api';
 import type { RoleplayScript } from '../App';
 
@@ -218,12 +218,12 @@ const ScriptUploadModal = ({
     // Per-type size caps: videos may be larger than images (stored raw).
     const oversizeVideo = picked.find((f) => f.type.startsWith('video/') && f.size > VIDEO_MAX_BYTES);
     if (oversizeVideo) {
-      alert(`影片大小不能超過 ${Math.round(VIDEO_MAX_BYTES / (1024 * 1024))}MB，請壓縮或改用較短的片段後再試。`);
+      alert(`影片大小不能超過 ${mediaLimitMb(VIDEO_MAX_BYTES)}MB，請壓縮或改用較短的片段後再試。`);
       return;
     }
-    const oversizeImage = picked.find((f) => !f.type.startsWith('video/') && f.size > 5 * 1024 * 1024);
+    const oversizeImage = picked.find((f) => !f.type.startsWith('video/') && f.size > IMAGE_MAX_BYTES);
     if (oversizeImage) {
-      alert('每張照片大小不能超過 5MB');
+      alert(`每張照片大小不能超過 ${mediaLimitMb(IMAGE_MAX_BYTES)}MB，請壓縮後再試。`);
       return;
     }
     const room = MAX_SCRIPT_PHOTOS - photoCount;
@@ -609,7 +609,7 @@ const ScriptUploadModal = ({
 
           <div>
             <label htmlFor="script-thumbnail" className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
-              劇本封面照片／影片（選填，最多 {MAX_SCRIPT_PHOTOS} 個，照片每張最大 5MB、影片最大 {Math.round(VIDEO_MAX_BYTES / (1024 * 1024))}MB）
+              劇本封面照片／影片（選填，最多 {MAX_SCRIPT_PHOTOS} 個，照片每張最大 {mediaLimitMb(IMAGE_MAX_BYTES)}MB、影片最大 {mediaLimitMb(VIDEO_MAX_BYTES)}MB）
               <span className="ml-1 normal-case tracking-normal text-petal-muted/80">· 第一個為封面，可用短影片</span>
             </label>
             <input

@@ -635,7 +635,8 @@ router.post(
         });
       }
 
-      // Per-type size cap (image 5MB / video 20MB) with a specific message.
+      // Per-type size cap (see IMAGE_MAX_BYTES / VIDEO_MAX_BYTES) with a
+      // specific message.
       const oversize = checkMediaSizes(mediaFiles, { tooLargeCode: 'WALL_MEDIA_TOO_LARGE' });
       if (oversize) {
         logWarn('wall.post.media_too_large', { userId, coupleId: couple.id, blocked: true });
