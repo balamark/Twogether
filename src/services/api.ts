@@ -1070,8 +1070,8 @@ const apiClient = axios.create({
 });
 
 // The default 15s timeout is fine for JSON requests but far too short for a
-// multipart upload: a wall post can carry up to 4 files (images ≤5MB, videos
-// ≤20MB each), and on a mobile connection those bytes take much longer than
+// multipart upload: a wall post can carry up to 4 files (images ≤10MB, videos
+// ≤30MB each), and on a mobile connection those bytes take much longer than
 // 15s to leave the device. When axios gives up first, the upload usually still
 // completes server-side — the user gets a false "network failed" while the post
 // actually posts. Scale the timeout with the payload (min 60s), with a generous

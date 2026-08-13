@@ -100,9 +100,9 @@ test.describe('Custom scripts API', () => {
     const ctx = await request.newContext({
       extraHTTPHeaders: { Authorization: `Bearer ${token}` },
     });
-    // 6MB > the 5MB image cap (but under the 20MB multer ceiling) → the
+    // 11MB > the 10MB image cap (but under the 30MB multer ceiling) → the
     // per-type size check rejects it before upload.
-    const bigImage = Buffer.alloc(6 * 1024 * 1024, 1);
+    const bigImage = Buffer.alloc(11 * 1024 * 1024, 1);
     const res = await ctx.post(`${API_BASE}/custom-scripts`, {
       multipart: {
         title: `API Oversize ${Date.now()}`,

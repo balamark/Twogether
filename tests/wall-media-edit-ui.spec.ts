@@ -219,10 +219,10 @@ test.describe('Wall — editing a post with media', () => {
     await chooser.setFiles({
       name: 'huge.png',
       mimeType: 'image/png',
-      buffer: Buffer.alloc(6 * 1024 * 1024, 1),
+      buffer: Buffer.alloc(11 * 1024 * 1024, 1),
     });
 
-    await expect(page.locator('text=每張照片大小不能超過 5MB')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=每張照片大小不能超過 10MB')).toBeVisible({ timeout: 5000 });
   });
 
   test('a video previews as a <video>, not an <img>', async ({ page }) => {

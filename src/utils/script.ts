@@ -62,9 +62,15 @@ export function scriptHasUnresolvedGenderTokens(content: string): boolean {
   return /\[男\]|\[他\]|\[女\]|\[她\]/i.test(content);
 }
 
-// Max bytes for a script cover/photo video. Mirrors VIDEO_MAX_BYTES in
-// routes/custom-scripts.js. Images stay capped at 5MB separately.
-export const VIDEO_MAX_BYTES = 20 * 1024 * 1024;
+// Max bytes per uploaded media file, shared by the wall composer and the script
+// uploader. Mirrors IMAGE_MAX_BYTES / VIDEO_MAX_BYTES in lib/media-upload.js —
+// keep both sides in step so the client-side check matches what the server
+// actually accepts.
+export const IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+export const VIDEO_MAX_BYTES = 30 * 1024 * 1024;
+
+// Bytes → whole MB, for the size-limit copy shown to users.
+export const mediaLimitMb = (bytes: number): number => Math.round(bytes / (1024 * 1024));
 
 // Is this media URL a video? Script covers/photos store images and videos in
 // the same URL fields (thumbnail_url / custom_script_photos.url); we generate

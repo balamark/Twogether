@@ -3,7 +3,7 @@ import { X, Sparkles, Star, ImagePlus, Lock, Plus } from 'lucide-react';
 import { apiService, type WallPost, type WallPostCategory } from '../services/api';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useAsyncAction } from '../hooks/useAsyncAction';
-import { isVideoUrl, VIDEO_MAX_BYTES } from '../utils/script';
+import { isVideoUrl, IMAGE_MAX_BYTES, VIDEO_MAX_BYTES, mediaLimitMb } from '../utils/script';
 
 export interface WallExample {
   id: string;
@@ -54,7 +54,6 @@ const rememberTemplatesSeen = (key: string | undefined, seen: boolean) => {
 const MAX_CONTENT = 6000;
 // Max photos/videos per post. Kept in sync with WALL_MAX_MEDIA in routes/wall.js.
 const WALL_MAX_MEDIA = 4;
-const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 
 const WallPostComposer: React.FC<WallPostComposerProps> = ({
   isOpen,
@@ -220,12 +219,12 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
     // Per-type size caps: videos may be larger than images (stored raw).
     const oversizeVideo = picked.find((f) => f.type.startsWith('video/') && f.size > VIDEO_MAX_BYTES);
     if (oversizeVideo) {
-      setError(`影片大小不能超過 ${Math.round(VIDEO_MAX_BYTES / (1024 * 1024))}MB，請壓縮或改用較短的片段後再試。`);
+      setError(`影片大小不能超過 ${mediaLimitMb(VIDEO_MAX_BYTES)}MB，請壓縮或改用較短的片段後再試。`);
       return;
     }
     const oversizeImage = picked.find((f) => !f.type.startsWith('video/') && f.size > IMAGE_MAX_BYTES);
     if (oversizeImage) {
-      setError(`每張照片大小不能超過 ${Math.round(IMAGE_MAX_BYTES / (1024 * 1024))}MB，請壓縮後再試。`);
+      setError(`每張照片大小不能超過 ${mediaLimitMb(IMAGE_MAX_BYTES)}MB，請壓縮後再試。`);
       return;
     }
     const room = WALL_MAX_MEDIA - mediaCount;
@@ -394,7 +393,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
             <p className="mt-1 font-body text-[11px] text-petal-muted">
               {atMediaCap && `已達 ${WALL_MAX_MEDIA} 個上限，先移除一個才能再加。`}
               {atMediaCap && <br />}
-              {`照片每張最大 ${Math.round(IMAGE_MAX_BYTES / (1024 * 1024))}MB、影片最大 ${Math.round(VIDEO_MAX_BYTES / (1024 * 1024))}MB`}
+              {`照片每張最大 ${mediaLimitMb(IMAGE_MAX_BYTES)}MB、影片最大 ${mediaLimitMb(VIDEO_MAX_BYTES)}MB`}
             </p>
 
             {mediaCount > 0 && (
