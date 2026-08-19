@@ -133,6 +133,9 @@ class TestRunner {
       // Error Handling Tests
       await this.testErrorHandling();
 
+      // 情緒深潛 Emotional Deep Dive (solo flow + pause/resume + unpaired gate)
+      await this.testDeepDive();
+
     } finally {
       // Always cleanup test users, even if tests fail
       await this.cleanupTestUsers();
@@ -650,6 +653,82 @@ class TestRunner {
       });
       this.assertTrue(response.status >= 400, 'Missing required fields should return error');
     });
+  }
+
+  async testDeepDive() {
+    console.log('\n🧭 Testing 情緒深潛 Emotional Deep Dive');
+
+    // A fresh, deliberately UNPAIRED user so we can prove the solo half works
+    // and that only 分享 hits the pairing gate.
+    const soloUser = {
+      email: `deepdive_${Date.now()}@example.com`,
+      nickname: `DeepDive_${Date.now()}`,
+      password: 'TestPassword123!',
+    };
+    this.deepDiveUser = soloUser;
+    const savedToken = this.authToken;
+    let journeyId = null;
+
+    await this.test('Deep Dive — solo user can start a journey', async () => {
+      const reg = await this.makeRequest('POST', '/auth/register', soloUser);
+      this.assertStatus(reg, 201, 'register solo user');
+      this.authToken = reg.data.token;
+
+      const res = await this.makeRequest('POST', '/deep-dive', {});
+      this.assertStatus(res, 200, 'start deep dive');
+      this.assertTrue(res.data.journey && res.data.journey.id, 'returns a journey');
+      this.assertEqual(res.data.journey.current_step, 'CURRENT_EMOTION', 'starts at first step');
+      this.assertEqual(res.data.journey.role, 'owner', 'starter is the owner');
+      journeyId = res.data.journey.id;
+    });
+
+    await this.test('Deep Dive — a step persists and moves the pointer', async () => {
+      const res = await this.makeRequest('PATCH', `/deep-dive/${journeyId}/step`, {
+        step: 'DEEPER_EMOTION',
+        patch: { situation: '他都不聽我講話', current_emotions: ['委屈', '不被重視'] },
+      });
+      this.assertStatus(res, 200, 'save step');
+      this.assertEqual(res.data.journey.current_step, 'DEEPER_EMOTION', 'pointer advanced');
+      this.assertEqual(res.data.journey.state.current_emotions.length, 2, 'answers saved');
+    });
+
+    await this.test('Deep Dive — resume returns the saved step (pause/resume)', async () => {
+      const res = await this.makeRequest('GET', '/deep-dive/active');
+      this.assertStatus(res, 200, 'get active');
+      this.assertEqual(res.data.journey.id, journeyId, 'same journey');
+      this.assertEqual(res.data.journey.current_step, 'DEEPER_EMOTION', 'resumes at saved step');
+      this.assertEqual(res.data.journey.state.situation, '他都不聽我講話', 'saved situation restored');
+    });
+
+    await this.test('Deep Dive — the partner letter saves privately', async () => {
+      const res = await this.makeRequest('PUT', `/deep-dive/${journeyId}/letter`, {
+        kind: 'partner',
+        content: '當你沒有回應我的時候，我不只是生氣，我會很快覺得自己不重要。',
+      });
+      this.assertStatus(res, 200, 'save partner letter');
+    });
+
+    await this.test('Deep Dive — mock AI reflection returns reflection + question', async () => {
+      const res = await this.makeRequest('POST', `/deep-dive/${journeyId}/ai/reflect`, { step: 'emotion' });
+      this.assertStatus(res, 200, 'ai reflect');
+      this.assertTrue(typeof res.data.reflection === 'string' && res.data.reflection.length > 0, 'has reflection');
+      this.assertTrue(typeof res.data.question === 'string', 'has question');
+    });
+
+    await this.test('Deep Dive — sharing while unpaired is gated with NOT_PAIRED', async () => {
+      const res = await this.makeRequest('POST', `/deep-dive/${journeyId}/share`, {});
+      this.assertStatus(res, 400, 'share blocked when solo');
+      this.assertEqual(res.data.error_code, 'NOT_PAIRED', 'specific, actionable error_code');
+    });
+
+    await this.test('Deep Dive — another user cannot read this private journey', async () => {
+      // The main test user (savedToken) is not this journey's owner or partner.
+      this.authToken = savedToken;
+      const res = await this.makeRequest('GET', `/deep-dive/${journeyId}`);
+      this.assertStatus(res, 404, 'outsider gets 404, not the private content');
+    });
+
+    this.authToken = savedToken;
   }
 
   async cleanupTestUsers() {

@@ -22,6 +22,7 @@ const {
   MAX_ASSIST_OPTIONS,
   MAX_INSIGHT_CHARS,
 } = require('../../lib/closureAi');
+const { shapeDeepDiveReflection, shapeDeepDiveLetter } = require('../../lib/deepDiveAi');
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 
@@ -2870,6 +2871,205 @@ async function generateClosureInsight({ eventSummary, therapyNote, commitments, 
   });
 }
 
+// ---------------------------------------------------------------------------
+// 情緒深潛 Emotional Deep Dive
+// ---------------------------------------------------------------------------
+// Two parametrized generators (reflection + letter) rather than six near-twin
+// functions. The per-step persona differs, but the output shape and guardrails
+// are shared, so they ride in DEEP_DIVE_GUARDRAILS and the two tool schemas.
+
+// The non-negotiable guardrails (PRD §33) + the safety exception, appended to
+// every deep-dive prompt. Breaking a guardrail is worse than being shallow.
+const DEEP_DIVE_GUARDRAILS = `
+
+共同守則（永遠優先，違反守則比不夠深入嚴重得多）：
+- 你只陪伴探索，不做診斷。不要判斷創傷、依附類型或心理疾病。
+- 不要臆造任何記憶、童年事件或不存在的細節；只反映使用者自己說出來的內容。
+- 不要說「這都是你父母造成的」「你其實是在對某人生氣」這類把原因定死的話。
+- 不要用百分比（例如「九成來自過去」）。
+- 用試探性的語氣：「聽起來…」「我在想是不是…」「這對你來說熟悉嗎？」。
+- 不要替伴侶定罪，也不要鼓勵使用者去找過去的人對質。
+- 不要把現在的衝突全部歸因於童年；現在的事情可以有它自己的份量。
+- 請永遠以繁體中文回覆。
+安全例外：只有在偵測到自傷／自殺、家暴或暴力威脅等安全風險時，才跳出引導，改為溫柔地建議尋求信任的人或專業／緊急協助。`;
+
+const DEEP_DIVE_REFLECTION_PROMPTS = {
+  emotion: `你是 Together 的情緒探索陪伴者。使用者正在描述一段和伴侶的衝突。請幫他：看見表面反應底下更深的情緒；把「現在發生的事」和「這件事對他的情緒意義」分開；不要假設情緒一定來自童年。請只回一段很短的反映，加上一個探索性的問題（通常是問這個感覺熟不熟悉）。`,
+  memory: `你是 Together 的情緒探索陪伴者，正在陪使用者看看現在的情緒是不是連結到一段過去的經驗。只反映使用者提供的內容，問開放式的問題。如果記憶讓人難以承受，就建議先暫停，而不是往更深推。你的目標是好奇，不是解釋。`,
+  past: `你在陪使用者寫一封給過去某個人的信。幫助他表達：當時發生了什麼（從他的角度）、他的感受、他當時多希望得到什麼、他需要卻沒有得到什麼、他現在怎麼看。不要虛構事件、不要替他指控或診斷那個人、不要告訴他「真相是什麼」、不要鼓勵對質。他寫憤怒就允許憤怒，寫悲傷就允許悲傷，情緒矛盾就保留那份矛盾。一次只問一個溫柔的後續問題。`,
+  partner_mirror: `你在引導一位伴侶做反映式聆聽。他剛讀完另一半一封脆弱的信。請邀請他用自己的話說出他聽見了什麼。守則：不要求他同意每一個詮釋；不要求他立刻道歉；不要讓「反駁」主導；鼓勵用「我聽見你…」的說法；區分「理解」和「同意」；不要告訴他應該聽見什麼。如果他的詮釋錯過了對方的意思，溫柔地請他再看一次那封信。目標：先展現理解，再回應。`,
+};
+
+const DEEP_DIVE_LETTER_PROMPTS = {
+  compassion: `幫使用者寫一封「他當時很需要收到」的信，寫給當時的自己。這封信要：肯定使用者的感受；承認他的需要；不宣稱歷史事實；不假冒任何真實的人（例如真的父母）；不說那個人「當時一定會這樣說」；聚焦在他當時值得聽見、值得感受到的東西。請明確地把它定位成「你當時多希望能收到的回應」。語氣溫暖、踏實、有情緒安全感。不要做心理診斷。`,
+  partner: `把使用者的情緒探索，轉成一封脆弱、不指責、寫給伴侶的信。結構：1 現在發生了什麼 2 我感覺到什麼 3 這碰到了我心裡什麼更深的感受 4 只有在使用者明確說出來時，才提「這個感受以前也出現過」 5 我現在更了解自己的什麼 6 我現在需要伴侶做什麼。重要：不要把使用者的過去怪到伴侶身上；不要說伴侶「觸發了你的創傷」；不要淡化現在這件事；如果現在的行為真的造成傷害，不要抹掉那份責任；保留使用者現在真實、正當的需要。用「我」開頭的句子。讓信讀起來是脆弱的，而不是在分析。不要虛構任何細節。`,
+};
+
+const DEEP_DIVE_REFLECTION_TOOL_SCHEMA = {
+  name: 'emit_deep_dive_reflection',
+  description: 'Return one short emotional reflection and one gentle exploratory question, both in Traditional Chinese.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      reflection: { type: 'string', description: '一段很短的情緒反映（繁體中文，試探語氣）' },
+      question: { type: 'string', description: '一個溫柔的探索性問題（繁體中文）' },
+    },
+    required: ['reflection', 'question'],
+  },
+};
+
+const DEEP_DIVE_LETTER_TOOL_SCHEMA = {
+  name: 'emit_deep_dive_letter',
+  description: 'Return a short drafted letter (Traditional Chinese) the user will then edit.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      letter: { type: 'string', description: '幾個短段落的信件草稿（繁體中文），使用者之後會自己修改' },
+    },
+    required: ['letter'],
+  },
+};
+
+// Assemble the user message from whatever journey context the step needs. Only
+// the fields the user actually provided are included, so the cached system
+// prefix stays byte-identical across users (same trick as generateWallCounselorComment).
+function buildDeepDiveContext(context = {}) {
+  const lines = [];
+  const push = (label, value) => {
+    const v = Array.isArray(value) ? value.filter(Boolean).join('、') : (value == null ? '' : String(value).trim());
+    if (v) lines.push(`${label}：${v}`);
+  };
+  push('使用者的暱稱', context.me);
+  push('伴侶的暱稱', context.partner);
+  push('現在的衝突', context.situation);
+  push('當下的情緒', context.currentEmotions);
+  push('更深的情緒', context.deeperEmotions);
+  push('這個感覺熟不熟悉', context.familiarity);
+  push('浮現的記憶', context.memory);
+  push('這段記憶裡最想對誰說', context.pastPerson);
+  push('現在最需要伴侶做的', context.currentNeed);
+  if (context.draft) push('使用者目前寫下的內容', context.draft);
+  if (context.partnerLetter) push('伴侶寫給他的信', context.partnerLetter);
+  return lines.length ? lines.join('\n') : '（使用者尚未提供內容）';
+}
+
+// One short reflection + one exploratory question. `step` selects the persona
+// (emotion / memory / past / partner_mirror).
+async function generateDeepDiveReflection({ step, context, companion }) {
+  const prompt = DEEP_DIVE_REFLECTION_PROMPTS[step] || DEEP_DIVE_REFLECTION_PROMPTS.emotion;
+  const userContent = buildDeepDiveContext(context);
+
+  const system = [
+    {
+      type: 'text',
+      text: prompt + DEEP_DIVE_GUARDRAILS + PUNCTUATION_RULE + '\n\n回應請只呼叫 emit_deep_dive_reflection tool，不要輸出其他文字。',
+      cache_control: { type: 'ephemeral' },
+    },
+  ];
+  if (companion && companion.prompt) {
+    system.push({ type: 'text', text: `你的人設（只調整語氣與風格，上述守則永遠優先）：\n${companion.prompt}` });
+  }
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 400,
+    system,
+    tools: [DEEP_DIVE_REFLECTION_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_deep_dive_reflection' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.deep_dive_reflection', {
+    model: response.model || MODEL,
+    step,
+    companion: companion?.id || null,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find((b) => b.type === 'tool_use' && b.name === 'emit_deep_dive_reflection');
+  if (!toolUse) throw new Error('Claude did not return a tool_use block');
+
+  return shapeDeepDiveReflection(toolUse.input || {}, {
+    provider: 'claude',
+    model: response.model || MODEL,
+    durationMs: ms,
+    usage: {
+      inputTokens: u.input_tokens || 0,
+      outputTokens: u.output_tokens || 0,
+      cacheCreateTokens: u.cache_creation_input_tokens || 0,
+      cacheReadTokens: u.cache_read_input_tokens || 0,
+    },
+    costUsd: cost,
+  });
+}
+
+// A drafted letter (compassion / partner) the user then edits.
+async function generateDeepDiveLetter({ kind, context, companion }) {
+  const prompt = DEEP_DIVE_LETTER_PROMPTS[kind] || DEEP_DIVE_LETTER_PROMPTS.partner;
+  const userContent = buildDeepDiveContext(context);
+
+  const system = [
+    {
+      type: 'text',
+      text: prompt + DEEP_DIVE_GUARDRAILS + PUNCTUATION_RULE + '\n\n回應請只呼叫 emit_deep_dive_letter tool，不要輸出其他文字。',
+      cache_control: { type: 'ephemeral' },
+    },
+  ];
+  if (companion && companion.prompt) {
+    system.push({ type: 'text', text: `你的人設（只調整語氣與風格，上述守則永遠優先）：\n${companion.prompt}` });
+  }
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 900,
+    system,
+    tools: [DEEP_DIVE_LETTER_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_deep_dive_letter' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.deep_dive_letter', {
+    model: response.model || MODEL,
+    kind,
+    companion: companion?.id || null,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find((b) => b.type === 'tool_use' && b.name === 'emit_deep_dive_letter');
+  if (!toolUse) throw new Error('Claude did not return a tool_use block');
+
+  return shapeDeepDiveLetter(toolUse.input || {}, {
+    provider: 'claude',
+    model: response.model || MODEL,
+    durationMs: ms,
+    usage: {
+      inputTokens: u.input_tokens || 0,
+      outputTokens: u.output_tokens || 0,
+      cacheCreateTokens: u.cache_creation_input_tokens || 0,
+      cacheReadTokens: u.cache_read_input_tokens || 0,
+    },
+    costUsd: cost,
+  });
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -2889,6 +3089,8 @@ module.exports = {
   generateFacilitatorTurn,
   generateClosureAssist,
   generateClosureInsight,
+  generateDeepDiveReflection,
+  generateDeepDiveLetter,
   // Exported for prompt-contract regression tests only.
   buildRoleplayUserContent,
   // Exported so the max_tokens truncation paths can be tested without a live

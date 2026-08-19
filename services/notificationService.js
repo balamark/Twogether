@@ -47,6 +47,9 @@ const CATALOG = {
   // 婚姻健檢 — marriage checkups
   checkup_created: { emoji: '💑', verb: '發起了一次婚姻健檢', fallback: '打開 App 一起完成健檢', priority: 2 },
   checkup_response: { emoji: '💑', verb: '回覆了婚姻健檢', fallback: '打開 App 查看 TA 的回覆', priority: 2 },
+  // 情緒深潛 — emotional deep dive (tone: 分享/一起，先讀完，不是被回報)
+  deep_dive_shared: { emoji: '💌', verb: '想讓你更了解 TA 的感受', fallback: '打開 App，先花點時間讀完 TA 想分享的', priority: 2 },
+  deep_dive_partner_responded: { emoji: '💛', verb: '回應了你分享的感受', fallback: '打開 App 看看 TA 的理解與回應', priority: 2 },
   // 共同設定 / 個人資料
   couple_settings_updated: { emoji: '⚙️', verb: '更新了你們的共同設定', fallback: '打開 App 查看更新後的設定' },
   profile_updated: { emoji: '👤', verb: '更新了個人資料', fallback: '打開 App 看看 TA 的更新' },

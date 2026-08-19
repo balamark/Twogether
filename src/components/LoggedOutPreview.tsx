@@ -727,6 +727,36 @@ const PairingReminderSample: React.FC = () => (
   </div>
 );
 
+// Read-only「情緒深潛」sample: hint at the journey from a present feeling down to
+// a familiar one, and the private-letter promise. Static 範例 data.
+const DeepDiveSample: React.FC = () => (
+  <div className="rounded-md border border-petal-rule bg-petal-cream overflow-hidden">
+    <div className="flex items-center justify-between px-3 py-2 border-b border-petal-rule bg-petal-cream-2">
+      <div className="flex items-center gap-1.5">
+        <Compass className="w-4 h-4 text-petal-rose-deep" strokeWidth={1.5} />
+        <span className="font-body text-xs font-medium text-petal-ink">情緒深潛</span>
+      </div>
+      <SampleTag />
+    </div>
+    <div className="p-3 space-y-2">
+      <div className="flex flex-wrap gap-1.5">
+        {['不被重視', '孤單', '委屈'].map((e) => (
+          <span key={e} className="rounded-full bg-white border border-petal-rule px-2.5 py-0.5 font-body text-[11px] text-petal-ink">{e}</span>
+        ))}
+      </div>
+      <SampleCard>
+        <p className="font-body text-xs text-petal-ink-soft leading-relaxed">
+          「聽起來，生氣底下還有一種<span className="text-petal-ink">『我的感受沒被重視』</span>的委屈。這種感覺，對你來說熟悉嗎？」
+        </p>
+      </SampleCard>
+      <div className="flex items-center gap-1 font-body text-[11px] text-petal-muted">
+        <Lock className="w-3 h-3" strokeWidth={1.5} />
+        寫給過去的信永遠只留給你自己，只有寫給另一半的信會分享
+      </div>
+    </div>
+  </div>
+);
+
 const PREVIEWS: Record<string, PreviewConfig> = {
   record: {
     icon: Calendar,
@@ -793,8 +823,13 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       </>
     ),
     description:
-      '這是 Twogether 的核心，也是「用寫的，把話說對」的地方。先讓情緒被接住：一方寫下感受，AI 幫你說得不傷人，另一方收到後 AI 也教他怎麼接住你。被接住了，再一起看你們反覆卡住的溝通模式、學會怎麼說，真的卡住就請 AI 或真人諮商師陪你們。',
-    sample: <ConflictFlywheelSample />,
+      '這是 Twogether 的核心，也是「用寫的，把話說對」的地方。先讓情緒被接住：一方寫下感受，AI 幫你說得不傷人，另一方收到後 AI 也教他怎麼接住你。被接住了，再一起看你們反覆卡住的溝通模式、學會怎麼說，真的卡住就請 AI 或真人諮商師陪你們。想更深一點，還能走一趟「情緒深潛」，看看現在的痛是不是碰到了心裡更早的感受。',
+    sample: (
+      <div className="space-y-3">
+        <ConflictFlywheelSample />
+        <DeepDiveSample />
+      </div>
+    ),
   },
   wall: {
     icon: StickyNote,
