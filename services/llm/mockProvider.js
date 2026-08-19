@@ -796,6 +796,51 @@ async function generateClosureInsight({ commitments, sharedDecision } = {}) {
   );
 }
 
+// --- 情緒深潛 Emotional Deep Dive ------------------------------------------
+// Deterministic, guardrail-safe stand-ins. Same output shape as the claude
+// provider (via lib/deepDiveAi shapers) so the e2e journey runs on the mock.
+const { shapeDeepDiveReflection, shapeDeepDiveLetter } = require('../../lib/deepDiveAi');
+
+const MOCK_DEEP_DIVE_REFLECTIONS = {
+  emotion: { reflection: '聽起來，生氣底下可能還有一種「我的感受沒有被重視」的委屈。', question: '這種不被重視的感覺，對你來說熟悉嗎？' },
+  memory: { reflection: '你剛才想到的畫面，好像也帶著一種「沒有人聽見我」的感覺。', question: '那個時候的你，最希望有人怎麼對你？' },
+  past: { reflection: '你願意把當時說不出口的話寫下來，這件事本身就很不容易。', question: '那時候的你，最想讓對方知道的是什麼？' },
+  partner_mirror: { reflection: '先不用急著判斷誰對誰錯，你已經願意好好讀完，這很重要。', question: '用你自己的話說說看，你聽見對方真正想讓你知道的是什麼？' },
+};
+
+async function generateDeepDiveReflection({ step } = {}) {
+  const startedAt = Date.now();
+  const key = MOCK_DEEP_DIVE_REFLECTIONS[step] ? step : 'emotion';
+  return shapeDeepDiveReflection(MOCK_DEEP_DIVE_REFLECTIONS[key], {
+    provider: 'mock',
+    model: 'mock',
+    durationMs: Date.now() - startedAt,
+    usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+    costUsd: 0,
+    assembledPrompt: `[mock] deep dive reflection for ${key}`,
+  });
+}
+
+const MOCK_DEEP_DIVE_LETTERS = {
+  compassion:
+    '親愛的那時候的我：\n\n你的感受沒有錯。你想被聽見，是很自然的。你不需要變得更乖、更安靜、更懂事，才值得有人認真聽你說話。我知道那時候你很孤單，但你值得被好好對待。',
+  partner:
+    '當你沒有回應我的時候，我表面上是生氣，但後來我發現，我很快就會覺得自己不重要。這種感覺以前也出現過。我不是要你為我的過去負責，我只是想讓你知道：當我變得很生氣的時候，我裡面其實有一個很怕不被聽見的自己。現在我需要的，是你先聽我說完，而不是馬上解釋。',
+};
+
+async function generateDeepDiveLetter({ kind } = {}) {
+  const startedAt = Date.now();
+  const key = MOCK_DEEP_DIVE_LETTERS[kind] ? kind : 'partner';
+  return shapeDeepDiveLetter({ letter: MOCK_DEEP_DIVE_LETTERS[key] }, {
+    provider: 'mock',
+    model: 'mock',
+    durationMs: Date.now() - startedAt,
+    usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+    costUsd: 0,
+    assembledPrompt: `[mock] deep dive letter for ${key}`,
+  });
+}
+
 module.exports = {
   generateIcebreaker,
   rewriteReply,
@@ -815,4 +860,6 @@ module.exports = {
   generateFacilitatorTurn,
   generateClosureAssist,
   generateClosureInsight,
+  generateDeepDiveReflection,
+  generateDeepDiveLetter,
 };

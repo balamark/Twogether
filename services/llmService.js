@@ -33,6 +33,8 @@ module.exports = {
   generateFacilitatorTurn: provider.generateFacilitatorTurn,
   generateClosureAssist: provider.generateClosureAssist,
   generateClosureInsight: provider.generateClosureInsight,
+  generateDeepDiveReflection: provider.generateDeepDiveReflection,
+  generateDeepDiveLetter: provider.generateDeepDiveLetter,
   analyzeDraft: provider.analyzeDraft,
   providerName: PROVIDER_NAME,
 };

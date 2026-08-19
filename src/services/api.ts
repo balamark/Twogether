@@ -1574,6 +1574,63 @@ export interface GoodwillGroup {
   items: { text: string; who?: string; at: string; resolved?: boolean }[];
 }
 
+// ---- 情緒深潛 Emotional Deep Dive ----
+export type DeepDiveStep =
+  | 'CURRENT_EMOTION' | 'DEEPER_EMOTION' | 'FAMILIARITY_CHECK' | 'MEMORY_EXPLORATION'
+  | 'PAST_PERSON' | 'PAST_LETTER' | 'COMPASSION_LETTER' | 'CURRENT_NEED' | 'PARTNER_LETTER'
+  | 'SHARED' | 'PARTNER_READING' | 'PARTNER_MIRROR' | 'PARTNER_VALIDATION'
+  | 'PARTNER_RESPONSE' | 'REPAIR' | 'COMPLETED';
+
+export type DeepDiveStatus =
+  | 'in_progress' | 'shared' | 'partner_reading' | 'partner_responded' | 'completed' | 'abandoned';
+
+export interface DeepDiveCurrentNeed { type?: string; custom?: string }
+
+export interface DeepDiveState {
+  situation?: string;
+  current_emotions?: string[];
+  deeper_emotions?: string[];
+  familiarity?: string;
+  memory_text?: string;
+  past_person?: string;
+  current_need?: DeepDiveCurrentNeed;
+  repair?: { shared_understanding?: string; agreed_action?: string };
+  skipped?: string[];
+}
+
+export interface DeepDiveValidation { knew_now?: string; didnt_know?: string; want_you_to_know?: string }
+
+export interface DeepDivePartnerResponse {
+  mirror: string | null;
+  validation: DeepDiveValidation | null;
+  response: string | null;
+  status: 'reading' | 'mirrored' | 'validated' | 'responded';
+}
+
+export interface DeepDiveJourney {
+  id: string;
+  role: 'owner' | 'partner';
+  status: DeepDiveStatus;
+  current_step: DeepDiveStep;
+  event_id?: string | null;
+  state?: DeepDiveState;
+  letters?: {
+    past: { content: string; status: string } | null;
+    compassion: { content: string; status: string } | null;
+    partner: { content: string; status: string; visibility: string } | null;
+  };
+  // Partner-view only: the shared letter + the owner's stated need.
+  partner_letter?: { content: string; updated_at: string } | null;
+  current_need?: DeepDiveCurrentNeed | null;
+  partner_response: DeepDivePartnerResponse | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DeepDiveReflection { reflection: string; question: string }
+export interface DeepDiveLetterAi { letter: string }
+export interface DeepDiveInboxItem { id: string; status: DeepDiveStatus; updated_at: string; from_nickname: string }
+
 // API Service Class
 class ApiService {
   private throwApiError(error: unknown, fallbackMessage: string): never {
@@ -3922,6 +3979,161 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to fetch therapy note:', error);
       this.throwApiError(error, '治療摘要暫時無法產生，請稍後再試');
+    }
+  }
+
+  // ---- 情緒深潛 Emotional Deep Dive ----
+  // The whole journey is server-persisted, so closing the UI is a pause and
+  // these resume it. AI calls pass skipBillingRedirect: a daily-quota 429 must
+  // NOT nuke the in-progress journey — the user just writes it themselves.
+
+  // Start a new journey, or resume the caller's open one. Optional eventId seeds
+  // the current conflict (Entry A).
+  async startDeepDive(eventId?: string): Promise<DeepDiveJourney> {
+    try {
+      const response = await apiClient.post('/deep-dive', eventId ? { event_id: eventId } : {});
+      return response.data.journey as DeepDiveJourney;
+    } catch (error: unknown) {
+      console.error('Failed to start deep dive:', error);
+      this.throwApiError(error, '暫時沒辦法開始情緒深潛，請稍後再試');
+    }
+  }
+
+  // The caller's resume point (their most recent unfinished journey), or null.
+  async getActiveDeepDive(): Promise<DeepDiveJourney | null> {
+    try {
+      const response = await apiClient.get('/deep-dive/active');
+      return (response.data.journey ?? null) as DeepDiveJourney | null;
+    } catch (error: unknown) {
+      console.error('Failed to fetch active deep dive:', error);
+      this.throwApiError(error, '暫時讀不到你的情緒深潛進度');
+    }
+  }
+
+  async getDeepDive(id: string): Promise<DeepDiveJourney> {
+    try {
+      const response = await apiClient.get(`/deep-dive/${id}`);
+      return response.data.journey as DeepDiveJourney;
+    } catch (error: unknown) {
+      console.error('Failed to fetch deep dive:', error);
+      this.throwApiError(error, '暫時讀不到這段情緒深潛');
+    }
+  }
+
+  // Journeys a partner shared with the caller that still await them.
+  async getDeepDiveInbox(): Promise<DeepDiveInboxItem[]> {
+    try {
+      const response = await apiClient.get('/deep-dive/inbox');
+      return (response.data.journeys ?? []) as DeepDiveInboxItem[];
+    } catch (error: unknown) {
+      console.error('Failed to fetch deep dive inbox:', error);
+      this.throwApiError(error, '暫時讀不到伴侶分享的內容');
+    }
+  }
+
+  // Save a step's answers and move the resume pointer. `skip` records that the
+  // current step was skipped.
+  async saveDeepDiveStep(id: string, step: DeepDiveStep, patch?: Partial<DeepDiveState>, skip?: boolean): Promise<DeepDiveJourney> {
+    try {
+      const response = await apiClient.patch(`/deep-dive/${id}/step`, { step, patch, skip: !!skip });
+      return response.data.journey as DeepDiveJourney;
+    } catch (error: unknown) {
+      console.error('Failed to save deep dive step:', error);
+      this.throwApiError(error, '這一步暫時存不起來，你寫的內容還在，請再試一次');
+    }
+  }
+
+  async saveDeepDiveLetter(id: string, kind: 'past' | 'compassion' | 'partner', content: string): Promise<void> {
+    try {
+      await apiClient.put(`/deep-dive/${id}/letter`, { kind, content });
+    } catch (error: unknown) {
+      console.error('Failed to save deep dive letter:', error);
+      this.throwApiError(error, '這封信暫時存不起來，你寫的內容還在，請再試一次');
+    }
+  }
+
+  async deepDiveReflect(id: string, step: 'emotion' | 'memory' | 'past' | 'partner_mirror', draft?: string): Promise<DeepDiveReflection> {
+    try {
+      const response = await apiClient.post(`/deep-dive/${id}/ai/reflect`, { step, draft }, { timeout: 45000, skipBillingRedirect: true });
+      return response.data as DeepDiveReflection;
+    } catch (error: unknown) {
+      console.error('Failed to get deep dive reflection:', error);
+      this.throwApiError(error, 'AI 暫時想不出來，你還是可以自己寫');
+    }
+  }
+
+  async deepDiveLetterAi(id: string, letterKind: 'compassion' | 'partner', draft?: string): Promise<DeepDiveLetterAi> {
+    try {
+      const response = await apiClient.post(`/deep-dive/${id}/ai/letter`, { letterKind, draft }, { timeout: 45000, skipBillingRedirect: true });
+      return response.data as DeepDiveLetterAi;
+    } catch (error: unknown) {
+      console.error('Failed to get deep dive letter draft:', error);
+      this.throwApiError(error, 'AI 暫時想不出來，你還是可以自己寫');
+    }
+  }
+
+  async shareDeepDive(id: string): Promise<DeepDiveJourney> {
+    try {
+      const response = await apiClient.post(`/deep-dive/${id}/share`);
+      return response.data.journey as DeepDiveJourney;
+    } catch (error: unknown) {
+      console.error('Failed to share deep dive:', error);
+      this.throwApiError(error, '暫時沒辦法分享，你的信已經存好了，請稍後再試一次');
+    }
+  }
+
+  async deepDivePartnerRead(id: string): Promise<void> {
+    try {
+      await apiClient.post(`/deep-dive/${id}/partner/read`);
+    } catch (error: unknown) {
+      console.error('Failed to mark deep dive read:', error);
+      this.throwApiError(error, '暫時存不起來，請再試一次');
+    }
+  }
+
+  async deepDivePartnerMirror(id: string, mirror: string): Promise<void> {
+    try {
+      await apiClient.put(`/deep-dive/${id}/partner/mirror`, { mirror });
+    } catch (error: unknown) {
+      console.error('Failed to save mirror:', error);
+      this.throwApiError(error, '暫時存不起來，你寫的內容還在，請再試一次');
+    }
+  }
+
+  async deepDivePartnerValidation(id: string, validation: DeepDiveValidation): Promise<void> {
+    try {
+      await apiClient.put(`/deep-dive/${id}/partner/validation`, validation);
+    } catch (error: unknown) {
+      console.error('Failed to save validation:', error);
+      this.throwApiError(error, '暫時存不起來，你寫的內容還在，請再試一次');
+    }
+  }
+
+  async deepDivePartnerResponse(id: string, response: string): Promise<void> {
+    try {
+      await apiClient.put(`/deep-dive/${id}/partner/response`, { response });
+    } catch (error: unknown) {
+      console.error('Failed to save response:', error);
+      this.throwApiError(error, '暫時存不起來，你寫的內容還在，請再試一次');
+    }
+  }
+
+  async deepDiveRepair(id: string, payload: { shared_understanding?: string; agreed_action?: string }): Promise<DeepDiveJourney> {
+    try {
+      const response = await apiClient.post(`/deep-dive/${id}/repair`, payload);
+      return response.data.journey as DeepDiveJourney;
+    } catch (error: unknown) {
+      console.error('Failed to finish deep dive:', error);
+      this.throwApiError(error, '暫時存不起來，請再試一次');
+    }
+  }
+
+  async abandonDeepDive(id: string): Promise<void> {
+    try {
+      await apiClient.post(`/deep-dive/${id}/abandon`);
+    } catch (error: unknown) {
+      console.error('Failed to abandon deep dive:', error);
+      this.throwApiError(error, '暫時沒辦法結束，請再試一次');
     }
   }
 

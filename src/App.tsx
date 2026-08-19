@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, StickyNote, Trash2, Pencil, HeartHandshake, Crown, BookOpen } from 'lucide-react';
+import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, StickyNote, Trash2, Pencil, HeartHandshake, Crown, BookOpen, Compass } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import ActivityView from './components/ActivityView';
 import UpgradeView, { BillingResultView } from './components/UpgradeView';
@@ -31,6 +31,9 @@ import MomentResponseBar from './components/MomentResponseBar';
 import PairingInvitationHandler from './components/PairingInvitationHandler';
 import { PairingInviteShare } from './components/PairingInviteShare';
 import PairingReminderBanner from './components/PairingReminderBanner';
+import DeepDiveJourneyView, { type DeepDiveIntent } from './components/deepdive/DeepDiveJourneyView';
+import DeepDiveResumeBanner from './components/deepdive/DeepDiveResumeBanner';
+import type { DeepDiveJourney, DeepDiveInboxItem } from './services/api';
 import AiCompanionOnboarding from './components/AiCompanionPicker';
 import GettingStartedCard from './components/GettingStartedCard';
 import HelpView from './components/HelpView';
@@ -624,6 +627,14 @@ const LoveTimeApp = () => {
     }, notification.duration || 5000);
   }, []);
 
+  // 情緒深潛 Emotional Deep Dive: opening the full-screen journey layer, plus the
+  // resume banner (the user's core ask: pause now, finish later). intent !== null
+  // means the layer is open; activeDeepDive drives the dismissible resume banner.
+  const [deepDiveIntent, setDeepDiveIntent] = useState<DeepDiveIntent | null>(null);
+  const [activeDeepDive, setActiveDeepDive] = useState<DeepDiveJourney | null>(null);
+  const [incomingDeepDive, setIncomingDeepDive] = useState<DeepDiveInboxItem | null>(null);
+  const [deepDiveBannerDismissed, setDeepDiveBannerDismissed] = useState(false);
+
   const [totalCoins, setTotalCoins] = useState(0);
   const [customGifts, setCustomGifts] = useState<CoinGift[]>([]);
   const [authState, setAuthState] = useState<AuthState>({
@@ -632,6 +643,28 @@ const LoveTimeApp = () => {
     partnerConnected: false
   });
   const { isAuthenticated, user: authUser, partnerConnected } = authState;
+
+  // Fetch the caller's resumable deep-dive journey (owner) and any journey a
+  // partner shared with them (inbox), so both halves are reachable in-app.
+  // Silent on failure — a missing banner is never worth a toast.
+  const refreshActiveDeepDive = useCallback(async () => {
+    if (!authState.isAuthenticated) { setActiveDeepDive(null); setIncomingDeepDive(null); return; }
+    try {
+      const own = await apiService.getActiveDeepDive();
+      setActiveDeepDive(own);
+      if (!own) {
+        const inbox = await apiService.getDeepDiveInbox();
+        setIncomingDeepDive(inbox[0] || null);
+      } else {
+        setIncomingDeepDive(null);
+      }
+    } catch {
+      setActiveDeepDive(null);
+      setIncomingDeepDive(null);
+    }
+  }, [authState.isAuthenticated]);
+  useEffect(() => { refreshActiveDeepDive(); }, [refreshActiveDeepDive]);
+
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showPairingPrompt, setShowPairingPrompt] = useState(false);
   const [pairingPromptDismissed, setPairingPromptDismissed] = useState(
@@ -2425,6 +2458,23 @@ const LoveTimeApp = () => {
                 </button>
               </div>
             </div>
+            {/* Entry A — 情緒深潛 invite. The present conflict may connect to an
+                older, familiar feeling; offer to go deeper (playbook: value first). */}
+            <div className="max-w-4xl mx-auto px-4 md:px-6 pt-3">
+              <button
+                type="button"
+                data-testid="deep-dive-entry-communicate"
+                onClick={() => setDeepDiveIntent({ type: 'start' })}
+                className="w-full flex items-center gap-3 rounded-2xl border border-petal-rule bg-petal-rose-soft/20 px-4 py-3 text-left hover:border-petal-rose-deep transition"
+              >
+                <Compass className="w-5 h-5 text-petal-rose-deep shrink-0" strokeWidth={1.5} />
+                <span className="flex-1 min-w-0">
+                  <span className="block font-body text-sm text-petal-ink">這個感覺，好像比今天更早就存在</span>
+                  <span className="block font-body text-xs text-petal-muted">情緒深潛：看看現在的痛，是不是碰到了熟悉的地方</span>
+                </span>
+                <span className="shrink-0 text-sm font-medium text-petal-rose-deep">深入看看</span>
+              </button>
+            </div>
             {communicateSub === 'harmony' ? (
               <ConflictView
                 showNotification={showNotification}
@@ -2621,10 +2671,35 @@ const LoveTimeApp = () => {
         onShowFeedback={() => setCurrentView('feedback')}
         onShowHelp={() => setCurrentView('help')}
         onShowLoveLanguage={() => setCurrentView('love-language')}
+        onShowDeepDive={() => setDeepDiveIntent({ type: 'start' })}
         onShowUpgrade={() => { setUpgradeReason(null); setCurrentView('upgrade'); }}
         billingStatus={billingStatus}
       />
-      
+
+      {/* 情緒深潛 resume banner — dismissible, does not re-fire same session (R4).
+          Prefers the caller's own unfinished journey; otherwise surfaces a
+          journey a partner shared with them so the partner side is reachable. */}
+      {isAuthenticated && !deepDiveBannerDismissed && !deepDiveIntent && (activeDeepDive || incomingDeepDive) && (
+        <div className="max-w-2xl mx-auto px-4 mt-3">
+          <DeepDiveResumeBanner
+            journey={activeDeepDive || { id: incomingDeepDive!.id, role: 'partner', status: incomingDeepDive!.status }}
+            fromNickname={!activeDeepDive ? incomingDeepDive?.from_nickname : null}
+            onResume={() => setDeepDiveIntent({ type: 'open', journeyId: (activeDeepDive || incomingDeepDive)!.id })}
+            onDismiss={() => setDeepDiveBannerDismissed(true)}
+          />
+        </div>
+      )}
+
+      {/* 情緒深潛 full-screen journey layer */}
+      <DeepDiveJourneyView
+        open={!!deepDiveIntent}
+        intent={deepDiveIntent}
+        onClose={() => setDeepDiveIntent(null)}
+        onNotify={showNotification}
+        onChanged={refreshActiveDeepDive}
+        companionShortName={resolveCompanion(authState.user?.selected_therapist).name}
+      />
+
       {/* Notification Container */}
       <NotificationContainer
         notifications={notifications}

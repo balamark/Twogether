@@ -32,6 +32,7 @@ const customGiftsRoutes = require('./routes/custom-gifts');
 const wallRoutes = require('./routes/wall');
 const eventRoutes = require('./routes/events');
 const eventClosureRoutes = require('./routes/event-closure');
+const deepDiveRoutes = require('./routes/deep-dive');
 const aiCompanionRoutes = require('./routes/ai-companions');
 const aiUsageRoutes = require('./routes/ai-usage');
 const storyRoutes = require('./routes/stories');
@@ -208,6 +209,7 @@ app.use('/api/wall', wallRoutes);
 // /:id/closure/* paths are matched first rather than falling into /:id.
 app.use('/api/events', eventClosureRoutes);
 app.use('/api/events', eventRoutes);
+app.use('/api/deep-dive', deepDiveRoutes);
 app.use('/api/ai-companions', aiCompanionRoutes);
 app.use('/api/ai-usage', aiUsageRoutes);
 app.use('/api/stories', storyRoutes.router);

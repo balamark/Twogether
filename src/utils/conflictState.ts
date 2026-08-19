@@ -36,6 +36,10 @@ const RECENT_WINDOW = 6;
 const CRISIS_PATTERNS: RegExp[] = [
   /離婚|分手|離開你|不想跟你|再也不|我要走|滾出去|滾回去/,
   /去死|自殺|不想活|傷害你|揍你|打你|威脅/,
+  // Self-harm / not-safe-at-home (PRD §34 safety exit): the deep-dive journey
+  // must stop exploring when someone turns the harm on themselves, not only on
+  // their partner. Also read by ConflictBanner across the app.
+  /自傷|傷害自己|結束生命|活不下去|不想活了|害怕回家|不敢回家/,
   /受夠你了|我不愛你|後悔跟你|當初就不該/,
 ];
 

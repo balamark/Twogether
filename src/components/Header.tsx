@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown, MessageSquarePlus, Activity, LifeBuoy } from 'lucide-react';
+import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown, MessageSquarePlus, Activity, LifeBuoy, Compass } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { BillingStatus } from '../services/api';
 
@@ -33,6 +33,7 @@ interface HeaderProps {
   onShowUpgrade: () => void;
   onShowFeedback: () => void;
   onShowLoveLanguage: () => void;
+  onShowDeepDive: () => void;
   onShowHelp: () => void;
   // Couple's Premium status; when premium, the menu shows the expiry date so it's
   // always visible (not just on the upgrade page).
@@ -63,6 +64,7 @@ const Header: React.FC<HeaderProps> = ({
   onShowUpgrade,
   onShowFeedback,
   onShowLoveLanguage,
+  onShowDeepDive,
   onShowHelp,
   billingStatus,
 }) => {
@@ -240,6 +242,17 @@ const Header: React.FC<HeaderProps> = ({
                       >
                         <Heart className="w-3.5 h-3.5" strokeWidth={1.5} />
                         <span>愛的語言</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          onShowDeepDive();
+                          setShowUserMenu(false);
+                        }}
+                        data-testid="user-menu-deep-dive"
+                        className="w-full flex items-center space-x-2 px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
+                      >
+                        <Compass className="w-3.5 h-3.5" strokeWidth={1.5} />
+                        <span>情緒深潛</span>
                       </button>
                       <button
                         onClick={() => {
