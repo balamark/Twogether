@@ -76,6 +76,9 @@ adds a fragment file in `changelog/`; CI compiles them into the block below —
 see `CLAUDE.md`.)
 
 <!-- changelog:begin (generated from changelog/*.md — edit those, not this) -->
+### 2026-08-19
+- **情緒深潛**: 新增一條引導旅程，陪你看看現在的衝突為什麼這麼痛：從當下的情緒，到熟悉的感受、過去的記憶，寫一封給過去的信、一封安撫自己的信，最後把想讓另一半懂的話，寫成一封不指責的信分享出去。過去的信永遠只留給你自己；每一步都能跳過，也能先暫停、之後再接著走。
+
 ### 2026-08-13
 - **上傳容量放寬**: 牆上貼文與劇本封面的照片上限從 5MB 提高到 10MB、影片從 20MB 提高到 30MB，手機直出的照片和短片不用先壓縮就能上傳。
 
