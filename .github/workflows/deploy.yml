@@ -74,9 +74,28 @@ jobs:
           cache: 'npm'
       
       - name: Install PostgreSQL client
+        # Only psql + pg_isready are needed (health-wait + migrations run through
+        # node-pg). The ubuntu-latest image already ships a PostgreSQL client, so
+        # the fast path skips apt entirely. When an install IS needed, bound the
+        # boot-time apt lock (unattended-upgrades) wait and retry a slow mirror,
+        # and cap the whole step so a transient apt hang can never wedge a deploy
+        # for hours (the failure mode seen on runs #449/#450).
+        timeout-minutes: 5
         run: |
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client
+          set -euxo pipefail
+          if command -v pg_isready >/dev/null 2>&1 && command -v psql >/dev/null 2>&1; then
+            echo "postgresql-client already present: $(psql --version)"
+            exit 0
+          fi
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 \
+              && sudo apt-get install -y -o DPkg::Lock::Timeout=180 postgresql-client; then
+              break
+            fi
+            echo "apt attempt ${attempt} failed; retrying in 15s"
+            sleep 15
+          done
+          psql --version
       
       - name: Install dependencies
         run: npm ci
