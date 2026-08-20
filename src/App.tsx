@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, StickyNote, Trash2, Pencil, HeartHandshake, Crown, BookOpen, Compass } from 'lucide-react';
+import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, StickyNote, Trash2, Pencil, HeartHandshake, Crown, BookOpen } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import ActivityView from './components/ActivityView';
 import UpgradeView, { BillingResultView } from './components/UpgradeView';
@@ -664,6 +664,17 @@ const LoveTimeApp = () => {
     }
   }, [authState.isAuthenticated]);
   useEffect(() => { refreshActiveDeepDive(); }, [refreshActiveDeepDive]);
+
+  // Contextual entry: the conversation (EventDetail) opens 情緒深潛 by dispatching
+  // a window event, so the deep-dive layer stays owned by App without prop drills.
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const eventId = (e as CustomEvent<{ eventId?: string }>).detail?.eventId;
+      setDeepDiveIntent({ type: 'start', eventId });
+    };
+    window.addEventListener('deepdive:open', onOpen);
+    return () => window.removeEventListener('deepdive:open', onOpen);
+  }, []);
 
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showPairingPrompt, setShowPairingPrompt] = useState(false);
@@ -2457,23 +2468,6 @@ const LoveTimeApp = () => {
                   接住情緒・檢查
                 </button>
               </div>
-            </div>
-            {/* Entry A — 情緒深潛 invite. The present conflict may connect to an
-                older, familiar feeling; offer to go deeper (playbook: value first). */}
-            <div className="max-w-4xl mx-auto px-4 md:px-6 pt-3">
-              <button
-                type="button"
-                data-testid="deep-dive-entry-communicate"
-                onClick={() => setDeepDiveIntent({ type: 'start' })}
-                className="w-full flex items-center gap-3 rounded-2xl border border-petal-rule bg-petal-rose-soft/20 px-4 py-3 text-left hover:border-petal-rose-deep transition"
-              >
-                <Compass className="w-5 h-5 text-petal-rose-deep shrink-0" strokeWidth={1.5} />
-                <span className="flex-1 min-w-0">
-                  <span className="block font-body text-sm text-petal-ink">這個感覺，好像比今天更早就存在</span>
-                  <span className="block font-body text-xs text-petal-muted">情緒深潛：看看現在的痛，是不是碰到了熟悉的地方</span>
-                </span>
-                <span className="shrink-0 text-sm font-medium text-petal-rose-deep">深入看看</span>
-              </button>
             </div>
             {communicateSub === 'harmony' ? (
               <ConflictView

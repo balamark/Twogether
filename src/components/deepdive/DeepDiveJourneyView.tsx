@@ -48,10 +48,16 @@ function isFamiliar(state: DeepDiveState | undefined): boolean {
   return !!state && FAMILIAR.has(state.familiarity || '');
 }
 
+// CURRENT_EMOTION now covers naming the feeling AND seeing the deeper one in a
+// single, compact screen (the old separate DEEPER_EMOTION step re-showed the
+// same chip grid and made the flow feel long). DEEPER_EMOTION is kept in the
+// type for older in-progress journeys; normalizeStep folds it back in.
+function normalizeStep(step: DeepDiveStep): DeepDiveStep {
+  return step === 'DEEPER_EMOTION' ? 'CURRENT_EMOTION' : step;
+}
 function nextOwnerStep(step: DeepDiveStep, state: DeepDiveState): DeepDiveStep {
   switch (step) {
-    case 'CURRENT_EMOTION': return 'DEEPER_EMOTION';
-    case 'DEEPER_EMOTION': return 'FAMILIARITY_CHECK';
+    case 'CURRENT_EMOTION': return 'FAMILIARITY_CHECK';
     case 'FAMILIARITY_CHECK': return isFamiliar(state) ? 'MEMORY_EXPLORATION' : 'CURRENT_NEED';
     case 'MEMORY_EXPLORATION': return 'PAST_PERSON';
     case 'PAST_PERSON': return 'PAST_LETTER';
@@ -64,8 +70,7 @@ function nextOwnerStep(step: DeepDiveStep, state: DeepDiveState): DeepDiveStep {
 }
 function prevOwnerStep(step: DeepDiveStep, state: DeepDiveState): DeepDiveStep {
   switch (step) {
-    case 'DEEPER_EMOTION': return 'CURRENT_EMOTION';
-    case 'FAMILIARITY_CHECK': return 'DEEPER_EMOTION';
+    case 'FAMILIARITY_CHECK': return 'CURRENT_EMOTION';
     case 'MEMORY_EXPLORATION': return 'FAMILIARITY_CHECK';
     case 'PAST_PERSON': return 'MEMORY_EXPLORATION';
     case 'PAST_LETTER': return 'PAST_PERSON';
@@ -79,11 +84,11 @@ function prevOwnerStep(step: DeepDiveStep, state: DeepDiveState): DeepDiveStep {
 // Which steps allow 「跳過這一步」 (the exploration steps; the entry emotion and
 // the final share are not "skips").
 const SKIPPABLE: Set<DeepDiveStep> = new Set([
-  'DEEPER_EMOTION', 'MEMORY_EXPLORATION', 'PAST_PERSON', 'PAST_LETTER', 'COMPASSION_LETTER', 'CURRENT_NEED',
+  'MEMORY_EXPLORATION', 'PAST_PERSON', 'PAST_LETTER', 'COMPASSION_LETTER', 'CURRENT_NEED',
 ]);
 
 const SELF_PATH: DeepDiveStep[] = [
-  'CURRENT_EMOTION', 'DEEPER_EMOTION', 'FAMILIARITY_CHECK', 'MEMORY_EXPLORATION',
+  'CURRENT_EMOTION', 'FAMILIARITY_CHECK', 'MEMORY_EXPLORATION',
   'PAST_PERSON', 'PAST_LETTER', 'COMPASSION_LETTER', 'CURRENT_NEED', 'PARTNER_LETTER',
 ];
 
@@ -93,7 +98,7 @@ const Chip: React.FC<{ label: string; active: boolean; onClick: () => void; test
     type="button"
     onClick={onClick}
     data-testid={testid}
-    className={`rounded-full px-4 py-2 text-sm font-body border transition ${
+    className={`rounded-full px-3 py-1 text-[13px] font-body border transition ${
       active
         ? 'bg-petal-ink text-petal-cream border-petal-ink'
         : 'bg-white text-petal-ink border-petal-rule hover:border-petal-rose-deep'
@@ -105,6 +110,17 @@ const Chip: React.FC<{ label: string; active: boolean; onClick: () => void; test
 
 const Card: React.FC<{ children: React.ReactNode; testid?: string }> = ({ children, testid }) => (
   <div className="rounded-2xl border border-petal-rule bg-white p-5 sm:p-6" data-testid={testid}>{children}</div>
+);
+
+// Scroll body + optional footer. MUST live at module scope: defining it inside
+// the component recreated its type every render, so React remounted the whole
+// subtree (incl. any focused <textarea>) on each keystroke — which on iOS drops
+// focus and breaks the Mandarin IME (one committed letter at a time).
+const Frame: React.FC<{ children: React.ReactNode; footer?: React.ReactNode }> = ({ children, footer }) => (
+  <>
+    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">{children}</div>
+    {footer && <div className="pt-4 mt-4 border-t border-petal-rule">{footer}</div>}
+  </>
 );
 
 const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify, onChanged, companionShortName = 'Luma' }) => {
@@ -147,7 +163,7 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
 
   const hydrate = useCallback((j: DeepDiveJourney) => {
     setJourney(j);
-    setStep(j.current_step);
+    setStep(normalizeStep(j.current_step));
     if (j.role === 'owner') {
       const s = j.state || {};
       setForm((f) => ({
@@ -202,8 +218,7 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
 
   const patchFor = useCallback((s: DeepDiveStep): Partial<DeepDiveState> => {
     switch (s) {
-      case 'CURRENT_EMOTION': return { situation: form.situation.trim(), current_emotions: form.current_emotions };
-      case 'DEEPER_EMOTION': return { deeper_emotions: form.deeper_emotions };
+      case 'CURRENT_EMOTION': return { situation: form.situation.trim(), current_emotions: form.current_emotions, deeper_emotions: form.current_emotions };
       case 'FAMILIARITY_CHECK': return { familiarity: form.familiarity };
       case 'MEMORY_EXPLORATION': return { memory_text: form.memory_text.trim() };
       case 'PAST_PERSON': return { past_person: form.past_person };
@@ -375,13 +390,6 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
   const progress = stepIndex >= 0 ? `第 ${stepIndex + 1} 步` : '';
 
   const toggle = (arr: string[], v: string): string[] => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
-
-  const Frame: React.FC<{ children: React.ReactNode; footer?: React.ReactNode }> = ({ children, footer }) => (
-    <>
-      <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">{children}</div>
-      {footer && <div className="pt-4 mt-4 border-t border-petal-rule">{footer}</div>}
-    </>
-  );
 
   // Standard owner footer: 上一步 / 跳過 / 下一步.
   const ownerFooter = (opts?: { nextLabel?: string; nextDisabled?: boolean; hidePrev?: boolean }) => (
@@ -592,32 +600,21 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
       case 'CURRENT_EMOTION':
         return (
           <Frame footer={ownerFooter({ nextDisabled: form.current_emotions.length === 0 && form.situation.trim().length === 0, nextLabel: '開始探索' })}>
-            <div className="inline-flex items-center gap-2 text-petal-rose-deep mb-2"><Compass className="w-5 h-5" strokeWidth={1.5} /><span className="font-display italic text-lg">深入這個感覺</span></div>
-            <p className="font-body text-sm text-petal-muted mb-4">有時候，現在的事情之所以特別痛，是因為它碰到了我們過去曾經有過的感受。我們不用急著找答案，只要一起看看，這個感覺對你來說是不是很熟悉。</p>
-            <label className="font-body text-sm text-petal-ink-soft">現在發生了什麼事？</label>
+            <div className="inline-flex items-center gap-2 text-petal-rose-deep mb-1"><Compass className="w-5 h-5" strokeWidth={1.5} /><span className="font-display italic text-lg">深入這個感覺</span></div>
+            <p className="font-body text-sm text-petal-muted mb-3">現在的事情之所以特別痛，有時是因為它碰到了過去的感受。先看看它是什麼。</p>
             <textarea value={form.situation} onChange={(e) => { setForm((f) => ({ ...f, situation: e.target.value })); guard(e.target.value); }}
-              placeholder="簡單描述這次讓你有感覺的事……" rows={3} maxLength={2000} data-testid="deep-dive-situation"
-              className="w-full mt-1 mb-4 p-3 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y font-body text-sm" />
-            <label className="font-body text-sm text-petal-ink">如果不只看生氣，現在的你還感覺到什麼？<span className="text-petal-muted">（可以多選）</span></label>
-            <div className="flex flex-wrap gap-2 mt-3">
+              placeholder="現在發生了什麼事？（簡單描述就好）" rows={2} maxLength={2000} data-testid="deep-dive-situation"
+              className="w-full mb-3 p-3 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y font-body text-sm" />
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <label className="font-body text-sm text-petal-ink">除了生氣，你還感覺到什麼？<span className="text-petal-muted">（可多選）</span></label>
+              {aiReflectButton('emotion')}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
               {EMOTION_CHIPS.map((c) => (
                 <Chip key={c} label={c} active={form.current_emotions.includes(c)} onClick={() => setForm((f) => ({ ...f, current_emotions: toggle(f.current_emotions, c) }))} testid={`deep-dive-emotion-${c}`} />
               ))}
             </div>
-          </Frame>
-        );
-      case 'DEEPER_EMOTION':
-        return (
-          <Frame footer={ownerFooter()}>
-            <h3 className="font-display italic text-lg text-petal-ink mb-1">再往下看一點</h3>
-            <p className="font-body text-sm text-petal-muted mb-3">生氣底下，常常還有一個更安靜的感受。{aiReflectButton('emotion')}</p>
             {reflectionCard}
-            <p className="font-body text-sm text-petal-ink mt-4">哪一個更靠近你心裡的感覺？</p>
-            <div className="flex flex-wrap gap-2 mt-3">
-              {EMOTION_CHIPS.map((c) => (
-                <Chip key={c} label={c} active={form.deeper_emotions.includes(c)} onClick={() => setForm((f) => ({ ...f, deeper_emotions: toggle(f.deeper_emotions, c) }))} testid={`deep-dive-deeper-${c}`} />
-              ))}
-            </div>
           </Frame>
         );
       case 'FAMILIARITY_CHECK':
