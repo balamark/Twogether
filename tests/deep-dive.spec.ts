@@ -97,17 +97,18 @@ test.describe('情緒深潛 Emotional Deep Dive', () => {
   test('can skip a step', async ({ page }) => {
     await openFromMenu(page);
     await page.getByTestId('deep-dive-situation').fill('一件小事');
-    await page.getByTestId('deep-dive-next').click(); // -> DEEPER_EMOTION (skippable)
+    await page.getByTestId('deep-dive-next').click(); // -> FAMILIARITY_CHECK
+    await page.getByTestId('deep-dive-familiarity-很熟悉').click();
+    await page.getByTestId('deep-dive-next').click(); // -> MEMORY_EXPLORATION (skippable)
     await expect(page.getByTestId('deep-dive-skip')).toBeVisible();
     await page.getByTestId('deep-dive-skip').click();
-    await expect(page.getByTestId('deep-dive-progress')).toContainText('第 3 步'); // FAMILIARITY_CHECK
+    await expect(page.getByTestId('deep-dive-progress')).toContainText('第 4 步'); // PAST_PERSON
   });
 
   test('a not-familiar answer skips the memory steps', async ({ page }) => {
     await openFromMenu(page);
     await page.getByTestId('deep-dive-situation').fill('一件小事');
-    await page.getByTestId('deep-dive-next').click(); // DEEPER_EMOTION
-    await page.getByTestId('deep-dive-next').click(); // FAMILIARITY_CHECK
+    await page.getByTestId('deep-dive-next').click(); // -> FAMILIARITY_CHECK
     await page.getByTestId('deep-dive-familiarity-不太熟悉').click();
     await page.getByTestId('deep-dive-next').click();
     // Should jump straight to 回到現在 (CURRENT_NEED), not the memory screen.

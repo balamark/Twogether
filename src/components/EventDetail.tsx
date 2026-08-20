@@ -1011,6 +1011,21 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               />
             </button>
           </div>
+          {/* Contextual 情緒深潛 entry — a quiet line, not a box. Shown only once
+              the emotion lens is on, i.e. when the underlying need is visible and
+              this might read as a familiar, older feeling (PRD Entry A). Opens the
+              journey via a window event so no prop-drilling is needed. */}
+          {translationEnabled && (
+            <button
+              type="button"
+              data-testid="deep-dive-entry-conversation"
+              onClick={() => window.dispatchEvent(new CustomEvent('deepdive:open', { detail: { eventId } }))}
+              className="w-full flex items-center gap-1.5 text-left text-[11px] text-petal-rose-deep hover:underline px-1"
+            >
+              <Compass className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
+              這個感覺好像不只是現在？深入看看
+            </button>
+          )}
           {/* An unfinished batch has to stay explained on screen: the toast
               disappears, but the missing cards do not. */}
           {translationEnabled && translationNotice && !translationLoading && (
