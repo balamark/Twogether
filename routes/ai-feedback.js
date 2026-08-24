@@ -46,6 +46,20 @@ async function ensureAiFeedbackTable() {
     CREATE UNIQUE INDEX IF NOT EXISTS uq_ai_response_feedback_user_ref
       ON ai_response_feedback (user_id, surface, reference_id)
   `);
+  // Phase 2 curation columns (migration 089) — admins promote a down-vote into a
+  // negative example for the judge. Kept here too so the admin flow works before
+  // migrations run.
+  await db.query(`
+    ALTER TABLE ai_response_feedback
+      ADD COLUMN IF NOT EXISTS curated_negative BOOLEAN NOT NULL DEFAULT false,
+      ADD COLUMN IF NOT EXISTS curated_note TEXT,
+      ADD COLUMN IF NOT EXISTS curated_at TIMESTAMP WITH TIME ZONE
+  `);
+  await db.query(`
+    CREATE INDEX IF NOT EXISTS idx_ai_response_feedback_curated
+      ON ai_response_feedback (surface, curated_at DESC)
+      WHERE curated_negative
+  `);
   ensured = true;
 }
 
@@ -107,4 +121,7 @@ router.post(
   }
 );
 
+// Exported so the admin curation endpoints (routes/admin.js) can guarantee the
+// table + curation columns exist before reading/updating them.
+router.ensureAiFeedbackTable = ensureAiFeedbackTable;
 module.exports = router;

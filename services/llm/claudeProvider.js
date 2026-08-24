@@ -30,6 +30,7 @@ const {
   passthroughVerdict,
   buildJudgeInstruction,
 } = require('../../lib/reflectionJudge');
+const { getCuratedExamples, buildExamplesBlock } = require('../../lib/judgeExamples');
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 
@@ -159,17 +160,25 @@ async function judgeResponse({ surface, context, output }) {
 
   const startedAt = Date.now();
   try {
+    // Phase 2: fold in admin-curated negative examples for this surface, as a
+    // SECOND system block after the cache-controlled base so the shared prefix
+    // stays byte-identical and cacheable. getCuratedExamples is fail-open ([]),
+    // and the block is clearly-delimited data (never instructions).
+    const system = [
+      {
+        type: 'text',
+        text: JUDGE_SYSTEM_PROMPT + PUNCTUATION_RULE,
+        cache_control: { type: 'ephemeral' },
+      },
+    ];
+    const examplesBlock = buildExamplesBlock(await getCuratedExamples(surface));
+    if (examplesBlock) system.push({ type: 'text', text: examplesBlock });
+
     const response = await getClient().messages.create(
       {
         model: JUDGE_MODEL,
         max_tokens: 512,
-        system: [
-          {
-            type: 'text',
-            text: JUDGE_SYSTEM_PROMPT + PUNCTUATION_RULE,
-            cache_control: { type: 'ephemeral' },
-          },
-        ],
+        system,
         tools: [JUDGE_TOOL_SCHEMA],
         tool_choice: { type: 'tool', name: 'emit_judge_verdict' },
         messages: [{ role: 'user', content: userContent }],

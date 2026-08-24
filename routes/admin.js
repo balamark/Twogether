@@ -13,6 +13,9 @@ const db = require('../database/db');
 const { logInfo, logError, logWarn } = require('../lib/logger');
 const { optionalAuth } = require('../middleware/auth');
 const featureFlags = require('../lib/featureFlags');
+// For ensureAiFeedbackTable() — guarantees the curation columns exist before the
+// AI down-vote endpoints read/update them (no cycle: ai-feedback never requires admin).
+const aiFeedbackRoutes = require('./ai-feedback');
 
 const publicRouter = express.Router();
 const adminApiRouter = express.Router();
@@ -750,6 +753,80 @@ adminApiRouter.post('/feedback/:id/moderate', express.json(), async (req, res) =
   }
 });
 
+// ── AI response down-votes → judge curation ("AI 負評") ──────────────────────
+// List recent 👎 on AI responses (情緒翻譯 / AI 諮商師) so an admin can confirm
+// which are genuine bad cases and promote them into the reflection judge's
+// negative examples (Phase 2). GET /api/admin/ai-downvotes?surface=&limit=
+adminApiRouter.get('/ai-downvotes', async (req, res) => {
+  const surface = ['emotion_translation', 'counselor'].includes(req.query.surface)
+    ? req.query.surface
+    : null;
+  const limit = Math.min(Math.max(1, parseInt(req.query.limit, 10) || 100), 200);
+  try {
+    await aiFeedbackRoutes.ensureAiFeedbackTable();
+    const params = [];
+    let where = "f.rating = 'down'";
+    if (surface) {
+      params.push(surface);
+      where += ` AND f.surface = $${params.length}`;
+    }
+    params.push(limit);
+    const result = await db.query(
+      `SELECT f.id, f.surface, f.reference_id, f.message_text, f.feedback_text,
+              f.context_snapshot, f.curated_negative, f.curated_note, f.curated_at,
+              f.created_at, u.email AS user_email
+         FROM ai_response_feedback f
+         LEFT JOIN users u ON u.id = f.user_id
+        WHERE ${where}
+        ORDER BY f.created_at DESC
+        LIMIT $${params.length}`,
+      params
+    );
+    res.json({ downvotes: result.rows });
+  } catch (err) {
+    // Table may not exist yet on a fresh DB — surface as empty, not an error.
+    logWarn('Admin ai-downvotes query failed', { err: err.message });
+    res.json({ downvotes: [] });
+  }
+});
+
+// POST /api/admin/ai-downvotes/:id/curate { curated: boolean, note?: string }
+// Promote (or un-promote) a down-vote as a negative example for the judge. Only
+// the admin-authored `note` (never the raw user feedback_text) can reach the
+// judge prompt, so this endpoint is the trust boundary for that loop.
+adminApiRouter.post('/ai-downvotes/:id/curate', express.json(), async (req, res) => {
+  const id = req.params.id;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    return res.status(400).json({ error: 'invalid id' });
+  }
+  const { curated } = req.body || {};
+  if (typeof curated !== 'boolean') {
+    return res.status(400).json({ error: 'curated must be a boolean' });
+  }
+  const note =
+    curated && typeof req.body.note === 'string' ? req.body.note.trim().slice(0, 200) : null;
+  try {
+    await aiFeedbackRoutes.ensureAiFeedbackTable();
+    const result = await db.query(
+      `UPDATE ai_response_feedback
+          SET curated_negative = $1,
+              curated_note = $2,
+              curated_at = CASE WHEN $1 THEN NOW() ELSE NULL END
+        WHERE id = $3
+        RETURNING id, curated_negative, curated_note`,
+      [curated, note, id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'down-vote not found' });
+    }
+    logInfo('admin.ai_downvote.curated', { id, curated });
+    res.json({ success: true, downvote: result.rows[0] });
+  } catch (err) {
+    logError('Admin ai-downvote curate failed', { err: err.message, id });
+    res.status(500).json({ error: 'curate failed' });
+  }
+});
+
 // GET /api/admin/feature-flags — list every known flag with its label +
 // description + current on/off state for the dashboard toggles.
 adminApiRouter.get('/feature-flags', async (req, res) => {
@@ -906,6 +983,7 @@ const ADMIN_HTML = `<!doctype html>
       <button class="tab" data-panel="pool">分潤</button>
       <button class="tab" data-panel="roleplay">邀請劇本</button>
       <button class="tab" data-panel="ai-usage">AI 用量</button>
+      <button class="tab" data-panel="ai-downvotes">AI 負評</button>
       <button class="tab" data-panel="flags">功能開關</button>
     </div>
 
@@ -1043,6 +1121,30 @@ const ADMIN_HTML = `<!doctype html>
         <table id="feedbackTable">
           <thead>
             <tr><th>顯示名稱</th><th>帳號</th><th class="num">評分</th><th>內容</th><th>時間</th><th>操作</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Panel: AI 負評 → reflection judge curation -->
+    <div class="panel" id="panel-ai-downvotes">
+      <p class="sub">使用者對 AI 回應（情緒翻譯 / AI 諮商師）按 👎 的紀錄。確認是真的不好的案例後，設為「判官負例」，第二層 AI 判官會把它當成負面示例，之後更會抓同類錯誤。只有你填的「問題說明」會進入判官提示，使用者原文不會。</p>
+      <div class="controls">
+        <label>類型
+          <select id="downvoteSurface">
+            <option value="">全部</option>
+            <option value="emotion_translation">情緒翻譯</option>
+            <option value="counselor">AI 諮商師</option>
+          </select>
+        </label>
+        <button id="downvoteRefresh">重新整理</button>
+        <span class="muted" id="downvoteStatusMsg"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="downvoteTable">
+          <thead>
+            <tr><th>類型</th><th>AI 輸出</th><th>使用者說明</th><th>時間</th><th>問題說明（給判官）</th><th>操作</th></tr>
           </thead>
           <tbody></tbody>
         </table>
@@ -1738,6 +1840,61 @@ const ADMIN_HTML = `<!doctype html>
     $('feedbackRefresh').addEventListener('click', loadFeedback);
     $('feedbackStatus').addEventListener('change', loadFeedback);
 
+    // AI 負評 → reflection judge curation. Admin confirms real bad cases and
+    // promotes them (with an admin-authored 問題說明) into the judge's examples.
+    var DV_SURFACE_LABEL = { emotion_translation: '情緒翻譯', counselor: 'AI 諮商師' };
+    async function loadDownvotes() {
+      var surface = $('downvoteSurface').value;
+      $('downvoteStatusMsg').textContent = '載入中…';
+      try {
+        var res = await fetch('/api/admin/ai-downvotes' + (surface ? '?surface=' + encodeURIComponent(surface) : ''));
+        if (!res.ok) throw new Error('ai-downvotes ' + res.status);
+        var body = await res.json();
+        renderDownvotes(body.downvotes || []);
+        $('downvoteStatusMsg').textContent = '更新於 ' + new Date().toLocaleTimeString('zh-TW');
+      } catch (e) { $('downvoteStatusMsg').textContent = '載入失敗: ' + e.message; }
+    }
+    function renderDownvotes(rows) {
+      var tbody = document.querySelector('#downvoteTable tbody');
+      if (rows.length === 0) { tbody.innerHTML = '<tr><td colspan="6" class="muted">沒有資料</td></tr>'; return; }
+      tbody.innerHTML = rows.map(function (r) {
+        var curated = r.curated_negative === true;
+        var noteAttr = esc(r.curated_note || '').replace(/"/g, '&quot;');
+        var btn = curated
+          ? '<button data-dv="off" data-id="' + r.id + '">取消負例</button>'
+          : '<button data-dv="on" data-id="' + r.id + '">設為判官負例</button>';
+        return '<tr' + (curated ? ' style="background:#f0fff4"' : '') + '>' +
+          '<td>' + esc(DV_SURFACE_LABEL[r.surface] || r.surface) + '</td>' +
+          '<td style="max-width:300px">' + esc(r.message_text || '—') + '</td>' +
+          '<td style="max-width:220px">' + esc(r.feedback_text || '—') + '</td>' +
+          '<td>' + fmtDate(r.created_at) + '</td>' +
+          '<td><input type="text" data-note="' + r.id + '" value="' + noteAttr + '" placeholder="例如：把對方的話寫成我的" style="width:200px"></td>' +
+          '<td>' + btn + '</td>' +
+          '</tr>';
+      }).join('');
+      tbody.querySelectorAll('button[data-dv]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.getAttribute('data-id');
+          var on = btn.getAttribute('data-dv') === 'on';
+          var noteEl = document.querySelector('input[data-note="' + id + '"]');
+          curateDownvote(id, on, noteEl ? noteEl.value : '', btn);
+        });
+      });
+    }
+    async function curateDownvote(id, curated, note, btn) {
+      btn.disabled = true;
+      try {
+        var res = await fetch('/api/admin/ai-downvotes/' + id + '/curate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ curated: curated, note: note })
+        });
+        if (!res.ok) throw new Error('curate ' + res.status);
+        await loadDownvotes();
+      } catch (e) { btn.disabled = false; $('downvoteStatusMsg').textContent = '操作失敗: ' + e.message; }
+    }
+    $('downvoteRefresh').addEventListener('click', loadDownvotes);
+    $('downvoteSurface').addEventListener('change', loadDownvotes);
+
     // ── 真實故事 moderation ────────────────────────────────────────────────
     async function loadStories() {
       $('storiesStatusMsg').textContent = '載入中…';
@@ -2154,7 +2311,7 @@ const ADMIN_HTML = `<!doctype html>
 
     // Lazy-load the reviews + pool + roleplay + ai-usage + flags tabs the first
     // time they're opened.
-    var reviewsLoaded = false, feedbackLoaded = false, poolLoaded = false, roleplayLoaded = false, aiUsageLoaded = false, flagsLoaded = false, storiesLoaded = false, pollsLoaded = false;
+    var reviewsLoaded = false, feedbackLoaded = false, poolLoaded = false, roleplayLoaded = false, aiUsageLoaded = false, flagsLoaded = false, storiesLoaded = false, pollsLoaded = false, aiDownvotesLoaded = false;
     document.querySelectorAll('.tab').forEach(function (btn) {
       var panel = btn.getAttribute('data-panel');
       if (panel === 'reviews') btn.addEventListener('click', function () { if (!reviewsLoaded) { reviewsLoaded = true; loadReviews(); } });
@@ -2164,6 +2321,7 @@ const ADMIN_HTML = `<!doctype html>
       if (panel === 'pool') btn.addEventListener('click', function () { if (!poolLoaded) { poolLoaded = true; loadPools(); } });
       if (panel === 'roleplay') btn.addEventListener('click', function () { if (!roleplayLoaded) { roleplayLoaded = true; loadRoleplay(); } });
       if (panel === 'ai-usage') btn.addEventListener('click', function () { if (!aiUsageLoaded) { aiUsageLoaded = true; loadAiUsage(); } });
+      if (panel === 'ai-downvotes') btn.addEventListener('click', function () { if (!aiDownvotesLoaded) { aiDownvotesLoaded = true; loadDownvotes(); } });
       if (panel === 'flags') btn.addEventListener('click', function () { if (!flagsLoaded) { flagsLoaded = true; loadFlags(); } });
     });
 
