@@ -136,6 +136,9 @@ class TestRunner {
       // 情緒深潛 Emotional Deep Dive (solo flow + pause/resume + unpaired gate)
       await this.testDeepDive();
 
+      // 👍/👎 feedback on AI responses (validation + upsert + auth gate)
+      await this.testAiFeedback();
+
     } finally {
       // Always cleanup test users, even if tests fail
       await this.cleanupTestUsers();
@@ -729,6 +732,65 @@ class TestRunner {
     });
 
     this.authToken = savedToken;
+  }
+
+  async testAiFeedback() {
+    console.log('\n👍👎 Testing AI response feedback (/ai-feedback)');
+    const { randomUUID } = require('crypto');
+    // A real UUID reference so the (user, surface, reference_id) unique index can
+    // actually dedupe the re-vote below (NULL refs are treated as distinct).
+    const refId = randomUUID();
+
+    await this.test('AI feedback — thumb up is accepted', async () => {
+      const res = await this.makeRequest('POST', '/ai-feedback', {
+        surface: 'emotion_translation',
+        rating: 'up',
+        referenceId: refId,
+        messageText: '我需要你多陪我一點。',
+        contextSnapshot: { thread: [{ isAi: false, content: '你都不理我' }] },
+      });
+      this.assertStatus(res, 200, 'up accepted');
+      this.assertTrue(res.data.success === true, 'returns success');
+    });
+
+    await this.test('AI feedback — re-voting the same response upserts (no unique violation)', async () => {
+      // Same (user, surface, referenceId) with the opposite rating. A working
+      // ON CONFLICT keeps this at one row and returns 200; a broken upsert would
+      // hit the unique index and 500.
+      const res = await this.makeRequest('POST', '/ai-feedback', {
+        surface: 'emotion_translation',
+        rating: 'down',
+        referenceId: refId,
+        messageText: '我需要你多陪我一點。',
+        feedbackText: '視角好像反了',
+      });
+      this.assertStatus(res, 200, 're-vote accepted');
+      this.assertTrue(res.data.success === true, 'returns success');
+    });
+
+    await this.test('AI feedback — invalid surface is rejected with AI_FEEDBACK_INVALID', async () => {
+      const res = await this.makeRequest('POST', '/ai-feedback', { surface: 'bogus', rating: 'up' });
+      this.assertStatus(res, 400, 'invalid surface blocked');
+      this.assertEqual(res.data.error_code, 'AI_FEEDBACK_INVALID', 'specific error_code');
+    });
+
+    await this.test('AI feedback — invalid rating is rejected with AI_FEEDBACK_INVALID', async () => {
+      const res = await this.makeRequest('POST', '/ai-feedback', { surface: 'counselor', rating: 'sideways' });
+      this.assertStatus(res, 400, 'invalid rating blocked');
+      this.assertEqual(res.data.error_code, 'AI_FEEDBACK_INVALID', 'specific error_code');
+    });
+
+    await this.test('AI feedback — requires auth', async () => {
+      const savedToken = this.authToken;
+      this.authToken = null;
+      const res = await this.makeRequest('POST', '/ai-feedback', {
+        surface: 'counselor',
+        rating: 'up',
+        referenceId: randomUUID(),
+      });
+      this.authToken = savedToken;
+      this.assertStatus(res, 401, 'unauth blocked');
+    });
   }
 
   async cleanupTestUsers() {

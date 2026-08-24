@@ -32,6 +32,11 @@ env_variables:
   # If ANTHROPIC_API_KEY is missing, llmService falls back to the mock.
   LLM_PROVIDER: $_LLM_PROVIDER
   ANTHROPIC_API_KEY: $_ANTHROPIC_API_KEY
+  # Reflection judge (LLM-as-judge second layer). Both optional: the judge model
+  # defaults to ANTHROPIC_MODEL, and the step is on by default. Uncomment to pin
+  # a stronger judge model or to disable the step without a code change.
+  # ANTHROPIC_JUDGE_MODEL: $_ANTHROPIC_JUDGE_MODEL
+  # REFLECTION_JUDGE_ENABLED: $_REFLECTION_JUDGE_ENABLED
   # Admin dashboard (/admin) Basic-Auth password. Without it, adminAuth returns
   # 503 "Admin disabled". Shares the prod ADMIN_PASSWORD secret.
   ADMIN_PASSWORD: $_ADMIN_PASSWORD

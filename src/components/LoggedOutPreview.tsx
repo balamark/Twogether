@@ -24,6 +24,8 @@ import {
   ShieldCheck,
   MessageSquare,
   Eye,
+  ThumbsUp,
+  ThumbsDown,
   type LucideIcon,
 } from 'lucide-react';
 import { daysSinceLastNudge } from './AchievementsView';
@@ -606,6 +608,12 @@ const ThreeSeatSample: React.FC = () => (
           <p className="font-body text-sm text-petal-ink">
             我想在這裡停一下。你們現在都在描述「對方做了什麼」。
           </p>
+          {/* 每則 AI 回應都能一秒回饋；不通順就按 👎，我們會把它變得更準。範例僅展示。 */}
+          <div className="flex items-center gap-1.5 mt-1.5">
+            <ThumbsUp className="w-3.5 h-3.5 text-petal-muted" strokeWidth={1.5} />
+            <ThumbsDown className="w-3.5 h-3.5 text-petal-muted" strokeWidth={1.5} />
+            <span className="font-body text-[10px] text-petal-muted">這則回應如何？</span>
+          </div>
         </div>
       </div>
     </div>

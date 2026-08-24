@@ -23,8 +23,29 @@ const {
   MAX_INSIGHT_CHARS,
 } = require('../../lib/closureAi');
 const { shapeDeepDiveReflection, shapeDeepDiveLetter } = require('../../lib/deepDiveAi');
+const {
+  SURFACE_TRANSLATION,
+  SURFACE_COUNSELOR,
+  shapeJudgeVerdict,
+  passthroughVerdict,
+  buildJudgeInstruction,
+} = require('../../lib/reflectionJudge');
+const { getCuratedExamples, buildExamplesBlock } = require('../../lib/judgeExamples');
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
+
+// The judge (second-layer review) can run on a different model than the primary
+// generator; defaults to the same one. A stronger model (e.g. sonnet) can be
+// pinned via ANTHROPIC_JUDGE_MODEL when perspective accuracy matters more than
+// cost. The whole judge step is gated by REFLECTION_JUDGE_ENABLED (default on)
+// so it can be turned off without a code rollback.
+const JUDGE_MODEL = process.env.ANTHROPIC_JUDGE_MODEL || MODEL;
+const REFLECTION_JUDGE_ENABLED = !['0', 'false', 'off'].includes(
+  String(process.env.REFLECTION_JUDGE_ENABLED || '').toLowerCase()
+);
+// The judge must never blow the overall latency budget: bound each judge call
+// so a slow judge degrades to "return the primary output" instead of hanging.
+const JUDGE_TIMEOUT_MS = Number(process.env.REFLECTION_JUDGE_TIMEOUT_MS || 20000);
 
 // Per-million-token prices (USD). Keep in sync with
 // https://docs.anthropic.com/en/docs/about-claude/pricing — Haiku 4.5 row.
@@ -61,6 +82,163 @@ function getClient() {
 const PUNCTUATION_RULE = `
 
 標點規則（所有產生的文字一律適用）：不要使用破折號（——、—、–）。需要補充或轉折時，改用冒號、括號或直接分成兩句。`;
+
+// ---------------------------------------------------------------------------
+// Reflection judge (LLM-as-judge, second-layer review)
+// ---------------------------------------------------------------------------
+// After a primary generation (情緒翻譯 / AI 諮商師 回應), a judge LLM reads the
+// SAME speaker-labeled context the primary model saw plus the primary output,
+// and grades it — chiefly for 你/我 perspective/attribution errors (the bug this
+// exists to catch), plus groundedness and fluency. A `hard` verdict makes the
+// caller regenerate once with the judge's critique. The judge never blocks the
+// user: any failure/timeout returns a pass-through verdict. Shape/threshold
+// logic lives in lib/reflectionJudge.js so it stays unit-testable.
+
+const JUDGE_SYSTEM_PROMPT = `你是一位嚴謹的品質檢查員（第二層審查）。有一個 AI 剛替一對伴侶產生了「情緒翻譯」或「諮商回應」。你的工作不是重寫，而是判斷這份輸出能不能直接呈現給使用者。請永遠以繁體中文思考並回覆。
+
+請依序檢查（優先級由高到低）：
+1. 視角與歸屬（最重要）：輸出裡每一個「我／你」是否都對應到正確的發話者？有沒有把某一方的感受、經歷或立場，錯寫成另一方的？第一人稱「我」的翻譯是否確實站在「原本說這句話的人」的角度？這是最常見也最嚴重的錯誤，尤其當使用者一次貼了很多「你／我」的句子時。
+2. 忠實度：內容有沒有編造對話裡不存在的事實、指控或情節？有沒有偏離這個人真正的立場？
+3. 通順與自然：繁體中文是否通順、自然、沒有語意破碎或明顯翻譯腔？
+
+嚴重度判斷：
+- hard：出現視角/歸屬錯誤、編造事實，或有安全風險（自我傷害、暴力）被忽略。這種必須重寫。
+- soft：意思與視角都正確，只是語氣、通順度或用詞可以更好。不需要重寫。
+- ok：沒有問題。
+
+若為 hard，請在 critique 裡具體指出「哪一句、錯在哪、應該是誰的視角」，讓重寫者能照著修正。
+
+回應請只呼叫 emit_judge_verdict tool，不要輸出其他文字。`;
+
+const JUDGE_TOOL_SCHEMA = {
+  name: 'emit_judge_verdict',
+  description: 'Return a quality verdict on an AI-generated couples-counseling output.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      severity: {
+        type: 'string',
+        enum: ['ok', 'soft', 'hard'],
+        description: 'hard = must rewrite (perspective/attribution error, fabrication, missed safety risk); soft = correct but could read better; ok = fine',
+      },
+      issues: {
+        type: 'array',
+        maxItems: 5,
+        items: { type: 'string', maxLength: 120 },
+        description: '每項一句話，指出一個具體問題',
+      },
+      critique: {
+        type: 'string',
+        maxLength: 400,
+        description: '若為 hard，給重寫者的具體修正指示；否則可留空',
+      },
+    },
+    required: ['severity'],
+  },
+};
+
+// Grade one primary output. `context` and `output` are plain strings the caller
+// has already rendered (the same labeled thread the primary model saw, and the
+// primary result). Returns a verdict from lib/reflectionJudge with a `_meta`
+// carrying this call's usage/cost so the caller can fold it into its billed
+// total. NEVER throws: on disable/error/timeout it returns a pass-through.
+async function judgeResponse({ surface, context, output }) {
+  if (!REFLECTION_JUDGE_ENABLED) return passthroughVerdict('disabled');
+  const outText = (output == null ? '' : String(output)).trim();
+  if (!outText) return passthroughVerdict('empty-output');
+
+  const surfaceLabel = surface === SURFACE_COUNSELOR ? '諮商回應' : '情緒翻譯';
+  const userContent = [
+    `這是一份「${surfaceLabel}」的輸出，請依守則檢查品質。`,
+    '',
+    '=== 對話脈絡（AI 當時看到的內容，每行標了發話者）===',
+    (context == null ? '' : String(context)).trim() || '（無額外脈絡）',
+    '',
+    `=== AI 產生的${surfaceLabel} ===`,
+    outText,
+  ].join('\n');
+
+  const startedAt = Date.now();
+  try {
+    // Phase 2: fold in admin-curated negative examples for this surface, as a
+    // SECOND system block after the cache-controlled base so the shared prefix
+    // stays byte-identical and cacheable. getCuratedExamples is fail-open ([]),
+    // and the block is clearly-delimited data (never instructions).
+    const system = [
+      {
+        type: 'text',
+        text: JUDGE_SYSTEM_PROMPT + PUNCTUATION_RULE,
+        cache_control: { type: 'ephemeral' },
+      },
+    ];
+    const examplesBlock = buildExamplesBlock(await getCuratedExamples(surface));
+    if (examplesBlock) system.push({ type: 'text', text: examplesBlock });
+
+    const response = await getClient().messages.create(
+      {
+        model: JUDGE_MODEL,
+        max_tokens: 512,
+        system,
+        tools: [JUDGE_TOOL_SCHEMA],
+        tool_choice: { type: 'tool', name: 'emit_judge_verdict' },
+        messages: [{ role: 'user', content: userContent }],
+      },
+      { timeout: JUDGE_TIMEOUT_MS }
+    );
+
+    const ms = Date.now() - startedAt;
+    const u = response.usage || {};
+    const cost = estimateCostUSD(response.model || JUDGE_MODEL, u);
+    const toolUse = (response.content || []).find(
+      (b) => b.type === 'tool_use' && b.name === 'emit_judge_verdict'
+    );
+    const meta = {
+      model: response.model || JUDGE_MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost || 0,
+    };
+    const verdict = shapeJudgeVerdict(toolUse ? toolUse.input : null, meta);
+    logInfo('llm.claude.reflection_judge', {
+      surface,
+      model: meta.model,
+      severity: verdict.severity,
+      pass: verdict.pass,
+      issues: verdict.issues.length,
+      durationMs: ms,
+      inputTokens: meta.usage.inputTokens,
+      outputTokens: meta.usage.outputTokens,
+      costUsd: cost,
+    });
+    return verdict;
+  } catch (err) {
+    // Fail-open: a flaky judge must never withhold a response the primary model
+    // already produced.
+    logWarn('llm.claude.reflection_judge.failed', {
+      surface,
+      durationMs: Date.now() - startedAt,
+      err: err.message,
+    });
+    return passthroughVerdict('error');
+  }
+}
+
+// Sum a judge/regen verdict's usage + cost into a running total object shaped
+// like the translation usageTotal ({inputTokens, outputTokens, cacheCreateTokens,
+// cacheReadTokens}). Returns the cost so callers can also add it to a scalar.
+function foldJudgeUsage(usageTotal, verdict) {
+  const u = (verdict && verdict._meta && verdict._meta.usage) || {};
+  usageTotal.inputTokens += u.inputTokens || 0;
+  usageTotal.outputTokens += u.outputTokens || 0;
+  usageTotal.cacheCreateTokens += u.cacheCreateTokens || 0;
+  usageTotal.cacheReadTokens += u.cacheReadTokens || 0;
+  return (verdict && verdict._meta && verdict._meta.costUsd) || 0;
+}
 
 const SYSTEM_PROMPT = `你是一個專為情侶設計的「破冰」AI 助手，協助一方把當下強烈、可能傷人的情緒，整理成三種風格的破冰版本。請永遠以繁體中文回覆。
 
@@ -729,51 +907,87 @@ async function generateWallCounselorComment({ postContent, postAuthorName, moodT
   }
 
   const startedAt = Date.now();
-  const response = await getClient().messages.create({
-    model: MODEL,
-    max_tokens: 1024,
-    system,
-    tools: [WALL_COUNSELOR_TOOL_SCHEMA],
-    tool_choice: { type: 'tool', name: 'emit_wall_counselor_comment' },
-    messages: [{ role: 'user', content: userContent }],
-  });
+  const usageTotal = { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 };
+  let costTotal = 0;
+  let lastModel = MODEL;
 
-  const ms = Date.now() - startedAt;
-  const u = response.usage || {};
-  const cost = estimateCostUSD(response.model || MODEL, u);
-  logInfo('llm.claude.wall_counselor', {
-    model: response.model || MODEL,
-    companion: companion?.id || null,
-    durationMs: ms,
-    inputTokens: u.input_tokens || 0,
-    outputTokens: u.output_tokens || 0,
-    cacheCreate: u.cache_creation_input_tokens || 0,
-    cacheRead: u.cache_read_input_tokens || 0,
-    costUsd: cost,
-  });
+  // One counselor generation. `extraDirective`, present only on a judge-triggered
+  // regeneration, is appended to the user turn (never the cached system block, so
+  // the shared prefix stays byte-identical and cacheable).
+  const runOnce = async (extraDirective) => {
+    const content = extraDirective ? `${userContent}\n${extraDirective}` : userContent;
+    const callStartedAt = Date.now();
+    const response = await getClient().messages.create({
+      model: MODEL,
+      max_tokens: 1024,
+      system,
+      tools: [WALL_COUNSELOR_TOOL_SCHEMA],
+      tool_choice: { type: 'tool', name: 'emit_wall_counselor_comment' },
+      messages: [{ role: 'user', content }],
+    });
+    const ms = Date.now() - callStartedAt;
+    const u = response.usage || {};
+    const cost = estimateCostUSD(response.model || MODEL, u);
+    lastModel = response.model || MODEL;
+    usageTotal.inputTokens += u.input_tokens || 0;
+    usageTotal.outputTokens += u.output_tokens || 0;
+    usageTotal.cacheCreateTokens += u.cache_creation_input_tokens || 0;
+    usageTotal.cacheReadTokens += u.cache_read_input_tokens || 0;
+    costTotal += cost || 0;
+    logInfo('llm.claude.wall_counselor', {
+      model: lastModel,
+      companion: companion?.id || null,
+      regenerated: Boolean(extraDirective),
+      durationMs: ms,
+      inputTokens: u.input_tokens || 0,
+      outputTokens: u.output_tokens || 0,
+      cacheCreate: u.cache_creation_input_tokens || 0,
+      cacheRead: u.cache_read_input_tokens || 0,
+      costUsd: cost,
+    });
+    const toolUse = response.content.find(
+      (b) => b.type === 'tool_use' && b.name === 'emit_wall_counselor_comment'
+    );
+    if (!toolUse) {
+      throw new Error('Claude did not return a tool_use block');
+    }
+    return toolUse.input || {};
+  };
 
-  const toolUse = response.content.find(
-    (b) => b.type === 'tool_use' && b.name === 'emit_wall_counselor_comment'
-  );
-  if (!toolUse) {
-    throw new Error('Claude did not return a tool_use block');
+  let out = await runOnce();
+
+  // Second-layer review: catch 你/我 attribution errors (and fabrication) before
+  // the comment is shown, regenerating once with the judge's critique on a hard
+  // verdict. Judge + regen cost fold into the returned _meta, so the route still
+  // bills one `wall_counselor` unit. Fail-open via judgeResponse.
+  if (REFLECTION_JUDGE_ENABLED && out.comment && out.comment.trim()) {
+    const verdict = await judgeResponse({
+      surface: SURFACE_COUNSELOR,
+      context: userContent,
+      output: out.comment,
+    });
+    costTotal += foldJudgeUsage(usageTotal, verdict);
+    if (!verdict.pass) {
+      const regen = await runOnce(buildJudgeInstruction(verdict.critique));
+      const kept = regen.comment && regen.comment.trim() ? regen : out;
+      logInfo('llm.claude.reflection_judge.regenerated', {
+        surface: SURFACE_COUNSELOR,
+        severity: verdict.severity,
+        kept: kept === regen ? 'regen' : 'original',
+      });
+      out = kept;
+    }
   }
-  const out = toolUse.input;
 
   return {
     comment: out.comment || '',
     toxicityFlags: out.toxicityFlags || [],
     _meta: {
       provider: 'claude',
-      model: response.model || MODEL,
-      durationMs: ms,
-      usage: {
-        inputTokens: u.input_tokens || 0,
-        outputTokens: u.output_tokens || 0,
-        cacheCreateTokens: u.cache_creation_input_tokens || 0,
-        cacheReadTokens: u.cache_read_input_tokens || 0,
-      },
-      costUsd: cost,
+      model: lastModel,
+      durationMs: Date.now() - startedAt,
+      usage: usageTotal,
+      costUsd: costTotal,
       assembledPrompt: userContent,
     },
   };
@@ -1723,7 +1937,7 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
 
   // The thread is rendered per chunk: this chunk's targets in full, everything
   // else clipped to keep the input (and the latency) down.
-  const buildUserContent = (chunkRefs) => {
+  const buildUserContent = (chunkRefs, extraDirective) => {
     const targetSet = new Set(chunkRefs);
     const lines = [];
     if (context && context.summary) {
@@ -1740,8 +1954,25 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
     });
     lines.push('');
     lines.push(`請只翻譯以下編號的訊息：${chunkRefs.map((r) => `#${r}`).join('、')}`);
+    // On a judge-triggered regeneration, the critique is appended so the model
+    // fixes the specific perspective/attribution error it was flagged for.
+    if (extraDirective) lines.push(extraDirective);
     return lines.join('\n');
   };
+
+  // Render this chunk's translations back for the judge, each paired with its
+  // source line + speaker so the judge can check that every first-person "我"
+  // sits in the right speaker's voice.
+  const renderTranslationsForJudge = (translations) =>
+    translations
+      .map((t) => {
+        const ref = idToRef.get(t.id);
+        const src = ref != null ? all[ref - 1] : null;
+        const speaker = (src && src.speaker) || '某人';
+        const srcText = (src && (src.content || '').toString().trim()) || '';
+        return `#${ref} ${speaker} 原句：${srcText}\n    → 翻譯（第一人稱）：${t.rewrite}`;
+      })
+      .join('\n');
 
   const startedAt = Date.now();
   const usageTotal = { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 };
@@ -1753,8 +1984,8 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
 
   // One request for one batch of refs. Returns whatever parsed plus whether the
   // model was cut off, so the caller can retry that batch smaller.
-  const callChunk = async (chunkRefs) => {
-    const userContent = buildUserContent(chunkRefs);
+  const callChunk = async (chunkRefs, extraDirective) => {
+    const userContent = buildUserContent(chunkRefs, extraDirective);
     prompts.push(userContent);
     const callStartedAt = Date.now();
     const response = await getClient().messages.create({
@@ -1804,29 +2035,63 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
     return parsed;
   };
 
+  // Second-layer review for one chunk: judge the translations, and on a hard
+  // verdict (a 你/我 perspective/attribution error) regenerate this chunk once
+  // with the critique. Judge + regen tokens are folded into the run totals, so
+  // the whole thing still bills as one `need_translation` unit. Never lowers the
+  // item count (a regen can't lose ground). Fail-open via judgeResponse.
+  const judgeAndMaybeRegenerate = async (chunkRefs, translations) => {
+    if (!REFLECTION_JUDGE_ENABLED || translations.length === 0) return translations;
+    const verdict = await judgeResponse({
+      surface: SURFACE_TRANSLATION,
+      context: buildUserContent(chunkRefs),
+      output: renderTranslationsForJudge(translations),
+    });
+    costTotal += foldJudgeUsage(usageTotal, verdict);
+    if (verdict.pass) return translations;
+
+    const regen = await callChunk(chunkRefs, buildJudgeInstruction(verdict.critique));
+    const improved = regen.translations.length >= translations.length
+      ? regen.translations
+      : translations;
+    logInfo('llm.claude.reflection_judge.regenerated', {
+      surface: SURFACE_TRANSLATION,
+      refs: chunkRefs,
+      severity: verdict.severity,
+      before: translations.length,
+      after: regen.translations.length,
+      kept: improved === regen.translations ? 'regen' : 'original',
+    });
+    return improved;
+  };
+
   // Chunks are sized so this should not happen; if it does, halve the batch once
   // rather than returning nothing.
   const translateChunk = async (chunkRefs) => {
     const parsed = await callChunk(chunkRefs);
-    if (!parsed.truncated) return parsed.translations;
+    let translations = parsed.translations;
 
-    truncatedChunks += 1;
-    logWarn('llm.claude.need_translation.truncated', {
-      refs: chunkRefs,
-      maxTokens: TRANSLATION_MAX_TOKENS,
-      matched: parsed.translations.length,
-    });
-    if (chunkRefs.length < 2) return parsed.translations;
+    if (parsed.truncated) {
+      truncatedChunks += 1;
+      logWarn('llm.claude.need_translation.truncated', {
+        refs: chunkRefs,
+        maxTokens: TRANSLATION_MAX_TOKENS,
+        matched: parsed.translations.length,
+      });
+      if (chunkRefs.length >= 2) {
+        const mid = Math.ceil(chunkRefs.length / 2);
+        const halves = await Promise.all([
+          callChunk(chunkRefs.slice(0, mid)),
+          callChunk(chunkRefs.slice(mid)),
+        ]);
+        halves.forEach((h) => { if (h.truncated) truncatedChunks += 1; });
+        const retried = halves.flatMap((h) => h.translations);
+        // Keep whichever attempt produced more, so a retry can never lose ground.
+        translations = retried.length >= parsed.translations.length ? retried : parsed.translations;
+      }
+    }
 
-    const mid = Math.ceil(chunkRefs.length / 2);
-    const halves = await Promise.all([
-      callChunk(chunkRefs.slice(0, mid)),
-      callChunk(chunkRefs.slice(mid)),
-    ]);
-    halves.forEach((h) => { if (h.truncated) truncatedChunks += 1; });
-    const retried = halves.flatMap((h) => h.translations);
-    // Keep whichever attempt produced more, so a retry can never lose ground.
-    return retried.length >= parsed.translations.length ? retried : parsed.translations;
+    return judgeAndMaybeRegenerate(chunkRefs, translations);
   };
 
   const chunks = chunkTargets(wantedRefs, TRANSLATION_CHUNK_SIZE);
