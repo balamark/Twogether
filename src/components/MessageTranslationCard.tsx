@@ -1,6 +1,7 @@
 import React from 'react';
 import { HeartHandshake } from 'lucide-react';
 import type { MessageTranslation } from '../services/api';
+import AiResponseFeedback from './AiResponseFeedback';
 
 // The 情緒翻譯 (emotion/need translation) shown under a message when the shared
 // lens is on. It reframes an attack into the underlying need so the other
@@ -14,9 +15,20 @@ import type { MessageTranslation } from '../services/api';
 interface Props {
   translation: MessageTranslation;
   className?: string;
+  // When given, a 👍/👎 footer lets the reader flag whether this translation read
+  // well. `messageId` is the translated message's id (the feedback reference);
+  // `contextSnapshot` is a small slice of the thread stored with down-votes so a
+  // perspective error can be diagnosed later. Omit to render read-only.
+  messageId?: string;
+  contextSnapshot?: unknown;
 }
 
-const MessageTranslationCard: React.FC<Props> = ({ translation, className }) => {
+const MessageTranslationCard: React.FC<Props> = ({
+  translation,
+  className,
+  messageId,
+  contextSnapshot,
+}) => {
   const { rewrite, need, emotions } = translation;
   if (!rewrite) return null;
   return (
@@ -49,6 +61,15 @@ const MessageTranslationCard: React.FC<Props> = ({ translation, className }) => 
             </span>
           ))}
         </div>
+      )}
+      {messageId && (
+        <AiResponseFeedback
+          surface="emotion_translation"
+          referenceId={messageId}
+          messageText={rewrite}
+          contextSnapshot={contextSnapshot}
+          className="mt-1.5"
+        />
       )}
     </div>
   );

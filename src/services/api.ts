@@ -309,6 +309,17 @@ interface RoleplayMessageFeedbackInput {
   feedbackText?: string;
 }
 
+// 👍/👎 on an AI-generated response (情緒翻譯 / AI 諮商師). A down-vote can carry a
+// context snapshot so bad cases (chiefly 你/我 perspective errors) are diagnosable.
+export interface AiResponseFeedbackInput {
+  surface: 'emotion_translation' | 'counselor';
+  referenceId?: string;
+  rating: 'up' | 'down';
+  messageText?: string;
+  feedbackText?: string;
+  contextSnapshot?: unknown;
+}
+
 interface AlternativeIntimacyOption {
   id: string;
   category: string;
@@ -2817,6 +2828,17 @@ class ApiService {
       await apiClient.post('/intimacy-requests/script-messages/feedback', input);
     } catch (error: unknown) {
       console.error('Failed to submit roleplay message feedback:', error);
+    }
+  }
+
+  // Thumb up/down (+ optional text) on an AI-generated response (情緒翻譯 /
+  // AI 諮商師). Best-effort analytics — callers fire-and-forget; failures never
+  // block the user.
+  async submitAiResponseFeedback(input: AiResponseFeedbackInput): Promise<void> {
+    try {
+      await apiClient.post('/ai-feedback', input);
+    } catch (error: unknown) {
+      console.error('Failed to submit AI response feedback:', error);
     }
   }
 

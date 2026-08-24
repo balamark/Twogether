@@ -109,6 +109,24 @@ function formatTime(iso: string, tz: string) {
 // (database/migrations/029_events.sql, routes/events.js POST /:id/messages).
 const REPLY_MAX_CHARS = 2000;
 
+// A compact, speaker-labeled slice of the thread stored with a translation
+// down-vote, so a 你/我 perspective error can be diagnosed later. senderId
+// distinguishes the two partners; content is truncated to keep it small.
+const buildEventSnapshot = (
+  eventId: string,
+  ratedId: string,
+  messages: { id: string; isAi?: boolean; senderId?: string; content?: string }[],
+) => ({
+  eventId,
+  ratedId,
+  thread: messages.map((m) => ({
+    id: m.id,
+    isAi: m.isAi === true,
+    senderId: m.senderId || null,
+    content: (m.content || '').slice(0, 300),
+  })),
+});
+
 export default function EventDetail({ eventId, currentUserId, companionId, myNickname, partnerNickname, onBack, showNotification }: EventDetailProps) {
   const myCompanion = resolveCompanion(companionId);
   const { quota, refresh: refreshQuota } = useAiQuota();
@@ -1225,7 +1243,11 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                         )}
                       </p>
                       {translationEnabled && translations[m.id] && (
-                        <MessageTranslationCard translation={translations[m.id]} />
+                        <MessageTranslationCard
+                          translation={translations[m.id]}
+                          messageId={m.id}
+                          contextSnapshot={buildEventSnapshot(event.id, m.id, event.messages)}
+                        />
                       )}
                     </>
                   )}

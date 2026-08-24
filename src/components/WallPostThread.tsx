@@ -9,6 +9,7 @@ import { ROLE_STYLE, counselorLabel } from '../utils/threadRoles';
 import { useAiQuota } from '../hooks/useAiQuota';
 import AiQuotaHint from './AiQuotaHint';
 import MessageTranslationCard from './MessageTranslationCard';
+import AiResponseFeedback from './AiResponseFeedback';
 import ConflictBanner from './ConflictBanner';
 import ParticipantAvatar from './ParticipantAvatar';
 import MarkdownContent from './MarkdownContent';
@@ -30,6 +31,20 @@ interface WallPostThreadProps {
 
 const formatTime = (iso: string, tz: string) =>
   formatRelativeOrDate(iso, tz, { month: 'short', day: 'numeric' });
+
+// A compact, speaker-labeled slice of the thread stored alongside a down-vote,
+// so a bad AI response (chiefly a 你/我 perspective error) can be diagnosed
+// later without re-fetching. Content is truncated to keep the snapshot small.
+const buildThreadSnapshot = (postId: string, ratedReplyId: string, replies: WallReply[]) => ({
+  postId,
+  ratedReplyId,
+  thread: replies.map((r) => ({
+    id: r.id,
+    isAi: r.is_ai === true,
+    author: r.author_nickname || null,
+    content: (r.content || '').slice(0, 300),
+  })),
+});
 
 const WallPostThread: React.FC<WallPostThreadProps> = ({
   postId,
@@ -359,8 +374,23 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
               content={reply.content}
               className="mt-1 font-body text-sm text-petal-ink leading-relaxed"
             />
+            {isAi && (
+              // Let the reader flag whether the AI 諮商師 reply read well; a
+              // down-vote carries the thread so a bad case is diagnosable.
+              <AiResponseFeedback
+                surface="counselor"
+                referenceId={reply.id}
+                messageText={reply.content}
+                contextSnapshot={buildThreadSnapshot(postId, reply.id, replies)}
+                className="mt-1.5"
+              />
+            )}
             {translationEnabled && !isAi && !isTherapist && translations[reply.id] && (
-              <MessageTranslationCard translation={translations[reply.id]} />
+              <MessageTranslationCard
+                translation={translations[reply.id]}
+                messageId={reply.id}
+                contextSnapshot={buildThreadSnapshot(postId, reply.id, replies)}
+              />
             )}
           </div>
         );
