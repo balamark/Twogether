@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import {
   apiService,
+  type UploadProgressOptions,
   type WallPost,
   type WallPostCategory,
   type WallReactionKey,
@@ -281,17 +282,20 @@ const WallView: React.FC<WallViewProps> = ({
   const importantPosts = filteredPosts.filter((p) => p.category === 'important');
   const generalPosts = filteredPosts.filter((p) => p.category === 'general');
 
-  const handleSubmit = async (input: {
-    content: string;
-    mood_tag: string | null;
-    category: WallPostCategory;
-    media: File[];
-    is_private: boolean;
-    existingMedia?: string[];
-  }) => {
+  const handleSubmit = async (
+    input: {
+      content: string;
+      mood_tag: string | null;
+      category: WallPostCategory;
+      media: File[];
+      is_private: boolean;
+      existingMedia?: string[];
+    },
+    options?: UploadProgressOptions
+  ) => {
     try {
       if (editingPost) {
-        const updated = await apiService.updateWallPost(editingPost.id, input);
+        const updated = await apiService.updateWallPost(editingPost.id, input, options);
         setPosts((prev) =>
           prev.map((p) => (p.id === updated.id ? { ...updated, reply_count: p.reply_count } : p))
         );
@@ -301,7 +305,7 @@ const WallView: React.FC<WallViewProps> = ({
           message: '貼文已儲存',
         });
       } else {
-        const created = await apiService.createWallPost(input);
+        const created = await apiService.createWallPost(input, options);
         setPosts((prev) => [created, ...prev]);
         showNotification({
           type: 'success',
@@ -324,7 +328,9 @@ const WallView: React.FC<WallViewProps> = ({
         });
         return; // resolve so the composer closes without an error
       }
-      throw err; // real failure → composer surfaces it inline for a retry
+      // User-initiated cancel via the composer's progress ring — nothing went
+      // wrong, just let it propagate so the composer stays open with the draft.
+      throw err;
     }
   };
 

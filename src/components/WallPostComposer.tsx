@@ -1,9 +1,48 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Sparkles, Star, ImagePlus, Lock, Plus } from 'lucide-react';
-import { apiService, type WallPost, type WallPostCategory } from '../services/api';
+import { apiService, type UploadProgressOptions, type WallPost, type WallPostCategory } from '../services/api';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { isVideoUrl, IMAGE_MAX_BYTES, VIDEO_MAX_BYTES, mediaLimitMb } from '../utils/script';
+
+// A YouTube/Google-Photos-style circular upload indicator: the ring fills as
+// bytes go out, and — since large photos/videos can take a while — doubles as
+// the cancel button so the user is never just staring at a stuck "送出中…"
+// with no way to tell whether it's still going or how to stop it.
+const UploadProgressRing: React.FC<{ percent: number; onCancel: () => void }> = ({ percent, onCancel }) => {
+  const radius = 18;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.min(100, Math.max(0, percent));
+  const offset = circumference * (1 - clamped / 100);
+  return (
+    <button
+      type="button"
+      onClick={onCancel}
+      aria-label={`取消上傳（已完成 ${clamped}%）`}
+      data-testid="wall-composer-upload-cancel"
+      className="relative w-11 h-11 min-w-[44px] min-h-[44px] flex-shrink-0 inline-flex items-center justify-center rounded-full group"
+    >
+      <svg className="w-11 h-11 -rotate-90" viewBox="0 0 44 44">
+        <circle cx="22" cy="22" r={radius} fill="none" stroke="currentColor" strokeWidth="3" className="text-petal-rule" />
+        <circle
+          cx="22"
+          cy="22"
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          className="text-petal-rose-deep transition-[stroke-dashoffset] duration-200 ease-linear"
+        />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center">
+        <X className="w-4 h-4 text-petal-ink-soft group-hover:text-petal-rose-deep transition-colors" strokeWidth={2} />
+      </span>
+    </button>
+  );
+};
 
 export interface WallExample {
   id: string;
@@ -16,15 +55,20 @@ export interface WallExample {
 interface WallPostComposerProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (input: {
-    content: string;
-    mood_tag: string | null;
-    category: WallPostCategory;
-    media: File[];
-    is_private: boolean;
-    // Present in edit mode: URLs of existing media the user chose to keep.
-    existingMedia?: string[];
-  }) => Promise<void>;
+  onSubmit: (
+    input: {
+      content: string;
+      mood_tag: string | null;
+      category: WallPostCategory;
+      media: File[];
+      is_private: boolean;
+      // Present in edit mode: URLs of existing media the user chose to keep.
+      existingMedia?: string[];
+    },
+    // Only meaningful when `media` is non-empty — lets the composer drive its
+    // upload progress ring and cancel button.
+    options?: UploadProgressOptions
+  ) => Promise<void>;
   moodTags: readonly string[];
   examples: WallExample[];
   editingPost?: WallPost | null;
@@ -83,6 +127,11 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
   const [customTags, setCustomTags] = useState<string[]>([]);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customInput, setCustomInput] = useState('');
+  // null = not uploading; 0-100 while a media submit is in flight, driving the
+  // progress ring. Only set when there's actually new media to send — a
+  // text-only save is fast enough that a ring would just be noise.
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const markTemplatesSeen = (seen: boolean) => rememberTemplatesSeen(templatesSeenKey, seen);
 
@@ -149,23 +198,40 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
       return;
     }
     setError(null);
+    const hasNewMedia = newMedia.length > 0;
+    const controller = hasNewMedia ? new AbortController() : null;
+    abortControllerRef.current = controller;
+    if (hasNewMedia) setUploadProgress(0);
     try {
-      await onSubmit({
-        content: content.trim(),
-        mood_tag: moodTag,
-        category,
-        media: newMedia,
-        is_private: isPrivate,
-        // In edit mode always send the kept list so removals are applied.
-        ...(editingPost ? { existingMedia } : {}),
-      });
+      await onSubmit(
+        {
+          content: content.trim(),
+          mood_tag: moodTag,
+          category,
+          media: newMedia,
+          is_private: isPrivate,
+          // In edit mode always send the kept list so removals are applied.
+          ...(editingPost ? { existingMedia } : {}),
+        },
+        hasNewMedia ? { signal: controller!.signal, onUploadProgress: setUploadProgress } : undefined
+      );
       // They've written one — no need to pitch the templates panel again.
       markTemplatesSeen(true);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '發布失敗，請稍後再試');
+      const code = (err as { error_code?: string })?.error_code;
+      // A deliberate cancel via the progress ring — not a failure, so no red
+      // error text. Draft + media stay in place so they can just hit 送出 again.
+      if (code !== 'CANCELED') {
+        setError(err instanceof Error ? err.message : '發布失敗，請稍後再試');
+      }
+    } finally {
+      abortControllerRef.current = null;
+      setUploadProgress(null);
     }
   });
+
+  const cancelUpload = () => abortControllerRef.current?.abort();
 
   if (!isOpen) return null;
 
@@ -259,8 +325,10 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
       className="fixed inset-0 z-[60] flex items-center justify-center bg-petal-ink/40 backdrop-blur-sm px-4 py-8"
       // Only a tap on the backdrop itself closes; taps inside the panel bubble
       // up here too, and losing a half-written post to a stray tap is the worst
-      // outcome in this modal.
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      // outcome in this modal. While an upload is in flight, closing this way
+      // would orphan the request with no way back to it — route the user to
+      // the explicit cancel button (the progress ring) instead.
+      onClick={(e) => { if (e.target === e.currentTarget && !submitting) onClose(); }}
       data-testid="wall-composer-backdrop"
     >
       <div
@@ -272,7 +340,8 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
           </h2>
           <button
             onClick={onClose}
-            className="p-2.5 min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-md hover:bg-petal-cream-2 transition-colors"
+            disabled={submitting}
+            className="p-2.5 min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-md hover:bg-petal-cream-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             aria-label="關閉"
           >
             <X className="w-5 h-5 text-petal-ink-soft" strokeWidth={1.5} />
@@ -588,21 +657,36 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
         </div>
 
         <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-petal-rule">
-          <button
-            onClick={onClose}
-            disabled={submitting}
-            className="px-4 py-2 rounded-md font-display italic text-sm text-petal-ink-soft hover:text-petal-ink transition-colors disabled:opacity-50"
-          >
-            取消
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={submitting || (!content.trim() && mediaCount === 0)}
-            className="bg-petal-ink text-petal-cream px-5 py-2 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            data-testid="wall-composer-submit"
-          >
-            {submitting ? '送出中…' : editingPost ? '儲存' : '發布'}
-          </button>
+          {uploadProgress !== null ? (
+            // Large photo/video uploads can take a while — show live percent
+            // progress instead of a stuck-looking disabled button, and let the
+            // ring double as an explicit cancel so the user always has a way out.
+            <div className="flex items-center gap-3" data-testid="wall-composer-upload-progress">
+              <UploadProgressRing percent={uploadProgress} onCancel={cancelUpload} />
+              <span className="font-body text-sm text-petal-ink-soft">
+                上傳中… {uploadProgress}%
+                <span className="block text-[11px] text-petal-muted">點擊圈圈可取消</span>
+              </span>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={onClose}
+                disabled={submitting}
+                className="px-4 py-2 rounded-md font-display italic text-sm text-petal-ink-soft hover:text-petal-ink transition-colors disabled:opacity-50"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSubmit}
+                disabled={submitting || (!content.trim() && mediaCount === 0)}
+                className="bg-petal-ink text-petal-cream px-5 py-2 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="wall-composer-submit"
+              >
+                {submitting ? '送出中…' : editingPost ? '儲存' : '發布'}
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
