@@ -931,6 +931,14 @@ export interface UpdateWallPostInput {
   is_private?: boolean;
 }
 
+// Lets a caller watch bytes-sent progress on a multipart upload and cancel it
+// mid-flight (e.g. the wall composer's upload progress ring + 取消上傳 button).
+// Both are no-ops for the plain-JSON path (no files to track or worth aborting).
+export interface UploadProgressOptions {
+  onUploadProgress?: (percent: number) => void;
+  signal?: AbortSignal;
+}
+
 // Marketplace — public custom-script discovery + community rating
 export type ScriptCategory = 'romantic' | 'adventurous' | 'school' | 'bold';
 export type ScriptReportReason = 'inappropriate' | 'spam' | 'copyright' | 'other';
@@ -1136,6 +1144,15 @@ apiClient.interceptors.response.use(
   (error) => {
     setLastRequestId(error.response?.headers?.['x-request-id']);
     console.error('API Error:', error);
+
+    // The user hit "取消上傳" (AbortController.abort()) — not a failure, just
+    // an intentional stop. Give it its own error_code so callers can treat it
+    // as silent/expected instead of surfacing a red "上傳失敗" toast.
+    if (axios.isCancel(error) || error.code === 'ERR_CANCELED') {
+      const canceledError = new Error('已取消上傳') as Error & { error_code?: string };
+      canceledError.error_code = 'CANCELED';
+      throw canceledError;
+    }
 
     if (error.response) {
       // Server responded with error status
@@ -3435,7 +3452,7 @@ class ApiService {
     };
   }
 
-  async createWallPost(input: CreateWallPostInput): Promise<WallPost> {
+  async createWallPost(input: CreateWallPostInput, options?: UploadProgressOptions): Promise<WallPost> {
     try {
       // Multipart path when photos/videos are attached; mirrors createCustomScript.
       if (input.media && input.media.length > 0) {
@@ -3448,21 +3465,31 @@ class ApiService {
         const response = await apiClient.post('/wall', fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
           timeout: uploadTimeoutFor(input.media),
+          signal: options?.signal,
+          onUploadProgress: options?.onUploadProgress
+            ? (evt) => options.onUploadProgress!(evt.total ? Math.round((evt.loaded / evt.total) * 100) : 0)
+            : undefined,
         });
         return response.data.wall_post as WallPost;
       }
       // No files → plain JSON.
       const { media: _media, ...body } = input;
       void _media;
-      const response = await apiClient.post('/wall', body);
+      const response = await apiClient.post('/wall', body, { signal: options?.signal });
       return response.data.wall_post as WallPost;
     } catch (error) {
-      console.error('Failed to create wall post:', error);
+      if ((error as { error_code?: string })?.error_code !== 'CANCELED') {
+        console.error('Failed to create wall post:', error);
+      }
       throw error;
     }
   }
 
-  async updateWallPost(id: string, updates: UpdateWallPostInput): Promise<WallPost> {
+  async updateWallPost(
+    id: string,
+    updates: UpdateWallPostInput,
+    options?: UploadProgressOptions
+  ): Promise<WallPost> {
     try {
       const mediaChanged =
         (updates.media && updates.media.length > 0) || updates.existingMedia !== undefined;
@@ -3480,6 +3507,10 @@ class ApiService {
         const response = await apiClient.put(`/wall/${id}`, fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
           timeout: uploadTimeoutFor(updates.media ?? []),
+          signal: options?.signal,
+          onUploadProgress: options?.onUploadProgress
+            ? (evt) => options.onUploadProgress!(evt.total ? Math.round((evt.loaded / evt.total) * 100) : 0)
+            : undefined,
         });
         return response.data.wall_post as WallPost;
       }
@@ -3487,10 +3518,12 @@ class ApiService {
       const { media: _media, existingMedia: _existingMedia, ...body } = updates;
       void _media;
       void _existingMedia;
-      const response = await apiClient.put(`/wall/${id}`, body);
+      const response = await apiClient.put(`/wall/${id}`, body, { signal: options?.signal });
       return response.data.wall_post as WallPost;
     } catch (error) {
-      console.error('Failed to update wall post:', error);
+      if ((error as { error_code?: string })?.error_code !== 'CANCELED') {
+        console.error('Failed to update wall post:', error);
+      }
       throw error;
     }
   }
