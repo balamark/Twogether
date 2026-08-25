@@ -201,7 +201,7 @@ async function seedEvent(page: Page, initial: ReturnType<typeof makeEvent>) {
 async function openEventDetail(page: Page) {
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
-  await page.getByTestId('nav-tab-communicate').click();
+  await page.getByTestId('nav-tab-talk').click();
   await page.locator('text=接送小孩的分工').first().click();
 }
 
@@ -315,7 +315,8 @@ async function seedWallPost(page: Page, isPrivate: boolean) {
 async function openWall(page: Page) {
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
-  const nav = page.locator('button:has-text("我們的牆")').first();
+  await page.getByTestId('nav-tab-us').click();
+  const nav = page.getByTestId('us-wall-entry');
   await nav.waitFor({ state: 'visible', timeout: 15000 });
   await nav.click();
   await expect(page.getByTestId(`wall-privacy-toggle-${POST_ID}`)).toBeVisible({ timeout: 10000 });
@@ -413,7 +414,7 @@ test.describe('Deleting a logged period', () => {
 
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.getByTestId('nav-tab-record').click();
+    await page.getByTestId('nav-tab-us').click();
 
     // Today is inside the seeded period, so today's heatmap cell opens the
     // period-management modal.

@@ -152,7 +152,8 @@ test.describe('Wall thread — 情緒翻譯 lens', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    const wallNav = page.locator('button:has-text("我們的牆")').first();
+    await page.getByTestId('nav-tab-us').click();
+    const wallNav = page.getByTestId('us-wall-entry');
     await wallNav.waitFor({ state: 'visible', timeout: 15000 });
     await wallNav.click();
 
@@ -194,7 +195,8 @@ test.describe('Wall thread — 情緒翻譯 lens', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    const wallNav = page.locator('button:has-text("我們的牆")').first();
+    await page.getByTestId('nav-tab-us').click();
+    const wallNav = page.getByTestId('us-wall-entry');
     await wallNav.waitFor({ state: 'visible', timeout: 15000 });
     await wallNav.click();
 
@@ -227,7 +229,8 @@ test.describe('Wall thread — 情緒翻譯 lens', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    const wallNav = page.locator('button:has-text("我們的牆")').first();
+    await page.getByTestId('nav-tab-us').click();
+    const wallNav = page.getByTestId('us-wall-entry');
     await wallNav.waitFor({ state: 'visible', timeout: 15000 });
     await wallNav.click();
 

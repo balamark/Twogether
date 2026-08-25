@@ -112,7 +112,8 @@ async function setup(page: Page, opts: { isPrivate?: boolean } = {}) {
 async function openWall(page: Page) {
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
-  const wallNav = page.locator('button:has-text("我們的牆")').first();
+  await page.getByTestId('nav-tab-us').click();
+  const wallNav = page.getByTestId('us-wall-entry');
   await wallNav.waitFor({ state: 'visible', timeout: 15000 });
   await wallNav.click();
   await expect(page.locator('[aria-label="編輯"]').first()).toBeVisible({ timeout: 10000 });

@@ -170,7 +170,7 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
 
     // Navigate to events view directly via the deep-link state by tapping
     // through the nav. The nav item id is 'events'. Use a generic locator.
-    const eventsNav = page.getByTestId('nav-tab-communicate');
+    const eventsNav = page.getByTestId('nav-tab-talk');
     await eventsNav.waitFor({ state: 'visible', timeout: 15000 });
     await eventsNav.click();
 
@@ -221,7 +221,7 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    const eventsNav = page.getByTestId('nav-tab-communicate');
+    const eventsNav = page.getByTestId('nav-tab-talk');
     await eventsNav.waitFor({ state: 'visible', timeout: 15000 });
     await eventsNav.click();
 
@@ -302,7 +302,7 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
 
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.getByTestId('nav-tab-communicate').click();
+    await page.getByTestId('nav-tab-talk').click();
     await page.locator('text=今晚的家事').first().click();
 
     // Invite the AI counselor → preview modal appears.

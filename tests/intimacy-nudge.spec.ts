@@ -65,14 +65,17 @@ async function loginUI(page: Page, user: typeof USER_A) {
   await page.waitForLoadState('domcontentloaded');
 
   const loginButton = page.getByTestId('header-auth-button');
-  const recordButton = page.getByTestId('add-record-button');
+  // 今天 (home) is the default landing view now, not 我們/record — probe with
+  // user-menu-toggle (present on every authenticated view) instead of a
+  // testid that only exists after navigating to 我們.
+  const userMenu = page.getByTestId('user-menu-toggle');
 
   await Promise.race([
     loginButton.waitFor({ state: 'visible', timeout: 20000 }),
-    recordButton.waitFor({ state: 'visible', timeout: 20000 }),
+    userMenu.waitFor({ state: 'visible', timeout: 20000 }),
   ]).catch(() => {});
 
-  if (await recordButton.isVisible({ timeout: 1500 }).catch(() => false)) return;
+  if (await userMenu.isVisible({ timeout: 1500 }).catch(() => false)) return;
   if (!(await loginButton.isVisible({ timeout: 3000 }).catch(() => false))) return;
 
   await loginButton.click();
@@ -83,13 +86,13 @@ async function loginUI(page: Page, user: typeof USER_A) {
 
   await Promise.race([
     page.waitForResponse((r) => r.url().includes('/auth/login'), { timeout: 15000 }),
-    recordButton.waitFor({ timeout: 15000 }),
+    userMenu.waitFor({ timeout: 15000 }),
   ]).catch(() => {});
 
   if (await page.getByTestId('auth-modal-heading').isVisible({ timeout: 1000 }).catch(() => false)) {
     await page.keyboard.press('Escape');
   }
-  await recordButton.waitFor({ state: 'visible', timeout: 20000 });
+  await userMenu.waitFor({ state: 'visible', timeout: 20000 });
 }
 
 test.describe('AI 溫柔提醒 nudge flow', () => {
@@ -102,8 +105,10 @@ test.describe('AI 溫柔提醒 nudge flow', () => {
     page.on('dialog', (dialog) => dialog.accept());
 
     await loginUI(page, USER_A);
+    // The stats card (and its nudge button) lives on 我們, not the default 今天.
+    await page.getByTestId('nav-tab-us').click();
 
-    // The stats card lives on the home/record view; scroll it into view.
+    // The stats card lives on the 我們 view; scroll it into view.
     const openBtn = page.getByTestId('intimacy-nudge-open');
     await openBtn.scrollIntoViewIfNeeded().catch(() => {});
     await expect(openBtn).toBeVisible({ timeout: 15000 });

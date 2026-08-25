@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, MapPin, Play, Clock, Trash2 } from 'lucide-react';
+import { Camera, MapPin, Play, Clock, Trash2, LayoutGrid, ListTree } from 'lucide-react';
 import CalendarDatePicker from './CalendarDatePicker';
 import InfoHint from './InfoHint';
-import { AchievementsView, IntimacyStatsCards, CalendarHeatmap } from './AchievementsView';
-import RelationshipDashboard from './RelationshipDashboard';
+import { IntimacyStatsCards, CalendarHeatmap } from './AchievementsView';
 import { periodDateSet, fertileDateSet, predictedPeriodDateSet, addDays } from '../utils/cycle';
 import { formatYmdInTz } from '../utils/datetime';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -119,6 +118,11 @@ interface CalendarViewProps {
   daysTogether: number;
   primaryTimezone: string;
   onNudgePartner?: () => void;
+  /** Consume-once flag: opens the add-record modal once, then clears itself.
+   * Lets 今天's "加一筆記錄" CTA open this modal after switching to 我們, since
+   * the modal only exists inside this mounted component. */
+  autoOpenAddRecord?: boolean;
+  onAutoOpenAddRecordConsumed?: () => void;
 }
 
 // Calendar / record-keeping view. Defined at module scope (not inside App) so
@@ -155,8 +159,11 @@ const CalendarView = ({
   daysTogether,
   primaryTimezone,
   onNudgePartner,
+  autoOpenAddRecord,
+  onAutoOpenAddRecordConsumed,
 }: CalendarViewProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [viewMode, setViewMode] = useState<'calendar' | 'timeline'>('calendar');
 
   const getCurrentTime = () => {
     const now = new Date();
@@ -220,6 +227,16 @@ const CalendarView = ({
       });
     }
   }, [editingRecord, showRecordModal]);
+
+  // Same consume-once pattern as EventsView's initialSubView: 今天's "加一筆記錄"
+  // CTA sets this after switching to 我們, so it only fires once per request.
+  useEffect(() => {
+    if (autoOpenAddRecord) {
+      openAddModalForDate(todayYmd());
+      onAutoOpenAddRecordConsumed?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpenAddRecord]);
 
   const recordsByDate = React.useMemo(() => {
     const map = new Map<string, IntimateRecord[]>();
@@ -414,12 +431,6 @@ const CalendarView = ({
 
   return (
     <div className="space-y-10">
-      <RelationshipDashboard
-        partnerConnected={authState.partnerConnected}
-        showNotification={showNotification}
-        onNudgePartner={onNudgePartner}
-        onGoToWall={() => setCurrentView('wall')}
-      />
       <div className="border-b border-petal-rule pb-7">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
           <div>
@@ -451,8 +462,39 @@ const CalendarView = ({
         </div>
       </div>
 
+      {/* Calendar/Timeline toggle — 一起走過的每一天 can be browsed as a month
+          heatmap or as a chronological list; the record list below already IS a
+          timeline, this just adds a way to jump between the two. */}
+      <div className="inline-flex rounded-full border border-petal-rule overflow-hidden self-start" role="tablist" aria-label="檢視方式">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={viewMode === 'calendar'}
+          data-testid="us-view-toggle-calendar"
+          onClick={() => setViewMode('calendar')}
+          className={`inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium transition-colors ${
+            viewMode === 'calendar' ? 'bg-petal-ink text-petal-cream' : 'bg-transparent text-petal-ink-soft hover:text-petal-ink'
+          }`}
+        >
+          <LayoutGrid className="w-3.5 h-3.5" strokeWidth={1.5} /> Calendar
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={viewMode === 'timeline'}
+          data-testid="us-view-toggle-timeline"
+          onClick={() => setViewMode('timeline')}
+          className={`inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium border-l border-petal-rule transition-colors ${
+            viewMode === 'timeline' ? 'bg-petal-ink text-petal-cream' : 'bg-transparent text-petal-ink-soft hover:text-petal-ink'
+          }`}
+        >
+          <ListTree className="w-3.5 h-3.5" strokeWidth={1.5} /> Timeline
+        </button>
+      </div>
+
       {/* Calendar — the primary way to add & review records. Promoted to the top
           so the first thing after login is your shared rhythm + a one-tap add. */}
+      {viewMode === 'calendar' && (
       <div>
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5">
           <div>
@@ -508,6 +550,7 @@ const CalendarView = ({
           />
         </div>
       </div>
+      )}
 
       {/* Intimacy Stats — 4 cards */}
       <IntimacyStatsCards
@@ -835,7 +878,8 @@ const CalendarView = ({
       )}
 
 
-      {/* Record List */}
+      {/* Record List — the Timeline view: it's already reverse-chronological. */}
+      {viewMode === 'timeline' && (
       <div>
         <div className="flex items-baseline justify-between mb-6">
           <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink">
@@ -958,10 +1002,7 @@ const CalendarView = ({
           })()}
         </div>
       </div>
-
-      <div className="border-t border-petal-rule pt-10">
-        <AchievementsView />
-      </div>
+      )}
     </div>
   );
 };

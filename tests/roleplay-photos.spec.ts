@@ -17,7 +17,7 @@ async function loginIfNeeded(page: Page) {
   await page.waitForLoadState('domcontentloaded');
 
   const loginButton = page.getByTestId('header-auth-button');
-  const recordButton = page.getByTestId('add-record-button');
+  const recordButton = page.getByTestId('user-menu-toggle');
   await Promise.race([
     loginButton.waitFor({ state: 'visible', timeout: 20000 }),
     recordButton.waitFor({ state: 'visible', timeout: 20000 }),
@@ -45,7 +45,8 @@ test.describe('Roleplay custom script — multi-photo upload + lightbox nav', ()
     test.slow(); // create + 2 uploads + view, under parallel load
 
     await loginIfNeeded(page);
-    const roleplayTab = page.getByTestId('nav-tab-roleplay');
+    await page.getByTestId('nav-tab-talk').click();
+    const roleplayTab = page.getByTestId('talk-roleplay-entry');
     await expect(roleplayTab).toBeVisible({ timeout: 8000 });
     await roleplayTab.click();
     await page.waitForTimeout(1500);

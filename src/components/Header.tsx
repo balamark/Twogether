@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown, MessageSquarePlus, Activity, LifeBuoy, Compass } from 'lucide-react';
+import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown, MessageSquarePlus, Activity, LifeBuoy, Compass, BookOpen } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { BillingStatus } from '../services/api';
 
@@ -29,6 +29,7 @@ interface HeaderProps {
   onShowSettings: () => void;
   onShowActivity: () => void;
   onShowJourney: () => void;
+  onShowStories: () => void;
   onShowIntimacyHistory: () => void;
   onShowUpgrade: () => void;
   onShowFeedback: () => void;
@@ -60,6 +61,7 @@ const Header: React.FC<HeaderProps> = ({
   onShowSettings,
   onShowActivity,
   onShowJourney,
+  onShowStories,
   onShowIntimacyHistory,
   onShowUpgrade,
   onShowFeedback,
@@ -220,6 +222,17 @@ const Header: React.FC<HeaderProps> = ({
                       >
                         <Trophy className="w-3.5 h-3.5" strokeWidth={1.5} />
                         <span>愛情旅程</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          onShowStories();
+                          setShowUserMenu(false);
+                        }}
+                        data-testid="user-menu-stories"
+                        className="w-full flex items-center space-x-2 px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
+                      >
+                        <BookOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
+                        <span>真實故事</span>
                       </button>
                       <button
                         onClick={() => {

@@ -126,7 +126,7 @@ const isPairedBody = (paired: boolean) =>
 const openRecords = async (page: import('@playwright/test').Page) => {
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
-  await page.getByTestId('nav-tab-record').click();
+  await page.getByTestId('nav-tab-us').click();
   await expect(page.getByTestId(`moment-reaction-love-${localId(THEIRS)}`)).toBeVisible({ timeout: 15000 });
 };
 
@@ -223,7 +223,7 @@ test.describe('親密記錄 — 快速回應', () => {
 
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.getByTestId('nav-tab-record').click();
+    await page.getByTestId('nav-tab-us').click();
 
     // Solo mode only ever shows the user's own records.
     await expect(page.getByText('記錄 aaaa')).toBeVisible({ timeout: 15000 });

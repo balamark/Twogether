@@ -13,7 +13,7 @@ test.describe('好好說話 — one feature, two sub-views', () => {
     await seedClosure(page, { event: { status: 'open' } });
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.getByTestId('nav-tab-communicate').click();
+    await page.getByTestId('nav-tab-talk').click();
   });
 
   test('each sub-view is titled after the chip you tapped, with no third pill row', async ({
