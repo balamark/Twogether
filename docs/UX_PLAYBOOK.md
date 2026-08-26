@@ -29,12 +29,32 @@ Twogether 是一個「情侶關係經營」App：記錄親密時光、用 AI 把
 
 ## §1 現況盤點（2026-07 快照）
 
-### 導覽結構（2026-07-08 後）
-登入後 6 個分頁（`src/App.tsx` `navItems`，已達 R3 上限）：
-記錄時光 / 好好說話（合併）/ 角色扮演 / 我們的牆 / 真實故事 / 心理諮商。
-「真實故事」= 公開社群面（智慧故事庫＋公開問答，未登入可瀏覽，仿 therapists 直接渲染真實視圖）；
-公開問答已從心理諮商分頁遷出。未登入導覽為 7 顆（+訪客限定 Premium），為既定例外。
-另有用戶選單（Header 右上）：金幣商店、最近動態、意見回饋、使用說明、設定、升級 Premium。
+### 導覽結構（2026-08-25 後）
+登入後 4 個分頁（`src/App.tsx` `navItems`）：
+**今天 `home` / 對話 `talk` / 我們 `us` / 成長 `grow`**。
+對應四個問題：現在怎麼了？／我們要談什麼？／我們一起經歷過什麼？／我們有沒有變好？
+
+- **今天**：`HomeView.tsx`。不是總覽，是「現在最需要知道什麼」——開始三步驟、
+  關係之屋（單一最急提醒）、Twogether 發現（靜態 teaser，**不自動呼叫**耗 AI 額度的
+  `getCommunicationPattern`）、近兩週真實數字、最近動態、成長入口。
+- **對話**：吸收原「好好說話」（子分頁 說開一件事 `events` / 接住情緒・檢查 `conflict`），
+  另加入口卡 角色扮演 `talk-roleplay-entry`、心理諮商 `talk-therapists-entry`。
+- **我們**：原「記錄時光」（`CalendarView`），新增 月曆／時間軸 切換
+  （`us-view-toggle-calendar` / `us-view-toggle-timeline`，預設月曆；**記錄清單與快速回應
+  只在時間軸**），另加入口卡 我們的牆 `us-wall-entry`、愛情旅程 `us-journey-entry`。
+- **成長**：`GrowView.tsx`。成就統計（`AchievementsView`）＋ 事件分析與溝通模式
+  （直接 import `EventAnalytics`，不經 `EventsView`）＋ 真實故事入口 `grow-stories-entry`。
+  真實故事單人可用，**入口卡放在配對 gate 之上**。
+
+角色扮演／心理諮商／真實故事不再是主分頁，改為上述入口卡（真實故事另在用戶選單
+`user-menu-stories`）。舊 view id（`record`/`communicate`/`events`/`conflict`/`roleplay`/
+`wall`/`stories`/`therapists`/`journey`/`achievements`…）全部保留有效，深連結與重新整理
+不受影響；nav 高亮把各自的子視圖算回所屬主分頁。預設落地頁由 `record` 改為 `home`。
+未登入導覽為 5 顆（+訪客限定 Premium），`LoggedOutPreview` 對 `home`/`grow` 有專屬範例，
+並用 `ExploreLinks` 保留未登入者前往 角色扮演／心理諮商／我們的牆／真實故事 的路徑
+（testid 與登入後的入口卡一致）。
+另有用戶選單（Header 右上）：金幣商店、最近動態、愛情旅程、真實故事、訊息紀錄、
+愛的語言、情緒深潛、意見回饋、使用說明、設定、升級 Premium。
 
 ### 既有的上手機制
 - 註冊後：AI 諮商師選擇 modal（`AiCompanionPicker.tsx`）→ 配對邀請 modal。
@@ -212,7 +232,14 @@ activity 記錄）時補上：開始引導點擊、快速回覆 chip 點擊、tr
   `selected_therapist`，否則 companion modal 不會如預期。**
   點擊目標一律用 `data-testid`（見 memory/feedback_playwright_locators）。
 - **真實流程**：註冊/配對類改動跑 `tests/user-journey.spec.ts`。
-- 導覽到合併分頁用 `getByTestId('nav-tab-communicate')`（舊的 `has-text("事件")` 已無效）。
+- 導覽一律用四個主分頁的 testid：`nav-tab-home` / `nav-tab-talk` / `nav-tab-us` /
+  `nav-tab-grow`（舊的 `nav-tab-communicate`/`-record`/`-roleplay`/`-stories`/
+  `-therapists` 與 `has-text("我們的牆")` 皆已無效）。巢狀功能要先點主分頁再點入口卡，
+  例如 `nav-tab-talk` → `talk-roleplay-entry`。
+- **預設落地頁是 `home`**：需要月曆／記錄的 spec 必須顯式點 `nav-tab-us`；需要記錄清單或
+  快速回應的還要再點 `us-view-toggle-timeline`。
+- 判斷「已登入」的 readiness probe 用 `user-menu-toggle`（各視圖都在），
+  不要用只存在於 我們 的 `add-record-button`。
 - 已知 flake：`roleplay-invitation.spec.ts` 的配對 fixture 偶發失敗，與 UI 改動無關。
 - **部署陷阱**：docs-only push 會跳過部署、卻仍會取消進行中的部署 run。連續 push
   間隔 <11 分鐘時，確認前一個 run 是 `success` 不是 `cancelled`；被取消就

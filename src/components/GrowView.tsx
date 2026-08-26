@@ -42,21 +42,29 @@ const GrowView: React.FC<GrowViewProps> = ({ authState, onInvitePartner, onNavig
     );
   }
 
+  // 真實故事 is explicitly solo-friendly (you can read and publish without a
+  // partner), so its entry card sits ABOVE the pairing gate — gating the only
+  // way into it would make a solo-usable feature unreachable from the nav.
+  const storiesCard = <StoriesTeaserCard onGoToStories={() => onNavigate('stories')} />;
+
   if (!authState.partnerConnected) {
     return (
-      <SoloModeGate
-        icon={TrendingUp}
-        title="配對後，看見你們的成長"
-        valueLine="配對之後，這裡會累積你們的統計、AI 觀察到的溝通模式，以及一起達成的里程碑。"
-        onInvite={onInvitePartner}
-        alternatives={[
-          {
-            label: '逛逛真實故事',
-            desc: '看看其他伴侶怎麼把關係經營得更好。',
-            onClick: () => onNavigate('stories'),
-          },
-        ]}
-      />
+      <>
+        <div className="max-w-2xl mx-auto px-4 md:px-6 pt-4">{storiesCard}</div>
+        <SoloModeGate
+          icon={TrendingUp}
+          title="配對後，看見你們的成長"
+          valueLine="配對之後，這裡會累積你們的統計、AI 觀察到的溝通模式，以及一起達成的里程碑。"
+          onInvite={onInvitePartner}
+          alternatives={[
+            {
+              label: '逛逛真實故事',
+              desc: '看看其他伴侶怎麼把關係經營得更好。',
+              onClick: () => onNavigate('stories'),
+            },
+          ]}
+        />
+      </>
     );
   }
 
@@ -75,7 +83,7 @@ const GrowView: React.FC<GrowViewProps> = ({ authState, onInvitePartner, onNavig
         </p>
       </header>
 
-      <StoriesTeaserCard onGoToStories={() => onNavigate('stories')} />
+      {storiesCard}
       <EventAnalytics />
       <AchievementsView />
     </div>

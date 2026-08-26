@@ -465,7 +465,7 @@ const CalendarView = ({
       {/* Calendar/Timeline toggle — 一起走過的每一天 can be browsed as a month
           heatmap or as a chronological list; the record list below already IS a
           timeline, this just adds a way to jump between the two. */}
-      <div className="inline-flex rounded-full border border-petal-rule overflow-hidden self-start" role="tablist" aria-label="檢視方式">
+      <div className="inline-flex rounded-full border border-petal-rule overflow-hidden" role="tablist" aria-label="檢視方式">
         <button
           type="button"
           role="tab"
@@ -476,7 +476,7 @@ const CalendarView = ({
             viewMode === 'calendar' ? 'bg-petal-ink text-petal-cream' : 'bg-transparent text-petal-ink-soft hover:text-petal-ink'
           }`}
         >
-          <LayoutGrid className="w-3.5 h-3.5" strokeWidth={1.5} /> Calendar
+          <LayoutGrid className="w-3.5 h-3.5" strokeWidth={1.5} /> 月曆
         </button>
         <button
           type="button"
@@ -488,7 +488,7 @@ const CalendarView = ({
             viewMode === 'timeline' ? 'bg-petal-ink text-petal-cream' : 'bg-transparent text-petal-ink-soft hover:text-petal-ink'
           }`}
         >
-          <ListTree className="w-3.5 h-3.5" strokeWidth={1.5} /> Timeline
+          <ListTree className="w-3.5 h-3.5" strokeWidth={1.5} /> 時間軸
         </button>
       </div>
 

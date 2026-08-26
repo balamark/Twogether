@@ -6,6 +6,7 @@ import InfoHint from './InfoHint';
 import { apiService, type RelationshipSummary, type ActivityItem } from '../services/api';
 import { formatDateTime } from '../utils/datetime';
 import { useTimezone } from '../contexts/TimezoneContext';
+import { trackAction } from '../utils/track';
 import type { AuthState, Notification } from '../App';
 
 interface HomeViewProps {
@@ -22,6 +23,17 @@ interface HomeViewProps {
   onGoToActivity: () => void;
 }
 
+// Time-of-day greeting on the viewer's own device clock (deliberately NOT the
+// couple's shared primary timezone — a greeting is personal, so someone reading
+// this at 11pm abroad should see 晚安). A hardcoded 早安 reads as broken at night.
+const greeting = (): string => {
+  const h = new Date().getHours();
+  if (h < 5) return '晚安';
+  if (h < 11) return '早安';
+  if (h < 18) return '午安';
+  return '晚安';
+};
+
 // "Twogether 發現" — a static, non-fetching teaser. The real AI pattern-detection
 // call (apiService.getCommunicationPattern) spends an AI credit on first
 // generation when nothing is cached yet, so Home must never call it just because
@@ -30,7 +42,7 @@ interface HomeViewProps {
 const PatternTeaserCard: React.FC<{ onGoToGrow: () => void }> = ({ onGoToGrow }) => (
   <button
     type="button"
-    onClick={onGoToGrow}
+    onClick={() => { trackAction('onboarding.home.pattern_teaser'); onGoToGrow(); }}
     data-testid="home-pattern-teaser"
     className="w-full flex items-center gap-3 bg-petal-cream border border-petal-rule rounded-2xl px-4 py-3.5 text-left hover:border-petal-ink transition-colors"
   >
@@ -50,7 +62,11 @@ const PatternTeaserCard: React.FC<{ onGoToGrow: () => void }> = ({ onGoToGrow })
 const WeeklyStatsStrip: React.FC = () => {
   const [summary, setSummary] = useState<RelationshipSummary | null>(null);
   useEffect(() => {
-    apiService.getRelationshipSummary().then(setSummary).catch(() => {});
+    let cancelled = false;
+    apiService.getRelationshipSummary()
+      .then((s) => { if (!cancelled) setSummary(s); })
+      .catch(() => {});
+    return () => { cancelled = true; };
   }, []);
 
   if (!summary?.paired) return null;
@@ -84,7 +100,11 @@ const ActivityTeaser: React.FC<{ onGoToActivity: () => void }> = ({ onGoToActivi
   const tz = useTimezone();
   const [items, setItems] = useState<ActivityItem[] | null>(null);
   useEffect(() => {
-    apiService.getActivityFeed().then((all) => setItems(all.slice(0, 3))).catch(() => setItems([]));
+    let cancelled = false;
+    apiService.getActivityFeed()
+      .then((all) => { if (!cancelled) setItems(all.slice(0, 3)); })
+      .catch(() => { if (!cancelled) setItems([]); });
+    return () => { cancelled = true; };
   }, []);
 
   if (!items || items.length === 0) return null;
@@ -97,7 +117,7 @@ const ActivityTeaser: React.FC<{ onGoToActivity: () => void }> = ({ onGoToActivi
         </span>
         <button
           type="button"
-          onClick={onGoToActivity}
+          onClick={() => { trackAction('onboarding.home.activity_all'); onGoToActivity(); }}
           className="font-body text-[11px] text-petal-muted hover:text-petal-ink underline underline-offset-2"
         >
           查看全部
@@ -122,7 +142,7 @@ const ActivityTeaser: React.FC<{ onGoToActivity: () => void }> = ({ onGoToActivi
 const GrowthTeaserCard: React.FC<{ onGoToGrow: () => void }> = ({ onGoToGrow }) => (
   <button
     type="button"
-    onClick={onGoToGrow}
+    onClick={() => { trackAction('onboarding.home.grow_teaser'); onGoToGrow(); }}
     data-testid="home-grow-teaser"
     className="w-full flex items-center gap-3 bg-petal-sage/10 border border-petal-sage/40 rounded-2xl px-4 py-3.5 text-left hover:border-petal-sage-deep transition-colors"
   >
@@ -151,6 +171,11 @@ const HomeView: React.FC<HomeViewProps> = ({
   onGoToGrow,
   onGoToActivity,
 }) => {
+  // Greet the couple, not just the account holder — this is a shared space.
+  const me = authState.user?.nickname;
+  const them = authState.partnerConnected ? authState.user?.partnerNickname : null;
+  const names = me ? (them ? `${me} & ${them}` : me) : '';
+
   return (
     <div className="space-y-4" data-testid="home-view">
       <div className="border-b border-petal-rule pb-5 mb-1">
@@ -159,8 +184,9 @@ const HomeView: React.FC<HomeViewProps> = ({
         </div>
         <div className="flex items-center gap-2">
           <h2 className="font-display text-3xl md:text-4xl font-light tracking-tight text-petal-ink leading-[1.05]">
-            {authState.user?.nickname ? `早安，${authState.user.nickname}` : '早安'}
-            <em className="not-italic font-light italic text-pink-600">。</em>
+            {greeting()}
+            {names && <>，{names}</>}
+            <em className="not-italic font-light italic text-pink-600"> ❤️</em>
           </h2>
           <InfoHint viewId="home" />
         </div>
@@ -180,7 +206,10 @@ const HomeView: React.FC<HomeViewProps> = ({
         onNudgePartner={onNudgePartner}
         onGoToWall={onGoToWall}
       />
-      <PatternTeaserCard onGoToGrow={onGoToGrow} />
+      {/* Pattern detection reads across BOTH partners' events, so it has nothing
+          to offer a solo user — showing the teaser would promise an insight and
+          deliver a pairing gate. */}
+      {authState.partnerConnected && <PatternTeaserCard onGoToGrow={onGoToGrow} />}
       <WeeklyStatsStrip />
       <ActivityTeaser onGoToActivity={onGoToActivity} />
       <GrowthTeaserCard onGoToGrow={onGoToGrow} />

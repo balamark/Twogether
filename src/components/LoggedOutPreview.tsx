@@ -1097,18 +1097,21 @@ const PREVIEWS: Record<string, PreviewConfig> = {
 // visitor reach a dedicated real/bespoke preview that's no longer its own
 // bottom-nav tab (roleplay/therapists nest inside 對話, wall/journey inside
 // 我們, stories inside 成長).
+// The testids intentionally match the authenticated entry cards
+// (TalkEntryCards / UsEntryCards / GrowView), so "the way into 真實故事 from
+// 成長" is one addressable thing whether you're signed in or not.
 const ExploreLinks: React.FC<{ view: string; onNavigate?: (view: string) => void }> = ({ view, onNavigate }) => {
   if (!onNavigate) return null;
-  const links: { label: string; target: string }[] =
+  const links: { label: string; target: string; testId: string }[] =
     view === 'talk' || view === 'communicate' ? [
-      { label: '看看角色扮演', target: 'roleplay' },
-      { label: '看看心理諮商', target: 'therapists' },
+      { label: '看看角色扮演', target: 'roleplay', testId: 'talk-roleplay-entry' },
+      { label: '看看心理諮商', target: 'therapists', testId: 'talk-therapists-entry' },
     ] :
     view === 'us' || view === 'record' ? [
-      { label: '看看我們的牆', target: 'wall' },
+      { label: '看看我們的牆', target: 'wall', testId: 'us-wall-entry' },
     ] :
     view === 'grow' ? [
-      { label: '看看真實故事', target: 'stories' },
+      { label: '看看真實故事', target: 'stories', testId: 'grow-stories-entry' },
     ] : [];
   if (links.length === 0) return null;
   return (
@@ -1118,6 +1121,7 @@ const ExploreLinks: React.FC<{ view: string; onNavigate?: (view: string) => void
           key={l.target}
           type="button"
           onClick={() => onNavigate(l.target)}
+          data-testid={l.testId}
           className="font-body text-xs text-petal-muted hover:text-petal-ink underline underline-offset-2"
         >
           {l.label} →

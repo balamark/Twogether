@@ -2913,8 +2913,10 @@ const LoveTimeApp = () => {
             const isActive =
               currentView === item.id ||
               (item.id === 'talk' && ['communicate', 'conflict', 'events', 'roleplay', 'therapists'].includes(currentView)) ||
-              (item.id === 'us' && ['record', 'achievements', 'wall', 'journey'].includes(currentView)) ||
-              (item.id === 'grow' && currentView === 'stories');
+              (item.id === 'us' && ['record', 'wall', 'journey'].includes(currentView)) ||
+              // 'achievements' is a legacy deep-link id that now renders GrowView,
+              // so it must light up 成長 — not 我們.
+              (item.id === 'grow' && ['achievements', 'stories'].includes(currentView));
             return (
               <button
                 key={item.id}
