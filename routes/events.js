@@ -292,6 +292,9 @@ router.post(
   [
     body('title').isString().isLength({ min: 1, max: 120 }),
     body('summary').isString().isLength({ min: 1, max: 1000 }),
+    // 完整經過 for long drafts. Absent/empty for short ones; the cap is generous
+    // because the whole point is that it restates a 1000–2000 字 draft in full.
+    body('detail').optional({ nullable: true }).isString().isLength({ max: 20000 }),
     body('ai_neutral').isString().isLength({ min: 1 }),
     body('ai_firm').isString().isLength({ min: 1 }),
     body('ai_warm').isString().isLength({ min: 1 }),
@@ -331,17 +334,18 @@ router.post(
         tags = [],
         toxicity_flags = [],
         is_private = false,
+        detail = null,
       } = req.body;
 
       const eventId = uuidv4();
 
       const insertResult = await db.query(
         `INSERT INTO events (
-           id, couple_id, created_by, title, summary,
+           id, couple_id, created_by, title, summary, detail,
            emotions, tags, toxicity_flags,
            ai_neutral, ai_firm, ai_warm,
            selected_version, is_private, status
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,'open')
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'open')
          RETURNING *`,
         [
           eventId,
@@ -349,6 +353,7 @@ router.post(
           userId,
           title,
           summary,
+          typeof detail === 'string' && detail.trim() ? detail.trim() : null,
           emotions,
           tags,
           toxicity_flags,
@@ -1054,13 +1059,8 @@ router.patch(
       const userId = req.user.id;
       const access = await assertEventAccess(req.params.id, userId);
       if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
-      if (access.event.is_private) {
-        return res.status(403).json({
-          success: false,
-          message: '私人對話無法編輯訊息',
-          error_code: 'PRIVATE_EVENT',
-        });
-      }
+      // Private events are editable too — see the add-message route: solo notes
+      // stay fully usable before (or without) sharing them.
       if (access.event.status === 'resolved' || access.event.status === 'closing') {
         return res.status(400).json({
           success: false,
@@ -1131,25 +1131,28 @@ router.post(
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
       if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
-      if (access.event.is_private) {
-        return res.status(403).json({ success: false, message: '私人對話無法新增訊息' });
-      }
+      // A private event is the author's own notebook: they can keep adding to it
+      // solo (and talk it through with the AI) without having to expose it to
+      // the partner first. Only the notify below is partner-shaped, so it is
+      // what gets skipped — not the write.
       if (access.event.status === 'resolved') {
         return res.status(400).json({ success: false, message: '這段對話已完成，無法新增訊息' });
       }
 
       const message = await insertEventMessage(req.params.id, req.user.id, req.body.content);
 
-      await notify(
-        access.partnerId,
-        'event_reply',
-        '伴侶回覆了你們的對話',
-        access.event.title,
-        req.params.id,
-        req.user.id,
-        2,
-        req.body.content
-      );
+      if (!access.event.is_private) {
+        await notify(
+          access.partnerId,
+          'event_reply',
+          '伴侶回覆了你們的對話',
+          access.event.title,
+          req.params.id,
+          req.user.id,
+          2,
+          req.body.content
+        );
+      }
 
       res.status(201).json({ success: true, message });
     } catch (err) {
@@ -1172,9 +1175,8 @@ router.post(
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
       if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
-      if (access.event.is_private) {
-        return res.status(403).json({ success: false, message: '私人對話不支援 AI 回覆改寫' });
-      }
+      // Private events get the AI rewrite too — thinking a draft through with
+      // the AI is exactly what a solo note is for.
 
       const userId = req.user.id;
       const rawReply = req.body.rawReply;
@@ -1270,9 +1272,7 @@ router.post(
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
       if (!access) return res.status(404).json({ success: false, message: '找不到事件或沒有權限' });
-      if (access.event.is_private) {
-        return res.status(403).json({ success: false, message: '私人事件不支援情緒檢測', error_code: 'PRIVATE_EVENT' });
-      }
+      // Draft analysis looks at the writer's own text, so it works solo too.
 
       const userId = req.user.id;
       const draft = req.body.draft;
@@ -1421,9 +1421,8 @@ router.post('/:id/ai-comment/preview', [param('id').isUUID()], async (req, res) 
   try {
     const access = await assertEventAccess(req.params.id, req.user.id);
     if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
-    if (access.event.is_private) {
-      return res.status(403).json({ success: false, message: '私人對話無法邀請 AI 諮商師' });
-    }
+    // The AI companion is available in private events: the author may want to
+    // talk it through before deciding whether to share it with their partner.
 
     const userId = req.user.id;
 
@@ -1505,9 +1504,6 @@ router.post(
     try {
       const access = await assertEventAccess(req.params.id, req.user.id);
       if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
-      if (access.event.is_private) {
-        return res.status(403).json({ success: false, message: '私人對話無法新增訊息' });
-      }
       if (access.event.status === 'resolved') {
         return res.status(400).json({ success: false, message: '這段對話已完成，無法新增訊息' });
       }
@@ -1522,17 +1518,20 @@ router.post(
 
       logInfo('events.ai_comment.posted', { userId: req.user.id, eventId: req.params.id, messageId: msgResult.rows[0].id, companion: companion.id });
 
-      await notify(
-        access.partnerId,
-        'event_ai_comment',
-        `AI 諮商師 ${companion.name} 在對話中留言`,
-        access.event.title,
-        req.params.id,
-        req.user.id,
-        2,
-        req.body.content,
-        companion.name
-      );
+      // Nothing to notify in a private event — the partner cannot see it yet.
+      if (!access.event.is_private) {
+        await notify(
+          access.partnerId,
+          'event_ai_comment',
+          `AI 諮商師 ${companion.name} 在對話中留言`,
+          access.event.title,
+          req.params.id,
+          req.user.id,
+          2,
+          req.body.content,
+          companion.name
+        );
+      }
 
       res.status(201).json({ success: true, message: serializeMessage(msgResult.rows[0]) });
     } catch (err) {

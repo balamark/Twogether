@@ -627,6 +627,35 @@ const ThreeSeatSample: React.FC = () => (
   </SampleCard>
 );
 
+// 長文不會被縮成一小段：短摘要給對方一眼看懂，「完整經過」保留原文所有內容。
+// 順帶說明私人對話一個人也能繼續寫、找 AI 討論。
+const LongDraftSample: React.FC = () => (
+  <SampleCard>
+    <div className="flex items-center justify-between mb-2">
+      <span className="font-body text-xs text-petal-muted">寫了很長也不會被縮掉</span>
+      <SampleTag />
+    </div>
+    <div className="rounded-md border border-petal-rule bg-white px-3 py-2">
+      <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-0.5">
+        事件紀錄（雙方都看得到的中性摘要）
+      </div>
+      <p className="font-body text-sm text-petal-ink">晚餐時，兩人就育兒的分工談到後來沒有結論。</p>
+    </div>
+    <div className="mt-2 rounded-md border border-petal-rule bg-petal-cream-2 px-3 py-2">
+      <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep mb-0.5">
+        完整經過 ▾（原文全部保留，只拿掉攻擊性字眼）
+      </div>
+      <p className="font-body text-sm text-petal-ink leading-relaxed">
+        我想把這件事完整說清楚。第一件事是上週三的接送⋯⋯另外，昨天的午睡時間⋯⋯還有我一直沒說出口的是⋯⋯
+      </p>
+    </div>
+    <div className="mt-2 flex items-start gap-1.5 font-body text-[11px] text-petal-muted">
+      <Lock className="w-3 h-3 mt-0.5 shrink-0" strokeWidth={1.5} />
+      <span>也可以先存成只有你看得到的私人對話，一個人慢慢補充、先找 AI 討論，想清楚再決定要不要讓另一半看到。</span>
+    </div>
+  </SampleCard>
+);
+
 const ConflictFlywheelSample: React.FC = () => (
   <div className="space-y-4">
     <SafetyBannerSample />
@@ -638,6 +667,8 @@ const ConflictFlywheelSample: React.FC = () => (
     <TherapistModeSample />
 
     <EmotionAcceptanceSample />
+
+    <LongDraftSample />
 
     <TherapyNoteSample />
 

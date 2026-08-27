@@ -19,6 +19,9 @@ import {
   Gauge,
   PlayCircle,
   Compass,
+  FileText,
+  ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 import apiService, {
   type EventRecord,
@@ -162,6 +165,9 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const [sharingPartner, setSharingPartner] = useState(false);
   // Post-send editing: creator edits title/summary; each side edits own messages.
   const [editingHeader, setEditingHeader] = useState(false);
+  // 完整經過 starts collapsed so the header stays scannable; long drafts are the
+  // only ones that have one.
+  const [detailOpen, setDetailOpen] = useState(false);
   const [headerTitle, setHeaderTitle] = useState('');
   const [headerSummary, setHeaderSummary] = useState('');
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -817,8 +823,11 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   // Once we're in 一起收尾, hide the entire reply composer + AI-invite row so
   // the closure ceremony has the screen to itself. Users who need to say one
   // more thing tap 取消收尾 to reopen the discussion first.
-  const canSendMessage = !event.isPrivate && event.status !== 'resolved' && event.status !== 'closing';
-  const canFacilitate = canSendMessage;
+  // Private events stay writable: the author can keep adding to their own note
+  // and talk it through with the AI without having to share it first. Only the
+  // genuinely two-person flows (引導模式, 收尾, 情緒翻譯) stay partner-only.
+  const canSendMessage = event.status !== 'resolved' && event.status !== 'closing';
+  const canFacilitate = !event.isPrivate && canSendMessage;
 
   // 引導專注層需要的資料：最新一則引導回合，以及現在輪到誰。turnOwner 為 null 表示
   // 這一步是給兩個人的，所以也算輪到我。
@@ -907,6 +916,41 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           </div>
         ) : (
           <p className="text-sm text-petal-ink-soft leading-relaxed mb-3 whitespace-pre-wrap">{event.summary}</p>
+        )}
+
+        {/* 完整經過 — only long drafts have one. The summary above is the neutral
+            3-sentence record; this keeps everything the writer actually said, so
+            the specifics they want to discuss don't vanish into the summary.
+            Collapsed by default so the header stays scannable. */}
+        {event.detail && !editingHeader && (
+          <div className="mb-3 border border-petal-rule rounded-xl overflow-hidden" data-testid="event-detail-panel">
+            <button
+              type="button"
+              onClick={() => setDetailOpen((v) => !v)}
+              data-testid="event-detail-toggle"
+              aria-expanded={detailOpen}
+              className="w-full flex items-center gap-2 px-3 py-2 bg-petal-cream-2 text-left hover:bg-petal-cream transition-colors"
+            >
+              <FileText className="w-3.5 h-3.5 text-petal-rose-deep shrink-0" strokeWidth={1.5} />
+              <span className="font-body text-xs font-medium text-petal-ink flex-1">完整經過</span>
+              <span className="font-body text-[11px] text-petal-muted">
+                {detailOpen ? '收合' : '展開'}
+              </span>
+              {detailOpen
+                ? <ChevronUp className="w-3.5 h-3.5 text-petal-muted shrink-0" strokeWidth={1.5} />
+                : <ChevronDown className="w-3.5 h-3.5 text-petal-muted shrink-0" strokeWidth={1.5} />}
+            </button>
+            {detailOpen && (
+              <div className="px-3 py-3 bg-white">
+                <p className="text-sm text-petal-ink-soft leading-relaxed whitespace-pre-wrap">
+                  {event.detail}
+                </p>
+                <p className="mt-2 font-body text-[11px] text-petal-muted">
+                  上面的紀錄是中性摘要；這段保留了原文完整的內容，只拿掉了攻擊性的字眼。
+                </p>
+              </div>
+            )}
+          </div>
         )}
 
         <div className="flex flex-wrap gap-1.5">
@@ -1306,7 +1350,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
 
       {/* 引導進行中：對話這邊只留一顆入口，練習本身在專注層裡。進度、輪到誰、
           快速回應都跟著搬過去，免得對話區被練習的零件塞滿。 */}
-      {canSendMessage && facilitation && facilitation.status === 'active' && (
+      {canFacilitate && facilitation && facilitation.status === 'active' && (
         <button
           type="button"
           onClick={() => setGuideOpen(true)}
@@ -1388,17 +1432,21 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gauge className="w-4 h-4" />}
               <span>情緒檢測</span>
             </button>
-            <button
-              type="button"
-              data-testid="event-acceptance-button"
-              onClick={requestAcceptance}
-              disabled={accepting}
-              className="px-3 py-2 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
-              title="先別急著解決——讓 AI 教你怎麼接住TA的情緒"
-            >
-              {accepting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HandHeart className="w-4 h-4" />}
-              <span>如何接住TA的情緒</span>
-            </button>
+            {/* 接住TA的情緒 reads the partner's last message, so it has nothing
+                to work with in a solo note — hide it rather than let it 403. */}
+            {!event.isPrivate && (
+              <button
+                type="button"
+                data-testid="event-acceptance-button"
+                onClick={requestAcceptance}
+                disabled={accepting}
+                className="px-3 py-2 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
+                title="先別急著解決——讓 AI 教你怎麼接住TA的情緒"
+              >
+                {accepting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HandHeart className="w-4 h-4" />}
+                <span>如何接住TA的情緒</span>
+              </button>
+            )}
             <button
               type="button"
               data-testid="event-reply-rewrite-button"
