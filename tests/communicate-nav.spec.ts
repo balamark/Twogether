@@ -1,15 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { seedAuth, seedClosure, seedQuota, EVENT_TITLE } from './helpers/closure';
 
-// 對話 is a hub of cards, not a page with a sticky sub-tab row. The row could
-// only ever hold two destinations and it cost vertical space on every screen
-// below it; as cards, 說開一件事 and 情緒檢查 sit alongside 角色扮演, 我們的牆
-// and 專業諮商師 and cost nothing when you are not looking at them.
+// 對話 lands straight on 說開一件事 (its core). The other four destinations
+// live in a thin sticky switcher present on every 對話-family view, so you hop
+// between them without going back. It replaced a card-hub landing page, which
+// replaced a two-item sub-tab row.
 //
-// What this pins: every destination is reachable from the hub, each one owns
-// the whole screen once opened, and the 對話 tab is the way back.
+// What this pins: the direct landing, the five-chip switcher, jumping between
+// destinations, and that the switcher is still there on a destination page.
 
-test.describe('對話 — a hub of cards', () => {
+test.describe('對話 — a persistent switcher over 說開一件事', () => {
   test.beforeEach(async ({ page }) => {
     await seedAuth(page);
     await seedQuota(page, 1, 10);
@@ -19,10 +19,17 @@ test.describe('對話 — a hub of cards', () => {
     await page.getByTestId('nav-tab-talk').click();
   });
 
-  test('the hub lists every way into a conversation, and no sub-tab row', async ({ page }) => {
+  test('對話 opens 說開一件事 directly, with a five-chip switcher and no sub-tab row', async ({
+    page,
+  }) => {
     test.setTimeout(60000);
 
-    await expect(page.getByTestId('talk-hub')).toBeVisible();
+    // Landed on 說開一件事, not a hub screen.
+    await expect(page.getByRole('heading', { name: /說開一件事/ })).toBeVisible();
+    await expect(page.locator(`text=${EVENT_TITLE}`).first()).toBeVisible();
+
+    // The switcher carries all five, with 說開一件事 active.
+    await expect(page.getByTestId('talk-switcher')).toBeVisible();
     for (const id of [
       'talk-events-entry',
       'talk-conflict-entry',
@@ -32,43 +39,27 @@ test.describe('對話 — a hub of cards', () => {
     ]) {
       await expect(page.getByTestId(id)).toBeVisible();
     }
+    await expect(page.getByTestId('talk-events-entry')).toHaveAttribute('aria-selected', 'true');
 
-    // The row this replaced is gone for good.
+    // The old sub-tab row is gone; so is the events 歷史／開始對話／分析 pill row.
     await expect(page.getByTestId('communicate-subtab-events')).toHaveCount(0);
     await expect(page.getByTestId('communicate-subtab-harmony')).toHaveCount(0);
-  });
-
-  test('說開一件事 opens full screen, with no third pill row', async ({ page }) => {
-    test.setTimeout(60000);
-
-    await page.getByTestId('talk-events-entry').click();
-
-    // The old 歷史／開始對話／分析 row is gone — 開始對話 is a primary button in
-    // the list header and 分析 is an icon beside it.
-    await expect(page.getByRole('heading', { name: /說開一件事/ })).toBeVisible();
     await expect(page.getByTestId('events-compose-button')).toBeVisible();
     await expect(page.getByTestId('events-analytics-button')).toBeVisible();
-    await expect(page.locator(`text=${EVENT_TITLE}`).first()).toBeVisible();
-
-    // 分析 has to be escapable without a tab row to carry 歷史.
-    await page.getByTestId('events-analytics-button').click();
-    await expect(page.getByTestId('events-analytics-back')).toBeVisible();
-    await page.getByTestId('events-analytics-back').click();
-    await expect(page.getByTestId('events-compose-button')).toBeVisible();
   });
 
-  test('the 對話 tab is the way back to the hub from a destination', async ({ page }) => {
+  test('the switcher jumps straight to a sibling, and is still there when you arrive', async ({
+    page,
+  }) => {
     test.setTimeout(60000);
 
     await page.getByTestId('talk-conflict-entry').click();
     await expect(page.getByRole('heading', { name: /接住情緒/ })).toBeVisible();
+    // Still switchable from here — no going back to find the others.
+    await expect(page.getByTestId('talk-switcher')).toBeVisible();
+    await expect(page.getByTestId('talk-conflict-entry')).toHaveAttribute('aria-selected', 'true');
 
-    // 接住情緒 is a long page with its own sticky section nav; scrolling past it
-    // must not strand you there.
-    await page.mouse.wheel(0, 2000);
-    await page.getByTestId('nav-tab-talk').click();
-    await expect(page.getByTestId('talk-hub')).toBeVisible();
-
+    // Hop back to 說開一件事 from the destination itself.
     await page.getByTestId('talk-events-entry').click();
     await expect(page.getByRole('heading', { name: /說開一件事/ })).toBeVisible();
   });
@@ -85,7 +76,7 @@ test.describe('對話 — a hub of cards', () => {
 
     // Consume-once: leaving and coming back must NOT drop you in the composer
     // again.
-    await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-conflict-entry').click();
     await page.getByTestId('talk-events-entry').click();
     await expect(page.getByTestId('events-compose-button')).toBeVisible();
     await expect(page.getByTestId('compose-raw-input')).toHaveCount(0);

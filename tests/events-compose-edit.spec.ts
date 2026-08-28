@@ -103,7 +103,6 @@ test.describe('Compose event — summary at top + editable opener', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
     await page.getByTestId('nav-tab-talk').click();
-    await page.getByTestId('talk-events-entry').click();
     await page.locator('button:has-text("開始對話")').first().click();
     await page.getByTestId('compose-raw-input').fill('他今天早上又沒起床送小孩，超級失望');
     await page.locator('button:has-text("讓 AI 整理")').click();

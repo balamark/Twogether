@@ -165,7 +165,6 @@ test.describe('AI companion — settings picker and named threads', () => {
     const eventsNav = page.getByTestId('nav-tab-talk');
     await eventsNav.waitFor({ state: 'visible', timeout: 15000 });
     await eventsNav.click();
-    await page.getByTestId('talk-events-entry').click();
 
     const eventCard = page.locator('text=今晚的家事').first();
     await eventCard.waitFor({ state: 'visible', timeout: 10000 });

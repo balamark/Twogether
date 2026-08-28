@@ -3,7 +3,7 @@ import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, Trash2, Penc
 import SettingsView from './components/SettingsView';
 import HomeView from './components/HomeView';
 import GrowView from './components/GrowView';
-import TalkHub from './components/TalkHub';
+import TalkSwitcher from './components/TalkSwitcher';
 import ActivityView from './components/ActivityView';
 import UpgradeView, { BillingResultView } from './components/UpgradeView';
 import PremiumExpiryBanner from './components/PremiumExpiryBanner';
@@ -2454,77 +2454,83 @@ const LoveTimeApp = () => {
       // slot: 說開一件事 (the old 衝突事件) and 接住情緒與檢查 (the old
       // 和諧相處). 'events' / 'conflict' stay valid view ids so deep links
       // (notification taps, reload persistence) keep working.
-      // 對話 is a launcher, not a page: the hub lists every way into a
-      // conversation, and each destination then owns the whole screen. The old
-      // sticky sub-tab row could only hold two of them and cost vertical space
-      // on every screen below it. Getting back is the 對話 tab itself, which
-      // stays lit for all of these views (see the nav-highlight map above).
+      // 對話 lands straight on 說開一件事 — its core — rather than on a hub
+      // screen you have to click past. The other four destinations live in the
+      // TalkSwitcher, a thin sticky row present on every 對話-family view so you
+      // can hop between them without going back. Each destination still owns the
+      // whole screen; the 對話 tab stays lit throughout (nav-highlight map above).
       case 'communicate':
       case 'talk':
+      case 'events':
         return (
-          <TalkHub
-            onGoToEvents={() => setCurrentView('events')}
-            onGoToConflict={() => setCurrentView('conflict')}
-            onGoToRoleplay={() => setCurrentView('roleplay')}
-            onGoToWall={() => setCurrentView('wall')}
-            onGoToTherapists={() => setCurrentView('therapists')}
-          />
+          <div>
+            <TalkSwitcher current="events" onNavigate={setCurrentView} />
+            <EventsView
+              authState={authState}
+              showNotification={showNotification}
+              initialEventId={pendingEventId}
+              onInitialEventConsumed={() => setPendingEventId(null)}
+              initialSubView={pendingEventsCompose ? 'compose' : null}
+              onInitialSubViewConsumed={() => setPendingEventsCompose(false)}
+              onInvitePartner={() => {
+                localStorage.removeItem('pairingPromptDismissed');
+                setPairingPromptDismissed(false);
+                setShowPairingPrompt(true);
+              }}
+              onNavigate={setCurrentView}
+            />
+          </div>
         );
       case 'conflict':
         return (
-          <ConflictView
-            showNotification={showNotification}
-            partnerConnected={partnerConnected}
-            onNavigate={setCurrentView}
-            onComposeEvent={() => {
-              setPendingEventsCompose(true);
-              setCurrentView('events');
-            }}
-          />
+          <div>
+            <TalkSwitcher current="conflict" onNavigate={setCurrentView} />
+            <ConflictView
+              showNotification={showNotification}
+              partnerConnected={partnerConnected}
+              onNavigate={setCurrentView}
+              onComposeEvent={() => {
+                setPendingEventsCompose(true);
+                setCurrentView('events');
+              }}
+            />
+          </div>
         );
-      case 'events':
-        return (
-          <EventsView
-            authState={authState}
-            showNotification={showNotification}
-            initialEventId={pendingEventId}
-            onInitialEventConsumed={() => setPendingEventId(null)}
-            initialSubView={pendingEventsCompose ? 'compose' : null}
-            onInitialSubViewConsumed={() => setPendingEventsCompose(false)}
-            onInvitePartner={() => {
-              localStorage.removeItem('pairingPromptDismissed');
-              setPairingPromptDismissed(false);
-              setShowPairingPrompt(true);
+      // roleplay / wall / therapists are 對話 destinations too, so they carry the
+      // switcher — you can jump straight to a sibling from here rather than going
+      // back. (They're also reachable from the profile menu; the switcher's
+      // active chip keeps you oriented either way.)
+      case 'roleplay': return (
+        <div>
+          <TalkSwitcher current="roleplay" onNavigate={setCurrentView} />
+          <RoleplayView
+            defaultRoleplayScripts={defaultRoleplayScripts}
+            customScripts={customScripts}
+            roleplayFilter={roleplayFilter}
+            setRoleplayFilter={setRoleplayFilter}
+            setShowScriptUploadModal={setShowScriptUploadModal}
+            parseScriptContent={parseScriptContent}
+            addIntimateRecord={addIntimateRecord}
+            onEditScript={(script) => {
+              setEditingScript(script);
+              setShowScriptUploadModal(true);
             }}
-            onNavigate={setCurrentView}
+            showNotification={showNotification}
+            favoriteScriptIds={favoriteScriptIds}
+            onToggleFavorite={toggleFavoriteScript}
+            onUnpublishScript={unpublishScript}
+            initialScriptTitle={pendingScriptTitle}
+            onInitialScriptConsumed={() => setPendingScriptTitle(null)}
+            renderGames={() => <GamesView
+              totalCoins={totalCoins}
+              customMemoryQuestions={customMemoryQuestions}
+              customEmotions={customEmotions}
+              setTotalCoins={setTotalCoins}
+              showNotification={showNotification}
+            />}
           />
-        );
-      case 'roleplay': return <RoleplayView
-        defaultRoleplayScripts={defaultRoleplayScripts}
-        customScripts={customScripts}
-        roleplayFilter={roleplayFilter}
-        setRoleplayFilter={setRoleplayFilter}
-        setShowScriptUploadModal={setShowScriptUploadModal}
-        parseScriptContent={parseScriptContent}
-        addIntimateRecord={addIntimateRecord}
-        onEditScript={(script) => {
-          setEditingScript(script);
-          setShowScriptUploadModal(true);
-        }}
-        showNotification={showNotification}
-        favoriteScriptIds={favoriteScriptIds}
-        onToggleFavorite={toggleFavoriteScript}
-        onUnpublishScript={unpublishScript}
-        initialScriptTitle={pendingScriptTitle}
-        onInitialScriptConsumed={() => setPendingScriptTitle(null)}
-        renderGames={() => <GamesView
-        totalCoins={totalCoins}
-        customMemoryQuestions={customMemoryQuestions}
-        customEmotions={customEmotions}
-        setTotalCoins={setTotalCoins}
-        showNotification={showNotification}
-      />}
-      />;
+        </div>
+      );
       case 'journey': return (
         <OurJourneyView
           journeyMilestones={journeyMilestones}
@@ -2532,13 +2538,18 @@ const LoveTimeApp = () => {
           setCurrentView={setCurrentView}
         />
       );
-      case 'wall': return <WallView
-        authState={authState}
-        nicknames={nicknames}
-        defaultWallExamples={defaultWallExamples}
-        moodTags={WALL_MOOD_TAGS}
-        showNotification={showNotification}
-      />;
+      case 'wall': return (
+        <div>
+          <TalkSwitcher current="wall" onNavigate={setCurrentView} />
+          <WallView
+            authState={authState}
+            nicknames={nicknames}
+            defaultWallExamples={defaultWallExamples}
+            moodTags={WALL_MOOD_TAGS}
+            showNotification={showNotification}
+          />
+        </div>
+      );
       case 'settings': return <SettingsView
         nicknames={nicknames}
         handleNicknameChange={handleNicknameChange}
@@ -2592,7 +2603,12 @@ const LoveTimeApp = () => {
           }
         }}
       />;
-      case 'therapists': return <TherapistsView authState={authState} showNotification={showNotification} />;
+      case 'therapists': return (
+        <div>
+          <TalkSwitcher current="therapists" onNavigate={setCurrentView} />
+          <TherapistsView authState={authState} showNotification={showNotification} />
+        </div>
+      );
       case 'feedback': return <FeedbackView authState={authState} showNotification={showNotification} setShowAuthModal={setShowAuthModal} />;
       case 'love-language': return <LoveLanguageView authState={authState} showNotification={showNotification} setShowAuthModal={setShowAuthModal} />;
       default: return <GamesView

@@ -37,12 +37,15 @@ Twogether 是一個「情侶關係經營」App：記錄親密時光、用 AI 把
 - **今天**：`HomeView.tsx`。不是總覽，是「現在最需要知道什麼」——開始三步驟、
   關係之屋（單一最急提醒）、Twogether 發現（靜態 teaser，**不自動呼叫**耗 AI 額度的
   `getCommunicationPattern`）、近兩週真實數字、最近動態、成長入口。
-- **對話**：`TalkHub.tsx`——一頁卡片入口，不是有內容的頁面。取代了原本的置頂子分頁列
-  （只能放兩個目的地，還在每個下層畫面吃掉垂直空間）。一張大卡 說開一件事
-  `talk-events-entry`（產品核心，滿版、填色）＋ 2×2 的 情緒檢查 `talk-conflict-entry`／
-  角色扮演 `talk-roleplay-entry`／我們的牆 `talk-wall-entry`／專業諮商師
-  `talk-therapists-entry`。點任一張卡，該功能用整個畫面開啟（`events` → `EventsView`，
-  `conflict` → `ConflictView`）；回到 hub 就是再點一次「對話」分頁，全程 `talk` 保持高亮。
+- **對話**：直接進到「說開一件事」（`events` → `EventsView`），不是先看一個 hub 頁面。
+  其餘目的地放在 `TalkSwitcher.tsx`——一條置頂、可橫向捲動的細切換列，出現在每個
+  對話系列的畫面（events/conflict/roleplay/wall/therapists）上，讓使用者不用退回去就能
+  在五者間跳。五個 chip 的 testid：說開一件事 `talk-events-entry`／情緒檢查
+  `talk-conflict-entry`／角色扮演 `talk-roleplay-entry`／我們的牆 `talk-wall-entry`／
+  專業諮商師 `talk-therapists-entry`（沿用原卡片的 testid）。作用中的 chip 會自動置中，
+  390px 上永遠看得到現在在哪。切換列 sticky 在 top-0，ConflictView 自己的區塊 nav 在
+  top-[52px] 疊在下面。全程 `talk` 分頁保持高亮。roleplay/wall/therapists 也從個人選單進得去，
+  切換列在那裡照樣顯示（作用 chip 幫你定位）。
 - **我們**：只有「記錄時光」（`CalendarView`），新增 月曆／時間軸 切換
   （`us-view-toggle-calendar` / `us-view-toggle-timeline`，預設月曆；**記錄清單與快速回應
   只在時間軸**）。我們的牆移到「對話」，愛情旅程移到用戶選單。
@@ -241,10 +244,11 @@ activity 記錄）時補上：開始引導點擊、快速回覆 chip 點擊、tr
 - 導覽一律用四個主分頁的 testid：`nav-tab-home` / `nav-tab-talk` / `nav-tab-us` /
   `nav-tab-grow`（舊的 `nav-tab-communicate`/`-record`/`-roleplay`/`-stories`/
   `-therapists`、子分頁 `communicate-subtab-*`，與 `has-text("我們的牆")` 皆已無效）。
-- **「對話」是卡片 hub**：說開一件事／情緒檢查／角色扮演／我們的牆／專業諮商師都要先點
-  `nav-tab-talk`，再點對應的入口卡 `talk-events-entry`／`talk-conflict-entry`／
-  `talk-roleplay-entry`／`talk-wall-entry`／`talk-therapists-entry`。我們的牆已從「我們」
-  移到「對話」，所以進牆是 `nav-tab-talk` → `talk-wall-entry`（不再是 `nav-tab-us`）。
+- **「對話」直接開「說開一件事」**：點 `nav-tab-talk` 就落在 events，不用再點入口。要去
+  其他四個目的地，點置頂切換列的 chip：`talk-conflict-entry`／`talk-roleplay-entry`／
+  `talk-wall-entry`／`talk-therapists-entry`（`talk-events-entry` 是回到 events 的 chip）。
+  我們的牆已從「我們」移到「對話」，進牆是 `nav-tab-talk` → `talk-wall-entry`（不再是
+  `nav-tab-us`）。切換列在每個對話系列畫面都在，所以從任一目的地都能直接切到另一個。
 - **預設落地頁是 `home`**：需要月曆／記錄的 spec 必須顯式點 `nav-tab-us`；需要記錄清單或
   快速回應的還要再點 `us-view-toggle-timeline`。
 - 判斷「已登入」的 readiness probe 用 `user-menu-toggle`（各視圖都在），
