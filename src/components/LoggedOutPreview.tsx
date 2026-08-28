@@ -235,14 +235,14 @@ const SampleRecordList: React.FC = () => {
                 </div>
               )}
               {i === 0 && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-3">
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   {chips.map((label, ci) => (
                     <span
                       key={label}
-                      className={`font-body text-[11px] ${
+                      className={`font-body text-[11px] px-2.5 py-1 rounded-full border ${
                         ci === 0
-                          ? 'text-petal-rose-deep border-b border-petal-rose-deep pb-0.5'
-                          : 'text-petal-ink-soft'
+                          ? 'bg-petal-rose-deep border-petal-rose-deep text-white font-medium'
+                          : 'bg-white border-petal-rule text-petal-ink-soft'
                       }`}
                     >
                       {label}

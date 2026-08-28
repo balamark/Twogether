@@ -8,9 +8,11 @@ import type { IntimateRecord } from '../App';
 // could answer: the moment belongs to both people, but only one of them ever
 // got to say anything about it.
 //
-// Words, not emoji. A row of coloured capsules turned every record into a
-// control panel; four plain words sit inside the card's own typography and only
-// the chosen one takes on any colour at all.
+// Words, not emoji — but they are pills, not bare text. An earlier pass set
+// these as four plain words to keep the row quiet, and the row was quiet to a
+// fault: nobody could tell they were tappable at all. The outline carries the
+// affordance; the quiet is bought back by leaving unselected pills as a hairline
+// on white, so a row of them still recedes until one is chosen and fills rose.
 const MOMENT_REACTIONS: { key: MomentReactionKey; label: string }[] = [
   { key: 'love', label: '愛你' },
   { key: 'fire', label: '意猶未盡' },
@@ -103,13 +105,22 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
 
   const toggleReaction = (key: MomentReactionKey) => send({ reaction: key });
 
-  // One quiet line, and only four things in it. The underline is reserved for
-  // "this one is chosen" — nothing else in this row is allowed to wear it.
-  // There is deliberately no 說一句 link here: at 390px the list row gives this
-  // strip 254px, which the four words fill, and tapping anywhere else on the
-  // record already opens the detail view where the sentence gets written.
+  // At 390px the list row gives this strip 254px. The four labels are 182px of
+  // text and pill padding adds ~80px, so they cannot sit on one line there.
+  // Left to flex-wrap they break 3+1, which strands 很難忘 alone; a 2-column
+  // grid makes the wrap deliberate and keeps the columns aligned. The detail
+  // view is wide enough for a single row, so it stays flex.
+  //
+  // There is deliberately no 說一句 link here: tapping anywhere else on the
+  // record already opens the detail view, which is where the sentence is written.
   const chips = (
-    <div className="flex flex-wrap items-center gap-x-4">
+    <div
+      className={
+        variant === 'row'
+          ? 'grid grid-cols-2 gap-2 justify-items-start'
+          : 'flex flex-wrap items-center gap-2'
+      }
+    >
       {MOMENT_REACTIONS.map(({ key, label }) => {
         const active = mine?.reaction === key;
         return (
@@ -120,16 +131,13 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
             disabled={busy}
             aria-pressed={active}
             data-testid={`moment-reaction-${key}-${record.id}`}
-            // py-2 is for the finger, not the eye: a bare word is an easy tap
-            // to miss. The rule goes on the inner span so it hugs the text
-            // instead of floating below the padding.
-            className={`py-2 font-body text-[13px] transition-colors disabled:opacity-50 ${
-              active ? 'text-petal-rose-deep' : 'text-petal-ink-soft hover:text-petal-ink'
+            className={`px-3 py-1.5 rounded-full border font-body text-[13px] transition-colors disabled:opacity-50 ${
+              active
+                ? 'bg-petal-rose-deep border-petal-rose-deep text-white font-medium'
+                : 'bg-white border-petal-rule text-petal-ink-soft hover:border-petal-rose hover:text-petal-ink'
             }`}
           >
-            <span className={active ? 'border-b border-petal-rose-deep pb-0.5' : ''}>
-              {label}
-            </span>
+            {label}
           </button>
         );
       })}
