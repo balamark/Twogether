@@ -155,8 +155,8 @@ test.describe('Wall thread — AI 諮商師 mediator', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // Navigate to the wall view.
-    await page.getByTestId('nav-tab-us').click();
-    const wallNav = page.getByTestId('us-wall-entry');
+    await page.getByTestId('nav-tab-talk').click();
+    const wallNav = page.getByTestId('talk-wall-entry');
     await wallNav.waitFor({ state: 'visible', timeout: 15000 });
     await wallNav.click();
 

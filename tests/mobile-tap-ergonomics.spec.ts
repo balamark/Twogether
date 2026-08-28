@@ -127,8 +127,8 @@ test.describe('Mobile tap ergonomics', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    await page.getByTestId('nav-tab-us').click();
-    const wallNav = page.getByTestId('us-wall-entry');
+    await page.getByTestId('nav-tab-talk').click();
+    const wallNav = page.getByTestId('talk-wall-entry');
     await wallNav.waitFor({ state: 'visible', timeout: 15000 });
     await wallNav.click();
     await page.locator('button:has-text("新貼文")').first().click();
@@ -171,8 +171,8 @@ test.describe('Mobile tap ergonomics', () => {
     test.setTimeout(60000);
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.getByTestId('nav-tab-us').click();
-    await page.getByTestId('us-wall-entry').click();
+    await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-wall-entry').click();
     await page.locator('button:has-text("新貼文")').first().click();
 
     // Collapse the starter-templates panel so the chip row isn't pushed past
@@ -250,8 +250,8 @@ test.describe('Mobile tap ergonomics', () => {
     test.setTimeout(60000);
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.getByTestId('nav-tab-us').click();
-    await page.getByTestId('us-wall-entry').click();
+    await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-wall-entry').click();
     await page.locator('button:has-text("新貼文")').first().click();
 
     // A `position: fixed` element that scrolls its own content is the shape iOS

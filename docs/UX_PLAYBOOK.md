@@ -29,7 +29,7 @@ Twogether 是一個「情侶關係經營」App：記錄親密時光、用 AI 把
 
 ## §1 現況盤點（2026-07 快照）
 
-### 導覽結構（2026-08-25 後）
+### 導覽結構（2026-08-28 後）
 登入後 4 個分頁（`src/App.tsx` `navItems`）：
 **今天 `home` / 對話 `talk` / 我們 `us` / 成長 `grow`**。
 對應四個問題：現在怎麼了？／我們要談什麼？／我們一起經歷過什麼？／我們有沒有變好？
@@ -37,24 +37,30 @@ Twogether 是一個「情侶關係經營」App：記錄親密時光、用 AI 把
 - **今天**：`HomeView.tsx`。不是總覽，是「現在最需要知道什麼」——開始三步驟、
   關係之屋（單一最急提醒）、Twogether 發現（靜態 teaser，**不自動呼叫**耗 AI 額度的
   `getCommunicationPattern`）、近兩週真實數字、最近動態、成長入口。
-- **對話**：吸收原「好好說話」（子分頁 說開一件事 `events` / 接住情緒・檢查 `conflict`），
-  另加入口卡 角色扮演 `talk-roleplay-entry`、心理諮商 `talk-therapists-entry`。
-- **我們**：原「記錄時光」（`CalendarView`），新增 月曆／時間軸 切換
+- **對話**：`TalkHub.tsx`——一頁卡片入口，不是有內容的頁面。取代了原本的置頂子分頁列
+  （只能放兩個目的地，還在每個下層畫面吃掉垂直空間）。一張大卡 說開一件事
+  `talk-events-entry`（產品核心，滿版、填色）＋ 2×2 的 情緒檢查 `talk-conflict-entry`／
+  角色扮演 `talk-roleplay-entry`／我們的牆 `talk-wall-entry`／專業諮商師
+  `talk-therapists-entry`。點任一張卡，該功能用整個畫面開啟（`events` → `EventsView`，
+  `conflict` → `ConflictView`）；回到 hub 就是再點一次「對話」分頁，全程 `talk` 保持高亮。
+- **我們**：只有「記錄時光」（`CalendarView`），新增 月曆／時間軸 切換
   （`us-view-toggle-calendar` / `us-view-toggle-timeline`，預設月曆；**記錄清單與快速回應
-  只在時間軸**），另加入口卡 我們的牆 `us-wall-entry`、愛情旅程 `us-journey-entry`。
+  只在時間軸**）。我們的牆移到「對話」，愛情旅程移到用戶選單。
 - **成長**：`GrowView.tsx`。成就統計（`AchievementsView`）＋ 事件分析與溝通模式
   （直接 import `EventAnalytics`，不經 `EventsView`）＋ 真實故事入口 `grow-stories-entry`。
   真實故事單人可用，**入口卡放在配對 gate 之上**。
 
-角色扮演／心理諮商／真實故事不再是主分頁，改為上述入口卡（真實故事另在用戶選單
-`user-menu-stories`）。舊 view id（`record`/`communicate`/`events`/`conflict`/`roleplay`/
+角色扮演／我們的牆／專業諮商師／愛情旅程／真實故事都不是主分頁：主要入口在「對話」
+hub（前三個）與「成長」（真實故事），用戶選單（Header 右上）另備一份 —
+`user-menu-roleplay`／`user-menu-wall`／`user-menu-therapists`／`user-menu-journey`／
+`user-menu-stories`。舊 view id（`record`/`communicate`/`events`/`conflict`/`roleplay`/
 `wall`/`stories`/`therapists`/`journey`/`achievements`…）全部保留有效，深連結與重新整理
 不受影響；nav 高亮把各自的子視圖算回所屬主分頁。預設落地頁由 `record` 改為 `home`。
 未登入導覽為 5 顆（+訪客限定 Premium），`LoggedOutPreview` 對 `home`/`grow` 有專屬範例，
-並用 `ExploreLinks` 保留未登入者前往 角色扮演／心理諮商／我們的牆／真實故事 的路徑
+並用 `ExploreLinks` 保留未登入者前往 角色扮演／我們的牆／專業諮商師／真實故事 的路徑
 （testid 與登入後的入口卡一致）。
-另有用戶選單（Header 右上）：金幣商店、最近動態、愛情旅程、真實故事、訊息紀錄、
-愛的語言、情緒深潛、意見回饋、使用說明、設定、升級 Premium。
+另有用戶選單（Header 右上）：金幣商店、最近動態、愛情旅程、真實故事、角色扮演、我們的牆、
+專業諮商師、訊息紀錄、愛的語言、情緒深潛、意見回饋、使用說明、設定、升級 Premium。
 
 ### 既有的上手機制
 - 註冊後：AI 諮商師選擇 modal（`AiCompanionPicker.tsx`）→ 配對邀請 modal。
@@ -234,8 +240,11 @@ activity 記錄）時補上：開始引導點擊、快速回覆 chip 點擊、tr
 - **真實流程**：註冊/配對類改動跑 `tests/user-journey.spec.ts`。
 - 導覽一律用四個主分頁的 testid：`nav-tab-home` / `nav-tab-talk` / `nav-tab-us` /
   `nav-tab-grow`（舊的 `nav-tab-communicate`/`-record`/`-roleplay`/`-stories`/
-  `-therapists` 與 `has-text("我們的牆")` 皆已無效）。巢狀功能要先點主分頁再點入口卡，
-  例如 `nav-tab-talk` → `talk-roleplay-entry`。
+  `-therapists`、子分頁 `communicate-subtab-*`，與 `has-text("我們的牆")` 皆已無效）。
+- **「對話」是卡片 hub**：說開一件事／情緒檢查／角色扮演／我們的牆／專業諮商師都要先點
+  `nav-tab-talk`，再點對應的入口卡 `talk-events-entry`／`talk-conflict-entry`／
+  `talk-roleplay-entry`／`talk-wall-entry`／`talk-therapists-entry`。我們的牆已從「我們」
+  移到「對話」，所以進牆是 `nav-tab-talk` → `talk-wall-entry`（不再是 `nav-tab-us`）。
 - **預設落地頁是 `home`**：需要月曆／記錄的 spec 必須顯式點 `nav-tab-us`；需要記錄清單或
   快速回應的還要再點 `us-view-toggle-timeline`。
 - 判斷「已登入」的 readiness probe 用 `user-menu-toggle`（各視圖都在），

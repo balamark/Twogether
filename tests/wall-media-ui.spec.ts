@@ -109,8 +109,8 @@ test.describe('Wall — attach a photo', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    await page.getByTestId('nav-tab-us').click();
-    const wallNav = page.getByTestId('us-wall-entry');
+    await page.getByTestId('nav-tab-talk').click();
+    const wallNav = page.getByTestId('talk-wall-entry');
     await wallNav.waitFor({ state: 'visible', timeout: 15000 });
     await wallNav.click();
 

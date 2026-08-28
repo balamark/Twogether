@@ -127,6 +127,7 @@ test.describe('Event thread — 引導模式 (Therapist Mode)', () => {
     await page.waitForLoadState('domcontentloaded');
 
     await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-events-entry').click();
     await page.locator('text=今晚回不回家').first().click();
 
     const startBtn = page.getByTestId('event-facilitation-start-button');
@@ -158,6 +159,7 @@ test.describe('Event thread — 引導模式 (Therapist Mode)', () => {
     await page.waitForLoadState('domcontentloaded');
 
     await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-events-entry').click();
     await page.locator('text=今晚回不回家').first().click();
 
     const startBtn = page.getByTestId('event-facilitation-start-button');

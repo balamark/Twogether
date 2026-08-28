@@ -1126,20 +1126,18 @@ const PREVIEWS: Record<string, PreviewConfig> = {
 
 // Small "explore more" links shown under some previews, letting a logged-out
 // visitor reach a dedicated real/bespoke preview that's no longer its own
-// bottom-nav tab (roleplay/therapists nest inside 對話, wall/journey inside
-// 我們, stories inside 成長).
-// The testids intentionally match the authenticated entry cards
-// (TalkEntryCards / UsEntryCards / GrowView), so "the way into 真實故事 from
-// 成長" is one addressable thing whether you're signed in or not.
+// bottom-nav tab (roleplay/wall/therapists nest inside 對話's hub, stories
+// inside 成長).
+// The testids intentionally match the authenticated entry cards (TalkHub /
+// GrowView), so "the way into 真實故事 from 成長" is one addressable thing
+// whether you're signed in or not.
 const ExploreLinks: React.FC<{ view: string; onNavigate?: (view: string) => void }> = ({ view, onNavigate }) => {
   if (!onNavigate) return null;
   const links: { label: string; target: string; testId: string }[] =
     view === 'talk' || view === 'communicate' ? [
       { label: '看看角色扮演', target: 'roleplay', testId: 'talk-roleplay-entry' },
-      { label: '看看心理諮商', target: 'therapists', testId: 'talk-therapists-entry' },
-    ] :
-    view === 'us' || view === 'record' ? [
-      { label: '看看我們的牆', target: 'wall', testId: 'us-wall-entry' },
+      { label: '看看我們的牆', target: 'wall', testId: 'talk-wall-entry' },
+      { label: '看看專業諮商師', target: 'therapists', testId: 'talk-therapists-entry' },
     ] :
     view === 'grow' ? [
       { label: '看看真實故事', target: 'stories', testId: 'grow-stories-entry' },

@@ -128,6 +128,7 @@ test.describe('Event composer — 情緒檢測 (emotion meter)', () => {
     await page.waitForLoadState('domcontentloaded');
 
     await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-events-entry').click();
     await page.locator('text=今晚回不回家').first().click();
 
     const input = page.getByTestId('event-reply-input');

@@ -136,6 +136,7 @@ test.describe('Event — 接住情緒 (emotion acceptance)', () => {
     await page.waitForLoadState('domcontentloaded');
 
     await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-events-entry').click();
     await page.locator('text=今晚的家事').first().click();
 
     const replyInput = page.getByTestId('event-reply-input');

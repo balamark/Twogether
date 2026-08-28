@@ -152,8 +152,8 @@ test.describe('Wall thread — 情緒翻譯 lens', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    await page.getByTestId('nav-tab-us').click();
-    const wallNav = page.getByTestId('us-wall-entry');
+    await page.getByTestId('nav-tab-talk').click();
+    const wallNav = page.getByTestId('talk-wall-entry');
     await wallNav.waitFor({ state: 'visible', timeout: 15000 });
     await wallNav.click();
 
@@ -195,8 +195,8 @@ test.describe('Wall thread — 情緒翻譯 lens', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    await page.getByTestId('nav-tab-us').click();
-    const wallNav = page.getByTestId('us-wall-entry');
+    await page.getByTestId('nav-tab-talk').click();
+    const wallNav = page.getByTestId('talk-wall-entry');
     await wallNav.waitFor({ state: 'visible', timeout: 15000 });
     await wallNav.click();
 
@@ -229,8 +229,8 @@ test.describe('Wall thread — 情緒翻譯 lens', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    await page.getByTestId('nav-tab-us').click();
-    const wallNav = page.getByTestId('us-wall-entry');
+    await page.getByTestId('nav-tab-talk').click();
+    const wallNav = page.getByTestId('talk-wall-entry');
     await wallNav.waitFor({ state: 'visible', timeout: 15000 });
     await wallNav.click();
 

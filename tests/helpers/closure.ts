@@ -346,5 +346,6 @@ export async function openEventDetail(page: Page) {
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
   await page.getByTestId('nav-tab-talk').click();
+  await page.getByTestId('talk-events-entry').click();
   await page.locator(`text=${EVENT_TITLE}`).first().click();
 }

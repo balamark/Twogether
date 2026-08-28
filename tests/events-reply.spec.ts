@@ -173,6 +173,7 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
     const eventsNav = page.getByTestId('nav-tab-talk');
     await eventsNav.waitFor({ state: 'visible', timeout: 15000 });
     await eventsNav.click();
+    await page.getByTestId('talk-events-entry').click();
 
     // Tap the (single) fake event in the history list.
     const eventCard = page.locator(`text=今晚的家事`).first();
@@ -224,6 +225,7 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
     const eventsNav = page.getByTestId('nav-tab-talk');
     await eventsNav.waitFor({ state: 'visible', timeout: 15000 });
     await eventsNav.click();
+    await page.getByTestId('talk-events-entry').click();
 
     const eventCard = page.locator('text=今晚的家事').first();
     await eventCard.waitFor({ state: 'visible', timeout: 10000 });
@@ -303,6 +305,7 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
     await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-events-entry').click();
     await page.locator('text=今晚的家事').first().click();
 
     // Invite the AI counselor → preview modal appears.

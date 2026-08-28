@@ -132,6 +132,7 @@ test.describe('Event 治療摘要 (Therapy Note)', () => {
     await page.waitForLoadState('domcontentloaded');
 
     await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-events-entry').click();
 
     const eventCard = page.locator('text=沒有回訊息').first();
     await eventCard.waitFor({ state: 'visible', timeout: 10000 });

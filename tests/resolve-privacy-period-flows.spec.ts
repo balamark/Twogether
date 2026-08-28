@@ -202,6 +202,7 @@ async function openEventDetail(page: Page) {
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
   await page.getByTestId('nav-tab-talk').click();
+  await page.getByTestId('talk-events-entry').click();
   await page.locator('text=接送小孩的分工').first().click();
 }
 
@@ -315,8 +316,8 @@ async function seedWallPost(page: Page, isPrivate: boolean) {
 async function openWall(page: Page) {
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
-  await page.getByTestId('nav-tab-us').click();
-  const nav = page.getByTestId('us-wall-entry');
+  await page.getByTestId('nav-tab-talk').click();
+  const nav = page.getByTestId('talk-wall-entry');
   await nav.waitFor({ state: 'visible', timeout: 15000 });
   await nav.click();
   await expect(page.getByTestId(`wall-privacy-toggle-${POST_ID}`)).toBeVisible({ timeout: 10000 });

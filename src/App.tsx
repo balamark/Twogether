@@ -3,8 +3,7 @@ import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, Trash2, Penc
 import SettingsView from './components/SettingsView';
 import HomeView from './components/HomeView';
 import GrowView from './components/GrowView';
-import UsEntryCards from './components/UsEntryCards';
-import TalkEntryCards from './components/TalkEntryCards';
+import TalkHub from './components/TalkHub';
 import ActivityView from './components/ActivityView';
 import UpgradeView, { BillingResultView } from './components/UpgradeView';
 import PremiumExpiryBanner from './components/PremiumExpiryBanner';
@@ -2397,10 +2396,6 @@ const LoveTimeApp = () => {
       case 'us':
         return (
           <div className="space-y-4">
-          <UsEntryCards
-            onGoToWall={() => setCurrentView('wall')}
-            onGoToJourney={() => setCurrentView('journey')}
-          />
           <CalendarView
             selectedDate={selectedDate}
             setSelectedDate={setSelectedDate}
@@ -2459,81 +2454,51 @@ const LoveTimeApp = () => {
       // slot: 說開一件事 (the old 衝突事件) and 接住情緒與檢查 (the old
       // 和諧相處). 'events' / 'conflict' stay valid view ids so deep links
       // (notification taps, reload persistence) keep working.
+      // 對話 is a launcher, not a page: the hub lists every way into a
+      // conversation, and each destination then owns the whole screen. The old
+      // sticky sub-tab row could only hold two of them and cost vertical space
+      // on every screen below it. Getting back is the 對話 tab itself, which
+      // stays lit for all of these views (see the nav-highlight map above).
       case 'communicate':
-      case 'conflict':
-      case 'events':
-      case 'talk': {
-        const communicateSub = currentView === 'conflict' ? 'harmony' : 'events';
+      case 'talk':
         return (
-          <div>
-            {/* Sticky so the way back to the other sub-view survives a scroll.
-                ConflictView's own section nav sits at top-[52px] and stacks
-                under this row rather than replacing it. */}
-            <div className="sticky top-0 z-30 bg-petal-cream/95 backdrop-blur-sm border-b border-petal-rule">
-              <div className="max-w-4xl mx-auto px-4 md:px-6 py-2 flex gap-2" role="tablist" aria-label="好好說話">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={communicateSub === 'events'}
-                  data-testid="communicate-subtab-events"
-                  onClick={() => setCurrentView('events')}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
-                    communicateSub === 'events'
-                      ? 'bg-petal-ink text-petal-cream border-petal-ink'
-                      : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
-                  }`}
-                >
-                  說開一件事
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={communicateSub === 'harmony'}
-                  data-testid="communicate-subtab-harmony"
-                  onClick={() => setCurrentView('conflict')}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
-                    communicateSub === 'harmony'
-                      ? 'bg-petal-ink text-petal-cream border-petal-ink'
-                      : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
-                  }`}
-                >
-                  接住情緒・檢查
-                </button>
-              </div>
-            </div>
-            <TalkEntryCards
-              onGoToRoleplay={() => setCurrentView('roleplay')}
-              onGoToTherapists={() => setCurrentView('therapists')}
-            />
-            {communicateSub === 'harmony' ? (
-              <ConflictView
-                showNotification={showNotification}
-                partnerConnected={partnerConnected}
-                onNavigate={setCurrentView}
-                onComposeEvent={() => {
-                  setPendingEventsCompose(true);
-                  setCurrentView('events');
-                }}
-              />
-            ) : (
-              <EventsView
-                authState={authState}
-                showNotification={showNotification}
-                initialEventId={pendingEventId}
-                onInitialEventConsumed={() => setPendingEventId(null)}
-                initialSubView={pendingEventsCompose ? 'compose' : null}
-                onInitialSubViewConsumed={() => setPendingEventsCompose(false)}
-                onInvitePartner={() => {
-                  localStorage.removeItem('pairingPromptDismissed');
-                  setPairingPromptDismissed(false);
-                  setShowPairingPrompt(true);
-                }}
-                onNavigate={setCurrentView}
-              />
-            )}
-          </div>
+          <TalkHub
+            onGoToEvents={() => setCurrentView('events')}
+            onGoToConflict={() => setCurrentView('conflict')}
+            onGoToRoleplay={() => setCurrentView('roleplay')}
+            onGoToWall={() => setCurrentView('wall')}
+            onGoToTherapists={() => setCurrentView('therapists')}
+          />
         );
-      }
+      case 'conflict':
+        return (
+          <ConflictView
+            showNotification={showNotification}
+            partnerConnected={partnerConnected}
+            onNavigate={setCurrentView}
+            onComposeEvent={() => {
+              setPendingEventsCompose(true);
+              setCurrentView('events');
+            }}
+          />
+        );
+      case 'events':
+        return (
+          <EventsView
+            authState={authState}
+            showNotification={showNotification}
+            initialEventId={pendingEventId}
+            onInitialEventConsumed={() => setPendingEventId(null)}
+            initialSubView={pendingEventsCompose ? 'compose' : null}
+            onInitialSubViewConsumed={() => setPendingEventsCompose(false)}
+            onInvitePartner={() => {
+              localStorage.removeItem('pairingPromptDismissed');
+              setPairingPromptDismissed(false);
+              setShowPairingPrompt(true);
+            }}
+            onNavigate={setCurrentView}
+          />
+        );
       case 'roleplay': return <RoleplayView
         defaultRoleplayScripts={defaultRoleplayScripts}
         customScripts={customScripts}
@@ -2698,6 +2663,9 @@ const LoveTimeApp = () => {
         onShowActivity={() => setCurrentView('activity')}
         onShowJourney={() => setCurrentView('journey')}
         onShowStories={() => setCurrentView('stories')}
+        onShowRoleplay={() => setCurrentView('roleplay')}
+        onShowWall={() => setCurrentView('wall')}
+        onShowTherapists={() => setCurrentView('therapists')}
         onShowIntimacyHistory={() => setCurrentView('intimacy-history')}
         onShowFeedback={() => setCurrentView('feedback')}
         onShowHelp={() => setCurrentView('help')}
@@ -2912,8 +2880,8 @@ const LoveTimeApp = () => {
             const Icon = item.icon;
             const isActive =
               currentView === item.id ||
-              (item.id === 'talk' && ['communicate', 'conflict', 'events', 'roleplay', 'therapists'].includes(currentView)) ||
-              (item.id === 'us' && ['record', 'wall', 'journey'].includes(currentView)) ||
+              (item.id === 'talk' && ['communicate', 'conflict', 'events', 'roleplay', 'therapists', 'wall'].includes(currentView)) ||
+              (item.id === 'us' && currentView === 'record') ||
               // 'achievements' is a legacy deep-link id that now renders GrowView,
               // so it must light up 成長 — not 我們.
               (item.id === 'grow' && ['achievements', 'stories'].includes(currentView));

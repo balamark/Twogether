@@ -139,6 +139,7 @@ async function openDetail(page: import('@playwright/test').Page, title: string) 
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
   await page.getByTestId('nav-tab-talk').click();
+  await page.getByTestId('talk-events-entry').click();
   await page.locator(`text=${title}`).first().click();
 }
 
