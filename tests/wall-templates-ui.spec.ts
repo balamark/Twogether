@@ -73,7 +73,8 @@ test.describe('Wall — starter templates', () => {
     test.setTimeout(60000);
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.locator('button:has-text("我們的牆")').first().click();
+    await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-wall-entry').click();
 
     // toHaveCount retries — the wall re-renders while it loads, and a bare
     // count() can land on the in-between frame.
@@ -89,7 +90,8 @@ test.describe('Wall — starter templates', () => {
     test.setTimeout(60000);
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.locator('button:has-text("我們的牆")').first().click();
+    await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-wall-entry').click();
 
     await page.locator('button:has-text("新貼文")').first().click();
     const toggle = page.getByTestId('wall-composer-templates-toggle');

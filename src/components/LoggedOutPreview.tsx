@@ -58,6 +58,10 @@ interface LoggedOutPreviewProps {
   onSignUp: () => void;
   /** Default (public) roleplay scripts, shown read-only on the roleplay tab. */
   scripts?: PreviewScript[];
+  /** Navigates to another view id — lets a preview link out to a dedicated
+   * real/bespoke preview (roleplay, therapists, wall, stories) that's no
+   * longer its own bottom-nav tab. */
+  onNavigate?: (view: string) => void;
 }
 
 interface PreviewConfig {
@@ -231,14 +235,14 @@ const SampleRecordList: React.FC = () => {
                 </div>
               )}
               {i === 0 && (
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-3">
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   {chips.map((label, ci) => (
                     <span
                       key={label}
-                      className={`font-body text-[11px] ${
+                      className={`font-body text-[11px] px-2.5 py-1 rounded-full border ${
                         ci === 0
-                          ? 'text-petal-rose-deep border-b border-petal-rose-deep pb-0.5'
-                          : 'text-petal-ink-soft'
+                          ? 'bg-petal-rose-deep border-petal-rose-deep text-white font-medium'
+                          : 'bg-white border-petal-rule text-petal-ink-soft'
                       }`}
                     >
                       {label}
@@ -623,6 +627,35 @@ const ThreeSeatSample: React.FC = () => (
   </SampleCard>
 );
 
+// 長文不會被縮成一小段：短摘要給對方一眼看懂，「完整經過」保留原文所有內容。
+// 順帶說明私人對話一個人也能繼續寫、找 AI 討論。
+const LongDraftSample: React.FC = () => (
+  <SampleCard>
+    <div className="flex items-center justify-between mb-2">
+      <span className="font-body text-xs text-petal-muted">寫了很長也不會被縮掉</span>
+      <SampleTag />
+    </div>
+    <div className="rounded-md border border-petal-rule bg-white px-3 py-2">
+      <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-0.5">
+        事件紀錄（雙方都看得到的中性摘要）
+      </div>
+      <p className="font-body text-sm text-petal-ink">晚餐時，兩人就育兒的分工談到後來沒有結論。</p>
+    </div>
+    <div className="mt-2 rounded-md border border-petal-rule bg-petal-cream-2 px-3 py-2">
+      <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep mb-0.5">
+        完整經過 ▾（原文全部保留，只拿掉攻擊性字眼）
+      </div>
+      <p className="font-body text-sm text-petal-ink leading-relaxed">
+        我想把這件事完整說清楚。第一件事是上週三的接送⋯⋯另外，昨天的午睡時間⋯⋯還有我一直沒說出口的是⋯⋯
+      </p>
+    </div>
+    <div className="mt-2 flex items-start gap-1.5 font-body text-[11px] text-petal-muted">
+      <Lock className="w-3 h-3 mt-0.5 shrink-0" strokeWidth={1.5} />
+      <span>也可以先存成只有你看得到的私人對話，一個人慢慢補充、先找 AI 討論，想清楚再決定要不要讓另一半看到。</span>
+    </div>
+  </SampleCard>
+);
+
 const ConflictFlywheelSample: React.FC = () => (
   <div className="space-y-4">
     <SafetyBannerSample />
@@ -634,6 +667,8 @@ const ConflictFlywheelSample: React.FC = () => (
     <TherapistModeSample />
 
     <EmotionAcceptanceSample />
+
+    <LongDraftSample />
 
     <TherapyNoteSample />
 
@@ -1019,6 +1054,110 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       </div>
     ),
   },
+  // 今天：the dashboard tab. Previews the "single most-urgent nudge" idea
+  // (the real RelationshipDashboard) rather than a data-heavy sample.
+  home: {
+    icon: Sparkles,
+    eyebrow: '今天',
+    title: (
+      <>
+        今天，最值得做的<em className="not-italic font-light italic text-pink-600">一件事</em>
+      </>
+    ),
+    description:
+      '不是所有資料的總覽，而是「現在你們最需要知道什麼」：一個最急的提醒、AI 發現的溝通模式、還有最近發生了什麼，一次只給一件事，不會同時塞一堆通知給你。',
+    sample: (
+      <div className="space-y-2.5">
+        <SampleCard>
+          <div className="flex items-center justify-between mb-1">
+            <span className="font-body text-xs text-petal-muted">💗 已經 5 天沒有親密了</span>
+            <SampleTag />
+          </div>
+          <p className="font-body text-sm text-petal-ink-soft leading-relaxed">找個時間靠近一下，重新連結彼此。</p>
+        </SampleCard>
+        <SampleCard>
+          <div className="flex items-center justify-between mb-1">
+            <span className="font-body text-xs text-petal-muted">💡 Twogether 發現</span>
+            <SampleTag />
+          </div>
+          <p className="font-body text-sm text-petal-ink-soft leading-relaxed">你們最近幾次衝突，都和同一件事有關。</p>
+        </SampleCard>
+      </div>
+    ),
+  },
+  // 成長：stats + AI pattern + milestones.
+  grow: {
+    icon: TrendingUp,
+    eyebrow: '成長',
+    title: (
+      <>
+        你們有沒有<em className="not-italic font-light italic text-pink-600">變得更好</em>
+      </>
+    ),
+    description:
+      '統計數字、AI 讀過你們最近的對話後觀察到的反覆溝通模式，還有一起達成的里程碑——記錄不是目的，看見自己在變好才是。',
+    sample: (
+      <SampleCard>
+        <div className="flex items-center justify-between mb-3">
+          <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
+            <TrendingUp className="w-3.5 h-3.5 text-petal-sage-deep" />
+            本月
+          </span>
+          <SampleTag />
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div>
+            <div className="font-display italic text-lg text-petal-ink">12</div>
+            <div className="font-body text-[11px] text-petal-muted">深度對話</div>
+          </div>
+          <div>
+            <div className="font-display italic text-lg text-petal-ink">8</div>
+            <div className="font-body text-[11px] text-petal-muted">成功理解</div>
+          </div>
+          <div>
+            <div className="font-display italic text-lg text-petal-ink">4</div>
+            <div className="font-body text-[11px] text-petal-muted">修復衝突</div>
+          </div>
+        </div>
+      </SampleCard>
+    ),
+  },
+};
+
+// Small "explore more" links shown under some previews, letting a logged-out
+// visitor reach a dedicated real/bespoke preview that's no longer its own
+// bottom-nav tab (roleplay/wall/therapists nest inside 對話's hub, stories
+// inside 成長).
+// The testids intentionally match the authenticated entry points (the
+// TalkSwitcher chips / GrowView), so "the way into 真實故事 from 成長" is one
+// addressable thing whether you're signed in or not.
+const ExploreLinks: React.FC<{ view: string; onNavigate?: (view: string) => void }> = ({ view, onNavigate }) => {
+  if (!onNavigate) return null;
+  const links: { label: string; target: string; testId: string }[] =
+    view === 'talk' || view === 'communicate' ? [
+      { label: '看看角色扮演', target: 'roleplay', testId: 'talk-roleplay-entry' },
+      { label: '看看我們的牆', target: 'wall', testId: 'talk-wall-entry' },
+      { label: '看看專業諮商師', target: 'therapists', testId: 'talk-therapists-entry' },
+    ] :
+    view === 'grow' ? [
+      { label: '看看真實故事', target: 'stories', testId: 'grow-stories-entry' },
+    ] : [];
+  if (links.length === 0) return null;
+  return (
+    <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mb-6">
+      {links.map((l) => (
+        <button
+          key={l.target}
+          type="button"
+          onClick={() => onNavigate(l.target)}
+          data-testid={l.testId}
+          className="font-body text-xs text-petal-muted hover:text-petal-ink underline underline-offset-2"
+        >
+          {l.label} →
+        </button>
+      ))}
+    </div>
+  );
 };
 
 // Roleplay scripts mix [partner1]/[partner2] and [男]/[女]/[他]/[她] role
@@ -1060,7 +1199,7 @@ const SignUpCta: React.FC<{ onSignUp: () => void; compact?: boolean }> = ({ onSi
  * single generic login wall, each tab previews its own feature (read-only) so a
  * visitor understands the product, then funnels to sign-up.
  */
-const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scripts = [] }) => {
+const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scripts = [], onNavigate }) => {
   const [openScript, setOpenScript] = useState<PreviewScript | null>(null);
 
   // Roleplay gets a dedicated layout: real public scripts the visitor can open.
@@ -1258,8 +1397,12 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scr
   }
 
   // 好好說話 (merged tab) previews the conflict-repair flywheel: it's the
-  // heart of the product and covers both sub-tabs' value.
-  const config = view === 'communicate' ? PREVIEWS.events : PREVIEWS[view];
+  // heart of the product and covers both sub-tabs' value. 對話/我們 are the new
+  // 4-tab IA's ids — they reuse the same underlying preview content.
+  const config =
+    view === 'communicate' || view === 'talk' ? PREVIEWS.events :
+    view === 'us' ? PREVIEWS.record :
+    PREVIEWS[view];
 
   // Unknown view → friendly generic welcome (keeps old behaviour as a fallback).
   if (!config) {
@@ -1312,6 +1455,8 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scr
 
       {/* Read-only sample */}
       <div className="mb-8">{config.sample}</div>
+
+      <ExploreLinks view={view} onNavigate={onNavigate} />
 
       {/* Sign-up CTA */}
       <SignUpCta onSignUp={onSignUp} />

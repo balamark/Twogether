@@ -389,6 +389,8 @@ export interface EventVersions {
 export interface IcebreakerPreview {
   title: string;
   summary: string;
+  /** 完整經過 — full rewrite kept for long drafts; '' for short ones. */
+  detail?: string;
   emotions: string[];
   tags: string[];
   toxicityFlags: string[];
@@ -643,6 +645,8 @@ export interface EventRecord {
   createdBy: string;
   title: string;
   summary: string;
+  /** 完整經過 — full rewrite kept for long drafts; null for short ones. */
+  detail: string | null;
   emotions: string[];
   tags: string[];
   toxicityFlags: string[];
@@ -835,6 +839,8 @@ export interface TherapySummaryHistoryEntry {
 export interface CreateEventInput {
   title: string;
   summary: string;
+  /** 完整經過 — passed straight through from the icebreaker preview. */
+  detail?: string | null;
   emotions: string[];
   tags: string[];
   toxicityFlags: string[];
@@ -3822,6 +3828,7 @@ class ApiService {
       return {
         title: p.title || '',
         summary: p.summary || '',
+        detail: p.detail || '',
         emotions: Array.isArray(p.emotions) ? p.emotions : [],
         tags: Array.isArray(p.tags) ? p.tags : [],
         toxicityFlags: Array.isArray(p.toxicityFlags) ? p.toxicityFlags : [],
@@ -3842,6 +3849,7 @@ class ApiService {
       const payload = {
         title: input.title,
         summary: input.summary,
+        detail: input.detail ?? null,
         emotions: input.emotions,
         tags: input.tags,
         toxicity_flags: input.toxicityFlags,
@@ -4570,6 +4578,7 @@ class ApiService {
       created_by?: string;
       title?: string;
       summary?: string;
+      detail?: string | null;
       emotions?: string[];
       tags?: string[];
       toxicity_flags?: string[];
@@ -4598,6 +4607,7 @@ class ApiService {
       createdBy: r.created_by || '',
       title: r.title || '',
       summary: r.summary || '',
+      detail: r.detail ?? null,
       emotions: r.emotions ?? [],
       tags: r.tags ?? [],
       toxicityFlags: r.toxicity_flags ?? [],

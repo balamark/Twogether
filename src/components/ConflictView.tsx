@@ -5,6 +5,7 @@ import InfoHint from './InfoHint';
 import { apiService } from '../services/api';
 import MarriageCheckup from './MarriageCheckup';
 import type { Notification } from '../App';
+import AutoGrowTextarea from './AutoGrowTextarea';
 
 interface ConflictViewProps {
   showNotification: (notification: Omit<Notification, 'id'>) => void;
@@ -265,14 +266,13 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
 
     return (
       <div className="bg-white/90 rounded-md border border-petal-rule p-3">
-        <textarea
+        <AutoGrowTextarea
           value={draft}
           onChange={(e) => setCustomDrafts(prev => ({ ...prev, [key]: e.target.value }))}
           placeholder={placeholder}
-          rows={2}
           maxLength={300}
           disabled={isSending}
-          className="w-full font-body text-sm text-petal-ink leading-relaxed bg-transparent border-0 resize-none focus:outline-none placeholder:text-petal-muted/70"
+          className="w-full font-body text-sm text-petal-ink leading-relaxed bg-transparent border-0 resize-none focus:outline-none placeholder:text-petal-muted/70 min-h-[6.5rem] max-h-[40vh] overflow-y-auto"
         />
         <div className="flex items-center justify-between gap-2 mt-1.5 pt-2 border-t border-petal-rule-soft">
           <span className="font-body text-[11px] text-petal-muted">

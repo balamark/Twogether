@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, MapPin, Play, Clock, Trash2 } from 'lucide-react';
+import { Camera, MapPin, Play, Clock, Trash2, LayoutGrid, ListTree } from 'lucide-react';
 import CalendarDatePicker from './CalendarDatePicker';
 import InfoHint from './InfoHint';
-import { AchievementsView, IntimacyStatsCards, CalendarHeatmap } from './AchievementsView';
-import RelationshipDashboard from './RelationshipDashboard';
+import { IntimacyStatsCards, CalendarHeatmap } from './AchievementsView';
 import { periodDateSet, fertileDateSet, predictedPeriodDateSet, addDays } from '../utils/cycle';
 import { formatYmdInTz } from '../utils/datetime';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -119,6 +118,11 @@ interface CalendarViewProps {
   daysTogether: number;
   primaryTimezone: string;
   onNudgePartner?: () => void;
+  /** Consume-once flag: opens the add-record modal once, then clears itself.
+   * Lets 今天's "加一筆記錄" CTA open this modal after switching to 我們, since
+   * the modal only exists inside this mounted component. */
+  autoOpenAddRecord?: boolean;
+  onAutoOpenAddRecordConsumed?: () => void;
 }
 
 // Calendar / record-keeping view. Defined at module scope (not inside App) so
@@ -155,8 +159,11 @@ const CalendarView = ({
   daysTogether,
   primaryTimezone,
   onNudgePartner,
+  autoOpenAddRecord,
+  onAutoOpenAddRecordConsumed,
 }: CalendarViewProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [viewMode, setViewMode] = useState<'calendar' | 'timeline'>('calendar');
 
   const getCurrentTime = () => {
     const now = new Date();
@@ -220,6 +227,16 @@ const CalendarView = ({
       });
     }
   }, [editingRecord, showRecordModal]);
+
+  // Same consume-once pattern as EventsView's initialSubView: 今天's "加一筆記錄"
+  // CTA sets this after switching to 我們, so it only fires once per request.
+  useEffect(() => {
+    if (autoOpenAddRecord) {
+      openAddModalForDate(todayYmd());
+      onAutoOpenAddRecordConsumed?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpenAddRecord]);
 
   const recordsByDate = React.useMemo(() => {
     const map = new Map<string, IntimateRecord[]>();
@@ -414,12 +431,6 @@ const CalendarView = ({
 
   return (
     <div className="space-y-10">
-      <RelationshipDashboard
-        partnerConnected={authState.partnerConnected}
-        showNotification={showNotification}
-        onNudgePartner={onNudgePartner}
-        onGoToWall={() => setCurrentView('wall')}
-      />
       <div className="border-b border-petal-rule pb-7">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
           <div>
@@ -451,15 +462,26 @@ const CalendarView = ({
         </div>
       </div>
 
-      {/* Calendar — the primary way to add & review records. Promoted to the top
-          so the first thing after login is your shared rhythm + a one-tap add. */}
+      {/* 一起走過的每一天 — the same records as either a month heatmap or a
+          chronological list. Both modes render in THIS slot (and share the
+          header + 記錄今天 button) so flipping the toggle visibly swaps one view
+          for the other in place, rather than making the calendar vanish and the
+          list appear somewhere far below the stats cards. */}
       <div>
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-5">
           <div>
             <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink">
-              你們的<em className="not-italic font-light italic text-pink-600">節奏</em>
+              {viewMode === 'calendar' ? (
+                <>你們的<em className="not-italic font-light italic text-pink-600">節奏</em></>
+              ) : (
+                <>親密<em className="not-italic font-light italic text-pink-600">記錄</em></>
+              )}
             </h3>
-            <p className="mt-1 font-body text-sm text-petal-muted">點月曆任一天新增或查看紀錄</p>
+            <p className="mt-1 font-body text-sm text-petal-muted">
+              {viewMode === 'calendar'
+                ? '點月曆任一天新增或查看紀錄'
+                : `一起走過的每一天，共 ${intimateRecords.length} 次`}
+            </p>
           </div>
           <button
             data-testid="add-record-button"
@@ -469,6 +491,35 @@ const CalendarView = ({
             <span className="text-lg leading-none">＋</span> 記錄今天
           </button>
         </div>
+
+        <div className="inline-flex rounded-full border border-petal-rule overflow-hidden mb-5" role="tablist" aria-label="檢視方式">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'calendar'}
+            data-testid="us-view-toggle-calendar"
+            onClick={() => setViewMode('calendar')}
+            className={`inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium transition-colors ${
+              viewMode === 'calendar' ? 'bg-petal-ink text-petal-cream' : 'bg-transparent text-petal-ink-soft hover:text-petal-ink'
+            }`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5" strokeWidth={1.5} /> 月曆
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={viewMode === 'timeline'}
+            data-testid="us-view-toggle-timeline"
+            onClick={() => setViewMode('timeline')}
+            className={`inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium border-l border-petal-rule transition-colors ${
+              viewMode === 'timeline' ? 'bg-petal-ink text-petal-cream' : 'bg-transparent text-petal-ink-soft hover:text-petal-ink'
+            }`}
+          >
+            <ListTree className="w-3.5 h-3.5" strokeWidth={1.5} /> 時間軸
+          </button>
+        </div>
+
+        {viewMode === 'calendar' && (
         <div className="bg-white rounded-md border border-petal-rule p-5 sm:p-6">
           <CalendarHeatmap
             data={intimateRecords}
@@ -507,6 +558,126 @@ const CalendarView = ({
             }}
           />
         </div>
+        )}
+
+        {/* Record List — the Timeline view: it's already reverse-chronological. */}
+        {viewMode === 'timeline' && (
+        <div>
+          {/* The section header above already names this view and its count. */}
+          {/* Taller than it used to be: each row now carries a 快速回應 strip
+              (~190px vs ~130px), and at 28rem only two records stayed in view. */}
+          <div className="max-h-[36rem] overflow-y-auto overflow-x-hidden">
+            {(() => {
+              const filtered = intimateRecords
+                .slice()
+                .sort((a, b) => (b.date + 'T' + b.time).localeCompare(a.date + 'T' + a.time));
+              return filtered.length > 0 ? filtered.map((record, idx) => {
+                // filtered is sorted newest-first, so the previous intimacy is the
+                // next item. Show how many days apart it was from that one.
+                const prev = filtered[idx + 1];
+                const gapDays = prev ? daysBetweenYmd(record.date, prev.date) : null;
+                return (
+                <article
+                  key={record.id}
+                  onClick={() => showRecordDetails(record.id)}
+                  className={`group grid grid-cols-[40px_1fr_auto] gap-5 py-5 cursor-pointer hover:bg-petal-cream-2/40 -mx-2 px-2 transition-colors ${
+                    idx === 0 ? '' : 'border-t border-petal-rule-soft'
+                  }`}
+                >
+                  <div className="text-base opacity-70 saturate-75 mt-1 text-center leading-none">
+                    {record.mood}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="font-display italic font-light text-sm text-petal-muted mb-1">
+                      {record.date} · {record.time}
+                      {gapDays !== null && (
+                        <span className="text-petal-rose-deep" data-testid="intimacy-gap-days">
+                          {' '}· 距上次相隔 {gapDays} 天
+                        </span>
+                      )}
+                    </div>
+                    {record.description && (
+                      <p className="font-body text-[15px] leading-relaxed text-petal-ink mb-1.5">
+                        {record.description}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap gap-2 text-[11px] text-petal-muted mt-1.5">
+                      {record.duration && (
+                        <span className="inline-flex items-start max-w-full px-2.5 py-0.5 border border-petal-rule rounded-md">
+                          <Clock className="w-3 h-3 mr-1 mt-[3px] flex-shrink-0" />
+                          <span className="break-words leading-snug">{record.duration}</span>
+                        </span>
+                      )}
+                      {record.location && (
+                        <span className="inline-flex items-start max-w-full px-2.5 py-0.5 border border-petal-rule rounded-md">
+                          <MapPin className="w-3 h-3 mr-1 mt-[3px] flex-shrink-0" />
+                          <span className="break-words leading-snug">{record.location}</span>
+                        </span>
+                      )}
+                      {record.roleplayScript && (
+                        <span className="inline-flex items-start max-w-full px-2.5 py-0.5 border border-petal-sage/60 bg-petal-sage/10 text-petal-sage-deep rounded-md">
+                          <Play className="w-3 h-3 mr-1 mt-[3px] flex-shrink-0" />
+                          <span className="break-words leading-snug">{record.roleplayScript}</span>
+                        </span>
+                      )}
+                    </div>
+                    {record.notes && (
+                      <p className="font-display italic font-light text-sm text-petal-ink-soft mt-2.5 pl-3 border-l border-petal-rose-soft leading-relaxed">
+                        "{record.notes}"
+                      </p>
+                    )}
+                    {record.photo && (
+                      <img
+                        src={record.photo}
+                        alt="記憶照片"
+                        className="mt-3 w-24 h-24 rounded-md object-contain bg-petal-cream-2 border border-petal-rule"
+                      />
+                    )}
+                    {/* One tap is all it takes to answer a record — no need to
+                        open it first. The four words stop propagation so the
+                        row's own onClick doesn't fire; everything else here still
+                        opens the record. */}
+                    <MomentResponseBar
+                      record={record}
+                      partnerConnected={authState.partnerConnected}
+                      partnerNickname={partnerNickname}
+                      variant="row"
+                      onRespond={setRecordResponse}
+                      timezone={primaryTimezone}
+                    />
+                  </div>
+                  <div className="flex items-start pt-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openDeleteConfirm(record); }}
+                      className="opacity-0 group-hover:opacity-100 text-petal-muted hover:text-red-500 transition-all p-1 rounded"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </article>
+                );
+              }) : (
+                <div className="border border-dashed border-petal-rule rounded-md py-10 px-6 text-center" data-testid="records-empty-state">
+                  <p className="font-display italic font-light text-base text-petal-muted">
+                    還沒有記錄：留下的每一筆，之後都是你們的回憶
+                  </p>
+                  <p className="text-xs text-petal-ink-soft mt-2 leading-relaxed max-w-xs mx-auto">
+                    記下親密時光與心情，月曆會看見你們的節奏；太久沒互動時，也會溫柔提醒彼此多關心。
+                  </p>
+                  <button
+                    type="button"
+                    data-testid="records-empty-add"
+                    onClick={() => setShowRecordModal(true)}
+                    className="mt-4 px-4 py-2 rounded-full bg-petal-rose-deep text-white text-sm font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition"
+                  >
+                    ＋ 記下第一筆時光
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+        )}
       </div>
 
       {/* Intimacy Stats — 4 cards */}
@@ -834,134 +1005,6 @@ const CalendarView = ({
         </div>
       )}
 
-
-      {/* Record List */}
-      <div>
-        <div className="flex items-baseline justify-between mb-6">
-          <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink">
-            親密<em className="not-italic font-light italic text-pink-600">記錄</em>
-          </h3>
-          <span className="font-display italic font-light text-sm text-petal-muted">
-            共 <b className="not-italic font-normal text-petal-ink">{intimateRecords.length}</b> 次
-          </span>
-        </div>
-        {/* Taller than it used to be: each row now carries a 快速回應 strip
-            (~190px vs ~130px), and at 28rem only two records stayed in view. */}
-        <div className="max-h-[36rem] overflow-y-auto overflow-x-hidden">
-          {(() => {
-            const filtered = intimateRecords
-              .slice()
-              .sort((a, b) => (b.date + 'T' + b.time).localeCompare(a.date + 'T' + a.time));
-            return filtered.length > 0 ? filtered.map((record, idx) => {
-              // filtered is sorted newest-first, so the previous intimacy is the
-              // next item. Show how many days apart it was from that one.
-              const prev = filtered[idx + 1];
-              const gapDays = prev ? daysBetweenYmd(record.date, prev.date) : null;
-              return (
-              <article
-                key={record.id}
-                onClick={() => showRecordDetails(record.id)}
-                className={`group grid grid-cols-[40px_1fr_auto] gap-5 py-5 cursor-pointer hover:bg-petal-cream-2/40 -mx-2 px-2 transition-colors ${
-                  idx === 0 ? '' : 'border-t border-petal-rule-soft'
-                }`}
-              >
-                <div className="text-base opacity-70 saturate-75 mt-1 text-center leading-none">
-                  {record.mood}
-                </div>
-                <div className="min-w-0">
-                  <div className="font-display italic font-light text-sm text-petal-muted mb-1">
-                    {record.date} · {record.time}
-                    {gapDays !== null && (
-                      <span className="text-petal-rose-deep" data-testid="intimacy-gap-days">
-                        {' '}· 距上次相隔 {gapDays} 天
-                      </span>
-                    )}
-                  </div>
-                  {record.description && (
-                    <p className="font-body text-[15px] leading-relaxed text-petal-ink mb-1.5">
-                      {record.description}
-                    </p>
-                  )}
-                  <div className="flex flex-wrap gap-2 text-[11px] text-petal-muted mt-1.5">
-                    {record.duration && (
-                      <span className="inline-flex items-start max-w-full px-2.5 py-0.5 border border-petal-rule rounded-md">
-                        <Clock className="w-3 h-3 mr-1 mt-[3px] flex-shrink-0" />
-                        <span className="break-words leading-snug">{record.duration}</span>
-                      </span>
-                    )}
-                    {record.location && (
-                      <span className="inline-flex items-start max-w-full px-2.5 py-0.5 border border-petal-rule rounded-md">
-                        <MapPin className="w-3 h-3 mr-1 mt-[3px] flex-shrink-0" />
-                        <span className="break-words leading-snug">{record.location}</span>
-                      </span>
-                    )}
-                    {record.roleplayScript && (
-                      <span className="inline-flex items-start max-w-full px-2.5 py-0.5 border border-petal-sage/60 bg-petal-sage/10 text-petal-sage-deep rounded-md">
-                        <Play className="w-3 h-3 mr-1 mt-[3px] flex-shrink-0" />
-                        <span className="break-words leading-snug">{record.roleplayScript}</span>
-                      </span>
-                    )}
-                  </div>
-                  {record.notes && (
-                    <p className="font-display italic font-light text-sm text-petal-ink-soft mt-2.5 pl-3 border-l border-petal-rose-soft leading-relaxed">
-                      "{record.notes}"
-                    </p>
-                  )}
-                  {record.photo && (
-                    <img
-                      src={record.photo}
-                      alt="記憶照片"
-                      className="mt-3 w-24 h-24 rounded-md object-contain bg-petal-cream-2 border border-petal-rule"
-                    />
-                  )}
-                  {/* One tap is all it takes to answer a record — no need to
-                      open it first. The four words stop propagation so the
-                      row's own onClick doesn't fire; everything else here still
-                      opens the record. */}
-                  <MomentResponseBar
-                    record={record}
-                    partnerConnected={authState.partnerConnected}
-                    partnerNickname={partnerNickname}
-                    variant="row"
-                    onRespond={setRecordResponse}
-                    timezone={primaryTimezone}
-                  />
-                </div>
-                <div className="flex items-start pt-1">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); openDeleteConfirm(record); }}
-                    className="opacity-0 group-hover:opacity-100 text-petal-muted hover:text-red-500 transition-all p-1 rounded"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              </article>
-              );
-            }) : (
-              <div className="border border-dashed border-petal-rule rounded-md py-10 px-6 text-center" data-testid="records-empty-state">
-                <p className="font-display italic font-light text-base text-petal-muted">
-                  還沒有記錄：留下的每一筆，之後都是你們的回憶
-                </p>
-                <p className="text-xs text-petal-ink-soft mt-2 leading-relaxed max-w-xs mx-auto">
-                  記下親密時光與心情，月曆會看見你們的節奏；太久沒互動時，也會溫柔提醒彼此多關心。
-                </p>
-                <button
-                  type="button"
-                  data-testid="records-empty-add"
-                  onClick={() => setShowRecordModal(true)}
-                  className="mt-4 px-4 py-2 rounded-full bg-petal-rose-deep text-white text-sm font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition"
-                >
-                  ＋ 記下第一筆時光
-                </button>
-              </div>
-            );
-          })()}
-        </div>
-      </div>
-
-      <div className="border-t border-petal-rule pt-10">
-        <AchievementsView />
-      </div>
     </div>
   );
 };

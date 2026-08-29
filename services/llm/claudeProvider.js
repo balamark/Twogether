@@ -262,6 +262,28 @@ const SYSTEM_PROMPT = `你是一個專為情侶設計的「破冰」AI 助手，
 
 回應請呼叫 emit_icebreaker tool，不要輸出其他文字。`;
 
+// Appended to SYSTEM_PROMPT only for long drafts (see LONG_DRAFT_CHARS). A
+// 1000–2000 字 draft compressed into a ≤200 字 summary plus three 1–3 句 versions
+// loses the specifics — which are exactly what the couple needs to discuss. The
+// `detail` field is the second panel that keeps all of it.
+//
+// Kept as a separate suffix so the cached system prefix stays byte-identical for
+// short drafts (the common case); the cache breakpoint sits on the whole system
+// block, so appending this only re-caches on the long-draft path.
+const LONG_DRAFT_PROMPT = `
+
+9. detail：完整經過 —— 這次的原文很長，summary 與三個版本一定裝不下。請把原文「全部」的內容改寫成一段可以直接給伴侶看的完整敘述：
+- 使用者第一人稱「我」的口吻，跟三個版本同一個聲音。
+- **不可以摘要、不可以濃縮、不可以只挑重點**。原文提到的每一件事、每一個時間點、每一個具體例子、每一個訴求，都要保留下來，順序依照原文。原文有幾件事就寫幾件事。
+- 只做三件事：(a) 拿掉人身攻擊、髒話與絕對化用語（總是/從來/每次/永遠），改寫成具體事實；(b) 把指責句改寫成「我訊息」（我感覺…／對我的影響是…）；(c) 分段，必要時用「第一件事／另外／還有」這類自然的連接詞讓長文好讀。
+- 不要新增原文沒有的事實、不要替任何一方辯護或道歉、不要下結論或給建議。
+- 長度沒有上限，寧可長也不要漏掉原文的內容。`;
+
+// Drafts at or above this many characters get the `detail` panel. Below it the
+// summary + three versions already carry the whole message, and asking for a
+// full rewrite would just restate them at extra cost.
+const LONG_DRAFT_CHARS = 400;
+
 const TOOL_SCHEMA = {
   name: 'emit_icebreaker',
   description: 'Return the structured icebreaker rewrite for the raw event text.',
@@ -332,6 +354,24 @@ const TOOL_SCHEMA = {
       },
     },
     required: ['title', 'summary', 'emotions', 'tags', 'toxicityFlags', 'versions'],
+  },
+};
+
+// Long-draft variant: same contract plus the required `detail` panel. Built by
+// cloning TOOL_SCHEMA so the two can never drift apart.
+const TOOL_SCHEMA_LONG = {
+  ...TOOL_SCHEMA,
+  input_schema: {
+    ...TOOL_SCHEMA.input_schema,
+    properties: {
+      ...TOOL_SCHEMA.input_schema.properties,
+      detail: {
+        type: 'string',
+        description:
+          '完整經過：把原文所有內容逐段改寫成第一人稱敘述，保留每一件事與每一個具體例子，只移除攻擊與絕對化用語。不可摘要或濃縮。',
+      },
+    },
+    required: [...TOOL_SCHEMA.input_schema.required, 'detail'],
   },
 };
 
@@ -651,18 +691,26 @@ async function generateIcebreaker(rawText, { userGender = null, partnerGender = 
     ? `${genderLines.join('\n')}\n\n原始情緒文字：\n${rawText}`
     : rawText;
 
+  // Long drafts additionally get the 完整經過 panel. The extra headroom is
+  // proportional to the draft: the rewrite restates every point, so it lands
+  // near the input's own length rather than at a fixed ceiling.
+  const isLongDraft = rawText.trim().length >= LONG_DRAFT_CHARS;
+  const maxTokens = isLongDraft
+    ? Math.min(16000, 1024 + Math.ceil(rawText.trim().length * 2.5))
+    : 1024;
+
   const startedAt = Date.now();
   const response = await getClient().messages.create({
     model: MODEL,
-    max_tokens: 1024,
+    max_tokens: maxTokens,
     system: [
       {
         type: 'text',
-        text: SYSTEM_PROMPT + PUNCTUATION_RULE,
+        text: SYSTEM_PROMPT + PUNCTUATION_RULE + (isLongDraft ? LONG_DRAFT_PROMPT : ''),
         cache_control: { type: 'ephemeral' },
       },
     ],
-    tools: [TOOL_SCHEMA],
+    tools: [isLongDraft ? TOOL_SCHEMA_LONG : TOOL_SCHEMA],
     tool_choice: { type: 'tool', name: 'emit_icebreaker' },
     messages: [{ role: 'user', content: userContent }],
   });
@@ -678,6 +726,10 @@ async function generateIcebreaker(rawText, { userGender = null, partnerGender = 
     cacheCreate: u.cache_creation_input_tokens || 0,
     cacheRead: u.cache_read_input_tokens || 0,
     costUsd: cost,
+    draftChars: rawText.trim().length,
+    longDraft: isLongDraft,
+    maxTokens,
+    stopReason: response.stop_reason,
   });
 
   const toolUse = response.content.find((b) => b.type === 'tool_use' && b.name === 'emit_icebreaker');
@@ -686,9 +738,23 @@ async function generateIcebreaker(rawText, { userGender = null, partnerGender = 
   }
   const out = toolUse.input;
 
+  // A detail panel cut off mid-sentence is worse than none: drop it and keep the
+  // (complete) summary + versions rather than showing the couple a truncated
+  // account of their own argument.
+  const detail = (out.detail || '').toString().trim();
+  if (isLongDraft && response.stop_reason === 'max_tokens') {
+    logWarn('llm.claude.icebreaker.detail_truncated', {
+      draftChars: rawText.trim().length,
+      outputTokens: u.output_tokens || 0,
+      maxTokens,
+    });
+  }
+  const detailOut = response.stop_reason === 'max_tokens' ? '' : detail;
+
   return {
     title: out.title,
     summary: out.summary,
+    detail: detailOut,
     emotions: out.emotions || [],
     tags: out.tags || [],
     toxicityFlags: out.toxicityFlags || [],

@@ -162,7 +162,7 @@ test.describe('AI companion — settings picker and named threads', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    const eventsNav = page.getByTestId('nav-tab-communicate');
+    const eventsNav = page.getByTestId('nav-tab-talk');
     await eventsNav.waitFor({ state: 'visible', timeout: 15000 });
     await eventsNav.click();
 

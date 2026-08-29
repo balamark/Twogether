@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, StickyNote, Trash2, Pencil, HeartHandshake, Crown, BookOpen } from 'lucide-react';
+import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, Trash2, Pencil, Crown, Home as HomeIcon, TrendingUp } from 'lucide-react';
 import SettingsView from './components/SettingsView';
+import HomeView from './components/HomeView';
+import GrowView from './components/GrowView';
+import TalkSwitcher from './components/TalkSwitcher';
 import ActivityView from './components/ActivityView';
 import UpgradeView, { BillingResultView } from './components/UpgradeView';
 import PremiumExpiryBanner from './components/PremiumExpiryBanner';
@@ -35,7 +38,6 @@ import DeepDiveJourneyView, { type DeepDiveIntent } from './components/deepdive/
 import DeepDiveResumeBanner from './components/deepdive/DeepDiveResumeBanner';
 import type { DeepDiveJourney, DeepDiveInboxItem } from './services/api';
 import AiCompanionOnboarding from './components/AiCompanionPicker';
-import GettingStartedCard from './components/GettingStartedCard';
 import HelpView from './components/HelpView';
 import StoriesView from './components/StoriesView';
 import { resolveCompanion } from './utils/aiCompanions';
@@ -526,6 +528,7 @@ export interface PositionSuggestion {
 // stale/unknown stored value can't drop the user on an unexpected page.
 const VIEW_STORAGE_KEY = 'tw:lastView';
 const PERSISTED_VIEWS = new Set([
+  'home', 'talk', 'us', 'grow',
   'record', 'achievements', 'conflict', 'events', 'roleplay', 'wall',
   'therapists', 'stories', 'shop', 'journey', 'intimacy-history', 'settings', 'activity',
   'feedback', 'love-language', 'upgrade', 'pricing', 'foreplay', 'games', 'communicate', 'help',
@@ -536,14 +539,14 @@ const LoveTimeApp = () => {
   // the same page (e.g. 角色扮演) instead of bouncing back to 記錄時光. Only
   // restore known navigable views; transient/result flows handle their own view.
   const [currentView, setCurrentView] = useState(() => {
-    if (typeof window === 'undefined') return 'record';
+    if (typeof window === 'undefined') return 'home';
     const p = window.location.pathname;
-    if (p.startsWith('/billing/result') || p.startsWith('/booking/result')) return 'record';
+    if (p.startsWith('/billing/result') || p.startsWith('/booking/result')) return 'home';
     try {
       const saved = localStorage.getItem(VIEW_STORAGE_KEY);
       if (saved && PERSISTED_VIEWS.has(saved)) return saved;
     } catch { /* storage disabled — fall back to default */ }
-    return 'record';
+    return 'home';
   });
 
   // Remember the active tab (best-effort) so a refresh restores it.
@@ -565,6 +568,9 @@ const LoveTimeApp = () => {
   // Set when another view means "write one now" (接住情緒's CTA) so 說開一件事
   // opens on the composer instead of the history list. Consumed once.
   const [pendingEventsCompose, setPendingEventsCompose] = useState(false);
+  // Set by 今天's "加一筆記錄" CTA so 我們 opens the add-record modal once it
+  // mounts (the modal only exists inside CalendarView). Consumed once.
+  const [pendingAddRecord, setPendingAddRecord] = useState(false);
   const [pendingScriptTitle, setPendingScriptTitle] = useState<string | null>(null);
   const [intimateRecords, setIntimateRecords] = useState<IntimateRecord[]>([]);
   const [cycleRecords, setCycleRecords] = useState<CycleRecord[]>([]);
@@ -1141,7 +1147,7 @@ const LoveTimeApp = () => {
     });
     // Reset the view so we land back on the logged-out home, not whatever
     // authenticated panel (設定 / 金幣商店 / …) was open at logout time.
-    setCurrentView('record');
+    setCurrentView('home');
     showNotification({
       type: 'info',
       title: '已登出',
@@ -1302,7 +1308,7 @@ const LoveTimeApp = () => {
         return { user: null, isAuthenticated: false, partnerConnected: false };
       });
       clearAuthStorage();
-      setCurrentView('record');
+      setCurrentView('home');
       setShowAuthModal(true);
       showNotification({
         type: 'warning',
@@ -2301,17 +2307,16 @@ const LoveTimeApp = () => {
 
   // SettingsView component moved to separate file
 
+  // 4-tab IA: 今天 (what matters now) / 對話 (all conversation & counseling) /
+  // 我們 (relationship memory: calendar+timeline) / 成長 (stats, AI patterns,
+  // milestones). 角色扮演/心理諮商/真實故事 are no longer their own bottom tabs —
+  // they nest as entry cards inside 對話/成長 (and 我們的牆/愛情旅程 inside 我們),
+  // per the playbook's 6-tab cap / elevator-test rule.
   const navItems = [
-    { id: 'record', label: '記錄時光', icon: Calendar },
-    // 好好說話 merges the old 和諧相處 + 衝突事件 (playbook §6 Q1): one
-    // positively-named tab, sub-tabs inside.
-    { id: 'communicate', label: '好好說話', icon: MessageCircle },
-    { id: 'roleplay', label: '角色扮演', icon: Play },
-    { id: 'wall', label: '我們的牆', icon: StickyNote },
-    // 真實故事: the public community surface (wisdom archive + 公開問答).
-    // Takes the last main-tab slot (playbook R3 cap = 6).
-    { id: 'stories', label: '真實故事', icon: BookOpen },
-    { id: 'therapists', label: '心理諮商', icon: HeartHandshake },
+    { id: 'home', label: '今天', icon: HomeIcon },
+    { id: 'talk', label: '對話', icon: MessageCircle },
+    { id: 'us', label: '我們', icon: Calendar },
+    { id: 'grow', label: '成長', icon: TrendingUp },
     // Pricing is a sales surface for visitors; signed-in users upgrade via the
     // dedicated 'upgrade' view instead, so this tab is logged-out only.
     ...(!authState.isAuthenticated ? [{ id: 'pricing', label: 'Premium', icon: Crown }] : []),
@@ -2350,28 +2355,47 @@ const LoveTimeApp = () => {
         );
         // Each nav tab previews its own feature (read-only) instead of all
         // falling through to one generic login wall. See LoggedOutPreview.
-        default: return <LoggedOutPreview view={currentView} onSignUp={() => setShowAuthModal(true)} scripts={defaultRoleplayScripts} />;
+        default: return <LoggedOutPreview view={currentView} onSignUp={() => setShowAuthModal(true)} scripts={defaultRoleplayScripts} onNavigate={setCurrentView} />;
       }
     }
 
     // Show authenticated content
     switch (currentView) {
-      case 'record':
-      case 'achievements':
+      case 'home':
         return (
-          <div className="space-y-4">
-          <GettingStartedCard
-            companionPicked={!!authState.user?.selected_therapist}
-            paired={partnerConnected}
+          <HomeView
+            authState={authState}
+            showNotification={showNotification}
             hasFirstEntry={intimateRecords.length > 0 || localStorage.getItem('gettingStartedEventOpened') === 'true'}
             onPickCompanion={() => setShowCompanionOnboarding(true)}
             onInvitePartner={openPairingPrompt}
-            onAddRecord={() => setShowRecordModal(true)}
+            onAddRecord={() => {
+              setPendingAddRecord(true);
+              setCurrentView('us');
+            }}
             onOpenEvents={() => {
               localStorage.setItem('gettingStartedEventOpened', 'true');
               setCurrentView('events');
             }}
+            onNudgePartner={partnerConnected ? () => setShowIntimacyRequestForm(true) : undefined}
+            onGoToWall={() => setCurrentView('wall')}
+            onGoToGrow={() => setCurrentView('grow')}
+            onGoToActivity={() => setCurrentView('activity')}
           />
+        );
+      case 'grow':
+      case 'achievements':
+        return (
+          <GrowView
+            authState={authState}
+            onInvitePartner={openPairingPrompt}
+            onNavigate={setCurrentView}
+          />
+        );
+      case 'record':
+      case 'us':
+        return (
+          <div className="space-y-4">
           <CalendarView
             selectedDate={selectedDate}
             setSelectedDate={setSelectedDate}
@@ -2403,6 +2427,8 @@ const LoveTimeApp = () => {
             onNudgePartner={partnerConnected ? () => setShowIntimacyRequestForm(true) : undefined}
             setRecordResponse={setRecordResponse}
             partnerNickname={nicknames.partner2 || '對方'}
+            autoOpenAddRecord={pendingAddRecord}
+            onAutoOpenAddRecordConsumed={() => setPendingAddRecord(false)}
           />
           </div>
         );
@@ -2428,102 +2454,83 @@ const LoveTimeApp = () => {
       // slot: 說開一件事 (the old 衝突事件) and 接住情緒與檢查 (the old
       // 和諧相處). 'events' / 'conflict' stay valid view ids so deep links
       // (notification taps, reload persistence) keep working.
+      // 對話 lands straight on 說開一件事 — its core — rather than on a hub
+      // screen you have to click past. The other four destinations live in the
+      // TalkSwitcher, a thin sticky row present on every 對話-family view so you
+      // can hop between them without going back. Each destination still owns the
+      // whole screen; the 對話 tab stays lit throughout (nav-highlight map above).
       case 'communicate':
-      case 'conflict':
-      case 'events': {
-        const communicateSub = currentView === 'conflict' ? 'harmony' : 'events';
+      case 'talk':
+      case 'events':
         return (
           <div>
-            {/* Sticky so the way back to the other sub-view survives a scroll.
-                ConflictView's own section nav sits at top-[52px] and stacks
-                under this row rather than replacing it. */}
-            <div className="sticky top-0 z-30 bg-petal-cream/95 backdrop-blur-sm border-b border-petal-rule">
-              <div className="max-w-4xl mx-auto px-4 md:px-6 py-2 flex gap-2" role="tablist" aria-label="好好說話">
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={communicateSub === 'events'}
-                  data-testid="communicate-subtab-events"
-                  onClick={() => setCurrentView('events')}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
-                    communicateSub === 'events'
-                      ? 'bg-petal-ink text-petal-cream border-petal-ink'
-                      : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
-                  }`}
-                >
-                  說開一件事
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={communicateSub === 'harmony'}
-                  data-testid="communicate-subtab-harmony"
-                  onClick={() => setCurrentView('conflict')}
-                  className={`px-4 py-1.5 rounded-full text-sm font-medium border transition ${
-                    communicateSub === 'harmony'
-                      ? 'bg-petal-ink text-petal-cream border-petal-ink'
-                      : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
-                  }`}
-                >
-                  接住情緒・檢查
-                </button>
-              </div>
-            </div>
-            {communicateSub === 'harmony' ? (
-              <ConflictView
-                showNotification={showNotification}
-                partnerConnected={partnerConnected}
-                onNavigate={setCurrentView}
-                onComposeEvent={() => {
-                  setPendingEventsCompose(true);
-                  setCurrentView('events');
-                }}
-              />
-            ) : (
-              <EventsView
-                authState={authState}
-                showNotification={showNotification}
-                initialEventId={pendingEventId}
-                onInitialEventConsumed={() => setPendingEventId(null)}
-                initialSubView={pendingEventsCompose ? 'compose' : null}
-                onInitialSubViewConsumed={() => setPendingEventsCompose(false)}
-                onInvitePartner={() => {
-                  localStorage.removeItem('pairingPromptDismissed');
-                  setPairingPromptDismissed(false);
-                  setShowPairingPrompt(true);
-                }}
-                onNavigate={setCurrentView}
-              />
-            )}
+            <TalkSwitcher current="events" onNavigate={setCurrentView} />
+            <EventsView
+              authState={authState}
+              showNotification={showNotification}
+              initialEventId={pendingEventId}
+              onInitialEventConsumed={() => setPendingEventId(null)}
+              initialSubView={pendingEventsCompose ? 'compose' : null}
+              onInitialSubViewConsumed={() => setPendingEventsCompose(false)}
+              onInvitePartner={() => {
+                localStorage.removeItem('pairingPromptDismissed');
+                setPairingPromptDismissed(false);
+                setShowPairingPrompt(true);
+              }}
+              onNavigate={setCurrentView}
+            />
           </div>
         );
-      }
-      case 'roleplay': return <RoleplayView
-        defaultRoleplayScripts={defaultRoleplayScripts}
-        customScripts={customScripts}
-        roleplayFilter={roleplayFilter}
-        setRoleplayFilter={setRoleplayFilter}
-        setShowScriptUploadModal={setShowScriptUploadModal}
-        parseScriptContent={parseScriptContent}
-        addIntimateRecord={addIntimateRecord}
-        onEditScript={(script) => {
-          setEditingScript(script);
-          setShowScriptUploadModal(true);
-        }}
-        showNotification={showNotification}
-        favoriteScriptIds={favoriteScriptIds}
-        onToggleFavorite={toggleFavoriteScript}
-        onUnpublishScript={unpublishScript}
-        initialScriptTitle={pendingScriptTitle}
-        onInitialScriptConsumed={() => setPendingScriptTitle(null)}
-        renderGames={() => <GamesView
-        totalCoins={totalCoins}
-        customMemoryQuestions={customMemoryQuestions}
-        customEmotions={customEmotions}
-        setTotalCoins={setTotalCoins}
-        showNotification={showNotification}
-      />}
-      />;
+      case 'conflict':
+        return (
+          <div>
+            <TalkSwitcher current="conflict" onNavigate={setCurrentView} />
+            <ConflictView
+              showNotification={showNotification}
+              partnerConnected={partnerConnected}
+              onNavigate={setCurrentView}
+              onComposeEvent={() => {
+                setPendingEventsCompose(true);
+                setCurrentView('events');
+              }}
+            />
+          </div>
+        );
+      // roleplay / wall / therapists are 對話 destinations too, so they carry the
+      // switcher — you can jump straight to a sibling from here rather than going
+      // back. (They're also reachable from the profile menu; the switcher's
+      // active chip keeps you oriented either way.)
+      case 'roleplay': return (
+        <div>
+          <TalkSwitcher current="roleplay" onNavigate={setCurrentView} />
+          <RoleplayView
+            defaultRoleplayScripts={defaultRoleplayScripts}
+            customScripts={customScripts}
+            roleplayFilter={roleplayFilter}
+            setRoleplayFilter={setRoleplayFilter}
+            setShowScriptUploadModal={setShowScriptUploadModal}
+            parseScriptContent={parseScriptContent}
+            addIntimateRecord={addIntimateRecord}
+            onEditScript={(script) => {
+              setEditingScript(script);
+              setShowScriptUploadModal(true);
+            }}
+            showNotification={showNotification}
+            favoriteScriptIds={favoriteScriptIds}
+            onToggleFavorite={toggleFavoriteScript}
+            onUnpublishScript={unpublishScript}
+            initialScriptTitle={pendingScriptTitle}
+            onInitialScriptConsumed={() => setPendingScriptTitle(null)}
+            renderGames={() => <GamesView
+              totalCoins={totalCoins}
+              customMemoryQuestions={customMemoryQuestions}
+              customEmotions={customEmotions}
+              setTotalCoins={setTotalCoins}
+              showNotification={showNotification}
+            />}
+          />
+        </div>
+      );
       case 'journey': return (
         <OurJourneyView
           journeyMilestones={journeyMilestones}
@@ -2531,13 +2538,18 @@ const LoveTimeApp = () => {
           setCurrentView={setCurrentView}
         />
       );
-      case 'wall': return <WallView
-        authState={authState}
-        nicknames={nicknames}
-        defaultWallExamples={defaultWallExamples}
-        moodTags={WALL_MOOD_TAGS}
-        showNotification={showNotification}
-      />;
+      case 'wall': return (
+        <div>
+          <TalkSwitcher current="wall" onNavigate={setCurrentView} />
+          <WallView
+            authState={authState}
+            nicknames={nicknames}
+            defaultWallExamples={defaultWallExamples}
+            moodTags={WALL_MOOD_TAGS}
+            showNotification={showNotification}
+          />
+        </div>
+      );
       case 'settings': return <SettingsView
         nicknames={nicknames}
         handleNicknameChange={handleNicknameChange}
@@ -2591,7 +2603,12 @@ const LoveTimeApp = () => {
           }
         }}
       />;
-      case 'therapists': return <TherapistsView authState={authState} showNotification={showNotification} />;
+      case 'therapists': return (
+        <div>
+          <TalkSwitcher current="therapists" onNavigate={setCurrentView} />
+          <TherapistsView authState={authState} showNotification={showNotification} />
+        </div>
+      );
       case 'feedback': return <FeedbackView authState={authState} showNotification={showNotification} setShowAuthModal={setShowAuthModal} />;
       case 'love-language': return <LoveLanguageView authState={authState} showNotification={showNotification} setShowAuthModal={setShowAuthModal} />;
       default: return <GamesView
@@ -2622,7 +2639,7 @@ const LoveTimeApp = () => {
         onDone={() => {
           window.history.replaceState(null, '', '/');
           setIsBillingResult(false);
-          setCurrentView('record');
+          setCurrentView('home');
         }}
       />
     );
@@ -2661,6 +2678,10 @@ const LoveTimeApp = () => {
         onShowSettings={() => setCurrentView('settings')}
         onShowActivity={() => setCurrentView('activity')}
         onShowJourney={() => setCurrentView('journey')}
+        onShowStories={() => setCurrentView('stories')}
+        onShowRoleplay={() => setCurrentView('roleplay')}
+        onShowWall={() => setCurrentView('wall')}
+        onShowTherapists={() => setCurrentView('therapists')}
         onShowIntimacyHistory={() => setCurrentView('intimacy-history')}
         onShowFeedback={() => setCurrentView('feedback')}
         onShowHelp={() => setCurrentView('help')}
@@ -2875,7 +2896,11 @@ const LoveTimeApp = () => {
             const Icon = item.icon;
             const isActive =
               currentView === item.id ||
-              (item.id === 'communicate' && (currentView === 'events' || currentView === 'conflict'));
+              (item.id === 'talk' && ['communicate', 'conflict', 'events', 'roleplay', 'therapists', 'wall'].includes(currentView)) ||
+              (item.id === 'us' && currentView === 'record') ||
+              // 'achievements' is a legacy deep-link id that now renders GrowView,
+              // so it must light up 成長 — not 我們.
+              (item.id === 'grow' && ['achievements', 'stories'].includes(currentView));
             return (
               <button
                 key={item.id}

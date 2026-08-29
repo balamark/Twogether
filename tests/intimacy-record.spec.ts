@@ -30,17 +30,20 @@ test.describe('Intimacy Record Flow', () => {
 
     // Handle login if required
     const loginButton = page.getByTestId('header-auth-button');
-    const recordButton = page.getByTestId('add-record-button');
+    // 今天 (home) is the default landing view now, not 我們/record — probe with
+    // user-menu-toggle (present on every authenticated view) instead of a
+    // testid that only exists after navigating to 我們.
+    const userMenu = page.getByTestId('user-menu-toggle');
 
     // Wait until the app's auth state is determinate — either the login button
-    // or the record button must show. networkidle is racy under parallel load
+    // or the user menu must show. networkidle is racy under parallel load
     // (poll loops keep the network busy and it never settles).
     await Promise.race([
       loginButton.waitFor({ state: 'visible', timeout: 20000 }),
-      recordButton.waitFor({ state: 'visible', timeout: 20000 }),
+      userMenu.waitFor({ state: 'visible', timeout: 20000 }),
     ]).catch(() => {});
 
-    const alreadyLoggedIn = await recordButton.isVisible({ timeout: 2000 });
+    const alreadyLoggedIn = await userMenu.isVisible({ timeout: 2000 });
     if (!alreadyLoggedIn && await loginButton.isVisible({ timeout: 3000 })) {
       await loginButton.click();
       await page.waitForTimeout(1000);
@@ -67,7 +70,7 @@ test.describe('Intimacy Record Flow', () => {
         page.waitForResponse(response => response.url().includes('/auth/login'), { timeout: 15000 }),
         page.waitForSelector('text=登入成功', { timeout: 10000 }),
         page.waitForSelector('text=歡迎', { timeout: 10000 }),
-        recordButton.waitFor({ timeout: 15000 }),
+        userMenu.waitFor({ timeout: 15000 }),
       ]).catch(() => {});
 
       // Close auth modal if still open
@@ -82,12 +85,15 @@ test.describe('Intimacy Record Flow', () => {
         await page.waitForTimeout(1000);
       }
 
-      // Wait for app to fully initialize after login — record button signals
-      // that the home view is ready.
-      await recordButton.waitFor({ state: 'visible', timeout: 20000 });
+      // Wait for app to fully initialize after login — the user menu signals
+      // that 今天 (home) is ready.
+      await userMenu.waitFor({ state: 'visible', timeout: 20000 });
     } else {
-      throw new Error('Neither login button nor record button found - app may not have loaded correctly');
+      throw new Error('Neither login button nor user menu found - app may not have loaded correctly');
     }
+
+    // 記錄時光 now lives under 我們, not the default 今天 landing view.
+    await page.getByTestId('nav-tab-us').click();
 
     // Click the record button
     const addRecordButton = page.getByTestId('add-record-button');
@@ -186,6 +192,7 @@ test.describe('Intimacy Record Flow', () => {
     await page.goto('/');
 
     // Navigate to add record
+    await page.getByTestId('nav-tab-us').click().catch(() => {});
     const addButton = page.getByTestId('add-record-button');
 
     if (await addButton.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -217,6 +224,7 @@ test.describe('Intimacy Record Flow', () => {
   test('should validate required fields', async ({ page }) => {
     await page.goto('/');
 
+    await page.getByTestId('nav-tab-us').click().catch(() => {});
     const addButton = page.getByTestId('add-record-button');
 
     if (await addButton.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -243,6 +251,7 @@ test.describe('Intimacy Record Flow', () => {
   test('should display roleplay scripts correctly', async ({ page }) => {
     await page.goto('/');
 
+    await page.getByTestId('nav-tab-us').click().catch(() => {});
     const addButton = page.getByTestId('add-record-button');
 
     if (await addButton.isVisible({ timeout: 3000 }).catch(() => false)) {

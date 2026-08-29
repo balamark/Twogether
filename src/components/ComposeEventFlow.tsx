@@ -121,6 +121,9 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
       const event = await apiService.createEvent({
         title: preview.title,
         summary,
+        // 完整經過 — present only for long drafts; carried through untouched so
+        // the whole of what the user wrote survives past the短 summary.
+        detail: preview.detail || null,
         emotions: preview.emotions,
         tags: preview.tags,
         toxicityFlags: preview.toxicityFlags,
