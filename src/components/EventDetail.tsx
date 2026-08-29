@@ -1035,11 +1035,16 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
         <ThreadRoleLegend companionName={myCompanion.name} partnerName={partnerNickname || undefined} />
       )}
 
-      {!event.isPrivate && (
-        <section className="bg-petal-cream border border-petal-rule rounded-2xl p-4 space-y-3">
-          {/* 情緒翻譯 lens toggle — shared across both partners. Turns each
-              message into the underlying emotion + need so nobody reads an
-              attack. */}
+      <section className="bg-petal-cream border border-petal-rule rounded-2xl p-4 space-y-3">
+          {/* The thread renders for private (solo) notes too — that's how the
+              author sees their own messages and the AI 諮商師 replies. Previously
+              this whole section was gated on !isPrivate, so a private
+              conversation showed nothing and 請 AI 諮商師加入 looked broken. Only
+              the shared-lens sub-features below stay partner-only. */}
+          {/* 情緒翻譯 lens toggle — shared across both partners; a private (solo)
+              note has no partner to share the lens with, so it's hidden there
+              (the backend also 403s translation on a private event). */}
+          {!event.isPrivate && (
           <div className="flex items-center justify-between gap-2 bg-petal-cream-2 border border-petal-rule rounded-xl px-3 py-2">
             <div className="flex items-center gap-1.5 min-w-0">
               <HeartHandshake className="w-4 h-4 text-petal-rose-deep shrink-0" strokeWidth={1.5} />
@@ -1074,6 +1079,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               />
             </button>
           </div>
+          )}
           {/* Contextual 情緒深潛 entry — a quiet line, not a box. Shown only once
               the emotion lens is on, i.e. when the underlying need is visible and
               this might read as a familiar, older feeling (PRD Entry A). Opens the
@@ -1302,7 +1308,6 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             });
           })()}
         </section>
-      )}
 
       {/* Invite the AI 諮商師 based on the conversation so far — deliberately
           OUTSIDE the reply composer: it reads the thread history, it doesn't
