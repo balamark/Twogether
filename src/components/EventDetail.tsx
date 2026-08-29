@@ -35,6 +35,7 @@ import apiService, {
   type FacilitationSession,
 } from '../services/api';
 import ReplyStepBar from './ReplyStepBar';
+import AutoGrowTextarea from './AutoGrowTextarea';
 import MessageTranslationCard from './MessageTranslationCard';
 import TherapyNoteCard from './TherapyNoteCard';
 import ConflictBanner from './ConflictBanner';
@@ -1377,14 +1378,13 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       {canSendMessage && (
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-3">
           <ReplyStepBar onInsertPhrase={insertPhrase} />
-          <textarea
+          <AutoGrowTextarea
             data-testid="event-reply-input"
             value={reply}
             onChange={(e) => setReply(e.target.value)}
             placeholder="回覆…"
-            rows={2}
             maxLength={REPLY_MAX_CHARS}
-            className="w-full p-2 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y"
+            className="w-full p-2 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-none min-h-[6.5rem] max-h-[40vh] overflow-y-auto"
           />
           {/* maxLength only limits typing — an applied AI rewrite or an
               inserted phrase sets the value directly and can land over the

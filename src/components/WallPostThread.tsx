@@ -6,6 +6,7 @@ import { useTimezone } from '../contexts/TimezoneContext';
 import { formatRelativeOrDate } from '../utils/datetime';
 import { companionName, resolveCompanion } from '../utils/aiCompanions';
 import { ROLE_STYLE, counselorLabel } from '../utils/threadRoles';
+import AutoGrowTextarea from './AutoGrowTextarea';
 import { useAiQuota } from '../hooks/useAiQuota';
 import AiQuotaHint from './AiQuotaHint';
 import MessageTranslationCard from './MessageTranslationCard';
@@ -455,13 +456,12 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
       </div>
 
       <div className="flex items-start gap-2 pt-2">
-        <textarea
+        <AutoGrowTextarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          rows={2}
           maxLength={MAX_REPLY}
           placeholder="回覆⋯（支援 Markdown）"
-          className="flex-1 bg-white border border-petal-rule rounded-md px-3 py-2 font-body text-sm text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y"
+          className="flex-1 bg-white border border-petal-rule rounded-md px-3 py-2 font-body text-sm text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-none min-h-[6.5rem] max-h-[40vh] overflow-y-auto"
           data-testid={`wall-reply-input-${postId}`}
           onKeyDown={(e) => {
             if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {

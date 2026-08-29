@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { formatRelativeOrDate } from '../utils/datetime';
 import type { MomentReactionKey } from '../services/api';
 import type { IntimateRecord } from '../App';
+import AutoGrowTextarea from './AutoGrowTextarea';
 
 // 快速回應 on a 親密記錄. Keys must match MOMENT_REACTIONS in
 // routes/love-moments.js. These exist because a record used to be a row nobody
@@ -195,15 +196,14 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
 
       {editingNote ? (
         <div className="space-y-2">
-          <textarea
+          <AutoGrowTextarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             maxLength={NOTE_MAX}
-            rows={2}
             autoFocus
             placeholder="想說一句什麼？"
             data-testid={`moment-note-input-${record.id}`}
-            className="w-full rounded-md border border-petal-rule bg-petal-cream px-3 py-2 font-body text-sm text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y"
+            className="w-full rounded-md border border-petal-rule bg-petal-cream px-3 py-2 font-body text-sm text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-none min-h-[6.5rem] max-h-[40vh] overflow-y-auto"
           />
           <div className="flex items-center justify-between gap-3">
             <span className="font-body text-[11px] text-petal-muted">
