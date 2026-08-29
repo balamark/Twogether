@@ -14,6 +14,7 @@ import {
   HandHeart,
   Hand,
   Compass,
+  Library,
   NotebookPen,
   Gauge,
   ClipboardCheck,
@@ -433,6 +434,43 @@ const TherapyNoteSample: React.FC = () => (
         <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep mb-0.5">下次可以先說</div>
         <p className="font-body text-sm text-petal-ink">「我現在不是生氣，我只是有點害怕。」</p>
       </div>
+    </div>
+  </SampleCard>
+);
+
+// 話題建議 read-only sample: AI proactively suggests topics for the NEXT
+// session even without a fresh conflict, plus a always-available 話題庫 for
+// starting right away — and a note the couple typed themselves.
+const TherapyTopicsSample: React.FC = () => (
+  <SampleCard>
+    <div className="flex items-center justify-between mb-3">
+      <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
+        <Compass className="w-3.5 h-3.5 text-petal-sage-deep" />
+        AI 主動建議下次諮商可以聊的話題
+      </span>
+      <SampleTag />
+    </div>
+    <div className="rounded-md bg-petal-cream-2 px-3 py-2 mb-2.5">
+      <p className="font-body text-xs text-petal-ink-soft leading-relaxed">
+        最近很平靜，這是好事——但平靜不代表沒有話題可聊。
+      </p>
+    </div>
+    <div className="rounded-md border border-petal-rule bg-white px-3 py-2.5 mb-2">
+      <div className="font-body text-sm font-medium text-petal-ink">家務分工的期待落差</div>
+      <p className="font-body text-xs text-petal-ink-soft leading-relaxed mt-0.5">
+        這兩週「家務」出現了 3 次，這通常代表期待落差，很適合找時間聊聊。
+      </p>
+      <div className="mt-2 rounded-md bg-pink-50 border border-pink-200 px-2.5 py-1.5">
+        <div className="font-body text-[10px] uppercase tracking-[0.1em] text-pink-700 mb-0.5">想延伸聊的點</div>
+        <p className="font-body text-xs text-petal-ink">想聊聊假日的家務怎麼分才公平。</p>
+      </div>
+    </div>
+    <div className="rounded-md border border-petal-rule bg-white px-3 py-2.5">
+      <div className="flex items-center gap-1 mb-0.5">
+        <Library className="w-3 h-3 text-petal-sage-deep" />
+        <span className="font-body text-[10px] uppercase tracking-[0.1em] text-petal-sage-deep">話題庫 · 不用等 AI，隨時可以挑一個開始</span>
+      </div>
+      <div className="font-body text-sm font-medium text-petal-ink">孩子之外，我們還是伴侶嗎？</div>
     </div>
   </SampleCard>
 );
@@ -975,7 +1013,8 @@ const PREVIEWS: Record<string, PreviewConfig> = {
               { n: '1', t: '好好說（事件記錄）', d: '把這週發生的事寫下來，下次諮商不用再花 30 分鐘回想。' },
               { n: '2', t: 'AI 示範引導', d: '不是給答案，而是示範心理師可能會怎麼帶你們一步步練習。' },
               { n: '3', t: '諮商摘要', d: '把最近兩週整理成一份摘要，帶進諮商室更快進入重點。舊摘要會保存下來，隨時點開回顧，不用重新產生、不扣 AI 次數。' },
-              { n: '4', t: '預約真人諮商師', d: '真的卡住了，挑一位受過專業訓練的人好好談。' },
+              { n: '4', t: '話題建議', d: 'AI 主動整理下次諮商可以聊的方向，就算最近很平靜也一樣有話題，還能寫下自己想延伸聊的點。' },
+              { n: '5', t: '預約真人諮商師', d: '真的卡住了，挑一位受過專業訓練的人好好談。' },
             ].map((s) => (
               <li key={s.n} className="flex items-start gap-3 text-left">
                 <span className="shrink-0 w-6 h-6 rounded-full bg-petal-cream-2 text-pink-600 font-body text-xs flex items-center justify-center">
@@ -989,6 +1028,8 @@ const PREVIEWS: Record<string, PreviewConfig> = {
             ))}
           </ol>
         </SampleCard>
+
+        <TherapyTopicsSample />
 
         {/* 專屬心理師 — a couple can grant one approved therapist read (and
             optionally comment) access to their wall + 好好說話, private items

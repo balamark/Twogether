@@ -832,6 +832,84 @@ export interface TherapySummaryHistoryEntry {
   summary: TherapySummary;
 }
 
+// 話題建議 (Therapy Topics): AI-suggested discussion topics for the couple's
+// NEXT session, proactively drawn from recent events. Unlike TherapySummary
+// (which organizes what already happened), this looks forward and is
+// designed to never come back empty — a quiet couple still gets grounded
+// topics, just with a reassuring "no conflict ≠ no relationship problem" tone.
+export interface TherapyTopic {
+  title: string;
+  whySuggested: string;
+  prompts: string[];
+}
+export interface TherapyTopics {
+  intro: string;
+  topics: TherapyTopic[];
+}
+export type TherapyTopicSelectionStatus = 'selected' | 'saved' | 'dismissed';
+export interface TherapyTopicSelection {
+  status: TherapyTopicSelectionStatus | null;
+  notes: string | null;
+  updatedAt: string;
+}
+export interface TherapyTopicsPeriod {
+  days: number;
+  appliedDays: number;
+  label: string;
+  eventCount: number;
+  quiet: boolean;
+}
+
+export type TherapyTopicsResult =
+  | {
+      ok: true;
+      inputHash: string;
+      topics: TherapyTopics;
+      period: TherapyTopicsPeriod;
+      selections: Record<number, TherapyTopicSelection>;
+      cached: boolean;
+    }
+  // The only expected non-error state — this endpoint deliberately never
+  // guards on "no events": a quiet couple still gets general topics.
+  | { ok: false; errorCode: 'NOT_PAIRED'; message: string };
+
+export interface TherapyTopicsHistoryEntry {
+  id: string;
+  inputHash: string;
+  periodDays: number;
+  appliedDays: number;
+  periodLabel: string;
+  quiet: boolean;
+  eventCount: number | null;
+  createdAt: string;
+  topics: TherapyTopics;
+  selections: Record<number, TherapyTopicSelection>;
+}
+
+// The static 話題庫 — curated relationship-maintenance topics, always
+// available with no AI generation, no quota cost.
+export interface TherapyTopicLibraryEntry {
+  id: string;
+  title: string;
+  description: string;
+  prompts: string[];
+}
+export interface TherapyTopicLibraryResult {
+  library: TherapyTopicLibraryEntry[];
+  selections: Record<string, TherapyTopicSelection>;
+}
+
+// The dedicated therapist's read-only view of a client couple's latest topics
+// (both AI-generated and library), including the couple's own picks/notes.
+export interface TherapistClientTopics {
+  topics: TherapyTopics | null;
+  period: TherapyTopicsPeriod | null;
+  selections: Record<number, TherapyTopicSelection>;
+  generatedAt: string | null;
+  library: TherapyTopicLibraryEntry[];
+  librarySelections: Record<string, TherapyTopicSelection>;
+}
+
 export interface CreateEventInput {
   title: string;
   summary: string;
@@ -4508,6 +4586,90 @@ class ApiService {
     }
   }
 
+  // Fetch (or generate) 話題建議 for the couple's recent events. Same
+  // discriminated-result shape as getTherapySummary, but the only expected
+  // non-error state is NOT_PAIRED — there is no "no events" guard, the server
+  // widens its lookback and returns general topics instead.
+  async getTherapyTopics(days = 14): Promise<TherapyTopicsResult> {
+    try {
+      const response = await apiClient.get('/events/therapy-topics', { params: { days } });
+      const d = response.data ?? {};
+      if (d.success === false) {
+        return {
+          ok: false,
+          errorCode: (d.error_code as 'NOT_PAIRED') ?? 'NOT_PAIRED',
+          message: d.message ?? '先和另一半配對，就能開始收到話題建議。',
+        };
+      }
+      return {
+        ok: true,
+        inputHash: d.inputHash as string,
+        topics: d.topics as TherapyTopics,
+        period: d.period as TherapyTopicsPeriod,
+        selections: (d.selections ?? {}) as Record<number, TherapyTopicSelection>,
+        cached: d.cached === true,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch therapy topics:', error);
+      this.throwApiError(error, '話題建議暫時無法產生，請稍後再試');
+    }
+  }
+
+  async getTherapyTopicsHistory(): Promise<TherapyTopicsHistoryEntry[]> {
+    try {
+      const response = await apiClient.get('/events/therapy-topics/history');
+      return (response.data?.history as TherapyTopicsHistoryEntry[]) ?? [];
+    } catch (error: unknown) {
+      console.error('Failed to fetch therapy topics history:', error);
+      return [];
+    }
+  }
+
+  // Mark an AI-suggested topic 加入諮商/先收藏/不相關 and/or save notes.
+  // Either field alone is valid — omit the one you're not changing. Throws on
+  // failure so an optimistic UI update can be rolled back.
+  async setTherapyTopicSelection(
+    inputHash: string,
+    topicIndex: number,
+    update: { status?: TherapyTopicSelectionStatus; notes?: string }
+  ): Promise<TherapyTopicSelection & { topicIndex: number }> {
+    try {
+      const response = await apiClient.put(`/events/therapy-topics/${inputHash}/selections/${topicIndex}`, update);
+      return response.data?.selection as TherapyTopicSelection & { topicIndex: number };
+    } catch (error: unknown) {
+      console.error('Failed to update therapy topic selection:', error);
+      this.throwApiError(error, '更新失敗，請稍後再試');
+    }
+  }
+
+  // The static 話題庫 — always available, no AI cost. Merges in the caller's
+  // own selections in one round trip.
+  async getTherapyTopicLibrary(): Promise<TherapyTopicLibraryResult> {
+    try {
+      const response = await apiClient.get('/events/therapy-topics/library');
+      return {
+        library: (response.data?.library ?? []) as TherapyTopicLibraryEntry[],
+        selections: (response.data?.selections ?? {}) as Record<string, TherapyTopicSelection>,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch therapy topic library:', error);
+      return { library: [], selections: {} };
+    }
+  }
+
+  async setTherapyTopicLibrarySelection(
+    topicId: string,
+    update: { status?: TherapyTopicSelectionStatus; notes?: string }
+  ): Promise<TherapyTopicSelection & { topicId: string }> {
+    try {
+      const response = await apiClient.put(`/events/therapy-topics/library/${topicId}/selection`, update);
+      return response.data?.selection as TherapyTopicSelection & { topicId: string };
+    } catch (error: unknown) {
+      console.error('Failed to update therapy topic library selection:', error);
+      this.throwApiError(error, '更新失敗，請稍後再試');
+    }
+  }
+
   // ----- 婚姻檢查 (Marriage Check-up) -----
 
   async getMarriageCheckup(): Promise<MarriageCheckup | null> {
@@ -4933,6 +5095,27 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to fetch client event detail:', error);
       this.throwApiError(error, '無法取得對話詳情');
+    }
+  }
+
+  // The dedicated therapist's read-only view of a client couple's latest 話題
+  // 建議 (AI-generated + library), including the couple's own picks/notes.
+  // Never triggers generation.
+  async getClientTherapyTopics(coupleId: string): Promise<TherapistClientTopics> {
+    try {
+      const response = await apiClient.get(`/therapists/clients/${coupleId}/therapy-topics`);
+      const d = response.data ?? {};
+      return {
+        topics: (d.topics ?? null) as TherapyTopics | null,
+        period: (d.period ?? null) as TherapyTopicsPeriod | null,
+        selections: (d.selections ?? {}) as Record<number, TherapyTopicSelection>,
+        generatedAt: (d.generatedAt ?? null) as string | null,
+        library: (d.library ?? []) as TherapyTopicLibraryEntry[],
+        librarySelections: (d.librarySelections ?? {}) as Record<string, TherapyTopicSelection>,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch client therapy topics:', error);
+      this.throwApiError(error, '無法取得話題建議');
     }
   }
 

@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { X, Lock, Send, MessageCircle, ChevronLeft } from 'lucide-react';
+import { X, Lock, Send, MessageCircle, ChevronLeft, Compass, Library } from 'lucide-react';
 import {
   apiService,
   type WallPost,
   type WallReply,
   type EventRecord,
   type TherapistClientCouple,
+  type TherapistClientTopics,
+  type TherapyTopicSelectionStatus,
 } from '../services/api';
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -24,7 +26,7 @@ interface Props {
   showNotification: (n: Omit<Notification, 'id'>) => void;
 }
 
-type Tab = 'wall' | 'events';
+type Tab = 'wall' | 'events' | 'topics';
 
 const coupleTitle = (c: TherapistClientCouple): string =>
   c.coupleName || (c.partnerNames.length ? c.partnerNames.join(' & ') : '伴侶');
@@ -52,7 +54,7 @@ const TherapistClientView: React.FC<Props> = ({ client, onClose, showNotificatio
 
         {/* Tabs */}
         <div className="flex border-b border-petal-rule">
-          {(['wall', 'events'] as Tab[]).map((key) => (
+          {(['wall', 'events', 'topics'] as Tab[]).map((key) => (
             <button
               key={key}
               onClick={() => setTab(key)}
@@ -61,7 +63,7 @@ const TherapistClientView: React.FC<Props> = ({ client, onClose, showNotificatio
                 tab === key ? 'text-pink-600 border-b-2 border-pink-500' : 'text-petal-muted hover:text-petal-ink'
               }`}
             >
-              {key === 'wall' ? '牆' : '好好說話'}
+              {key === 'wall' ? '牆' : key === 'events' ? '好好說話' : '話題建議'}
             </button>
           ))}
         </div>
@@ -70,8 +72,10 @@ const TherapistClientView: React.FC<Props> = ({ client, onClose, showNotificatio
         <div className="flex-1 overflow-y-auto">
           {tab === 'wall' ? (
             <ClientWall coupleId={client.coupleId} canComment={client.canComment} showNotification={showNotification} />
-          ) : (
+          ) : tab === 'events' ? (
             <ClientEvents coupleId={client.coupleId} canComment={client.canComment} showNotification={showNotification} />
+          ) : (
+            <ClientTherapyTopics coupleId={client.coupleId} showNotification={showNotification} />
           )}
         </div>
       </div>
@@ -424,6 +428,141 @@ const ClientEventDetail: React.FC<{
             </div>
           )}
         </>
+      )}
+    </div>
+  );
+};
+
+// --- 話題建議 tab -----------------------------------------------------------
+
+const STATUS_LABEL: Record<TherapyTopicSelectionStatus | 'none', string> = {
+  selected: '已加入諮商',
+  saved: '先收藏',
+  dismissed: '不相關',
+  none: '尚未決定',
+};
+const STATUS_CLS: Record<TherapyTopicSelectionStatus | 'none', string> = {
+  selected: 'bg-petal-rose-deep text-white',
+  saved: 'bg-petal-cream-2 text-petal-ink-soft',
+  dismissed: 'bg-petal-cream-2 text-petal-muted',
+  none: 'bg-petal-cream-2 text-petal-muted',
+};
+
+const StatusChip: React.FC<{ status: TherapyTopicSelectionStatus | null }> = ({ status }) => {
+  const key = status ?? 'none';
+  return (
+    <span className={`inline-flex items-center rounded-full font-body text-[11px] px-2.5 py-0.5 ${STATUS_CLS[key]}`}>
+      {STATUS_LABEL[key]}
+    </span>
+  );
+};
+
+// Read-only therapist rendering of one topic — pick + notes, no controls.
+const TopicReadOnly: React.FC<{
+  title: string;
+  subtitleLabel: string;
+  subtitle: string;
+  status: TherapyTopicSelectionStatus | null;
+  notes: string | null;
+}> = ({ title, subtitleLabel, subtitle, status, notes }) => (
+  <div className="rounded-lg border border-petal-rule bg-petal-cream p-4">
+    <div className="flex items-center justify-between gap-2 mb-1.5">
+      <span className="font-display text-base text-petal-ink">{title}</span>
+      <StatusChip status={status} />
+    </div>
+    <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-0.5">{subtitleLabel}</div>
+    <p className="font-body text-sm text-petal-ink-soft leading-relaxed">{subtitle}</p>
+    {notes && (
+      <div className="mt-2 rounded-md bg-pink-50 border border-pink-200 px-3 py-2">
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-pink-700 mb-0.5">伴侶想延伸聊的點</div>
+        <p className="font-body text-sm text-petal-ink whitespace-pre-wrap">{notes}</p>
+      </div>
+    )}
+  </div>
+);
+
+const ClientTherapyTopics: React.FC<{
+  coupleId: string;
+  showNotification: (n: Omit<Notification, 'id'>) => void;
+}> = ({ coupleId, showNotification }) => {
+  const [data, setData] = useState<TherapistClientTopics | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      setData(await apiService.getClientTherapyTopics(coupleId));
+    } catch (err) {
+      showNotification({ type: 'error', title: '無法載入', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
+    } finally {
+      setLoading(false);
+    }
+  }, [coupleId, showNotification]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <p className="text-center font-body text-sm text-petal-muted py-10">載入中…</p>;
+  if (!data) return null;
+
+  const hasAiTopics = !!data.topics && data.topics.topics.length > 0;
+  const hasLibrary = data.library.length > 0;
+
+  if (!hasAiTopics && !hasLibrary) {
+    return (
+      <p className="text-center font-body text-sm text-petal-muted py-10 px-6 leading-relaxed">
+        這對伴侶還沒有產生話題建議。等他們下次整理事件後，這裡會主動顯示下次諮商可以聊的方向。
+      </p>
+    );
+  }
+
+  return (
+    <div className="p-4 space-y-5" data-testid="client-therapy-topics">
+      {hasAiTopics && data.topics && (
+        <div>
+          <div className="flex items-center gap-1.5 text-petal-sage-deep mb-2">
+            <Compass className="w-4 h-4" strokeWidth={1.5} />
+            <h4 className="font-display text-base text-petal-ink">話題建議</h4>
+            {data.period?.quiet && (
+              <span className="font-body text-[11px] text-petal-muted">・平靜模式</span>
+            )}
+          </div>
+          {data.topics.intro && (
+            <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-2">{data.topics.intro}</p>
+          )}
+          <div className="space-y-2">
+            {data.topics.topics.map((t, idx) => (
+              <TopicReadOnly
+                key={idx}
+                title={t.title}
+                subtitleLabel="為什麼會建議這個"
+                subtitle={t.whySuggested}
+                status={data.selections[idx]?.status ?? null}
+                notes={data.selections[idx]?.notes ?? null}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {hasLibrary && (
+        <div>
+          <div className="flex items-center gap-1.5 text-petal-sage-deep mb-2">
+            <Library className="w-4 h-4" strokeWidth={1.5} />
+            <h4 className="font-display text-base text-petal-ink">話題庫</h4>
+          </div>
+          <div className="space-y-2">
+            {data.library.map((t) => (
+              <TopicReadOnly
+                key={t.id}
+                title={t.title}
+                subtitleLabel="為什麼值得聊聊"
+                subtitle={t.description}
+                status={data.librarySelections[t.id]?.status ?? null}
+                notes={data.librarySelections[t.id]?.notes ?? null}
+              />
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );
