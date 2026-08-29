@@ -1036,6 +1036,48 @@ adminApiRouter.delete('/coupons/:id', async (req, res) => {
   }
 });
 
+// GET /api/admin/coupons/:id/redemptions — who redeemed this coupon, when,
+// and the Premium window it granted (join couple_entitlements for the exact
+// start/expiry actually applied — stacking can push starts_at into the
+// future of the redemption timestamp, so don't assume they match).
+adminApiRouter.get('/coupons/:id/redemptions', async (req, res) => {
+  const id = req.params.id;
+  if (!COUPON_ID_RE.test(id)) {
+    return res.status(400).json({ error: 'invalid coupon id' });
+  }
+  try {
+    const result = await db.query(
+      `SELECT
+         cr.id,
+         cr.created_at                  AS redeemed_at,
+         ru.email                       AS redeemed_by_email,
+         ru.nickname                    AS redeemed_by_nickname,
+         u1.nickname                    AS partner1_nickname,
+         u1.email                       AS partner1_email,
+         u2.nickname                    AS partner2_nickname,
+         u2.email                       AS partner2_email,
+         ce.starts_at                   AS entitlement_starts_at,
+         ce.expires_at                  AS entitlement_expires_at,
+         CASE WHEN ce.starts_at IS NOT NULL AND ce.expires_at IS NOT NULL
+              THEN ROUND(EXTRACT(EPOCH FROM (ce.expires_at - ce.starts_at)) / 86400)::int
+              ELSE NULL END             AS granted_days
+       FROM coupon_redemptions cr
+       LEFT JOIN users ru ON ru.id = cr.redeemed_by
+       LEFT JOIN couples c ON c.id = cr.couple_id
+       LEFT JOIN users u1 ON u1.id = c.user1_id
+       LEFT JOIN users u2 ON u2.id = c.user2_id
+       LEFT JOIN couple_entitlements ce ON ce.id = cr.entitlement_id
+       WHERE cr.coupon_id = $1
+       ORDER BY cr.created_at DESC`,
+      [id]
+    );
+    res.json({ redemptions: result.rows });
+  } catch (err) {
+    logWarn('Admin coupon redemptions query failed', { err: err.message, id });
+    res.json({ redemptions: [] });
+  }
+});
+
 // ──────────────────────────────────────────────────────────────────────────
 // Admin: HTML dashboard.
 // ──────────────────────────────────────────────────────────────────────────
@@ -1419,6 +1461,24 @@ const ADMIN_HTML = `<!doctype html>
           </thead>
           <tbody></tbody>
         </table>
+      </div>
+      <div id="couponRedemptionsDetail" hidden style="margin-top:20px">
+        <h3 style="margin:0 0 8px;font-weight:500;font-size:14px" id="couponRedemptionsTitle">兌換紀錄</h3>
+        <div style="overflow-x:auto">
+          <table id="couponRedemptionsTable">
+            <thead>
+              <tr>
+                <th>兌換者</th>
+                <th>情侶雙方</th>
+                <th>兌換時間</th>
+                <th class="num">天數</th>
+                <th>Premium 起</th>
+                <th>Premium 訖</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -2334,10 +2394,13 @@ const ADMIN_HTML = `<!doctype html>
       tbody.innerHTML = rows.map(function (c) {
         var maxLabel = c.max_redemptions == null ? '不限' : c.max_redemptions;
         var toggleLabel = c.active ? '停用' : '啟用';
+        var redemptionsLink = c.redeemed_count > 0
+          ? ' <button data-coupon-redemptions="' + c.id + '" data-code="' + esc(c.code) + '" style="margin-left:4px;font-size:11px;padding:2px 8px">查看</button>'
+          : '';
         return '<tr>' +
           '<td><code>' + esc(c.code) + '</code></td>' +
           '<td class="num">' + c.days + '</td>' +
-          '<td class="num">' + c.redeemed_count + ' / ' + maxLabel + '</td>' +
+          '<td class="num">' + c.redeemed_count + ' / ' + maxLabel + redemptionsLink + '</td>' +
           '<td>' + (c.expires_at ? fmtDate(c.expires_at) : '永不過期') + '</td>' +
           '<td>' + couponStatusBadge(c) + '</td>' +
           '<td class="muted" style="font-size:12px;max-width:220px">' + esc(c.note || '') + '</td>' +
@@ -2365,6 +2428,55 @@ const ADMIN_HTML = `<!doctype html>
           deleteCoupon(btn.getAttribute('data-coupon-del'), btn.getAttribute('data-code'), btn);
         });
       });
+      tbody.querySelectorAll('button[data-coupon-redemptions]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          openCouponRedemptions(btn.getAttribute('data-coupon-redemptions'), btn.getAttribute('data-code'));
+        });
+      });
+    }
+    async function openCouponRedemptions(id, code) {
+      $('couponRedemptionsDetail').hidden = false;
+      $('couponRedemptionsTitle').textContent = '兌換紀錄 · ' + code;
+      var tbody = document.querySelector('#couponRedemptionsTable tbody');
+      tbody.innerHTML = '<tr><td colspan="6" class="muted">載入中…</td></tr>';
+      $('couponRedemptionsDetail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      try {
+        var res = await fetch('/api/admin/coupons/' + id + '/redemptions');
+        if (!res.ok) throw new Error('redemptions ' + res.status);
+        var body = await res.json();
+        renderCouponRedemptions(body.redemptions || []);
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="6" class="error">載入失敗: ' + esc(e.message) + '</td></tr>';
+      }
+    }
+    function couponRedeemerLabel(r) {
+      if (r.redeemed_by_nickname || r.redeemed_by_email) {
+        return esc(r.redeemed_by_nickname || r.redeemed_by_email);
+      }
+      return '<span class="muted">帳號已刪除</span>';
+    }
+    function couponCoupleLabel(r) {
+      var names = [r.partner1_nickname || r.partner1_email, r.partner2_nickname || r.partner2_email]
+        .filter(Boolean)
+        .map(esc);
+      return names.length ? names.join(' + ') : '<span class="muted">—</span>';
+    }
+    function renderCouponRedemptions(rows) {
+      var tbody = document.querySelector('#couponRedemptionsTable tbody');
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="muted">尚無兌換紀錄</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(function (r) {
+        return '<tr>' +
+          '<td>' + couponRedeemerLabel(r) + '</td>' +
+          '<td>' + couponCoupleLabel(r) + '</td>' +
+          '<td>' + fmtDate(r.redeemed_at) + '</td>' +
+          '<td class="num">' + (r.granted_days == null ? '—' : r.granted_days) + '</td>' +
+          '<td>' + (r.entitlement_starts_at ? fmtDate(r.entitlement_starts_at) : '—') + '</td>' +
+          '<td>' + (r.entitlement_expires_at ? fmtDate(r.entitlement_expires_at) : '—') + '</td>' +
+          '</tr>';
+      }).join('');
     }
     function startEditCoupon(c) {
       if (!c) return;
