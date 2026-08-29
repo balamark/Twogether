@@ -879,6 +879,205 @@ adminApiRouter.delete('/users/:id', async (req, res) => {
   }
 });
 
+// ── Coupons ("優惠碼") ──────────────────────────────────────────────────────
+// Free-Premium coupon codes (see database/migrations/043_coupons.sql). Full
+// CRUD for the admin dashboard: list every coupon (including inactive/expired
+// ones, so nothing is hidden), create, edit any field, and delete.
+
+const COUPON_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const COUPON_FIELDS =
+  'id, code, days, max_redemptions, redeemed_count, expires_at, active, note, created_at';
+
+// GET /api/admin/coupons — every coupon, newest first.
+adminApiRouter.get('/coupons', async (req, res) => {
+  try {
+    const result = await db.query(
+      `SELECT ${COUPON_FIELDS} FROM coupons ORDER BY created_at DESC`
+    );
+    res.json({ coupons: result.rows });
+  } catch (err) {
+    // Table may not exist yet on a fresh DB — surface as empty, not an error.
+    logWarn('Admin coupons list failed', { err: err.message });
+    res.json({ coupons: [] });
+  }
+});
+
+// POST /api/admin/coupons { code, days, max_redemptions?, expires_at?, note? }
+adminApiRouter.post('/coupons', express.json(), async (req, res) => {
+  const body = req.body || {};
+  const code = typeof body.code === 'string' ? body.code.trim().toUpperCase().slice(0, 40) : '';
+  const days = parseInt(body.days, 10);
+  if (!code) return res.status(400).json({ error: '請輸入優惠碼代碼' });
+  if (!Number.isFinite(days) || days <= 0) return res.status(400).json({ error: '天數需為正整數' });
+
+  const maxRedemptions =
+    body.max_redemptions === '' || body.max_redemptions === null || body.max_redemptions === undefined
+      ? null
+      : parseInt(body.max_redemptions, 10);
+  if (maxRedemptions !== null && (!Number.isFinite(maxRedemptions) || maxRedemptions < 0)) {
+    return res.status(400).json({ error: '兌換上限需為非負整數' });
+  }
+
+  const expiresAt = body.expires_at ? new Date(body.expires_at) : null;
+  if (expiresAt && Number.isNaN(expiresAt.getTime())) {
+    return res.status(400).json({ error: '到期日格式錯誤' });
+  }
+
+  const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim().slice(0, 500) : null;
+
+  try {
+    const result = await db.query(
+      `INSERT INTO coupons (code, days, max_redemptions, expires_at, note)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING ${COUPON_FIELDS}`,
+      [code, days, maxRedemptions, expiresAt, note]
+    );
+    logInfo('admin.coupon.created', { id: result.rows[0].id, code, days });
+    res.json({ success: true, coupon: result.rows[0] });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: '這組優惠碼代碼已經存在' });
+    }
+    logError('Admin coupon create failed', { err: err.message, code });
+    res.status(500).json({ error: '建立失敗，請稍後再試' });
+  }
+});
+
+// PATCH /api/admin/coupons/:id — partial update; only provided fields change.
+adminApiRouter.patch('/coupons/:id', express.json(), async (req, res) => {
+  const id = req.params.id;
+  if (!COUPON_ID_RE.test(id)) {
+    return res.status(400).json({ error: 'invalid coupon id' });
+  }
+  const body = req.body || {};
+  const sets = [];
+  const params = [];
+  let idx = 1;
+
+  if (body.code !== undefined) {
+    const code = String(body.code).trim().toUpperCase().slice(0, 40);
+    if (!code) return res.status(400).json({ error: '優惠碼代碼不可為空' });
+    sets.push('code = $' + idx++);
+    params.push(code);
+  }
+  if (body.days !== undefined) {
+    const days = parseInt(body.days, 10);
+    if (!Number.isFinite(days) || days <= 0) return res.status(400).json({ error: '天數需為正整數' });
+    sets.push('days = $' + idx++);
+    params.push(days);
+  }
+  if (body.max_redemptions !== undefined) {
+    const mr = body.max_redemptions === '' || body.max_redemptions === null ? null : parseInt(body.max_redemptions, 10);
+    if (mr !== null && (!Number.isFinite(mr) || mr < 0)) {
+      return res.status(400).json({ error: '兌換上限需為非負整數' });
+    }
+    sets.push('max_redemptions = $' + idx++);
+    params.push(mr);
+  }
+  if (body.expires_at !== undefined) {
+    const exp = body.expires_at === '' || body.expires_at === null ? null : new Date(body.expires_at);
+    if (exp && Number.isNaN(exp.getTime())) return res.status(400).json({ error: '到期日格式錯誤' });
+    sets.push('expires_at = $' + idx++);
+    params.push(exp);
+  }
+  if (body.active !== undefined) {
+    if (typeof body.active !== 'boolean') return res.status(400).json({ error: 'active 需為布林值' });
+    sets.push('active = $' + idx++);
+    params.push(body.active);
+  }
+  if (body.note !== undefined) {
+    const note = body.note === null || body.note === '' ? null : String(body.note).trim().slice(0, 500);
+    sets.push('note = $' + idx++);
+    params.push(note);
+  }
+
+  if (sets.length === 0) {
+    return res.status(400).json({ error: '沒有可更新的欄位' });
+  }
+  params.push(id);
+
+  try {
+    const result = await db.query(
+      `UPDATE coupons SET ${sets.join(', ')} WHERE id = $${idx} RETURNING ${COUPON_FIELDS}`,
+      params
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'coupon not found' });
+    }
+    logInfo('admin.coupon.updated', { id, fields: Object.keys(body) });
+    res.json({ success: true, coupon: result.rows[0] });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({ error: '這組優惠碼代碼已經存在' });
+    }
+    logError('Admin coupon update failed', { err: err.message, id });
+    res.status(500).json({ error: '更新失敗，請稍後再試' });
+  }
+});
+
+// DELETE /api/admin/coupons/:id — cascades to coupon_redemptions (ON DELETE
+// CASCADE) but never touches couple_entitlements, so Premium time already
+// granted from a past redemption is unaffected. Irreversible.
+adminApiRouter.delete('/coupons/:id', async (req, res) => {
+  const id = req.params.id;
+  if (!COUPON_ID_RE.test(id)) {
+    return res.status(400).json({ error: 'invalid coupon id' });
+  }
+  try {
+    const result = await db.query(`DELETE FROM coupons WHERE id = $1 RETURNING code`, [id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'coupon not found' });
+    }
+    logInfo('admin.coupon.deleted', { id, code: result.rows[0].code });
+    res.json({ success: true, code: result.rows[0].code });
+  } catch (err) {
+    logError('Admin coupon delete failed', { err: err.message, id });
+    res.status(500).json({ error: 'delete failed' });
+  }
+});
+
+// GET /api/admin/coupons/:id/redemptions — who redeemed this coupon, when,
+// and the Premium window it granted (join couple_entitlements for the exact
+// start/expiry actually applied — stacking can push starts_at into the
+// future of the redemption timestamp, so don't assume they match).
+adminApiRouter.get('/coupons/:id/redemptions', async (req, res) => {
+  const id = req.params.id;
+  if (!COUPON_ID_RE.test(id)) {
+    return res.status(400).json({ error: 'invalid coupon id' });
+  }
+  try {
+    const result = await db.query(
+      `SELECT
+         cr.id,
+         cr.created_at                  AS redeemed_at,
+         ru.email                       AS redeemed_by_email,
+         ru.nickname                    AS redeemed_by_nickname,
+         u1.nickname                    AS partner1_nickname,
+         u1.email                       AS partner1_email,
+         u2.nickname                    AS partner2_nickname,
+         u2.email                       AS partner2_email,
+         ce.starts_at                   AS entitlement_starts_at,
+         ce.expires_at                  AS entitlement_expires_at,
+         CASE WHEN ce.starts_at IS NOT NULL AND ce.expires_at IS NOT NULL
+              THEN ROUND(EXTRACT(EPOCH FROM (ce.expires_at - ce.starts_at)) / 86400)::int
+              ELSE NULL END             AS granted_days
+       FROM coupon_redemptions cr
+       LEFT JOIN users ru ON ru.id = cr.redeemed_by
+       LEFT JOIN couples c ON c.id = cr.couple_id
+       LEFT JOIN users u1 ON u1.id = c.user1_id
+       LEFT JOIN users u2 ON u2.id = c.user2_id
+       LEFT JOIN couple_entitlements ce ON ce.id = cr.entitlement_id
+       WHERE cr.coupon_id = $1
+       ORDER BY cr.created_at DESC`,
+      [id]
+    );
+    res.json({ redemptions: result.rows });
+  } catch (err) {
+    logWarn('Admin coupon redemptions query failed', { err: err.message, id });
+    res.json({ redemptions: [] });
+  }
+});
+
 // ──────────────────────────────────────────────────────────────────────────
 // Admin: HTML dashboard.
 // ──────────────────────────────────────────────────────────────────────────
@@ -981,6 +1180,7 @@ const ADMIN_HTML = `<!doctype html>
       <button class="tab" data-panel="stories">真實故事</button>
       <button class="tab" data-panel="polls">投票心聲</button>
       <button class="tab" data-panel="pool">分潤</button>
+      <button class="tab" data-panel="coupons">優惠碼</button>
       <button class="tab" data-panel="roleplay">邀請劇本</button>
       <button class="tab" data-panel="ai-usage">AI 用量</button>
       <button class="tab" data-panel="ai-downvotes">AI 負評</button>
@@ -1225,6 +1425,56 @@ const ADMIN_HTML = `<!doctype html>
           <table id="sharesTable">
             <thead>
               <tr><th>諮商師</th><th class="num">回覆</th><th class="num">公開</th><th class="num">讚</th><th class="num">權重</th><th class="num">分潤</th><th>撥款</th><th>操作</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel: Coupons ("優惠碼") -->
+    <div class="panel" id="panel-coupons">
+      <p class="sub">優惠碼可讓情侶免費兌換一段時間的 Premium（見 database/migrations/043_coupons.sql）。停用或刪除不影響已發放的 Premium 天數，只是讓代碼無法再被兌換。</p>
+      <div class="controls" style="align-items:flex-end">
+        <label>代碼<br><input type="text" id="couponCode" placeholder="WELCOME30" style="text-transform:uppercase" maxlength="40"></label>
+        <label>天數<br><input type="number" id="couponDays" min="1" step="1" value="30" style="width:90px"></label>
+        <label>兌換上限<br><input type="number" id="couponMax" min="0" step="1" placeholder="不限" style="width:100px"></label>
+        <label>到期日<br><input type="date" id="couponExpires"></label>
+        <label>備註<br><input type="text" id="couponNote" placeholder="選填" style="width:200px"></label>
+        <button id="couponSubmit">建立</button>
+        <button id="couponCancelEdit" hidden>取消編輯</button>
+        <span class="muted" id="couponStatusMsg"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="couponsTable">
+          <thead>
+            <tr>
+              <th>代碼</th>
+              <th class="num">天數</th>
+              <th class="num">已兌換 / 上限</th>
+              <th>到期日</th>
+              <th>狀態</th>
+              <th>備註</th>
+              <th>建立時間</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="couponRedemptionsDetail" hidden style="margin-top:20px">
+        <h3 style="margin:0 0 8px;font-weight:500;font-size:14px" id="couponRedemptionsTitle">兌換紀錄</h3>
+        <div style="overflow-x:auto">
+          <table id="couponRedemptionsTable">
+            <thead>
+              <tr>
+                <th>兌換者</th>
+                <th>情侶雙方</th>
+                <th>兌換時間</th>
+                <th class="num">天數</th>
+                <th>Premium 起</th>
+                <th>Premium 訖</th>
+              </tr>
             </thead>
             <tbody></tbody>
           </table>
@@ -2115,6 +2365,201 @@ const ADMIN_HTML = `<!doctype html>
     }
     $('poolCreate').addEventListener('click', createPool);
 
+    // ── Coupons ("優惠碼") ──────────────────────────────────────────────────
+    var couponEditingId = null;
+    async function loadCoupons() {
+      $('couponStatusMsg').textContent = '載入中…';
+      try {
+        var res = await fetch('/api/admin/coupons');
+        if (!res.ok) throw new Error('coupons ' + res.status);
+        var body = await res.json();
+        renderCoupons(body.coupons || []);
+        $('couponStatusMsg').textContent = '更新於 ' + new Date().toLocaleTimeString('zh-TW');
+      } catch (e) {
+        $('couponStatusMsg').textContent = '載入失敗: ' + e.message;
+      }
+    }
+    function couponStatusBadge(c) {
+      if (!c.active) return '<span class="badge no">已停用</span>';
+      if (c.expires_at && new Date(c.expires_at) < new Date()) return '<span class="badge no">已過期</span>';
+      if (c.max_redemptions != null && c.redeemed_count >= c.max_redemptions) return '<span class="badge no">已兌換完畢</span>';
+      return '<span class="badge yes">生效中</span>';
+    }
+    function renderCoupons(rows) {
+      var tbody = document.querySelector('#couponsTable tbody');
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="muted">尚無優惠碼</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(function (c) {
+        var maxLabel = c.max_redemptions == null ? '不限' : c.max_redemptions;
+        var toggleLabel = c.active ? '停用' : '啟用';
+        var redemptionsLink = c.redeemed_count > 0
+          ? ' <button data-coupon-redemptions="' + c.id + '" data-code="' + esc(c.code) + '" style="margin-left:4px;font-size:11px;padding:2px 8px">查看</button>'
+          : '';
+        return '<tr>' +
+          '<td><code>' + esc(c.code) + '</code></td>' +
+          '<td class="num">' + c.days + '</td>' +
+          '<td class="num">' + c.redeemed_count + ' / ' + maxLabel + redemptionsLink + '</td>' +
+          '<td>' + (c.expires_at ? fmtDate(c.expires_at) : '永不過期') + '</td>' +
+          '<td>' + couponStatusBadge(c) + '</td>' +
+          '<td class="muted" style="font-size:12px;max-width:220px">' + esc(c.note || '') + '</td>' +
+          '<td>' + fmtDate(c.created_at) + '</td>' +
+          '<td>' +
+            '<button data-coupon-edit="' + c.id + '">編輯</button> ' +
+            '<button data-coupon-toggle="' + c.id + '" data-next="' + (!c.active) + '">' + toggleLabel + '</button> ' +
+            '<button class="danger" data-coupon-del="' + c.id + '" data-code="' + esc(c.code) + '">刪除</button>' +
+          '</td>' +
+          '</tr>';
+      }).join('');
+      tbody.querySelectorAll('button[data-coupon-edit]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var target = btn.getAttribute('data-coupon-edit');
+          startEditCoupon(rows.find(function (r) { return r.id === target; }));
+        });
+      });
+      tbody.querySelectorAll('button[data-coupon-toggle]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          toggleCoupon(btn.getAttribute('data-coupon-toggle'), btn.getAttribute('data-next') === 'true', btn);
+        });
+      });
+      tbody.querySelectorAll('button[data-coupon-del]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          deleteCoupon(btn.getAttribute('data-coupon-del'), btn.getAttribute('data-code'), btn);
+        });
+      });
+      tbody.querySelectorAll('button[data-coupon-redemptions]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          openCouponRedemptions(btn.getAttribute('data-coupon-redemptions'), btn.getAttribute('data-code'));
+        });
+      });
+    }
+    async function openCouponRedemptions(id, code) {
+      $('couponRedemptionsDetail').hidden = false;
+      $('couponRedemptionsTitle').textContent = '兌換紀錄 · ' + code;
+      var tbody = document.querySelector('#couponRedemptionsTable tbody');
+      tbody.innerHTML = '<tr><td colspan="6" class="muted">載入中…</td></tr>';
+      $('couponRedemptionsDetail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      try {
+        var res = await fetch('/api/admin/coupons/' + id + '/redemptions');
+        if (!res.ok) throw new Error('redemptions ' + res.status);
+        var body = await res.json();
+        renderCouponRedemptions(body.redemptions || []);
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="6" class="error">載入失敗: ' + esc(e.message) + '</td></tr>';
+      }
+    }
+    function couponRedeemerLabel(r) {
+      if (r.redeemed_by_nickname || r.redeemed_by_email) {
+        return esc(r.redeemed_by_nickname || r.redeemed_by_email);
+      }
+      return '<span class="muted">帳號已刪除</span>';
+    }
+    function couponCoupleLabel(r) {
+      var names = [r.partner1_nickname || r.partner1_email, r.partner2_nickname || r.partner2_email]
+        .filter(Boolean)
+        .map(esc);
+      return names.length ? names.join(' + ') : '<span class="muted">—</span>';
+    }
+    function renderCouponRedemptions(rows) {
+      var tbody = document.querySelector('#couponRedemptionsTable tbody');
+      if (rows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="muted">尚無兌換紀錄</td></tr>';
+        return;
+      }
+      tbody.innerHTML = rows.map(function (r) {
+        return '<tr>' +
+          '<td>' + couponRedeemerLabel(r) + '</td>' +
+          '<td>' + couponCoupleLabel(r) + '</td>' +
+          '<td>' + fmtDate(r.redeemed_at) + '</td>' +
+          '<td class="num">' + (r.granted_days == null ? '—' : r.granted_days) + '</td>' +
+          '<td>' + (r.entitlement_starts_at ? fmtDate(r.entitlement_starts_at) : '—') + '</td>' +
+          '<td>' + (r.entitlement_expires_at ? fmtDate(r.entitlement_expires_at) : '—') + '</td>' +
+          '</tr>';
+      }).join('');
+    }
+    function startEditCoupon(c) {
+      if (!c) return;
+      couponEditingId = c.id;
+      $('couponCode').value = c.code;
+      $('couponDays').value = c.days;
+      $('couponMax').value = c.max_redemptions == null ? '' : c.max_redemptions;
+      $('couponExpires').value = c.expires_at ? String(c.expires_at).slice(0, 10) : '';
+      $('couponNote').value = c.note || '';
+      $('couponSubmit').textContent = '更新';
+      $('couponCancelEdit').hidden = false;
+    }
+    function resetCouponForm() {
+      couponEditingId = null;
+      $('couponCode').value = '';
+      $('couponDays').value = '30';
+      $('couponMax').value = '';
+      $('couponExpires').value = '';
+      $('couponNote').value = '';
+      $('couponSubmit').textContent = '建立';
+      $('couponCancelEdit').hidden = true;
+    }
+    $('couponCancelEdit').addEventListener('click', resetCouponForm);
+    async function submitCoupon() {
+      var payload = {
+        code: $('couponCode').value.trim(),
+        days: parseInt($('couponDays').value, 10),
+        max_redemptions: $('couponMax').value === '' ? null : parseInt($('couponMax').value, 10),
+        expires_at: $('couponExpires').value || null,
+        note: $('couponNote').value.trim() || null,
+      };
+      if (!payload.code) { $('couponStatusMsg').textContent = '請輸入代碼'; return; }
+      if (!(payload.days > 0)) { $('couponStatusMsg').textContent = '請輸入天數'; return; }
+      $('couponSubmit').disabled = true;
+      try {
+        var url = couponEditingId ? '/api/admin/coupons/' + couponEditingId : '/api/admin/coupons';
+        var method = couponEditingId ? 'PATCH' : 'POST';
+        var res = await fetch(url, {
+          method: method,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        var b = await res.json().catch(function () { return {}; });
+        if (!res.ok) throw new Error(b.error || (method + ' ' + res.status));
+        resetCouponForm();
+        await loadCoupons();
+        $('couponStatusMsg').textContent = '已儲存';
+      } catch (e) {
+        $('couponStatusMsg').textContent = '儲存失敗: ' + e.message;
+      } finally {
+        $('couponSubmit').disabled = false;
+      }
+    }
+    $('couponSubmit').addEventListener('click', submitCoupon);
+    async function toggleCoupon(id, next, btn) {
+      btn.disabled = true;
+      try {
+        var res = await fetch('/api/admin/coupons/' + id, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ active: next }),
+        });
+        if (!res.ok) throw new Error('toggle ' + res.status);
+        await loadCoupons();
+      } catch (e) {
+        btn.disabled = false;
+        $('couponStatusMsg').textContent = '更新失敗: ' + e.message;
+      }
+    }
+    async function deleteCoupon(id, code, btn) {
+      if (!confirm('永久刪除優惠碼「' + code + '」？\\n\\n已兌換的紀錄會一併刪除，但不影響已發放的 Premium 天數，且無法復原。')) return;
+      btn.disabled = true;
+      try {
+        var res = await fetch('/api/admin/coupons/' + id, { method: 'DELETE' });
+        if (!res.ok) throw new Error('delete ' + res.status);
+        if (couponEditingId === id) resetCouponForm();
+        await loadCoupons();
+      } catch (e) {
+        btn.disabled = false;
+        $('couponStatusMsg').textContent = '刪除失敗: ' + e.message;
+      }
+    }
+
     // ── Roleplay invitations ────────────────────────────────────────────────
     var ROLEPLAY_LEVEL_LABEL = {
       normal: '普通', mild: '輕微', moderate: '中等', explicit: '露骨', intense: '最強烈'
@@ -2311,7 +2756,7 @@ const ADMIN_HTML = `<!doctype html>
 
     // Lazy-load the reviews + pool + roleplay + ai-usage + flags tabs the first
     // time they're opened.
-    var reviewsLoaded = false, feedbackLoaded = false, poolLoaded = false, roleplayLoaded = false, aiUsageLoaded = false, flagsLoaded = false, storiesLoaded = false, pollsLoaded = false, aiDownvotesLoaded = false;
+    var reviewsLoaded = false, feedbackLoaded = false, poolLoaded = false, couponsLoaded = false, roleplayLoaded = false, aiUsageLoaded = false, flagsLoaded = false, storiesLoaded = false, pollsLoaded = false, aiDownvotesLoaded = false;
     document.querySelectorAll('.tab').forEach(function (btn) {
       var panel = btn.getAttribute('data-panel');
       if (panel === 'reviews') btn.addEventListener('click', function () { if (!reviewsLoaded) { reviewsLoaded = true; loadReviews(); } });
@@ -2319,6 +2764,7 @@ const ADMIN_HTML = `<!doctype html>
       if (panel === 'stories') btn.addEventListener('click', function () { if (!storiesLoaded) { storiesLoaded = true; loadStories(); } });
       if (panel === 'polls') btn.addEventListener('click', function () { if (!pollsLoaded) { pollsLoaded = true; loadPollVoices(); } });
       if (panel === 'pool') btn.addEventListener('click', function () { if (!poolLoaded) { poolLoaded = true; loadPools(); } });
+      if (panel === 'coupons') btn.addEventListener('click', function () { if (!couponsLoaded) { couponsLoaded = true; loadCoupons(); } });
       if (panel === 'roleplay') btn.addEventListener('click', function () { if (!roleplayLoaded) { roleplayLoaded = true; loadRoleplay(); } });
       if (panel === 'ai-usage') btn.addEventListener('click', function () { if (!aiUsageLoaded) { aiUsageLoaded = true; loadAiUsage(); } });
       if (panel === 'ai-downvotes') btn.addEventListener('click', function () { if (!aiDownvotesLoaded) { aiDownvotesLoaded = true; loadDownvotes(); } });
