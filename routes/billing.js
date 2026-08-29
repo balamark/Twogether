@@ -121,11 +121,11 @@ router.post(
           const currentMax = expiryRow.rows[0]?.max_exp || null;
 
           const entRes = await client.query(
-            `INSERT INTO couple_entitlements (couple_id, plan, starts_at, expires_at, order_id)
-             SELECT $1, $2, s, s + make_interval(days => $3), NULL
+            `INSERT INTO couple_entitlements (couple_id, plan, starts_at, expires_at, order_id, unlimited_ai)
+             SELECT $1, $2, s, s + make_interval(days => $3), NULL, $5
                FROM (SELECT GREATEST(NOW(), COALESCE($4::timestamptz, NOW())) AS s) t
              RETURNING id, expires_at`,
-            [coupleId, `coupon_${coupon.days}`.slice(0, 16), coupon.days, currentMax]
+            [coupleId, `coupon_${coupon.days}`.slice(0, 16), coupon.days, currentMax, !!coupon.unlimited_ai]
           );
           newExpiry = entRes.rows[0].expires_at;
 
@@ -149,13 +149,22 @@ router.post(
         throw e;
       }
 
-      logInfo('billing.coupon.redeemed', { coupleId, userId: req.user.id, code, days: coupon.days });
+      logInfo('billing.coupon.redeemed', {
+        coupleId,
+        userId: req.user.id,
+        code,
+        days: coupon.days,
+        unlimitedAi: !!coupon.unlimited_ai,
+      });
       res.json({
         success: true,
-        message: `已啟用 Premium ${coupon.days} 天`,
+        message: coupon.unlimited_ai
+          ? `已啟用 Premium ${coupon.days} 天，AI 使用次數無上限`
+          : `已啟用 Premium ${coupon.days} 天`,
         days: coupon.days,
         expires_at: newExpiry,
         tier: 'premium',
+        unlimited_ai: !!coupon.unlimited_ai,
       });
     } catch (err) {
       logError('Coupon redeem failed', { err: err.message, stack: err.stack });

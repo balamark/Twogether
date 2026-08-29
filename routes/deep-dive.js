@@ -308,9 +308,9 @@ router.post(
       // Shared daily AI budget. A block is a soft, inline stop — the frontend
       // passes skipBillingRedirect so the user keeps their progress and can
       // just write it themselves.
-      const { tier, limit } = await resolveAiLimit(userId);
+      const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
       const usedToday = await countTodayAiUsage(userId);
-      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
       if (!limitCheck.ok) {
         logInfo('deep_dive.ai', { userId, journeyId: access.journey.id, blocked: true, used: usedToday, limit, tier });
         return res.status(limitCheck.status).json({ ...limitCheck.body, error_code: 'DEEP_DIVE_AI_QUOTA' });

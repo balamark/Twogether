@@ -253,9 +253,9 @@ router.post(
     logInfo('events.icebreaker.input', { userId, len: rawText.length, raw: rawText });
 
     try {
-      const { tier, limit } = await resolveAiLimit(userId);
+      const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
       const usedToday = await countTodayAiUsage(userId);
-      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
       if (!limitCheck.ok) {
         logInfo('events.icebreaker.limit', { userId, used: usedToday, limit, tier, blocked: true });
         return res.status(limitCheck.status).json(limitCheck.body);
@@ -642,9 +642,9 @@ router.get(
       }
 
       // Fresh generation costs one AI credit (same budget as the therapy note).
-      const { tier, limit } = await resolveAiLimit(userId);
+      const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
       const usedToday = await countTodayAiUsage(userId);
-      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
       if (!limitCheck.ok) {
         logInfo('events.therapy_summary.limit', { userId, coupleId, used: usedToday, limit, tier, blocked: true });
         return res.status(limitCheck.status).json(limitCheck.body);
@@ -818,9 +818,9 @@ router.get('/communication-pattern', async (req, res) => {
     }
 
     // Fresh generation costs one AI credit (same daily budget as the icebreaker).
-    const { tier, limit } = await resolveAiLimit(userId);
+    const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
     const usedToday = await countTodayAiUsage(userId);
-    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
     if (!limitCheck.ok) {
       logInfo('events.communication_pattern.limit', { userId, coupleId, used: usedToday, limit, tier, blocked: true });
       return res.status(limitCheck.status).json(limitCheck.body);
@@ -1181,9 +1181,9 @@ router.post(
       logInfo('events.reply_rewrite.input', { userId, eventId: req.params.id, len: rawReply.length, raw: rawReply });
 
       // Shares the daily AI budget with the icebreaker (both hit the paid LLM).
-      const { tier, limit, coupleId } = await resolveAiLimit(userId);
+      const { tier, limit, coupleId, unlimitedAi } = await resolveAiLimit(userId);
       const usedToday = await countTodayAiUsage(userId);
-      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
       if (!limitCheck.ok) {
         // Include the per-kind breakdown so a block can be attributed to the
         // right feature (改寫 vs 角色扮演 vs 諮商師…) directly from the logs.
@@ -1295,9 +1295,9 @@ router.post(
         return res.json({ success: true, analysis: cached, cached: true });
       }
 
-      const { tier, limit } = await resolveAiLimit(userId);
+      const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
       const usedToday = await countTodayAiUsage(userId);
-      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
       if (!limitCheck.ok) {
         logInfo('events.draft_analysis.limit', { userId, eventId: req.params.id, used: usedToday, limit, tier, blocked: true });
         return res.status(limitCheck.status).json(limitCheck.body);
@@ -1377,9 +1377,9 @@ router.post(
       }
 
       // Shares the daily AI budget with the icebreaker (both hit the paid LLM).
-      const { tier, limit } = await resolveAiLimit(userId);
+      const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
       const usedToday = await countTodayAiUsage(userId);
-      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
       if (!limitCheck.ok) {
         logInfo('events.emotion_acceptance.limit', { userId, used: usedToday, limit, tier, blocked: true });
         return res.status(limitCheck.status).json(limitCheck.body);
@@ -1452,9 +1452,9 @@ router.post('/:id/ai-comment/preview', [param('id').isUUID()], async (req, res) 
       return res.json({ success: true, comment: cached.comment, cached: true });
     }
 
-    const { tier, limit } = await resolveAiLimit(userId);
+    const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
     const usedToday = await countTodayAiUsage(userId);
-    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
     if (!limitCheck.ok) {
       logInfo('events.ai_comment.limit', { userId, eventId: req.params.id, used: usedToday, limit, tier, blocked: true });
       return res.status(limitCheck.status).json(limitCheck.body);
@@ -1619,9 +1619,9 @@ router.get('/:id/translations', [param('id').isUUID()], async (req, res) => {
     });
 
     if (missing.length > 0) {
-      const { tier, limit } = await resolveAiLimit(userId);
+      const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
       const usedToday = await countTodayAiUsage(userId);
-      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
       if (!limitCheck.ok) {
         logInfo('events.translation.limit', { userId, eventId: req.params.id, used: usedToday, limit, tier, blocked: true });
         return res.status(limitCheck.status).json(limitCheck.body);
@@ -1760,9 +1760,9 @@ router.get('/:id/therapy-note', [param('id').isUUID()], async (req, res) => {
       isAi: r.is_ai === true,
     }));
 
-    const { tier, limit } = await resolveAiLimit(userId);
+    const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
     const usedToday = await countTodayAiUsage(userId);
-    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
     if (!limitCheck.ok) {
       logInfo('events.therapy_note.limit', { userId, eventId: req.params.id, used: usedToday, limit, tier, blocked: true });
       return res.status(limitCheck.status).json(limitCheck.body);
@@ -2216,9 +2216,9 @@ router.post('/:id/facilitation/start', [param('id').isUUID()], async (req, res) 
     const userId = req.user.id;
     if (!(await facilitationPreflight(access, res, userId))) return;
 
-    const { tier, limit } = await resolveAiLimit(userId);
+    const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
     const usedToday = await countTodayAiUsage(userId);
-    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
     if (!limitCheck.ok) {
       logInfo('events.facilitation.limit', { userId, eventId: req.params.id, used: usedToday, limit, tier, blocked: true });
       return res.status(limitCheck.status).json(limitCheck.body);
@@ -2339,9 +2339,9 @@ router.post('/:id/facilitation/next', [param('id').isUUID()], async (req, res) =
       return res.json({ success: true, session: serializeSession(session), message: null });
     }
 
-    const { tier, limit } = await resolveAiLimit(userId);
+    const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
     const usedToday = await countTodayAiUsage(userId);
-    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
     if (!limitCheck.ok) {
       logInfo('events.facilitation.limit', { userId, eventId: req.params.id, used: usedToday, limit, tier, blocked: true });
       return res.status(limitCheck.status).json(limitCheck.body);

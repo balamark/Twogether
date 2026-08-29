@@ -380,9 +380,9 @@ async function writeClosureInsight(eventId, userId, { charge = true } = {}) {
     }
 
     if (charge) {
-      const { tier } = await resolveAiLimit(userId);
+      const { tier, unlimitedAi } = await resolveAiLimit(userId);
       const usedToday = await countTodayAiUsage(userId);
-      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
       if (!limitCheck.ok) {
         logInfo('events.closure.insight_deferred', { eventId, userId, reason: 'quota' });
         return null;
@@ -590,9 +590,9 @@ router.post(
       const userId = req.user.id;
       const field = isAssistField(req.body.field) ? req.body.field : 'commitment';
 
-      const { tier, limit } = await resolveAiLimit(userId);
+      const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
       const usedToday = await countTodayAiUsage(userId);
-      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
       if (!limitCheck.ok) {
         logInfo('events.closure.assist', {
           userId, eventId: access.event.id, field, blocked: true, used: usedToday, limit, tier,
@@ -1067,9 +1067,9 @@ router.post('/:id/closure/insight', [param('id').isUUID()], async (req, res) => 
       return res.json({ success: true, closure: await loadAndSerialize(access, userId) });
     }
 
-    const { tier, limit } = await resolveAiLimit(userId);
+    const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
     const usedToday = await countTodayAiUsage(userId);
-    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
     if (!limitCheck.ok) {
       logInfo('events.closure.insight', { userId, eventId, blocked: true, used: usedToday, limit, tier });
       return res.status(limitCheck.status).json(limitCheck.body);

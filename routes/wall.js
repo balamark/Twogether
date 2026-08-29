@@ -1050,9 +1050,9 @@ router.post('/:id/ai-comment/preview', async (req, res) => {
     const post = postResult.rows[0];
 
     // Shared daily AI budget (same pool as the icebreaker / reply-rewrite).
-    const { tier, limit } = await resolveAiLimit(userId);
+    const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
     const usedToday = await countTodayAiUsage(userId);
-    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
     if (!limitCheck.ok) {
       logInfo('wall.ai_comment.limit', { userId, postId, used: usedToday, limit, tier, blocked: true });
       return res.status(limitCheck.status).json(limitCheck.body);
@@ -1274,9 +1274,9 @@ router.get('/:id/translations', async (req, res) => {
     });
 
     if (missing.length > 0) {
-      const { tier, limit } = await resolveAiLimit(userId);
+      const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
       const usedToday = await countTodayAiUsage(userId);
-      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
       if (!limitCheck.ok) {
         logInfo('wall.translation.limit', { userId, postId, used: usedToday, limit, tier, blocked: true });
         return res.status(limitCheck.status).json(limitCheck.body);
