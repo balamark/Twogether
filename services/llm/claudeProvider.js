@@ -2908,9 +2908,18 @@ async function generateTherapyTopics({ periodLabel, appliedDays, events, stats, 
       .filter((t) => t.prompts.length >= 2)
       .slice(0, max);
 
+  const topics = cleanTopics(out.topics, 5);
+  // The whole contract of this feature is "never empty". If cleaning stripped
+  // everything (malformed / too-short model output), throw so the route's
+  // catch surfaces a retryable error — instead of caching an empty set (which
+  // would be charged AND permanently returned for this input hash).
+  if (!topics.length) {
+    throw new Error('Claude returned no usable therapy topics');
+  }
+
   return {
     intro: cleanStr(out.intro),
-    topics: cleanTopics(out.topics, 5),
+    topics,
     _meta: {
       provider: 'claude',
       model: response.model || MODEL,

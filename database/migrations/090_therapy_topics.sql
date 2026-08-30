@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS therapy_topic_suggestions (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   couple_id    UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
   period_days  INTEGER NOT NULL,               -- requested window (14 or 30)
-  applied_days INTEGER NOT NULL,                -- actual window used (== period_days unless quiet-widened to 60)
-  quiet        BOOLEAN NOT NULL DEFAULT FALSE,  -- true when little/no recent conflict triggered the widen fallback
+  applied_days INTEGER NOT NULL,                -- actual window used (== period_days unless widened to 60 when recent events were sparse)
+  quiet        BOOLEAN NOT NULL DEFAULT FALSE,  -- true only when the recent window had NO events (drives the "最近很平靜" reassurance framing)
   input_hash   VARCHAR(64) NOT NULL,
   topics       JSONB NOT NULL,                  -- { intro: string, topics: [{ title, whySuggested, prompts: string[] }] }
   event_count  INTEGER,                          -- events (primary + widened) fed to the generator

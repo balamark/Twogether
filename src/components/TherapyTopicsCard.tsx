@@ -46,27 +46,39 @@ function formatHistoryDate(iso: string): string {
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 }
 
+const NOTES_MAX = 500;
+
 // One topic card — shared shape for both AI-suggested topics and the static
 // 話題庫, so picking/annotating either feels identical. `onSetStatus`/
 // `onSetNotes` resolve to whether the save succeeded (never reject) so this
 // component can flash "已儲存" without the caller needing a try/catch here.
+//
+// `resetKey` identifies which topic/generation this card is showing. The notes
+// draft is synced from the prop ONLY when resetKey changes (a different topic,
+// or a different generation opened from history) — never on every `notes`
+// change. That's deliberate: an optimistic rollback after a failed save flips
+// the `notes` prop back, and syncing on `notes` would then wipe the text the
+// user still needs to retry with (and could bleed a draft across a history swap).
 const TopicCard: React.FC<{
+  resetKey: string;
   title: string;
   subtitleLabel: string;
   subtitle: string;
   prompts: string[];
   status: TherapyTopicSelectionStatus | null;
   notes: string | null;
-  onSetStatus: (status: TherapyTopicSelectionStatus) => void;
+  onSetStatus: (status: TherapyTopicSelectionStatus | null) => void;
   onSetNotes: (notes: string) => Promise<boolean>;
-}> = ({ title, subtitleLabel, subtitle, prompts, status, notes, onSetStatus, onSetNotes }) => {
+}> = ({ resetKey, title, subtitleLabel, subtitle, prompts, status, notes, onSetStatus, onSetNotes }) => {
   const [notesDraft, setNotesDraft] = useState(notes || '');
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
 
   useEffect(() => {
     setNotesDraft(notes || '');
-  }, [notes]);
+    // Intentionally keyed on resetKey only — see the component comment above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resetKey]);
 
   const commitNotes = async () => {
     if (notesDraft === (notes || '')) return;
@@ -100,7 +112,8 @@ const TopicCard: React.FC<{
         {STATUS_OPTIONS.map((opt) => (
           <button
             key={opt.key}
-            onClick={() => onSetStatus(opt.key)}
+            // Tapping the active pick again clears it (null) — a mis-tap shouldn't be permanent.
+            onClick={() => onSetStatus(status === opt.key ? null : opt.key)}
             data-testid={`therapy-topic-status-${opt.key}`}
             className={`px-3 py-1.5 rounded-full font-body text-xs transition-colors ${
               status === opt.key
@@ -117,6 +130,7 @@ const TopicCard: React.FC<{
           value={notesDraft}
           onChange={(e) => setNotesDraft(e.target.value)}
           onBlur={commitNotes}
+          maxLength={NOTES_MAX}
           placeholder="想延伸聊的點，例如你想多聊哪個部分…"
           rows={2}
           data-testid="therapy-topic-notes"
@@ -218,17 +232,35 @@ const TherapyTopicsCard: React.FC<Props> = ({ authState, showNotification }) => 
     }
   };
 
-  const updateTopicSelection = async (idx: number, update: { status?: TherapyTopicSelectionStatus; notes?: string }): Promise<boolean> => {
+  // A single next-status/notes shape → the optimistically-merged selection. An
+  // explicit `status: null` clears the pick; a `notes` string replaces notes.
+  const mergeSelection = (
+    prev: TherapyTopicSelection | undefined,
+    update: { status?: TherapyTopicSelectionStatus | null; notes?: string }
+  ): TherapyTopicSelection => ({
+    status: 'status' in update ? (update.status ?? null) : (prev?.status ?? null),
+    notes: update.notes !== undefined ? update.notes : (prev?.notes ?? null),
+    updatedAt: new Date().toISOString(),
+  });
+
+  // Unpaired users can browse the 話題庫 but can't persist picks (the couple
+  // scope doesn't exist yet). Gate that as a guiding warning with a next step,
+  // not a red failure toast — matches the CLAUDE.md three-part-gate convention.
+  const guardPaired = (): boolean => {
+    if (authState.partnerConnected) return true;
+    showNotification({
+      type: 'warning',
+      title: '配對後就能標記話題',
+      message: '和另一半配對後，就能把想聊的話題標記起來、寫下延伸的想法，也讓你們的專屬心理師看得到。',
+      duration: 4000,
+    });
+    return false;
+  };
+
+  const updateTopicSelection = async (idx: number, update: { status?: TherapyTopicSelectionStatus | null; notes?: string }): Promise<boolean> => {
     if (!inputHash) return false;
     const prev = selections[idx];
-    setSelections((s) => ({
-      ...s,
-      [idx]: {
-        status: update.status ?? prev?.status ?? null,
-        notes: update.notes !== undefined ? update.notes : (prev?.notes ?? null),
-        updatedAt: new Date().toISOString(),
-      },
-    }));
+    setSelections((s) => ({ ...s, [idx]: mergeSelection(prev, update) }));
     try {
       await apiService.setTherapyTopicSelection(inputHash, idx, update);
       return true;
@@ -239,16 +271,10 @@ const TherapyTopicsCard: React.FC<Props> = ({ authState, showNotification }) => 
     }
   };
 
-  const updateLibrarySelection = async (topicId: string, update: { status?: TherapyTopicSelectionStatus; notes?: string }): Promise<boolean> => {
+  const updateLibrarySelection = async (topicId: string, update: { status?: TherapyTopicSelectionStatus | null; notes?: string }): Promise<boolean> => {
+    if (!guardPaired()) return false;
     const prev = librarySelections[topicId];
-    setLibrarySelections((s) => ({
-      ...s,
-      [topicId]: {
-        status: update.status ?? prev?.status ?? null,
-        notes: update.notes !== undefined ? update.notes : (prev?.notes ?? null),
-        updatedAt: new Date().toISOString(),
-      },
-    }));
+    setLibrarySelections((s) => ({ ...s, [topicId]: mergeSelection(prev, update) }));
     try {
       await apiService.setTherapyTopicLibrarySelection(topicId, update);
       return true;
@@ -356,7 +382,14 @@ const TherapyTopicsCard: React.FC<Props> = ({ authState, showNotification }) => 
         <div className="mt-4 space-y-3" data-testid="therapy-topics-result">
           <div className="flex items-center justify-between gap-2">
             <span className="font-body text-xs text-petal-muted flex items-center gap-2 flex-wrap">
-              <span>{period.label} · 共 {period.eventCount} 件事件</span>
+              {/* Whenever we widened the lookback (appliedDays > days), eventCount
+                  includes older events — say so instead of mislabelling the count
+                  as belonging to "最近兩週". */}
+              <span>
+                {period.appliedDays > period.days
+                  ? `已從最近 ${period.appliedDays} 天找出可以聊的方向 · 共 ${period.eventCount} 件`
+                  : `${period.label} · 共 ${period.eventCount} 件事件`}
+              </span>
               {viewingId && viewingDate && (
                 <span data-testid="therapy-topics-historic-badge" className="inline-flex items-center gap-1 rounded-full bg-petal-cream-2 text-petal-ink-soft px-2 py-0.5 text-[11px]">
                   <History className="w-3 h-3" strokeWidth={1.5} />
@@ -383,6 +416,7 @@ const TherapyTopicsCard: React.FC<Props> = ({ authState, showNotification }) => 
               return (
                 <TopicCard
                   key={idx}
+                  resetKey={`${inputHash ?? 'none'}-${idx}`}
                   title={t.title}
                   subtitleLabel="為什麼會建議這個"
                   subtitle={t.whySuggested}
@@ -414,6 +448,7 @@ const TherapyTopicsCard: React.FC<Props> = ({ authState, showNotification }) => 
               return (
                 <TopicCard
                   key={t.id}
+                  resetKey={`lib-${t.id}`}
                   title={t.title}
                   subtitleLabel="為什麼值得聊聊"
                   subtitle={t.description}

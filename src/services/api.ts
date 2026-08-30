@@ -4631,7 +4631,7 @@ class ApiService {
   async setTherapyTopicSelection(
     inputHash: string,
     topicIndex: number,
-    update: { status?: TherapyTopicSelectionStatus; notes?: string }
+    update: { status?: TherapyTopicSelectionStatus | null; notes?: string }
   ): Promise<TherapyTopicSelection & { topicIndex: number }> {
     try {
       const response = await apiClient.put(`/events/therapy-topics/${inputHash}/selections/${topicIndex}`, update);
@@ -4659,7 +4659,7 @@ class ApiService {
 
   async setTherapyTopicLibrarySelection(
     topicId: string,
-    update: { status?: TherapyTopicSelectionStatus; notes?: string }
+    update: { status?: TherapyTopicSelectionStatus | null; notes?: string }
   ): Promise<TherapyTopicSelection & { topicId: string }> {
     try {
       const response = await apiClient.put(`/events/therapy-topics/library/${topicId}/selection`, update);

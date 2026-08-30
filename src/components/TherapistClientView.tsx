@@ -507,42 +507,43 @@ const ClientTherapyTopics: React.FC<{
   const hasAiTopics = !!data.topics && data.topics.topics.length > 0;
   const hasLibrary = data.library.length > 0;
 
-  if (!hasAiTopics && !hasLibrary) {
-    return (
-      <p className="text-center font-body text-sm text-petal-muted py-10 px-6 leading-relaxed">
-        這對伴侶還沒有產生話題建議。等他們下次整理事件後，這裡會主動顯示下次諮商可以聊的方向。
-      </p>
-    );
-  }
-
   return (
     <div className="p-4 space-y-5" data-testid="client-therapy-topics">
-      {hasAiTopics && data.topics && (
-        <div>
-          <div className="flex items-center gap-1.5 text-petal-sage-deep mb-2">
-            <Compass className="w-4 h-4" strokeWidth={1.5} />
-            <h4 className="font-display text-base text-petal-ink">話題建議</h4>
-            {data.period?.quiet && (
-              <span className="font-body text-[11px] text-petal-muted">・平靜模式</span>
-            )}
-          </div>
-          {data.topics.intro && (
-            <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-2">{data.topics.intro}</p>
+      <div>
+        <div className="flex items-center gap-1.5 text-petal-sage-deep mb-2">
+          <Compass className="w-4 h-4" strokeWidth={1.5} />
+          <h4 className="font-display text-base text-petal-ink">話題建議</h4>
+          {hasAiTopics && data.period?.quiet && (
+            <span className="font-body text-[11px] text-petal-muted">・平靜模式</span>
           )}
-          <div className="space-y-2">
-            {data.topics.topics.map((t, idx) => (
-              <TopicReadOnly
-                key={idx}
-                title={t.title}
-                subtitleLabel="為什麼會建議這個"
-                subtitle={t.whySuggested}
-                status={data.selections[idx]?.status ?? null}
-                notes={data.selections[idx]?.notes ?? null}
-              />
-            ))}
-          </div>
         </div>
-      )}
+        {/* library is always non-empty, so the "no topics yet" state has to be
+            scoped to the AI section — otherwise a couple who never generated
+            shows the therapist a bare 話題庫 with no explanation. */}
+        {hasAiTopics && data.topics ? (
+          <>
+            {data.topics.intro && (
+              <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-2">{data.topics.intro}</p>
+            )}
+            <div className="space-y-2">
+              {data.topics.topics.map((t, idx) => (
+                <TopicReadOnly
+                  key={idx}
+                  title={t.title}
+                  subtitleLabel="為什麼會建議這個"
+                  subtitle={t.whySuggested}
+                  status={data.selections[idx]?.status ?? null}
+                  notes={data.selections[idx]?.notes ?? null}
+                />
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="font-body text-sm text-petal-muted leading-relaxed">
+            這對伴侶還沒有產生 AI 話題建議。等他們下次整理事件後，這裡會顯示下次諮商可以聊的方向。以下是他們可以直接挑選的話題庫。
+          </p>
+        )}
+      </div>
 
       {hasLibrary && (
         <div>

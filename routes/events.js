@@ -1035,13 +1035,15 @@ router.get(
         [coupleId, String(days)]
       );
       let rows = primary.rows;
-      let quiet = false;
+      const primaryCount = primary.rows.length;
       let appliedDays = days;
 
-      // Quiet-widen: little/no recent conflict is the whole "no conflict ≠ no
-      // relationship problem" case this feature exists for — widen the
-      // lookback to still-open older events instead of returning thin results.
-      if (rows.length < QUIET_EVENT_THRESHOLD) {
+      // Widen the lookback when recent activity is thin so the model has real
+      // material to ground topics in, rather than returning a sparse result.
+      // But `quiet` — the "最近很平靜" reassurance framing — is reserved for a
+      // genuinely empty recent window: with 1-2 real recent conflicts we still
+      // widen for context, yet must NOT tell the couple things have been calm.
+      if (primaryCount < QUIET_EVENT_THRESHOLD) {
         const widened = await db.query(
           `SELECT id, title, summary, status, tags, emotions,
                   created_at, resolved_at, therapy_note, content_edited_at
@@ -1056,9 +1058,13 @@ router.get(
           [coupleId, String(days), String(QUIET_WIDEN_DAYS)]
         );
         rows = rows.concat(widened.rows);
-        quiet = true;
         appliedDays = QUIET_WIDEN_DAYS;
       }
+      const quiet = primaryCount === 0;
+      // Primary rows are ASC and any widened rows were fetched DESC — sort the
+      // combined set oldest-first so it matches the "最舊在前" prompt label and
+      // gives a stable, deterministic order for the cache fingerprint.
+      rows.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
 
       // Deterministic aggregates — hand the model counts so it narrates, not tallies.
       const themeMap = new Map();
@@ -1171,14 +1177,17 @@ router.get(
 
 // PUT /api/events/therapy-topics/:inputHash/selections/:topicIndex — mark a
 // suggested topic 加入諮商/先收藏/不相關 and/or jot free-text notes. Either
-// field alone is valid (e.g. typing notes without changing the pick); the
-// other is carried forward via COALESCE. No AI quota involved.
+// field alone may be sent (e.g. typing notes without changing the pick); the
+// field NOT present is carried forward. `status: null` is a deliberate clear
+// (un-tapping the pick) and is distinct from omitting status — the `hasStatus`
+// flag drives a CASE so a clear actually writes null instead of being kept.
+// No AI quota involved.
 router.put(
   '/therapy-topics/:inputHash/selections/:topicIndex',
   [
     param('inputHash').isLength({ min: 64, max: 64 }).isHexadecimal(),
     param('topicIndex').isInt({ min: 0, max: 9 }).toInt(),
-    body('status').optional().isIn(['selected', 'saved', 'dismissed']),
+    body('status').optional({ nullable: true }).isIn(['selected', 'saved', 'dismissed']),
     body('notes').optional().isString().isLength({ max: 500 }).withMessage('筆記需在 500 字以內'),
   ],
   async (req, res) => {
@@ -1212,18 +1221,21 @@ router.put(
       }
 
       await ensureTherapyTopicSelectionsTable();
-      const statusParam = hasStatus ? req.body.status : null;
+      const statusParam = hasStatus ? (req.body.status ?? null) : null;
       const notesParam = hasNotes ? req.body.notes.toString().trim() : null;
       const result = await db.query(
+        // $7/$8 = "this field is being set" flags. When true we write the value
+        // directly (so an explicit null clears it); when false we keep the
+        // existing value. COALESCE alone can't express a deliberate clear.
         `INSERT INTO therapy_topic_selections (couple_id, input_hash, topic_index, status, notes, updated_by)
          VALUES ($1, $2, $3, $4, $5, $6)
          ON CONFLICT (couple_id, input_hash, topic_index) DO UPDATE
-           SET status = COALESCE($4, therapy_topic_selections.status),
-               notes = COALESCE($5, therapy_topic_selections.notes),
+           SET status = CASE WHEN $7::boolean THEN $4 ELSE therapy_topic_selections.status END,
+               notes = CASE WHEN $8::boolean THEN $5 ELSE therapy_topic_selections.notes END,
                updated_by = $6,
                updated_at = NOW()
          RETURNING status, notes, updated_at`,
-        [coupleId, inputHash, topicIndex, statusParam, notesParam, userId]
+        [coupleId, inputHash, topicIndex, statusParam, notesParam, userId, hasStatus, hasNotes]
       );
       const row = result.rows[0];
       res.json({ success: true, selection: { topicIndex, status: row.status, notes: row.notes, updatedAt: row.updated_at } });
@@ -1262,7 +1274,7 @@ router.get('/therapy-topics/library', async (req, res) => {
 router.put(
   '/therapy-topics/library/:topicId/selection',
   [
-    body('status').optional().isIn(['selected', 'saved', 'dismissed']),
+    body('status').optional({ nullable: true }).isIn(['selected', 'saved', 'dismissed']),
     body('notes').optional().isString().isLength({ max: 500 }).withMessage('筆記需在 500 字以內'),
   ],
   async (req, res) => {
@@ -1285,18 +1297,21 @@ router.put(
       }
 
       await ensureTherapyTopicLibrarySelectionsTable();
-      const statusParam = hasStatus ? req.body.status : null;
+      const statusParam = hasStatus ? (req.body.status ?? null) : null;
       const notesParam = hasNotes ? req.body.notes.toString().trim() : null;
       const result = await db.query(
+        // $6/$7 = "field is being set" flags — see the AI-topic endpoint above.
+        // Lets an explicit `status: null` clear the pick instead of COALESCE
+        // silently keeping the old value.
         `INSERT INTO therapy_topic_library_selections (couple_id, topic_id, status, notes, updated_by)
          VALUES ($1, $2, $3, $4, $5)
          ON CONFLICT (couple_id, topic_id) DO UPDATE
-           SET status = COALESCE($3, therapy_topic_library_selections.status),
-               notes = COALESCE($4, therapy_topic_library_selections.notes),
+           SET status = CASE WHEN $6::boolean THEN $3 ELSE therapy_topic_library_selections.status END,
+               notes = CASE WHEN $7::boolean THEN $4 ELSE therapy_topic_library_selections.notes END,
                updated_by = $5,
                updated_at = NOW()
          RETURNING status, notes, updated_at`,
-        [couple.couple_id, topicId, statusParam, notesParam, userId]
+        [couple.couple_id, topicId, statusParam, notesParam, userId, hasStatus, hasNotes]
       );
       const row = result.rows[0];
       res.json({ success: true, selection: { topicId, status: row.status, notes: row.notes, updatedAt: row.updated_at } });
@@ -1365,16 +1380,29 @@ router.get('/therapy-topics/history', async (req, res) => {
   }
 });
 
-// The couple's most recent generated topic set + selections, plus the static
+// The topic set the therapist should see + its selections, plus the static
 // library + the couple's library selections — for the dedicated-therapist
 // read-only view (routes/therapists.js). Never triggers generation.
+//
+// Selections are keyed by input_hash, so a fresh generation (new event set →
+// new hash) would otherwise orphan the picks/notes the couple made on an
+// earlier set and show the therapist an un-annotated board. To keep the
+// changelog's promise ("心理師也看得到這些建議與筆記"), prefer the most
+// recent generation the couple actually ENGAGED with (has ≥1 selection),
+// falling back to the newest generation when none is annotated yet.
 async function getLatestTherapyTopicsForCouple(coupleId) {
   await ensureTherapyTopicSuggestionsTable();
+  await ensureTherapyTopicSelectionsTable();
   const latest = await db.query(
-    `SELECT input_hash, period_days, applied_days, quiet, event_count, topics, created_at
-       FROM therapy_topic_suggestions
-      WHERE couple_id = $1
-      ORDER BY created_at DESC
+    `SELECT s.input_hash, s.period_days, s.applied_days, s.quiet, s.event_count, s.topics, s.created_at
+       FROM therapy_topic_suggestions s
+       LEFT JOIN LATERAL (
+         SELECT 1 FROM therapy_topic_selections sel
+          WHERE sel.couple_id = s.couple_id AND sel.input_hash = s.input_hash
+          LIMIT 1
+       ) has_sel ON true
+      WHERE s.couple_id = $1
+      ORDER BY (has_sel IS NOT NULL) DESC, s.created_at DESC
       LIMIT 1`,
     [coupleId]
   );
@@ -1382,7 +1410,6 @@ async function getLatestTherapyTopicsForCouple(coupleId) {
 
   let selections = {};
   if (row) {
-    await ensureTherapyTopicSelectionsTable();
     const sel = await db.query(
       `SELECT topic_index, status, notes, updated_at FROM therapy_topic_selections
         WHERE couple_id = $1 AND input_hash = $2`,
