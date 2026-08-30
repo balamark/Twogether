@@ -29,6 +29,7 @@ module.exports = {
   generateThreadTranslations: provider.generateThreadTranslations,
   generateTherapyNote: provider.generateTherapyNote,
   generateTherapySummary: provider.generateTherapySummary,
+  generateTherapyTopics: provider.generateTherapyTopics,
   generateCommunicationPatternSummary: provider.generateCommunicationPatternSummary,
   generateFacilitatorTurn: provider.generateFacilitatorTurn,
   generateClosureAssist: provider.generateClosureAssist,

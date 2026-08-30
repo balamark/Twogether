@@ -711,6 +711,65 @@ async function generateTherapySummary({ periodLabel, events, stats }) {
   };
 }
 
+// Deterministic 話題建議 (Therapy Topics). Builds up to 3 topics from the top
+// recurring themes when not quiet; tops up with general relationship-
+// maintenance topics (and the product's own reassurance line) when quiet or
+// when themes run out, so the couple always gets 3-5 topics — same input →
+// same output, no live LLM needed.
+const GENERAL_MAINTENANCE_TOPICS = [
+  {
+    title: '我們有沒有花時間只做兩個人的事？',
+    whySuggested: '最近的紀錄比較少看到只屬於你們兩人的時光。',
+    prompts: ['我們上一次單獨約會是什麼時候？', '最近聊天，多半在聊孩子/工作，還是彼此？'],
+  },
+  {
+    title: '我們有沒有在照顧彼此？',
+    whySuggested: '忙碌時很容易只顧著把事情做完，忘了問問對方過得好不好。',
+    prompts: ['最近有沒有哪件事，希望對方能多注意到？', '我們怎麼讓彼此感覺被照顧？'],
+  },
+  {
+    title: '我們對未來有沒有共同的小計畫？',
+    whySuggested: '一起期待一件小事，是維繫關係很實在的方式。',
+    prompts: ['最近有沒有什麼想一起做的事？', '我們多久會聊一次「以後」？'],
+  },
+];
+
+async function generateTherapyTopics({ events, stats, quiet }) {
+  const startedAt = Date.now();
+  const evs = Array.isArray(events) ? events : [];
+  const themeTopics = (stats?.themeCounts || [])
+    .filter((t) => t.tag)
+    .slice(0, 3)
+    .map((t) => ({
+      title: `${t.tag}的期待落差`,
+      whySuggested: `最近「${t.tag}」出現了 ${t.count} 次，這通常代表期待落差，很適合找時間聊聊。`,
+      prompts: [`我們對${t.tag}，各自心裡的期待是什麼？`, `最近在${t.tag}上，有沒有哪個瞬間讓你不太舒服？`],
+    }));
+
+  const topics = [...themeTopics];
+  for (const t of GENERAL_MAINTENANCE_TOPICS) {
+    if (topics.length >= 5) break;
+    if (topics.length < 3 || quiet) topics.push(t);
+  }
+
+  const intro = quiet
+    ? '最近很平靜，這是好事——但平靜不代表沒有話題可聊。'
+    : `${evs.length} 件最近記錄的事，整理出了幾個可能值得聊聊的方向。`;
+
+  return {
+    intro,
+    topics: topics.slice(0, 5),
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+      assembledPrompt: `[mock] therapy topics for ${evs.length} events (quiet=${!!quiet})`,
+    },
+  };
+}
+
 async function generateCommunicationPatternSummary({ events, stats }) {
   const startedAt = Date.now();
   const evs = Array.isArray(events) ? events : [];
@@ -864,6 +923,7 @@ module.exports = {
   generateTherapyNote,
   analyzeDraft,
   generateTherapySummary,
+  generateTherapyTopics,
   generateCommunicationPatternSummary,
   generateFacilitatorTurn,
   generateClosureAssist,

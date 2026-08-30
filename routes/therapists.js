@@ -1640,6 +1640,23 @@ router.get('/clients/:coupleId/events/:eventId', authenticateToken, async (req, 
   }
 });
 
+// GET /api/therapists/clients/:coupleId/therapy-topics — the couple's latest
+// 話題建議 (both the AI-generated set and the static 話題庫) plus their
+// selections/notes on each. Read-only: never triggers generation, and there's
+// no write path for the therapist here — they see the couple's picks and
+// notes, they don't set them.
+router.get('/clients/:coupleId/therapy-topics', authenticateToken, async (req, res) => {
+  try {
+    const link = await requireDedicatedLink(req, res);
+    if (!link) return;
+    const latest = await eventsRoutes.getLatestTherapyTopicsForCouple(req.params.coupleId);
+    res.json({ success: true, ...latest });
+  } catch (error) {
+    logError('Failed to load client therapy topics', { userId: req.user?.id, coupleId: req.params.coupleId, err: error.message });
+    res.status(500).json({ success: false, message: '無法取得話題建議' });
+  }
+});
+
 // POST /api/therapists/clients/:coupleId/events/:eventId/messages — therapist
 // message (requires can_comment). Never touches private events.
 router.post('/clients/:coupleId/events/:eventId/messages', authenticateToken, [

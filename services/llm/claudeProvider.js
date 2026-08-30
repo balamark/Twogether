@@ -2828,6 +2828,181 @@ async function generateTherapySummary({ periodLabel, events, stats }) {
 }
 
 // ---------------------------------------------------------------------------
+// Therapy Topics ("話題建議") — proactive discussion topics for the NEXT session
+// ---------------------------------------------------------------------------
+// The Therapy Summary above organizes what already happened. This looks
+// forward: even when nothing dramatic happened recently, it hands the couple
+// 3-5 things worth raising with their therapist. "No conflict" is not the
+// same as "no relationship problem" — a quiet couple should still get real,
+// grounded topics, never an empty result.
+
+const THERAPY_TOPICS_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴侶諮商師的助理。這對伴侶固定接受心理諮商，你的任務是在他們下次諮商「之前」，根據最近記錄的事件，主動整理出 3 到 5 個「值得帶去諮商聊聊」的話題——即使最近沒有明顯衝突。請永遠以繁體中文回覆。
+
+重要守則（務必遵守，這是本功能的倫理紅線）：
+- 你只是「發現」值得聊的方向，不是「診斷」。永遠不要說『你們的關係有問題』『這是不健康的』等評斷語言；只能說『這可能值得聊聊』『這是一個可以一起探索的地方』。真正的判斷與探索交給合格心理師，你只負責整理出方向。
+- 不評斷對錯、不選邊站、不指定是誰該改變。
+- 若最近沒有明顯衝突（quiet 為 true），這是好消息，不是沒東西可聊——intro 請傳達「最近很平靜，這是好事，但平靜不代表沒有話題可聊」這樣安心＋邀請的語氣，接著從較舊的未解決事件、或一般關係維繫角度（感謝表達、各自需求是否被看見、未來的小計畫、親密感）提供建議，不要編造沒發生過的具體衝突。
+
+請產出：
+1. intro：一句話開場，中性、溫暖，視 quiet 狀態調整語氣（見上）。
+2. topics：3 到 5 個話題，每個包含：
+   - title：話題名稱，簡短（例如「家務分工的期待落差」）。
+   - whySuggested：為什麼建議這個話題，一句話，緊扣提供的事件/統計資料，不評對錯。
+   - prompts：2 到 4 個「可以直接照著聊」的具體引導問題或練習，第一人稱複數（我們）。
+
+守則：緊扣提供的資料，不要編造具體事件細節；中立、溫柔；只使用繁體中文；遵守標點規則。
+
+回應請只呼叫 emit_therapy_topics tool，不要輸出其他文字。`;
+
+const THERAPY_TOPICS_TOOL_SCHEMA = {
+  name: 'emit_therapy_topics',
+  description: 'Return 3-5 suggested discussion topics for the couple\'s next therapy session, grounded in their recent events.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      intro: { type: 'string', maxLength: 150, description: '一句話開場，視 quiet 狀態調整語氣' },
+      topics: {
+        type: 'array',
+        minItems: 3,
+        maxItems: 5,
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', maxLength: 20, description: '話題名稱' },
+            whySuggested: { type: 'string', maxLength: 100, description: '為什麼建議這個話題，緊扣資料' },
+            prompts: {
+              type: 'array',
+              minItems: 2,
+              maxItems: 4,
+              items: { type: 'string', maxLength: 60, description: '可以直接照著聊的引導問題' },
+            },
+          },
+          required: ['title', 'whySuggested', 'prompts'],
+        },
+      },
+    },
+    required: ['intro', 'topics'],
+  },
+};
+
+// events: [{ title, summary, status, tags, emotions, createdAt, resolvedAt, therapyNote }]
+// stats:  { themeCounts, emotionCounts, resolvedCount, unresolvedCount, daysSinceLastEvent }
+async function generateTherapyTopics({ periodLabel, appliedDays, events, stats, quiet }) {
+  const evs = Array.isArray(events) ? events : [];
+  const lines = [];
+  lines.push(
+    quiet
+      ? `本次分析：最近衝突不多，已放寬到過去 ${appliedDays || 60} 天內尚未解決的事件（quiet 模式）`
+      : `期間：${periodLabel || '最近兩週'}`
+  );
+  lines.push(`事件總數：${evs.length}`, '');
+
+  const themeCounts = stats?.themeCounts || [];
+  if (themeCounts.length) {
+    lines.push('主題統計（標籤：次數）：' + themeCounts.map((t) => `${t.tag}×${t.count}`).join('、'));
+  }
+  const emotionCounts = stats?.emotionCounts || [];
+  if (emotionCounts.length) {
+    lines.push('情緒統計（情緒：次數）：' + emotionCounts.map((e) => `${e.emotion}×${e.count}`).join('、'));
+  }
+  if (typeof stats?.daysSinceLastEvent === 'number') {
+    lines.push(`距離上一次記錄事件：${stats.daysSinceLastEvent} 天`);
+  }
+  if (evs.length) {
+    lines.push('', '事件清單（最舊在前）：');
+    evs.forEach((e, i) => {
+      const state = e.status === 'resolved' ? '已解決' : '未解決';
+      lines.push(`${i + 1}. [${state}]《${(e.title || '未命名').toString().trim()}》`);
+      if (e.summary) lines.push(`   摘要：${e.summary.toString().trim()}`);
+      if (Array.isArray(e.tags) && e.tags.length) lines.push(`   主題：${e.tags.join('、')}`);
+      if (Array.isArray(e.emotions) && e.emotions.length) lines.push(`   情緒：${e.emotions.join('、')}`);
+    });
+  } else {
+    lines.push('', '（目前沒有可參考的事件紀錄，請提供一般性的關係維繫話題。）');
+  }
+  const userContent = lines.join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1500,
+    system: [
+      {
+        type: 'text',
+        text: THERAPY_TOPICS_SYSTEM_PROMPT + PUNCTUATION_RULE,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [THERAPY_TOPICS_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_therapy_topics' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.therapy_topics', {
+    model: response.model || MODEL,
+    durationMs: ms,
+    eventCount: evs.length,
+    quiet: !!quiet,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_therapy_topics'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input || {};
+  const cleanStr = (s) => (s || '').toString().trim();
+  const cleanList = (arr, max) =>
+    (Array.isArray(arr) ? arr : []).map(cleanStr).filter(Boolean).slice(0, max);
+  const cleanTopics = (arr, max) =>
+    (Array.isArray(arr) ? arr : [])
+      .filter((t) => t && t.title && t.whySuggested && Array.isArray(t.prompts))
+      .map((t) => ({
+        title: cleanStr(t.title),
+        whySuggested: cleanStr(t.whySuggested),
+        prompts: cleanList(t.prompts, 4),
+      }))
+      .filter((t) => t.prompts.length >= 2)
+      .slice(0, max);
+
+  const topics = cleanTopics(out.topics, 5);
+  // The whole contract of this feature is "never empty". If cleaning stripped
+  // everything (malformed / too-short model output), throw so the route's
+  // catch surfaces a retryable error — instead of caching an empty set (which
+  // would be charged AND permanently returned for this input hash).
+  if (!topics.length) {
+    throw new Error('Claude returned no usable therapy topics');
+  }
+
+  return {
+    intro: cleanStr(out.intro),
+    topics,
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+      assembledPrompt: userContent,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Communication-pattern summary ("溝通模式" 第三方視角) — cross-conflict lens
 // ---------------------------------------------------------------------------
 // Single conflicts each get their own therapy note (with a per-event `cycle`).
@@ -3416,6 +3591,7 @@ module.exports = {
   generateTherapyNote,
   analyzeDraft,
   generateTherapySummary,
+  generateTherapyTopics,
   generateCommunicationPatternSummary,
   generateFacilitatorTurn,
   generateClosureAssist,

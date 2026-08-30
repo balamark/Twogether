@@ -22,6 +22,7 @@ import PaymentMethodPicker from './PaymentMethodPicker';
 import { FocusFilter } from './FocusFilter';
 import TherapistProfileModal from './TherapistProfileModal';
 import TherapySummaryCard from './TherapySummaryCard';
+import TherapyTopicsCard from './TherapyTopicsCard';
 import DedicatedTherapistPanel from './DedicatedTherapistPanel';
 import TherapistClientsPanel from './TherapistClientsPanel';
 import ParticipantAvatar from './ParticipantAvatar';
@@ -165,6 +166,14 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
           This is the Therapy Companion flagship: it sits above the directory so
           "整理你們的近況 → 帶去和心理師談" reads as one flow. */}
       <TherapySummaryCard
+        authState={{ isAuthenticated: authState.isAuthenticated, partnerConnected: authState.partnerConnected }}
+        showNotification={showNotification}
+      />
+
+      {/* 話題建議 — proactively suggests topics for the NEXT session, even when
+          nothing dramatic happened recently. Sits right below 諮商摘要 since
+          both are "prep for your next session" tools. */}
+      <TherapyTopicsCard
         authState={{ isAuthenticated: authState.isAuthenticated, partnerConnected: authState.partnerConnected }}
         showNotification={showNotification}
       />

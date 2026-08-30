@@ -16,6 +16,7 @@ const {
   recordAiUsage,
 } = require('../lib/aiUsage');
 const { translationStatus } = require('../lib/translationStatus');
+const { THERAPY_TOPIC_LIBRARY, isValidLibraryTopicId } = require('../lib/therapyTopicLibrary');
 // Access checks, serializers and the notification fan-out live in lib/ so the
 // closure router (and later Playbook / follow-up) can use them without
 // requiring this router back. Re-exported at the bottom of this file — the
@@ -913,6 +914,532 @@ router.get('/therapy-summary/history', async (req, res) => {
     res.status(500).json({ success: false, message: '無法載入諮商摘要紀錄，請稍後再試' });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Therapy Topics ("話題建議") — proactive discussion topics for the couple's
+// NEXT session, generated from recent events. Unlike 諮商摘要 above (which
+// organizes what already happened), this looks forward — and deliberately
+// never goes empty: "no conflict" is not "no relationship problem". A couple
+// with a quiet couple of weeks still gets 3-5 grounded topics, just framed
+// with a reassuring tone and drawn from older unresolved events or general
+// relationship-maintenance angles instead of manufactured conflict.
+// ---------------------------------------------------------------------------
+
+// Below this many recent events, "recent conflict" isn't really the picture —
+// widen the lookback and switch to quiet framing instead of thin results.
+const QUIET_EVENT_THRESHOLD = 3;
+const QUIET_WIDEN_DAYS = 60;
+
+async function ensureTherapyTopicSuggestionsTable() {
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS therapy_topic_suggestions (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        couple_id UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
+        period_days INTEGER NOT NULL,
+        applied_days INTEGER NOT NULL,
+        quiet BOOLEAN NOT NULL DEFAULT FALSE,
+        input_hash VARCHAR(64) NOT NULL,
+        topics JSONB NOT NULL,
+        event_count INTEGER,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        UNIQUE (couple_id, input_hash)
+      );
+    `);
+  } catch (err) {
+    logWarn('ensureTherapyTopicSuggestionsTable failed', { err: err.message });
+  }
+}
+
+async function ensureTherapyTopicSelectionsTable() {
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS therapy_topic_selections (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        couple_id UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
+        input_hash VARCHAR(64) NOT NULL,
+        topic_index INTEGER NOT NULL,
+        status VARCHAR(16) CHECK (status IS NULL OR status IN ('selected', 'saved', 'dismissed')),
+        notes TEXT,
+        updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        UNIQUE (couple_id, input_hash, topic_index),
+        FOREIGN KEY (couple_id, input_hash)
+          REFERENCES therapy_topic_suggestions (couple_id, input_hash) ON DELETE CASCADE
+      );
+    `);
+  } catch (err) {
+    logWarn('ensureTherapyTopicSelectionsTable failed', { err: err.message });
+  }
+}
+
+async function ensureTherapyTopicLibrarySelectionsTable() {
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS therapy_topic_library_selections (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        couple_id UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
+        topic_id VARCHAR(64) NOT NULL,
+        status VARCHAR(16) CHECK (status IS NULL OR status IN ('selected', 'saved', 'dismissed')),
+        notes TEXT,
+        updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        UNIQUE (couple_id, topic_id)
+      );
+    `);
+  } catch (err) {
+    logWarn('ensureTherapyTopicLibrarySelectionsTable failed', { err: err.message });
+  }
+}
+
+// selections rows -> { [topicIndex]: {status, notes, updatedAt} } (or keyed by topic_id for the library)
+function selectionsByKey(rows, keyField) {
+  const map = {};
+  for (const r of rows) {
+    map[r[keyField]] = {
+      status: r.status || null,
+      notes: r.notes || null,
+      updatedAt: r.updated_at,
+    };
+  }
+  return map;
+}
+
+// GET /api/events/therapy-topics?days=14 — 3-5 AI-suggested discussion topics
+// for the couple's next session. Cached per (couple, input event-set); a
+// re-open (or the partner's view) is free. Deliberately has NO "no events"
+// guard — see the quiet-widen fallback below.
+router.get(
+  '/therapy-topics',
+  [query('days').optional().isInt({ min: 7, max: 30 }).toInt()],
+  async (req, res) => {
+    if (sendValidationError(req, res)) return;
+    try {
+      const userId = req.user.id;
+      const days = req.query.days || 14;
+      const periodLabel = periodLabelFor(days);
+
+      const couple = await getCoupleForUser(userId);
+      if (!couple) {
+        return res.status(200).json({
+          success: false,
+          error_code: 'NOT_PAIRED',
+          message: '話題建議會從你們最近記錄的事件裡，主動整理出下次諮商可以聊的方向。先和另一半配對，就能開始收到建議。',
+        });
+      }
+      const coupleId = couple.couple_id;
+
+      const primary = await db.query(
+        `SELECT id, title, summary, status, tags, emotions,
+                created_at, resolved_at, therapy_note, content_edited_at
+           FROM events
+          WHERE couple_id = $1
+            AND is_private = FALSE
+            AND created_at >= NOW() - ($2 || ' days')::interval
+          ORDER BY created_at ASC`,
+        [coupleId, String(days)]
+      );
+      let rows = primary.rows;
+      const primaryCount = primary.rows.length;
+      let appliedDays = days;
+
+      // Widen the lookback when recent activity is thin so the model has real
+      // material to ground topics in, rather than returning a sparse result.
+      // But `quiet` — the "最近很平靜" reassurance framing — is reserved for a
+      // genuinely empty recent window: with 1-2 real recent conflicts we still
+      // widen for context, yet must NOT tell the couple things have been calm.
+      if (primaryCount < QUIET_EVENT_THRESHOLD) {
+        const widened = await db.query(
+          `SELECT id, title, summary, status, tags, emotions,
+                  created_at, resolved_at, therapy_note, content_edited_at
+             FROM events
+            WHERE couple_id = $1
+              AND is_private = FALSE
+              AND created_at < NOW() - ($2 || ' days')::interval
+              AND created_at >= NOW() - ($3 || ' days')::interval
+              AND status IN ('open', 'resolve_pending', 'closing')
+            ORDER BY created_at DESC
+            LIMIT 10`,
+          [coupleId, String(days), String(QUIET_WIDEN_DAYS)]
+        );
+        rows = rows.concat(widened.rows);
+        appliedDays = QUIET_WIDEN_DAYS;
+      }
+      const quiet = primaryCount === 0;
+      // Primary rows are ASC and any widened rows were fetched DESC — sort the
+      // combined set oldest-first so it matches the "最舊在前" prompt label and
+      // gives a stable, deterministic order for the cache fingerprint.
+      rows.sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+
+      // Deterministic aggregates — hand the model counts so it narrates, not tallies.
+      const themeMap = new Map();
+      const emotionMap = new Map();
+      let resolvedCount = 0;
+      let unresolvedCount = 0;
+      for (const r of rows) {
+        (r.tags || []).forEach((t) => themeMap.set(t, (themeMap.get(t) || 0) + 1));
+        (r.emotions || []).forEach((e) => emotionMap.set(e, (emotionMap.get(e) || 0) + 1));
+        if (r.status === 'resolved' || r.status === 'closing') resolvedCount += 1;
+        else unresolvedCount += 1;
+      }
+      const sortDesc = (m) => [...m.entries()].sort((a, b) => b[1] - a[1]);
+      const themeCounts = sortDesc(themeMap).map(([tag, count]) => ({ tag, count }));
+      const emotionCounts = sortDesc(emotionMap).map(([emotion, count]) => ({ emotion, count }));
+      const daysSinceLastEvent = rows.length
+        ? Math.floor((Date.now() - new Date(rows.reduce((latest, r) => (new Date(r.created_at) > new Date(latest.created_at) ? r : latest)).created_at).getTime()) / 86400000)
+        : null;
+      const stats = { themeCounts, emotionCounts, resolvedCount, unresolvedCount, daysSinceLastEvent };
+
+      // Cache key includes `quiet` so crossing the threshold always busts the
+      // cache even when appliedDays coincidentally matches.
+      const fingerprint = rows.map((r) => [
+        r.id,
+        r.status,
+        r.content_edited_at ? new Date(r.content_edited_at).getTime() : 0,
+        r.therapy_note ? 1 : 0,
+      ]);
+      const inputHash = aiCacheHash(['therapy_topics_v1', appliedDays, quiet, fingerprint]);
+
+      await ensureTherapyTopicSuggestionsTable();
+      await ensureTherapyTopicSelectionsTable();
+      const cached = await db.query(
+        `SELECT topics FROM therapy_topic_suggestions WHERE couple_id = $1 AND input_hash = $2`,
+        [coupleId, inputHash]
+      );
+      if (cached.rows[0]) {
+        const sel = await db.query(
+          `SELECT topic_index, status, notes, updated_at FROM therapy_topic_selections
+            WHERE couple_id = $1 AND input_hash = $2`,
+          [coupleId, inputHash]
+        );
+        return res.json({
+          success: true,
+          inputHash,
+          topics: cached.rows[0].topics,
+          period: { days, appliedDays, label: periodLabel, eventCount: rows.length, quiet },
+          selections: selectionsByKey(sel.rows, 'topic_index'),
+          cached: true,
+        });
+      }
+
+      // Fresh generation costs one AI credit (same shared daily budget as every
+      // other AI feature).
+      const { tier, limit } = await resolveAiLimit(userId);
+      const usedToday = await countTodayAiUsage(userId);
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      if (!limitCheck.ok) {
+        logInfo('events.therapy_topics.limit', { userId, coupleId, used: usedToday, limit, tier, blocked: true });
+        return res.status(limitCheck.status).json(limitCheck.body);
+      }
+
+      logInfo('events.therapy_topics.generate', { userId, coupleId, days, appliedDays, quiet, eventCount: rows.length });
+
+      const events = rows.map((r) => ({
+        title: r.title,
+        summary: r.summary,
+        status: r.status,
+        tags: r.tags || [],
+        emotions: r.emotions || [],
+        createdAt: r.created_at,
+        resolvedAt: r.resolved_at,
+      }));
+
+      const result = await llmService.generateTherapyTopics({ periodLabel, appliedDays, events, stats, quiet });
+      const meta = result._meta;
+      delete result._meta;
+
+      logInfo('events.therapy_topics.cost', {
+        userId,
+        coupleId,
+        provider: meta?.provider,
+        model: meta?.model,
+        costUsd: meta?.costUsd,
+        durationMs: meta?.durationMs,
+      });
+
+      await recordAiUsage(userId, 'therapy_topics', `${periodLabel}・${quiet ? '平靜模式・' : ''}${rows.length} 件`, meta);
+      await db.query(
+        `INSERT INTO therapy_topic_suggestions (couple_id, period_days, applied_days, quiet, input_hash, topics, event_count)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         ON CONFLICT (couple_id, input_hash)
+           DO UPDATE SET topics = EXCLUDED.topics, event_count = EXCLUDED.event_count`,
+        [coupleId, days, appliedDays, quiet, inputHash, JSON.stringify(result), rows.length]
+      );
+
+      res.json({
+        success: true,
+        inputHash,
+        topics: result,
+        period: { days, appliedDays, label: periodLabel, eventCount: rows.length, quiet },
+        selections: {},
+      });
+    } catch (err) {
+      logError('Therapy topics failed', { err: err.message, stack: err.stack });
+      res.status(500).json({ success: false, message: '話題建議暫時無法產生，請稍後再試' });
+    }
+  }
+);
+
+// PUT /api/events/therapy-topics/:inputHash/selections/:topicIndex — mark a
+// suggested topic 加入諮商/先收藏/不相關 and/or jot free-text notes. Either
+// field alone may be sent (e.g. typing notes without changing the pick); the
+// field NOT present is carried forward. `status: null` is a deliberate clear
+// (un-tapping the pick) and is distinct from omitting status — the `hasStatus`
+// flag drives a CASE so a clear actually writes null instead of being kept.
+// No AI quota involved.
+router.put(
+  '/therapy-topics/:inputHash/selections/:topicIndex',
+  [
+    param('inputHash').isLength({ min: 64, max: 64 }).isHexadecimal(),
+    param('topicIndex').isInt({ min: 0, max: 9 }).toInt(),
+    body('status').optional({ nullable: true }).isIn(['selected', 'saved', 'dismissed']),
+    body('notes').optional().isString().isLength({ max: 500 }).withMessage('筆記需在 500 字以內'),
+  ],
+  async (req, res) => {
+    if (sendValidationError(req, res)) return;
+    try {
+      const userId = req.user.id;
+      const { inputHash, topicIndex } = req.params;
+      const hasStatus = Object.prototype.hasOwnProperty.call(req.body, 'status');
+      const hasNotes = Object.prototype.hasOwnProperty.call(req.body, 'notes');
+      if (!hasStatus && !hasNotes) {
+        return res.status(400).json({ success: false, message: '請提供 status 或 notes 其中之一' });
+      }
+
+      const couple = await getCoupleForUser(userId);
+      if (!couple) {
+        return res.status(404).json({ success: false, message: '找不到這批話題建議' });
+      }
+      const coupleId = couple.couple_id;
+
+      await ensureTherapyTopicSuggestionsTable();
+      const suggestion = await db.query(
+        `SELECT topics FROM therapy_topic_suggestions WHERE couple_id = $1 AND input_hash = $2`,
+        [coupleId, inputHash]
+      );
+      if (!suggestion.rows[0]) {
+        return res.status(404).json({ success: false, message: '找不到這批話題建議' });
+      }
+      const topicCount = Array.isArray(suggestion.rows[0].topics?.topics) ? suggestion.rows[0].topics.topics.length : 0;
+      if (topicIndex >= topicCount) {
+        return res.status(400).json({ success: false, message: '找不到這個話題' });
+      }
+
+      await ensureTherapyTopicSelectionsTable();
+      const statusParam = hasStatus ? (req.body.status ?? null) : null;
+      const notesParam = hasNotes ? req.body.notes.toString().trim() : null;
+      const result = await db.query(
+        // $7/$8 = "this field is being set" flags. When true we write the value
+        // directly (so an explicit null clears it); when false we keep the
+        // existing value. COALESCE alone can't express a deliberate clear.
+        `INSERT INTO therapy_topic_selections (couple_id, input_hash, topic_index, status, notes, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (couple_id, input_hash, topic_index) DO UPDATE
+           SET status = CASE WHEN $7::boolean THEN $4 ELSE therapy_topic_selections.status END,
+               notes = CASE WHEN $8::boolean THEN $5 ELSE therapy_topic_selections.notes END,
+               updated_by = $6,
+               updated_at = NOW()
+         RETURNING status, notes, updated_at`,
+        [coupleId, inputHash, topicIndex, statusParam, notesParam, userId, hasStatus, hasNotes]
+      );
+      const row = result.rows[0];
+      res.json({ success: true, selection: { topicIndex, status: row.status, notes: row.notes, updatedAt: row.updated_at } });
+    } catch (err) {
+      logError('Therapy topic selection failed', { err: err.message, stack: err.stack });
+      res.status(500).json({ success: false, message: '更新失敗，請稍後再試' });
+    }
+  }
+);
+
+// GET /api/events/therapy-topics/library — the static Topic Library (話題庫):
+// curated relationship-maintenance topics, always available with no AI cost.
+// Merges in the caller's own selections (when paired) in one round trip.
+router.get('/therapy-topics/library', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const couple = await getCoupleForUser(userId);
+    let selections = {};
+    if (couple) {
+      await ensureTherapyTopicLibrarySelectionsTable();
+      const sel = await db.query(
+        `SELECT topic_id, status, notes, updated_at FROM therapy_topic_library_selections WHERE couple_id = $1`,
+        [couple.couple_id]
+      );
+      selections = selectionsByKey(sel.rows, 'topic_id');
+    }
+    res.json({ success: true, library: THERAPY_TOPIC_LIBRARY, selections });
+  } catch (err) {
+    logError('Therapy topic library failed', { err: err.message, stack: err.stack });
+    res.status(500).json({ success: false, message: '無法載入話題庫，請稍後再試' });
+  }
+});
+
+// PUT /api/events/therapy-topics/library/:topicId/selection — same pick/notes
+// semantics as the AI-generated endpoint above, for a static library topic.
+router.put(
+  '/therapy-topics/library/:topicId/selection',
+  [
+    body('status').optional({ nullable: true }).isIn(['selected', 'saved', 'dismissed']),
+    body('notes').optional().isString().isLength({ max: 500 }).withMessage('筆記需在 500 字以內'),
+  ],
+  async (req, res) => {
+    if (sendValidationError(req, res)) return;
+    try {
+      const userId = req.user.id;
+      const { topicId } = req.params;
+      if (!isValidLibraryTopicId(topicId)) {
+        return res.status(400).json({ success: false, message: '找不到這個話題' });
+      }
+      const hasStatus = Object.prototype.hasOwnProperty.call(req.body, 'status');
+      const hasNotes = Object.prototype.hasOwnProperty.call(req.body, 'notes');
+      if (!hasStatus && !hasNotes) {
+        return res.status(400).json({ success: false, message: '請提供 status 或 notes 其中之一' });
+      }
+
+      const couple = await getCoupleForUser(userId);
+      if (!couple) {
+        return res.status(400).json({ success: false, error_code: 'NOT_PAIRED', message: '請先和另一半配對，才能標記話題庫的話題' });
+      }
+
+      await ensureTherapyTopicLibrarySelectionsTable();
+      const statusParam = hasStatus ? (req.body.status ?? null) : null;
+      const notesParam = hasNotes ? req.body.notes.toString().trim() : null;
+      const result = await db.query(
+        // $6/$7 = "field is being set" flags — see the AI-topic endpoint above.
+        // Lets an explicit `status: null` clear the pick instead of COALESCE
+        // silently keeping the old value.
+        `INSERT INTO therapy_topic_library_selections (couple_id, topic_id, status, notes, updated_by)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (couple_id, topic_id) DO UPDATE
+           SET status = CASE WHEN $6::boolean THEN $3 ELSE therapy_topic_library_selections.status END,
+               notes = CASE WHEN $7::boolean THEN $4 ELSE therapy_topic_library_selections.notes END,
+               updated_by = $5,
+               updated_at = NOW()
+         RETURNING status, notes, updated_at`,
+        [couple.couple_id, topicId, statusParam, notesParam, userId, hasStatus, hasNotes]
+      );
+      const row = result.rows[0];
+      res.json({ success: true, selection: { topicId, status: row.status, notes: row.notes, updatedAt: row.updated_at } });
+    } catch (err) {
+      logError('Therapy topic library selection failed', { err: err.message, stack: err.stack });
+      res.status(500).json({ success: false, message: '更新失敗，請稍後再試' });
+    }
+  }
+);
+
+// GET /api/events/therapy-topics/history — the couple's previously generated
+// 話題建議 snapshots, newest first. Free to re-open. Library picks aren't part
+// of this list — they're not per-generation, they always reflect current
+// state via GET /therapy-topics/library above.
+router.get('/therapy-topics/history', async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const couple = await getCoupleForUser(userId);
+    if (!couple) {
+      return res.json({ success: true, history: [] });
+    }
+
+    await ensureTherapyTopicSuggestionsTable();
+    const result = await db.query(
+      `SELECT id, input_hash, period_days, applied_days, quiet, event_count, topics, created_at
+         FROM therapy_topic_suggestions
+        WHERE couple_id = $1
+        ORDER BY created_at DESC
+        LIMIT 50`,
+      [couple.couple_id]
+    );
+
+    let selectionsByHash = {};
+    if (result.rows.length) {
+      await ensureTherapyTopicSelectionsTable();
+      const hashes = result.rows.map((r) => r.input_hash);
+      const sel = await db.query(
+        `SELECT input_hash, topic_index, status, notes, updated_at
+           FROM therapy_topic_selections
+          WHERE couple_id = $1 AND input_hash = ANY($2)`,
+        [couple.couple_id, hashes]
+      );
+      for (const r of sel.rows) {
+        if (!selectionsByHash[r.input_hash]) selectionsByHash[r.input_hash] = {};
+        selectionsByHash[r.input_hash][r.topic_index] = { status: r.status || null, notes: r.notes || null, updatedAt: r.updated_at };
+      }
+    }
+
+    const history = result.rows.map((r) => ({
+      id: r.id,
+      inputHash: r.input_hash,
+      periodDays: r.period_days,
+      appliedDays: r.applied_days,
+      periodLabel: periodLabelFor(r.period_days),
+      quiet: r.quiet === true,
+      eventCount: r.event_count,
+      createdAt: r.created_at,
+      topics: r.topics,
+      selections: selectionsByHash[r.input_hash] || {},
+    }));
+
+    res.json({ success: true, history });
+  } catch (err) {
+    logError('Therapy topics history failed', { err: err.message, stack: err.stack });
+    res.status(500).json({ success: false, message: '無法載入話題建議紀錄，請稍後再試' });
+  }
+});
+
+// The topic set the therapist should see + its selections, plus the static
+// library + the couple's library selections — for the dedicated-therapist
+// read-only view (routes/therapists.js). Never triggers generation.
+//
+// Selections are keyed by input_hash, so a fresh generation (new event set →
+// new hash) would otherwise orphan the picks/notes the couple made on an
+// earlier set and show the therapist an un-annotated board. To keep the
+// changelog's promise ("心理師也看得到這些建議與筆記"), prefer the most
+// recent generation the couple actually ENGAGED with (has ≥1 selection),
+// falling back to the newest generation when none is annotated yet.
+async function getLatestTherapyTopicsForCouple(coupleId) {
+  await ensureTherapyTopicSuggestionsTable();
+  await ensureTherapyTopicSelectionsTable();
+  const latest = await db.query(
+    `SELECT s.input_hash, s.period_days, s.applied_days, s.quiet, s.event_count, s.topics, s.created_at
+       FROM therapy_topic_suggestions s
+       LEFT JOIN LATERAL (
+         SELECT 1 FROM therapy_topic_selections sel
+          WHERE sel.couple_id = s.couple_id AND sel.input_hash = s.input_hash
+          LIMIT 1
+       ) has_sel ON true
+      WHERE s.couple_id = $1
+      ORDER BY (has_sel IS NOT NULL) DESC, s.created_at DESC
+      LIMIT 1`,
+    [coupleId]
+  );
+  const row = latest.rows[0] || null;
+
+  let selections = {};
+  if (row) {
+    const sel = await db.query(
+      `SELECT topic_index, status, notes, updated_at FROM therapy_topic_selections
+        WHERE couple_id = $1 AND input_hash = $2`,
+      [coupleId, row.input_hash]
+    );
+    selections = selectionsByKey(sel.rows, 'topic_index');
+  }
+
+  await ensureTherapyTopicLibrarySelectionsTable();
+  const librarySel = await db.query(
+    `SELECT topic_id, status, notes, updated_at FROM therapy_topic_library_selections WHERE couple_id = $1`,
+    [coupleId]
+  );
+
+  return {
+    topics: row?.topics || null,
+    period: row
+      ? { days: row.period_days, appliedDays: row.applied_days, label: periodLabelFor(row.period_days), eventCount: row.event_count, quiet: row.quiet === true }
+      : null,
+    selections,
+    generatedAt: row?.created_at || null,
+    library: THERAPY_TOPIC_LIBRARY,
+    librarySelections: selectionsByKey(librarySel.rows, 'topic_id'),
+  };
+}
 
 // List events for caller's couple
 router.get(
@@ -2446,3 +2973,4 @@ module.exports.listEventsForCouple = listEventsForCouple;
 module.exports.getEventDetailForCouple = getEventDetailForCouple;
 module.exports.insertEventMessage = insertEventMessage;
 module.exports.notify = notify;
+module.exports.getLatestTherapyTopicsForCouple = getLatestTherapyTopicsForCouple;
