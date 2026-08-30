@@ -129,6 +129,9 @@ test.describe('Wall — upload progress ring', () => {
 
     // The stuck-button bug this fixes: instead of a disabled "送出中…" button
     // with zero feedback, a progress ring (with a cancel affordance) appears.
+    // (Playwright's route interception fakes the response without a real byte
+    // transfer, so it can't exercise axios's onUploadProgress ticks or the
+    // 100%→"處理中" handoff — that path is covered by code review, not e2e.)
     const ring = page.getByTestId('wall-composer-upload-progress');
     await expect(ring).toBeVisible({ timeout: 5000 });
     await expect(page.getByTestId('wall-composer-submit')).toHaveCount(0);

@@ -9,20 +9,31 @@ import { isVideoUrl, IMAGE_MAX_BYTES, VIDEO_MAX_BYTES, mediaLimitMb } from '../u
 // bytes go out, and — since large photos/videos can take a while — doubles as
 // the cancel button so the user is never just staring at a stuck "送出中…"
 // with no way to tell whether it's still going or how to stop it.
-const UploadProgressRing: React.FC<{ percent: number; onCancel: () => void }> = ({ percent, onCancel }) => {
+//
+// `indeterminate` covers the gap axios's onUploadProgress can't see: once all
+// bytes have left the browser, the server still has to save the files, write
+// the post, and reply — with zero progress events during that window. Sitting
+// at a static "100%" through that gap used to read as stuck (the exact bug
+// this ring was built to fix), so the ring switches to a spinning arc instead
+// of claiming "done" before the response has actually come back.
+const UploadProgressRing: React.FC<{ percent: number; indeterminate?: boolean; onCancel: () => void }> = ({
+  percent,
+  indeterminate = false,
+  onCancel,
+}) => {
   const radius = 18;
   const circumference = 2 * Math.PI * radius;
   const clamped = Math.min(100, Math.max(0, percent));
-  const offset = circumference * (1 - clamped / 100);
+  const offset = indeterminate ? circumference * 0.75 : circumference * (1 - clamped / 100);
   return (
     <button
       type="button"
       onClick={onCancel}
-      aria-label={`取消上傳（已完成 ${clamped}%）`}
+      aria-label={indeterminate ? '取消上傳（處理中）' : `取消上傳（已完成 ${clamped}%）`}
       data-testid="wall-composer-upload-cancel"
       className="relative w-11 h-11 min-w-[44px] min-h-[44px] flex-shrink-0 inline-flex items-center justify-center rounded-full group"
     >
-      <svg className="w-11 h-11 -rotate-90" viewBox="0 0 44 44">
+      <svg className={`w-11 h-11 -rotate-90 ${indeterminate ? 'animate-spin' : ''}`} viewBox="0 0 44 44">
         <circle cx="22" cy="22" r={radius} fill="none" stroke="currentColor" strokeWidth="3" className="text-petal-rule" />
         <circle
           cx="22"
@@ -34,7 +45,7 @@ const UploadProgressRing: React.FC<{ percent: number; onCancel: () => void }> = 
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
-          className="text-petal-rose-deep transition-[stroke-dashoffset] duration-200 ease-linear"
+          className={`text-petal-rose-deep ${indeterminate ? '' : 'transition-[stroke-dashoffset] duration-200 ease-linear'}`}
         />
       </svg>
       <span className="absolute inset-0 flex items-center justify-center">
@@ -127,10 +138,17 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
   const [customTags, setCustomTags] = useState<string[]>([]);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customInput, setCustomInput] = useState('');
-  // null = not uploading; 0-100 while a media submit is in flight, driving the
+  // null = not uploading; 0-99 while bytes are actively going out, driving the
   // progress ring. Only set when there's actually new media to send — a
-  // text-only save is fast enough that a ring would just be noise.
+  // text-only save is fast enough that a ring would just be noise. Capped
+  // below 100 on purpose: axios's onUploadProgress only tracks bytes leaving
+  // the browser, not the server saving the files and writing the post, so
+  // reaching "100%" here would claim the post is done well before it is.
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  // True once all bytes are sent but the server hasn't replied yet — the gap
+  // upload progress can't see. Shown as a spinning ring instead of a frozen
+  // 100%, so the user isn't left staring at a number that stopped moving.
+  const [processingUpload, setProcessingUpload] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const markTemplatesSeen = (seen: boolean) => rememberTemplatesSeen(templatesSeenKey, seen);
@@ -201,7 +219,10 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
     const hasNewMedia = newMedia.length > 0;
     const controller = hasNewMedia ? new AbortController() : null;
     abortControllerRef.current = controller;
-    if (hasNewMedia) setUploadProgress(0);
+    if (hasNewMedia) {
+      setUploadProgress(0);
+      setProcessingUpload(false);
+    }
     try {
       await onSubmit(
         {
@@ -213,7 +234,23 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
           // In edit mode always send the kept list so removals are applied.
           ...(editingPost ? { existingMedia } : {}),
         },
-        hasNewMedia ? { signal: controller!.signal, onUploadProgress: setUploadProgress } : undefined
+        hasNewMedia
+          ? {
+              signal: controller!.signal,
+              onUploadProgress: (percent) => {
+                // 100% here only means the bytes left the browser — the server
+                // still has to save the files and write the post. Cap the
+                // number and flip to the indeterminate spinner instead of
+                // showing a "done" that isn't true yet.
+                if (percent >= 100) {
+                  setUploadProgress(99);
+                  setProcessingUpload(true);
+                } else {
+                  setUploadProgress(percent);
+                }
+              },
+            }
+          : undefined
       );
       // They've written one — no need to pitch the templates panel again.
       markTemplatesSeen(true);
@@ -228,6 +265,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
     } finally {
       abortControllerRef.current = null;
       setUploadProgress(null);
+      setProcessingUpload(false);
     }
   });
 
@@ -662,9 +700,9 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
             // progress instead of a stuck-looking disabled button, and let the
             // ring double as an explicit cancel so the user always has a way out.
             <div className="flex items-center gap-3" data-testid="wall-composer-upload-progress">
-              <UploadProgressRing percent={uploadProgress} onCancel={cancelUpload} />
+              <UploadProgressRing percent={uploadProgress} indeterminate={processingUpload} onCancel={cancelUpload} />
               <span className="font-body text-sm text-petal-ink-soft">
-                上傳中… {uploadProgress}%
+                {processingUpload ? '處理中，快完成了…' : `上傳中… ${uploadProgress}%`}
                 <span className="block text-[11px] text-petal-muted">點擊圈圈可取消</span>
               </span>
             </div>
