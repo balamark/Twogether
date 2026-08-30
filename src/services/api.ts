@@ -389,6 +389,8 @@ export interface EventVersions {
 export interface IcebreakerPreview {
   title: string;
   summary: string;
+  /** 完整經過 — full rewrite kept for long drafts; '' for short ones. */
+  detail?: string;
   emotions: string[];
   tags: string[];
   toxicityFlags: string[];
@@ -643,6 +645,8 @@ export interface EventRecord {
   createdBy: string;
   title: string;
   summary: string;
+  /** 完整經過 — full rewrite kept for long drafts; null for short ones. */
+  detail: string | null;
   emotions: string[];
   tags: string[];
   toxicityFlags: string[];
@@ -913,6 +917,8 @@ export interface TherapistClientTopics {
 export interface CreateEventInput {
   title: string;
   summary: string;
+  /** 完整經過 — passed straight through from the icebreaker preview. */
+  detail?: string | null;
   emotions: string[];
   tags: string[];
   toxicityFlags: string[];
@@ -1165,6 +1171,17 @@ const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// An LLM generation regularly runs past the 15s client default. The 諮商師
+// comment is the worst case: it can chain three sequential Claude calls
+// (generate → reflection judge → regenerate on a failed verdict), so 20–45s in
+// prod is normal. When axios gives up first, the request is aborted as a
+// TIMEOUT even though the server goes on to answer 200, so the user sees a
+// false "連線逾時 / 暫時無法回應" (this was the bug behind 請 AI 諮商師加入 failing
+// in a private conversation). Every LLM-backed call sets this instead of the
+// default; a higher ceiling has no cost — the promise resolves the moment the
+// server answers, it just stops us abandoning a request that's still working.
+const AI_TIMEOUT = 60000;
 
 // The default 15s timeout is fine for JSON requests but far too short for a
 // multipart upload: a wall post can carry up to 4 files (images ≤10MB, videos
@@ -3648,7 +3665,7 @@ class ApiService {
   // requester previews it before choosing to share it with their partner.
   async previewWallAiComment(postId: string): Promise<string> {
     try {
-      const response = await apiClient.post(`/wall/${postId}/ai-comment/preview`, {});
+      const response = await apiClient.post(`/wall/${postId}/ai-comment/preview`, {}, { timeout: AI_TIMEOUT });
       return response.data.comment as string;
     } catch (error) {
       console.error('Failed to preview wall AI comment:', error);
@@ -3895,11 +3912,12 @@ class ApiService {
 
   async previewIcebreaker(rawText: string): Promise<IcebreakerPreview> {
     try {
-      const response = await apiClient.post('/events/icebreaker', { rawText });
+      const response = await apiClient.post('/events/icebreaker', { rawText }, { timeout: AI_TIMEOUT });
       const p = response.data.preview ?? {};
       return {
         title: p.title || '',
         summary: p.summary || '',
+        detail: p.detail || '',
         emotions: Array.isArray(p.emotions) ? p.emotions : [],
         tags: Array.isArray(p.tags) ? p.tags : [],
         toxicityFlags: Array.isArray(p.toxicityFlags) ? p.toxicityFlags : [],
@@ -3920,6 +3938,7 @@ class ApiService {
       const payload = {
         title: input.title,
         summary: input.summary,
+        detail: input.detail ?? null,
         emotions: input.emotions,
         tags: input.tags,
         toxicity_flags: input.toxicityFlags,
@@ -3996,7 +4015,7 @@ class ApiService {
 
   async previewReplyRewrite(eventId: string, rawReply: string): Promise<ReplyRewritePreview> {
     try {
-      const response = await apiClient.post(`/events/${eventId}/messages/preview-rewrite`, { rawReply });
+      const response = await apiClient.post(`/events/${eventId}/messages/preview-rewrite`, { rawReply }, { timeout: AI_TIMEOUT });
       const p = response.data.preview ?? {};
       return {
         versions: {
@@ -4016,7 +4035,7 @@ class ApiService {
   // persisted; cached server-side per draft so re-checking is free.
   async analyzeDraft(eventId: string, draft: string): Promise<DraftAnalysis> {
     try {
-      const response = await apiClient.post(`/events/${eventId}/messages/analyze-draft`, { draft });
+      const response = await apiClient.post(`/events/${eventId}/messages/analyze-draft`, { draft }, { timeout: AI_TIMEOUT });
       const a = response.data.analysis ?? {};
       return {
         emotions: Array.isArray(a.emotions) ? a.emotions : [],
@@ -4038,7 +4057,7 @@ class ApiService {
   // validating responses. Not persisted; the user picks one to insert/send.
   async previewEmotionAcceptance(eventId: string): Promise<EmotionAcceptancePreview> {
     try {
-      const response = await apiClient.post(`/events/${eventId}/messages/preview-acceptance`);
+      const response = await apiClient.post(`/events/${eventId}/messages/preview-acceptance`, undefined, { timeout: AI_TIMEOUT });
       const p = response.data.preview ?? {};
       return {
         empathy: p.empathy || '',
@@ -4058,7 +4077,7 @@ class ApiService {
   // Preview an AI 諮商師 comment for an event (not persisted until posted).
   async previewEventAiComment(eventId: string): Promise<string> {
     try {
-      const response = await apiClient.post(`/events/${eventId}/ai-comment/preview`);
+      const response = await apiClient.post(`/events/${eventId}/ai-comment/preview`, undefined, { timeout: AI_TIMEOUT });
       return response.data.comment || '';
     } catch (error: unknown) {
       console.error('Failed to preview event AI comment:', error);
@@ -4286,7 +4305,7 @@ class ApiService {
   // Start (or resume) a facilitated session; returns the first therapist turn.
   async startFacilitation(eventId: string): Promise<FacilitationAdvance> {
     try {
-      const response = await apiClient.post(`/events/${eventId}/facilitation/start`);
+      const response = await apiClient.post(`/events/${eventId}/facilitation/start`, undefined, { timeout: AI_TIMEOUT });
       return {
         session: (response.data.session ?? null) as FacilitationSession | null,
         message: response.data.message ? this.transformEventMessage(response.data.message) : null,
@@ -4300,7 +4319,7 @@ class ApiService {
   // Advance the session after the awaited partner has replied.
   async advanceFacilitation(eventId: string): Promise<FacilitationAdvance> {
     try {
-      const response = await apiClient.post(`/events/${eventId}/facilitation/next`);
+      const response = await apiClient.post(`/events/${eventId}/facilitation/next`, undefined, { timeout: AI_TIMEOUT });
       return {
         session: (response.data.session ?? null) as FacilitationSession | null,
         message: response.data.message ? this.transformEventMessage(response.data.message) : null,
@@ -4376,7 +4395,7 @@ class ApiService {
       const response = await apiClient.post(
         `/events/${id}/closure/assist`,
         { field },
-        { skipBillingRedirect: true }
+        { skipBillingRedirect: true, timeout: AI_TIMEOUT }
       );
       console.log('[closure] assist', { eventId: id, field, count: response.data?.options?.length });
       return { options: Array.isArray(response.data?.options) ? response.data.options : [] };
@@ -4473,7 +4492,7 @@ class ApiService {
 
   async retryClosureInsight(id: string): Promise<EventClosure> {
     try {
-      const response = await apiClient.post(`/events/${id}/closure/insight`);
+      const response = await apiClient.post(`/events/${id}/closure/insight`, undefined, { timeout: AI_TIMEOUT });
       console.log('[closure] insight retry', { eventId: id });
       return response.data.closure;
     } catch (error: unknown) {
@@ -4732,6 +4751,7 @@ class ApiService {
       created_by?: string;
       title?: string;
       summary?: string;
+      detail?: string | null;
       emotions?: string[];
       tags?: string[];
       toxicity_flags?: string[];
@@ -4760,6 +4780,7 @@ class ApiService {
       createdBy: r.created_by || '',
       title: r.title || '',
       summary: r.summary || '',
+      detail: r.detail ?? null,
       emotions: r.emotions ?? [],
       tags: r.tags ?? [],
       toxicityFlags: r.toxicity_flags ?? [],

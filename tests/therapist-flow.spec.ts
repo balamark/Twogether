@@ -47,8 +47,9 @@ async function login(page: Page) {
 }
 
 async function openTherapists(page: Page) {
-  // 心理諮商 moved from the Profile dropdown to a top-level nav tab.
-  await page.getByTestId('nav-tab-therapists').click();
+  // 心理諮商 nests inside 對話 (Talk) as an entry card, not its own nav tab.
+  await page.getByTestId('nav-tab-talk').click();
+  await page.getByTestId('talk-therapists-entry').click();
   await expect(page.getByTestId('therapists-view')).toBeVisible({ timeout: 10000 });
 }
 
@@ -113,8 +114,9 @@ test.describe('Therapist counseling', () => {
   test('公開問答 lives under 真實故事; the therapist profile shows reviews', async ({ page }) => {
     await login(page);
 
-    // 公開問答 moved to the 真實故事 tab (stories sub-tab).
-    await page.getByTestId('nav-tab-stories').click();
+    // 公開問答 lives under 真實故事, reached via 成長's entry card.
+    await page.getByTestId('nav-tab-grow').click();
+    await page.getByTestId('grow-stories-entry').click();
     await page.getByTestId('stories-tab-qa').click();
     await expect(page.getByTestId('public-qa-view')).toBeVisible({ timeout: 10000 });
 

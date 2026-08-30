@@ -18,7 +18,7 @@ async function loginIfNeeded(page: Page) {
   await page.waitForTimeout(2000);
 
   const loginButton = page.getByTestId('header-auth-button');
-  const recordButton = page.getByTestId('add-record-button');
+  const recordButton = page.getByTestId('user-menu-toggle');
 
   const alreadyLoggedIn = await recordButton.isVisible({ timeout: 2000 });
   if (alreadyLoggedIn) return;
@@ -58,7 +58,8 @@ const KNOWN_SCRIPT_ID = 'fan-idol-backstage';
 test.describe.serial('Roleplay favorites — couple-shared 我的最愛劇本', () => {
   test.beforeEach(async ({ page }) => {
     await loginIfNeeded(page);
-    const roleplayTab = page.getByTestId('nav-tab-roleplay');
+    await page.getByTestId('nav-tab-talk').click();
+    const roleplayTab = page.getByTestId('talk-roleplay-entry');
     await expect(roleplayTab).toBeVisible({ timeout: 5000 });
     await roleplayTab.click();
     await page.waitForTimeout(2000);
@@ -84,7 +85,8 @@ test.describe.serial('Roleplay favorites — couple-shared 我的最愛劇本', 
     // 3. Reload — favorite persists from the backend, still under 我的最愛.
     await page.reload();
     await page.waitForLoadState('domcontentloaded');
-    await page.getByTestId('nav-tab-roleplay').click();
+    await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-roleplay-entry').click();
     await page.waitForTimeout(1500);
     await page.getByTestId('roleplay-filter-favorites').click();
     await page.waitForTimeout(500);

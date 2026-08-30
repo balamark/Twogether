@@ -345,6 +345,6 @@ export async function seedQuota(page: Page, used: number, limit: number) {
 export async function openEventDetail(page: Page) {
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
-  await page.getByTestId('nav-tab-communicate').click();
+  await page.getByTestId('nav-tab-talk').click();
   await page.locator(`text=${EVENT_TITLE}`).first().click();
 }

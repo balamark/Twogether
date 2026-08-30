@@ -132,7 +132,8 @@ async function setup(page: import('@playwright/test').Page, media: string[]) {
 async function openEditor(page: import('@playwright/test').Page) {
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
-  const wallNav = page.locator('button:has-text("我們的牆")').first();
+  await page.getByTestId('nav-tab-talk').click();
+  const wallNav = page.getByTestId('talk-wall-entry');
   await wallNav.waitFor({ state: 'visible', timeout: 15000 });
   await wallNav.click();
   await page.locator('[aria-label="編輯"]').first().click();

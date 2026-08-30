@@ -36,7 +36,7 @@ test.describe.serial('Custom Script Upload and Persistence', () => {
 
     // Handle login if required
     const loginButton = page.getByTestId('header-auth-button');
-    const recordButton = page.getByTestId('add-record-button');
+    const recordButton = page.getByTestId('user-menu-toggle');
 
     const alreadyLoggedIn = await recordButton.isVisible({ timeout: 2000 });
     if (!alreadyLoggedIn && await loginButton.isVisible({ timeout: 3000 })) {
@@ -84,7 +84,8 @@ test.describe.serial('Custom Script Upload and Persistence', () => {
 
   test('should upload a custom script and persist it in the database', async ({ page }) => {
     // Navigate to roleplay section
-    const roleplayTab = page.getByTestId('nav-tab-roleplay');
+    await page.getByTestId('nav-tab-talk').click();
+    const roleplayTab = page.getByTestId('talk-roleplay-entry');
     await expect(roleplayTab).toBeVisible({ timeout: 5000 });
     await roleplayTab.click();
     await page.waitForTimeout(2000);
@@ -154,7 +155,8 @@ test.describe.serial('Custom Script Upload and Persistence', () => {
 
   test('should persist custom script after page reload', async ({ page }) => {
     // First, upload a script
-    const roleplayTab = page.getByTestId('nav-tab-roleplay');
+    await page.getByTestId('nav-tab-talk').click();
+    const roleplayTab = page.getByTestId('talk-roleplay-entry');
     await expect(roleplayTab).toBeVisible({ timeout: 5000 });
     await roleplayTab.click();
     await page.waitForTimeout(2000);
@@ -190,7 +192,8 @@ test.describe.serial('Custom Script Upload and Persistence', () => {
     await page.waitForTimeout(3000);
 
     // Navigate back to roleplay section
-    const roleplayTabAfterReload = page.getByTestId('nav-tab-roleplay');
+    await page.getByTestId('nav-tab-talk').click();
+    const roleplayTabAfterReload = page.getByTestId('talk-roleplay-entry');
     await expect(roleplayTabAfterReload).toBeVisible({ timeout: 5000 });
     await roleplayTabAfterReload.click();
     await page.waitForTimeout(2000);
@@ -202,7 +205,8 @@ test.describe.serial('Custom Script Upload and Persistence', () => {
 
   test('should use custom script and create intimacy record', async ({ page }) => {
     // Navigate to roleplay section
-    const roleplayTab = page.getByTestId('nav-tab-roleplay');
+    await page.getByTestId('nav-tab-talk').click();
+    const roleplayTab = page.getByTestId('talk-roleplay-entry');
     await expect(roleplayTab).toBeVisible({ timeout: 5000 });
     await roleplayTab.click();
     await page.waitForTimeout(2000);
@@ -242,7 +246,8 @@ test.describe.serial('Custom Script Upload and Persistence', () => {
 
   test('should display custom scripts in filtered view', async ({ page }) => {
     // Navigate to roleplay section
-    const roleplayTab = page.getByTestId('nav-tab-roleplay');
+    await page.getByTestId('nav-tab-talk').click();
+    const roleplayTab = page.getByTestId('talk-roleplay-entry');
     await expect(roleplayTab).toBeVisible({ timeout: 5000 });
     await roleplayTab.click();
     await page.waitForTimeout(2000);
@@ -262,7 +267,8 @@ test.describe.serial('Custom Script Upload and Persistence', () => {
 
   test('should validate custom script form fields', async ({ page }) => {
     // Navigate to roleplay section
-    const roleplayTab = page.getByTestId('nav-tab-roleplay');
+    await page.getByTestId('nav-tab-talk').click();
+    const roleplayTab = page.getByTestId('talk-roleplay-entry');
     await expect(roleplayTab).toBeVisible({ timeout: 5000 });
     await roleplayTab.click();
     await page.waitForTimeout(2000);
@@ -308,7 +314,8 @@ test.describe.serial('Custom Script Upload and Persistence', () => {
     const initialCoins = await readCoins();
 
     // Navigate to roleplay and upload a script
-    await page.getByTestId('nav-tab-roleplay').click();
+    await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-roleplay-entry').click();
     await page.waitForTimeout(2000);
 
     const uploadButton = page.getByTestId('script-upload-button');
@@ -343,7 +350,8 @@ test.describe.serial('Custom Script Upload and Persistence', () => {
   });
 
   test('a freshly created script shows created date, NEW tag, and a working share button', async ({ page }) => {
-    const roleplayTab = page.getByTestId('nav-tab-roleplay');
+    await page.getByTestId('nav-tab-talk').click();
+    const roleplayTab = page.getByTestId('talk-roleplay-entry');
     await expect(roleplayTab).toBeVisible({ timeout: 5000 });
     await roleplayTab.click();
     await page.waitForTimeout(1500);

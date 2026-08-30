@@ -43,7 +43,8 @@ test.describe.serial('真實故事 — real publish/vote/impact round trip', () 
 
   test('A publishes a story through the guided template', async ({ page }) => {
     await loginUI(page, USER_A);
-    await page.getByTestId('nav-tab-stories').click();
+    await page.getByTestId('nav-tab-grow').click();
+    await page.getByTestId('grow-stories-entry').click();
 
     // Empty archive on a fresh run shows the empty-state CTA instead of the
     // list CTA; either opens the compose flow. .or() waits for whichever
@@ -90,7 +91,8 @@ test.describe.serial('真實故事 — real publish/vote/impact round trip', () 
 
   test('B reads, votes all three types, and comments', async ({ page }) => {
     await loginUI(page, USER_B);
-    await page.getByTestId('nav-tab-stories').click();
+    await page.getByTestId('nav-tab-grow').click();
+    await page.getByTestId('grow-stories-entry').click();
     await page.getByTestId('story-search').fill(String(RUN));
     await expect(page.getByTestId('story-card').first()).toContainText(STORY_TITLE, { timeout: 10000 });
     await page.getByTestId('story-card').first().click();
@@ -108,7 +110,8 @@ test.describe.serial('真實故事 — real publish/vote/impact round trip', () 
 
   test("A sees impact stats and the comment notification", async ({ page }) => {
     await loginUI(page, USER_A);
-    await page.getByTestId('nav-tab-stories').click();
+    await page.getByTestId('nav-tab-grow').click();
+    await page.getByTestId('grow-stories-entry').click();
     await page.getByTestId('stories-tab-mine').click();
 
     const impact = page.getByTestId('my-stories-impact');

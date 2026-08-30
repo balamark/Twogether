@@ -2,15 +2,18 @@ import React, { useEffect, useState } from 'react';
 import { formatRelativeOrDate } from '../utils/datetime';
 import type { MomentReactionKey } from '../services/api';
 import type { IntimateRecord } from '../App';
+import AutoGrowTextarea from './AutoGrowTextarea';
 
 // 快速回應 on a 親密記錄. Keys must match MOMENT_REACTIONS in
 // routes/love-moments.js. These exist because a record used to be a row nobody
 // could answer: the moment belongs to both people, but only one of them ever
 // got to say anything about it.
 //
-// Words, not emoji. A row of coloured capsules turned every record into a
-// control panel; four plain words sit inside the card's own typography and only
-// the chosen one takes on any colour at all.
+// Words, not emoji — but they are pills, not bare text. An earlier pass set
+// these as four plain words to keep the row quiet, and the row was quiet to a
+// fault: nobody could tell they were tappable at all. The outline carries the
+// affordance; the quiet is bought back by leaving unselected pills as a hairline
+// on white, so a row of them still recedes until one is chosen and fills rose.
 const MOMENT_REACTIONS: { key: MomentReactionKey; label: string }[] = [
   { key: 'love', label: '愛你' },
   { key: 'fire', label: '意猶未盡' },
@@ -103,13 +106,22 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
 
   const toggleReaction = (key: MomentReactionKey) => send({ reaction: key });
 
-  // One quiet line, and only four things in it. The underline is reserved for
-  // "this one is chosen" — nothing else in this row is allowed to wear it.
-  // There is deliberately no 說一句 link here: at 390px the list row gives this
-  // strip 254px, which the four words fill, and tapping anywhere else on the
-  // record already opens the detail view where the sentence gets written.
+  // At 390px the list row gives this strip 254px. The four labels are 182px of
+  // text and pill padding adds ~80px, so they cannot sit on one line there.
+  // Left to flex-wrap they break 3+1, which strands 很難忘 alone; a 2-column
+  // grid makes the wrap deliberate and keeps the columns aligned. The detail
+  // view is wide enough for a single row, so it stays flex.
+  //
+  // There is deliberately no 說一句 link here: tapping anywhere else on the
+  // record already opens the detail view, which is where the sentence is written.
   const chips = (
-    <div className="flex flex-wrap items-center gap-x-4">
+    <div
+      className={
+        variant === 'row'
+          ? 'grid grid-cols-2 gap-2 justify-items-start'
+          : 'flex flex-wrap items-center gap-2'
+      }
+    >
       {MOMENT_REACTIONS.map(({ key, label }) => {
         const active = mine?.reaction === key;
         return (
@@ -120,16 +132,13 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
             disabled={busy}
             aria-pressed={active}
             data-testid={`moment-reaction-${key}-${record.id}`}
-            // py-2 is for the finger, not the eye: a bare word is an easy tap
-            // to miss. The rule goes on the inner span so it hugs the text
-            // instead of floating below the padding.
-            className={`py-2 font-body text-[13px] transition-colors disabled:opacity-50 ${
-              active ? 'text-petal-rose-deep' : 'text-petal-ink-soft hover:text-petal-ink'
+            className={`px-3 py-1.5 rounded-full border font-body text-[13px] transition-colors disabled:opacity-50 ${
+              active
+                ? 'bg-petal-rose-deep border-petal-rose-deep text-white font-medium'
+                : 'bg-white border-petal-rule text-petal-ink-soft hover:border-petal-rose hover:text-petal-ink'
             }`}
           >
-            <span className={active ? 'border-b border-petal-rose-deep pb-0.5' : ''}>
-              {label}
-            </span>
+            {label}
           </button>
         );
       })}
@@ -187,15 +196,14 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
 
       {editingNote ? (
         <div className="space-y-2">
-          <textarea
+          <AutoGrowTextarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             maxLength={NOTE_MAX}
-            rows={2}
             autoFocus
             placeholder="想說一句什麼？"
             data-testid={`moment-note-input-${record.id}`}
-            className="w-full rounded-md border border-petal-rule bg-petal-cream px-3 py-2 font-body text-sm text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y"
+            className="w-full rounded-md border border-petal-rule bg-petal-cream px-3 py-2 font-body text-sm text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-none min-h-[6.5rem] max-h-[40vh] overflow-y-auto"
           />
           <div className="flex items-center justify-between gap-3">
             <span className="font-body text-[11px] text-petal-muted">

@@ -90,7 +90,8 @@ test.describe('Wall — privacy toggle + custom mood', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    await page.locator('button:has-text("我們的牆")').first().click();
+    await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-wall-entry').click();
     await page.locator('button:has-text("新貼文")').first().click();
 
     await page.getByTestId('wall-composer-content').fill('今天很努力');

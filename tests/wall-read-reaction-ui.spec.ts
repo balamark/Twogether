@@ -112,7 +112,8 @@ test.describe('Wall — 已讀指示 + 一鍵心意回應', () => {
   const openWall = async (page: import('@playwright/test').Page) => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.locator('button:has-text("我們的牆")').first().click();
+    await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-wall-entry').click();
     await expect(page.getByTestId(`wall-post-${OWN_READ}`)).toBeVisible({ timeout: 10000 });
   };
 

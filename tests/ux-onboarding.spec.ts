@@ -140,7 +140,7 @@ test.describe('UX onboarding surfaces', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    await page.getByTestId('nav-tab-communicate').click();
+    await page.getByTestId('nav-tab-talk').click();
 
     const gate = page.getByTestId('solo-mode-gate');
     await expect(gate).toBeVisible({ timeout: 10000 });
@@ -235,7 +235,7 @@ test.describe('UX onboarding surfaces', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    await page.getByTestId('nav-tab-communicate').click();
+    await page.getByTestId('nav-tab-talk').click();
 
     await expect(page.getByTestId('events-empty-state')).toBeVisible({ timeout: 10000 });
     await page.getByTestId('events-empty-compose').click();

@@ -112,10 +112,18 @@ async function generateIcebreaker(rawText /* , { userGender, partnerGender } */)
   const tags = pickTags(rawText);
   const toxicityFlags = detectToxicity(rawText);
   const versions = buildVersions({ summary, emotions, tags });
+  // Mirrors the real provider's long-draft rule (services/llm/claudeProvider.js
+  // LONG_DRAFT_CHARS): only a long draft gets the 完整經過 panel, and it keeps
+  // the whole of the original rather than summarising it.
+  const trimmed = rawText.trim();
+  const detail = trimmed.length >= 400
+    ? `我想把這件事完整說清楚。${maskToxicWords(trimmed)}`
+    : '';
 
   return {
     title,
     summary,
+    detail,
     emotions,
     tags,
     toxicityFlags,

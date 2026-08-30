@@ -20,7 +20,7 @@ test.describe('Script gender role assignment', () => {
     await page.waitForTimeout(2000);
 
     const loginButton = page.getByTestId('header-auth-button');
-    const recordButton = page.getByTestId('add-record-button');
+    const recordButton = page.getByTestId('user-menu-toggle');
 
     const alreadyLoggedIn = await recordButton.isVisible({ timeout: 2000 });
     if (!alreadyLoggedIn && await loginButton.isVisible({ timeout: 3000 })) {
@@ -50,7 +50,8 @@ test.describe('Script gender role assignment', () => {
   });
 
   test('named speakers get an assignment panel and map to gender tokens', async ({ page }) => {
-    await page.getByTestId('nav-tab-roleplay').click();
+    await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-roleplay-entry').click();
     await page.waitForTimeout(2000);
 
     await page.getByTestId('script-upload-button').click();
@@ -98,7 +99,8 @@ test.describe('Script gender role assignment', () => {
   });
 
   test('placeholder-only scripts do not show the assignment panel', async ({ page }) => {
-    await page.getByTestId('nav-tab-roleplay').click();
+    await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-roleplay-entry').click();
     await page.waitForTimeout(2000);
 
     await page.getByTestId('script-upload-button').click();
@@ -109,7 +111,8 @@ test.describe('Script gender role assignment', () => {
   });
 
   test('AI role detection is premium-gated: free user sees upgrade prompt, draft is preserved', async ({ page }) => {
-    await page.getByTestId('nav-tab-roleplay').click();
+    await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-roleplay-entry').click();
     await page.waitForTimeout(2000);
 
     await page.getByTestId('script-upload-button').click();
@@ -134,7 +137,8 @@ test.describe('Script gender role assignment', () => {
   });
 
   test('Google Docs import rejects a non-docs URL with a specific message', async ({ page }) => {
-    await page.getByTestId('nav-tab-roleplay').click();
+    await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-roleplay-entry').click();
     await page.waitForTimeout(2000);
 
     await page.getByTestId('script-upload-button').click();
@@ -149,7 +153,8 @@ test.describe('Script gender role assignment', () => {
   });
 
   test('scenario location is saved, shown in the modal, and filterable via chips', async ({ page }) => {
-    await page.getByTestId('nav-tab-roleplay').click();
+    await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-roleplay-entry').click();
     await page.waitForTimeout(2000);
 
     await page.getByTestId('script-upload-button').click();
@@ -186,7 +191,8 @@ test.describe('Script gender role assignment', () => {
 
   test('marketplace search filters public scripts server-side', async ({ page }) => {
     // Upload a public script with a unique searchable title.
-    await page.getByTestId('nav-tab-roleplay').click();
+    await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-roleplay-entry').click();
     await page.waitForTimeout(2000);
 
     await page.getByTestId('script-upload-button').click();

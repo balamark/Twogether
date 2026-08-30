@@ -8,13 +8,16 @@ async function loginIfNeeded(page: Page) {
   await page.waitForLoadState('domcontentloaded');
 
   const loginButton = page.getByTestId('header-auth-button');
-  const recordButton = page.getByTestId('add-record-button');
+  // 今天 (home) is the default landing view now, not 我們/record — probe with
+  // user-menu-toggle (present on every authenticated view) instead of a
+  // testid that only exists after navigating to 我們.
+  const userMenu = page.getByTestId('user-menu-toggle');
   await Promise.race([
     loginButton.waitFor({ state: 'visible', timeout: 20000 }),
-    recordButton.waitFor({ state: 'visible', timeout: 20000 }),
+    userMenu.waitFor({ state: 'visible', timeout: 20000 }),
   ]).catch(() => {});
 
-  if (await recordButton.isVisible({ timeout: 1500 }).catch(() => false)) return;
+  if (await userMenu.isVisible({ timeout: 1500 }).catch(() => false)) return;
   if (!(await loginButton.isVisible({ timeout: 3000 }).catch(() => false))) return;
 
   await loginButton.click();
@@ -24,7 +27,7 @@ async function loginIfNeeded(page: Page) {
   await page.getByTestId('auth-submit-button').click();
   await Promise.race([
     page.waitForResponse((r) => r.url().includes('/auth/login'), { timeout: 15000 }),
-    page.getByTestId('add-record-button').waitFor({ timeout: 15000 }),
+    userMenu.waitFor({ timeout: 15000 }),
   ]).catch(() => {});
   if (await page.getByTestId('auth-modal-heading').isVisible({ timeout: 1000 }).catch(() => false)) {
     await page.keyboard.press('Escape');
@@ -34,6 +37,7 @@ async function loginIfNeeded(page: Page) {
 test.describe('Calendar month view — adjacent-month days', () => {
   test('grid fills leading/trailing cells with real days (no blank padding)', async ({ page }) => {
     await loginIfNeeded(page);
+    await page.getByTestId('nav-tab-us').click();
 
     const grid = page.getByTestId('calendar-grid');
     await expect(grid).toBeVisible({ timeout: 10000 });

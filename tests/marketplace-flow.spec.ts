@@ -39,7 +39,7 @@ async function loginIfNeeded(page: Page) {
   await page.waitForTimeout(2000);
 
   const loginButton = page.getByTestId('header-auth-button');
-  const recordButton = page.getByTestId('add-record-button');
+  const recordButton = page.getByTestId('user-menu-toggle');
 
   const alreadyLoggedIn = await recordButton.isVisible({ timeout: 2000 });
   if (alreadyLoggedIn) return;
@@ -71,7 +71,8 @@ async function loginIfNeeded(page: Page) {
 }
 
 async function gotoRoleplay(page: Page) {
-  const tab = page.getByTestId('nav-tab-roleplay');
+  await page.getByTestId('nav-tab-talk').click();
+  const tab = page.getByTestId('talk-roleplay-entry');
   await expect(tab).toBeVisible({ timeout: 5000 });
   await tab.click();
   await page.waitForTimeout(1500);

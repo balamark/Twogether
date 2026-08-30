@@ -175,7 +175,8 @@ test.describe('真實故事 — archive UI wiring', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    await page.getByTestId('nav-tab-stories').click();
+    await page.getByTestId('nav-tab-grow').click();
+    await page.getByTestId('grow-stories-entry').click();
     await expect(page.getByTestId('stories-view')).toBeVisible({ timeout: 10000 });
     await expect(page.getByTestId('story-featured')).toBeVisible();
     await expect(page.getByTestId('story-card').first()).toContainText(STORY.title);
@@ -204,7 +205,8 @@ test.describe('真實故事 — archive UI wiring', () => {
     });
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.getByTestId('nav-tab-stories').click();
+    await page.getByTestId('nav-tab-grow').click();
+    await page.getByTestId('grow-stories-entry').click();
     await page.getByTestId('story-search').fill('遲到');
     await expect.poll(() => searchedQ, { timeout: 5000 }).toBe('遲到');
     await expect(page.getByTestId('story-search-empty')).toBeVisible();
@@ -214,7 +216,8 @@ test.describe('真實故事 — archive UI wiring', () => {
     await seed(page);
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.getByTestId('nav-tab-stories').click();
+    await page.getByTestId('nav-tab-grow').click();
+    await page.getByTestId('grow-stories-entry').click();
 
     await page.getByTestId('story-compose-cta').click();
     await page.getByTestId('compose-choose-story').click();
@@ -264,7 +267,8 @@ test.describe('真實故事 — archive UI wiring', () => {
     );
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.getByTestId('nav-tab-stories').click();
+    await page.getByTestId('nav-tab-grow').click();
+    await page.getByTestId('grow-stories-entry').click();
     await page.getByTestId('story-compose-cta').click();
     await page.getByTestId('compose-choose-story').click();
     await page.getByTestId('story-mode-freeform').click();
@@ -298,7 +302,8 @@ test.describe('真實故事 — archive UI wiring', () => {
     });
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.getByTestId('nav-tab-stories').click();
+    await page.getByTestId('nav-tab-grow').click();
+    await page.getByTestId('grow-stories-entry').click();
 
     await page.getByTestId('story-compose-cta').click();
     await page.getByTestId('compose-choose-article').click();
@@ -346,7 +351,8 @@ test.describe('真實故事 — archive UI wiring', () => {
     });
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.getByTestId('nav-tab-stories').click();
+    await page.getByTestId('nav-tab-grow').click();
+    await page.getByTestId('grow-stories-entry').click();
 
     await expect(page.getByTestId('story-card').first()).toContainText('好文');
     await page.getByTestId('story-kind-article').click();
@@ -357,7 +363,8 @@ test.describe('真實故事 — archive UI wiring', () => {
     await seed(page);
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.getByTestId('nav-tab-stories').click();
+    await page.getByTestId('nav-tab-grow').click();
+    await page.getByTestId('grow-stories-entry').click();
     await page.getByTestId('stories-tab-mine').click();
 
     await expect(page.getByTestId('my-stories-impact')).toContainText('已被閱讀 12 次');
@@ -375,7 +382,8 @@ test.describe('真實故事 — archive UI wiring', () => {
     );
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.getByTestId('nav-tab-stories').click();
+    await page.getByTestId('nav-tab-grow').click();
+    await page.getByTestId('grow-stories-entry').click();
     await page.getByTestId('stories-tab-qa').click();
     await expect(page.getByTestId('public-qa-view')).toBeVisible({ timeout: 10000 });
   });
@@ -413,7 +421,8 @@ test.describe('真實故事 — archive UI wiring', () => {
     );
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
-    await page.getByTestId('nav-tab-stories').click();
+    await page.getByTestId('nav-tab-grow').click();
+    await page.getByTestId('grow-stories-entry').click();
     await page.getByTestId('stories-tab-polls').click();
     await expect(page.getByTestId('polls-view')).toBeVisible({ timeout: 10000 });
     await expect(page.getByTestId('poll-card').first()).toContainText('吵架後，誰該先低頭');
@@ -428,7 +437,8 @@ test.describe('真實故事 — archive UI wiring', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
 
-    await page.getByTestId('nav-tab-stories').click();
+    await page.getByTestId('nav-tab-grow').click();
+    await page.getByTestId('grow-stories-entry').click();
     await expect(page.getByTestId('stories-view')).toBeVisible({ timeout: 10000 });
     // 我的故事 sub-tab is signed-in only.
     await expect(page.getByTestId('stories-tab-mine')).toHaveCount(0);
