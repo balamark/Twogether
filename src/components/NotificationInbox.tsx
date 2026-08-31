@@ -57,17 +57,21 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       return;
     }
     switch (notification.notificationType) {
+      // Wall activity (incl. AI 諮商師 comments) → the wall thread.
       case 'wall_post':
       case 'wall_reply':
       case 'wall_reaction':
+      case 'wall_ai_comment':
         onNavigate('wall');
         break;
       // The three 一起收尾 types land here too: the closure panel (or the summary
       // card, once it's finished) is on the event itself.
       case 'event_created':
       case 'event_reply':
+      case 'event_ai_comment':
       case 'event_resolve_request':
       case 'event_resolved':
+      case 'event_reopened':
       case 'event_closing_started':
       case 'event_closure_partner_ready':
       case 'event_closure_done':
@@ -83,6 +87,21 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
         break;
       case 'consultation_message':
         onNavigate('therapists');
+        break;
+      // 情緒深潛 — one partner shared their feelings, or responded to a shared
+      // journey; open the deep-dive layer (App resolves the active/incoming one).
+      case 'deep_dive_shared':
+      case 'deep_dive_partner_responded':
+        onNavigate('deep-dive');
+        break;
+      // 專屬心理師關係變化。伴侶端：帶到「心理諮商」分頁（可管理專屬心理師）。
+      case 'dedicated_therapist_added':
+        onNavigate('therapists');
+        break;
+      // 諮商師端：有伴侶把你設為專屬諮商師 → 帶到諮商工作台的「我輔導的伴侶」，
+      // 並自動開啟你所諮商的那對伴侶的頁面（payload 'clients' 觸發自動展開）。
+      case 'dedicated_client_added':
+        onNavigate('counselor', 'clients');
         break;
       // Partner-action notifications (services/notificationService.js): route each
       // to the tab where the action lives so the tap lands somewhere useful.

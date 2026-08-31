@@ -752,6 +752,10 @@ const LoveTimeApp = () => {
     try { return localStorage.getItem('counselorMode') === 'true'; } catch { return false; }
   });
   const counselorActive = counselorMode && isTherapist;
+  // Deep-link token for the 諮商工作台 client panel: bumped when a notification
+  // (dedicated_client_added) asks to jump straight to 我輔導的伴侶 and auto-open
+  // the couple that just added this counselor. 0 = no pending focus.
+  const [counselorClientsFocus, setCounselorClientsFocus] = useState(0);
 
   // Page-view analytics for the /admin Pages + Retention tabs. Only fires for
   // authenticated users — anon traffic is already covered by landing_visits.
@@ -2676,7 +2680,7 @@ const LoveTimeApp = () => {
       // this isn't part of the couple's 對話 family. When not active it renders
       // nothing for the one frame before the guard effect redirects to 今天.
       case 'counselor': return counselorActive ? (
-        <TherapistsView authState={authState} showNotification={showNotification} mode="counselor" />
+        <TherapistsView authState={authState} showNotification={showNotification} mode="counselor" clientsFocusToken={counselorClientsFocus} />
       ) : null;
       case 'feedback': return <FeedbackView authState={authState} showNotification={showNotification} setShowAuthModal={setShowAuthModal} />;
       case 'love-language': return <LoveLanguageView authState={authState} showNotification={showNotification} setShowAuthModal={setShowAuthModal} />;
@@ -3156,6 +3160,23 @@ const LoveTimeApp = () => {
         onNavigate={(view, payload) => {
           if (view === 'events' && payload) {
             setPendingEventId(payload);
+          }
+          // 情緒深潛 notification → open the deep-dive layer over the current view
+          // rather than routing to a plain page. Resume the caller's active /
+          // incoming journey when we know it; otherwise start (which resumes an
+          // open one server-side). Don't change currentView.
+          if (view === 'deep-dive') {
+            const target = activeDeepDive || incomingDeepDive;
+            setDeepDiveIntent(target ? { type: 'open', journeyId: target.id } : { type: 'start' });
+            return;
+          }
+          // 諮商師被設為專屬諮商師 → enter the 諮商工作台 and jump to 我輔導的伴侶.
+          // Flip counselor mode on (guard effect keeps it only if this account is
+          // actually a therapist) and bump the focus token so the clients panel
+          // auto-opens the couple that just added them.
+          if (view === 'counselor') {
+            setCounselorMode(true);
+            if (payload === 'clients') setCounselorClientsFocus((n) => n + 1);
           }
           setCurrentView(view);
         }}
