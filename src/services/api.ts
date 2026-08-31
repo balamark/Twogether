@@ -4611,7 +4611,11 @@ class ApiService {
   // widens its lookback and returns general topics instead.
   async getTherapyTopics(days = 14): Promise<TherapyTopicsResult> {
     try {
-      const response = await apiClient.get('/events/therapy-topics', { params: { days } });
+      // Generating 3-5 topics with reasoning is an AI call — it routinely
+      // outruns the client's default 15s timeout, which surfaced to users as a
+      // "連線逾時" error on the 產生話題建議 button. Give it the same extended
+      // window as every other AI-generating request.
+      const response = await apiClient.get('/events/therapy-topics', { params: { days }, timeout: AI_TIMEOUT });
       const d = response.data ?? {};
       if (d.success === false) {
         return {
