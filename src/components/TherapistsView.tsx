@@ -35,6 +35,11 @@ interface TherapistsViewProps {
     partnerConnected: boolean;
   };
   showNotification: (notification: Omit<Notification, 'id'>) => void;
+  // 'user' — the couple-facing 心理諮商 directory (browse/book, 諮商摘要, 專屬心理師).
+  // 'counselor' — the 諮商師工作台: only the counselor's own tools (我輔導的伴侶,
+  // 我的諮商師檔案, 我的收入, 個案諮商室). The two role contexts never mix on one
+  // screen; the header switch flips between them. Defaults to 'user'.
+  mode?: 'user' | 'counselor';
 }
 
 const LANGUAGE_LABEL: Record<string, string> = {
@@ -63,7 +68,8 @@ const PUBLIC_STATUS_LABEL: Record<ConsultationPublicStatus, string> = {
   withdrawn: '已取消公開',
 };
 
-const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotification }) => {
+const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotification, mode = 'user' }) => {
+  const isCounselorMode = mode === 'counselor';
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -134,67 +140,97 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
     if (!consultationsLoaded) loadConsultations();
   };
 
+  // Split the shared consultations list by role so each mode only shows its own
+  // side: the couple sees the sessions they booked (client), the counselor sees
+  // the sessions where they are the therapist. Keeps the two roles separate.
+  const visibleConsultations = useMemo(
+    () => consultations.filter((c) => (isCounselorMode ? c.role === 'therapist' : c.role === 'client')),
+    [consultations, isCounselorMode]
+  );
+
   const pendingCount = useMemo(
-    () => consultations.filter((c) => c.status === 'pending').length,
-    [consultations]
+    () => visibleConsultations.filter((c) => c.status === 'pending').length,
+    [visibleConsultations]
   );
 
   return (
     <div className="space-y-8" data-testid="therapists-view">
-      {/* Intro — leads with the Therapy Companion positioning: we sit beside
-          therapists, not against them. The 167-hours one-liner + the honest
-          "not a substitute" note come from src/content/positioning.ts so every
-          surface stays in sync. */}
-      <div className="text-center max-w-2xl mx-auto">
-        <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-          — 心理諮商
+      {/* Intro — user mode leads with the Therapy Companion positioning (we sit
+          beside therapists, not against them; the 167-hours one-liner + honest
+          "not a substitute" note come from src/content/positioning.ts). In
+          counselor mode this is the 諮商師工作台 header instead. */}
+      {isCounselorMode ? (
+        <div className="text-center max-w-2xl mx-auto">
+          <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+            — 諮商師工作台
+          </div>
+          <h2 className="font-display text-3xl md:text-4xl font-light tracking-tight text-petal-ink leading-[1.1] mb-3">
+            你的 <em className="not-italic italic text-pink-600">諮商師</em> 工作區
+          </h2>
+          <p className="font-display italic font-light text-base text-petal-muted">
+            這裡集中你以諮商師身分使用的功能——你輔導的伴侶、個案諮商室、你的檔案與收入。
+            <br className="hidden sm:block" />
+            切回右上角的「一般」即可回到你自己的伴侶功能。
+          </p>
         </div>
-        <h2 className="font-display text-3xl md:text-4xl font-light tracking-tight text-petal-ink leading-[1.1] mb-3">
-          與真人 <em className="not-italic italic text-pink-600">諮商心理師</em> 聊聊
-        </h2>
-        <p className="font-display italic font-light text-base text-petal-muted">
-          {POSITIONING_ONE_LINER}
-          <br className="hidden sm:block" />
-          {POSITIONING_SUBLINE}有些議題值得和一位受過專業訓練的人好好談——選擇一位諮商師，預約屬於你們的對話。
-        </p>
-        <p className="mt-3 font-body text-xs text-petal-muted max-w-md mx-auto leading-relaxed">
-          {NOT_A_SUBSTITUTE}
-        </p>
-      </div>
+      ) : (
+        <div className="text-center max-w-2xl mx-auto">
+          <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+            — 心理諮商
+          </div>
+          <h2 className="font-display text-3xl md:text-4xl font-light tracking-tight text-petal-ink leading-[1.1] mb-3">
+            與真人 <em className="not-italic italic text-pink-600">諮商心理師</em> 聊聊
+          </h2>
+          <p className="font-display italic font-light text-base text-petal-muted">
+            {POSITIONING_ONE_LINER}
+            <br className="hidden sm:block" />
+            {POSITIONING_SUBLINE}有些議題值得和一位受過專業訓練的人好好談——選擇一位諮商師，預約屬於你們的對話。
+          </p>
+          <p className="mt-3 font-body text-xs text-petal-muted max-w-md mx-auto leading-relaxed">
+            {NOT_A_SUBSTITUTE}
+          </p>
+        </div>
+      )}
 
-      {/* 諮商摘要 — the between-sessions digest the couple brings INTO a session.
-          This is the Therapy Companion flagship: it sits above the directory so
-          "整理你們的近況 → 帶去和心理師談" reads as one flow. */}
-      <TherapySummaryCard
-        authState={{ isAuthenticated: authState.isAuthenticated, partnerConnected: authState.partnerConnected }}
-        showNotification={showNotification}
-      />
+      {/* 諮商摘要 / 話題建議 / 你們的專屬心理師 — couple-facing prep tools; only in
+          user mode. A counselor sees none of the couple's own 心理諮商 surface. */}
+      {!isCounselorMode && (
+        <>
+          {/* 諮商摘要 — the between-sessions digest the couple brings INTO a
+              session; sits above the directory so "整理近況 → 帶去談" reads as
+              one flow. */}
+          <TherapySummaryCard
+            authState={{ isAuthenticated: authState.isAuthenticated, partnerConnected: authState.partnerConnected }}
+            showNotification={showNotification}
+          />
 
-      {/* 話題建議 — proactively suggests topics for the NEXT session, even when
-          nothing dramatic happened recently. Sits right below 諮商摘要 since
-          both are "prep for your next session" tools. */}
-      <TherapyTopicsCard
-        authState={{ isAuthenticated: authState.isAuthenticated, partnerConnected: authState.partnerConnected }}
-        showNotification={showNotification}
-      />
+          {/* 話題建議 — proactively suggests topics for the NEXT session. */}
+          <TherapyTopicsCard
+            authState={{ isAuthenticated: authState.isAuthenticated, partnerConnected: authState.partnerConnected }}
+            showNotification={showNotification}
+          />
 
-      {/* 你們的專屬心理師 — set/manage the couple's dedicated therapist. */}
-      <DedicatedTherapistPanel
-        reloadKey={dedicatedKey}
-        isAuthenticated={authState.isAuthenticated}
-        showNotification={showNotification}
-      />
+          {/* 你們的專屬心理師 — set/manage the couple's dedicated therapist. */}
+          <DedicatedTherapistPanel
+            reloadKey={dedicatedKey}
+            isAuthenticated={authState.isAuthenticated}
+            showNotification={showNotification}
+          />
+        </>
+      )}
 
-      {/* 我輔導的伴侶 — only shown to a logged-in therapist. */}
-      {ownProfile && (
+      {/* 我輔導的伴侶 — counselor-only (the flagship counselor tool). Gated on the
+          role mode, not just on owning a profile, so it never leaks into a
+          regular user's 心理諮商 page. */}
+      {isCounselorMode && (
         <TherapistClientsPanel showNotification={showNotification} />
       )}
 
       {/* 公開問答 moved to the 真實故事 tab (StoriesView) — this view is the
           therapist directory only now. */}
       <>
-      {/* Actions row. 成為諮商師 lives in the page footer now (therapists sign
-          in with a normal account, so there's no separate login button here). */}
+      {/* Actions row. In user mode this is 我的預約 only; in counselor mode it's
+          the counselor's own tools (個案諮商室 + 我的諮商師檔案 + 我的收入). */}
       <div className="flex flex-wrap items-center justify-center gap-2">
         {authState.isAuthenticated && (
           <button
@@ -203,10 +239,10 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
             className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors font-body text-[13px] font-medium"
           >
             <CalendarCheck className="w-3.5 h-3.5" strokeWidth={1.5} />
-            我的預約{pendingCount > 0 ? ` (${pendingCount})` : ''}
+            {isCounselorMode ? '個案諮商室' : '我的預約'}{pendingCount > 0 ? ` (${pendingCount})` : ''}
           </button>
         )}
-        {authState.isAuthenticated && ownProfile && (
+        {isCounselorMode && authState.isAuthenticated && ownProfile && (
           <button
             onClick={() => setShowProfileEditor(true)}
             data-testid="therapist-myprofile-button"
@@ -216,7 +252,7 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
             我的諮商師檔案
           </button>
         )}
-        {authState.isAuthenticated && ownProfile && (
+        {isCounselorMode && authState.isAuthenticated && ownProfile && (
           <button
             onClick={() => setShowEarnings(true)}
             data-testid="therapist-earnings-button"
@@ -228,37 +264,43 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
         )}
       </div>
 
-      {/* Focus filter — a few common tags, the rest behind 更多 */}
-      <FocusFilter value={focusFilter} onChange={setFocusFilter} />
+      {/* Therapist directory (focus filter + card grid) — couple-facing browse;
+          user mode only. A counselor never browses the directory from here. */}
+      {!isCounselorMode && (
+        <>
+          {/* Focus filter — a few common tags, the rest behind 更多 */}
+          <FocusFilter value={focusFilter} onChange={setFocusFilter} />
 
-      {/* List */}
-      {loading ? (
-        <p className="text-center font-body text-sm text-petal-muted py-12">載入中…</p>
-      ) : error ? (
-        <div className="text-center py-12">
-          <p className="font-body text-sm text-petal-rose-deep mb-3">{error}</p>
-          <button
-            onClick={loadTherapists}
-            className="font-body text-sm text-petal-ink underline underline-offset-4"
-          >
-            重新載入
-          </button>
-        </div>
-      ) : therapists.length === 0 ? (
-        <p className="text-center font-body text-sm text-petal-muted py-12">
-          這個領域目前還沒有諮商師，換個領域看看吧。
-        </p>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {therapists.map((t) => (
-            <TherapistCard
-              key={t.id}
-              therapist={t}
-              onBook={() => setBookingTarget(t)}
-              onViewProfile={() => setProfileTarget(t)}
-            />
-          ))}
-        </div>
+          {/* List */}
+          {loading ? (
+            <p className="text-center font-body text-sm text-petal-muted py-12">載入中…</p>
+          ) : error ? (
+            <div className="text-center py-12">
+              <p className="font-body text-sm text-petal-rose-deep mb-3">{error}</p>
+              <button
+                onClick={loadTherapists}
+                className="font-body text-sm text-petal-ink underline underline-offset-4"
+              >
+                重新載入
+              </button>
+            </div>
+          ) : therapists.length === 0 ? (
+            <p className="text-center font-body text-sm text-petal-muted py-12">
+              這個領域目前還沒有諮商師，換個領域看看吧。
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {therapists.map((t) => (
+                <TherapistCard
+                  key={t.id}
+                  therapist={t}
+                  onBook={() => setBookingTarget(t)}
+                  onViewProfile={() => setProfileTarget(t)}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
       </>
 
@@ -295,7 +337,7 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
 
       {showMine && (
         <MyConsultationsModal
-          consultations={consultations}
+          consultations={visibleConsultations}
           onClose={() => setShowMine(false)}
           onOpenRoom={(c) => setChatTarget(c)}
           onChanged={loadConsultations}
@@ -329,20 +371,22 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
       )}
 
       {/* Page footer — becoming a therapist is a low-key entry (public sign-up
-          page). Therapists sign in with a normal Twogether account. */}
-      <footer className="mt-12 pt-6 border-t border-petal-rule text-center">
-        <p className="font-body text-xs text-petal-muted">
-          你是諮商師，想加入 Twogether？
-          <a
-            href="/therapist-signup"
-            data-testid="therapist-apply-button"
-            className="text-pink-600 hover:text-pink-700 underline underline-offset-2 ml-1 inline-flex items-center gap-1"
-          >
-            <UserPlus className="w-3 h-3" strokeWidth={1.5} />
-            成為諮商師
-          </a>
-        </p>
-      </footer>
+          page); user mode only. A signed-in counselor is already one. */}
+      {!isCounselorMode && (
+        <footer className="mt-12 pt-6 border-t border-petal-rule text-center">
+          <p className="font-body text-xs text-petal-muted">
+            你是諮商師，想加入 Twogether？
+            <a
+              href="/therapist-signup"
+              data-testid="therapist-apply-button"
+              className="text-pink-600 hover:text-pink-700 underline underline-offset-2 ml-1 inline-flex items-center gap-1"
+            >
+              <UserPlus className="w-3 h-3" strokeWidth={1.5} />
+              成為諮商師
+            </a>
+          </p>
+        </footer>
+      )}
     </div>
   );
 };

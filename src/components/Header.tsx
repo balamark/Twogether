@@ -42,6 +42,12 @@ interface HeaderProps {
   // Couple's Premium status; when premium, the menu shows the expiry date so it's
   // always visible (not just on the upgrade page).
   billingStatus?: BillingStatus | null;
+  // Counselor role switch. The pill only renders for therapist accounts
+  // (isTherapist); toggling flips the whole app between the couple context and
+  // the 諮商師工作台. counselorMode reflects which side is active.
+  isTherapist?: boolean;
+  counselorMode?: boolean;
+  onToggleCounselorMode?: () => void;
 }
 
 // Short M/D for the header badge (full date lives on the upgrade page).
@@ -75,6 +81,9 @@ const Header: React.FC<HeaderProps> = ({
   onShowDeepDive,
   onShowHelp,
   billingStatus,
+  isTherapist = false,
+  counselorMode = false,
+  onToggleCounselorMode,
 }) => {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
@@ -127,6 +136,49 @@ const Header: React.FC<HeaderProps> = ({
 
           {/* Right Side - Actions, Coins and User */}
           <div className="flex items-center space-x-1.5 sm:space-x-3 md:space-x-4 shrink-0">
+            {/* Counselor role switch — therapist accounts only. A segmented pill
+                (like a light/dark toggle) that flips the whole app between the
+                couple context (一般) and the 諮商師工作台 (諮商師). */}
+            {authState.isAuthenticated && isTherapist && onToggleCounselorMode && (
+              <div
+                role="switch"
+                aria-checked={counselorMode}
+                aria-label="切換諮商師模式"
+                data-testid="counselor-mode-toggle"
+                data-mode={counselorMode ? 'counselor' : 'user'}
+                className="flex items-center gap-0.5 p-0.5 rounded-full border border-petal-rule bg-petal-cream-2"
+              >
+                <button
+                  type="button"
+                  onClick={() => { if (counselorMode) onToggleCounselorMode(); }}
+                  aria-pressed={!counselorMode}
+                  title="一般使用者"
+                  className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full transition-colors text-xs font-medium ${
+                    !counselorMode
+                      ? 'bg-petal-ink text-petal-cream'
+                      : 'text-petal-ink-soft hover:text-petal-ink'
+                  }`}
+                >
+                  <User className="w-3.5 h-3.5" strokeWidth={1.5} />
+                  <span className="hidden sm:inline">一般</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { if (!counselorMode) onToggleCounselorMode(); }}
+                  aria-pressed={counselorMode}
+                  title="諮商師"
+                  className={`flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full transition-colors text-xs font-medium ${
+                    counselorMode
+                      ? 'bg-petal-ink text-petal-cream'
+                      : 'text-petal-ink-soft hover:text-petal-ink'
+                  }`}
+                >
+                  <HeartHandshake className="w-3.5 h-3.5" strokeWidth={1.5} />
+                  <span className="hidden sm:inline">諮商師</span>
+                </button>
+              </div>
+            )}
+
             {/* Intimacy Request Button */}
             {authState.isAuthenticated && authState.partnerConnected && (
               <button
