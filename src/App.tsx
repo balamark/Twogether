@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, Trash2, Pencil, Crown, Home as HomeIcon, TrendingUp } from 'lucide-react';
+import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, Trash2, Pencil, Crown, Home as HomeIcon, TrendingUp, HeartHandshake } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import HomeView from './components/HomeView';
 import GrowView from './components/GrowView';
@@ -530,7 +530,7 @@ const VIEW_STORAGE_KEY = 'tw:lastView';
 const PERSISTED_VIEWS = new Set([
   'home', 'talk', 'us', 'grow',
   'record', 'achievements', 'conflict', 'events', 'roleplay', 'wall',
-  'therapists', 'stories', 'shop', 'journey', 'intimacy-history', 'settings', 'activity',
+  'therapists', 'counselor', 'stories', 'shop', 'journey', 'intimacy-history', 'settings', 'activity',
   'feedback', 'love-language', 'upgrade', 'pricing', 'foreplay', 'games', 'communicate', 'help',
 ]);
 
@@ -742,6 +742,17 @@ const LoveTimeApp = () => {
   // and the proactive expiry banner can render without each re-fetching.
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
 
+  // 諮商師角色切換 — a therapist account can flip the whole app between its couple
+  // context and the 諮商師工作台. isTherapist is the only real signal (a therapist
+  // profile exists); counselorMode is the user's device-local preference. The
+  // switch (Header) only shows for therapists, and counselor tools only appear
+  // while counselorActive — so a regular user's pages never carry them.
+  const [isTherapist, setIsTherapist] = useState(false);
+  const [counselorMode, setCounselorMode] = useState<boolean>(() => {
+    try { return localStorage.getItem('counselorMode') === 'true'; } catch { return false; }
+  });
+  const counselorActive = counselorMode && isTherapist;
+
   // Page-view analytics for the /admin Pages + Retention tabs. Only fires for
   // authenticated users — anon traffic is already covered by landing_visits.
   // Each useEffect below reports an "enter" by calling track(); the hook
@@ -832,6 +843,36 @@ const LoveTimeApp = () => {
       .catch(() => { if (!cancelled) setBillingStatus(null); });
     return () => { cancelled = true; };
   }, [authState.isAuthenticated]);
+
+  // Am I a therapist? The only signal is a therapist profile existing (getMy…
+  // returns null on 404). Fetched on auth to drive the header role switch; a
+  // failed/absent lookup just means "not a therapist" (no switch, no counselor
+  // mode). Cleared on logout.
+  useEffect(() => {
+    if (!authState.isAuthenticated) {
+      setIsTherapist(false);
+      return;
+    }
+    let cancelled = false;
+    apiService
+      .getMyTherapistProfile()
+      .then((p) => { if (!cancelled) setIsTherapist(!!p); })
+      .catch(() => { if (!cancelled) setIsTherapist(false); });
+    return () => { cancelled = true; };
+  }, [authState.isAuthenticated]);
+
+  // Persist the counselor-mode preference so a refresh keeps a therapist on the
+  // same side of the switch (best-effort; private mode just forgets it).
+  useEffect(() => {
+    try { localStorage.setItem('counselorMode', counselorMode ? 'true' : 'false'); } catch { /* ignore */ }
+  }, [counselorMode]);
+
+  // Guard the counselor view: if we're on it but counselor mode isn't active
+  // (a non-therapist restored a stale 'counselor' view, or the therapist probe
+  // resolved false / they switched back), bounce to home.
+  useEffect(() => {
+    if (currentView === 'counselor' && !counselorActive) setCurrentView('home');
+  }, [currentView, counselorActive]);
 
   useEffect(() => {
     if (!pairingInvitationToken) {
@@ -1015,13 +1056,15 @@ const LoveTimeApp = () => {
 
   useEffect(() => {
     // The AI companion picker takes precedence right after sign-up — don't
-    // stack the pairing prompt on top of it.
-    if (authState.isAuthenticated && !authState.partnerConnected && !pairingPromptDismissed && !needsCompanionPick) {
+    // stack the pairing prompt on top of it. Also skip it in counselor mode:
+    // "invite your partner" is a couple nudge that doesn't belong on the
+    // 諮商師工作台.
+    if (authState.isAuthenticated && !authState.partnerConnected && !pairingPromptDismissed && !needsCompanionPick && !counselorActive) {
       setShowPairingPrompt(true);
     } else {
       setShowPairingPrompt(false);
     }
-  }, [authState.isAuthenticated, authState.partnerConnected, pairingPromptDismissed, needsCompanionPick]);
+  }, [authState.isAuthenticated, authState.partnerConnected, pairingPromptDismissed, needsCompanionPick, counselorActive]);
 
   // Pending-invite lookup for the reminder banner. Only runs while unpaired —
   // once paired the banner is gone and the answer stops mattering. A failure
@@ -1132,6 +1175,17 @@ const LoveTimeApp = () => {
     }
   };
 
+  // Flip the counselor role switch. Entering counselor mode lands on the
+  // workstation; leaving returns to 今天 (the couple home) so neither context
+  // shows the other's screens.
+  const handleToggleCounselorMode = () => {
+    setCounselorMode((prev) => {
+      const next = !prev;
+      setCurrentView(next ? 'counselor' : 'home');
+      return next;
+    });
+  };
+
   const handleLogout = async () => {
     // Logout must always clear local state, even if the server call hiccups —
     // otherwise the user stays on an authenticated panel with a cleared token.
@@ -1148,6 +1202,10 @@ const LoveTimeApp = () => {
     // Reset the view so we land back on the logged-out home, not whatever
     // authenticated panel (設定 / 金幣商店 / …) was open at logout time.
     setCurrentView('home');
+    // Drop the counselor role too so the next login (possibly a different
+    // account) never flashes a stale switch or workstation.
+    setIsTherapist(false);
+    setCounselorMode(false);
     showNotification({
       type: 'info',
       title: '已登出',
@@ -2312,15 +2370,19 @@ const LoveTimeApp = () => {
   // milestones). 角色扮演/心理諮商/真實故事 are no longer their own bottom tabs —
   // they nest as entry cards inside 對話/成長 (and 我們的牆/愛情旅程 inside 我們),
   // per the playbook's 6-tab cap / elevator-test rule.
-  const navItems = [
-    { id: 'home', label: '今天', icon: HomeIcon },
-    { id: 'talk', label: '對話', icon: MessageCircle },
-    { id: 'us', label: '我們', icon: Calendar },
-    { id: 'grow', label: '成長', icon: TrendingUp },
-    // Pricing is a sales surface for visitors; signed-in users upgrade via the
-    // dedicated 'upgrade' view instead, so this tab is logged-out only.
-    ...(!authState.isAuthenticated ? [{ id: 'pricing', label: 'Premium', icon: Crown }] : []),
-  ];
+  // In counselor mode the couple nav is fully replaced by the single 諮商工作台
+  // tab — the two role contexts never share a nav bar (confirmed product stance).
+  const navItems = counselorActive
+    ? [{ id: 'counselor', label: '諮商工作台', icon: HeartHandshake }]
+    : [
+        { id: 'home', label: '今天', icon: HomeIcon },
+        { id: 'talk', label: '對話', icon: MessageCircle },
+        { id: 'us', label: '我們', icon: Calendar },
+        { id: 'grow', label: '成長', icon: TrendingUp },
+        // Pricing is a sales surface for visitors; signed-in users upgrade via the
+        // dedicated 'upgrade' view instead, so this tab is logged-out only.
+        ...(!authState.isAuthenticated ? [{ id: 'pricing', label: 'Premium', icon: Crown }] : []),
+      ];
 
   const renderView = () => {
     // Show login prompt for private content when not authenticated
@@ -2606,9 +2668,16 @@ const LoveTimeApp = () => {
       case 'therapists': return (
         <div>
           <TalkSwitcher current="therapists" onNavigate={setCurrentView} />
-          <TherapistsView authState={authState} showNotification={showNotification} />
+          <TherapistsView authState={authState} showNotification={showNotification} mode="user" />
         </div>
       );
+      // 諮商師工作台 — the counselor role's own page. Only reachable while
+      // counselorActive (guarded by the effect above); no TalkSwitcher, since
+      // this isn't part of the couple's 對話 family. When not active it renders
+      // nothing for the one frame before the guard effect redirects to 今天.
+      case 'counselor': return counselorActive ? (
+        <TherapistsView authState={authState} showNotification={showNotification} mode="counselor" />
+      ) : null;
       case 'feedback': return <FeedbackView authState={authState} showNotification={showNotification} setShowAuthModal={setShowAuthModal} />;
       case 'love-language': return <LoveLanguageView authState={authState} showNotification={showNotification} setShowAuthModal={setShowAuthModal} />;
       default: return <GamesView
@@ -2689,6 +2758,9 @@ const LoveTimeApp = () => {
         onShowDeepDive={() => setDeepDiveIntent({ type: 'start' })}
         onShowUpgrade={() => { setUpgradeReason(null); setCurrentView('upgrade'); }}
         billingStatus={billingStatus}
+        isTherapist={isTherapist}
+        counselorMode={counselorMode}
+        onToggleCounselorMode={handleToggleCounselorMode}
       />
 
       {/* 情緒深潛 resume banner — dismissible, does not re-fire same session (R4).
@@ -2941,7 +3013,7 @@ const LoveTimeApp = () => {
         {/* Proactive Premium-expiry reminder — non-blocking, dismissible; shows
             only when Premium is within 7 days of lapsing. Hidden on the upgrade
             view itself (that page already shows expiry + a 續購 button). */}
-        {authState.isAuthenticated && currentView !== 'upgrade' && (
+        {authState.isAuthenticated && currentView !== 'upgrade' && !counselorActive && (
           <PremiumExpiryBanner
             status={billingStatus}
             onRenew={() => { setUpgradeReason(null); setCurrentView('upgrade'); }}
@@ -2951,7 +3023,7 @@ const LoveTimeApp = () => {
         {/* Standing 未配對 reminder — non-blocking, snoozes for 7 days. Hidden
             on 設定 (its own pairing panel lives there) and while the pairing
             modal is up, so we never stack two asks for the same thing. */}
-        {authState.isAuthenticated && !partnerConnected && currentView !== 'settings' && !showPairingPrompt && !showPairingInvitation && (
+        {authState.isAuthenticated && !partnerConnected && currentView !== 'settings' && !showPairingPrompt && !showPairingInvitation && !counselorActive && (
           <PairingReminderBanner
             invite={pendingPairingInvite}
             onInvite={() => {
