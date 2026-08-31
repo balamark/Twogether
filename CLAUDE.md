@@ -68,6 +68,18 @@ change — don't ship the happy path alone.
   `lib/logger` (structured `logInfo`/`logWarn`/`logError`) so Cloud Logging shows
   the feature being used, not just when it errors.
 
+## AI requests need the AI timeout (every AI-calling endpoint)
+
+Any client call that triggers an LLM generation MUST pass `{ timeout: AI_TIMEOUT }`
+in its axios config (`src/services/api.ts`). The default client timeout is only
+15s, but LLM calls routinely take longer — omitting the timeout makes axios abort
+a request the server is still (successfully) processing, and the interceptor
+surfaces it as a false "連線逾時" (`TIMEOUT`) error. This is easy to miss on
+**GET-based** AI endpoints, since the POST ones already set it. If you add or edit
+a method that calls the LLM, grep the endpoint for `AI_TIMEOUT` and make sure it's
+there. (This was the 產生話題建議 timeout bug: `getTherapyTopics` was a GET AI
+call with no timeout override.)
+
 ## UX conventions (every UI change)
 
 Read `docs/UX_PLAYBOOK.md` before UI work — it holds the binding UX rules and
