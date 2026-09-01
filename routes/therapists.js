@@ -1681,6 +1681,23 @@ router.get('/clients/:coupleId/therapy-topics', authenticateToken, async (req, r
   }
 });
 
+// GET /api/therapists/clients/:coupleId/therapy-summaries — the couple's
+// generated 諮商摘要 snapshots (newest first). Read-only: the couple compiles a
+// summary on their side to bring INTO the session; surfacing it here lets their
+// dedicated therapist read it before/at the session instead of waiting for a
+// paste. Never triggers generation and spends no AI credit.
+router.get('/clients/:coupleId/therapy-summaries', authenticateToken, async (req, res) => {
+  try {
+    const link = await requireDedicatedLink(req, res);
+    if (!link) return;
+    const summaries = await eventsRoutes.listTherapySummariesForCouple(req.params.coupleId);
+    res.json({ success: true, summaries });
+  } catch (error) {
+    logError('Failed to load client therapy summaries', { userId: req.user?.id, coupleId: req.params.coupleId, err: error.message });
+    res.status(500).json({ success: false, message: '無法取得諮商摘要' });
+  }
+});
+
 // POST /api/therapists/clients/:coupleId/events/:eventId/messages — therapist
 // message (requires can_comment). Never touches private events.
 router.post('/clients/:coupleId/events/:eventId/messages', authenticateToken, [

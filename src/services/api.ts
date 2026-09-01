@@ -5147,6 +5147,18 @@ class ApiService {
     }
   }
 
+  // The dedicated therapist's read-only view of a client couple's generated
+  // 諮商摘要 snapshots (newest first). Never triggers generation.
+  async getClientTherapySummaries(coupleId: string): Promise<TherapySummaryHistoryEntry[]> {
+    try {
+      const response = await apiClient.get(`/therapists/clients/${coupleId}/therapy-summaries`);
+      return (response.data?.summaries ?? []) as TherapySummaryHistoryEntry[];
+    } catch (error: unknown) {
+      console.error('Failed to fetch client therapy summaries:', error);
+      this.throwApiError(error, '無法取得諮商摘要');
+    }
+  }
+
   async addClientEventMessage(coupleId: string, eventId: string, content: string): Promise<EventMessage> {
     try {
       const response = await apiClient.post(`/therapists/clients/${coupleId}/events/${eventId}/messages`, { content });

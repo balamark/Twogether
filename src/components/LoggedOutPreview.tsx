@@ -18,6 +18,7 @@ import {
   NotebookPen,
   Gauge,
   ClipboardCheck,
+  ClipboardList,
   Crown,
   Check,
   Lock,
@@ -1083,6 +1084,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
             <strong className="text-petal-ink">好好說話</strong>，更了解你們的關係脈絡。
           </p>
           <ul className="mt-2.5 space-y-1.5 font-body text-xs text-petal-muted">
+            <li className="flex items-center gap-1.5"><ClipboardList className="w-3 h-3 text-petal-sage-deep" /> 你們整理的<strong className="text-petal-ink font-normal">諮商摘要</strong>會直接出現在他的頁面</li>
             <li className="flex items-center gap-1.5"><Lock className="w-3 h-3 text-petal-sage-deep" /> 私密內容不會被看到</li>
             <li className="flex items-center gap-1.5"><MessageSquare className="w-3 h-3 text-pink-500" /> 可選擇是否開放心理師留言</li>
             <li className="flex items-center gap-1.5"><HeartHandshake className="w-3 h-3 text-pink-500" /> 隨時可以解除</li>
