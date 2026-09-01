@@ -9,12 +9,20 @@ import TherapistClientView from './TherapistClientView';
 // 好好說話 (read-only, or with comment if the couple granted it).
 interface Props {
   showNotification: (n: Omit<Notification, 'id'>) => void;
+  // Bumped by a notification deep-link (dedicated_client_added) to auto-open the
+  // couple that just added this counselor.
+  autoOpenToken?: number;
+  // The exact couple to open when autoOpenToken fires. When null/not found (e.g.
+  // an older notification with no coupleId), fall back to clients[0] — the list
+  // is ordered most-recent-first, so that's the couple most likely meant.
+  autoOpenCoupleId?: string | null;
 }
 
-const TherapistClientsPanel: React.FC<Props> = ({ showNotification }) => {
+const TherapistClientsPanel: React.FC<Props> = ({ showNotification, autoOpenToken = 0, autoOpenCoupleId = null }) => {
   const [clients, setClients] = useState<TherapistClientCouple[]>([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<TherapistClientCouple | null>(null);
+  const [pendingAutoOpen, setPendingAutoOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -28,6 +36,22 @@ const TherapistClientsPanel: React.FC<Props> = ({ showNotification }) => {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+
+  // A notification asked to focus a client. Remember the request; the effect
+  // below opens it once the list has loaded (the fetch may still be in flight).
+  useEffect(() => {
+    if (autoOpenToken > 0) setPendingAutoOpen(true);
+  }, [autoOpenToken]);
+
+  useEffect(() => {
+    if (pendingAutoOpen && !loading && clients.length > 0) {
+      const match = autoOpenCoupleId
+        ? clients.find((c) => c.coupleId === autoOpenCoupleId)
+        : null;
+      setActive(match || clients[0]);
+      setPendingAutoOpen(false);
+    }
+  }, [pendingAutoOpen, loading, clients, autoOpenCoupleId]);
 
   if (loading) return null;
 
