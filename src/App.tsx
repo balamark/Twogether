@@ -756,6 +756,10 @@ const LoveTimeApp = () => {
   // (dedicated_client_added) asks to jump straight to 我輔導的伴侶 and auto-open
   // the couple that just added this counselor. 0 = no pending focus.
   const [counselorClientsFocus, setCounselorClientsFocus] = useState(0);
+  // The specific couple to auto-open in 我輔導的伴侶 (from the notification's
+  // coupleId). null → open the most-recent client as a fallback (older
+  // notifications predate the couple_id column).
+  const [counselorClientsTargetCoupleId, setCounselorClientsTargetCoupleId] = useState<string | null>(null);
 
   // Page-view analytics for the /admin Pages + Retention tabs. Only fires for
   // authenticated users — anon traffic is already covered by landing_visits.
@@ -2680,7 +2684,7 @@ const LoveTimeApp = () => {
       // this isn't part of the couple's 對話 family. When not active it renders
       // nothing for the one frame before the guard effect redirects to 今天.
       case 'counselor': return counselorActive ? (
-        <TherapistsView authState={authState} showNotification={showNotification} mode="counselor" clientsFocusToken={counselorClientsFocus} />
+        <TherapistsView authState={authState} showNotification={showNotification} mode="counselor" clientsFocusToken={counselorClientsFocus} clientsFocusCoupleId={counselorClientsTargetCoupleId} />
       ) : null;
       case 'feedback': return <FeedbackView authState={authState} showNotification={showNotification} setShowAuthModal={setShowAuthModal} />;
       case 'love-language': return <LoveLanguageView authState={authState} showNotification={showNotification} setShowAuthModal={setShowAuthModal} />;
@@ -3176,7 +3180,8 @@ const LoveTimeApp = () => {
           // auto-opens the couple that just added them.
           if (view === 'counselor') {
             setCounselorMode(true);
-            if (payload === 'clients') setCounselorClientsFocus((n) => n + 1);
+            setCounselorClientsTargetCoupleId(payload || null);
+            setCounselorClientsFocus((n) => n + 1);
           }
           setCurrentView(view);
         }}

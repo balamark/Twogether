@@ -44,6 +44,9 @@ interface TherapistsViewProps {
   // to 我輔導的伴侶 and auto-open the couple that just added this counselor. Each
   // increment is one focus request; ignored outside counselor mode.
   clientsFocusToken?: number;
+  // The specific couple to auto-open when clientsFocusToken fires; null → open
+  // the most-recent client as a fallback.
+  clientsFocusCoupleId?: string | null;
 }
 
 const LANGUAGE_LABEL: Record<string, string> = {
@@ -72,7 +75,7 @@ const PUBLIC_STATUS_LABEL: Record<ConsultationPublicStatus, string> = {
   withdrawn: '已取消公開',
 };
 
-const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotification, mode = 'user', clientsFocusToken = 0 }) => {
+const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotification, mode = 'user', clientsFocusToken = 0, clientsFocusCoupleId = null }) => {
   const isCounselorMode = mode === 'counselor';
   const [therapists, setTherapists] = useState<Therapist[]>([]);
   const [loading, setLoading] = useState(true);
@@ -227,7 +230,7 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
           role mode, not just on owning a profile, so it never leaks into a
           regular user's 心理諮商 page. */}
       {isCounselorMode && (
-        <TherapistClientsPanel showNotification={showNotification} autoOpenToken={clientsFocusToken} />
+        <TherapistClientsPanel showNotification={showNotification} autoOpenToken={clientsFocusToken} autoOpenCoupleId={clientsFocusCoupleId} />
       )}
 
       {/* 公開問答 moved to the 真實故事 tab (StoriesView) — this view is the

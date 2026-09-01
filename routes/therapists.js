@@ -1306,15 +1306,33 @@ const toDedicated = (row) => ({
   createdAt: row.created_at,
 });
 
+// Defensive: make sure the couple_id column exists (migration 092) so
+// insertNotification can wire a notification to a specific couple even on an
+// environment where migrations haven't caught up. Mirrors the event_id ensure
+// pattern in routes/intimacy-requests.js. Runs its ALTER once per process.
+let notificationsCoupleIdEnsured = false;
+async function ensureNotificationsCoupleIdColumn() {
+  if (notificationsCoupleIdEnsured) return;
+  try {
+    await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS couple_id UUID`);
+    notificationsCoupleIdEnsured = true;
+  } catch (err) {
+    logWarn('ensureNotificationsCoupleIdColumn failed', { err: err.message });
+  }
+}
+
 // In-app only notification (avoids the wall/event email templates for
 // relationship-status changes like adding/removing a dedicated therapist).
-async function insertNotification(userId, type, title, content, relatedUserId, priority = 1) {
+// coupleId (optional) lets the notification deep-link to a specific couple's
+// page — e.g. dedicated_client_added → the counselor's 我輔導的伴侶 for THIS couple.
+async function insertNotification(userId, type, title, content, relatedUserId, priority = 1, coupleId = null) {
   if (!userId) return;
   try {
+    await ensureNotificationsCoupleIdColumn();
     await db.query(
-      `INSERT INTO notifications (user_id, notification_type, title, content, related_user_id, priority)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [userId, type, title, (content || '').slice(0, 200), relatedUserId || null, priority]
+      `INSERT INTO notifications (user_id, notification_type, title, content, related_user_id, priority, couple_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [userId, type, title, (content || '').slice(0, 200), relatedUserId || null, priority, coupleId || null]
     );
   } catch (err) {
     logWarn('insertNotification failed', { type, err: err.message });
@@ -1412,14 +1430,20 @@ router.post('/dedicated', authenticateToken, [
         'dedicated_therapist_added',
         '你們新增了專屬心理師',
         `${therapist.display_name} 現在可以檢視你們的牆與好好說話${canComment ? '，並可留言' : ''}`,
-        userId
+        userId,
+        1,
+        couple.id
       );
+      // Carry couple.id so the counselor's notification opens exactly THIS
+      // couple in 我輔導的伴侶 (not just the most-recently-added client).
       await insertNotification(
         therapist.user_id,
         'dedicated_client_added',
         '有伴侶將你設為專屬心理師',
         '你可以在「我輔導的伴侶」檢視他們的牆與好好說話',
-        userId
+        userId,
+        1,
+        couple.id
       );
     })().catch((err) => logWarn('notify dedicated set failed', { err: err.message }));
 

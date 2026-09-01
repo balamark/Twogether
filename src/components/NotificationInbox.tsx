@@ -99,9 +99,10 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
         onNavigate('therapists');
         break;
       // 諮商師端：有伴侶把你設為專屬諮商師 → 帶到諮商工作台的「我輔導的伴侶」，
-      // 並自動開啟你所諮商的那對伴侶的頁面（payload 'clients' 觸發自動展開）。
+      // 並自動開啟你所諮商的那對伴侶的頁面。payload 帶 coupleId 精準定位該對伴侶；
+      // 舊通知沒有 coupleId 時，App 會退回開啟最新一筆 client。
       case 'dedicated_client_added':
-        onNavigate('counselor', 'clients');
+        onNavigate('counselor', notification.coupleId);
         break;
       // Partner-action notifications (services/notificationService.js): route each
       // to the tab where the action lives so the tap lands somewhere useful.

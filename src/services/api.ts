@@ -366,6 +366,7 @@ interface Notification {
   content: string;
   intimacyRequestId?: string;
   eventId?: string;
+  coupleId?: string;
   relatedUserNickname?: string;
   isRead: boolean;
   readAt?: string;
@@ -3870,6 +3871,7 @@ class ApiService {
       content?: string;
       intimacy_request_id?: string;
       event_id?: string;
+      couple_id?: string;
       related_user_nickname?: string;
       is_read?: boolean;
       read_at?: string;
@@ -3884,6 +3886,7 @@ class ApiService {
       content: typedData?.content || '',
       intimacyRequestId: typedData?.intimacy_request_id,
       eventId: typedData?.event_id,
+      coupleId: typedData?.couple_id,
       relatedUserNickname: typedData?.related_user_nickname,
       isRead: typedData?.is_read || false,
       readAt: typedData?.read_at,

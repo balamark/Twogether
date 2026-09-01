@@ -37,18 +37,27 @@ switch；它呼叫 `onNavigate(view, payload?)`，由 `src/App.tsx` 的 `<Notifi
   1. 打開諮商模式（`setCounselorMode(true)`；若此帳號其實不是諮商師，`App.tsx` 的
      守衛 effect 會把 view 導回今天，不會卡住）。
   2. 切到 `counselor` 諮商工作台。
-  3. 用 focus token（`counselorClientsFocus`）帶到「我輔導的伴侶」，並自動展開
-     `clients[0]`。後端 `GET /api/therapists/clients` 以 `ct.created_at DESC` 排序，
-     所以剛把你加入的那對伴侶就是第一筆——正是這則通知在講的伴侶。
+  3. 用 focus token（`counselorClientsFocus`）帶到「我輔導的伴侶」，並**精準**展開
+     該通知對應的那對伴侶：通知列上帶了 `couple_id`（migration 092），一路透過
+     `onNavigate` payload → `counselorClientsTargetCoupleId` →
+     `TherapistClientsPanel` 的 `autoOpenCoupleId`，比對 `clients[].coupleId` 開啟。
+     舊通知（沒有 `couple_id`）則退回開啟 `clients[0]`；後端
+     `GET /api/therapists/clients` 以 `ct.created_at DESC` 排序，所以那是「最近加入
+     你的那對伴侶」，多數情況仍是對的。
 - **`dedicated_therapist_added`**：伴侶端 → `therapists`。
 - **`event_ai_comment` / `event_reopened`**：補進 events 群組（原本 emoji/email 有、
   但 switch 漏了）。
 - **`wall_ai_comment`**：補進 wall 群組。
 - **`deep_dive_shared` / `deep_dive_partner_responded`**：開啟情緒深潛層。
 
-## 已知後續（follow-up）
+## couple_id 精準定位（已完成）
 
-- `dedicated_client_added` 目前用「最新一筆 client」推斷是哪對伴侶。單一伴侶或
-  剛加入的情境完全正確；若諮商師同時被多對伴侶指定、且通知不是最新那筆，展開的
-  可能不是該通知對應的伴侶。要做到 100% 精準需在通知列帶上 `couple_id`
-  （`notifications` 目前沒有這欄，需 migration + API 回傳），再由前端比對開啟。
+`notifications.couple_id`（migration 092，nullable，`ON DELETE CASCADE`）讓一則通知
+可以指向特定的一對伴侶。目前只有 `dedicated_client_added` /
+`dedicated_therapist_added` 會寫入（`routes/therapists.js` 的 `insertNotification`
+多帶一個 `coupleId` 參數）；`GET /api/therapists/notifications` 會一併回傳
+（`src/services/api.ts` 的 `Notification.coupleId`）。前端 `dedicated_client_added`
+就用它精準展開對應伴侶（找不到才退回 `clients[0]`）。
+
+未來若有其他「針對某對伴侶」的通知，沿用同一條路：`insertNotification(..., coupleId)`
+→ API 已回傳 `coupleId` → 前端 switch 用 `notification.coupleId` 導頁即可。

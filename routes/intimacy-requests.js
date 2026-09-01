@@ -1552,6 +1552,10 @@ async function ensureNotificationsEventIdColumn() {
   if (notificationsEventIdEnsured) return;
   try {
     await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS event_id UUID`);
+    // couple_id (migration 092) lets a notification deep-link to a specific
+    // couple — ensured here alongside event_id so the GET query can always
+    // select it, even on a DB that hasn't run the migration yet.
+    await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS couple_id UUID`);
     notificationsEventIdEnsured = true;
   } catch (err) {
     logWarn('ensureNotificationsEventIdColumn failed', { err: err.message });
@@ -1572,7 +1576,7 @@ router.get('/notifications', async (req, res) => {
     const result = await db.query(`
       SELECT
         n.id, n.notification_type, n.title, n.content,
-        n.intimacy_request_id, n.event_id, n.is_read, n.read_at,
+        n.intimacy_request_id, n.event_id, n.couple_id, n.is_read, n.read_at,
         n.created_at, n.priority,
         related_user.nickname as related_user_nickname
       FROM notifications n
@@ -1596,6 +1600,7 @@ router.get('/notifications', async (req, res) => {
             content TEXT NOT NULL,
             intimacy_request_id UUID REFERENCES intimacy_requests(id) ON DELETE CASCADE,
             event_id UUID,
+            couple_id UUID,
             related_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
             is_read BOOLEAN NOT NULL DEFAULT FALSE,
             read_at TIMESTAMP WITH TIME ZONE,

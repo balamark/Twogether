@@ -10,12 +10,15 @@ import TherapistClientView from './TherapistClientView';
 interface Props {
   showNotification: (n: Omit<Notification, 'id'>) => void;
   // Bumped by a notification deep-link (dedicated_client_added) to auto-open the
-  // couple that just added this counselor. Clients are ordered most-recent-first,
-  // so the newest link — the one the notification is about — is clients[0].
+  // couple that just added this counselor.
   autoOpenToken?: number;
+  // The exact couple to open when autoOpenToken fires. When null/not found (e.g.
+  // an older notification with no coupleId), fall back to clients[0] — the list
+  // is ordered most-recent-first, so that's the couple most likely meant.
+  autoOpenCoupleId?: string | null;
 }
 
-const TherapistClientsPanel: React.FC<Props> = ({ showNotification, autoOpenToken = 0 }) => {
+const TherapistClientsPanel: React.FC<Props> = ({ showNotification, autoOpenToken = 0, autoOpenCoupleId = null }) => {
   const [clients, setClients] = useState<TherapistClientCouple[]>([]);
   const [loading, setLoading] = useState(true);
   const [active, setActive] = useState<TherapistClientCouple | null>(null);
@@ -42,10 +45,13 @@ const TherapistClientsPanel: React.FC<Props> = ({ showNotification, autoOpenToke
 
   useEffect(() => {
     if (pendingAutoOpen && !loading && clients.length > 0) {
-      setActive(clients[0]);
+      const match = autoOpenCoupleId
+        ? clients.find((c) => c.coupleId === autoOpenCoupleId)
+        : null;
+      setActive(match || clients[0]);
       setPendingAutoOpen(false);
     }
-  }, [pendingAutoOpen, loading, clients]);
+  }, [pendingAutoOpen, loading, clients, autoOpenCoupleId]);
 
   if (loading) return null;
 
