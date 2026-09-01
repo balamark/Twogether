@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { X, Lock, Send, MessageCircle, ChevronLeft, Compass, Library } from 'lucide-react';
+import { X, Lock, Send, MessageCircle, ChevronLeft, Compass, Library, ClipboardList, Clock } from 'lucide-react';
 import {
   apiService,
   type WallPost,
@@ -8,6 +8,7 @@ import {
   type TherapistClientCouple,
   type TherapistClientTopics,
   type TherapyTopicSelectionStatus,
+  type TherapySummaryHistoryEntry,
 } from '../services/api';
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -15,6 +16,7 @@ import { isVideoUrl } from '../utils/script';
 import { companionName } from '../utils/aiCompanions';
 import { ROLE_STYLE } from '../utils/threadRoles';
 import ParticipantAvatar from './ParticipantAvatar';
+import TherapySummaryDetail from './TherapySummaryDetail';
 
 // A dedicated therapist's read-only (or read+comment) view of ONE client
 // couple's 牆 and 好好說話. Private items are never returned by the API, so this
@@ -26,7 +28,7 @@ interface Props {
   showNotification: (n: Omit<Notification, 'id'>) => void;
 }
 
-type Tab = 'wall' | 'events' | 'topics';
+type Tab = 'wall' | 'events' | 'topics' | 'summaries';
 
 const coupleTitle = (c: TherapistClientCouple): string =>
   c.coupleName || (c.partnerNames.length ? c.partnerNames.join(' & ') : '伴侶');
@@ -54,7 +56,7 @@ const TherapistClientView: React.FC<Props> = ({ client, onClose, showNotificatio
 
         {/* Tabs */}
         <div className="flex border-b border-petal-rule">
-          {(['wall', 'events', 'topics'] as Tab[]).map((key) => (
+          {(['wall', 'events', 'topics', 'summaries'] as Tab[]).map((key) => (
             <button
               key={key}
               onClick={() => setTab(key)}
@@ -63,7 +65,7 @@ const TherapistClientView: React.FC<Props> = ({ client, onClose, showNotificatio
                 tab === key ? 'text-pink-600 border-b-2 border-pink-500' : 'text-petal-muted hover:text-petal-ink'
               }`}
             >
-              {key === 'wall' ? '牆' : key === 'events' ? '好好說話' : '話題建議'}
+              {key === 'wall' ? '牆' : key === 'events' ? '好好說話' : key === 'topics' ? '話題建議' : '諮商摘要'}
             </button>
           ))}
         </div>
@@ -74,8 +76,10 @@ const TherapistClientView: React.FC<Props> = ({ client, onClose, showNotificatio
             <ClientWall coupleId={client.coupleId} canComment={client.canComment} showNotification={showNotification} />
           ) : tab === 'events' ? (
             <ClientEvents coupleId={client.coupleId} canComment={client.canComment} showNotification={showNotification} />
-          ) : (
+          ) : tab === 'topics' ? (
             <ClientTherapyTopics coupleId={client.coupleId} showNotification={showNotification} />
+          ) : (
+            <ClientTherapySummaries coupleId={client.coupleId} showNotification={showNotification} />
           )}
         </div>
       </div>
@@ -565,6 +569,94 @@ const ClientTherapyTopics: React.FC<{
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+// --- 諮商摘要 tab ----------------------------------------------------------
+
+const summaryDate = (iso: string): string => {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+};
+
+// The couple's generated 諮商摘要 snapshots, read-only for the dedicated
+// therapist. Newest first; each expands to the full digest. This is what the
+// couple compiled to bring into the session — the therapist reads it here.
+const ClientTherapySummaries: React.FC<{
+  coupleId: string;
+  showNotification: (n: Omit<Notification, 'id'>) => void;
+}> = ({ coupleId, showNotification }) => {
+  const [summaries, setSummaries] = useState<TherapySummaryHistoryEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const rows = await apiService.getClientTherapySummaries(coupleId);
+      setSummaries(rows);
+      // Open the most recent one by default — it's the one they'd bring in.
+      setOpenId(rows[0]?.id ?? null);
+    } catch (err) {
+      showNotification({ type: 'error', title: '無法載入', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
+    } finally {
+      setLoading(false);
+    }
+  }, [coupleId, showNotification]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) return <p className="text-center font-body text-sm text-petal-muted py-10">載入中…</p>;
+  if (summaries.length === 0) {
+    return (
+      <div className="p-4" data-testid="client-therapy-summaries">
+        <div className="rounded-lg border border-petal-rule bg-petal-cream-2/50 p-5 flex items-start gap-3">
+          <ClipboardList className="w-5 h-5 text-petal-sage-deep shrink-0 mt-0.5" strokeWidth={1.5} />
+          <div>
+            <h4 className="font-display text-base text-petal-ink">還沒有諮商摘要</h4>
+            <p className="mt-1 font-body text-sm text-petal-ink-soft leading-relaxed">
+              當這對伴侶把最近的事件整理成一份「諮商摘要」後，就會出現在這裡——最常出現的主題、雙方的情緒、已修復與未解決的事，以及他們想和你討論的問題。你可以在諮商前先讀過，直接切入重點。
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 space-y-2" data-testid="client-therapy-summaries">
+      {summaries.map((s) => {
+        const open = openId === s.id;
+        return (
+          <div key={s.id} className="rounded-lg border border-petal-rule bg-petal-cream overflow-hidden">
+            <button
+              onClick={() => setOpenId(open ? null : s.id)}
+              data-testid="client-summary-row"
+              aria-expanded={open}
+              className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-petal-cream-2/50 transition-colors"
+            >
+              <span className="flex items-center gap-2 min-w-0">
+                <ClipboardList className="w-4 h-4 text-petal-sage-deep shrink-0" strokeWidth={1.5} />
+                <span className="font-body text-sm text-petal-ink truncate">
+                  {s.periodLabel}
+                  {typeof s.eventCount === 'number' ? ` · 共 ${s.eventCount} 件` : ''}
+                </span>
+              </span>
+              <span className="inline-flex items-center gap-1 font-body text-[11px] text-petal-muted shrink-0">
+                <Clock className="w-3.5 h-3.5" strokeWidth={1.5} />
+                {summaryDate(s.createdAt)}
+              </span>
+            </button>
+            {open && (
+              <div className="px-4 pb-4 pt-1 border-t border-petal-rule" data-testid="client-summary-detail">
+                <TherapySummaryDetail summary={s.summary} />
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };

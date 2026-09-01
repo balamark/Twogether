@@ -3,11 +3,6 @@ import {
   ClipboardList,
   Sparkles,
   Loader2,
-  Hash,
-  HeartPulse,
-  CheckCircle2,
-  CircleDashed,
-  HelpCircle,
   Copy,
   Check,
   UserPlus,
@@ -17,7 +12,8 @@ import {
 } from 'lucide-react';
 import { apiService, type TherapySummary, type TherapySummaryHistoryEntry } from '../services/api';
 import type { Notification } from './ErrorNotification';
-import { NOT_A_SUBSTITUTE_SHORT } from '../content/positioning';
+import TherapySummaryDetail from './TherapySummaryDetail';
+import { summaryToText } from '../utils/therapySummary';
 
 interface Props {
   authState: { isAuthenticated: boolean; partnerConnected: boolean };
@@ -29,30 +25,6 @@ const PERIODS: { days: number; label: string }[] = [
   { days: 30, label: '最近 30 天' },
 ];
 
-// Build a plain-text version the couple can paste into notes or hand to their
-// therapist — the whole point of the feature is to carry it into the session.
-function summaryToText(s: TherapySummary, periodLabel: string): string {
-  const lines: string[] = [];
-  lines.push(`【Twogether 諮商摘要 · ${periodLabel}】`, '');
-  if (s.overview) lines.push(s.overview, '');
-  if (s.themes.length) lines.push('最常出現的衝突主題：' + s.themes.join('、'));
-  if (s.emotions.length) lines.push('雙方最常感受到的情緒：' + s.emotions.join('、'));
-  if (s.repaired.length) {
-    lines.push('', '已經成功修復的事件：');
-    s.repaired.forEach((r) => lines.push(`・${r.title} — ${r.insight}`));
-  }
-  if (s.unresolved.length) {
-    lines.push('', '還沒解決的事件：');
-    s.unresolved.forEach((r) => lines.push(`・${r.title} — ${r.note}`));
-  }
-  if (s.questions.length) {
-    lines.push('', '想帶去和心理師討論的問題：');
-    s.questions.forEach((q, i) => lines.push(`${i + 1}. ${q}`));
-  }
-  lines.push('', NOT_A_SUBSTITUTE_SHORT);
-  return lines.join('\n');
-}
-
 // Short date for the history list — the couple recognises "which session was
 // this for" by roughly when they made it.
 function formatHistoryDate(iso: string): string {
@@ -60,26 +32,6 @@ function formatHistoryDate(iso: string): string {
   if (Number.isNaN(d.getTime())) return '';
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 }
-
-const SectionTitle: React.FC<{ icon: React.ReactNode; children: React.ReactNode }> = ({ icon, children }) => (
-  <div className="flex items-center gap-1.5 text-petal-sage-deep mb-1.5">
-    {icon}
-    <span className="font-body text-[11px] font-medium uppercase tracking-[0.12em]">{children}</span>
-  </div>
-);
-
-const Chips: React.FC<{ items: string[] }> = ({ items }) => (
-  <div className="flex flex-wrap gap-1.5">
-    {items.map((t, i) => (
-      <span
-        key={i}
-        className="inline-flex items-center rounded-full bg-petal-rose-deep/10 text-petal-rose-deep font-body text-xs px-2.5 py-0.5"
-      >
-        {t}
-      </span>
-    ))}
-  </div>
-);
 
 const TherapySummaryCard: React.FC<Props> = ({ authState, showNotification }) => {
   const [days, setDays] = useState(14);
@@ -302,66 +254,7 @@ const TherapySummaryCard: React.FC<Props> = ({ authState, showNotification }) =>
             </button>
           </div>
 
-          {summary.overview && (
-            <p className="font-display italic font-light text-base text-petal-ink leading-relaxed border-l-2 border-petal-sage/50 pl-3">
-              {summary.overview}
-            </p>
-          )}
-
-          {summary.themes.length > 0 && (
-            <div>
-              <SectionTitle icon={<Hash className="w-3.5 h-3.5" strokeWidth={1.5} />}>最常出現的衝突主題</SectionTitle>
-              <Chips items={summary.themes} />
-            </div>
-          )}
-
-          {summary.emotions.length > 0 && (
-            <div>
-              <SectionTitle icon={<HeartPulse className="w-3.5 h-3.5" strokeWidth={1.5} />}>雙方最常感受到的情緒</SectionTitle>
-              <Chips items={summary.emotions} />
-            </div>
-          )}
-
-          {summary.repaired.length > 0 && (
-            <div>
-              <SectionTitle icon={<CheckCircle2 className="w-3.5 h-3.5" strokeWidth={1.5} />}>已經成功修復的事件</SectionTitle>
-              <ul className="space-y-1.5">
-                {summary.repaired.map((r, i) => (
-                  <li key={i} className="font-body text-sm text-petal-ink leading-relaxed">
-                    <span className="font-medium">{r.title}</span>
-                    <span className="text-petal-ink-soft"> — {r.insight}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {summary.unresolved.length > 0 && (
-            <div>
-              <SectionTitle icon={<CircleDashed className="w-3.5 h-3.5" strokeWidth={1.5} />}>還沒解決的事件</SectionTitle>
-              <ul className="space-y-1.5">
-                {summary.unresolved.map((r, i) => (
-                  <li key={i} className="font-body text-sm text-petal-ink leading-relaxed">
-                    <span className="font-medium">{r.title}</span>
-                    <span className="text-petal-ink-soft"> — {r.note}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {summary.questions.length > 0 && (
-            <div className="rounded-xl bg-petal-rose-soft/20 border border-petal-rose-soft px-4 py-3">
-              <SectionTitle icon={<HelpCircle className="w-3.5 h-3.5" strokeWidth={1.5} />}>想帶去和心理師討論的三個問題</SectionTitle>
-              <ol className="space-y-1.5 list-decimal list-inside">
-                {summary.questions.map((q, i) => (
-                  <li key={i} className="font-body text-sm text-petal-ink leading-relaxed">{q}</li>
-                ))}
-              </ol>
-            </div>
-          )}
-
-          <p className="font-body text-xs text-petal-muted leading-relaxed">{NOT_A_SUBSTITUTE_SHORT}</p>
+          <TherapySummaryDetail summary={summary} />
         </div>
       )}
     </div>

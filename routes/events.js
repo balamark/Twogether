@@ -875,6 +875,29 @@ router.get('/communication-pattern', async (req, res) => {
   }
 });
 
+// Reusable: the couple's previously generated 諮商摘要 snapshots, newest first.
+// Shared by the couple's own /therapy-summary/history endpoint and the dedicated
+// therapist's read-only view (routes/therapists.js) so both see the same list.
+async function listTherapySummariesForCouple(coupleId) {
+  await ensureTherapySummariesTable();
+  const result = await db.query(
+    `SELECT id, period_days, event_count, summary, created_at
+       FROM therapy_summaries
+      WHERE couple_id = $1
+      ORDER BY created_at DESC
+      LIMIT 50`,
+    [coupleId]
+  );
+  return result.rows.map((r) => ({
+    id: r.id,
+    periodDays: r.period_days,
+    periodLabel: periodLabelFor(r.period_days),
+    eventCount: r.event_count,
+    createdAt: r.created_at,
+    summary: r.summary,
+  }));
+}
+
 // GET /api/events/therapy-summary/history — the couple's previously generated
 // 諮商摘要 snapshots, newest first. Every distinct event-set produced a cached
 // row (see the generate route); this exposes them so either partner can re-open
@@ -889,25 +912,7 @@ router.get('/therapy-summary/history', async (req, res) => {
       return res.json({ success: true, history: [] });
     }
 
-    await ensureTherapySummariesTable();
-    const result = await db.query(
-      `SELECT id, period_days, event_count, summary, created_at
-         FROM therapy_summaries
-        WHERE couple_id = $1
-        ORDER BY created_at DESC
-        LIMIT 50`,
-      [couple.couple_id]
-    );
-
-    const history = result.rows.map((r) => ({
-      id: r.id,
-      periodDays: r.period_days,
-      periodLabel: periodLabelFor(r.period_days),
-      eventCount: r.event_count,
-      createdAt: r.created_at,
-      summary: r.summary,
-    }));
-
+    const history = await listTherapySummariesForCouple(couple.couple_id);
     res.json({ success: true, history });
   } catch (err) {
     logError('Therapy summary history failed', { err: err.message, stack: err.stack });
@@ -2974,3 +2979,4 @@ module.exports.getEventDetailForCouple = getEventDetailForCouple;
 module.exports.insertEventMessage = insertEventMessage;
 module.exports.notify = notify;
 module.exports.getLatestTherapyTopicsForCouple = getLatestTherapyTopicsForCouple;
+module.exports.listTherapySummariesForCouple = listTherapySummariesForCouple;
