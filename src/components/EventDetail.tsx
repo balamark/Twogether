@@ -34,7 +34,6 @@ import apiService, {
   type DraftAnalysis,
   type FacilitationSession,
 } from '../services/api';
-import ReplyStepBar from './ReplyStepBar';
 import AutoGrowTextarea from './AutoGrowTextarea';
 import MessageTranslationCard from './MessageTranslationCard';
 import TherapyNoteCard from './TherapyNoteCard';
@@ -53,6 +52,7 @@ import AiQuotaHint from './AiQuotaHint';
 import ParticipantAvatar from './ParticipantAvatar';
 import CloseTogetherBar from './closure/CloseTogetherBar';
 import CloseTogetherModal from './closure/CloseTogetherModal';
+import PrivateCoachDrawer from './PrivateCoachDrawer';
 import ClosurePanel from './closure/ClosurePanel';
 import ClosureSummaryCard from './closure/ClosureSummaryCard';
 
@@ -192,6 +192,9 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   // 引導的專注層。開著不代表 session 進行中（可以回頭看已結束的練習），關掉也不會
   // 結束 session —— 只有「結束引導」會。
   const [guideOpen, setGuideOpen] = useState(false);
+  // Private coach — the backstage drafting helper. Opens a bottom sheet that
+  // only the writer sees; nothing in it posts to the shared thread.
+  const [coachOpen, setCoachOpen] = useState(false);
   const tz = useTimezone();
 
   const insertPhrase = (phrase: string) => {
@@ -284,6 +287,9 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     setAccepting(true);
     try {
       const preview = await apiService.previewEmotionAcceptance(eventId);
+      // Hand off from the private sheet to the acceptance picker so they don't
+      // stack — both are full-screen overlays.
+      setCoachOpen(false);
       setAcceptancePreview(preview);
     } catch (err) {
       // A reached daily quota is an expected state (the global paywall already
@@ -1307,52 +1313,53 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             );
             });
           })()}
-        </section>
 
-      {/* Invite the AI 諮商師 based on the conversation so far — deliberately
-          OUTSIDE the reply composer: it reads the thread history, it doesn't
-          rewrite whatever you're typing below. */}
-      {canSendMessage && (
-        <div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              data-testid="event-ai-counselor-button"
-              onClick={inviteAiCounselor}
-              disabled={aiInviting}
-              className="px-3 py-2 rounded-full bg-petal-sage-deeper text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
-              title={`請 ${myCompanion.name} 讀過你們的對話，給一段中立的建議`}
+          {/* Public mediator — anchored in the chat feed, NOT on the input
+              toolbar. Sophie replies INTO the shared thread, so her entry point
+              belongs where both partners read, clearly marked as shared. This
+              is the opposite scope from the private coach above the input box. */}
+          {canSendMessage && (
+            <div
+              data-testid="event-sophie-invite-row"
+              className="pt-2 flex flex-col items-center gap-2 border-t border-petal-rule-soft"
             >
-              {aiInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
-              <span>請 {myCompanion.name} 加入</span>
-            </button>
-            {/* 引導模式: a facilitated session, not one-shot advice. Shown only when
-                no session is active — an active one renders its progress tray.
-                Hidden during 收尾: the couple is finishing an existing
-                discussion, not starting a new practice. */}
-            {canFacilitate && (!facilitation || facilitation.status !== 'active') && (
-              <button
-                type="button"
-                data-testid="event-facilitation-start-button"
-                onClick={startFacilitation}
-                disabled={facilitating}
-                className="px-3 py-2 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
-              >
-                {facilitating ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
-                <span>開始引導</span>
-              </button>
-            )}
-          </div>
-          {/* Visible on mobile (tooltips aren't): what 開始引導 does + that both
-              buttons draw from the shared daily AI budget. */}
-          <div className="flex flex-wrap items-center justify-between gap-1 mt-1.5">
-            <p className="font-body text-xs text-petal-muted">
-              「開始引導」：{myCompanion.name} 會像諮商師一樣，一步一步帶你們做練習（會使用 AI 次數）。
-            </p>
-            <AiQuotaHint quota={quota} />
-          </div>
-        </div>
-      )}
+              <div className="flex flex-wrap justify-center gap-2">
+                <button
+                  type="button"
+                  data-testid="event-ai-counselor-button"
+                  onClick={inviteAiCounselor}
+                  disabled={aiInviting}
+                  className="px-4 py-2 rounded-full border border-petal-sage-deep/40 bg-petal-sage/15 text-petal-sage-deeper font-medium inline-flex items-center gap-2 disabled:opacity-50 hover:bg-petal-sage/25 active:scale-[0.98] transition"
+                  title={`請 ${myCompanion.name} 讀過你們的對話，給一段中立的建議`}
+                >
+                  {aiInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
+                  <span>請 {myCompanion.name} 加入</span>
+                </button>
+                {/* 引導模式: a facilitated session, not one-shot advice. Shown only
+                    when no session is active — an active one renders its progress
+                    tray. Hidden during 收尾: the couple is finishing an existing
+                    discussion, not starting a new practice. */}
+                {canFacilitate && (!facilitation || facilitation.status !== 'active') && (
+                  <button
+                    type="button"
+                    data-testid="event-facilitation-start-button"
+                    onClick={startFacilitation}
+                    disabled={facilitating}
+                    className="px-4 py-2 rounded-full border border-petal-rule text-petal-ink-soft font-medium inline-flex items-center gap-2 disabled:opacity-50 hover:border-petal-ink hover:text-petal-ink active:scale-[0.98] transition"
+                    title={`${myCompanion.name} 會像諮商師一樣，一步一步帶你們做練習`}
+                  >
+                    {facilitating ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
+                    <span>開始引導</span>
+                  </button>
+                )}
+              </div>
+              <p className="font-body text-[11px] text-petal-muted text-center max-w-sm leading-relaxed inline-flex items-center gap-1">
+                <Globe className="w-3 h-3 shrink-0" strokeWidth={1.75} />
+                回應會出現在對話裡，兩人都看得到（會用到 AI 次數）。
+              </p>
+            </div>
+          )}
+        </section>
 
       {/* 引導進行中：對話這邊只留一顆入口，練習本身在專注層裡。進度、輪到誰、
           快速回應都跟著搬過去，免得對話區被練習的零件塞滿。 */}
@@ -1381,20 +1388,39 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       )}
 
       {canSendMessage && (
-        <div className="bg-petal-cream border border-petal-rule rounded-2xl p-3">
-          <ReplyStepBar onInsertPhrase={insertPhrase} />
+        <div className="bg-petal-cream border border-petal-rule rounded-2xl p-3 space-y-2">
+          {/* Private coach trigger — a calm, text-only chip. Opens a private
+              bottom sheet (the 8-step guide + 接住TA的情緒) that only the writer
+              sees; nothing in it posts to the shared thread. This is the manual
+              trigger for "stuck on what to say". */}
+          <button
+            type="button"
+            data-testid="private-coach-trigger"
+            onClick={() => setCoachOpen(true)}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-petal-rule text-left text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink hover:bg-white/60 transition-colors"
+          >
+            <span aria-hidden className="text-base leading-none">💡</span>
+            <span className="flex-1 min-w-0 font-body text-sm">
+              不知道怎麼開口？讓 {myCompanion.name} 私下幫你想
+            </span>
+            <span className="shrink-0 inline-flex items-center gap-1 font-body text-[11px] text-petal-muted">
+              <Lock className="w-3 h-3" strokeWidth={1.75} />
+              只有你看得到
+            </span>
+          </button>
+
           <AutoGrowTextarea
             data-testid="event-reply-input"
             value={reply}
             onChange={(e) => setReply(e.target.value)}
-            placeholder="回覆…"
+            placeholder="把心裡的話，好好說出來…"
             maxLength={REPLY_MAX_CHARS}
             className="w-full p-2 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-none min-h-[6.5rem] max-h-[40vh] overflow-y-auto"
           />
           {/* maxLength only limits typing — an applied AI rewrite or an
               inserted phrase sets the value directly and can land over the
               cap. Show the count so the disabled send button is explainable. */}
-          <div className="flex justify-end mt-1">
+          <div className="flex justify-end">
             <span
               data-testid="event-reply-counter"
               className={`font-body text-[11px] ${replyOver ? 'text-red-600' : 'text-petal-muted'}`}
@@ -1403,7 +1429,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             </span>
           </div>
           {replyOver && (
-            <p data-testid="event-reply-over-hint" className="mt-1 font-body text-xs text-red-600">
+            <p data-testid="event-reply-over-hint" className="font-body text-xs text-red-600">
               這則留言 {reply.length} / {REPLY_MAX_CHARS} 字，請刪掉 {reply.length - REPLY_MAX_CHARS} 字，或分成兩則送出。
             </p>
           )}
@@ -1414,7 +1440,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             if (tone === 'connection') return null;
             return (
               <p
-                className="mt-1.5 font-body text-xs text-petal-rose-deep flex items-start gap-1.5"
+                className="font-body text-xs text-petal-rose-deep flex items-start gap-1.5"
                 data-testid="event-draft-tone-hint"
               >
                 <Gauge className="w-3.5 h-3.5 mt-0.5 shrink-0" strokeWidth={1.5} />
@@ -1422,53 +1448,45 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               </p>
             );
           })()}
-          <div className="flex justify-end mt-1.5">
+          {/* Single, muted daily-credit counter (was duplicated above the steps
+              and again here). One source of truth, next to the action bar. */}
+          <div className="flex justify-end">
             <AiQuotaHint quota={quota} />
           </div>
-          <div className="flex flex-wrap justify-end gap-2 mt-1">
-            <button
-              type="button"
-              data-testid="event-draft-analyze-button"
-              onClick={requestDraftAnalysis}
-              disabled={analyzing || reply.trim().length === 0}
-              className="px-3 py-2 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:shadow-none hover:opacity-90 active:scale-[0.98] transition"
-              title="送出前，看看這句話底層的情緒、對方會怎麼聽，以及更好的說法"
-            >
-              {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gauge className="w-4 h-4" />}
-              <span>情緒檢測</span>
-            </button>
-            {/* 接住TA的情緒 reads the partner's last message, so it has nothing
-                to work with in a solo note — hide it rather than let it 403. */}
-            {!event.isPrivate && (
+          {/* Action bar — the visual hierarchy the redesign is about: the two
+              private draft-aids are flat ghost buttons on the left; the only
+              high-contrast fill in the whole bar is 送出, the true primary. */}
+          <div className="flex items-center justify-between gap-2 border-t border-petal-rule-soft pt-2">
+            <div className="flex items-center gap-0.5">
               <button
                 type="button"
-                data-testid="event-acceptance-button"
-                onClick={requestAcceptance}
-                disabled={accepting}
-                className="px-3 py-2 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
-                title="先別急著解決——讓 AI 教你怎麼接住TA的情緒"
+                data-testid="event-draft-analyze-button"
+                onClick={requestDraftAnalysis}
+                disabled={analyzing || reply.trim().length === 0}
+                className="px-2.5 py-1.5 rounded-full font-body text-xs text-petal-ink-soft inline-flex items-center gap-1.5 hover:bg-petal-sage/15 hover:text-petal-ink disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+                title="送出前，看看這句話底層的情緒、對方會怎麼聽，以及更好的說法"
               >
-                {accepting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HandHeart className="w-4 h-4" />}
-                <span>如何接住TA的情緒</span>
+                {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gauge className="w-4 h-4" strokeWidth={1.75} />}
+                <span>情緒檢測</span>
               </button>
-            )}
-            <button
-              type="button"
-              data-testid="event-reply-rewrite-button"
-              onClick={requestRewrite}
-              disabled={rewriting || reply.trim().length === 0}
-              className="px-3 py-2 rounded-full bg-petal-rose text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:shadow-none hover:opacity-90 active:scale-[0.98] transition"
-              title="讓 AI 把你的回覆改得更中性、客觀"
-            >
-              {rewriting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              <span>讓 AI 重寫</span>
-            </button>
+              <button
+                type="button"
+                data-testid="event-reply-rewrite-button"
+                onClick={requestRewrite}
+                disabled={rewriting || reply.trim().length === 0}
+                className="px-2.5 py-1.5 rounded-full font-body text-xs text-petal-ink-soft inline-flex items-center gap-1.5 hover:bg-petal-sage/15 hover:text-petal-ink disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+                title="讓 AI 把你的回覆改得更中性、客觀"
+              >
+                {rewriting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" strokeWidth={1.75} />}
+                <span>緩和語氣</span>
+              </button>
+            </div>
             <button
               type="button"
               data-testid="event-reply-send-button"
               onClick={sendReply}
               disabled={sending || reply.trim().length === 0 || replyOver}
-              className="px-4 py-2 rounded-full bg-petal-ink text-petal-cream font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:shadow-none hover:opacity-90 active:scale-[0.98] transition"
+              className="px-5 py-2 rounded-full bg-petal-ink text-petal-cream font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:shadow-none hover:opacity-90 active:scale-[0.98] transition"
             >
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               <span>送出</span>
@@ -1530,12 +1548,23 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
         />
       )}
 
-      {!event.isPrivate && (event.status === 'open' || event.status === 'resolve_pending') && (
-        <CloseTogetherBar
-          onStart={() => setCloseConfirmOpen(true)}
-          busy={resolving}
-        />
-      )}
+      {!event.isPrivate && (event.status === 'open' || event.status === 'resolve_pending') && (() => {
+        // The wrap-up invitation is quiet mid-dialogue and only steps forward
+        // once the conversation has actually lulled — no reply for a few hours,
+        // or a long back-and-forth that's plausibly winding down. That's when
+        // "shall we finish up?" is the real next step, not an interruption.
+        const last = event.messages[event.messages.length - 1];
+        const lulledMs = 3 * 60 * 60 * 1000;
+        const quietForAWhile = !!last && Date.now() - new Date(last.createdAt).getTime() > lulledMs;
+        const longExchange = event.messages.filter((m) => !m.isAi).length >= 8;
+        return (
+          <CloseTogetherBar
+            onStart={() => setCloseConfirmOpen(true)}
+            busy={resolving}
+            emphasized={quietForAWhile || longExchange}
+          />
+        );
+      })()}
 
       {closeConfirmOpen && (
         <CloseTogetherModal
@@ -1635,6 +1664,24 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           maxChars={REPLY_MAX_CHARS}
           onEnd={endFacilitation}
           ending={endingSession}
+        />
+      )}
+
+      {/* Private coach bottom sheet — the backstage half of Sophie. Everything
+          here lands in the writer's own draft; it never posts to the thread. */}
+      {canSendMessage && (
+        <PrivateCoachDrawer
+          open={coachOpen}
+          onClose={() => setCoachOpen(false)}
+          companionName={myCompanion.name}
+          onInsertPhrase={(phrase) => {
+            // Picking a sample line drops it into the writer's own draft and
+            // closes the sheet, handing them back the input to edit and send.
+            insertPhrase(phrase);
+            setCoachOpen(false);
+          }}
+          onRequestAcceptance={event.isPrivate ? undefined : requestAcceptance}
+          accepting={accepting}
         />
       )}
     </div>

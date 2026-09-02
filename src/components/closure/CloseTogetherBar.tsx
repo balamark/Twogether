@@ -1,16 +1,46 @@
 import { Sprout, Loader2 } from 'lucide-react';
 
-// Screen 0 — the always-present bar on open (and legacy resolve_pending) events.
-// One tap by either partner moves the event into 'closing'. The visual weight
-// is deliberately smaller than 送出 so mid-thread it doesn't compete with the
-// reply button; the invitation is «when you're both ready».
+// The invitation to wrap up. It used to sit permanently under the send row as a
+// full warm card, interrupting couples mid-argument with an exit ramp. Now it
+// has two forms: a quiet one-line entry during active dialogue (so it stays
+// discoverable without competing with 送出), and the fuller invitation only when
+// the conversation has actually lulled (`emphasized`), which is when finishing
+// up is genuinely the next step.
 export default function CloseTogetherBar({
   onStart,
   busy,
+  emphasized = false,
 }: {
   onStart: () => void;
   busy: boolean;
+  emphasized?: boolean;
 }) {
+  if (!emphasized) {
+    // Quiet form — a low-weight single line, so it never pulls the eye from the
+    // reply the couple is still writing.
+    return (
+      <div
+        data-testid="event-close-together-bar"
+        className="flex items-center justify-between gap-3 px-1"
+      >
+        <p className="text-xs text-petal-muted inline-flex items-center gap-1.5">
+          <Sprout className="w-3.5 h-3.5 text-petal-sage-deep" />
+          聊到一段落了嗎？
+        </p>
+        <button
+          type="button"
+          data-testid="event-close-together-button"
+          disabled={busy}
+          onClick={onStart}
+          className="text-xs px-3 py-1.5 rounded-full border border-petal-sage text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink inline-flex items-center gap-1.5 disabled:opacity-50 transition-colors"
+        >
+          {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sprout className="w-3.5 h-3.5" />}
+          一起收尾
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
       data-testid="event-close-together-bar"

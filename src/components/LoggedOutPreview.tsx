@@ -28,6 +28,8 @@ import {
   Eye,
   ThumbsUp,
   ThumbsDown,
+  Send,
+  Globe,
   type LucideIcon,
 } from 'lucide-react';
 import { daysSinceLastNudge } from './AchievementsView';
@@ -695,11 +697,70 @@ const LongDraftSample: React.FC = () => (
   </SampleCard>
 );
 
+// Read-only sample of the redesigned chat input — the split at the heart of the
+// UI overhaul. Public mediation (請 Sophie 加入) lives in the shared thread and
+// is clearly marked «兩人都看得到»; private coaching (讓 Sophie 私下幫你想) sits
+// on the input box, marked «只有你看得到» and never posts. The only high-contrast
+// fill in the whole bar is 送出 — the true primary action.
+const PublicPrivateSophieSample: React.FC = () => (
+  <SampleCard>
+    <div className="flex items-center justify-between mb-2.5">
+      <span className="font-body text-xs text-petal-muted">好好說話・輸入區</span>
+      <SampleTag />
+    </div>
+
+    {/* Public mediator — anchored in the shared feed */}
+    <div className="flex flex-col items-center gap-1.5 pb-3 mb-3 border-b border-petal-rule-soft">
+      <span className="inline-flex items-center gap-2 rounded-full border border-petal-sage-deep/40 bg-petal-sage/15 px-4 py-2 font-body text-sm font-medium text-petal-sage-deep">
+        <HeartHandshake className="w-4 h-4" strokeWidth={1.75} />
+        請 Sophie 加入
+      </span>
+      <span className="inline-flex items-center gap-1 font-body text-[11px] text-petal-muted">
+        <Globe className="w-3 h-3" strokeWidth={1.75} />
+        回應會出現在對話裡，兩人都看得到
+      </span>
+    </div>
+
+    {/* Private coach chip + input box */}
+    <div className="rounded-2xl border border-petal-rule bg-petal-cream p-2.5 space-y-2">
+      <div className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-petal-rule text-petal-ink-soft">
+        <span aria-hidden className="text-base leading-none">💡</span>
+        <span className="flex-1 min-w-0 font-body text-sm">不知道怎麼開口？讓 Sophie 私下幫你想</span>
+        <span className="shrink-0 inline-flex items-center gap-1 font-body text-[11px] text-petal-muted">
+          <Lock className="w-3 h-3" strokeWidth={1.75} />
+          只有你看得到
+        </span>
+      </div>
+      <div className="w-full rounded-xl border border-petal-rule bg-white px-3 py-2 font-body text-sm text-petal-muted">
+        把心裡的話，好好說出來…
+      </div>
+      <div className="flex items-center justify-between gap-2 border-t border-petal-rule-soft pt-2">
+        <div className="flex items-center gap-1">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-body text-xs text-petal-ink-soft">
+            <Gauge className="w-4 h-4" strokeWidth={1.75} />
+            情緒檢測
+          </span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full font-body text-xs text-petal-ink-soft">
+            <Sparkles className="w-4 h-4" strokeWidth={1.75} />
+            緩和語氣
+          </span>
+        </div>
+        <span className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-petal-ink text-petal-cream font-body text-sm font-medium">
+          <Send className="w-4 h-4" strokeWidth={1.75} />
+          送出
+        </span>
+      </div>
+    </div>
+  </SampleCard>
+);
+
 const ConflictFlywheelSample: React.FC = () => (
   <div className="space-y-4">
     <SafetyBannerSample />
 
     <ThreeSeatSample />
+
+    <PublicPrivateSophieSample />
 
     <EmotionMeterSample />
 

@@ -141,6 +141,10 @@ test.describe('Event — 接住情緒 (emotion acceptance)', () => {
     const replyInput = page.getByTestId('event-reply-input');
     await replyInput.waitFor({ state: 'visible', timeout: 10000 });
 
+    // 接住TA的情緒 now lives inside the private coach drawer — open it first.
+    await page.getByTestId('private-coach-trigger').click();
+    await expect(page.getByTestId('private-coach-drawer')).toBeVisible({ timeout: 5000 });
+
     // Open the 接住情緒 suggestions.
     await page.getByTestId('event-acceptance-button').click();
     await expect(page.getByTestId('event-acceptance-modal')).toBeVisible({ timeout: 10000 });
