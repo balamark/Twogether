@@ -422,9 +422,9 @@ router.post('/script-messages', [
     }
 
     // Cache miss / forced regenerate → bill against the daily AI budget.
-    const { tier, limit } = await resolveAiLimit(userId);
+    const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
     const usedToday = await countTodayAiUsage(userId);
-    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
     if (!limitCheck.ok) {
       logInfo('intimacy.script_messages.limit', { userId, used: usedToday, limit, tier, blocked: true });
       return res.status(limitCheck.status).json(limitCheck.body);
@@ -589,9 +589,9 @@ router.post('/reconciliation-openers', [
       };
     }
 
-    const { tier, limit } = await resolveAiLimit(userId);
+    const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
     const usedToday = await countTodayAiUsage(userId);
-    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
     if (!limitCheck.ok) {
       logInfo('intimacy.reconciliation.limit', { userId, used: usedToday, limit, tier, blocked: true });
       return res.status(limitCheck.status).json(limitCheck.body);

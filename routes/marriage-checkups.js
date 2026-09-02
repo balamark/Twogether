@@ -333,9 +333,9 @@ async function maybeReveal(loaded, userId, partnerId) {
   let aiSummary = '';
   let aiPoints = [];
   try {
-    const { tier, limit } = await resolveAiLimit(userId);
+    const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
     const usedToday = await countTodayAiUsage(userId);
-    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
     if (!limitCheck.ok) {
       logInfo('marriage_checkup.summary.limit', { userId, used: usedToday, limit, tier, blocked: true });
       aiSummary = '今日 AI 次數已達上限，這次先看看彼此的答案，過了今天再回來看 AI 的中立總結，或升級 Premium 提高每日上限。';
