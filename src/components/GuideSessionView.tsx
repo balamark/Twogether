@@ -188,7 +188,7 @@ const GuideSessionView: React.FC<Props> = ({
         <p className="mt-3 font-body text-[11px] text-petal-muted">
           {active
             ? `送出後 ${companionShortName} 會接著給下一步。想先看看你們剛剛說了什麼，可以隨時「回到對話」——練習會留在這裡。`
-            : '這次練習已經結束。想再練一次，回到對話按「開始引導」。'}
+            : `這次練習已經結束。想再練一次，回到對話請 ${companionShortName} 加入、選「帶一張練習卡」。`}
         </p>
       </div>
     </div>,

@@ -17,7 +17,6 @@ import {
   NotebookPen,
   Sprout,
   Gauge,
-  PlayCircle,
   Compass,
   FileText,
   ChevronUp,
@@ -34,7 +33,6 @@ import apiService, {
   type DraftAnalysis,
   type FacilitationSession,
 } from '../services/api';
-import ReplyStepBar from './ReplyStepBar';
 import AutoGrowTextarea from './AutoGrowTextarea';
 import MessageTranslationCard from './MessageTranslationCard';
 import TherapyNoteCard from './TherapyNoteCard';
@@ -53,6 +51,7 @@ import AiQuotaHint from './AiQuotaHint';
 import ParticipantAvatar from './ParticipantAvatar';
 import CloseTogetherBar from './closure/CloseTogetherBar';
 import CloseTogetherModal from './closure/CloseTogetherModal';
+import PrivateCoachDrawer from './PrivateCoachDrawer';
 import ClosurePanel from './closure/ClosurePanel';
 import ClosureSummaryCard from './closure/ClosureSummaryCard';
 
@@ -160,6 +159,11 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const [aiInviting, setAiInviting] = useState(false);
   const [aiPosting, setAiPosting] = useState(false);
   const [aiPreview, setAiPreview] = useState<string | null>(null);
+  // Sophie's public entry is a single in-thread pill; tapping it asks HOW she
+  // should help — a one-shot 建議, or dealing a 練習卡 (引導模式) — instead of
+  // two competing buttons on the toolbar. The standalone 「開始引導」 button is
+  // gone; facilitation is now something Sophie offers when invited.
+  const [sophieChooserOpen, setSophieChooserOpen] = useState(false);
   const [shareWarnOpen, setShareWarnOpen] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [sharePartnerOpen, setSharePartnerOpen] = useState(false);
@@ -192,6 +196,9 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   // 引導的專注層。開著不代表 session 進行中（可以回頭看已結束的練習），關掉也不會
   // 結束 session —— 只有「結束引導」會。
   const [guideOpen, setGuideOpen] = useState(false);
+  // Private coach — the backstage drafting helper. Opens a bottom sheet that
+  // only the writer sees; nothing in it posts to the shared thread.
+  const [coachOpen, setCoachOpen] = useState(false);
   const tz = useTimezone();
 
   const insertPhrase = (phrase: string) => {
@@ -284,6 +291,9 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     setAccepting(true);
     try {
       const preview = await apiService.previewEmotionAcceptance(eventId);
+      // Hand off from the private sheet to the acceptance picker so they don't
+      // stack — both are full-screen overlays.
+      setCoachOpen(false);
       setAcceptancePreview(preview);
     } catch (err) {
       // A reached daily quota is an expected state (the global paywall already
@@ -583,6 +593,18 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       setAiInviting(false);
       refreshQuota();
     }
+  };
+
+  // The two branches of Sophie's public help, chosen from the entry chooser.
+  // Each spends exactly one AI call — picking before we spend one means wanting
+  // a 練習卡 no longer costs a wasted 建議 preview first.
+  const chooseSophieAdvice = async () => {
+    setSophieChooserOpen(false);
+    await inviteAiCounselor();
+  };
+  const chooseSophiePractice = async () => {
+    setSophieChooserOpen(false);
+    await startFacilitation();
   };
 
   const postAiCounselor = async () => {
@@ -1307,52 +1329,37 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             );
             });
           })()}
-        </section>
 
-      {/* Invite the AI 諮商師 based on the conversation so far — deliberately
-          OUTSIDE the reply composer: it reads the thread history, it doesn't
-          rewrite whatever you're typing below. */}
-      {canSendMessage && (
-        <div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              data-testid="event-ai-counselor-button"
-              onClick={inviteAiCounselor}
-              disabled={aiInviting}
-              className="px-3 py-2 rounded-full bg-petal-sage-deeper text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
-              title={`請 ${myCompanion.name} 讀過你們的對話，給一段中立的建議`}
+          {/* Public mediator — anchored in the chat feed, NOT on the input
+              toolbar. One pill invites Sophie; she then asks HOW to help — a
+              one-shot 建議 or dealing a 練習卡 (引導模式). The standalone
+              「開始引導」 button is gone: facilitation is now something Sophie
+              offers when invited, not a function the user starts on their own.
+              Both replies land in the shared thread, so this lives where both
+              partners read. */}
+          {canSendMessage && (
+            <div
+              data-testid="event-sophie-invite-row"
+              className="pt-2 flex flex-col items-center gap-2 border-t border-petal-rule-soft"
             >
-              {aiInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
-              <span>請 {myCompanion.name} 加入</span>
-            </button>
-            {/* 引導模式: a facilitated session, not one-shot advice. Shown only when
-                no session is active — an active one renders its progress tray.
-                Hidden during 收尾: the couple is finishing an existing
-                discussion, not starting a new practice. */}
-            {canFacilitate && (!facilitation || facilitation.status !== 'active') && (
               <button
                 type="button"
-                data-testid="event-facilitation-start-button"
-                onClick={startFacilitation}
-                disabled={facilitating}
-                className="px-3 py-2 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
+                data-testid="event-ai-counselor-button"
+                onClick={() => setSophieChooserOpen(true)}
+                disabled={aiInviting || facilitating}
+                className="px-4 py-2 rounded-full border border-petal-sage-deep/40 bg-petal-sage/15 text-petal-sage-deeper font-medium inline-flex items-center gap-2 disabled:opacity-50 hover:bg-petal-sage/25 active:scale-[0.98] transition"
+                title={`請 ${myCompanion.name} 加入，給建議或帶你們做一張練習卡`}
               >
-                {facilitating ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
-                <span>開始引導</span>
+                {(aiInviting || facilitating) ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
+                <span>請 {myCompanion.name} 加入</span>
               </button>
-            )}
-          </div>
-          {/* Visible on mobile (tooltips aren't): what 開始引導 does + that both
-              buttons draw from the shared daily AI budget. */}
-          <div className="flex flex-wrap items-center justify-between gap-1 mt-1.5">
-            <p className="font-body text-xs text-petal-muted">
-              「開始引導」：{myCompanion.name} 會像諮商師一樣，一步一步帶你們做練習（會使用 AI 次數）。
-            </p>
-            <AiQuotaHint quota={quota} />
-          </div>
-        </div>
-      )}
+              <p className="font-body text-[11px] text-petal-muted text-center max-w-sm leading-relaxed inline-flex items-center gap-1">
+                <Globe className="w-3 h-3 shrink-0" strokeWidth={1.75} />
+                回應會出現在對話裡，兩人都看得到（會用到 AI 次數）。
+              </p>
+            </div>
+          )}
+        </section>
 
       {/* 引導進行中：對話這邊只留一顆入口，練習本身在專注層裡。進度、輪到誰、
           快速回應都跟著搬過去，免得對話區被練習的零件塞滿。 */}
@@ -1381,20 +1388,39 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       )}
 
       {canSendMessage && (
-        <div className="bg-petal-cream border border-petal-rule rounded-2xl p-3">
-          <ReplyStepBar onInsertPhrase={insertPhrase} />
+        <div className="bg-petal-cream border border-petal-rule rounded-2xl p-3 space-y-2">
+          {/* Private coach trigger — a calm, text-only chip. Opens a private
+              bottom sheet (the 8-step guide + 接住TA的情緒) that only the writer
+              sees; nothing in it posts to the shared thread. This is the manual
+              trigger for "stuck on what to say". */}
+          <button
+            type="button"
+            data-testid="private-coach-trigger"
+            onClick={() => setCoachOpen(true)}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-petal-rule text-left text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink hover:bg-white/60 transition-colors"
+          >
+            <span aria-hidden className="text-base leading-none">💡</span>
+            <span className="flex-1 min-w-0 font-body text-sm">
+              不知道怎麼開口？讓 {myCompanion.name} 私下幫你想
+            </span>
+            <span className="shrink-0 inline-flex items-center gap-1 font-body text-[11px] text-petal-muted">
+              <Lock className="w-3 h-3" strokeWidth={1.75} />
+              只有你看得到
+            </span>
+          </button>
+
           <AutoGrowTextarea
             data-testid="event-reply-input"
             value={reply}
             onChange={(e) => setReply(e.target.value)}
-            placeholder="回覆…"
+            placeholder="把心裡的話，好好說出來…"
             maxLength={REPLY_MAX_CHARS}
             className="w-full p-2 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-none min-h-[6.5rem] max-h-[40vh] overflow-y-auto"
           />
           {/* maxLength only limits typing — an applied AI rewrite or an
               inserted phrase sets the value directly and can land over the
               cap. Show the count so the disabled send button is explainable. */}
-          <div className="flex justify-end mt-1">
+          <div className="flex justify-end">
             <span
               data-testid="event-reply-counter"
               className={`font-body text-[11px] ${replyOver ? 'text-red-600' : 'text-petal-muted'}`}
@@ -1403,7 +1429,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             </span>
           </div>
           {replyOver && (
-            <p data-testid="event-reply-over-hint" className="mt-1 font-body text-xs text-red-600">
+            <p data-testid="event-reply-over-hint" className="font-body text-xs text-red-600">
               這則留言 {reply.length} / {REPLY_MAX_CHARS} 字，請刪掉 {reply.length - REPLY_MAX_CHARS} 字，或分成兩則送出。
             </p>
           )}
@@ -1414,7 +1440,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             if (tone === 'connection') return null;
             return (
               <p
-                className="mt-1.5 font-body text-xs text-petal-rose-deep flex items-start gap-1.5"
+                className="font-body text-xs text-petal-rose-deep flex items-start gap-1.5"
                 data-testid="event-draft-tone-hint"
               >
                 <Gauge className="w-3.5 h-3.5 mt-0.5 shrink-0" strokeWidth={1.5} />
@@ -1422,53 +1448,45 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               </p>
             );
           })()}
-          <div className="flex justify-end mt-1.5">
+          {/* Single, muted daily-credit counter (was duplicated above the steps
+              and again here). One source of truth, next to the action bar. */}
+          <div className="flex justify-end">
             <AiQuotaHint quota={quota} />
           </div>
-          <div className="flex flex-wrap justify-end gap-2 mt-1">
-            <button
-              type="button"
-              data-testid="event-draft-analyze-button"
-              onClick={requestDraftAnalysis}
-              disabled={analyzing || reply.trim().length === 0}
-              className="px-3 py-2 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:shadow-none hover:opacity-90 active:scale-[0.98] transition"
-              title="送出前，看看這句話底層的情緒、對方會怎麼聽，以及更好的說法"
-            >
-              {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gauge className="w-4 h-4" />}
-              <span>情緒檢測</span>
-            </button>
-            {/* 接住TA的情緒 reads the partner's last message, so it has nothing
-                to work with in a solo note — hide it rather than let it 403. */}
-            {!event.isPrivate && (
+          {/* Action bar — the visual hierarchy the redesign is about: the two
+              private draft-aids are flat ghost buttons on the left; the only
+              high-contrast fill in the whole bar is 送出, the true primary. */}
+          <div className="flex items-center justify-between gap-2 border-t border-petal-rule-soft pt-2">
+            <div className="flex items-center gap-0.5">
               <button
                 type="button"
-                data-testid="event-acceptance-button"
-                onClick={requestAcceptance}
-                disabled={accepting}
-                className="px-3 py-2 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
-                title="先別急著解決——讓 AI 教你怎麼接住TA的情緒"
+                data-testid="event-draft-analyze-button"
+                onClick={requestDraftAnalysis}
+                disabled={analyzing || reply.trim().length === 0}
+                className="px-2.5 py-1.5 rounded-full font-body text-xs text-petal-ink-soft inline-flex items-center gap-1.5 hover:bg-petal-sage/15 hover:text-petal-ink disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+                title="送出前，看看這句話底層的情緒、對方會怎麼聽，以及更好的說法"
               >
-                {accepting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HandHeart className="w-4 h-4" />}
-                <span>如何接住TA的情緒</span>
+                {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gauge className="w-4 h-4" strokeWidth={1.75} />}
+                <span>情緒檢測</span>
               </button>
-            )}
-            <button
-              type="button"
-              data-testid="event-reply-rewrite-button"
-              onClick={requestRewrite}
-              disabled={rewriting || reply.trim().length === 0}
-              className="px-3 py-2 rounded-full bg-petal-rose text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:shadow-none hover:opacity-90 active:scale-[0.98] transition"
-              title="讓 AI 把你的回覆改得更中性、客觀"
-            >
-              {rewriting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-              <span>讓 AI 重寫</span>
-            </button>
+              <button
+                type="button"
+                data-testid="event-reply-rewrite-button"
+                onClick={requestRewrite}
+                disabled={rewriting || reply.trim().length === 0}
+                className="px-2.5 py-1.5 rounded-full font-body text-xs text-petal-ink-soft inline-flex items-center gap-1.5 hover:bg-petal-sage/15 hover:text-petal-ink disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+                title="讓 AI 把你的回覆改得更中性、客觀"
+              >
+                {rewriting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" strokeWidth={1.75} />}
+                <span>緩和語氣</span>
+              </button>
+            </div>
             <button
               type="button"
               data-testid="event-reply-send-button"
               onClick={sendReply}
               disabled={sending || reply.trim().length === 0 || replyOver}
-              className="px-4 py-2 rounded-full bg-petal-ink text-petal-cream font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:shadow-none hover:opacity-90 active:scale-[0.98] transition"
+              className="px-5 py-2 rounded-full bg-petal-ink text-petal-cream font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:shadow-none hover:opacity-90 active:scale-[0.98] transition"
             >
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               <span>送出</span>
@@ -1504,6 +1522,16 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
         />
       )}
 
+      {sophieChooserOpen && (
+        <SophieHelpChooser
+          companionName={myCompanion.name}
+          canOfferPractice={canFacilitate && (!facilitation || facilitation.status !== 'active')}
+          onChooseAdvice={chooseSophieAdvice}
+          onChoosePractice={chooseSophiePractice}
+          onCancel={() => setSophieChooserOpen(false)}
+        />
+      )}
+
       {aiPreview !== null && (
         <AiCounselorPreview
           companionName={myCompanion.name}
@@ -1530,12 +1558,23 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
         />
       )}
 
-      {!event.isPrivate && (event.status === 'open' || event.status === 'resolve_pending') && (
-        <CloseTogetherBar
-          onStart={() => setCloseConfirmOpen(true)}
-          busy={resolving}
-        />
-      )}
+      {!event.isPrivate && (event.status === 'open' || event.status === 'resolve_pending') && (() => {
+        // The wrap-up invitation is quiet mid-dialogue and only steps forward
+        // once the conversation has actually lulled — no reply for a few hours,
+        // or a long back-and-forth that's plausibly winding down. That's when
+        // "shall we finish up?" is the real next step, not an interruption.
+        const last = event.messages[event.messages.length - 1];
+        const lulledMs = 3 * 60 * 60 * 1000;
+        const quietForAWhile = !!last && Date.now() - new Date(last.createdAt).getTime() > lulledMs;
+        const longExchange = event.messages.filter((m) => !m.isAi).length >= 8;
+        return (
+          <CloseTogetherBar
+            onStart={() => setCloseConfirmOpen(true)}
+            busy={resolving}
+            emphasized={quietForAWhile || longExchange}
+          />
+        );
+      })()}
 
       {closeConfirmOpen && (
         <CloseTogetherModal
@@ -1637,6 +1676,107 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           ending={endingSession}
         />
       )}
+
+      {/* Private coach bottom sheet — the backstage half of Sophie. Everything
+          here lands in the writer's own draft; it never posts to the thread. */}
+      {canSendMessage && (
+        <PrivateCoachDrawer
+          open={coachOpen}
+          onClose={() => setCoachOpen(false)}
+          companionName={myCompanion.name}
+          onInsertPhrase={(phrase) => {
+            // Picking a sample line drops it into the writer's own draft and
+            // closes the sheet, handing them back the input to edit and send.
+            insertPhrase(phrase);
+            setCoachOpen(false);
+          }}
+          onRequestAcceptance={event.isPrivate ? undefined : requestAcceptance}
+          accepting={accepting}
+        />
+      )}
+    </div>
+  );
+}
+
+// Sophie's public-help chooser — the single entry that replaced the two
+// competing 「請 Sophie 加入」/「開始引導」 pills. It asks HOW she should help
+// before spending any AI, so picking a 練習卡 no longer costs a wasted 建議
+// preview first. 練習卡 (引導模式) only appears on shared events with no active
+// session — an active one is resumed from its own tray.
+function SophieHelpChooser({
+  companionName: name,
+  canOfferPractice,
+  onChooseAdvice,
+  onChoosePractice,
+  onCancel,
+}: {
+  companionName: string;
+  canOfferPractice: boolean;
+  onChooseAdvice: () => void;
+  onChoosePractice: () => void;
+  onCancel: () => void;
+}) {
+  useScrollLock(true);
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+      data-testid="event-sophie-help-chooser"
+    >
+      <button type="button" aria-label="取消" onClick={onCancel} className="absolute inset-0 bg-black/40" />
+      <div className="relative w-full sm:max-w-md bg-petal-cream rounded-t-3xl sm:rounded-3xl max-h-[85dvh] overflow-y-auto overscroll-contain safe-pb shadow-xl">
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1">
+          <span className="h-1 w-10 rounded-full bg-petal-rule" />
+        </div>
+        <div className="px-5 pt-3 pb-4">
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <h3 className="text-lg font-serif text-petal-ink flex items-center gap-1.5">
+              <span aria-hidden>👩‍🏫</span>
+              {name} 可以怎麼幫你們？
+            </h3>
+            <button type="button" onClick={onCancel} aria-label="取消" className="flex-shrink-0 -m-1 p-1 text-petal-ink-soft hover:text-petal-ink">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <p className="text-[11px] text-petal-ink-soft mb-4 inline-flex items-center gap-1">
+            <Globe className="w-3 h-3" strokeWidth={1.75} />
+            兩種都會出現在對話裡、兩人都看得到，各會用到 1 次 AI。
+          </p>
+
+          <div className="space-y-2.5">
+            <button
+              type="button"
+              data-testid="event-sophie-help-advice"
+              onClick={onChooseAdvice}
+              className="w-full text-left rounded-2xl border border-petal-sage/50 bg-white hover:bg-petal-sage/10 p-4 transition-colors"
+            >
+              <div className="flex items-center gap-2 font-body text-sm font-medium text-petal-ink">
+                <HeartHandshake className="w-4 h-4 text-petal-sage-deep shrink-0" strokeWidth={1.75} />
+                給一段中立的建議
+              </div>
+              <p className="mt-1 font-body text-xs text-petal-ink-soft leading-relaxed">
+                {name} 讀過你們的對話，給一段不站邊的話，貼到對話裡兩人一起看。
+              </p>
+            </button>
+
+            {canOfferPractice && (
+              <button
+                type="button"
+                data-testid="event-facilitation-start-button"
+                onClick={onChoosePractice}
+                className="w-full text-left rounded-2xl border border-petal-rose/40 bg-white hover:bg-petal-rose/10 p-4 transition-colors"
+              >
+                <div className="flex items-center gap-2 font-body text-sm font-medium text-petal-ink">
+                  <Compass className="w-4 h-4 text-petal-rose-deep shrink-0" strokeWidth={1.75} />
+                  帶我們做一張練習卡
+                </div>
+                <p className="mt-1 font-body text-xs text-petal-ink-soft leading-relaxed">
+                  {name} 像諮商師一樣，一步一步帶你們做一個小練習（🪞 鏡映、🔄 換位、🫶 肯定…），一次一張卡、指定誰先做。
+                </p>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

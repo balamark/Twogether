@@ -183,7 +183,12 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
     const replyInput = page.getByTestId('event-reply-input');
     await replyInput.waitFor({ state: 'visible', timeout: 10000 });
 
-    // Step-bar: open step ② (承認情緒) and insert one of its phrases.
+    // Step-bar now lives in the private coach drawer, grouped into stages. Open
+    // the drawer, expand stage 1 (先穩住自己), then open step ② (承認情緒) and
+    // insert one of its phrases.
+    await page.getByTestId('private-coach-trigger').click();
+    await expect(page.getByTestId('private-coach-drawer')).toBeVisible({ timeout: 5000 });
+    await page.getByTestId('reply-stage-self').getByRole('button').first().click();
     const stepPill = page.getByTestId('reply-step-pill-acknowledge');
     await stepPill.click();
     const firstPhrase = page.getByTestId('reply-step-phrase').first();
@@ -305,8 +310,10 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
     await page.getByTestId('nav-tab-talk').click();
     await page.locator('text=今晚的家事').first().click();
 
-    // Invite the AI counselor → preview modal appears.
+    // Invite the AI counselor → chooser asks how Sophie should help; pick
+    // 給建議 → preview modal appears.
     await page.getByTestId('event-ai-counselor-button').click();
+    await page.getByTestId('event-sophie-help-advice').click();
     await expect(page.getByTestId('event-ai-counselor-modal')).toBeVisible({ timeout: 10000 });
 
     // Post it into the thread → modal closes and the AI message renders.
