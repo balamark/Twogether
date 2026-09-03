@@ -129,6 +129,9 @@ test.describe('Event thread — 引導模式 (Therapist Mode)', () => {
     await page.getByTestId('nav-tab-talk').click();
     await page.locator('text=今晚回不回家').first().click();
 
+    // 引導練習不再有獨立按鈕 —— 改由「請 Sophie 加入」的選單發牌。先打開選單，
+    // 再選「帶一張練習卡」。
+    await page.getByTestId('event-ai-counselor-button').click();
     const startBtn = page.getByTestId('event-facilitation-start-button');
     await startBtn.waitFor({ state: 'visible', timeout: 10000 });
     await startBtn.click();
@@ -160,6 +163,9 @@ test.describe('Event thread — 引導模式 (Therapist Mode)', () => {
     await page.getByTestId('nav-tab-talk').click();
     await page.locator('text=今晚回不回家').first().click();
 
+    // 引導練習不再有獨立按鈕 —— 改由「請 Sophie 加入」的選單發牌。先打開選單，
+    // 再選「帶一張練習卡」。
+    await page.getByTestId('event-ai-counselor-button').click();
     const startBtn = page.getByTestId('event-facilitation-start-button');
     await startBtn.waitFor({ state: 'visible', timeout: 10000 });
     await startBtn.click();

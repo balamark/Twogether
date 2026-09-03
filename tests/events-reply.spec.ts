@@ -310,8 +310,10 @@ test.describe('Event reply — step-bar and AI rewrite', () => {
     await page.getByTestId('nav-tab-talk').click();
     await page.locator('text=今晚的家事').first().click();
 
-    // Invite the AI counselor → preview modal appears.
+    // Invite the AI counselor → chooser asks how Sophie should help; pick
+    // 給建議 → preview modal appears.
     await page.getByTestId('event-ai-counselor-button').click();
+    await page.getByTestId('event-sophie-help-advice').click();
     await expect(page.getByTestId('event-ai-counselor-modal')).toBeVisible({ timeout: 10000 });
 
     // Post it into the thread → modal closes and the AI message renders.

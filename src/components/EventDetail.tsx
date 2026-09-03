@@ -17,7 +17,6 @@ import {
   NotebookPen,
   Sprout,
   Gauge,
-  PlayCircle,
   Compass,
   FileText,
   ChevronUp,
@@ -160,6 +159,11 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const [aiInviting, setAiInviting] = useState(false);
   const [aiPosting, setAiPosting] = useState(false);
   const [aiPreview, setAiPreview] = useState<string | null>(null);
+  // Sophie's public entry is a single in-thread pill; tapping it asks HOW she
+  // should help — a one-shot 建議, or dealing a 練習卡 (引導模式) — instead of
+  // two competing buttons on the toolbar. The standalone 「開始引導」 button is
+  // gone; facilitation is now something Sophie offers when invited.
+  const [sophieChooserOpen, setSophieChooserOpen] = useState(false);
   const [shareWarnOpen, setShareWarnOpen] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [sharePartnerOpen, setSharePartnerOpen] = useState(false);
@@ -589,6 +593,18 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       setAiInviting(false);
       refreshQuota();
     }
+  };
+
+  // The two branches of Sophie's public help, chosen from the entry chooser.
+  // Each spends exactly one AI call — picking before we spend one means wanting
+  // a 練習卡 no longer costs a wasted 建議 preview first.
+  const chooseSophieAdvice = async () => {
+    setSophieChooserOpen(false);
+    await inviteAiCounselor();
+  };
+  const chooseSophiePractice = async () => {
+    setSophieChooserOpen(false);
+    await startFacilitation();
   };
 
   const postAiCounselor = async () => {
@@ -1315,44 +1331,28 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           })()}
 
           {/* Public mediator — anchored in the chat feed, NOT on the input
-              toolbar. Sophie replies INTO the shared thread, so her entry point
-              belongs where both partners read, clearly marked as shared. This
-              is the opposite scope from the private coach above the input box. */}
+              toolbar. One pill invites Sophie; she then asks HOW to help — a
+              one-shot 建議 or dealing a 練習卡 (引導模式). The standalone
+              「開始引導」 button is gone: facilitation is now something Sophie
+              offers when invited, not a function the user starts on their own.
+              Both replies land in the shared thread, so this lives where both
+              partners read. */}
           {canSendMessage && (
             <div
               data-testid="event-sophie-invite-row"
               className="pt-2 flex flex-col items-center gap-2 border-t border-petal-rule-soft"
             >
-              <div className="flex flex-wrap justify-center gap-2">
-                <button
-                  type="button"
-                  data-testid="event-ai-counselor-button"
-                  onClick={inviteAiCounselor}
-                  disabled={aiInviting}
-                  className="px-4 py-2 rounded-full border border-petal-sage-deep/40 bg-petal-sage/15 text-petal-sage-deeper font-medium inline-flex items-center gap-2 disabled:opacity-50 hover:bg-petal-sage/25 active:scale-[0.98] transition"
-                  title={`請 ${myCompanion.name} 讀過你們的對話，給一段中立的建議`}
-                >
-                  {aiInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
-                  <span>請 {myCompanion.name} 加入</span>
-                </button>
-                {/* 引導模式: a facilitated session, not one-shot advice. Shown only
-                    when no session is active — an active one renders its progress
-                    tray. Hidden during 收尾: the couple is finishing an existing
-                    discussion, not starting a new practice. */}
-                {canFacilitate && (!facilitation || facilitation.status !== 'active') && (
-                  <button
-                    type="button"
-                    data-testid="event-facilitation-start-button"
-                    onClick={startFacilitation}
-                    disabled={facilitating}
-                    className="px-4 py-2 rounded-full border border-petal-rule text-petal-ink-soft font-medium inline-flex items-center gap-2 disabled:opacity-50 hover:border-petal-ink hover:text-petal-ink active:scale-[0.98] transition"
-                    title={`${myCompanion.name} 會像諮商師一樣，一步一步帶你們做練習`}
-                  >
-                    {facilitating ? <Loader2 className="w-4 h-4 animate-spin" /> : <PlayCircle className="w-4 h-4" />}
-                    <span>開始引導</span>
-                  </button>
-                )}
-              </div>
+              <button
+                type="button"
+                data-testid="event-ai-counselor-button"
+                onClick={() => setSophieChooserOpen(true)}
+                disabled={aiInviting || facilitating}
+                className="px-4 py-2 rounded-full border border-petal-sage-deep/40 bg-petal-sage/15 text-petal-sage-deeper font-medium inline-flex items-center gap-2 disabled:opacity-50 hover:bg-petal-sage/25 active:scale-[0.98] transition"
+                title={`請 ${myCompanion.name} 加入，給建議或帶你們做一張練習卡`}
+              >
+                {(aiInviting || facilitating) ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
+                <span>請 {myCompanion.name} 加入</span>
+              </button>
               <p className="font-body text-[11px] text-petal-muted text-center max-w-sm leading-relaxed inline-flex items-center gap-1">
                 <Globe className="w-3 h-3 shrink-0" strokeWidth={1.75} />
                 回應會出現在對話裡，兩人都看得到（會用到 AI 次數）。
@@ -1522,6 +1522,16 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
         />
       )}
 
+      {sophieChooserOpen && (
+        <SophieHelpChooser
+          companionName={myCompanion.name}
+          canOfferPractice={canFacilitate && (!facilitation || facilitation.status !== 'active')}
+          onChooseAdvice={chooseSophieAdvice}
+          onChoosePractice={chooseSophiePractice}
+          onCancel={() => setSophieChooserOpen(false)}
+        />
+      )}
+
       {aiPreview !== null && (
         <AiCounselorPreview
           companionName={myCompanion.name}
@@ -1684,6 +1694,89 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           accepting={accepting}
         />
       )}
+    </div>
+  );
+}
+
+// Sophie's public-help chooser — the single entry that replaced the two
+// competing 「請 Sophie 加入」/「開始引導」 pills. It asks HOW she should help
+// before spending any AI, so picking a 練習卡 no longer costs a wasted 建議
+// preview first. 練習卡 (引導模式) only appears on shared events with no active
+// session — an active one is resumed from its own tray.
+function SophieHelpChooser({
+  companionName: name,
+  canOfferPractice,
+  onChooseAdvice,
+  onChoosePractice,
+  onCancel,
+}: {
+  companionName: string;
+  canOfferPractice: boolean;
+  onChooseAdvice: () => void;
+  onChoosePractice: () => void;
+  onCancel: () => void;
+}) {
+  useScrollLock(true);
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
+      data-testid="event-sophie-help-chooser"
+    >
+      <button type="button" aria-label="取消" onClick={onCancel} className="absolute inset-0 bg-black/40" />
+      <div className="relative w-full sm:max-w-md bg-petal-cream rounded-t-3xl sm:rounded-3xl max-h-[85dvh] overflow-y-auto overscroll-contain safe-pb shadow-xl">
+        <div className="sm:hidden flex justify-center pt-2.5 pb-1">
+          <span className="h-1 w-10 rounded-full bg-petal-rule" />
+        </div>
+        <div className="px-5 pt-3 pb-4">
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <h3 className="text-lg font-serif text-petal-ink flex items-center gap-1.5">
+              <span aria-hidden>👩‍🏫</span>
+              {name} 可以怎麼幫你們？
+            </h3>
+            <button type="button" onClick={onCancel} aria-label="取消" className="flex-shrink-0 -m-1 p-1 text-petal-ink-soft hover:text-petal-ink">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <p className="text-[11px] text-petal-ink-soft mb-4 inline-flex items-center gap-1">
+            <Globe className="w-3 h-3" strokeWidth={1.75} />
+            兩種都會出現在對話裡、兩人都看得到，各會用到 1 次 AI。
+          </p>
+
+          <div className="space-y-2.5">
+            <button
+              type="button"
+              data-testid="event-sophie-help-advice"
+              onClick={onChooseAdvice}
+              className="w-full text-left rounded-2xl border border-petal-sage/50 bg-white hover:bg-petal-sage/10 p-4 transition-colors"
+            >
+              <div className="flex items-center gap-2 font-body text-sm font-medium text-petal-ink">
+                <HeartHandshake className="w-4 h-4 text-petal-sage-deep shrink-0" strokeWidth={1.75} />
+                給一段中立的建議
+              </div>
+              <p className="mt-1 font-body text-xs text-petal-ink-soft leading-relaxed">
+                {name} 讀過你們的對話，給一段不站邊的話，貼到對話裡兩人一起看。
+              </p>
+            </button>
+
+            {canOfferPractice && (
+              <button
+                type="button"
+                data-testid="event-facilitation-start-button"
+                onClick={onChoosePractice}
+                className="w-full text-left rounded-2xl border border-petal-rose/40 bg-white hover:bg-petal-rose/10 p-4 transition-colors"
+              >
+                <div className="flex items-center gap-2 font-body text-sm font-medium text-petal-ink">
+                  <Compass className="w-4 h-4 text-petal-rose-deep shrink-0" strokeWidth={1.75} />
+                  帶我們做一張練習卡
+                </div>
+                <p className="mt-1 font-body text-xs text-petal-ink-soft leading-relaxed">
+                  {name} 像諮商師一樣，一步一步帶你們做一個小練習（🪞 鏡映、🔄 換位、🫶 肯定…），一次一張卡、指定誰先做。
+                </p>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
