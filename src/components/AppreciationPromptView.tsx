@@ -121,8 +121,11 @@ const AppreciationPromptView: React.FC<AppreciationPromptViewProps> = ({
   };
 
   const { run: submit, pending } = useAsyncAction(async () => {
-    const content = draft.trim();
-    if (!content) return;
+    const answer = draft.trim();
+    if (!answer) return;
+    // Carry the prompt into the post so it reads with context on the wall, not
+    // as a floating sentence. Markdown blockquote → the question leads quietly.
+    const content = `> ${personalize(prompt.q)}\n\n${answer}`;
     try {
       await apiService.createWallPost({
         content,

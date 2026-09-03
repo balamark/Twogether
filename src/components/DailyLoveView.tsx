@@ -82,6 +82,26 @@ const DailyLoveView: React.FC<DailyLoveViewProps> = ({ authState, showNotificati
     return [...CURATED, ...aiPool].filter((q) => (seen.has(q) ? false : (seen.add(q), true)));
   }, [aiPool]);
 
+  // Hydrate the AI pool from the couple's server-side cache once. This is the
+  // free (no-token) read: a batch generated earlier — on this device, the
+  // partner's device, or before the browser was cleared — comes back here so we
+  // never re-spend a credit just to see questions we already paid for.
+  useEffect(() => {
+    let cancelled = false;
+    apiService.getAppreciationQuestions([], false)
+      .then(({ questions }) => {
+        if (cancelled || !Array.isArray(questions) || questions.length === 0) return;
+        setAiPool((prev) => {
+          const seen = new Set<string>();
+          const merged = [...questions, ...prev].filter((q) => (q && !seen.has(q) ? (seen.add(q), true) : false));
+          try { localStorage.setItem(poolKey(userId), JSON.stringify(merged)); } catch { /* ignore */ }
+          return merged;
+        });
+      })
+      .catch(() => { /* offline / not paired — the localStorage copy still drives this session */ });
+    return () => { cancelled = true; };
+  }, [userId]);
+
   // Stable "today's question": seeded by the day so it doesn't change on every
   // render, persisted so re-opening shows the same one, and only rolling over
   // to a fresh pick when the date changes. 換一題 advances it manually.
@@ -125,21 +145,21 @@ const DailyLoveView: React.FC<DailyLoveViewProps> = ({ authState, showNotificati
     try { localStorage.setItem(poolKey(userId), JSON.stringify(next)); } catch { /* ignore */ }
   };
 
-  // 讓 AI 想幾個新的 — one AI credit; appends fresh questions and jumps to one.
+  // 讓 AI 想幾個新的 — one AI credit; the server appends the fresh batch to the
+  // couple's shared cache and returns the whole pool, so this is the only path
+  // that ever spends a token.
   const { run: regenerate, pending: regenerating } = useAsyncAction(async () => {
     try {
       trackAction('daily_love.ai_regenerate');
-      const fresh = await apiService.generateAppreciationQuestions(pool);
-      const known = new Set(pool);
-      const added = fresh.filter((q) => q && q.trim() && !known.has(q.trim())).map((q) => q.trim());
-      if (added.length === 0) {
+      const { questions, added } = await apiService.getAppreciationQuestions(pool, true);
+      if (!added || added.length === 0) {
         showNotification({ type: 'info', title: '這批和現在的很像', message: '再按一次可以請 AI 換個角度想想。' });
         return;
       }
-      const nextAi = [...aiPool, ...added].slice(-80); // cap on-device growth
-      persistAiPool(nextAi);
+      // Server pool is canonical; mirror it locally for offline reads.
+      persistAiPool(questions);
       // Jump to the first newly-added question so the user sees the result.
-      const firstNew = [...CURATED, ...nextAi].indexOf(added[0]);
+      const firstNew = [...CURATED, ...questions].indexOf(added[0]);
       if (firstNew >= 0) setDayIndex(firstNew);
       showNotification({ type: 'success', title: 'AI 想了幾個新問題', message: `加了 ${added.length} 個新問題，用「換一題」逛逛看。` });
     } catch (err) {
@@ -154,8 +174,11 @@ const DailyLoveView: React.FC<DailyLoveViewProps> = ({ authState, showNotificati
   });
 
   const { run: submit, pending: submitting } = useAsyncAction(async () => {
-    const content = draft.trim();
-    if (!content) return;
+    const answer = draft.trim();
+    if (!answer) return;
+    // Include the question so the wall post reads with context, not a floating
+    // answer. Markdown blockquote → the question shows as a quiet lead-in.
+    const content = `> ${personalize(question)}\n\n${answer}`;
     try {
       await apiService.createWallPost({ content, mood_tag: TAG, category: 'general', is_private: false });
       trackAction('daily_love.sent');

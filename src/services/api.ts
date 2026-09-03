@@ -2975,20 +2975,31 @@ class ApiService {
     }
   }
 
-  // 今天你還喜歡他什麼？ — ask the LLM for a fresh batch of natural, life-like
-  // daily-appreciation questions. `avoid` lists questions the couple has already
-  // seen so the model changes angle. Costs one AI credit; AI_TIMEOUT because LLM
-  // calls routinely run past the 15s default (see CLAUDE.md).
-  async generateAppreciationQuestions(avoid: string[] = []): Promise<string[]> {
+  // 今天你還喜歡他什麼？ — the couple's AI-generated question pool, cached
+  // server-side so it's generated once and then served for free.
+  //   • regenerate=false (default): fetch the cached pool — never spends a token.
+  //   • regenerate=true: spend one AI credit to add a fresh batch; `avoid` lists
+  //     questions already shown so the model changes angle.
+  // Returns the full pool plus just the questions added this call. AI_TIMEOUT
+  // because LLM calls routinely run past the 15s default (see CLAUDE.md).
+  async getAppreciationQuestions(
+    avoid: string[] = [],
+    regenerate = false,
+  ): Promise<{ questions: string[]; added: string[] }> {
     try {
       const response = await apiClient.post(
         '/love-moments/appreciation-questions',
-        { avoid: avoid.slice(0, 40) },
+        { avoid: avoid.slice(0, 40), regenerate },
+        // Only the LLM path is slow; the cache-read path returns instantly, so
+        // the longer timeout is harmless there and needed when regenerating.
         { timeout: AI_TIMEOUT },
       );
-      return (response.data.questions || []) as string[];
+      return {
+        questions: (response.data.questions || []) as string[],
+        added: (response.data.added || []) as string[],
+      };
     } catch (error: unknown) {
-      console.error('Failed to generate appreciation questions:', error);
+      console.error('Failed to get appreciation questions:', error);
       // Preserve error_code/message from the interceptor so the UI can branch.
       throw error;
     }
