@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, Eye, Heart, Shuffle, Send, Check } from 'lucide-react';
+import { ArrowLeft, Eye, Heart, Shuffle, Send, Check, type LucideIcon } from 'lucide-react';
 import AutoGrowTextarea from './AutoGrowTextarea';
+import SoloModeGate from './SoloModeGate';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { apiService } from '../services/api';
 import { trackAction } from '../utils/track';
@@ -14,6 +15,8 @@ interface AppreciationPromptViewProps {
   showNotification: (notification: Omit<Notification, 'id'>) => void;
   onBack: () => void;
   onGoToWall: () => void;
+  onInvitePartner: () => void;
+  onGoToRediscover: () => void;
 }
 
 // 我看見你 / 他不知道的事 — two appreciation flows that used to be nothing more
@@ -31,7 +34,7 @@ interface ThemeConfig {
   eyebrow: string;
   title: React.ReactNode;
   subtitle: string;
-  icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+  icon: LucideIcon;
   // Mood tag stamped on the wall post so the couple (and filters) can tell these
   // apart from a plain post. Kept short and human — it shows on the card.
   tag: string;
@@ -43,6 +46,9 @@ interface ThemeConfig {
   cta: string;
   successTitle: string;
   successBody: string;
+  // 單人模式 gate copy — these post to the shared wall, so they need a partner.
+  soloTitle: string;
+  soloValue: string;
 }
 
 const THEMES: Record<AppreciationTheme, ThemeConfig> = {
@@ -67,6 +73,8 @@ const THEMES: Record<AppreciationTheme, ThemeConfig> = {
     cta: '讓 TA 知道我看見了',
     successTitle: '已經留在我們的牆上了',
     successBody: 'TA 會看到你注意到了 TA。要不要再看見一件？',
+    soloTitle: '配對後，讓 TA 知道你看見了',
+    soloValue: '配對之後，你注意到的每件小事都會留在你們的牆上，讓 TA 知道——TA 的付出，你有看見。',
   },
   secret: {
     eyebrow: '他不知道的事',
@@ -89,6 +97,8 @@ const THEMES: Record<AppreciationTheme, ThemeConfig> = {
     cta: '偷偷告訴 TA',
     successTitle: '悄悄話送出去了',
     successBody: 'TA 會在我們的牆上收到這句話。要不要再說一件？',
+    soloTitle: '配對後，把悄悄話送到 TA 面前',
+    soloValue: '配對之後，你一直沒說出口的欣賞，會變成一句悄悄話留在你們的牆上，讓 TA 收到。',
   },
 };
 
@@ -98,6 +108,8 @@ const AppreciationPromptView: React.FC<AppreciationPromptViewProps> = ({
   showNotification,
   onBack,
   onGoToWall,
+  onInvitePartner,
+  onGoToRediscover,
 }) => {
   const cfg = THEMES[theme];
   const Icon = cfg.icon;
@@ -149,6 +161,26 @@ const AppreciationPromptView: React.FC<AppreciationPromptViewProps> = ({
       });
     }
   });
+
+  // These post to the shared wall so TA receives them — needs a partner. Gate
+  // solo users with the three-part 單人模式 gate instead of a raw wall-post error.
+  if (!authState.partnerConnected) {
+    return (
+      <SoloModeGate
+        icon={cfg.icon}
+        title={cfg.soloTitle}
+        valueLine={cfg.soloValue}
+        onInvite={onInvitePartner}
+        alternatives={[
+          {
+            label: '先玩「重新認識你」',
+            desc: '不用配對也能寫，一題一題回想當初怎麼愛上對方。',
+            onClick: onGoToRediscover,
+          },
+        ]}
+      />
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto p-4 md:p-6" data-testid={`appreciation-${theme}`}>

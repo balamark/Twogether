@@ -690,6 +690,33 @@ async function loadAppreciationCache(scopeId) {
   }
 }
 
+// Resolve the cache scope, migrating a solo user's paid-for pool into the couple
+// scope when a couple id appears (couple rows are created lazily, so a solo
+// batch first lands under userId). Without this, pairing would strand questions
+// the user spent a credit to generate. No-op once there's nothing solo-scoped.
+async function resolveAppreciationScope(userId) {
+  const coupleId = await getCoupleIdForUser(userId);
+  if (!coupleId || coupleId === userId) return coupleId || userId;
+  try {
+    const solo = await loadAppreciationCache(userId);
+    if (solo.length > 0) {
+      const couple = await loadAppreciationCache(coupleId);
+      const seen = new Set(couple);
+      const merged = [...couple, ...solo.filter((q) => !seen.has(q))].slice(-APPRECIATION_POOL_CAP);
+      await db.query(
+        `INSERT INTO appreciation_question_cache (scope_id, questions, provider, model, gen_count)
+         VALUES ($1, $2::jsonb, 'migrated', 'migrated', 1)
+         ON CONFLICT (scope_id) DO UPDATE SET questions = EXCLUDED.questions, updated_at = NOW()`,
+        [coupleId, JSON.stringify(merged)]
+      );
+      await db.query(`DELETE FROM appreciation_question_cache WHERE scope_id = $1`, [userId]);
+    }
+  } catch (err) {
+    logWarn('appreciation.scope.migrate_failed', { err: err.message });
+  }
+  return coupleId;
+}
+
 // 今天你還喜歡他什麼？ — the "讓 AI 想幾個新的" escape hatch, with a shared cache.
 // - regenerate=false (or omitted): return the cached pool, never spending a token
 //   (used on load so both partners see the same AI questions for free).
@@ -712,8 +739,7 @@ router.post('/appreciation-questions', [
 
   try {
     await ensureAppreciationQuestionCacheTable();
-    const coupleId = await getCoupleIdForUser(userId);
-    const scopeId = coupleId || userId;
+    const scopeId = await resolveAppreciationScope(userId);
     const cached = await loadAppreciationCache(scopeId);
 
     // Load path: hand back whatever's cached, free. Empty is fine — the client

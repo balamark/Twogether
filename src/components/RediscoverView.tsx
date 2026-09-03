@@ -100,6 +100,15 @@ const RediscoverView: React.FC<RediscoverViewProps> = ({ authState, onBack }) =>
     else goToStep(step - 1);
   };
 
+  // Skip advances WITHOUT discarding what's already typed — a user who wrote an
+  // answer (or edited a saved one) and taps 跳過 instead of 下一題 shouldn't lose
+  // it from the final letter. Persist the current draft first, like handleBack.
+  const handleSkip = () => {
+    const q = questions[step];
+    if (q) persist({ ...answers, [q.key]: draft.trim() });
+    goToStep(step + 1);
+  };
+
   const restart = () => {
     trackAction('rediscover.restart');
     goToStep(0);
@@ -209,7 +218,7 @@ const RediscoverView: React.FC<RediscoverViewProps> = ({ authState, onBack }) =>
         <div className="mt-6 flex items-center justify-between">
           <button
             type="button"
-            onClick={() => goToStep(step + 1)}
+            onClick={handleSkip}
             className="font-body text-sm text-petal-muted hover:text-petal-ink transition-colors"
           >
             這題先跳過
