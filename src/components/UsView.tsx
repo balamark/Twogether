@@ -6,8 +6,6 @@ import { trackAction } from '../utils/track';
 
 interface UsViewProps {
   onNavigate: (view: string) => void;
-  // Opens the 我們的美好 composer straight away (＋ 留下一個美好).
-  onAddGoodMoment: () => void;
 }
 
 // 愛的存款 — a felt sense of what you've built together, deliberately NOT a
@@ -79,7 +77,7 @@ const Scenario: React.FC<{
 // product's core idea: 愛 is not an add-on to problems, and 成長 is not a
 // replacement for 愛 — both are part of one relationship. So the cards are the
 // same size, same visual weight, side by side.
-const UsView: React.FC<UsViewProps> = ({ onNavigate, onAddGoodMoment }) => {
+const UsView: React.FC<UsViewProps> = ({ onNavigate }) => {
   useEffect(() => { trackAction('us.hub.view'); }, []);
 
   return (
@@ -116,11 +114,11 @@ const UsView: React.FC<UsViewProps> = ({ onNavigate, onAddGoodMoment }) => {
           </p>
           <div className="space-y-2.5 flex-1">
             <Scenario
-              cue="今天想靠近彼此？"
+              cue="今天想存一點愛？"
               icon={PlusCircle}
-              action="留下一個美好"
-              onClick={() => { trackAction('us.love.add_moment'); onAddGoodMoment(); }}
-              testId="us-scenario-add-moment"
+              action="今天你還喜歡他什麼"
+              onClick={() => { trackAction('us.love.daily'); onNavigate('daily-love'); }}
+              testId="us-scenario-daily-love"
             />
             <Scenario
               cue="有件小事想讓他知道你看見了？"

@@ -22,6 +22,7 @@ interface HomeViewProps {
   onGoToGrow: () => void;
   onGoToActivity: () => void;
   onGoToTalk: () => void;
+  onGoToDailyLove: () => void;
 }
 
 // Time-of-day greeting on the viewer's own device clock (deliberately NOT the
@@ -161,10 +162,10 @@ const GrowthTeaserCard: React.FC<{ onGoToGrow: () => void }> = ({ onGoToGrow }) 
 // first thing after the greeting: opening Twogether should feel like "今天我們
 // 可以為這段關係做什麼？", never "啊，又有事情". 存一點愛 leads, on purpose.
 const TodayActions: React.FC<{
-  onGoToWall: () => void;
+  onGoToDailyLove: () => void;
   onGoToTalk: () => void;
   onGoToGrow: () => void;
-}> = ({ onGoToWall, onGoToTalk, onGoToGrow }) => {
+}> = ({ onGoToDailyLove, onGoToTalk, onGoToGrow }) => {
   const items: {
     emoji: string;
     title: string;
@@ -177,9 +178,9 @@ const TodayActions: React.FC<{
     {
       emoji: '❤️',
       title: '今天存一點愛',
-      desc: '花 1 分鐘，留下一件你喜歡對方的事。',
+      desc: '花 1 分鐘，回答一個小問題：今天你還喜歡他什麼？',
       cta: '開始',
-      onClick: () => { trackAction('home.today.save_love'); onGoToWall(); },
+      onClick: () => { trackAction('home.today.save_love'); onGoToDailyLove(); },
       testId: 'home-today-love',
       tone: 'bg-petal-rose-soft/25 border-petal-rose-soft',
     },
@@ -248,6 +249,7 @@ const HomeView: React.FC<HomeViewProps> = ({
   onGoToGrow,
   onGoToActivity,
   onGoToTalk,
+  onGoToDailyLove,
 }) => {
   // Greet the couple, not just the account holder — this is a shared space.
   const me = authState.user?.nickname;
@@ -269,7 +271,7 @@ const HomeView: React.FC<HomeViewProps> = ({
           <InfoHint viewId="home" />
         </div>
       </div>
-      <TodayActions onGoToWall={onGoToWall} onGoToTalk={onGoToTalk} onGoToGrow={onGoToGrow} />
+      <TodayActions onGoToDailyLove={onGoToDailyLove} onGoToTalk={onGoToTalk} onGoToGrow={onGoToGrow} />
       <GettingStartedCard
         companionPicked={!!authState.user?.selected_therapist}
         paired={authState.partnerConnected}

@@ -1204,6 +1204,112 @@ async function generateReconciliationOpeners({ intensity, eventContext }) {
 }
 
 // ---------------------------------------------------------------------------
+// Appreciation questions ("今天你還喜歡他什麼？")
+// ---------------------------------------------------------------------------
+// A daily micro-habit: one small, life-like question that nudges you to notice
+// one thing you appreciate about your partner today. The curated bank ships on
+// the client; this is the "讓 AI 想幾個新的" escape hatch for couples who want a
+// fresh batch. The whole point is that these read like a friend nudging you,
+// NOT a worksheet ("請表達你對伴侶的感謝") — so the prompt leans hard on
+// concrete, everyday, slightly playful moments.
+const APPRECIATION_QUESTIONS_SYSTEM_PROMPT = `你是一位很懂生活的伴侶關係設計師。你要為一個叫 Twogether 的 App 想一批「每日小問題」，讓使用者每天回答一題，慢慢養成「看見並感謝另一半」的習慣。請永遠以繁體中文回覆。
+
+任務：想出「八則」不同的每日小問題。
+
+風格守則（很重要）：
+- 要非常生活化、口語、具體，像好朋友隨口問你的話，不是問卷或作業。
+- 直接爛的範例（不要這樣寫）：「請表達你對伴侶的感謝」「請描述伴侶的優點」。
+- 好的方向（可參考語氣，但不要照抄）：「今天有沒有一個瞬間，讓你覺得『還好是他』？」「今天他做了什麼，讓你覺得被照顧？」「今天他有沒有一個很可愛、讓你想多看一眼的瞬間？」「如果今天只能誇他一件事，你會說什麼？」
+- 聚焦「今天／最近」的具體小事與小瞬間，避免抽象的大問題。
+- 每題簡短，一句話，結尾是問句。
+- 用中性的方式指稱另一半（例如「他／TA」），不要假設性別或叫名字。
+- 八題角度要有變化：被照顧、覺得可愛、覺得可靠、心動、好笑、感激、重新看見對方的付出…等等。
+
+回應請只呼叫 emit_appreciation_questions tool，不要輸出其他文字。`;
+
+const APPRECIATION_QUESTIONS_TOOL_SCHEMA = {
+  name: 'emit_appreciation_questions',
+  description: 'Return eight short, natural, everyday daily-appreciation questions in zh-TW.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      questions: {
+        type: 'array',
+        minItems: 6,
+        maxItems: 8,
+        items: { type: 'string', description: '一句話的每日小問題，口語、具體、以問號結尾' },
+      },
+    },
+    required: ['questions'],
+  },
+};
+
+async function generateAppreciationQuestions({ avoid } = {}) {
+  const lines = [];
+  lines.push('請想一批全新的每日小問題。');
+  if (Array.isArray(avoid) && avoid.length) {
+    lines.push('');
+    lines.push('以下這些問題已經出現過，請不要重複、也盡量換不同的角度：');
+    for (const q of avoid.slice(0, 40)) lines.push(`- ${q}`);
+  }
+  const userContent = lines.join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 1024,
+    system: [
+      {
+        type: 'text',
+        text: APPRECIATION_QUESTIONS_SYSTEM_PROMPT + PUNCTUATION_RULE,
+        cache_control: { type: 'ephemeral' },
+      },
+    ],
+    tools: [APPRECIATION_QUESTIONS_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_appreciation_questions' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.appreciation_questions', {
+    model: response.model || MODEL,
+    avoidCount: Array.isArray(avoid) ? avoid.length : 0,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    cacheCreate: u.cache_creation_input_tokens || 0,
+    cacheRead: u.cache_read_input_tokens || 0,
+    costUsd: cost,
+  });
+
+  const toolUse = response.content.find(
+    (b) => b.type === 'tool_use' && b.name === 'emit_appreciation_questions'
+  );
+  if (!toolUse) {
+    throw new Error('Claude did not return a tool_use block');
+  }
+  const out = toolUse.input;
+
+  return {
+    questions: Array.isArray(out.questions) ? out.questions.filter((q) => typeof q === 'string' && q.trim()) : [],
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Emotion acceptance ("接住情緒")
 // ---------------------------------------------------------------------------
 // The repair starts only once a feeling is *received* — not solved. The partner
@@ -3582,6 +3688,7 @@ module.exports = {
   generateRoleplayMessages,
   generateWallCounselorComment,
   generateReconciliationOpeners,
+  generateAppreciationQuestions,
   generateEmotionAcceptance,
   generateCheckupSummary,
   generateStoryInsights,

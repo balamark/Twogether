@@ -2975,6 +2975,25 @@ class ApiService {
     }
   }
 
+  // 今天你還喜歡他什麼？ — ask the LLM for a fresh batch of natural, life-like
+  // daily-appreciation questions. `avoid` lists questions the couple has already
+  // seen so the model changes angle. Costs one AI credit; AI_TIMEOUT because LLM
+  // calls routinely run past the 15s default (see CLAUDE.md).
+  async generateAppreciationQuestions(avoid: string[] = []): Promise<string[]> {
+    try {
+      const response = await apiClient.post(
+        '/love-moments/appreciation-questions',
+        { avoid: avoid.slice(0, 40) },
+        { timeout: AI_TIMEOUT },
+      );
+      return (response.data.questions || []) as string[];
+    } catch (error: unknown) {
+      console.error('Failed to generate appreciation questions:', error);
+      // Preserve error_code/message from the interceptor so the UI can branch.
+      throw error;
+    }
+  }
+
   // Fetch three platform-voiced「溫柔提醒」options for the given gap (days since
   // last intimacy). Twogether authors the copy from a curated tone catalog;
   // results are cached server-side per couple+day, and regenerate reshuffles.

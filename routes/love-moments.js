@@ -7,6 +7,9 @@ const { logInfo, logWarn, logError } = require('../lib/logger');
 const { logDbError, errorResponseBody } = require('../lib/db-errors');
 const { notifyPartnerAction, getPartnerId } = require('../services/notificationService');
 const lineService = require('../services/lineService');
+const llmService = require('../services/llmService');
+const { resolveAiLimit, countTodayAiUsage, recordAiUsage } = require('../lib/aiUsage');
+const { checkLimit } = require('../lib/entitlements');
 
 const router = express.Router();
 
@@ -644,6 +647,74 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       message: '刪除愛情時刻失敗'
+    });
+  }
+});
+
+// 今天你還喜歡他什麼？ — the "讓 AI 想幾個新的" escape hatch. The daily-question
+// bank ships on the client; this asks the LLM for a fresh batch of natural,
+// life-like questions when the couple doesn't vibe with the built-ins. Costs one
+// AI credit (same daily pool as the icebreaker), so it's gated + logged.
+router.post('/appreciation-questions', [
+  body('avoid').optional().isArray(),
+  body('avoid.*').optional().isString().isLength({ max: 200 }),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, message: '格式錯誤，請重新整理後再試', errors: errors.array() });
+  }
+
+  const userId = req.user.id;
+  const avoid = Array.isArray(req.body.avoid) ? req.body.avoid.filter((q) => typeof q === 'string').slice(0, 40) : [];
+
+  try {
+    const { tier, limit } = await resolveAiLimit(userId);
+    const usedToday = await countTodayAiUsage(userId);
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    if (!limitCheck.ok) {
+      logInfo('appreciation.questions.limit', { userId, used: usedToday, limit, tier, blocked: true });
+      return res.status(limitCheck.status).json(limitCheck.body);
+    }
+
+    logInfo('appreciation.questions.input', { userId, avoidCount: avoid.length });
+
+    const result = await llmService.generateAppreciationQuestions({ avoid });
+    const meta = result._meta;
+    delete result._meta;
+
+    const questions = (result.questions || [])
+      .map((q) => (typeof q === 'string' ? q.trim() : ''))
+      .filter(Boolean);
+    if (questions.length === 0) {
+      logWarn('appreciation.questions.empty', { userId });
+      return res.status(502).json({
+        success: false,
+        message: 'AI 一時想不出新問題，先用現有的問題，等等再試一次。',
+        error_code: 'APPRECIATION_QUESTIONS_EMPTY',
+      });
+    }
+
+    logInfo('appreciation.questions.cost', {
+      userId,
+      provider: meta?.provider,
+      model: meta?.model,
+      costUsd: meta?.costUsd,
+      durationMs: meta?.durationMs,
+      count: questions.length,
+      usedToday: usedToday + 1,
+      limit,
+      tier,
+    });
+
+    await recordAiUsage(userId, 'appreciation_questions', JSON.stringify({ avoidCount: avoid.length }), meta);
+
+    res.json({ success: true, questions });
+  } catch (error) {
+    logError('Generate appreciation questions failed', { err: error.message, stack: error.stack });
+    res.status(500).json({
+      success: false,
+      message: 'AI 暫時無法產生新問題，先用現有的問題，稍後再試一次。',
+      error_code: 'APPRECIATION_QUESTIONS_FAILED',
     });
   }
 });
