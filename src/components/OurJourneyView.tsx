@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Heart, Sparkles, Plus, X, ImagePlus, Pencil, Trash2 } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { apiService } from '../services/api';
 import type { AuthState, IntimateRecord, JourneyMilestone, Notification } from '../App';
 
 interface OurJourneyViewProps {
@@ -20,9 +21,9 @@ interface OurJourneyViewProps {
 //   •「當時，我喜歡你的一個地方」 and「現在回頭看，我才發現…」
 // so a milestone becomes a memory with feeling attached, not a bare marker.
 //
-// There is no journey backend, so the story layer is persisted per-user in
-// localStorage (photos downscaled first to stay under the quota). It's a
-// device-local keepsake — the same trade-off as 重新認識你.
+// The story layer is persisted server-side (routes/journey.js) scoped to the
+// couple, so it syncs across both partners and survives a new device. Photos are
+// downscaled client-side to a JPEG data URL before upload to keep rows small.
 
 interface StoryExtras {
   photo?: string; // downscaled JPEG data URL
@@ -71,8 +72,6 @@ const baseEmoji = (type: JourneyMilestone['type']): string =>
   type === 'child_born' ? '👶' :
   '✦';
 
-const storageKey = (userId?: string) => `tw:journey:${userId || 'anon'}`;
-
 const uid = () =>
   typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
@@ -80,9 +79,9 @@ const uid = () =>
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
-// Downscale an image to a small JPEG data URL so a handful fit inside the
-// ~5MB localStorage budget (there is no journey media backend). Rejects if the
-// browser can't decode the file, so the caller can tell the user.
+// Downscale an image to a small JPEG data URL before upload, so the stored value
+// (a data URL kept in-column, capped ~900KB server-side) stays modest. Rejects
+// if the browser can't decode the file, so the caller can tell the user.
 const fileToDownscaledDataUrl = (file: File, maxDim = 1000, quality = 0.78): Promise<string> =>
   new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -119,11 +118,12 @@ interface EditorState {
 
 const MilestoneEditor: React.FC<{
   state: EditorState;
+  saving: boolean;
   onClose: () => void;
   onSave: (m: StoryMilestone) => void;
   onDelete?: () => void;
   onPhotoError: () => void;
-}> = ({ state, onClose, onSave, onDelete, onPhotoError }) => {
+}> = ({ state, saving, onClose, onSave, onDelete, onPhotoError }) => {
   const [draft, setDraft] = useState<StoryMilestone>(state.draft);
   const [photoBusy, setPhotoBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -314,7 +314,8 @@ const MilestoneEditor: React.FC<{
             <button
               type="button"
               onClick={onDelete}
-              className="inline-flex items-center gap-1.5 font-body text-sm text-petal-muted hover:text-red-600 transition-colors"
+              disabled={saving}
+              className="inline-flex items-center gap-1.5 font-body text-sm text-petal-muted hover:text-red-600 transition-colors disabled:opacity-40"
               data-testid="milestone-delete"
             >
               <Trash2 className="w-4 h-4" strokeWidth={1.5} /> 刪除
@@ -323,11 +324,11 @@ const MilestoneEditor: React.FC<{
           <button
             type="button"
             onClick={() => onSave(draft)}
-            disabled={!canSave}
+            disabled={!canSave || saving}
             data-testid="milestone-save"
             className="ml-auto rounded-full bg-petal-rose-deep px-6 py-2.5 font-body text-sm font-medium text-white hover:bg-petal-rose transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            儲存
+            {saving ? '儲存中…' : '儲存'}
           </button>
         </div>
       </div>
@@ -353,37 +354,36 @@ const OurJourneyView = ({ journeyMilestones, intimateRecords, setCurrentView, au
   const [store, setStore] = useState<JourneyStore>({ added: [], enrich: {} });
   const [editor, setEditor] = useState<EditorState | null>(null);
 
-  // Load the device-local story layer once per user.
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(storageKey(userId));
-      if (raw) {
-        const parsed = JSON.parse(raw) as JourneyStore;
-        setStore({ added: parsed.added ?? [], enrich: parsed.enrich ?? {} });
-      } else {
-        setStore({ added: [], enrich: {} });
-      }
-    } catch {
-      setStore({ added: [], enrich: {} });
-    }
-  }, [userId]);
+  const [saving, setSaving] = useState(false);
 
-  const persist = (next: JourneyStore): boolean => {
-    setStore(next);
-    try {
-      localStorage.setItem(storageKey(userId), JSON.stringify(next));
-      return true;
-    } catch {
-      // Almost always the ~5MB quota, blown by a photo. Tell the user exactly
-      // what happened and what to do — don't fail silently.
-      showNotification({
-        type: 'warning',
-        title: '照片太多，存不下了',
-        message: '這台裝置的相片空間快滿了。可以先移除一張舊照片，或這則先不放照片再儲存。',
+  // Load the shared story layer from the server (syncs across both partners).
+  useEffect(() => {
+    let cancelled = false;
+    apiService.getJourney()
+      .then((data) => {
+        if (cancelled) return;
+        setStore({
+          added: (data.added ?? []).map((m) => ({
+            id: m.id,
+            emoji: m.emoji || '✦',
+            title: m.title,
+            date: m.date,
+            place: m.place,
+            description: m.description || '',
+            photo: m.photo,
+            likedThen: m.likedThen,
+            realizeNow: m.realizeNow,
+          })),
+          enrich: data.enrich ?? {},
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        const e = err as { message?: string };
+        showNotification({ type: 'error', title: '讀不到你們的故事', message: e?.message || '請稍後再試一次。' });
       });
-      return false;
-    }
-  };
+    return () => { cancelled = true; };
+  }, [userId, showNotification]);
 
   // Merge the read-only base timeline with the couple's own added milestones,
   // each carrying its extras (photo / reflections).
@@ -442,42 +442,80 @@ const OurJourneyView = ({ journeyMilestones, intimateRecords, setCurrentView, au
     }
   };
 
-  const saveFromEditor = (m: StoryMilestone) => {
-    if (!editor) return;
-    const extras: StoryExtras = {
-      ...(m.photo ? { photo: m.photo } : {}),
-      ...(m.likedThen?.trim() ? { likedThen: m.likedThen.trim() } : {}),
-      ...(m.realizeNow?.trim() ? { realizeNow: m.realizeNow.trim() } : {}),
-    };
-    let next: JourneyStore;
-    if (editor.mode === 'enrich') {
-      next = { ...store, enrich: { ...store.enrich, [m.id]: extras } };
-    } else {
-      const clean: StoryMilestone = {
-        id: m.id,
-        emoji: m.emoji,
-        title: m.title.trim(),
-        date: m.date,
-        place: m.place?.trim() || undefined,
-        description: m.description.trim(),
-        ...extras,
-      };
-      const exists = store.added.some((a) => a.id === m.id);
-      const added = exists ? store.added.map((a) => (a.id === m.id ? clean : a)) : [...store.added, clean];
-      next = { ...store, added };
-    }
-    if (persist(next)) setEditor(null);
+  const onSaveError = (err: unknown) => {
+    const e = err as { message?: string };
+    showNotification({ type: 'error', title: '沒有存起來', message: e?.message || '網路好像不太穩，你的內容還在，再按一次試試。' });
   };
 
-  const deleteFromEditor = () => {
-    if (!editor) return;
+  const saveFromEditor = async (m: StoryMilestone) => {
+    if (!editor || saving) return;
+    setSaving(true);
+    try {
+      if (editor.mode === 'enrich') {
+        // Extras layered onto a base milestone, keyed by its client id.
+        const returned = await apiService.upsertJourneyEnrich(m.id, {
+          photo: m.photo ?? null,
+          likedThen: m.likedThen?.trim() || null,
+          realizeNow: m.realizeNow?.trim() || null,
+        });
+        setStore((prev) => {
+          const enrich = { ...prev.enrich };
+          if (returned && (returned.photo || returned.likedThen || returned.realizeNow)) enrich[m.id] = returned;
+          else delete enrich[m.id];
+          return { ...prev, enrich };
+        });
+      } else {
+        const input = {
+          emoji: m.emoji || '✦',
+          title: m.title.trim(),
+          date: m.date,
+          place: m.place?.trim() || null,
+          description: m.description.trim() || null,
+          photo: m.photo ?? null,
+          likedThen: m.likedThen?.trim() || null,
+          realizeNow: m.realizeNow?.trim() || null,
+        };
+        const exists = store.added.some((a) => a.id === m.id);
+        const saved = exists
+          ? await apiService.updateJourneyMilestone(m.id, input)
+          : await apiService.createJourneyMilestone(input);
+        const clean: StoryMilestone = {
+          id: saved.id,
+          emoji: saved.emoji || '✦',
+          title: saved.title,
+          date: saved.date,
+          place: saved.place,
+          description: saved.description || '',
+          photo: saved.photo,
+          likedThen: saved.likedThen,
+          realizeNow: saved.realizeNow,
+        };
+        setStore((prev) => ({
+          ...prev,
+          added: exists ? prev.added.map((a) => (a.id === m.id ? clean : a)) : [...prev.added, clean],
+        }));
+      }
+      setEditor(null);
+    } catch (err) {
+      onSaveError(err);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteFromEditor = async () => {
+    if (!editor || saving) return;
     const id = editor.draft.id;
-    const next: JourneyStore = {
-      added: store.added.filter((a) => a.id !== id),
-      enrich: Object.fromEntries(Object.entries(store.enrich).filter(([k]) => k !== id)),
-    };
-    persist(next);
-    setEditor(null);
+    setSaving(true);
+    try {
+      await apiService.deleteJourneyMilestone(id);
+      setStore((prev) => ({ ...prev, added: prev.added.filter((a) => a.id !== id) }));
+      setEditor(null);
+    } catch (err) {
+      onSaveError(err);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleRecordClick = (m: RenderMilestone) => {
@@ -654,7 +692,8 @@ const OurJourneyView = ({ journeyMilestones, intimateRecords, setCurrentView, au
       {editor && (
         <MilestoneEditor
           state={editor}
-          onClose={() => setEditor(null)}
+          saving={saving}
+          onClose={() => { if (!saving) setEditor(null); }}
           onSave={saveFromEditor}
           onDelete={editor.mode === 'edit' ? deleteFromEditor : undefined}
           onPhotoError={() =>

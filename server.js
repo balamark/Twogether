@@ -30,6 +30,7 @@ const pairingRequestRoutes = require('./routes/pairing-requests');
 const customScriptsRoutes = require('./routes/custom-scripts');
 const customGiftsRoutes = require('./routes/custom-gifts');
 const wallRoutes = require('./routes/wall');
+const journeyRoutes = require('./routes/journey');
 const eventRoutes = require('./routes/events');
 const eventClosureRoutes = require('./routes/event-closure');
 const deepDiveRoutes = require('./routes/deep-dive');
@@ -205,6 +206,7 @@ app.use('/api/pairing-requests', pairingRequestRoutes);
 app.use('/api/custom-scripts', customScriptsRoutes);
 app.use('/api/custom-gifts', customGiftsRoutes);
 app.use('/api/wall', wallRoutes);
+app.use('/api/journey', journeyRoutes);
 // 一起收尾 lives in its own router but shares the /api/events prefix (the
 // closure IS a step of an event). Mounted BEFORE the events router so its
 // /:id/closure/* paths are matched first rather than falling into /:id.
