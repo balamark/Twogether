@@ -1545,7 +1545,7 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scr
   // 4-tab IA's ids — they reuse the same underlying preview content.
   const config =
     view === 'communicate' || view === 'talk' ? PREVIEWS.events :
-    view === 'rediscover' || view === 'see-you' || view === 'secret' ? PREVIEWS.us :
+    view === 'rediscover' || view === 'see-you' || view === 'secret' || view === 'journey' ? PREVIEWS.us :
     PREVIEWS[view];
 
   // Unknown view → friendly generic welcome (keeps old behaviour as a fallback).

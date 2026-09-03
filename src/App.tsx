@@ -2644,6 +2644,8 @@ const LoveTimeApp = () => {
           journeyMilestones={journeyMilestones}
           intimateRecords={intimateRecords}
           setCurrentView={setCurrentView}
+          authState={authState}
+          showNotification={showNotification}
         />
       );
       case 'wall': return (
