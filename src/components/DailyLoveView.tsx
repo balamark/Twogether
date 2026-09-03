@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Shuffle, Send, Check, Sparkles, Wand2 } from 'lucide-react';
+import { ArrowLeft, Shuffle, Send, Check, Sparkles, Wand2, Heart } from 'lucide-react';
 import AutoGrowTextarea from './AutoGrowTextarea';
+import SoloModeGate from './SoloModeGate';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { apiService } from '../services/api';
 import { trackAction } from '../utils/track';
@@ -11,6 +12,8 @@ interface DailyLoveViewProps {
   showNotification: (notification: Omit<Notification, 'id'>) => void;
   onBack: () => void;
   onGoToWall: () => void;
+  onInvitePartner: () => void;
+  onGoToRediscover: () => void;
 }
 
 // 今天你還喜歡他什麼？ — a daily micro-habit. Each day surfaces ONE small,
@@ -63,7 +66,14 @@ const poolKey = (userId?: string) => `tw:daily-love-pool:${userId || 'anon'}`;
 const dayKey = (userId?: string) => `tw:daily-love-day:${userId || 'anon'}`;
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
-const DailyLoveView: React.FC<DailyLoveViewProps> = ({ authState, showNotification, onBack, onGoToWall }) => {
+const DailyLoveView: React.FC<DailyLoveViewProps> = ({
+  authState,
+  showNotification,
+  onBack,
+  onGoToWall,
+  onInvitePartner,
+  onGoToRediscover,
+}) => {
   const userId = authState.user?.id;
   const them = authState.user?.partnerNickname?.trim();
 
@@ -159,7 +169,12 @@ const DailyLoveView: React.FC<DailyLoveViewProps> = ({ authState, showNotificati
       // Server pool is canonical; mirror it locally for offline reads.
       persistAiPool(questions);
       // Jump to the first newly-added question so the user sees the result.
-      const firstNew = [...CURATED, ...questions].indexOf(added[0]);
+      // Index must be computed against the SAME deduped pool the UI renders
+      // ([...CURATED, ...aiPool] with CURATED∩pool removed), not a raw concat —
+      // otherwise an AI question that overlaps CURATED shifts every index.
+      const seen = new Set<string>();
+      const newPool = [...CURATED, ...questions].filter((q) => (q && !seen.has(q) ? (seen.add(q), true) : false));
+      const firstNew = newPool.indexOf(added[0]);
       if (firstNew >= 0) setDayIndex(firstNew);
       showNotification({ type: 'success', title: 'AI 想了幾個新問題', message: `加了 ${added.length} 個新問題，用「換一題」逛逛看。` });
     } catch (err) {
@@ -195,6 +210,27 @@ const DailyLoveView: React.FC<DailyLoveViewProps> = ({ authState, showNotificati
       });
     }
   });
+
+  // Answers post to 我們的牆 so TA receives them, which needs a partner. Rather
+  // than let submit fail with a raw wall-post error, gate solo users with the
+  // three-part 單人模式 gate (why + invite CTA + a solo alternative).
+  if (!authState.partnerConnected) {
+    return (
+      <SoloModeGate
+        icon={Heart}
+        title="配對後，把愛存給 TA"
+        valueLine="配對之後，你每天寫下的一件喜歡對方的事，TA 都會在你們的牆上收到，慢慢累積成你們一起存的愛。"
+        onInvite={onInvitePartner}
+        alternatives={[
+          {
+            label: '先玩「重新認識你」',
+            desc: '不用配對也能寫，一題一題回想當初怎麼愛上對方。',
+            onClick: onGoToRediscover,
+          },
+        ]}
+      />
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto p-4 md:p-6" data-testid="daily-love-view">

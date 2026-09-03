@@ -2486,6 +2486,8 @@ const LoveTimeApp = () => {
             showNotification={showNotification}
             onBack={() => setCurrentView('us')}
             onGoToWall={() => setCurrentView('wall')}
+            onInvitePartner={openPairingPrompt}
+            onGoToRediscover={() => setCurrentView('rediscover')}
           />
         );
       case 'see-you':
@@ -2496,6 +2498,8 @@ const LoveTimeApp = () => {
             showNotification={showNotification}
             onBack={() => setCurrentView('us')}
             onGoToWall={() => setCurrentView('wall')}
+            onInvitePartner={openPairingPrompt}
+            onGoToRediscover={() => setCurrentView('rediscover')}
           />
         );
       case 'secret':
@@ -2506,6 +2510,8 @@ const LoveTimeApp = () => {
             showNotification={showNotification}
             onBack={() => setCurrentView('us')}
             onGoToWall={() => setCurrentView('wall')}
+            onInvitePartner={openPairingPrompt}
+            onGoToRediscover={() => setCurrentView('rediscover')}
           />
         );
       case 'record':

@@ -21,11 +21,36 @@ const PHOTO_MAX_CHARS = 900 * 1024; // ~900KB of data URL ≈ a ~1000px JPEG
 const TEXT_MAX = 4000;
 
 // owner_scope = couple id when the user belongs to a couple, else their user id.
-// Solo users still get a persistent story that becomes shared the moment they
-// pair (their couple id is created around that same user).
+//
+// A couple row is created lazily (couples.js, pairing), so a solo user's story
+// first lands under owner_scope = userId. The moment a couple id appears, we MUST
+// carry those rows over — otherwise the whole timeline would silently vanish
+// (couples.id !== userId). So resolving the scope also migrates any stranded
+// solo rows into the couple scope. It's a no-op once migrated. Enrich rows are
+// de-duplicated first: the partial unique index (owner_scope, base_ref) would
+// reject a solo enrich that collides with one the partner already made, so the
+// colliding solo copy is dropped in favour of the existing couple row.
 async function ownerScopeFor(userId) {
   const coupleId = await getCoupleIdForUser(userId);
-  return coupleId || userId;
+  if (!coupleId || coupleId === userId) return coupleId || userId;
+  try {
+    await db.query(
+      `DELETE FROM journey_milestones s
+        WHERE s.owner_scope = $2 AND s.kind = 'enrich'
+          AND EXISTS (
+            SELECT 1 FROM journey_milestones c
+             WHERE c.owner_scope = $1 AND c.kind = 'enrich' AND c.base_ref = s.base_ref
+          )`,
+      [coupleId, userId]
+    );
+    await db.query(
+      `UPDATE journey_milestones SET owner_scope = $1 WHERE owner_scope = $2`,
+      [coupleId, userId]
+    );
+  } catch (e) {
+    logWarn('journey.scope.migrate_failed', { err: e.message });
+  }
+  return coupleId;
 }
 
 function rowToMilestone(r) {
@@ -62,8 +87,13 @@ function cleanPhoto(v) {
 }
 
 function cleanDate(v) {
-  if (typeof v !== 'string') return null;
-  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  // Reject shape-valid but impossible dates (e.g. 2024-13-45) so they fail as a
+  // 400 '日期格式錯誤' rather than a 500 from the DATE column.
+  const [y, m, d] = v.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
+  return v;
 }
 
 // GET /api/journey — the whole story layer for this scope.
