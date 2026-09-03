@@ -21,6 +21,8 @@ interface HomeViewProps {
   onGoToWall: () => void;
   onGoToGrow: () => void;
   onGoToActivity: () => void;
+  onGoToTalk: () => void;
+  onGoToDailyLove: () => void;
 }
 
 // Time-of-day greeting on the viewer's own device clock (deliberately NOT the
@@ -155,6 +157,82 @@ const GrowthTeaserCard: React.FC<{ onGoToGrow: () => void }> = ({ onGoToGrow }) 
   </button>
 );
 
+// 今天想做什麼 — the positive-first block that greets the couple with three
+// things they CAN do today, not one more problem to process. Deliberately the
+// first thing after the greeting: opening Twogether should feel like "今天我們
+// 可以為這段關係做什麼？", never "啊，又有事情". 存一點愛 leads, on purpose.
+const TodayActions: React.FC<{
+  onGoToDailyLove: () => void;
+  onGoToTalk: () => void;
+  onGoToGrow: () => void;
+}> = ({ onGoToDailyLove, onGoToTalk, onGoToGrow }) => {
+  const items: {
+    emoji: string;
+    title: string;
+    desc: string;
+    cta: string;
+    onClick: () => void;
+    testId: string;
+    tone: string;
+  }[] = [
+    {
+      emoji: '❤️',
+      title: '今天存一點愛',
+      desc: '花 1 分鐘，回答一個小問題：今天你還喜歡他什麼？',
+      cta: '開始',
+      onClick: () => { trackAction('home.today.save_love'); onGoToDailyLove(); },
+      testId: 'home-today-love',
+      tone: 'bg-petal-rose-soft/25 border-petal-rose-soft',
+    },
+    {
+      emoji: '💬',
+      title: '有件事情想說',
+      desc: '有些話，不一定要等到吵架才說。',
+      cta: '說開一件事',
+      onClick: () => { trackAction('home.today.talk'); onGoToTalk(); },
+      testId: 'home-today-talk',
+      tone: 'bg-white border-petal-rule',
+    },
+    {
+      emoji: '🌱',
+      title: '一起變好',
+      desc: '今天想一起探索一個關係主題嗎？',
+      cta: '開始探索',
+      onClick: () => { trackAction('home.today.grow'); onGoToGrow(); },
+      testId: 'home-today-grow',
+      tone: 'bg-petal-sage/10 border-petal-sage/40',
+    },
+  ];
+
+  return (
+    <div className="space-y-2.5" data-testid="home-today-actions">
+      <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted">
+        今天想做什麼
+      </div>
+      {items.map((it) => (
+        <div
+          key={it.testId}
+          className={`flex items-center gap-3 rounded-2xl border px-4 py-3.5 ${it.tone}`}
+        >
+          <span className="text-lg shrink-0" aria-hidden>{it.emoji}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-display text-sm text-petal-ink">{it.title}</span>
+            <span className="block font-body text-[12px] text-petal-muted leading-relaxed">{it.desc}</span>
+          </span>
+          <button
+            type="button"
+            onClick={it.onClick}
+            data-testid={it.testId}
+            className="shrink-0 rounded-full bg-petal-ink px-4 py-1.5 font-body text-[13px] font-medium text-petal-cream hover:bg-petal-ink/85 transition-colors"
+          >
+            {it.cta}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 // 🏠 今天 — "what matters right now." Composes the onboarding checklist, the
 // single most-urgent nudge (RelationshipDashboard), a non-fetching AI-pattern
 // teaser, real weekly stats, a recent-activity teaser, and a growth teaser.
@@ -170,6 +248,8 @@ const HomeView: React.FC<HomeViewProps> = ({
   onGoToWall,
   onGoToGrow,
   onGoToActivity,
+  onGoToTalk,
+  onGoToDailyLove,
 }) => {
   // Greet the couple, not just the account holder — this is a shared space.
   const me = authState.user?.nickname;
@@ -191,6 +271,7 @@ const HomeView: React.FC<HomeViewProps> = ({
           <InfoHint viewId="home" />
         </div>
       </div>
+      <TodayActions onGoToDailyLove={onGoToDailyLove} onGoToTalk={onGoToTalk} onGoToGrow={onGoToGrow} />
       <GettingStartedCard
         companionPicked={!!authState.user?.selected_therapist}
         paired={authState.partnerConnected}

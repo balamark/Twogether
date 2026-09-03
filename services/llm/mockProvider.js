@@ -292,6 +292,37 @@ async function generateReconciliationOpeners({ intensity /* , eventContext */ })
   };
 }
 
+// Deterministic batch of natural daily-appreciation questions (dev/test with no
+// real LLM). Rotates a fixed pool by a cheap hash of `avoid` so re-rolling
+// returns a different-looking set. The real provider replaces this.
+const MOCK_APPRECIATION_QUESTIONS = [
+  '今天有沒有一個瞬間，讓你覺得「還好是他」？',
+  '今天他做了什麼，讓你覺得被照顧？',
+  '今天他有沒有一個很可愛、讓你想多看一眼的瞬間？',
+  '如果今天只能誇他一件事，你會說什麼？',
+  '最近他有沒有一件事，讓你覺得很可靠？',
+  '今天他有沒有讓你笑出來？是什麼？',
+  '今天他為家裡做了哪件你其實有注意到的小事？',
+  '最近你有沒有一個「幸好有他在」的時刻？',
+  '今天他身上，有沒有一個你一直很喜歡的樣子出現了？',
+  '如果要謝謝他今天的一件事，會是哪一件？',
+];
+async function generateAppreciationQuestions({ avoid } = {}) {
+  const startedAt = Date.now();
+  const seed = (Array.isArray(avoid) ? avoid.join('|') : '').length;
+  const rotated = [...MOCK_APPRECIATION_QUESTIONS.slice(seed % MOCK_APPRECIATION_QUESTIONS.length), ...MOCK_APPRECIATION_QUESTIONS.slice(0, seed % MOCK_APPRECIATION_QUESTIONS.length)];
+  return {
+    questions: rotated.slice(0, 8),
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: Date.now() - startedAt,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+    },
+  };
+}
+
 // Deterministic emotion-acceptance coaching for the receiver. Detects the
 // partner's dominant emotion from the latest [對方] message (or the event
 // summary) and returns a short empathy note + three validating responses. Same
@@ -914,6 +945,7 @@ module.exports = {
   generateRoleplayMessages,
   generateWallCounselorComment,
   generateReconciliationOpeners,
+  generateAppreciationQuestions,
   generateEmotionAcceptance,
   generateCheckupSummary,
   generateStoryInsights,

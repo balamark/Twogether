@@ -7,6 +7,9 @@ const { logInfo, logWarn, logError } = require('../lib/logger');
 const { logDbError, errorResponseBody } = require('../lib/db-errors');
 const { notifyPartnerAction, getPartnerId } = require('../services/notificationService');
 const lineService = require('../services/lineService');
+const llmService = require('../services/llmService');
+const { resolveAiLimit, countTodayAiUsage, recordAiUsage } = require('../lib/aiUsage');
+const { checkLimit, getCoupleIdForUser } = require('../lib/entitlements');
 
 const router = express.Router();
 
@@ -644,6 +647,154 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       message: '刪除愛情時刻失敗'
+    });
+  }
+});
+
+// AI-generated 今天你還喜歡他什麼？ questions are cached per couple (or per solo
+// user) so a batch is generated ONCE and then served for free forever after —
+// re-opening the app, the partner opening it, a cleared browser: none of them
+// re-spend a token. Only an explicit「讓 AI 想幾個新的」(regenerate) calls the LLM,
+// and even that appends to the same shared, persisted pool.
+const APPRECIATION_POOL_CAP = 60;
+
+async function ensureAppreciationQuestionCacheTable() {
+  try {
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS appreciation_question_cache (
+        scope_id VARCHAR(64) PRIMARY KEY,
+        questions JSONB NOT NULL,
+        provider VARCHAR(32),
+        model VARCHAR(64),
+        gen_count INTEGER NOT NULL DEFAULT 1,
+        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+      );
+    `);
+  } catch (err) {
+    logWarn('ensureAppreciationQuestionCacheTable failed', { err: err.message });
+  }
+}
+
+async function loadAppreciationCache(scopeId) {
+  try {
+    const r = await db.query(
+      `SELECT questions FROM appreciation_question_cache WHERE scope_id = $1 LIMIT 1`,
+      [scopeId]
+    );
+    const q = r.rows[0]?.questions;
+    return Array.isArray(q) ? q.filter((s) => typeof s === 'string' && s.trim()) : [];
+  } catch (err) {
+    logWarn('appreciation.cache.load_failed', { err: err.message });
+    return [];
+  }
+}
+
+// 今天你還喜歡他什麼？ — the "讓 AI 想幾個新的" escape hatch, with a shared cache.
+// - regenerate=false (or omitted): return the cached pool, never spending a token
+//   (used on load so both partners see the same AI questions for free).
+// - regenerate=true: spend one AI credit, append fresh questions to the cache.
+router.post('/appreciation-questions', [
+  body('avoid').optional().isArray(),
+  body('avoid.*').optional().isString().isLength({ max: 200 }),
+  body('regenerate').optional().isBoolean(),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ success: false, message: '格式錯誤，請重新整理後再試', errors: errors.array() });
+  }
+
+  const userId = req.user.id;
+  const regenerate = !!req.body.regenerate;
+  const clientAvoid = Array.isArray(req.body.avoid)
+    ? req.body.avoid.filter((q) => typeof q === 'string' && q.trim()).map((q) => q.trim())
+    : [];
+
+  try {
+    await ensureAppreciationQuestionCacheTable();
+    const coupleId = await getCoupleIdForUser(userId);
+    const scopeId = coupleId || userId;
+    const cached = await loadAppreciationCache(scopeId);
+
+    // Load path: hand back whatever's cached, free. Empty is fine — the client
+    // ships its own curated bank and only calls AI when the user asks.
+    if (!regenerate) {
+      logInfo('appreciation.questions.cache_read', { userId, scopeId, count: cached.length });
+      return res.json({ success: true, questions: cached, added: [], cached: true });
+    }
+
+    const { tier, limit } = await resolveAiLimit(userId);
+    const usedToday = await countTodayAiUsage(userId);
+    const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+    if (!limitCheck.ok) {
+      logInfo('appreciation.questions.limit', { userId, used: usedToday, limit, tier, blocked: true });
+      return res.status(limitCheck.status).json(limitCheck.body);
+    }
+
+    // Don't repeat anything already cached OR anything the client shows already.
+    const avoidSet = new Set([...cached, ...clientAvoid]);
+    const avoid = [...avoidSet].slice(0, 40);
+    logInfo('appreciation.questions.input', { userId, scopeId, avoidCount: avoid.length });
+
+    const result = await llmService.generateAppreciationQuestions({ avoid });
+    const meta = result._meta;
+    delete result._meta;
+
+    const fresh = (result.questions || [])
+      .map((q) => (typeof q === 'string' ? q.trim() : ''))
+      .filter(Boolean);
+    const known = new Set(cached);
+    const added = fresh.filter((q) => !known.has(q));
+    if (added.length === 0) {
+      logWarn('appreciation.questions.empty', { userId, scopeId, freshCount: fresh.length });
+      return res.status(502).json({
+        success: false,
+        message: 'AI 一時想不出新問題，先用現有的問題，等等再試一次。',
+        error_code: 'APPRECIATION_QUESTIONS_EMPTY',
+      });
+    }
+
+    // Append to the shared pool (newest kept if we hit the cap) and persist.
+    const merged = [...cached, ...added].slice(-APPRECIATION_POOL_CAP);
+    try {
+      await db.query(
+        `INSERT INTO appreciation_question_cache (scope_id, questions, provider, model, gen_count)
+         VALUES ($1, $2::jsonb, $3, $4, 1)
+         ON CONFLICT (scope_id) DO UPDATE SET
+           questions = EXCLUDED.questions,
+           provider = EXCLUDED.provider,
+           model = EXCLUDED.model,
+           gen_count = appreciation_question_cache.gen_count + 1,
+           updated_at = NOW()`,
+        [scopeId, JSON.stringify(merged), meta?.provider || null, meta?.model || null]
+      );
+    } catch (saveErr) {
+      logWarn('appreciation.cache.save_failed', { err: saveErr.message });
+    }
+
+    logInfo('appreciation.questions.cost', {
+      userId,
+      scopeId,
+      provider: meta?.provider,
+      model: meta?.model,
+      costUsd: meta?.costUsd,
+      durationMs: meta?.durationMs,
+      added: added.length,
+      poolSize: merged.length,
+      usedToday: usedToday + 1,
+      limit,
+      tier,
+    });
+
+    await recordAiUsage(userId, 'appreciation_questions', JSON.stringify({ avoidCount: avoid.length }), meta);
+
+    res.json({ success: true, questions: merged, added, cached: false });
+  } catch (error) {
+    logError('Generate appreciation questions failed', { err: error.message, stack: error.stack });
+    res.status(500).json({
+      success: false,
+      message: 'AI 暫時無法產生新問題，先用現有的問題，稍後再試一次。',
+      error_code: 'APPRECIATION_QUESTIONS_FAILED',
     });
   }
 });

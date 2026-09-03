@@ -2,6 +2,10 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, Trash2, Pencil, Crown, Home as HomeIcon, TrendingUp, HeartHandshake } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import HomeView from './components/HomeView';
+import UsView from './components/UsView';
+import RediscoverView from './components/RediscoverView';
+import AppreciationPromptView from './components/AppreciationPromptView';
+import DailyLoveView from './components/DailyLoveView';
 import GrowView from './components/GrowView';
 import TalkSwitcher from './components/TalkSwitcher';
 import ActivityView from './components/ActivityView';
@@ -529,7 +533,7 @@ export interface PositionSuggestion {
 const VIEW_STORAGE_KEY = 'tw:lastView';
 const PERSISTED_VIEWS = new Set([
   'home', 'talk', 'us', 'grow',
-  'record', 'achievements', 'conflict', 'events', 'roleplay', 'wall',
+  'record', 'calendar', 'rediscover', 'see-you', 'secret', 'daily-love', 'achievements', 'conflict', 'events', 'roleplay', 'wall',
   'therapists', 'counselor', 'stories', 'shop', 'journey', 'intimacy-history', 'settings', 'activity',
   'feedback', 'love-language', 'upgrade', 'pricing', 'foreplay', 'games', 'communicate', 'help',
 ]);
@@ -2441,7 +2445,7 @@ const LoveTimeApp = () => {
             onInvitePartner={openPairingPrompt}
             onAddRecord={() => {
               setPendingAddRecord(true);
-              setCurrentView('us');
+              setCurrentView('calendar');
             }}
             onOpenEvents={() => {
               localStorage.setItem('gettingStartedEventOpened', 'true');
@@ -2451,6 +2455,8 @@ const LoveTimeApp = () => {
             onGoToWall={() => setCurrentView('wall')}
             onGoToGrow={() => setCurrentView('grow')}
             onGoToActivity={() => setCurrentView('activity')}
+            onGoToTalk={() => setCurrentView('events')}
+            onGoToDailyLove={() => setCurrentView('daily-love')}
           />
         );
       case 'grow':
@@ -2462,8 +2468,48 @@ const LoveTimeApp = () => {
             onNavigate={setCurrentView}
           />
         );
-      case 'record':
+      // 我們 landing: the relationship's own home — two equal-weight cards
+      // (我們正在愛 / 我們正在成長) plus 愛的存款. The intimacy/cycle calendar
+      // that used to BE this tab now lives one tap down at 'calendar' / 'record'.
       case 'us':
+        return (
+          <UsView onNavigate={setCurrentView} />
+        );
+      case 'rediscover':
+        return (
+          <RediscoverView authState={authState} onBack={() => setCurrentView('us')} />
+        );
+      case 'daily-love':
+        return (
+          <DailyLoveView
+            authState={authState}
+            showNotification={showNotification}
+            onBack={() => setCurrentView('us')}
+            onGoToWall={() => setCurrentView('wall')}
+          />
+        );
+      case 'see-you':
+        return (
+          <AppreciationPromptView
+            theme="see-you"
+            authState={authState}
+            showNotification={showNotification}
+            onBack={() => setCurrentView('us')}
+            onGoToWall={() => setCurrentView('wall')}
+          />
+        );
+      case 'secret':
+        return (
+          <AppreciationPromptView
+            theme="secret"
+            authState={authState}
+            showNotification={showNotification}
+            onBack={() => setCurrentView('us')}
+            onGoToWall={() => setCurrentView('wall')}
+          />
+        );
+      case 'record':
+      case 'calendar':
         return (
           <div className="space-y-4">
           <CalendarView
@@ -2606,6 +2652,8 @@ const LoveTimeApp = () => {
           journeyMilestones={journeyMilestones}
           intimateRecords={intimateRecords}
           setCurrentView={setCurrentView}
+          authState={authState}
+          showNotification={showNotification}
         />
       );
       case 'wall': return (
@@ -2977,7 +3025,7 @@ const LoveTimeApp = () => {
             const isActive =
               currentView === item.id ||
               (item.id === 'talk' && ['communicate', 'conflict', 'events', 'roleplay', 'therapists', 'wall'].includes(currentView)) ||
-              (item.id === 'us' && currentView === 'record') ||
+              (item.id === 'us' && ['record', 'calendar', 'rediscover', 'see-you', 'secret', 'daily-love', 'journey'].includes(currentView)) ||
               // 'achievements' is a legacy deep-link id that now renders GrowView,
               // so it must light up 成長 — not 我們.
               (item.id === 'grow' && ['achievements', 'stories'].includes(currentView));

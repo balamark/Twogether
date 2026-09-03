@@ -127,8 +127,9 @@ const openRecords = async (page: import('@playwright/test').Page) => {
   await page.goto('/');
   await page.waitForLoadState('domcontentloaded');
   await page.getByTestId('nav-tab-us').click();
-  // 我們 opens on the calendar; the record list (and its 快速回應 strip) is the
-  // Timeline view.
+  // 我們 is a hub now; the 記錄時光 calendar (and its 快速回應 Timeline strip) is
+  // one tap down.
+  await page.getByTestId('us-calendar-entry').click();
   await page.getByTestId('us-view-toggle-timeline').click();
   await expect(page.getByTestId(`moment-reaction-love-${localId(THEIRS)}`)).toBeVisible({ timeout: 15000 });
 };
@@ -227,6 +228,7 @@ test.describe('親密記錄 — 快速回應', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
     await page.getByTestId('nav-tab-us').click();
+    await page.getByTestId('us-calendar-entry').click();
     await page.getByTestId('us-view-toggle-timeline').click();
 
     // Solo mode only ever shows the user's own records.

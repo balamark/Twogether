@@ -993,6 +993,39 @@ export interface WallReply {
   created_at: string;
 }
 
+export interface JourneyMilestoneExtras {
+  photo?: string;
+  likedThen?: string;
+  realizeNow?: string;
+}
+
+export interface JourneyStoryMilestone extends JourneyMilestoneExtras {
+  id: string;
+  kind?: string;
+  baseRef?: string;
+  emoji: string;
+  title: string;
+  date: string;
+  place?: string;
+  description: string;
+}
+
+export interface JourneyMilestoneInput {
+  emoji: string;
+  title: string;
+  date: string;
+  place?: string | null;
+  description?: string | null;
+  photo?: string | null;
+  likedThen?: string | null;
+  realizeNow?: string | null;
+}
+
+export interface JourneyData {
+  added: JourneyStoryMilestone[];
+  enrich: Record<string, JourneyMilestoneExtras>;
+}
+
 export interface CreateWallPostInput {
   content: string;
   mood_tag?: string | null;
@@ -2973,6 +3006,69 @@ class ApiService {
       // Preserve error_code/message from the interceptor so the UI can branch.
       throw error;
     }
+  }
+
+  // 今天你還喜歡他什麼？ — the couple's AI-generated question pool, cached
+  // server-side so it's generated once and then served for free.
+  //   • regenerate=false (default): fetch the cached pool — never spends a token.
+  //   • regenerate=true: spend one AI credit to add a fresh batch; `avoid` lists
+  //     questions already shown so the model changes angle.
+  // Returns the full pool plus just the questions added this call. AI_TIMEOUT
+  // because LLM calls routinely run past the 15s default (see CLAUDE.md).
+  async getAppreciationQuestions(
+    avoid: string[] = [],
+    regenerate = false,
+  ): Promise<{ questions: string[]; added: string[] }> {
+    try {
+      const response = await apiClient.post(
+        '/love-moments/appreciation-questions',
+        { avoid: avoid.slice(0, 40), regenerate },
+        // Only the LLM path is slow; the cache-read path returns instantly, so
+        // the longer timeout is harmless there and needed when regenerating.
+        { timeout: AI_TIMEOUT },
+      );
+      return {
+        questions: (response.data.questions || []) as string[],
+        added: (response.data.added || []) as string[],
+      };
+    } catch (error: unknown) {
+      console.error('Failed to get appreciation questions:', error);
+      // Preserve error_code/message from the interceptor so the UI can branch.
+      throw error;
+    }
+  }
+
+  // ── 我們的故事 (journey) — the couple's shared, persisted story timeline ──────
+  async getJourney(): Promise<JourneyData> {
+    const response = await apiClient.get('/journey');
+    return {
+      added: (response.data.added || []) as JourneyStoryMilestone[],
+      enrich: (response.data.enrich || {}) as Record<string, JourneyMilestoneExtras>,
+    };
+  }
+
+  async createJourneyMilestone(input: JourneyMilestoneInput): Promise<JourneyStoryMilestone> {
+    const response = await apiClient.post('/journey', input);
+    return response.data.milestone as JourneyStoryMilestone;
+  }
+
+  async updateJourneyMilestone(id: string, input: JourneyMilestoneInput): Promise<JourneyStoryMilestone> {
+    const response = await apiClient.put(`/journey/${id}`, input);
+    return response.data.milestone as JourneyStoryMilestone;
+  }
+
+  async deleteJourneyMilestone(id: string): Promise<void> {
+    await apiClient.delete(`/journey/${id}`);
+  }
+
+  // Upsert (or clear, when all-empty) the photo + reflections on a preset base
+  // milestone, keyed by its client id.
+  async upsertJourneyEnrich(
+    baseRef: string,
+    extras: { photo?: string | null; likedThen?: string | null; realizeNow?: string | null },
+  ): Promise<JourneyMilestoneExtras> {
+    const response = await apiClient.put(`/journey/enrich/${encodeURIComponent(baseRef)}`, extras);
+    return (response.data.enrich || {}) as JourneyMilestoneExtras;
   }
 
   // Fetch three platform-voiced「溫柔提醒」options for the given gap (days since

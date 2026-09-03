@@ -901,6 +901,46 @@ const DeepDiveSample: React.FC = () => (
 );
 
 const PREVIEWS: Record<string, PreviewConfig> = {
+  us: {
+    icon: Heart,
+    eyebrow: '我們',
+    title: (
+      <>
+        愛與成長，<em className="not-italic font-light italic text-pink-600">一樣重要</em>
+      </>
+    ),
+    description:
+      '我們的關係本身：一邊是「我們正在愛」，留下讓你覺得「還好是你」的時刻；一邊是「我們正在成長」，一起面對需要被理解、被修復的事。愛不是問題的附屬品，成長也不是愛的替代品。',
+    sample: (
+      <div className="space-y-4">
+        <div className="flex items-center justify-end">
+          <SampleTag />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-petal-rose-soft bg-petal-rose-soft/25 p-4 text-left">
+            <div className="text-lg mb-1" aria-hidden>❤️</div>
+            <div className="font-display text-sm text-petal-ink mb-1">我們正在愛</div>
+            <div className="font-body text-[11px] text-petal-muted leading-relaxed">
+              今天你還喜歡他什麼 · 我看見你 · 他不知道的事 · 重新認識你
+            </div>
+          </div>
+          <div className="rounded-2xl border border-petal-sage/40 bg-petal-sage/10 p-4 text-left">
+            <div className="text-lg mb-1" aria-hidden>🌱</div>
+            <div className="font-display text-sm text-petal-ink mb-1">我們正在成長</div>
+            <div className="font-body text-[11px] text-petal-muted leading-relaxed">
+              說開一件事 · 情緒檢查 · 專業諮商師
+            </div>
+          </div>
+        </div>
+        <SampleCard>
+          <div className="font-body text-[11px] text-petal-muted mb-1">💌 我們曾經這樣愛過</div>
+          <p className="font-display italic font-light text-sm text-petal-ink leading-relaxed">
+            「還記得第一次注意到他的時候，是他笑起來眼睛會彎的樣子。」
+          </p>
+        </SampleCard>
+      </div>
+    ),
+  },
   record: {
     icon: Calendar,
     eyebrow: '記錄時光',
@@ -1505,7 +1545,7 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scr
   // 4-tab IA's ids — they reuse the same underlying preview content.
   const config =
     view === 'communicate' || view === 'talk' ? PREVIEWS.events :
-    view === 'us' ? PREVIEWS.record :
+    view === 'rediscover' || view === 'see-you' || view === 'secret' || view === 'journey' || view === 'daily-love' ? PREVIEWS.us :
     PREVIEWS[view];
 
   // Unknown view → friendly generic welcome (keeps old behaviour as a fallback).
