@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Heart, Sprout, Sparkles, BookOpen, PlusCircle, ChevronRight, Eye, MessageCircleHeart, Wrench, Users } from 'lucide-react';
+import { Heart, Sprout, Sparkles, BookOpen, PlusCircle, ChevronRight, Eye, Gift, MessageCircleHeart, Wrench, Users } from 'lucide-react';
 import InfoHint from './InfoHint';
 import { apiService, type RelationshipSummary } from '../services/api';
 import { trackAction } from '../utils/track';
@@ -123,6 +123,20 @@ const UsView: React.FC<UsViewProps> = ({ onNavigate, onAddGoodMoment }) => {
               testId="us-scenario-add-moment"
             />
             <Scenario
+              cue="有件小事想讓他知道你看見了？"
+              icon={Eye}
+              action="我看見你"
+              onClick={() => { trackAction('us.love.see_you'); onNavigate('see-you'); }}
+              testId="us-scenario-see-you"
+            />
+            <Scenario
+              cue="有一直很欣賞、卻沒說出口的事？"
+              icon={Gift}
+              action="他不知道的事"
+              onClick={() => { trackAction('us.love.secret'); onNavigate('secret'); }}
+              testId="us-scenario-secret"
+            />
+            <Scenario
               cue="想重新認識他？"
               icon={Sparkles}
               action="重新認識你"
@@ -135,13 +149,6 @@ const UsView: React.FC<UsViewProps> = ({ onNavigate, onAddGoodMoment }) => {
               action="我們的故事"
               onClick={() => { trackAction('us.love.journey'); onNavigate('journey'); }}
               testId="us-scenario-journey"
-            />
-            <Scenario
-              cue="有件小事想讓他知道你看見了？"
-              icon={Eye}
-              action="我看見你"
-              onClick={() => { trackAction('us.love.wall_see'); onAddGoodMoment(); }}
-              testId="us-scenario-see-you"
             />
           </div>
           <button

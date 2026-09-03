@@ -921,7 +921,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
             <div className="text-lg mb-1" aria-hidden>❤️</div>
             <div className="font-display text-sm text-petal-ink mb-1">我們正在愛</div>
             <div className="font-body text-[11px] text-petal-muted leading-relaxed">
-              留下一個美好 · 重新認識你 · 我們的故事
+              留下一個美好 · 我看見你 · 他不知道的事 · 重新認識你
             </div>
           </div>
           <div className="rounded-2xl border border-petal-sage/40 bg-petal-sage/10 p-4 text-left">
@@ -1545,7 +1545,7 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scr
   // 4-tab IA's ids — they reuse the same underlying preview content.
   const config =
     view === 'communicate' || view === 'talk' ? PREVIEWS.events :
-    view === 'rediscover' ? PREVIEWS.us :
+    view === 'rediscover' || view === 'see-you' || view === 'secret' ? PREVIEWS.us :
     PREVIEWS[view];
 
   // Unknown view → friendly generic welcome (keeps old behaviour as a fallback).

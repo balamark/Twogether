@@ -4,6 +4,7 @@ import SettingsView from './components/SettingsView';
 import HomeView from './components/HomeView';
 import UsView from './components/UsView';
 import RediscoverView from './components/RediscoverView';
+import AppreciationPromptView from './components/AppreciationPromptView';
 import GrowView from './components/GrowView';
 import TalkSwitcher from './components/TalkSwitcher';
 import ActivityView from './components/ActivityView';
@@ -531,7 +532,7 @@ export interface PositionSuggestion {
 const VIEW_STORAGE_KEY = 'tw:lastView';
 const PERSISTED_VIEWS = new Set([
   'home', 'talk', 'us', 'grow',
-  'record', 'calendar', 'rediscover', 'achievements', 'conflict', 'events', 'roleplay', 'wall',
+  'record', 'calendar', 'rediscover', 'see-you', 'secret', 'achievements', 'conflict', 'events', 'roleplay', 'wall',
   'therapists', 'counselor', 'stories', 'shop', 'journey', 'intimacy-history', 'settings', 'activity',
   'feedback', 'love-language', 'upgrade', 'pricing', 'foreplay', 'games', 'communicate', 'help',
 ]);
@@ -2479,6 +2480,26 @@ const LoveTimeApp = () => {
         return (
           <RediscoverView authState={authState} onBack={() => setCurrentView('us')} />
         );
+      case 'see-you':
+        return (
+          <AppreciationPromptView
+            theme="see-you"
+            authState={authState}
+            showNotification={showNotification}
+            onBack={() => setCurrentView('us')}
+            onGoToWall={() => setCurrentView('wall')}
+          />
+        );
+      case 'secret':
+        return (
+          <AppreciationPromptView
+            theme="secret"
+            authState={authState}
+            showNotification={showNotification}
+            onBack={() => setCurrentView('us')}
+            onGoToWall={() => setCurrentView('wall')}
+          />
+        );
       case 'record':
       case 'calendar':
         return (
@@ -2994,7 +3015,7 @@ const LoveTimeApp = () => {
             const isActive =
               currentView === item.id ||
               (item.id === 'talk' && ['communicate', 'conflict', 'events', 'roleplay', 'therapists', 'wall'].includes(currentView)) ||
-              (item.id === 'us' && ['record', 'calendar', 'rediscover', 'journey'].includes(currentView)) ||
+              (item.id === 'us' && ['record', 'calendar', 'rediscover', 'see-you', 'secret', 'journey'].includes(currentView)) ||
               // 'achievements' is a legacy deep-link id that now renders GrowView,
               // so it must light up 成長 — not 我們.
               (item.id === 'grow' && ['achievements', 'stories'].includes(currentView));
