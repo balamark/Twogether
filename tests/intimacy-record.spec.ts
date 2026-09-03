@@ -197,8 +197,13 @@ test.describe('Intimacy Record Flow', () => {
 
     // Navigate to add record
     await page.getByTestId('nav-tab-us').click().catch(() => {});
-    // 我們 is a hub now; the 記錄時光 calendar (with add-record-button) is one tap down.
-    await page.getByTestId('us-calendar-entry').click().catch(() => {});
+    // 我們 is a hub now; the 記錄時光 calendar (with add-record-button) is one tap
+    // down. Guard the hop with a short visibility check so a logged-out run (no
+    // hub, no entry) skips fast instead of hanging on click's 60s auto-wait.
+    const calEntry = page.getByTestId('us-calendar-entry');
+    if (await calEntry.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await calEntry.click().catch(() => {});
+    }
     const addButton = page.getByTestId('add-record-button');
 
     if (await addButton.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -231,8 +236,13 @@ test.describe('Intimacy Record Flow', () => {
     await page.goto('/');
 
     await page.getByTestId('nav-tab-us').click().catch(() => {});
-    // 我們 is a hub now; the 記錄時光 calendar (with add-record-button) is one tap down.
-    await page.getByTestId('us-calendar-entry').click().catch(() => {});
+    // 我們 is a hub now; the 記錄時光 calendar (with add-record-button) is one tap
+    // down. Guard the hop with a short visibility check so a logged-out run (no
+    // hub, no entry) skips fast instead of hanging on click's 60s auto-wait.
+    const calEntry = page.getByTestId('us-calendar-entry');
+    if (await calEntry.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await calEntry.click().catch(() => {});
+    }
     const addButton = page.getByTestId('add-record-button');
 
     if (await addButton.isVisible({ timeout: 3000 }).catch(() => false)) {
@@ -260,8 +270,13 @@ test.describe('Intimacy Record Flow', () => {
     await page.goto('/');
 
     await page.getByTestId('nav-tab-us').click().catch(() => {});
-    // 我們 is a hub now; the 記錄時光 calendar (with add-record-button) is one tap down.
-    await page.getByTestId('us-calendar-entry').click().catch(() => {});
+    // 我們 is a hub now; the 記錄時光 calendar (with add-record-button) is one tap
+    // down. Guard the hop with a short visibility check so a logged-out run (no
+    // hub, no entry) skips fast instead of hanging on click's 60s auto-wait.
+    const calEntry = page.getByTestId('us-calendar-entry');
+    if (await calEntry.isVisible({ timeout: 3000 }).catch(() => false)) {
+      await calEntry.click().catch(() => {});
+    }
     const addButton = page.getByTestId('add-record-button');
 
     if (await addButton.isVisible({ timeout: 3000 }).catch(() => false)) {
