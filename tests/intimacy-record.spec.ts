@@ -92,8 +92,12 @@ test.describe('Intimacy Record Flow', () => {
       throw new Error('Neither login button nor user menu found - app may not have loaded correctly');
     }
 
-    // 記錄時光 now lives under 我們, not the default 今天 landing view.
+    // 我們 is now a two-card hub (愛 / 成長); the 記錄時光 calendar lives one tap
+    // down, reached from the hub's 記錄時光 entry.
     await page.getByTestId('nav-tab-us').click();
+    const calendarEntry = page.getByTestId('us-calendar-entry');
+    await expect(calendarEntry).toBeVisible({ timeout: 5000 });
+    await calendarEntry.click();
 
     // Click the record button
     const addRecordButton = page.getByTestId('add-record-button');

@@ -38,6 +38,7 @@ test.describe('Calendar month view — adjacent-month days', () => {
   test('grid fills leading/trailing cells with real days (no blank padding)', async ({ page }) => {
     await loginIfNeeded(page);
     await page.getByTestId('nav-tab-us').click();
+    await page.getByTestId('us-calendar-entry').click();
 
     const grid = page.getByTestId('calendar-grid');
     await expect(grid).toBeVisible({ timeout: 10000 });

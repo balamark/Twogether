@@ -23,9 +23,9 @@ const OurJourneyView = ({ journeyMilestones, intimateRecords, setCurrentView }: 
       // Find and highlight the specific record
       const record = intimateRecords.find(r => r.id === milestone.recordId);
       if (record) {
-        // 'calendar' was never a real view id — it fell through to the default
-        // branch and dumped the user on 情趣遊戲. The records live in 我們.
-        setCurrentView('us');
+        // The records live on the intimacy/cycle calendar (its own view now that
+        // 我們 is the two-card hub). 'record' and 'calendar' both render it.
+        setCurrentView('calendar');
       }
     }
   };

@@ -815,7 +815,7 @@ const WallView: React.FC<WallViewProps> = ({
               <span className="align-middle ml-2"><InfoHint viewId="wall" /></span>
             </h2>
             <p className="font-display italic font-light text-base text-petal-muted">
-              留下重要的話、心情、需要被理解的事 — 慢慢說。
+              留下讓你覺得「還好是你」的瞬間，也留下想被好好聽見的話。
             </p>
           </div>
           <button

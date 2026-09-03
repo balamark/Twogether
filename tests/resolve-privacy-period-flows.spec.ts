@@ -415,6 +415,7 @@ test.describe('Deleting a logged period', () => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');
     await page.getByTestId('nav-tab-us').click();
+    await page.getByTestId('us-calendar-entry').click();
 
     // Today is inside the seeded period, so today's heatmap cell opens the
     // period-management modal.

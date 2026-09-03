@@ -105,10 +105,12 @@ test.describe('AI 溫柔提醒 nudge flow', () => {
     page.on('dialog', (dialog) => dialog.accept());
 
     await loginUI(page, USER_A);
-    // The stats card (and its nudge button) lives on 我們, not the default 今天.
+    // The stats card (and its nudge button) lives on the 記錄時光 calendar, now
+    // one tap under the 我們 hub.
     await page.getByTestId('nav-tab-us').click();
+    await page.getByTestId('us-calendar-entry').click();
 
-    // The stats card lives on the 我們 view; scroll it into view.
+    // The stats card lives on the calendar view; scroll it into view.
     const openBtn = page.getByTestId('intimacy-nudge-open');
     await openBtn.scrollIntoViewIfNeeded().catch(() => {});
     await expect(openBtn).toBeVisible({ timeout: 15000 });
