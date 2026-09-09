@@ -141,11 +141,28 @@ export default {
         'glow':       'glow 2s ease-in-out infinite alternate',
         'scale-hover':'scale-hover 0.3s ease-in-out',
         'toast-in':   'toast-in 0.25s ease-out',
+        // The「+1 正向互動」celebration that floats up when a positive
+        // interaction is logged on the wall. Pops in, drifts up, fades out.
+        'plus-one':   'plus-one 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards',
+        'plus-one-burst': 'plus-one-burst 1.5s ease-out forwards',
       },
       keyframes: {
         'toast-in': {
           '0%':   { opacity: '0', transform: 'translateY(-12px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'plus-one': {
+          '0%':   { opacity: '0', transform: 'translateY(14px) scale(0.6)' },
+          '12%':  { opacity: '1', transform: 'translateY(0) scale(1.12)' },
+          '28%':  { opacity: '1', transform: 'translateY(-6px) scale(1)' },
+          '70%':  { opacity: '1', transform: 'translateY(-46px) scale(1)' },
+          '100%': { opacity: '0', transform: 'translateY(-84px) scale(0.95)' },
+        },
+        'plus-one-burst': {
+          '0%':   { opacity: '0', transform: 'scale(0.4)' },
+          '20%':  { opacity: '0.9', transform: 'scale(1)' },
+          '60%':  { opacity: '0', transform: 'scale(1.9)' },
+          '100%': { opacity: '0', transform: 'scale(1.9)' },
         },
         heartbeat: {
           '0%, 100%': { transform: 'scale(1)' },

@@ -933,6 +933,16 @@ const PREVIEWS: Record<string, PreviewConfig> = {
           </div>
         </div>
         <SampleCard>
+          <div className="text-center">
+            <div className="text-lg" aria-hidden>❤️</div>
+            <div className="font-body text-[10px] uppercase tracking-[0.16em] text-petal-muted">我們正在愛</div>
+            <div className="font-display text-3xl font-light text-petal-rose-deep leading-none my-0.5">10</div>
+            <p className="font-body text-[11px] text-petal-ink-soft leading-relaxed">
+              每次留言、記錄美好、化解衝突都 <span className="font-medium text-petal-rose-deep">+1</span>，美好存款越存越厚。
+            </p>
+          </div>
+        </SampleCard>
+        <SampleCard>
           <div className="font-body text-[11px] text-petal-muted mb-1">💌 我們曾經這樣愛過</div>
           <p className="font-display italic font-light text-sm text-petal-ink leading-relaxed">
             「還記得第一次注意到他的時候，是他笑起來眼睛會彎的樣子。」
