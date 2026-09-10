@@ -98,7 +98,7 @@ const JUDGE_SYSTEM_PROMPT = `你是一位嚴謹的品質檢查員（第二層審
 
 請依序檢查（優先級由高到低）：
 1. 視角與歸屬（最重要）：輸出裡每一個「我／你」是否都對應到正確的發話者？有沒有把某一方的感受、經歷或立場，錯寫成另一方的？第一人稱「我」的翻譯是否確實站在「原本說這句話的人」的角度？這是最常見也最嚴重的錯誤，尤其當使用者一次貼了很多「你／我」的句子時。
-2. 忠實度：內容有沒有編造對話裡不存在的事實、指控或情節？有沒有偏離這個人真正的立場？
+2. 忠實度：內容有沒有編造對話裡不存在的事實、指控或情節？有沒有偏離這個人真正的立場？特別注意單方對話：如果目前只有一方在對話裡發聲、另一半還沒回應，輸出有沒有去描述、猜測或代言那位「還沒說話」的人的感受、想法、需求或立場？把還沒發聲一方的心聲當成事實寫出來（把發文者對另一半的轉述當成另一半本人的聲音），屬於編造，應判 hard。
 3. 通順與自然：繁體中文是否通順、自然、沒有語意破碎或明顯翻譯腔？
 
 嚴重度判斷：
@@ -888,11 +888,12 @@ const WALL_COUNSELOR_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴
 
 你的角色（最重要）：
 - 你就是他們此刻的諮商師。不要叫他們「去找諮商師 / 心理師 / 專業人士 / 輔導」，也不要把「去諮商」「找人談」當成建議或結尾。把話丟回給別的專業，等於在他們最需要的當下離場。
-- 你要「當下就做」諮商師該做的事：先同理雙方，接著把每一句指責、抱怨、絕對化的話「翻譯成底層的情緒與需求」（例如「這句話背後，可能是：我很怕失去你」「這聽起來像是在說：我需要被重視」），讓對方聽到的不是攻擊，而是需要，再提出一個更靠近彼此的說法。
+- 你要「當下就做」諮商師該做的事：先同理「有在對話裡發聲的人」，接著把每一句指責、抱怨、絕對化的話「翻譯成底層的情緒與需求」（例如「這句話背後，可能是：我很怕失去你」「這聽起來像是在說：我需要被重視」），讓對方聽到的不是攻擊，而是需要，再提出一個更靠近彼此的說法。
 - 安全例外（唯一例外）：只有當對話出現家暴、肢體暴力、自我傷害 / 自殺、或明確的傷害威脅等安全風險時，才可以、也應該溫和地引導他們尋求專業或緊急協助。除此之外，都由你來承接與陪伴。
 
 留言守則：
-- 絕對中立，不選邊站。先同理「兩個人」的感受（可用他們的暱稱稱呼）。
+- 絕對中立，不選邊站。先同理「有在對話裡發聲的人」的感受，可用他們的暱稱稱呼：兩人都表達了就兩人都同理；若目前只有一方發聲、另一半還沒回應，就只同理、只翻譯這位有說話的人。
+- 只根據對話裡「本人親口說出」的內容來同理與翻譯。若某一方還沒有在這串對話裡發聲（例如只有一方發文、另一半尚未回應），絕對不要描述、猜測、翻譯或代言那一方的情緒、想法、需求或立場；發文者對另一半的轉述，只是發文者的視角，不是那一方本人的聲音，不可當成事實去同理、翻譯或回應。真的想帶到另一半時，最多只能保持好奇、不預設（例如「還不知道另一半心裡怎麼想」），絕不寫成已成立的心聲。
 - 如果某句話帶有指責、絕對化用語（總是／從來／每次）、輕蔑或人身攻擊，請溫和地指出那是一種「說法」帶來的影響（例如「這句話可能讓對方覺得被責怪」），不要說某個人「錯了」或「不對」，並把它翻譯成底層的情緒與需求。
 - 接著提供「一個」更靠近彼此的替代說法，用「也許可以這樣說：…」帶出，把指責改寫成「我訊息」或共同面對的語氣。
 - 語氣溫暖、具體、不說教；像一個在旁邊輕聲提醒、願意陪他們走下去的第三者。
@@ -933,15 +934,37 @@ const WALL_COUNSELOR_TOOL_SCHEMA = {
   },
 };
 
-async function generateWallCounselorComment({ postContent, postAuthorName, moodTag, replies, companion }) {
-  if (typeof postContent !== 'string' || postContent.trim().length === 0) {
-    throw new Error('postContent is required');
+// Distinct human voices in a counselor thread: the post author plus every
+// non-AI replier, counted by display name. Callers that hold stable user IDs
+// should decide one-sidedness there and pass `oneSided` into the builder below;
+// this name-based count is the self-contained fallback used when they don't.
+function countHumanVoices({ postAuthorName, replies }) {
+  const names = new Set();
+  const author = (postAuthorName || '').toString().trim();
+  if (author) names.add(author);
+  if (Array.isArray(replies)) {
+    for (const r of replies) {
+      if (!r || r.isAi) continue;
+      const n = (r.authorName || '').toString().trim();
+      if (n) names.add(n);
+    }
   }
+  return names.size;
+}
 
+// Assemble the counselor's user turn (shared by the wall thread and the event
+// thread). Exported for prompt-contract regression tests. When the thread is
+// one-sided — only one partner has actually spoken and the other hasn't
+// responded yet — it appends an explicit, deterministic instruction so the model
+// empathizes ONLY with the person who spoke and never fabricates the silent
+// partner's feelings, words, or stance. This is the one-sided-analysis bug: the
+// counselor validated the feelings of a partner who had said nothing, reading
+// the poster's one-sided account as if it were two voices.
+function buildWallCounselorUserContent({ postContent, postAuthorName, moodTag, replies, oneSided }) {
   const lines = [];
   const author = (postAuthorName || '對方').toString().trim() || '對方';
   lines.push(`原始貼文（由 ${author} 發佈${moodTag ? `，心情：${moodTag}` : ''}）：`);
-  lines.push(postContent.trim());
+  lines.push((postContent || '').toString().trim());
   lines.push('');
   if (Array.isArray(replies) && replies.length > 0) {
     lines.push('對話串（最舊在前，每行已標註發話者）：');
@@ -952,7 +975,28 @@ async function generateWallCounselorComment({ postContent, postAuthorName, moodT
   } else {
     lines.push('（目前還沒有任何回覆。）');
   }
-  const userContent = lines.join('\n');
+
+  const isOneSided =
+    typeof oneSided === 'boolean' ? oneSided : countHumanVoices({ postAuthorName, replies }) <= 1;
+  if (isOneSided) {
+    lines.push('');
+    lines.push(
+      `【重要】目前只有 ${author} 一個人在這串對話裡發聲，另一半還沒有回應。` +
+        `貼文裡提到另一半的部分，只是 ${author} 單方面的描述與感受，不是另一半親口說的。` +
+        `請「只」同理與翻譯 ${author} 說出口的內容；` +
+        `絕對不要描述、猜測、翻譯或代言另一半的情緒、想法、需求或立場，也不要把 ${author} 的轉述當成另一半的心聲。`
+    );
+  }
+
+  return lines.join('\n');
+}
+
+async function generateWallCounselorComment({ postContent, postAuthorName, moodTag, replies, companion, oneSided }) {
+  if (typeof postContent !== 'string' || postContent.trim().length === 0) {
+    throw new Error('postContent is required');
+  }
+
+  const userContent = buildWallCounselorUserContent({ postContent, postAuthorName, moodTag, replies, oneSided });
 
   // Persona extension (selected AI companion, e.g. Luma / Kai). Appended as a
   // separate system block AFTER the cache-controlled base prompt so the shared
@@ -3707,6 +3751,7 @@ module.exports = {
   generateDeepDiveLetter,
   // Exported for prompt-contract regression tests only.
   buildRoleplayUserContent,
+  buildWallCounselorUserContent,
   // Exported so the max_tokens truncation paths can be tested without a live
   // API call (getClient caches a module-level client and is not injectable).
   chunkTargets,

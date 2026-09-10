@@ -1959,7 +1959,7 @@ router.post('/:id/ai-comment/preview', [param('id').isUUID()], async (req, res) 
     const userId = req.user.id;
 
     const msgs = await db.query(
-      `SELECT m.content, m.is_ai, u.nickname AS author_nickname
+      `SELECT m.content, m.is_ai, m.sender_id, u.nickname AS author_nickname
          FROM event_messages m
          JOIN users u ON u.id = m.sender_id
         WHERE m.event_id = $1
@@ -1972,11 +1972,23 @@ router.post('/:id/ai-comment/preview', [param('id').isUUID()], async (req, res) 
       isAi: r.is_ai === true,
     }));
 
+    // One-sided when only the event author has voiced themselves and the partner
+    // has posted no message of their own yet. The counselor must then analyze
+    // ONLY the author and never fabricate the silent partner's feelings — the
+    // event summary is the author's one-sided account, not the partner's voice.
+    const humanVoiceIds = new Set();
+    if (access.event.created_by) humanVoiceIds.add(access.event.created_by);
+    for (const r of msgs.rows) {
+      if (r.is_ai !== true && r.sender_id) humanVoiceIds.add(r.sender_id);
+    }
+    const oneSided = humanVoiceIds.size <= 1;
+
     const companion = await getUserCompanion(userId);
 
     // Cache first: same thread + same persona → reuse the stored comment for
-    // free (no LLM tokens, no daily-budget hit).
-    const inputHash = aiCacheHash(['counselor_v1', access.event.summary, replies, companion.id]);
+    // free (no LLM tokens, no daily-budget hit). `oneSided` is folded in so a
+    // comment cached while one-sided is not reused after the partner replies.
+    const inputHash = aiCacheHash(['counselor_v2', access.event.summary, replies, companion.id, oneSided]);
     const cached = await getAiCache(req.params.id, userId, 'event_counselor', inputHash);
     if (cached) {
       logInfo('events.ai_comment.cache_hit', { userId, eventId: req.params.id, companion: companion.id });
@@ -1991,7 +2003,7 @@ router.post('/:id/ai-comment/preview', [param('id').isUUID()], async (req, res) 
       return res.status(limitCheck.status).json(limitCheck.body);
     }
 
-    logInfo('events.ai_comment.preview', { userId, eventId: req.params.id, replyCount: replies.length, companion: companion.id });
+    logInfo('events.ai_comment.preview', { userId, eventId: req.params.id, replyCount: replies.length, oneSided, companion: companion.id });
 
     const result = await llmService.generateWallCounselorComment({
       postContent: access.event.summary,
@@ -1999,6 +2011,7 @@ router.post('/:id/ai-comment/preview', [param('id').isUUID()], async (req, res) 
       moodTag: (access.event.emotions || []).join('、') || null,
       replies,
       companion,
+      oneSided,
     });
     const meta = result._meta;
     delete result._meta;

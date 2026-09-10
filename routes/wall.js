@@ -1059,7 +1059,7 @@ router.post('/:id/ai-comment/preview', async (req, res) => {
     }
 
     const repliesResult = await db.query(
-      `SELECT r.content, r.is_ai, u.nickname AS author_nickname
+      `SELECT r.content, r.is_ai, r.author_id, u.nickname AS author_nickname
          FROM wall_post_replies r
          JOIN users u ON u.id = r.author_id
         WHERE r.post_id = $1
@@ -1072,8 +1072,18 @@ router.post('/:id/ai-comment/preview', async (req, res) => {
       isAi: r.is_ai === true,
     }));
 
+    // One-sided when only the post author has voiced themselves and the partner
+    // has left no reply of their own yet. The counselor must then analyze ONLY
+    // the author and never fabricate the silent partner's feelings.
+    const humanVoiceIds = new Set();
+    if (post.author_id) humanVoiceIds.add(post.author_id);
+    for (const r of repliesResult.rows) {
+      if (r.is_ai !== true && r.author_id) humanVoiceIds.add(r.author_id);
+    }
+    const oneSided = humanVoiceIds.size <= 1;
+
     const companion = await getUserCompanion(userId);
-    logInfo('wall.ai_comment.preview', { userId, postId, replyCount: replies.length, companion: companion.id });
+    logInfo('wall.ai_comment.preview', { userId, postId, replyCount: replies.length, oneSided, companion: companion.id });
 
     const result = await llmService.generateWallCounselorComment({
       postContent: post.content,
@@ -1081,6 +1091,7 @@ router.post('/:id/ai-comment/preview', async (req, res) => {
       moodTag: post.mood_tag,
       replies,
       companion,
+      oneSided,
     });
     const meta = result._meta;
     delete result._meta;
