@@ -94,10 +94,13 @@ const PlusOneCelebration: React.FC<{ onDone: () => void }> = ({ onDone }) => {
     typeof window.matchMedia === 'function' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Static path can't rely on onAnimationEnd, so time it out instead.
+  // The static path has no onAnimationEnd to clear itself; the animated path
+  // usually clears via onAnimationEnd but that event can silently never fire
+  // (backgrounded tab, animations stripped without the media query flag). A
+  // timeout guarantees onDone runs either way — a hair past the 1.5s animation
+  // so it doesn't cut a playing one short, sooner for the static badge.
   useEffect(() => {
-    if (!reduceMotion) return;
-    const t = setTimeout(onDone, 1200);
+    const t = setTimeout(onDone, reduceMotion ? 1200 : 1700);
     return () => clearTimeout(t);
   }, [reduceMotion, onDone]);
 
@@ -862,10 +865,15 @@ const WallView: React.FC<WallViewProps> = ({
   const hasNoRealPosts = !loading && posts.length === 0;
 
   return (
-    <div className="space-y-8">
+    <>
+      {/* Outside the space-y-8 flow on purpose: as a fixed, zero-height child it
+          would still count as a sibling for Tailwind's space-y rule and push the
+          header down ~2rem for the 1.5s it's mounted — a visible jump on every
+          post. As a fragment sibling it overlays cleanly with no layout shift. */}
       {plusOneKey !== null && (
         <PlusOneCelebration key={plusOneKey} onDone={() => setPlusOneKey(null)} />
       )}
+    <div className="space-y-8">
       <div className="border-b border-petal-rule pb-7">
         <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
           — 共享筆記
@@ -1073,6 +1081,7 @@ const WallView: React.FC<WallViewProps> = ({
         </div>
       )}
     </div>
+    </>
   );
 };
 
