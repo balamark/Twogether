@@ -210,7 +210,7 @@ async function generateRoleplayMessages({ title, scenario, senderGender /* , scr
 // `companion` (persona) is accepted for signature parity with the Claude
 // provider; the mock stays deterministic and persona-agnostic on purpose so
 // e2e content assertions don't depend on the picked companion.
-async function generateWallCounselorComment({ postContent, postAuthorName, replies /* , moodTag, companion */ }) {
+async function generateWallCounselorComment({ postContent, postAuthorName, replies, oneSided /* , moodTag, companion */ }) {
   if (typeof postContent !== 'string' || postContent.trim().length === 0) {
     throw new Error('postContent is required');
   }
@@ -218,7 +218,12 @@ async function generateWallCounselorComment({ postContent, postAuthorName, repli
 
   const author = (postAuthorName || '對方').toString().trim() || '對方';
   const list = Array.isArray(replies) ? replies.filter((r) => !r.isAi) : [];
-  const last = list.length > 0 ? list[list.length - 1] : null;
+  // A one-sided thread (only one partner has spoken) must be analyzed from that
+  // one voice alone — never fabricate the silent partner's feelings. When the
+  // caller flags it explicitly, honor that even if the lone speaker left several
+  // messages; otherwise fall back to "no non-AI reply yet".
+  const twoSided = typeof oneSided === 'boolean' ? !oneSided : list.length > 0;
+  const last = twoSided && list.length > 0 ? list[list.length - 1] : null;
   const lastName = last ? ((last.authorName || '另一位').toString().trim() || '另一位') : null;
   const focus = last ? (last.content || '') : postContent;
   const toxicityFlags = detectToxicity(focus);
