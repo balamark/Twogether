@@ -3,17 +3,20 @@ import { Heart, Sprout, Sparkles, BookOpen, PlusCircle, ChevronRight, Eye, Gift,
 import InfoHint from './InfoHint';
 import { apiService, type RelationshipSummary } from '../services/api';
 import { trackAction } from '../utils/track';
+import { POSITIVE_INTERACTION_ACTIONS } from '../content/positiveInteractions';
 
 interface UsViewProps {
   onNavigate: (view: string) => void;
 }
 
-// 愛的存款 — a felt sense of what you've built together, deliberately NOT a
-// score. RelationshipSummary only exposes real counts (positive interactions,
-// days since appreciation), so this shows accumulation ("這陣子留下了 N 個美好
-// 瞬間"), never "Love Score 78/100" — gamifying intimacy reads as bizarre. Hidden
-// entirely for solo users, who have nothing shared to total up yet.
-const LoveSavings: React.FC = () => {
+// 愛的存款 — a felt sense of what you've built together. It IS a number you
+// grow (每次留言／記錄美好／化解衝突都 +1，越多越好), but framed as a 存款 that
+// accumulates, never a graded "Love Score 78/100" — a number that only goes up
+// encourages; one that judges you 78/100 reads as bizarre for intimacy. The card
+// is tappable: it explains what the count means and opens 最近動態 so you can see
+// exactly which interactions earned each +1. Hidden for solo users, who have
+// nothing shared to total up yet.
+const LoveSavings: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
   const [summary, setSummary] = useState<RelationshipSummary | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -27,8 +30,10 @@ const LoveSavings: React.FC = () => {
   const pos = summary.positive14 ?? 0;
 
   return (
-    <div
-      className="rounded-3xl border border-petal-rose-soft bg-gradient-to-b from-white to-petal-cream px-6 py-7 text-center shadow-petal"
+    <button
+      type="button"
+      onClick={() => { trackAction('us.love_savings.open'); onNavigate('activity'); }}
+      className="group block w-full rounded-3xl border border-petal-rose-soft bg-gradient-to-b from-white to-petal-cream px-6 py-7 text-center shadow-petal transition-colors hover:border-petal-rose-deep"
       data-testid="us-love-savings"
     >
       <div className="text-2xl mb-1" aria-hidden>❤️</div>
@@ -39,12 +44,21 @@ const LoveSavings: React.FC = () => {
       <p className="font-display italic font-light text-sm text-petal-muted">
         這陣子一起留下的美好瞬間
       </p>
+      {/* What the number means + that growing it is the whole point. */}
+      <p className="mt-3 font-body text-[12px] text-petal-ink-soft leading-relaxed">
+        每一次{POSITIVE_INTERACTION_ACTIONS.map((a) => a.short).join('、')}
+        ，都 <span className="font-medium text-petal-rose-deep">+1</span>。越多，你們的美好存款越厚。
+      </p>
+      <span className="mt-2 inline-flex items-center gap-1 font-body text-[12px] font-medium text-petal-rose-deep">
+        看看是哪些互動加了分
+        <ChevronRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" strokeWidth={1.5} />
+      </span>
       {typeof summary.daysSinceAppreciation === 'number' && summary.daysSinceAppreciation >= 3 && (
         <p className="mt-3 font-body text-[12px] text-petal-ink-soft">
           已經 {summary.daysSinceAppreciation} 天沒說欣賞的話了，今天要不要存一點？
         </p>
       )}
-    </div>
+    </button>
   );
 };
 
@@ -97,7 +111,7 @@ const UsView: React.FC<UsViewProps> = ({ onNavigate }) => {
         </p>
       </header>
 
-      <LoveSavings />
+      <LoveSavings onNavigate={onNavigate} />
 
       <div className="grid gap-4 md:grid-cols-2">
         {/* ❤️ 我們正在愛 */}

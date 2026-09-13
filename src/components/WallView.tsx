@@ -81,6 +81,58 @@ const formatTime = (iso: string, tz: string) =>
 const formatShortTime = (iso: string, tz: string) =>
   formatRelativeOrDate(iso, tz, { month: 'short', day: 'numeric' });
 
+// The「+1 正向互動」celebration — a heart-and-sparkle badge that floats up from
+// centre-screen the moment a new post lands, so the writer feels that this note
+// just added to「我們正在愛」. Purely decorative (pointer-events-none) and
+// self-dismissing; parent remounts it via a changing `key` to replay it.
+//
+// Honours prefers-reduced-motion: those users get a brief static badge (no drift
+// or burst) that fades after a beat, instead of the animation.
+const PlusOneCelebration: React.FC<{ onDone: () => void }> = ({ onDone }) => {
+  const reduceMotion =
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // The static path has no onAnimationEnd to clear itself; the animated path
+  // usually clears via onAnimationEnd but that event can silently never fire
+  // (backgrounded tab, animations stripped without the media query flag). A
+  // timeout guarantees onDone runs either way — a hair past the 1.5s animation
+  // so it doesn't cut a playing one short, sooner for the static badge.
+  useEffect(() => {
+    const t = setTimeout(onDone, reduceMotion ? 1200 : 1700);
+    return () => clearTimeout(t);
+  }, [reduceMotion, onDone]);
+
+  return (
+    <div
+      className="pointer-events-none fixed inset-x-0 top-1/2 z-[60] flex justify-center"
+      role="status"
+      aria-live="polite"
+      data-testid="wall-plus-one"
+    >
+      <div className="relative">
+        {!reduceMotion && (
+          <span
+            aria-hidden
+            className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-24 w-24 rounded-full bg-petal-rose-soft/60 animate-plus-one-burst"
+          />
+        )}
+        <div
+          className={`relative flex items-center gap-2 rounded-full bg-petal-rose-deep px-4 py-2 text-white shadow-glow ${
+            reduceMotion ? 'animate-toast-in' : 'animate-plus-one'
+          }`}
+          onAnimationEnd={reduceMotion ? undefined : onDone}
+        >
+          <span className="text-lg leading-none" aria-hidden>💗</span>
+          <span className="font-display text-lg font-medium leading-none">+1</span>
+          <span className="font-body text-xs font-medium leading-none">正向互動</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const WallView: React.FC<WallViewProps> = ({
   authState,
   nicknames,
@@ -110,6 +162,11 @@ const WallView: React.FC<WallViewProps> = ({
   const [mediaRatios, setMediaRatios] = useState<Record<string, number>>({});
   const [privacyBusyId, setPrivacyBusyId] = useState<string | null>(null);
   const [reactionBusyId, setReactionBusyId] = useState<string | null>(null);
+  // A monotonically increasing key that, when bumped, (re)plays the「+1 正向互動」
+  // celebration — a new wall post is a positive interaction (+1 to positive14),
+  // so we mark that moment visibly. null = nothing playing. Keyed by the counter
+  // so posting twice in a row replays the animation rather than doing nothing.
+  const [plusOneKey, setPlusOneKey] = useState<number | null>(null);
   const [showTutorial, setShowTutorial] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return !localStorage.getItem(tutorialKey);
@@ -307,6 +364,11 @@ const WallView: React.FC<WallViewProps> = ({
       } else {
         const created = await apiService.createWallPost(input, options);
         setPosts((prev) => [created, ...prev]);
+        // A new post is a positive interaction (+1). positive14 counts every
+        // wall_post (private included) and the 最近動態 feed badges them all, so
+        // the celebration fires for any successful post — keeping the number,
+        // the feed, and this moment consistent.
+        setPlusOneKey((k) => (k ?? 0) + 1);
         showNotification({
           type: 'success',
           title: '已發布',
@@ -803,6 +865,14 @@ const WallView: React.FC<WallViewProps> = ({
   const hasNoRealPosts = !loading && posts.length === 0;
 
   return (
+    <>
+      {/* Outside the space-y-8 flow on purpose: as a fixed, zero-height child it
+          would still count as a sibling for Tailwind's space-y rule and push the
+          header down ~2rem for the 1.5s it's mounted — a visible jump on every
+          post. As a fragment sibling it overlays cleanly with no layout shift. */}
+      {plusOneKey !== null && (
+        <PlusOneCelebration key={plusOneKey} onDone={() => setPlusOneKey(null)} />
+      )}
     <div className="space-y-8">
       <div className="border-b border-petal-rule pb-7">
         <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
@@ -1011,6 +1081,7 @@ const WallView: React.FC<WallViewProps> = ({
         </div>
       )}
     </div>
+    </>
   );
 };
 

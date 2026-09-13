@@ -4,6 +4,7 @@ import { apiService, type ActivityItem } from '../services/api';
 import { formatDateTime } from '../utils/datetime';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { clientLog } from '../utils/telemetry';
+import { isPositiveInteraction, POSITIVE_INTERACTION_ACTIONS } from '../content/positiveInteractions';
 
 interface Notification {
   id: string;
@@ -81,6 +82,28 @@ const ActivityView: React.FC<ActivityViewProps> = ({ showNotification }) => {
         </p>
       </div>
 
+      {/* Ties the feed back to「我們正在愛」的那個數字: which rows earned a +1,
+          and what all counts. So the number on 我們 stops being a mystery. */}
+      <div
+        className="rounded-2xl border border-petal-rose-soft bg-petal-rose-soft/20 p-4 sm:p-5"
+        data-testid="activity-positive-legend"
+      >
+        <p className="font-body text-sm text-petal-ink leading-relaxed">
+          標有
+          <span className="mx-1 inline-flex items-center rounded-full bg-petal-rose-deep px-1.5 py-0.5 align-middle font-body text-[10px] font-semibold text-white">
+            +1
+          </span>
+          的是<span className="font-medium">正向互動</span> — 每一個都替你們「我們正在愛」的美好存款加 1 分，越多越好。
+        </p>
+        <ul className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5">
+          {POSITIVE_INTERACTION_ACTIONS.map((a) => (
+            <li key={a.label} className="font-body text-[12px] text-petal-ink-soft">
+              <span aria-hidden>{a.emoji}</span> {a.label}
+            </li>
+          ))}
+        </ul>
+      </div>
+
       <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6" data-testid="activity-feed">
         {loading ? (
           <div className="flex justify-center py-8">
@@ -107,6 +130,15 @@ const ActivityView: React.FC<ActivityViewProps> = ({ showNotification }) => {
                     <span className="font-medium">{a.isSelf ? '你' : (a.actorNickname || '你們')}</span>
                     {' '}
                     {a.description}
+                    {isPositiveInteraction(a.type) && (
+                      <span
+                        className="ml-1.5 inline-flex items-center rounded-full bg-petal-rose-deep px-1.5 py-0.5 align-middle font-body text-[10px] font-semibold text-white"
+                        data-testid="activity-plus-one"
+                        title="正向互動 +1：替你們的美好存款加了 1 分"
+                      >
+                        +1
+                      </span>
+                    )}
                   </p>
                   <p className="font-body text-xs text-petal-muted mt-0.5">
                     {formatDateTime(a.date, tz)}
