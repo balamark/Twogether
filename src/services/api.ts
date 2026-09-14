@@ -441,6 +441,121 @@ export interface AiUsageToday {
   remaining: number;
 }
 
+// --- Sophie 衝突即時介入 (Conflict Intervention) ---------------------------
+// Sophie never blocks or rewrites — she only controls WHEN and HOW the partner
+// receives a heated message. A held message is saved, paused, translated with
+// the user's consent, then released with the original words intact.
+export type ConflictMessageStatus = 'HELD' | 'IN_INTERVENTION' | 'RELEASED' | 'DELIVERED';
+export type ConflictState =
+  | 'PAUSED' | 'EXPLORING' | 'TRANSLATING' | 'CONFIRMING' | 'RELEASING' | 'ACTIVE_MEDIATION' | 'COMPLETED';
+
+export interface ConflictIntervention {
+  id: string;
+  couple_id: string;
+  sender_id: string;
+  recipient_id: string;
+  is_sender: boolean;
+  original_text: string | null;
+  emotion_level: 0 | 1 | 2 | 3;
+  detected_signals: string[];
+  message_status: ConflictMessageStatus;
+  state: ConflictState;
+  user_emotion: string | null;
+  underlying_need: string | null;
+  emotional_translation: string | null;
+  translation_confirmed: boolean;
+  safety_flag: boolean;
+  partner_understood: boolean | null;
+  partner_understood_at: string | null;
+  released_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SophiePauseCopy {
+  heading: string;
+  body: string[];
+  reassurance: string;
+  cta: string;
+}
+
+export interface SophieCoreOption {
+  key: string;
+  emoji: string;
+  label: string;
+  need: string | null;
+}
+
+export interface SophieSafetyCopy {
+  heading: string;
+  body: string[];
+  resources: { label: string; value: string }[];
+  note: string;
+}
+
+export interface ConflictSendResult {
+  delivered?: boolean;
+  held?: boolean;
+  safety?: boolean;
+  level: 0 | 1 | 2 | 3;
+  gentle_nudge?: string | null;
+  pause?: SophiePauseCopy;
+  core_question?: string;
+  core_options?: SophieCoreOption[];
+  safety_copy?: SophieSafetyCopy;
+  intervention: ConflictIntervention;
+}
+
+export interface ConflictActiveResult {
+  intervention: ConflictIntervention | null;
+  pause?: SophiePauseCopy;
+  core_question?: string;
+  core_options?: SophieCoreOption[];
+  safety?: boolean;
+  safety_copy?: SophieSafetyCopy | null;
+}
+
+export interface ConflictTranslation {
+  rewrite: string | null;
+  need: string | null;
+  emotions: DraftEmotion[];
+  partnerHears: { misread: string; real: string } | null;
+}
+
+export interface ConflictAnswerResult {
+  intervention: ConflictIntervention;
+  translation: ConflictTranslation;
+}
+
+// Normalize a raw intervention row from the API into the typed shape, defending
+// against missing/renamed fields so the UI never renders `undefined`.
+function toConflictIntervention(raw: unknown): ConflictIntervention {
+  const r = (raw || {}) as Record<string, unknown>;
+  const level = Number(r.emotion_level);
+  return {
+    id: String(r.id ?? ''),
+    couple_id: String(r.couple_id ?? ''),
+    sender_id: String(r.sender_id ?? ''),
+    recipient_id: String(r.recipient_id ?? ''),
+    is_sender: r.is_sender === true,
+    original_text: typeof r.original_text === 'string' ? r.original_text : null,
+    emotion_level: ([0, 1, 2, 3].includes(level) ? level : 0) as 0 | 1 | 2 | 3,
+    detected_signals: Array.isArray(r.detected_signals) ? (r.detected_signals as string[]) : [],
+    message_status: (r.message_status as ConflictMessageStatus) || 'HELD',
+    state: (r.state as ConflictState) || 'PAUSED',
+    user_emotion: typeof r.user_emotion === 'string' ? r.user_emotion : null,
+    underlying_need: typeof r.underlying_need === 'string' ? r.underlying_need : null,
+    emotional_translation: typeof r.emotional_translation === 'string' ? r.emotional_translation : null,
+    translation_confirmed: r.translation_confirmed === true,
+    safety_flag: r.safety_flag === true,
+    partner_understood: typeof r.partner_understood === 'boolean' ? r.partner_understood : null,
+    partner_understood_at: typeof r.partner_understood_at === 'string' ? r.partner_understood_at : null,
+    released_at: typeof r.released_at === 'string' ? r.released_at : null,
+    created_at: String(r.created_at ?? ''),
+    updated_at: String(r.updated_at ?? ''),
+  };
+}
+
 // 真實故事 (Relationship Wisdom Archive)
 export type StoryVoteType = 'helpful' | 'resonate' | 'repair_worked';
 
@@ -5511,6 +5626,151 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to fetch earnings:', error);
       this.throwApiError(error, '無法取得收入資料');
+    }
+  }
+
+  // --- Sophie 衝突即時介入 (Conflict Intervention) -------------------------
+  // Send a message. The backend detects the emotion level and decides whether to
+  // deliver immediately (Level 0/1 or force) or hold it for intervention.
+  async sendConflictMessage(content: string, force = false): Promise<ConflictSendResult> {
+    try {
+      const response = await apiClient.post('/conflict/messages', { content, force });
+      const d = response.data ?? {};
+      return {
+        delivered: d.delivered === true,
+        held: d.held === true,
+        safety: d.safety === true,
+        level: (d.level ?? 0) as 0 | 1 | 2 | 3,
+        gentle_nudge: d.gentle_nudge ?? null,
+        pause: d.pause,
+        core_question: d.core_question,
+        core_options: Array.isArray(d.core_options) ? d.core_options : undefined,
+        safety_copy: d.safety_copy,
+        intervention: toConflictIntervention(d.intervention),
+      };
+    } catch (error: unknown) {
+      console.error('Failed to send conflict message:', error);
+      this.throwApiError(error, 'Sophie 暫時無法處理這則訊息，請稍後再試');
+    }
+  }
+
+  // The sender's one in-flight held message, so a refresh can resume the pause.
+  async getActiveConflictIntervention(): Promise<ConflictActiveResult> {
+    try {
+      const response = await apiClient.get('/conflict/active');
+      const d = response.data ?? {};
+      return {
+        intervention: d.intervention ? toConflictIntervention(d.intervention) : null,
+        pause: d.pause,
+        core_question: d.core_question,
+        core_options: Array.isArray(d.core_options) ? d.core_options : undefined,
+        safety: d.safety === true,
+        safety_copy: d.safety_copy ?? null,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to load active intervention:', error);
+      this.throwApiError(error, '無法載入進行中的對話');
+    }
+  }
+
+  // Answer the core question → Sophie's emotional translation. LLM-backed, so it
+  // MUST carry AI_TIMEOUT (CLAUDE.md): the 15s default would abort a call the
+  // server is still completing and surface a false 連線逾時.
+  async answerConflictIntervention(
+    id: string,
+    emotionKey: string,
+    ownText?: string,
+  ): Promise<ConflictAnswerResult> {
+    try {
+      const response = await apiClient.post(
+        `/conflict/${id}/answer`,
+        { emotion_key: emotionKey, own_text: ownText },
+        // AI_TIMEOUT: this is an LLM call (see CLAUDE.md). skipBillingRedirect:
+        // the user is mid-intervention with a held message — a daily-quota 429
+        // must NOT hijack them to the paywall and lose the flow; the caller
+        // surfaces it as a warning and keeps 直接讓TA看到原話 available.
+        { timeout: AI_TIMEOUT, skipBillingRedirect: true },
+      );
+      const d = response.data ?? {};
+      const t = d.translation ?? {};
+      return {
+        intervention: toConflictIntervention(d.intervention),
+        translation: {
+          rewrite: t.rewrite ?? null,
+          need: t.need ?? null,
+          emotions: Array.isArray(t.emotions) ? t.emotions : [],
+          partnerHears: t.partnerHears
+            ? { misread: t.partnerHears.misread || '', real: t.partnerHears.real || '' }
+            : null,
+        },
+      };
+    } catch (error: unknown) {
+      console.error('Failed to answer intervention:', error);
+      this.throwApiError(error, 'Sophie 暫時無法整理這段話，請稍後再試');
+    }
+  }
+
+  // Confirm / edit / reject the translation. Never replaces the original words.
+  async confirmConflictTranslation(
+    id: string,
+    confirmed: boolean,
+    editedTranslation?: string,
+  ): Promise<ConflictIntervention> {
+    try {
+      const response = await apiClient.post(`/conflict/${id}/confirm`, {
+        confirmed,
+        edited_translation: editedTranslation,
+      });
+      return toConflictIntervention(response.data?.intervention);
+    } catch (error: unknown) {
+      console.error('Failed to confirm translation:', error);
+      this.throwApiError(error, '無法儲存，請稍後再試');
+    }
+  }
+
+  // Release the original (+ translation) to the partner. Works from any held
+  // state, so "直接讓他看到原話" (never-silence) is the same call.
+  async releaseConflictIntervention(id: string): Promise<ConflictIntervention> {
+    try {
+      const response = await apiClient.post(`/conflict/${id}/release`, {});
+      return toConflictIntervention(response.data?.intervention);
+    } catch (error: unknown) {
+      console.error('Failed to release intervention:', error);
+      this.throwApiError(error, '無法送出，請稍後再試');
+    }
+  }
+
+  // The recipient's released messages (original words + Sophie's lens).
+  async getConflictInbox(): Promise<ConflictIntervention[]> {
+    try {
+      const response = await apiClient.get('/conflict/inbox');
+      const items = response.data?.items;
+      return Array.isArray(items) ? items.map(toConflictIntervention) : [];
+    } catch (error: unknown) {
+      console.error('Failed to load conflict inbox:', error);
+      this.throwApiError(error, '無法載入收件匣');
+    }
+  }
+
+  async markConflictRead(id: string): Promise<ConflictIntervention> {
+    try {
+      const response = await apiClient.post(`/conflict/${id}/read`, {});
+      return toConflictIntervention(response.data?.intervention);
+    } catch (error: unknown) {
+      console.error('Failed to mark conflict read:', error);
+      this.throwApiError(error, '無法更新狀態');
+    }
+  }
+
+  // Recipient's acknowledgement (§14): "did you hear what TA wanted?" — not a
+  // verdict on who is right.
+  async respondConflictUnderstood(id: string, understood: boolean): Promise<ConflictIntervention> {
+    try {
+      const response = await apiClient.post(`/conflict/${id}/understood`, { understood });
+      return toConflictIntervention(response.data?.intervention);
+    } catch (error: unknown) {
+      console.error('Failed to respond understood:', error);
+      this.throwApiError(error, '無法送出回應');
     }
   }
 }

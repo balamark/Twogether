@@ -33,6 +33,7 @@ const wallRoutes = require('./routes/wall');
 const journeyRoutes = require('./routes/journey');
 const eventRoutes = require('./routes/events');
 const eventClosureRoutes = require('./routes/event-closure');
+const conflictInterventionRoutes = require('./routes/conflict-intervention');
 const deepDiveRoutes = require('./routes/deep-dive');
 const aiCompanionRoutes = require('./routes/ai-companions');
 const aiUsageRoutes = require('./routes/ai-usage');
@@ -212,6 +213,9 @@ app.use('/api/journey', journeyRoutes);
 // /:id/closure/* paths are matched first rather than falling into /:id.
 app.use('/api/events', eventClosureRoutes);
 app.use('/api/events', eventRoutes);
+// Sophie 衝突即時介入 — holds a heated message, runs a short emotional
+// intervention, then releases the original (+ Sophie's lens) to the partner.
+app.use('/api/conflict', conflictInterventionRoutes);
 app.use('/api/deep-dive', deepDiveRoutes);
 app.use('/api/ai-companions', aiCompanionRoutes);
 app.use('/api/ai-usage', aiUsageRoutes);

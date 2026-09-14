@@ -377,6 +377,35 @@ const CHECKUP_ROWS: { label: string; a: number; b: number }[] = [
   { label: '🏠 家務分工', a: 3, b: 2 },
 ];
 
+// Sophie 衝突即時介入 read-only sample: the held-message loop — your original
+// words are saved (never rewritten), then released alongside Sophie's read of
+// the need underneath. Static 範例 data.
+const SophieMediatorSample: React.FC = () => (
+  <div className="space-y-2.5">
+    <div className="flex items-center justify-between">
+      <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
+        <Sparkles className="w-3.5 h-3.5 text-petal-rose-deep" strokeWidth={1.5} />
+        Sophie 即時介入
+      </span>
+      <SampleTag />
+    </div>
+    <SampleCard>
+      <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-1">💬 阿哲原本說（原話保留）</div>
+      <p className="font-body text-sm text-petal-ink/80 leading-relaxed mb-3">「你根本完全不在乎我的感受！」</p>
+      <div className="border-l-2 border-dashed border-petal-rose-deep/35 pl-3">
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep mb-1">❤️ Sophie 幫你理解</div>
+        <p className="font-body text-sm text-petal-ink leading-relaxed">
+          TA真正想讓你知道的是：「當我說不要的時候，我希望你尊重我的拒絕，而不是繼續說服我。」
+        </p>
+        <span className="mt-1.5 inline-flex items-center rounded-full bg-petal-rose-deep/10 text-petal-rose-deep font-body text-[11px] px-2 py-0.5">
+          TA需要被尊重
+        </span>
+      </div>
+      <p className="font-body text-[11px] text-petal-muted mt-3">Sophie 不刪、不改你的話，只決定什麼時候、用什麼方式讓TA收到。</p>
+    </SampleCard>
+  </div>
+);
+
 const MarriageCheckupSample: React.FC = () => (
   <SampleCard>
     <div className="flex items-center justify-between mb-3">
@@ -982,6 +1011,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       '說不出口的時候，AI 諮商師幫你寫出不傷和氣的和解開場白；也能定期做「婚姻檢查」，各自打分後一起揭曉，AI 當中立第三方幫你們把話攤開來看。',
     sample: (
       <div className="space-y-4">
+        <SophieMediatorSample />
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="font-body text-xs text-petal-muted">AI 和解開場白</span>
