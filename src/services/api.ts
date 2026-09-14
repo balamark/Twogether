@@ -752,9 +752,11 @@ export interface EventMessage {
   readAt: string | null;
   editedAt: string | null;
   // Sophie 衝突即時介入: present when this reply was released through the mediator
-  // — the underlying-need translation shown inline beneath the original words.
+  // — the underlying-need translation shown inline beneath the original words,
+  // plus the display name of the sender's AI 諮商師 that helped compose it.
   sophieTranslation: string | null;
   sophieNeed: string | null;
+  sophieCompanion: string | null;
 }
 
 // 婚姻檢查 (Marriage Check-up)
@@ -5074,6 +5076,7 @@ class ApiService {
       edited_at?: string | null;
       sophie_translation?: string | null;
       sophie_need?: string | null;
+      sophie_companion?: string | null;
     };
     return {
       id: r.id || '',
@@ -5089,6 +5092,7 @@ class ApiService {
       editedAt: r.edited_at ?? null,
       sophieTranslation: r.sophie_translation ?? null,
       sophieNeed: r.sophie_need ?? null,
+      sophieCompanion: r.sophie_companion ?? null,
     };
   }
 

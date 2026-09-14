@@ -946,6 +946,7 @@ class TestRunner {
       this.assertTrue(!!msg, 'released original is now in the thread');
       this.assertTrue(!!msg.sophie_translation, 'released message carries Sophie translation inline');
       this.assertEqual(msg.sophie_need, '被尊重', 'released message carries the need');
+      this.assertTrue(!!msg.sophie_companion, "released message carries the sender's companion name");
     });
 
     await this.test('Conflict — event-scoped /active resumes only this thread’s held reply', async () => {

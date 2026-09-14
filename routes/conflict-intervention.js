@@ -19,6 +19,7 @@ const llmService = require('../services/llmService');
 const { checkLimit } = require('../lib/entitlements');
 const { countTodayAiUsage, resolveAiLimit, recordAiUsage } = require('../lib/aiUsage');
 const { getCoupleForUser, sendValidationError } = require('../lib/eventAccess');
+const { resolveCompanion } = require('../lib/aiCompanions');
 const { notify } = require('../lib/eventNotify');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 const {
@@ -63,6 +64,18 @@ async function loadIntervention(id, userId) {
   return r.rows[0] || null;
 }
 
+// The sender's chosen AI 諮商師 — its display name labels the mediated message
+// ("X 協助表達"), and its style seasons the translation's tone.
+async function getSenderCompanion(userId) {
+  try {
+    const r = await db.query(`SELECT selected_therapist FROM users WHERE id = $1`, [userId]);
+    return resolveCompanion(r.rows[0]?.selected_therapist);
+  } catch (err) {
+    logWarn('conflict.getSenderCompanion failed', { err: err.message });
+    return resolveCompanion(null);
+  }
+}
+
 // Both partners' genders so the AI translation uses 他/她 instead of guessing.
 async function getCoupleGenders(userId) {
   try {
@@ -102,11 +115,11 @@ async function assertEventAccess(eventId, userId) {
 // Sophie's translation inline so the partner sees the original + the need
 // together. Mirrors insertEventMessage in routes/events.js (kept local to avoid
 // a require cycle with the 2900-line events router).
-async function insertThreadMessage(eventId, senderId, content, { translation = null, need = null } = {}) {
+async function insertThreadMessage(eventId, senderId, content, { translation = null, need = null, companion = null } = {}) {
   const r = await db.query(
-    `INSERT INTO event_messages (event_id, sender_id, content, sophie_translation, sophie_need)
-     VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-    [eventId, senderId, content, translation, need]
+    `INSERT INTO event_messages (event_id, sender_id, content, sophie_translation, sophie_need, sophie_companion)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+    [eventId, senderId, content, translation, need, companion]
   );
   await db.query(`UPDATE events SET updated_at = NOW() WHERE id = $1`, [eventId]);
   return r.rows[0].id;
@@ -579,7 +592,10 @@ router.post('/:id/release', [param('id').isUUID()], async (req, res) => {
       if (event) {
         const translation = updated.translation_confirmed ? updated.emotional_translation : null;
         const need = updated.translation_confirmed ? updated.underlying_need : null;
-        threadMessageId = await insertThreadMessage(event.id, userId, updated.original_text, { translation, need });
+        // Label the mediated message with the sender's chosen companion, but only
+        // when Sophie actually shaped it (a raw release has no translation).
+        const companion = translation ? (await getSenderCompanion(userId)).name : null;
+        threadMessageId = await insertThreadMessage(event.id, userId, updated.original_text, { translation, need, companion });
         await notifyThreadReply(event, userId, updated.original_text);
       }
     } else {

@@ -17,16 +17,19 @@ interface Props {
   need?: string | null;
   // The viewer's own released message reads slightly differently from a partner's.
   mine: boolean;
+  // Display name of the AI 諮商師 that helped compose it (the sender's pick).
+  companion?: string | null;
 }
 
-const SophieHeader = () => (
+const SophieHeader = ({ companion }: { companion: string }) => (
   <div className="flex items-center gap-1.5 text-petal-rose-deep">
     <HeartHandshake className="w-3.5 h-3.5" strokeWidth={1.5} />
-    <span className="font-body text-[11px] font-medium">Sophie 協助表達</span>
+    <span className="font-body text-[11px] font-medium">{companion} 協助表達</span>
   </div>
 );
 
-const SophieMessageCard = ({ original, translation, need, mine }: Props) => {
+const SophieMessageCard = ({ original, translation, need, mine, companion }: Props) => {
+  const name = companion || 'AI 諮商師';
   const [revealed, setRevealed] = useState(false);
 
   // One stable layout: the translation is always primary (top); the original is
@@ -35,7 +38,7 @@ const SophieMessageCard = ({ original, translation, need, mine }: Props) => {
   return (
     <div data-testid="sophie-message-card" data-revealed={revealed ? 'true' : 'false'}>
       {/* Primary: what they really wanted you to know. */}
-      <SophieHeader />
+      <SophieHeader companion={name} />
       <p className="mt-1 text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">「{translation}」</p>
       {need && (
         <span className="mt-1.5 inline-flex items-center rounded-full bg-petal-rose-deep/10 text-petal-rose-deep font-body text-[11px] px-2 py-0.5">
@@ -51,7 +54,7 @@ const SophieMessageCard = ({ original, translation, need, mine }: Props) => {
           <>
             <p className="text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">「{original}」</p>
             <p className="font-body text-[11px] text-petal-muted mt-1.5 leading-relaxed">
-              這段話在送出後，Sophie 先幫你們暫停了一下。
+              這段話在送出後，{name} 先幫你們暫停了一下。
             </p>
           </>
         ) : (

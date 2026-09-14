@@ -30,6 +30,9 @@ interface Props {
   agencyCopy: SophieAgencyCopy | null;
   safety: boolean;
   safetyCopy: SophieSafetyCopy | null;
+  // The viewer's (sender's) chosen AI 諮商師 name — this overlay is their own
+  // intervention, so it speaks in their companion's name.
+  companionName: string;
   showNotification: (notification: Omit<Notification, 'id'>) => void;
   // 'released' → the original was posted to the thread; 'exited' → stepped away,
   // the words stay held and resumable.
@@ -65,6 +68,7 @@ const SophieInterventionOverlay = ({
   agencyCopy,
   safety,
   safetyCopy,
+  companionName,
   showNotification,
   onClose,
 }: Props) => {
@@ -92,7 +96,7 @@ const SophieInterventionOverlay = ({
       const e = err as Error & { error_code?: string };
       showNotification({
         type: 'warning',
-        title: 'Sophie 這次沒能整理好',
+        title: `${companionName} 這次沒能整理好`,
         message: e.message || '可以再試一次，或直接讓TA看到原話。',
         duration: 5000,
       });
@@ -158,7 +162,7 @@ const SophieInterventionOverlay = ({
         title: '已送進對話',
         message: raw
           ? '你的原話已經送到對話裡。'
-          : '你的原話送出了，Sophie 也把你真正想被理解的地方放在旁邊。',
+          : `你的原話送出了，${companionName} 也把你真正想被理解的地方放在旁邊。`,
         duration: 5000,
       });
       onClose('released');
@@ -223,7 +227,7 @@ const SophieInterventionOverlay = ({
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-petal-rose-deep" strokeWidth={1.5} />
             <div>
-              <div className="font-body text-[11px] uppercase tracking-[0.18em] text-petal-rose-deep">— Sophie</div>
+              <div className="font-body text-[11px] uppercase tracking-[0.18em] text-petal-rose-deep">— {companionName}</div>
               <div className="font-display text-lg text-petal-ink">即時介入</div>
             </div>
           </div>
@@ -352,7 +356,7 @@ const SophieInterventionOverlay = ({
             </div>
             {busy && (
               <p className="mt-4 font-body text-xs text-petal-muted flex items-center gap-1.5">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.75} /> Sophie 正在陪你…
+                <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.75} /> {companionName} 正在陪你…
               </p>
             )}
           </div>
@@ -419,7 +423,7 @@ const SophieInterventionOverlay = ({
             {translating ? (
               <div className="flex-1 flex flex-col items-center justify-center text-petal-muted gap-3">
                 <Loader2 className="w-8 h-8 animate-spin text-petal-rose-deep" strokeWidth={1.5} />
-                <p className="font-body text-sm">Sophie 正在聽你話裡的情緒…</p>
+                <p className="font-body text-sm">{companionName} 正在聽你話裡的情緒…</p>
               </div>
             ) : showOwnText ? (
               <div className="space-y-3">
@@ -450,7 +454,7 @@ const SophieInterventionOverlay = ({
                         : 'bg-petal-rose-deep text-white hover:opacity-90'
                     }`}
                   >
-                    讓 Sophie 幫我整理
+                    讓 {companionName} 幫我整理
                   </button>
                 </div>
               </div>
@@ -500,7 +504,7 @@ const SophieInterventionOverlay = ({
                 「{active.original_text}」
               </p>
             </div>
-            <div className="font-body text-[11px] uppercase tracking-[0.14em] text-petal-rose-deep mb-1">Sophie 幫你翻成</div>
+            <div className="font-body text-[11px] uppercase tracking-[0.14em] text-petal-rose-deep mb-1">{companionName} 幫你翻成</div>
             {editing ? (
               <div className="bg-white rounded-md border border-petal-rose/40 p-3 mb-2">
                 <AutoGrowTextarea

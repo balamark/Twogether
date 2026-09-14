@@ -1353,6 +1353,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                           translation={m.sophieTranslation}
                           need={m.sophieNeed}
                           mine={mine}
+                          companion={m.sophieCompanion}
                         />
                       ) : (
                         <p className="text-sm text-petal-ink whitespace-pre-wrap">{m.content}</p>
@@ -1518,17 +1519,17 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           <div className="flex justify-end">
             <AiQuotaHint quota={quota} />
           </div>
-          {/* Action bar — the visual hierarchy the redesign is about: the two
-              private draft-aids are flat ghost buttons on the left; the only
-              high-contrast fill in the whole bar is 送出, the true primary. */}
+          {/* Action bar — the two private draft-aids are outlined pill buttons
+              (bordered so they clearly read as tappable, not grey text); the
+              only high-contrast FILL in the bar is 送出, the true primary. */}
           <div className="flex items-center justify-between gap-2 border-t border-petal-rule-soft pt-2">
-            <div className="flex items-center gap-0.5">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 data-testid="event-draft-analyze-button"
                 onClick={requestDraftAnalysis}
                 disabled={analyzing || reply.trim().length === 0}
-                className="px-2.5 py-1.5 rounded-full font-body text-xs text-petal-ink-soft inline-flex items-center gap-1.5 hover:bg-petal-sage/15 hover:text-petal-ink disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+                className="px-3 py-1.5 rounded-full border border-petal-rule bg-white font-body text-xs font-medium text-petal-ink-soft inline-flex items-center gap-1.5 shadow-sm hover:border-petal-sage-deep hover:text-petal-ink hover:bg-petal-sage/10 disabled:opacity-40 disabled:shadow-none disabled:hover:border-petal-rule disabled:hover:bg-white transition-colors"
                 title="送出前，看看這句話底層的情緒、對方會怎麼聽，以及更好的說法"
               >
                 {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gauge className="w-4 h-4" strokeWidth={1.75} />}
@@ -1539,7 +1540,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 data-testid="event-reply-rewrite-button"
                 onClick={requestRewrite}
                 disabled={rewriting || reply.trim().length === 0}
-                className="px-2.5 py-1.5 rounded-full font-body text-xs text-petal-ink-soft inline-flex items-center gap-1.5 hover:bg-petal-sage/15 hover:text-petal-ink disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+                className="px-3 py-1.5 rounded-full border border-petal-rule bg-white font-body text-xs font-medium text-petal-ink-soft inline-flex items-center gap-1.5 shadow-sm hover:border-petal-sage-deep hover:text-petal-ink hover:bg-petal-sage/10 disabled:opacity-40 disabled:shadow-none disabled:hover:border-petal-rule disabled:hover:bg-white transition-colors"
                 title="讓 AI 把你的回覆改得更中性、客觀"
               >
                 {rewriting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" strokeWidth={1.75} />}
@@ -1585,6 +1586,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           agencyCopy={sophie.agency || null}
           safety={sophie.safety === true}
           safetyCopy={sophie.safety_copy ?? null}
+          companionName={myCompanion.name}
           showNotification={showNotification}
           onClose={handleSophieClose}
         />
