@@ -305,7 +305,7 @@ const SophieInterventionOverlay = ({
                 type="button"
                 data-testid="sophie-pause-continue"
                 onClick={() => setPhase('question')}
-                className="w-full px-5 py-4 bg-petal-rose-deep text-white rounded-md text-base font-medium hover:opacity-90 transition-colors flex items-center justify-center gap-2"
+                className="w-full px-5 py-4 bg-vivid-rose text-white rounded-md text-base font-medium hover:bg-vivid-rose-strong transition-colors flex items-center justify-center gap-2"
               >
                 {pauseCopy.cta}
                 <ChevronRight className="w-4 h-4" strokeWidth={2} />
@@ -451,7 +451,7 @@ const SophieInterventionOverlay = ({
                     className={`flex-1 px-4 py-2.5 rounded-md font-body text-sm font-medium transition-colors ${
                       ownText.trim().length === 0
                         ? 'bg-white border border-petal-rule text-petal-muted opacity-60'
-                        : 'bg-petal-rose-deep text-white hover:opacity-90'
+                        : 'bg-vivid-rose text-white hover:bg-vivid-rose-strong'
                     }`}
                   >
                     讓 {companionName} 幫我整理
@@ -522,7 +522,8 @@ const SophieInterventionOverlay = ({
               </div>
             )}
             {translation.need && (
-              <span className="self-start inline-flex items-center rounded-full bg-petal-rose-deep/10 text-petal-rose-deep font-body text-[12px] px-2.5 py-0.5 mb-4">
+              <span className="self-start inline-flex items-center gap-1.5 rounded bg-amber-50 text-amber-700 border border-amber-200/60 font-body text-[12px] font-medium px-2 py-0.5 mb-4">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" aria-hidden />
                 你其實需要{translation.need}
               </span>
             )}
@@ -533,7 +534,7 @@ const SophieInterventionOverlay = ({
                 data-testid="sophie-confirm-yes"
                 onClick={handleConfirmYes}
                 disabled={busy}
-                className="w-full px-5 py-4 bg-petal-rose-deep text-white rounded-md text-base font-medium hover:opacity-90 transition-colors flex items-center justify-center gap-2"
+                className="w-full px-5 py-4 bg-vivid-rose text-white rounded-md text-base font-medium hover:bg-vivid-rose-strong transition-colors flex items-center justify-center gap-2"
               >
                 <Heart className="w-4 h-4" strokeWidth={2} /> 對，就是這個
               </button>
@@ -576,7 +577,7 @@ const SophieInterventionOverlay = ({
                 data-testid="sophie-release"
                 onClick={() => doRelease(false)}
                 disabled={busy}
-                className="w-full px-5 py-4 bg-petal-rose-deep text-white rounded-md text-base font-medium hover:opacity-90 transition-colors flex items-center justify-center gap-2"
+                className="w-full px-5 py-4 bg-vivid-rose text-white rounded-md text-base font-medium hover:bg-vivid-rose-strong transition-colors flex items-center justify-center gap-2"
               >
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2} /> : <Send className="w-4 h-4" strokeWidth={1.75} />}
                 送進對話

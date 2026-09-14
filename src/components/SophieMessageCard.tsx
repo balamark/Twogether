@@ -41,7 +41,8 @@ const SophieMessageCard = ({ original, translation, need, mine, companion }: Pro
       <SophieHeader companion={name} />
       <p className="mt-1 text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">「{translation}」</p>
       {need && (
-        <span className="mt-1.5 inline-flex items-center rounded-full bg-petal-rose-deep/10 text-petal-rose-deep font-body text-[11px] px-2 py-0.5">
+        <span className="mt-2 inline-flex items-center gap-1.5 rounded bg-amber-50 text-amber-700 border border-amber-200/60 font-body text-[11px] font-medium px-2 py-0.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500" aria-hidden />
           {mine ? '你' : 'TA'}需要{need}
         </span>
       )}
@@ -65,12 +66,13 @@ const SophieMessageCard = ({ original, translation, need, mine, companion }: Pro
             {original}
           </p>
         )}
-        {/* Reveal and collapse share the same look — both are obviously tappable. */}
+        {/* A discrete inline text link, not a pill — reveal and collapse share
+            one look so it always reads as the same control. */}
         <button
           type="button"
           data-testid={revealed ? 'sophie-message-collapse' : 'sophie-message-reveal'}
           onClick={() => setRevealed((v) => !v)}
-          className="mt-1.5 inline-flex items-center gap-0.5 font-body text-xs font-medium text-petal-rose-deep hover:opacity-80 transition-opacity"
+          className="mt-1.5 inline-flex items-center gap-1 font-body text-xs text-slate-500 hover:text-slate-800 hover:underline underline-offset-2 cursor-pointer transition-colors"
         >
           {revealed ? '收合原話' : '查看原本的訊息'}
           <ChevronRight

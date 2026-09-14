@@ -399,7 +399,8 @@ const SophieMediatorSample: React.FC = () => (
       <p className="font-body text-sm text-petal-ink leading-relaxed">
         「我現在心裡真的很痛，剛才那件事讓我覺得自己不被尊重，我希望我們可以坐下來好好談。」
       </p>
-      <span className="mt-1.5 inline-flex items-center rounded-full bg-petal-rose-deep/10 text-petal-rose-deep font-body text-[11px] px-2 py-0.5">
+      <span className="mt-2 inline-flex items-center gap-1.5 rounded bg-amber-50 text-amber-700 border border-amber-200/60 font-body text-[11px] font-medium px-2 py-0.5">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" aria-hidden />
         TA需要被尊重
       </span>
       <div className="mt-3 pt-3 border-t border-dashed border-petal-rose-deep/30">
@@ -407,7 +408,7 @@ const SophieMediatorSample: React.FC = () => (
         <p aria-hidden className="font-body text-sm text-petal-ink/70 leading-relaxed select-none blur-[6px]">
           你欺人太甚，要離婚就來啊！
         </p>
-        <span className="mt-1.5 inline-flex items-center gap-0.5 font-body text-xs font-medium text-petal-rose-deep">
+        <span className="mt-1.5 inline-flex items-center gap-1 font-body text-xs text-slate-500">
           查看原本的訊息 ›
         </span>
       </div>

@@ -1408,18 +1408,20 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               data-testid="event-sophie-invite-row"
               className="pt-2 flex flex-col items-center gap-2 border-t border-petal-rule-soft"
             >
+              {/* AI hero — a warm violet→rose gradient pill (AI + empathy), the
+                  conversational invite to bring the counselor in. */}
               <button
                 type="button"
                 data-testid="event-ai-counselor-button"
                 onClick={() => setSophieChooserOpen(true)}
                 disabled={aiInviting || facilitating}
-                className="px-4 py-2 rounded-full border border-petal-sage-deep/40 bg-petal-sage/15 text-petal-sage-deeper font-medium inline-flex items-center gap-2 disabled:opacity-50 hover:bg-petal-sage/25 active:scale-[0.98] transition"
+                className="px-5 py-2 rounded-full bg-gradient-to-r from-violet-500 to-vivid-rose text-white font-medium text-sm inline-flex items-center gap-2 shadow-sm shadow-violet-500/25 hover:opacity-95 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                 title={`請 ${myCompanion.name} 加入，給建議或帶你們做一張練習卡`}
               >
                 {(aiInviting || facilitating) ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
                 <span>請 {myCompanion.name} 加入</span>
               </button>
-              <p className="font-body text-[11px] text-petal-muted text-center max-w-sm leading-relaxed inline-flex items-center gap-1">
+              <p className="font-body text-[11px] text-petal-muted text-center max-w-sm leading-relaxed inline-flex items-center gap-1 mt-0.5">
                 <Globe className="w-3 h-3 shrink-0" strokeWidth={1.75} />
                 回應會出現在對話裡，兩人都看得到（會用到 AI 次數）。
               </p>
@@ -1529,10 +1531,10 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 data-testid="event-draft-analyze-button"
                 onClick={requestDraftAnalysis}
                 disabled={analyzing || reply.trim().length === 0}
-                className="px-3 py-1.5 rounded-full border border-petal-rule bg-white font-body text-xs font-medium text-petal-ink-soft inline-flex items-center gap-1.5 shadow-sm hover:border-petal-sage-deep hover:text-petal-ink hover:bg-petal-sage/10 disabled:opacity-40 disabled:shadow-none disabled:hover:border-petal-rule disabled:hover:bg-white transition-colors"
+                className="px-3 py-1.5 rounded-full border border-slate-200 bg-white font-body text-xs font-medium text-slate-600 inline-flex items-center gap-1.5 shadow-sm hover:bg-violet-50 hover:text-violet-700 hover:border-violet-300 active:scale-95 transition-all duration-150 cursor-pointer disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-slate-600 disabled:hover:border-slate-200"
                 title="送出前，看看這句話底層的情緒、對方會怎麼聽，以及更好的說法"
               >
-                {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gauge className="w-4 h-4" strokeWidth={1.75} />}
+                {analyzing ? <Loader2 className="w-4 h-4 animate-spin text-amber-500" /> : <Gauge className="w-4 h-4 text-amber-500" strokeWidth={1.75} />}
                 <span>情緒檢測</span>
               </button>
               <button
@@ -1540,10 +1542,10 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 data-testid="event-reply-rewrite-button"
                 onClick={requestRewrite}
                 disabled={rewriting || reply.trim().length === 0}
-                className="px-3 py-1.5 rounded-full border border-petal-rule bg-white font-body text-xs font-medium text-petal-ink-soft inline-flex items-center gap-1.5 shadow-sm hover:border-petal-sage-deep hover:text-petal-ink hover:bg-petal-sage/10 disabled:opacity-40 disabled:shadow-none disabled:hover:border-petal-rule disabled:hover:bg-white transition-colors"
+                className="px-3 py-1.5 rounded-full border border-slate-200 bg-white font-body text-xs font-medium text-slate-600 inline-flex items-center gap-1.5 shadow-sm hover:bg-violet-50 hover:text-violet-700 hover:border-violet-300 active:scale-95 transition-all duration-150 cursor-pointer disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-slate-600 disabled:hover:border-slate-200"
                 title="讓 AI 把你的回覆改得更中性、客觀"
               >
-                {rewriting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" strokeWidth={1.75} />}
+                {rewriting ? <Loader2 className="w-4 h-4 animate-spin text-violet-500" /> : <Sparkles className="w-4 h-4 text-violet-500" strokeWidth={1.75} />}
                 <span>緩和語氣</span>
               </button>
             </div>
@@ -1552,7 +1554,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               data-testid="event-reply-send-button"
               onClick={sendReply}
               disabled={sending || reply.trim().length === 0 || replyOver}
-              className="px-5 py-2 rounded-full bg-petal-ink text-petal-cream font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:shadow-none hover:opacity-90 active:scale-[0.98] transition"
+              className="px-5 py-2 rounded-full font-medium inline-flex items-center gap-2 transition-all active:scale-[0.98] bg-vivid-rose text-white shadow-md shadow-vivid-rose/30 hover:bg-vivid-rose-strong cursor-pointer disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none disabled:cursor-not-allowed disabled:pointer-events-none disabled:hover:bg-slate-200"
             >
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               <span>送出</span>

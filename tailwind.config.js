@@ -76,6 +76,18 @@ export default {
           'rule-soft':'#E8DFD0',
         },
 
+        // Vibrant conflict-intervention accents (approved 2026-09). The base
+        // `rose` scale is remapped to muted Soft-Petal above, so the punchy
+        // #F43F5E empathy/primary red lives here under its own name. violet /
+        // indigo / emerald / amber keep their stock Tailwind vibrancy (only
+        // pink/purple/rose were overridden), so those are used directly.
+        vivid: {
+          rose:         '#F43F5E',
+          'rose-strong':'#E11D48',
+          'rose-soft':  '#FFF1F3',
+          'rose-ink':   '#BE1E3C',
+        },
+
         // Legacy token aliases — kept so older references don't break.
         primary: {
           50:  '#FBF7F2',
