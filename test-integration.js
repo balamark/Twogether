@@ -909,6 +909,57 @@ class TestRunner {
       this.assertTrue(!!ans.data.translation, 'translation produced from hurt');
     });
 
+    await this.test('Conflict — event reply: calm message posts straight into the thread', async () => {
+      this.authToken = sender;
+      const ev = await this.makeRequest('POST', '/events', {
+        title: '晚餐的事', summary: '想好好聊聊晚餐怎麼安排',
+        ai_neutral: 'n', ai_firm: 'f', ai_warm: 'w', selected_version: 'warm',
+      });
+      this.assertStatus(ev, 201, 'event created');
+      this._eventId = ev.data.event.id;
+      const res = await this.makeRequest('POST', '/conflict/messages', { content: '今天晚餐吃什麼？', event_id: this._eventId });
+      this.assertTrue(res.data.delivered === true, 'calm reply delivered');
+      const got = await this.makeRequest('GET', `/events/${this._eventId}`);
+      const found = (got.data.event.messages || []).some((m) => m.content === '今天晚餐吃什麼？');
+      this.assertTrue(found, 'calm reply is in the thread');
+    });
+
+    await this.test('Conflict — event reply: heated reply is held, then released into the thread with translation', async () => {
+      this.authToken = sender;
+      const held = await this.makeRequest('POST', '/conflict/messages', { content: '你根本完全不在乎我的感受！', event_id: this._eventId });
+      this.assertTrue(held.data.held === true, 'heated reply held');
+      const id = held.data.intervention.id;
+      this.assertEqual(held.data.intervention.event_id, this._eventId, 'intervention tied to event');
+
+      // Not in the thread while held.
+      let got = await this.makeRequest('GET', `/events/${this._eventId}`);
+      let inThread = (got.data.event.messages || []).some((m) => m.content === '你根本完全不在乎我的感受！');
+      this.assertTrue(!inThread, 'held reply not yet in thread');
+
+      await this.makeRequest('POST', `/conflict/${id}/answer`, { emotion_key: 'boundary' });
+      await this.makeRequest('POST', `/conflict/${id}/confirm`, { confirmed: true });
+      const rel = await this.makeRequest('POST', `/conflict/${id}/release`);
+      this.assertTrue(!!rel.data.thread_message_id, 'release returns a thread message id');
+
+      got = await this.makeRequest('GET', `/events/${this._eventId}`);
+      const msg = (got.data.event.messages || []).find((m) => m.content === '你根本完全不在乎我的感受！');
+      this.assertTrue(!!msg, 'released original is now in the thread');
+      this.assertTrue(!!msg.sophie_translation, 'released message carries Sophie translation inline');
+      this.assertEqual(msg.sophie_need, '被尊重', 'released message carries the need');
+    });
+
+    await this.test('Conflict — event-scoped /active resumes only this thread’s held reply', async () => {
+      this.authToken = sender;
+      await this.makeRequest('POST', '/conflict/messages', { content: '你每次都這樣，我受夠了！', event_id: this._eventId });
+      const act = await this.makeRequest('GET', '/conflict/active', null);
+      // GET with query — use a manual URL since makeRequest has no query support.
+      const scoped = await this.makeRequest('GET', `/conflict/active?event_id=${this._eventId}`);
+      this.assertTrue(!!scoped.data.intervention && scoped.data.intervention.event_id === this._eventId, 'scoped active returns this thread’s held reply');
+      this.assertTrue(!!act.data.intervention, 'unscoped active also returns a held reply');
+      // Clean up: release it so it doesn't linger.
+      await this.makeRequest('POST', `/conflict/${scoped.data.intervention.id}/release`);
+    });
+
     await this.test('Conflict — safety signal is flagged and NOT delivered (§25)', async () => {
       this.authToken = sender;
       const res = await this.makeRequest('POST', '/conflict/messages', { content: '我要打你' });

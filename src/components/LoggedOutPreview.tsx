@@ -1011,7 +1011,6 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       '說不出口的時候，AI 諮商師幫你寫出不傷和氣的和解開場白；也能定期做「婚姻檢查」，各自打分後一起揭曉，AI 當中立第三方幫你們把話攤開來看。',
     sample: (
       <div className="space-y-4">
-        <SophieMediatorSample />
         <div className="space-y-2.5">
           <div className="flex items-center justify-between">
             <span className="font-body text-xs text-petal-muted">AI 和解開場白</span>
@@ -1040,6 +1039,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
     sample: (
       <div className="space-y-3">
         <ConflictFlywheelSample />
+        <SophieMediatorSample />
         <DeepDiveSample />
       </div>
     ),

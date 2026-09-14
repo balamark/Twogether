@@ -39,6 +39,8 @@ import TherapyNoteCard from './TherapyNoteCard';
 import ConflictBanner from './ConflictBanner';
 import ThreadRoleLegend from './ThreadRoleLegend';
 import DraftEmotionMeter from './DraftEmotionMeter';
+import SophieInterventionOverlay from './SophieInterventionOverlay';
+import type { ConflictActiveResult } from '../services/api';
 import { detectDraftTone, draftToneHint } from '../utils/conflictState';
 import GuideSessionView from './GuideSessionView';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -156,6 +158,9 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const [acceptancePreview, setAcceptancePreview] = useState<EmotionAcceptancePreview | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [draftAnalysis, setDraftAnalysis] = useState<DraftAnalysis | null>(null);
+  // Sophie 衝突即時介入: when a reply is held, this holds the intervention + copy
+  // and the full-screen overlay takes over until the reply is released or shelved.
+  const [sophie, setSophie] = useState<ConflictActiveResult | null>(null);
   const [aiInviting, setAiInviting] = useState(false);
   const [aiPosting, setAiPosting] = useState(false);
   const [aiPreview, setAiPreview] = useState<string | null>(null);
@@ -536,9 +541,22 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     setLoading(true);
     setAdvancePaused(false);
     setGuideOpen(false);
+    setSophie(null);
     refresh().finally(() => setLoading(false));
+    // A held reply left in-flight for THIS thread resumes its pause instead of
+    // being lost on a refresh.
+    apiService.getActiveConflictIntervention(eventId)
+      .then((res) => { if (res.intervention) setSophie(res); })
+      .catch(() => { /* no active intervention is the common case */ });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
+
+  // After a Sophie release, the therapist-turn advance still needs to run.
+  const afterReplyLanded = async () => {
+    const myTurn = facilitation && facilitation.status === 'active' &&
+      (facilitation.turnOwner === currentUserId || facilitation.turnOwner === null);
+    if (myTurn && !advancePaused) await advanceFacilitation();
+  };
 
   const sendReply = async () => {
     const content = reply.trim();
@@ -547,16 +565,30 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     sendLockRef.current = true;
     setSending(true);
     try {
-      await apiService.replyToEvent(eventId, content);
-      setReply('');
-      setDraftAnalysis(null);
-      await refresh();
-      // In an active session, if the therapist was waiting on me, my reply
-      // completes the step — fetch the next facilitated turn. Skipped while
-      // paused (quota spent) so we don't re-toast on every reply.
-      const myTurn = facilitation && facilitation.status === 'active' &&
-        (facilitation.turnOwner === currentUserId || facilitation.turnOwner === null);
-      if (myTurn && !advancePaused) await advanceFacilitation();
+      // Route the reply through Sophie: a calm message goes straight into the
+      // thread; a heated one is held and the intervention overlay takes over.
+      const res = await apiService.sendConflictMessage(content, { eventId });
+      if (res.safety || res.held) {
+        setSophie({
+          intervention: res.intervention,
+          pause: res.pause,
+          core_question: res.core_question,
+          core_options: res.core_options,
+          agency: res.agency,
+          safety: res.safety === true,
+          safety_copy: res.safety_copy ?? null,
+        });
+        // The words are saved server-side; clear the box so it doesn't look
+        // unsent. The overlay owns the message from here.
+        setReply('');
+        setDraftAnalysis(null);
+      } else {
+        // Delivered immediately — already posted to the thread.
+        setReply('');
+        setDraftAnalysis(null);
+        await refresh();
+        await afterReplyLanded();
+      }
     } catch (err) {
       showNotification({
         type: 'error',
@@ -566,6 +598,21 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     } finally {
       setSending(false);
       sendLockRef.current = false;
+    }
+  };
+
+  const handleSophieClose = async (result: 'released' | 'exited') => {
+    setSophie(null);
+    if (result === 'released') {
+      await refresh();
+      await afterReplyLanded();
+    } else {
+      showNotification({
+        type: 'info',
+        title: '訊息已保存',
+        message: 'Sophie 幫你把這段話留著，隨時可以回來繼續。',
+        duration: 4000,
+      });
     }
   };
 
@@ -1315,13 +1362,20 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                           </button>
                         )}
                       </p>
-                      {translationEnabled && translations[m.id] && (
+                      {/* Sophie 衝突即時介入: a reply released through the mediator
+                          carries its translation on the message — always shown,
+                          not gated by the 情緒翻譯 lens toggle. */}
+                      {m.sophieTranslation ? (
+                        <MessageTranslationCard
+                          translation={{ rewrite: m.sophieTranslation, need: m.sophieNeed || '', emotions: [] }}
+                        />
+                      ) : translationEnabled && translations[m.id] ? (
                         <MessageTranslationCard
                           translation={translations[m.id]}
                           messageId={m.id}
                           contextSnapshot={buildEventSnapshot(event.id, m.id, event.messages)}
                         />
-                      )}
+                      ) : null}
                     </>
                   )}
                 </div>
@@ -1503,6 +1557,25 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             setDraftAnalysis(null);
           }}
           onClose={() => setDraftAnalysis(null)}
+        />
+      )}
+
+      {sophie?.intervention && (
+        <SophieInterventionOverlay
+          intervention={sophie.intervention}
+          pauseCopy={sophie.pause || {
+            heading: '我先暫停一下。',
+            body: ['你的訊息沒有被刪掉，也沒有被改寫，我已經幫你保存下來。', '我想先陪你一下，因為如果現在立刻讓TA看到，你們可能會直接進入下一輪爭吵。'],
+            reassurance: '你可以生氣。我只想幫你確定：在這股生氣下面，你最希望TA真正聽見的是什麼。',
+            cta: '好，先陪我一下',
+          }}
+          coreQuestion={sophie.core_question || ''}
+          coreOptions={sophie.core_options || []}
+          agencyCopy={sophie.agency || null}
+          safety={sophie.safety === true}
+          safetyCopy={sophie.safety_copy ?? null}
+          showNotification={showNotification}
+          onClose={handleSophieClose}
         />
       )}
 

@@ -4,7 +4,6 @@ import { useScrollLock } from '../hooks/useScrollLock';
 import InfoHint from './InfoHint';
 import { apiService } from '../services/api';
 import MarriageCheckup from './MarriageCheckup';
-import SophieMediator from './SophieMediator';
 import type { Notification } from '../App';
 import AutoGrowTextarea from './AutoGrowTextarea';
 
@@ -330,7 +329,6 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
 
   const sectionNav: { id: string; label: string }[] = [
     { id: 'conflict-lead', label: '先接住情緒' },
-    { id: 'conflict-sophie', label: 'Sophie 即時介入' },
     { id: 'conflict-pause', label: '正在爭吵中' },
     { id: 'conflict-toolkit', label: '應對工具' },
     { id: 'conflict-checkup', label: '婚姻檢查' },
@@ -476,13 +474,6 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
           </button>
         </div>
       </div>
-    </div>
-
-    {/* Sophie 即時介入 — hold a heated message, translate it, then release the
-        original to the partner. The one live, message-holding surface (the rest
-        of this page is static toolkit + pause guidance). */}
-    <div id="conflict-sophie" className="scroll-mt-20">
-      <SophieMediator showNotification={showNotification} partnerConnected={partnerConnected} />
     </div>
 
     {/* Emergency Pause — entry card for couples in active conflict */}

@@ -452,6 +452,7 @@ export type ConflictState =
 export interface ConflictIntervention {
   id: string;
   couple_id: string;
+  event_id: string | null;
   sender_id: string;
   recipient_id: string;
   is_sender: boolean;
@@ -555,6 +556,7 @@ function toConflictIntervention(raw: unknown): ConflictIntervention {
   return {
     id: String(r.id ?? ''),
     couple_id: String(r.couple_id ?? ''),
+    event_id: typeof r.event_id === 'string' ? r.event_id : null,
     sender_id: String(r.sender_id ?? ''),
     recipient_id: String(r.recipient_id ?? ''),
     is_sender: r.is_sender === true,
@@ -749,6 +751,10 @@ export interface EventMessage {
   createdAt: string;
   readAt: string | null;
   editedAt: string | null;
+  // Sophie 衝突即時介入: present when this reply was released through the mediator
+  // — the underlying-need translation shown inline beneath the original words.
+  sophieTranslation: string | null;
+  sophieNeed: string | null;
 }
 
 // 婚姻檢查 (Marriage Check-up)
@@ -5066,6 +5072,8 @@ class ApiService {
       created_at?: string;
       read_at?: string | null;
       edited_at?: string | null;
+      sophie_translation?: string | null;
+      sophie_need?: string | null;
     };
     return {
       id: r.id || '',
@@ -5079,6 +5087,8 @@ class ApiService {
       createdAt: r.created_at || '',
       readAt: r.read_at ?? null,
       editedAt: r.edited_at ?? null,
+      sophieTranslation: r.sophie_translation ?? null,
+      sophieNeed: r.sophie_need ?? null,
     };
   }
 
@@ -5658,9 +5668,16 @@ class ApiService {
   // --- Sophie 衝突即時介入 (Conflict Intervention) -------------------------
   // Send a message. The backend detects the emotion level and decides whether to
   // deliver immediately (Level 0/1 or force) or hold it for intervention.
-  async sendConflictMessage(content: string, force = false): Promise<ConflictSendResult> {
+  async sendConflictMessage(
+    content: string,
+    opts: { eventId?: string; force?: boolean } = {},
+  ): Promise<ConflictSendResult> {
     try {
-      const response = await apiClient.post('/conflict/messages', { content, force });
+      const response = await apiClient.post('/conflict/messages', {
+        content,
+        force: opts.force === true,
+        event_id: opts.eventId,
+      });
       const d = response.data ?? {};
       return {
         delivered: d.delivered === true,
@@ -5682,9 +5699,11 @@ class ApiService {
   }
 
   // The sender's one in-flight held message, so a refresh can resume the pause.
-  async getActiveConflictIntervention(): Promise<ConflictActiveResult> {
+  async getActiveConflictIntervention(eventId?: string): Promise<ConflictActiveResult> {
     try {
-      const response = await apiClient.get('/conflict/active');
+      const response = await apiClient.get('/conflict/active', {
+        params: eventId ? { event_id: eventId } : undefined,
+      });
       const d = response.data ?? {};
       return {
         intervention: d.intervention ? toConflictIntervention(d.intervention) : null,

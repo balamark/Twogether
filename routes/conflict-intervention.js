@@ -84,6 +84,49 @@ async function getCoupleGenders(userId) {
   }
 }
 
+// The caller's event + couple, or null when the event is missing or the caller
+// is not in its couple (collapsed into one so ids can't be probed).
+async function assertEventAccess(eventId, userId) {
+  const r = await db.query(
+    `SELECT e.id, e.couple_id, e.title, e.status,
+            CASE WHEN c.user1_id = $2 THEN c.user2_id ELSE c.user1_id END AS partner_id
+       FROM events e
+       JOIN couples c ON c.id = e.couple_id
+      WHERE e.id = $1 AND (c.user1_id = $2 OR c.user2_id = $2)`,
+    [eventId, userId]
+  );
+  return r.rows[0] || null;
+}
+
+// Post a released reply into the event thread as a normal message, carrying
+// Sophie's translation inline so the partner sees the original + the need
+// together. Mirrors insertEventMessage in routes/events.js (kept local to avoid
+// a require cycle with the 2900-line events router).
+async function insertThreadMessage(eventId, senderId, content, { translation = null, need = null } = {}) {
+  const r = await db.query(
+    `INSERT INTO event_messages (event_id, sender_id, content, sophie_translation, sophie_need)
+     VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+    [eventId, senderId, content, translation, need]
+  );
+  await db.query(`UPDATE events SET updated_at = NOW() WHERE id = $1`, [eventId]);
+  return r.rows[0].id;
+}
+
+// Notify the partner that a reply landed in the thread (event_reply lands on the
+// event so a tap opens the conversation).
+async function notifyThreadReply(eventRow, senderId, content) {
+  await notify(
+    eventRow.partner_id,
+    'event_reply',
+    '伴侶回覆了你們的對話',
+    eventRow.title,
+    eventRow.id,
+    senderId,
+    2,
+    content
+  );
+}
+
 // Deliver a released message to the partner (in-app + LINE + email fan-out).
 async function notifyRelease(row) {
   await notify(
@@ -109,6 +152,7 @@ router.post(
       .isLength({ min: 1, max: 2000 })
       .withMessage('訊息需在 1–2000 字之間，請刪減後再送出，或分成兩則送出'),
     body('force').optional().isBoolean(),
+    body('event_id').optional().isUUID(),
   ],
   async (req, res) => {
     if (sendValidationError(req, res)) return;
@@ -125,6 +169,16 @@ router.post(
         });
       }
 
+      // When sent from an event reply box, the message belongs to that thread.
+      let event = null;
+      if (req.body.event_id) {
+        event = await assertEventAccess(req.body.event_id, userId);
+        if (!event) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
+        if (event.status === 'resolved') {
+          return res.status(400).json({ success: false, message: '這段對話已完成，無法新增訊息' });
+        }
+      }
+
       const content = req.body.content.trim();
       const force = req.body.force === true;
       const detection = detectEmotion(content);
@@ -136,6 +190,7 @@ router.post(
         original_text: content,
         emotion_level: detection.level,
         detected_signals: detection.signals,
+        event_id: event ? event.id : null,
       };
 
       // --- Safety override: never dress a threat up as a normal spat. --------
@@ -144,10 +199,10 @@ router.post(
           await db.query(
             `INSERT INTO conflict_interventions
                (couple_id, sender_id, recipient_id, original_text, emotion_level,
-                detected_signals, message_status, state, safety_flag)
-             VALUES ($1,$2,$3,$4,$5,$6,'HELD','PAUSED',TRUE)
+                detected_signals, message_status, state, safety_flag, event_id)
+             VALUES ($1,$2,$3,$4,$5,$6,'HELD','PAUSED',TRUE,$7)
              RETURNING *`,
-            [base.couple_id, base.sender_id, base.recipient_id, base.original_text, base.emotion_level, base.detected_signals]
+            [base.couple_id, base.sender_id, base.recipient_id, base.original_text, base.emotion_level, base.detected_signals, base.event_id]
           )
         ).rows[0];
         logWarn('conflict.message.safety_hold', {
@@ -167,15 +222,21 @@ router.post(
           await db.query(
             `INSERT INTO conflict_interventions
                (couple_id, sender_id, recipient_id, original_text, emotion_level,
-                detected_signals, message_status, state, released_at)
-             VALUES ($1,$2,$3,$4,$5,$6,'DELIVERED','COMPLETED',NOW())
+                detected_signals, message_status, state, released_at, event_id)
+             VALUES ($1,$2,$3,$4,$5,$6,'DELIVERED','COMPLETED',NOW(),$7)
              RETURNING *`,
-            [base.couple_id, base.sender_id, base.recipient_id, base.original_text, base.emotion_level, base.detected_signals]
+            [base.couple_id, base.sender_id, base.recipient_id, base.original_text, base.emotion_level, base.detected_signals, base.event_id]
           )
         ).rows[0];
-        await notifyRelease(row);
+        if (event) {
+          // Calm reply → straight into the thread, no translation attached.
+          await insertThreadMessage(event.id, userId, content);
+          await notifyThreadReply(event, userId, content);
+        } else {
+          await notifyRelease(row);
+        }
         logInfo('conflict.message.delivered', {
-          userId, coupleId: couple.couple_id, level: detection.level, forced: force,
+          userId, coupleId: couple.couple_id, level: detection.level, forced: force, inThread: !!event,
         });
         return res.status(201).json({
           success: true,
@@ -192,10 +253,10 @@ router.post(
         await db.query(
           `INSERT INTO conflict_interventions
              (couple_id, sender_id, recipient_id, original_text, emotion_level,
-              detected_signals, message_status, state)
-           VALUES ($1,$2,$3,$4,$5,$6,'HELD','PAUSED')
+              detected_signals, message_status, state, event_id)
+           VALUES ($1,$2,$3,$4,$5,$6,'HELD','PAUSED',$7)
            RETURNING *`,
-          [base.couple_id, base.sender_id, base.recipient_id, base.original_text, base.emotion_level, base.detected_signals]
+          [base.couple_id, base.sender_id, base.recipient_id, base.original_text, base.emotion_level, base.detected_signals, base.event_id]
         )
       ).rows[0];
       logInfo('conflict.message.held', {
@@ -221,12 +282,16 @@ router.post(
 // ---------------------------------------------------------------------------
 router.get('/active', async (req, res) => {
   try {
+    // Optional event scoping: an event reply box resumes only ITS own held
+    // reply, not a held message from some other thread.
+    const eventId = typeof req.query.event_id === 'string' && req.query.event_id ? req.query.event_id : null;
     const r = await db.query(
       `SELECT * FROM conflict_interventions
         WHERE sender_id = $1 AND message_status IN ('HELD','IN_INTERVENTION')
+          AND ($2::uuid IS NULL OR event_id = $2::uuid)
         ORDER BY created_at DESC
         LIMIT 1`,
-      [req.user.id]
+      [req.user.id, eventId]
     );
     const row = r.rows[0];
     if (!row) return res.json({ success: true, intervention: null });
@@ -344,13 +409,35 @@ router.post(
       // synthesized summary biases it toward the chosen need without editing the
       // user's own message.
       const genders = await getCoupleGenders(userId);
-      const summary = `這是一段衝突當下、情緒很滿的訊息。說話的人最希望對方理解的是：「${emotionLabel}」。請翻出這句話底下真正想被聽見的情緒與需求。`;
+      // Ground the translation in the real thread when this reply belongs to an
+      // event; otherwise use a synthesized summary biased by the chosen need.
+      let summary = `這是一段衝突當下、情緒很滿的訊息。說話的人最希望對方理解的是：「${emotionLabel}」。請翻出這句話底下真正想被聽見的情緒與需求。`;
+      let recentMessages = [];
+      if (row.event_id) {
+        try {
+          const ev = await db.query(`SELECT summary FROM events WHERE id = $1`, [row.event_id]);
+          if (ev.rows[0]?.summary) {
+            summary = `${ev.rows[0].summary}\n\n對方在這段對話裡最希望被理解的是：「${emotionLabel}」。`;
+          }
+          const recent = await db.query(
+            `SELECT sender_id, content FROM event_messages
+              WHERE event_id = $1 ORDER BY created_at DESC LIMIT 6`,
+            [row.event_id]
+          );
+          recentMessages = recent.rows.reverse().map((m) => ({
+            fromSelf: m.sender_id === userId,
+            content: m.content,
+          }));
+        } catch (err) {
+          logWarn('conflict.answer.context_failed', { id: row.id, err: err.message });
+        }
+      }
       let analysis;
       try {
         analysis = await llmService.analyzeDraft({
           draft: row.original_text,
           eventSummary: summary,
-          recentMessages: [],
+          recentMessages,
           userGender: genders.userGender,
           partnerGender: genders.partnerGender,
         });
@@ -482,11 +569,31 @@ router.post('/:id/release', [param('id').isUUID()], async (req, res) => {
         [row.id]
       )
     ).rows[0];
-    await notifyRelease(updated);
+
+    // Event-tied release → post the ORIGINAL into the thread, carrying Sophie's
+    // translation inline (only when the user confirmed it). Standalone release →
+    // the recipient's Sophie inbox.
+    let threadMessageId = null;
+    if (updated.event_id) {
+      const event = await assertEventAccess(updated.event_id, userId);
+      if (event) {
+        const translation = updated.translation_confirmed ? updated.emotional_translation : null;
+        const need = updated.translation_confirmed ? updated.underlying_need : null;
+        threadMessageId = await insertThreadMessage(event.id, userId, updated.original_text, { translation, need });
+        await notifyThreadReply(event, userId, updated.original_text);
+      }
+    } else {
+      await notifyRelease(updated);
+    }
     logInfo('conflict.release', {
-      userId, id: row.id, translated: !!updated.emotional_translation, confirmed: updated.translation_confirmed,
+      userId, id: row.id, translated: !!updated.emotional_translation,
+      confirmed: updated.translation_confirmed, inThread: !!updated.event_id,
     });
-    res.json({ success: true, intervention: serializeIntervention(updated, userId) });
+    res.json({
+      success: true,
+      intervention: serializeIntervention(updated, userId),
+      thread_message_id: threadMessageId,
+    });
   } catch (err) {
     logError('conflict.release failed', { err: err.message, stack: err.stack });
     res.status(500).json({ success: false, message: '無法送出，請稍後再試' });
