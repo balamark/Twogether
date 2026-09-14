@@ -461,6 +461,8 @@ export interface ConflictIntervention {
   message_status: ConflictMessageStatus;
   state: ConflictState;
   user_emotion: string | null;
+  agency_intent: 'fight' | 'stop' | 'be_understood' | null;
+  agency_goal: 'hurt' | 'understand' | null;
   underlying_need: string | null;
   emotional_translation: string | null;
   translation_confirmed: boolean;
@@ -493,6 +495,22 @@ export interface SophieSafetyCopy {
   note: string;
 }
 
+export interface SophieAgencyOption {
+  key: string;
+  emoji?: string;
+  label: string;
+  hint?: string;
+}
+
+// Sophie's highest-level intervention (the retaliation / agency moment).
+export interface SophieAgencyCopy {
+  intent: { heading: string; body: string[]; options: SophieAgencyOption[] };
+  goal: { heading: string; body: string[]; options: SophieAgencyOption[] };
+  afterUnderstand: string;
+  afterHurt: { body: string; options: SophieAgencyOption[]; holdNote: string };
+  afterBeUnderstood: string;
+}
+
 export interface ConflictSendResult {
   delivered?: boolean;
   held?: boolean;
@@ -502,6 +520,7 @@ export interface ConflictSendResult {
   pause?: SophiePauseCopy;
   core_question?: string;
   core_options?: SophieCoreOption[];
+  agency?: SophieAgencyCopy;
   safety_copy?: SophieSafetyCopy;
   intervention: ConflictIntervention;
 }
@@ -511,6 +530,7 @@ export interface ConflictActiveResult {
   pause?: SophiePauseCopy;
   core_question?: string;
   core_options?: SophieCoreOption[];
+  agency?: SophieAgencyCopy;
   safety?: boolean;
   safety_copy?: SophieSafetyCopy | null;
 }
@@ -544,6 +564,12 @@ function toConflictIntervention(raw: unknown): ConflictIntervention {
     message_status: (r.message_status as ConflictMessageStatus) || 'HELD',
     state: (r.state as ConflictState) || 'PAUSED',
     user_emotion: typeof r.user_emotion === 'string' ? r.user_emotion : null,
+    agency_intent: (['fight', 'stop', 'be_understood'].includes(r.agency_intent as string)
+      ? r.agency_intent
+      : null) as ConflictIntervention['agency_intent'],
+    agency_goal: (['hurt', 'understand'].includes(r.agency_goal as string)
+      ? r.agency_goal
+      : null) as ConflictIntervention['agency_goal'],
     underlying_need: typeof r.underlying_need === 'string' ? r.underlying_need : null,
     emotional_translation: typeof r.emotional_translation === 'string' ? r.emotional_translation : null,
     translation_confirmed: r.translation_confirmed === true,
@@ -5645,6 +5671,7 @@ class ApiService {
         pause: d.pause,
         core_question: d.core_question,
         core_options: Array.isArray(d.core_options) ? d.core_options : undefined,
+        agency: d.agency,
         safety_copy: d.safety_copy,
         intervention: toConflictIntervention(d.intervention),
       };
@@ -5664,6 +5691,7 @@ class ApiService {
         pause: d.pause,
         core_question: d.core_question,
         core_options: Array.isArray(d.core_options) ? d.core_options : undefined,
+        agency: d.agency,
         safety: d.safety === true,
         safety_copy: d.safety_copy ?? null,
       };
@@ -5707,6 +5735,22 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to answer intervention:', error);
       this.throwApiError(error, 'Sophie 暫時無法整理這段話，請稍後再試');
+    }
+  }
+
+  // Record the retaliation / agency choice (Sophie's highest-level branch). No
+  // message is sent — the caller routes to /answer or /release next.
+  async recordConflictAgency(
+    id: string,
+    intent: 'fight' | 'stop' | 'be_understood',
+    goal?: 'hurt' | 'understand',
+  ): Promise<ConflictIntervention> {
+    try {
+      const response = await apiClient.post(`/conflict/${id}/agency`, { intent, goal });
+      return toConflictIntervention(response.data?.intervention);
+    } catch (error: unknown) {
+      console.error('Failed to record agency:', error);
+      this.throwApiError(error, 'Sophie 暫時無法處理，請稍後再試');
     }
   }
 

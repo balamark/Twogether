@@ -30,6 +30,7 @@ const {
   findCoreOption,
   pauseCopy,
   safetyCopy,
+  agencyCopy,
   gentleNudge,
   serializeIntervention,
 } = require('../lib/conflictMediator');
@@ -44,6 +45,9 @@ function interventionMenu(level) {
     pause: pauseCopy(level),
     core_question: CORE_QUESTION,
     core_options: CORE_OPTIONS,
+    // Sophie's highest-level branch — offered from the pause when the urge is to
+    // retaliate (surfaced most on escalation, available whenever a message is held).
+    agency: agencyCopy(),
   };
 }
 
@@ -238,6 +242,64 @@ router.get('/active', async (req, res) => {
     res.status(500).json({ success: false, message: '無法載入進行中的對話' });
   }
 });
+
+// ---------------------------------------------------------------------------
+// POST /:id/agency — record the retaliation / agency choice (§ highest-level
+// intervention). No LLM, no message change: this only captures what the user
+// said they wanted in the moment (fight / stop / be_understood, and the deeper
+// hurt-vs-understand goal), marks the intervention as active mediation, and logs
+// the path. The actual routing (translate vs raw release) is done by the client
+// calling /answer or /release next — this endpoint never sends the message.
+// ---------------------------------------------------------------------------
+router.post(
+  '/:id/agency',
+  [
+    param('id').isUUID(),
+    body('intent').isIn(['fight', 'stop', 'be_understood']),
+    body('goal').optional({ nullable: true }).isIn(['hurt', 'understand']),
+  ],
+  async (req, res) => {
+    if (sendValidationError(req, res)) return;
+    try {
+      const userId = req.user.id;
+      const row = await loadIntervention(req.params.id, userId);
+      if (!row || row.sender_id !== userId) {
+        return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
+      }
+      if (!['HELD', 'IN_INTERVENTION'].includes(row.message_status)) {
+        return res.status(400).json({ success: false, message: '這則訊息已經送出，無法再修改。' });
+      }
+
+      const intent = req.body.intent;
+      const goal = req.body.goal || null;
+      const updated = (
+        await db.query(
+          `UPDATE conflict_interventions
+              SET agency_intent = $2,
+                  agency_goal = COALESCE($3, agency_goal),
+                  message_status = 'IN_INTERVENTION',
+                  state = 'ACTIVE_MEDIATION'
+            WHERE id = $1
+            RETURNING *`,
+          [row.id, intent, goal]
+        )
+      ).rows[0];
+
+      // Log the path so Cloud Logging shows how often the real answer is
+      // "I just want them to know how hurt I am" rather than "I want to fight".
+      logInfo('conflict.agency', { userId, id: row.id, intent, goal, level: row.emotion_level });
+
+      res.json({
+        success: true,
+        agency: agencyCopy(),
+        intervention: serializeIntervention(updated, userId),
+      });
+    } catch (err) {
+      logError('conflict.agency failed', { err: err.message, stack: err.stack });
+      res.status(500).json({ success: false, message: 'Sophie 暫時無法處理，請稍後再試' });
+    }
+  }
+);
 
 // ---------------------------------------------------------------------------
 // POST /:id/answer — the user picks the core need. Sophie produces the emotional

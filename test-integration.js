@@ -874,6 +874,41 @@ class TestRunner {
       this.assertTrue(rel.data.intervention.translation_confirmed === false, 'no confirmed translation');
     });
 
+    await this.test('Conflict — send response carries Sophie agency copy', async () => {
+      this.authToken = sender;
+      const res = await this.makeRequest('POST', '/conflict/messages', { content: '你每次都這樣，你根本不在乎我！' });
+      this.assertTrue(res.data.held === true, 'held');
+      this.assertTrue(!!res.data.agency && Array.isArray(res.data.agency.intent.options), 'agency copy present');
+      this.assertEqual(res.data.agency.intent.options.length, 3, 'three intent options');
+      this._agencyHeldId = res.data.intervention.id;
+    });
+
+    await this.test('Conflict — agency records fight→hurt and enters ACTIVE_MEDIATION', async () => {
+      this.authToken = sender;
+      const res = await this.makeRequest('POST', `/conflict/${this._agencyHeldId}/agency`, { intent: 'fight', goal: 'hurt' });
+      this.assertStatus(res, 200, 'agency accepted');
+      this.assertEqual(res.data.intervention.agency_intent, 'fight', 'intent recorded');
+      this.assertEqual(res.data.intervention.agency_goal, 'hurt', 'goal recorded');
+      this.assertEqual(res.data.intervention.state, 'ACTIVE_MEDIATION', 'state ACTIVE_MEDIATION');
+    });
+
+    await this.test('Conflict — agency rejects an invalid intent', async () => {
+      this.authToken = sender;
+      const res = await this.makeRequest('POST', `/conflict/${this._agencyHeldId}/agency`, { intent: 'nuke' });
+      this.assertStatus(res, 400, 'invalid intent blocked');
+    });
+
+    await this.test('Conflict — "be_understood" agency then answer produces a translation', async () => {
+      this.authToken = sender;
+      const held = await this.makeRequest('POST', '/conflict/messages', { content: '你從來都不聽我說話，我受夠了！' });
+      const id = held.data.intervention.id;
+      const ag = await this.makeRequest('POST', `/conflict/${id}/agency`, { intent: 'be_understood' });
+      this.assertEqual(ag.data.intervention.agency_intent, 'be_understood', 'be_understood recorded');
+      const ans = await this.makeRequest('POST', `/conflict/${id}/answer`, { emotion_key: 'hurt' });
+      this.assertStatus(ans, 200, 'answer after agency works');
+      this.assertTrue(!!ans.data.translation, 'translation produced from hurt');
+    });
+
     await this.test('Conflict — safety signal is flagged and NOT delivered (§25)', async () => {
       this.authToken = sender;
       const res = await this.makeRequest('POST', '/conflict/messages', { content: '我要打你' });

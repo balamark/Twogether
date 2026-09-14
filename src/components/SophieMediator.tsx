@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ChevronRight, Heart, Loader2, MailOpen, Pause, Send, ShieldAlert, Sparkles,
+  ChevronRight, Flame, Heart, Loader2, MailOpen, Pause, Send, ShieldAlert, Sparkles,
 } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
 import AutoGrowTextarea from './AutoGrowTextarea';
@@ -9,6 +9,7 @@ import type {
   ConflictIntervention,
   ConflictSendResult,
   ConflictTranslation,
+  SophieAgencyCopy,
   SophieCoreOption,
   SophiePauseCopy,
   SophieSafetyCopy,
@@ -21,8 +22,11 @@ interface Props {
 }
 
 // The steps of the held-message intervention, shown as a full-screen overlay so
-// the user is never split between the argument and the pause.
-type Phase = 'pause' | 'question' | 'confirm' | 'release' | 'safety';
+// the user is never split between the argument and the pause. The agency-*
+// phases are Sophie's highest-level branch (the retaliation moment).
+type Phase =
+  | 'pause' | 'question' | 'confirm' | 'release' | 'safety'
+  | 'agency' | 'agency-goal' | 'agency-hurt';
 
 // Fallbacks so the flow renders even if a server field is momentarily missing.
 const DEFAULT_PAUSE: SophiePauseCopy = {
@@ -46,6 +50,7 @@ const SophieMediator = ({ showNotification, partnerConnected }: Props) => {
   const [pauseCopy, setPauseCopy] = useState<SophiePauseCopy>(DEFAULT_PAUSE);
   const [coreQuestion, setCoreQuestion] = useState('');
   const [coreOptions, setCoreOptions] = useState<SophieCoreOption[]>([]);
+  const [agencyCopy, setAgencyCopy] = useState<SophieAgencyCopy | null>(null);
   const [safetyCopy, setSafetyCopy] = useState<SophieSafetyCopy | null>(null);
   const [ownText, setOwnText] = useState('');
   const [showOwnText, setShowOwnText] = useState(false);
@@ -88,6 +93,7 @@ const SophieMediator = ({ showNotification, partnerConnected }: Props) => {
         if (res.pause) setPauseCopy(res.pause);
         if (res.core_question) setCoreQuestion(res.core_question);
         if (res.core_options) setCoreOptions(res.core_options);
+        if (res.agency) setAgencyCopy(res.agency);
         if (res.safety && res.safety_copy) {
           setSafetyCopy(res.safety_copy);
           setPhase('safety');
@@ -118,6 +124,7 @@ const SophieMediator = ({ showNotification, partnerConnected }: Props) => {
     if (res.pause) setPauseCopy(res.pause);
     if (res.core_question) setCoreQuestion(res.core_question);
     if (res.core_options) setCoreOptions(res.core_options);
+    if (res.agency) setAgencyCopy(res.agency);
     if (res.safety && res.safety_copy) {
       setSafetyCopy(res.safety_copy);
       setPhase('safety');
@@ -235,11 +242,76 @@ const SophieMediator = ({ showNotification, partnerConnected }: Props) => {
     }
   };
 
-  // Release the original (+ translation). `raw` = the never-silence path: skip
-  // straight to delivery without finishing the intervention.
-  const doRelease = async (raw: boolean) => {
+  // --- Agency / retaliation branch (Sophie's highest-level intervention) -----
+  const recordAgency = async (
+    intent: 'fight' | 'stop' | 'be_understood',
+    goal?: 'hurt' | 'understand',
+  ) => {
     if (!active) return;
-    if (raw) {
+    try {
+      const updated = await apiService.recordConflictAgency(active.id, intent, goal);
+      setActive(updated);
+    } catch {
+      // Recording the choice is best-effort — never block the user from moving
+      // on just because the analytics write hiccupped.
+    }
+  };
+
+  const handleAgencyIntent = async (intent: 'fight' | 'stop' | 'be_understood') => {
+    setBusy(true);
+    try {
+      await recordAgency(intent);
+      if (intent === 'fight') {
+        setPhase('agency-goal');
+      } else if (intent === 'stop') {
+        // "保留憤怒，但先不讓它決定下一句話" → find what you really want heard.
+        setPhase('question');
+      } else {
+        // "我其實只是想讓他知道我有多受傷" → straight into translation of the hurt.
+        await runAnswer('hurt');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleAgencyGoal = async (goal: 'hurt' | 'understand') => {
+    setBusy(true);
+    try {
+      await recordAgency('fight', goal);
+      if (goal === 'understand') {
+        // "先不要讓『讓他受傷』蓋掉『讓他理解你』" → into the core question.
+        setPhase('question');
+      } else {
+        setPhase('agency-hurt');
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleAgencyHurtChoice = async (choice: 'send_now' | 'hold') => {
+    if (choice === 'send_now') {
+      // They chose "繼續這一輪" with eyes open — no second confirm dialog.
+      await doRelease(true, true);
+      return;
+    }
+    // "先不讓它決定下一句話" — stop this round. The words stay held & resumable.
+    showNotification({
+      type: 'info',
+      title: '好，我幫你把這一輪停下來',
+      message: agencyCopy?.afterHurt.holdNote || '原話我幫你留著，等你準備好隨時回來。',
+      duration: 5000,
+    });
+    resetFlow();
+  };
+
+  // Release the original (+ translation). `raw` = the never-silence path: skip
+  // straight to delivery without finishing the intervention. `skipConfirm` is
+  // for a choice the user already made explicitly (e.g. agency "繼續這一輪").
+  const doRelease = async (raw: boolean, skipConfirm = false) => {
+    if (!active) return;
+    if (raw && !skipConfirm) {
       const ok = window.confirm(
         '可以。我不會阻止你。\n\n我只是想讓你知道，這句話現在可能比較容易讓TA進入防禦。\n\n要現在就讓TA看到原話嗎？',
       );
@@ -452,8 +524,113 @@ const SophieMediator = ({ showNotification, partnerConnected }: Props) => {
                     {pauseCopy.cta}
                     <ChevronRight className="w-4 h-4" strokeWidth={2} />
                   </button>
+                  {/* Sophie's highest-level branch — most relevant when the urge
+                      is to hit back (escalation), but always offered. */}
+                  {agencyCopy && (
+                    <button
+                      type="button"
+                      data-testid="sophie-agency-entry"
+                      onClick={() => setPhase('agency')}
+                      className="w-full px-5 py-3 bg-white border-2 border-amber-300 text-amber-800 rounded-md font-body text-sm font-medium hover:bg-amber-50 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Flame className="w-4 h-4" strokeWidth={1.75} />
+                      其實我很想回擊
+                    </button>
+                  )}
                   <ReleaseRawLink busy={busy} onClick={() => doRelease(true)} />
                 </div>
+              </div>
+            )}
+
+            {/* AGENCY — intent: name the urge, hand back control. */}
+            {phase === 'agency' && agencyCopy && (
+              <div className="flex-1 flex flex-col">
+                <div className="flex items-center gap-2 mb-4">
+                  <Flame className="w-5 h-5 text-amber-600" strokeWidth={1.75} />
+                  <h2 className="font-display text-2xl md:text-3xl font-light text-petal-ink leading-snug">
+                    {agencyCopy.intent.heading}
+                  </h2>
+                </div>
+                {agencyCopy.intent.body.map((p, i) => (
+                  <p key={i} className="font-body text-base text-petal-ink-soft leading-relaxed mb-2">{p}</p>
+                ))}
+                <div className="grid grid-cols-1 gap-2.5 mt-4">
+                  {agencyCopy.intent.options.map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      data-testid={`sophie-agency-${opt.key}`}
+                      onClick={() => handleAgencyIntent(opt.key as 'fight' | 'stop' | 'be_understood')}
+                      disabled={busy}
+                      className="bg-white border-2 border-petal-rule rounded-md p-4 text-left hover:border-amber-400 hover:bg-amber-50/40 transition-colors flex items-center gap-3"
+                    >
+                      <span className="text-2xl leading-none" aria-hidden>{opt.emoji}</span>
+                      <span className="flex-1">
+                        <span className="block font-body text-[15px] text-petal-ink">{opt.label}</span>
+                        {opt.hint && <span className="block font-body text-xs text-petal-muted mt-0.5">{opt.hint}</span>}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {busy && (
+                  <p className="mt-4 font-body text-xs text-petal-muted flex items-center gap-1.5">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.75} /> Sophie 正在陪你…
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* AGENCY — the pivotal question: hurt them, or be understood? */}
+            {phase === 'agency-goal' && agencyCopy && (
+              <div className="flex-1 flex flex-col">
+                <h2 className="font-display text-2xl md:text-3xl font-light text-petal-ink leading-snug mb-4">
+                  {agencyCopy.goal.heading}
+                </h2>
+                {agencyCopy.goal.body.map((p, i) => (
+                  <p key={i} className="font-body text-base text-petal-ink-soft leading-relaxed mb-2">{p}</p>
+                ))}
+                <div className="grid grid-cols-1 gap-2.5 mt-4">
+                  {agencyCopy.goal.options.map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      data-testid={`sophie-agency-goal-${opt.key}`}
+                      onClick={() => handleAgencyGoal(opt.key as 'hurt' | 'understand')}
+                      disabled={busy}
+                      className="bg-white border-2 border-petal-rule rounded-md p-4 text-left hover:border-petal-rose hover:bg-petal-rose/5 transition-colors flex items-center gap-3"
+                    >
+                      <span className="text-2xl leading-none" aria-hidden>{opt.emoji}</span>
+                      <span className="flex-1">
+                        <span className="block font-body text-[15px] text-petal-ink">{opt.label}</span>
+                        {opt.hint && <span className="block font-body text-xs text-petal-muted mt-0.5">{opt.hint}</span>}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* AGENCY — "want to hurt": no moralizing, two respected ways forward. */}
+            {phase === 'agency-hurt' && agencyCopy && (
+              <div className="flex-1 flex flex-col">
+                <p className="font-body text-base text-petal-ink-soft leading-relaxed mb-4">{agencyCopy.afterHurt.body}</p>
+                <div className="grid grid-cols-1 gap-2.5">
+                  {agencyCopy.afterHurt.options.map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      data-testid={`sophie-agency-hurt-${opt.key}`}
+                      onClick={() => handleAgencyHurtChoice(opt.key as 'send_now' | 'hold')}
+                      disabled={busy}
+                      className="bg-white border-2 border-petal-rule rounded-md p-4 text-left hover:border-petal-ink transition-colors font-body text-[15px] text-petal-ink"
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-4 font-body text-xs text-petal-muted leading-relaxed">
+                  你可以生氣，但你不用把行為的控制權交給這股情緒。
+                </p>
               </div>
             )}
 
@@ -518,7 +695,16 @@ const SophieMediator = ({ showNotification, partnerConnected }: Props) => {
                   </div>
                 )}
                 {!translating && (
-                  <div className="mt-auto pt-6">
+                  <div className="mt-auto pt-6 space-y-2">
+                    {agencyCopy && !showOwnText && (
+                      <button
+                        type="button"
+                        onClick={() => setPhase('agency')}
+                        className="w-full text-center font-body text-xs text-amber-700 hover:text-amber-800 underline underline-offset-2 transition-colors py-1"
+                      >
+                        其實我現在很想回擊
+                      </button>
+                    )}
                     <ReleaseRawLink busy={busy} onClick={() => doRelease(true)} />
                   </div>
                 )}
