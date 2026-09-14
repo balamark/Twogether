@@ -35,6 +35,7 @@ import apiService, {
 } from '../services/api';
 import AutoGrowTextarea from './AutoGrowTextarea';
 import MessageTranslationCard from './MessageTranslationCard';
+import SophieMessageCard from './SophieMessageCard';
 import TherapyNoteCard from './TherapyNoteCard';
 import ConflictBanner from './ConflictBanner';
 import ThreadRoleLegend from './ThreadRoleLegend';
@@ -1343,14 +1344,28 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                     </div>
                   ) : (
                     <>
-                      <p className="text-sm text-petal-ink whitespace-pre-wrap">{m.content}</p>
+                      {/* Sophie-mediated reply → the Conflict Intervention card:
+                          translation first, heated original blurred behind a
+                          reveal. Otherwise a plain message. */}
+                      {m.sophieTranslation ? (
+                        <SophieMessageCard
+                          original={m.content}
+                          translation={m.sophieTranslation}
+                          need={m.sophieNeed}
+                          mine={mine}
+                        />
+                      ) : (
+                        <p className="text-sm text-petal-ink whitespace-pre-wrap">{m.content}</p>
+                      )}
                       <p className="text-[10px] text-petal-muted mt-1 flex items-center gap-1">
                         <ParticipantAvatar size="xs" name={speakerName} colorKey={m.senderId} />
                         <span className="font-medium text-petal-ink-soft">{speakerName}</span>
                         <span>・{formatTime(m.createdAt, tz)}</span>
                         {m.editedAt && <span>・已編輯</span>}
                         {mine && m.readAt && <span>・已讀</span>}
-                        {mine && event.status !== 'resolved' && (
+                        {/* A mediated message keeps its buffer — editing the raw
+                            original in place would defeat the hierarchy. */}
+                        {mine && event.status !== 'resolved' && !m.sophieTranslation && (
                           <button
                             type="button"
                             data-testid={`event-message-edit-${m.id}`}
@@ -1362,20 +1377,16 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                           </button>
                         )}
                       </p>
-                      {/* Sophie 衝突即時介入: a reply released through the mediator
-                          carries its translation on the message — always shown,
-                          not gated by the 情緒翻譯 lens toggle. */}
-                      {m.sophieTranslation ? (
-                        <MessageTranslationCard
-                          translation={{ rewrite: m.sophieTranslation, need: m.sophieNeed || '', emotions: [] }}
-                        />
-                      ) : translationEnabled && translations[m.id] ? (
+                      {/* The 情緒翻譯 lens card, only for ordinary messages — a
+                          Sophie-mediated message already shows its translation
+                          inside SophieMessageCard above. */}
+                      {!m.sophieTranslation && translationEnabled && translations[m.id] && (
                         <MessageTranslationCard
                           translation={translations[m.id]}
                           messageId={m.id}
                           contextSnapshot={buildEventSnapshot(event.id, m.id, event.messages)}
                         />
-                      ) : null}
+                      )}
                     </>
                   )}
                 </div>
