@@ -130,8 +130,12 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       case 'love_wish_deleted':
         onNavigate('love-language');
         break;
+      // 婚姻檢查 + Sophie 衝突即時介入 (released / understood) all live on the
+      // 接住情緒 (conflict) surface.
       case 'checkup_created':
       case 'checkup_response':
+      case 'conflict_released':
+      case 'conflict_understood':
         onNavigate('conflict');
         break;
       case 'couple_settings_updated':

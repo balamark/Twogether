@@ -35,10 +35,13 @@ import apiService, {
 } from '../services/api';
 import AutoGrowTextarea from './AutoGrowTextarea';
 import MessageTranslationCard from './MessageTranslationCard';
+import SophieMessageCard from './SophieMessageCard';
 import TherapyNoteCard from './TherapyNoteCard';
 import ConflictBanner from './ConflictBanner';
 import ThreadRoleLegend from './ThreadRoleLegend';
 import DraftEmotionMeter from './DraftEmotionMeter';
+import SophieInterventionOverlay from './SophieInterventionOverlay';
+import type { ConflictActiveResult } from '../services/api';
 import { detectDraftTone, draftToneHint } from '../utils/conflictState';
 import GuideSessionView from './GuideSessionView';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -156,6 +159,9 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const [acceptancePreview, setAcceptancePreview] = useState<EmotionAcceptancePreview | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [draftAnalysis, setDraftAnalysis] = useState<DraftAnalysis | null>(null);
+  // Sophie 衝突即時介入: when a reply is held, this holds the intervention + copy
+  // and the full-screen overlay takes over until the reply is released or shelved.
+  const [sophie, setSophie] = useState<ConflictActiveResult | null>(null);
   const [aiInviting, setAiInviting] = useState(false);
   const [aiPosting, setAiPosting] = useState(false);
   const [aiPreview, setAiPreview] = useState<string | null>(null);
@@ -536,9 +542,22 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     setLoading(true);
     setAdvancePaused(false);
     setGuideOpen(false);
+    setSophie(null);
     refresh().finally(() => setLoading(false));
+    // A held reply left in-flight for THIS thread resumes its pause instead of
+    // being lost on a refresh.
+    apiService.getActiveConflictIntervention(eventId)
+      .then((res) => { if (res.intervention) setSophie(res); })
+      .catch(() => { /* no active intervention is the common case */ });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventId]);
+
+  // After a Sophie release, the therapist-turn advance still needs to run.
+  const afterReplyLanded = async () => {
+    const myTurn = facilitation && facilitation.status === 'active' &&
+      (facilitation.turnOwner === currentUserId || facilitation.turnOwner === null);
+    if (myTurn && !advancePaused) await advanceFacilitation();
+  };
 
   const sendReply = async () => {
     const content = reply.trim();
@@ -547,16 +566,30 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     sendLockRef.current = true;
     setSending(true);
     try {
-      await apiService.replyToEvent(eventId, content);
-      setReply('');
-      setDraftAnalysis(null);
-      await refresh();
-      // In an active session, if the therapist was waiting on me, my reply
-      // completes the step — fetch the next facilitated turn. Skipped while
-      // paused (quota spent) so we don't re-toast on every reply.
-      const myTurn = facilitation && facilitation.status === 'active' &&
-        (facilitation.turnOwner === currentUserId || facilitation.turnOwner === null);
-      if (myTurn && !advancePaused) await advanceFacilitation();
+      // Route the reply through Sophie: a calm message goes straight into the
+      // thread; a heated one is held and the intervention overlay takes over.
+      const res = await apiService.sendConflictMessage(content, { eventId });
+      if (res.safety || res.held) {
+        setSophie({
+          intervention: res.intervention,
+          pause: res.pause,
+          core_question: res.core_question,
+          core_options: res.core_options,
+          agency: res.agency,
+          safety: res.safety === true,
+          safety_copy: res.safety_copy ?? null,
+        });
+        // The words are saved server-side; clear the box so it doesn't look
+        // unsent. The overlay owns the message from here.
+        setReply('');
+        setDraftAnalysis(null);
+      } else {
+        // Delivered immediately — already posted to the thread.
+        setReply('');
+        setDraftAnalysis(null);
+        await refresh();
+        await afterReplyLanded();
+      }
     } catch (err) {
       showNotification({
         type: 'error',
@@ -566,6 +599,21 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     } finally {
       setSending(false);
       sendLockRef.current = false;
+    }
+  };
+
+  const handleSophieClose = async (result: 'released' | 'exited') => {
+    setSophie(null);
+    if (result === 'released') {
+      await refresh();
+      await afterReplyLanded();
+    } else {
+      showNotification({
+        type: 'info',
+        title: '訊息已保存',
+        message: 'Sophie 幫你把這段話留著，隨時可以回來繼續。',
+        duration: 4000,
+      });
     }
   };
 
@@ -1296,14 +1344,29 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                     </div>
                   ) : (
                     <>
-                      <p className="text-sm text-petal-ink whitespace-pre-wrap">{m.content}</p>
+                      {/* Sophie-mediated reply → the Conflict Intervention card:
+                          translation first, heated original blurred behind a
+                          reveal. Otherwise a plain message. */}
+                      {m.sophieTranslation ? (
+                        <SophieMessageCard
+                          original={m.content}
+                          translation={m.sophieTranslation}
+                          need={m.sophieNeed}
+                          mine={mine}
+                          companion={m.sophieCompanion}
+                        />
+                      ) : (
+                        <p className="text-sm text-petal-ink whitespace-pre-wrap">{m.content}</p>
+                      )}
                       <p className="text-[10px] text-petal-muted mt-1 flex items-center gap-1">
                         <ParticipantAvatar size="xs" name={speakerName} colorKey={m.senderId} />
                         <span className="font-medium text-petal-ink-soft">{speakerName}</span>
                         <span>・{formatTime(m.createdAt, tz)}</span>
                         {m.editedAt && <span>・已編輯</span>}
                         {mine && m.readAt && <span>・已讀</span>}
-                        {mine && event.status !== 'resolved' && (
+                        {/* A mediated message keeps its buffer — editing the raw
+                            original in place would defeat the hierarchy. */}
+                        {mine && event.status !== 'resolved' && !m.sophieTranslation && (
                           <button
                             type="button"
                             data-testid={`event-message-edit-${m.id}`}
@@ -1315,7 +1378,10 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                           </button>
                         )}
                       </p>
-                      {translationEnabled && translations[m.id] && (
+                      {/* The 情緒翻譯 lens card, only for ordinary messages — a
+                          Sophie-mediated message already shows its translation
+                          inside SophieMessageCard above. */}
+                      {!m.sophieTranslation && translationEnabled && translations[m.id] && (
                         <MessageTranslationCard
                           translation={translations[m.id]}
                           messageId={m.id}
@@ -1342,18 +1408,20 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               data-testid="event-sophie-invite-row"
               className="pt-2 flex flex-col items-center gap-2 border-t border-petal-rule-soft"
             >
+              {/* AI hero — a warm violet→rose gradient pill (AI + empathy), the
+                  conversational invite to bring the counselor in. */}
               <button
                 type="button"
                 data-testid="event-ai-counselor-button"
                 onClick={() => setSophieChooserOpen(true)}
                 disabled={aiInviting || facilitating}
-                className="px-4 py-2 rounded-full border border-petal-sage-deep/40 bg-petal-sage/15 text-petal-sage-deeper font-medium inline-flex items-center gap-2 disabled:opacity-50 hover:bg-petal-sage/25 active:scale-[0.98] transition"
+                className="px-5 py-2 rounded-full bg-gradient-to-r from-violet-500 to-vivid-rose text-white font-medium text-sm inline-flex items-center gap-2 shadow-sm shadow-violet-500/25 hover:opacity-95 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                 title={`請 ${myCompanion.name} 加入，給建議或帶你們做一張練習卡`}
               >
                 {(aiInviting || facilitating) ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
                 <span>請 {myCompanion.name} 加入</span>
               </button>
-              <p className="font-body text-[11px] text-petal-muted text-center max-w-sm leading-relaxed inline-flex items-center gap-1">
+              <p className="font-body text-[11px] text-petal-muted text-center max-w-sm leading-relaxed inline-flex items-center gap-1 mt-0.5">
                 <Globe className="w-3 h-3 shrink-0" strokeWidth={1.75} />
                 回應會出現在對話裡，兩人都看得到（會用到 AI 次數）。
               </p>
@@ -1453,20 +1521,20 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           <div className="flex justify-end">
             <AiQuotaHint quota={quota} />
           </div>
-          {/* Action bar — the visual hierarchy the redesign is about: the two
-              private draft-aids are flat ghost buttons on the left; the only
-              high-contrast fill in the whole bar is 送出, the true primary. */}
+          {/* Action bar — the two private draft-aids are outlined pill buttons
+              (bordered so they clearly read as tappable, not grey text); the
+              only high-contrast FILL in the bar is 送出, the true primary. */}
           <div className="flex items-center justify-between gap-2 border-t border-petal-rule-soft pt-2">
-            <div className="flex items-center gap-0.5">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 data-testid="event-draft-analyze-button"
                 onClick={requestDraftAnalysis}
                 disabled={analyzing || reply.trim().length === 0}
-                className="px-2.5 py-1.5 rounded-full font-body text-xs text-petal-ink-soft inline-flex items-center gap-1.5 hover:bg-petal-sage/15 hover:text-petal-ink disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+                className="px-3 py-1.5 rounded-full border border-slate-200 bg-white font-body text-xs font-medium text-slate-600 inline-flex items-center gap-1.5 shadow-sm hover:bg-violet-50 hover:text-violet-700 hover:border-violet-300 active:scale-95 transition-all duration-150 cursor-pointer disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-slate-600 disabled:hover:border-slate-200"
                 title="送出前，看看這句話底層的情緒、對方會怎麼聽，以及更好的說法"
               >
-                {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Gauge className="w-4 h-4" strokeWidth={1.75} />}
+                {analyzing ? <Loader2 className="w-4 h-4 animate-spin text-amber-500" /> : <Gauge className="w-4 h-4 text-amber-500" strokeWidth={1.75} />}
                 <span>情緒檢測</span>
               </button>
               <button
@@ -1474,10 +1542,10 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 data-testid="event-reply-rewrite-button"
                 onClick={requestRewrite}
                 disabled={rewriting || reply.trim().length === 0}
-                className="px-2.5 py-1.5 rounded-full font-body text-xs text-petal-ink-soft inline-flex items-center gap-1.5 hover:bg-petal-sage/15 hover:text-petal-ink disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+                className="px-3 py-1.5 rounded-full border border-slate-200 bg-white font-body text-xs font-medium text-slate-600 inline-flex items-center gap-1.5 shadow-sm hover:bg-violet-50 hover:text-violet-700 hover:border-violet-300 active:scale-95 transition-all duration-150 cursor-pointer disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-slate-600 disabled:hover:border-slate-200"
                 title="讓 AI 把你的回覆改得更中性、客觀"
               >
-                {rewriting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" strokeWidth={1.75} />}
+                {rewriting ? <Loader2 className="w-4 h-4 animate-spin text-violet-500" /> : <Sparkles className="w-4 h-4 text-violet-500" strokeWidth={1.75} />}
                 <span>緩和語氣</span>
               </button>
             </div>
@@ -1486,7 +1554,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               data-testid="event-reply-send-button"
               onClick={sendReply}
               disabled={sending || reply.trim().length === 0 || replyOver}
-              className="px-5 py-2 rounded-full bg-petal-ink text-petal-cream font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:shadow-none hover:opacity-90 active:scale-[0.98] transition"
+              className="px-5 py-2 rounded-full font-medium inline-flex items-center gap-2 transition-all active:scale-[0.98] bg-vivid-rose text-white shadow-md shadow-vivid-rose/30 hover:bg-vivid-rose-strong cursor-pointer disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none disabled:cursor-not-allowed disabled:pointer-events-none disabled:hover:bg-slate-200"
             >
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               <span>送出</span>
@@ -1503,6 +1571,26 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             setDraftAnalysis(null);
           }}
           onClose={() => setDraftAnalysis(null)}
+        />
+      )}
+
+      {sophie?.intervention && (
+        <SophieInterventionOverlay
+          intervention={sophie.intervention}
+          pauseCopy={sophie.pause || {
+            heading: '我先暫停一下。',
+            body: ['你的訊息沒有被刪掉，也沒有被改寫，我已經幫你保存下來。', '我想先陪你一下，因為如果現在立刻讓TA看到，你們可能會直接進入下一輪爭吵。'],
+            reassurance: '你可以生氣。我只想幫你確定：在這股生氣下面，你最希望TA真正聽見的是什麼。',
+            cta: '好，先陪我一下',
+          }}
+          coreQuestion={sophie.core_question || ''}
+          coreOptions={sophie.core_options || []}
+          agencyCopy={sophie.agency || null}
+          safety={sophie.safety === true}
+          safetyCopy={sophie.safety_copy ?? null}
+          companionName={myCompanion.name}
+          showNotification={showNotification}
+          onClose={handleSophieClose}
         />
       )}
 

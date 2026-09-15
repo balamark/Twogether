@@ -125,6 +125,7 @@ video {
 .dark .bg-petal-rose-soft,
 .dark .bg-petal-cream-2\/40,
 .dark .bg-petal-cream-2\/50,
+.dark .bg-slate-200,
 .dark .bg-gray-200 { background-color: #1C2128 !important; }
 
 /* 淡鼠尾草底（語意色：做到了 / 觀察 / 成功）。這些一直沒有深色覆寫，於是在
@@ -149,10 +150,12 @@ video {
 /* 文字：主 / 次 / 靜音 */
 .dark .text-petal-ink,
 .dark .text-gray-900,
-.dark .text-gray-800 { color: #E6EDF3 !important; }
+.dark .text-gray-800,
+.dark .text-slate-800 { color: #E6EDF3 !important; }
 .dark .text-petal-ink-soft,
 .dark .text-gray-700,
-.dark .text-gray-600 { color: #ADBAC7 !important; }
+.dark .text-gray-600,
+.dark .text-slate-600 { color: #ADBAC7 !important; }
 .dark .text-petal-muted,
 .dark .text-gray-500,
 .dark .text-gray-400 { color: #8B949E !important; }
@@ -229,6 +232,7 @@ video {
 .dark .bg-emerald-50\/60,
 .dark .bg-lime-50 { background-color: #12261E !important; }
 .dark .bg-green-100,
+.dark .bg-emerald-100,
 .dark .bg-emerald-100\/80 { background-color: #17301F !important; }
 .dark .text-green-600,
 .dark .text-green-700,
@@ -284,9 +288,11 @@ video {
 .dark .border-orange-200,
 .dark .border-orange-200\/50 { border-color: rgba(219,109,40,0.4) !important; }
 
-/* 特殊（violet） */
+/* 特殊（violet）——AI 工具的 hover 也用這組 */
+.dark .bg-violet-50,
 .dark .bg-violet-50\/60 { background-color: #1E1729 !important; }
 .dark .bg-violet-100\/80 { background-color: #251C33 !important; }
+.dark .text-violet-700,
 .dark .text-violet-800 { color: #A371F7 !important; }
 .dark .border-violet-200,
 .dark .border-violet-200\/50 { border-color: rgba(163,113,247,0.4) !important; }

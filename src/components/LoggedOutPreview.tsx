@@ -377,6 +377,45 @@ const CHECKUP_ROWS: { label: string; a: number; b: number }[] = [
   { label: '🏠 家務分工', a: 3, b: 2 },
 ];
 
+// Sophie 衝突即時介入 read-only sample: the held-message loop — your original
+// words are saved (never rewritten), then released alongside Sophie's read of
+// the need underneath. Static 範例 data.
+const SophieMediatorSample: React.FC = () => (
+  <div className="space-y-2.5">
+    <div className="flex items-center justify-between">
+      <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
+        <Sparkles className="w-3.5 h-3.5 text-petal-rose-deep" strokeWidth={1.5} />
+        Sophie 即時介入
+      </span>
+      <SampleTag />
+    </div>
+    {/* The Conflict Intervention card: translation first, the heated original
+        blurred behind a reveal. Static illustration of the real UI. */}
+    <SampleCard>
+      <div className="font-body text-[11px] font-medium text-petal-rose-deep inline-flex items-center gap-1.5 mb-1">
+        <HeartHandshake className="w-3.5 h-3.5" strokeWidth={1.5} />
+        Sophie 協助表達
+      </div>
+      <p className="font-body text-sm text-petal-ink leading-relaxed">
+        「我現在心裡真的很痛，剛才那件事讓我覺得自己不被尊重，我希望我們可以坐下來好好談。」
+      </p>
+      <span className="mt-2 inline-flex items-center gap-1.5 rounded bg-amber-50 text-amber-700 border border-amber-200/60 font-body text-[11px] font-medium px-2 py-0.5">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" aria-hidden />
+        TA需要被尊重
+      </span>
+      <div className="mt-3 pt-3 border-t border-dashed border-petal-rose-deep/30">
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-1">原本的訊息</div>
+        <p aria-hidden className="font-body text-sm text-petal-ink/70 leading-relaxed select-none blur-[6px]">
+          你欺人太甚，要離婚就來啊！
+        </p>
+        <span className="mt-1.5 inline-flex items-center gap-1 font-body text-xs text-slate-500">
+          查看原本的訊息 ›
+        </span>
+      </div>
+    </SampleCard>
+  </div>
+);
+
 const MarriageCheckupSample: React.FC = () => (
   <SampleCard>
     <div className="flex items-center justify-between mb-3">
@@ -1020,6 +1059,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
     sample: (
       <div className="space-y-3">
         <ConflictFlywheelSample />
+        <SophieMediatorSample />
         <DeepDiveSample />
       </div>
     ),

@@ -139,6 +139,9 @@ class TestRunner {
       // 👍/👎 feedback on AI responses (validation + upsert + auth gate)
       await this.testAiFeedback();
 
+      // Sophie 衝突即時介入 (hold → translate → release + safety + gate)
+      await this.testConflictIntervention();
+
     } finally {
       // Always cleanup test users, even if tests fail
       await this.cleanupTestUsers();
@@ -791,6 +794,199 @@ class TestRunner {
       this.authToken = savedToken;
       this.assertStatus(res, 401, 'unauth blocked');
     });
+  }
+
+  async testConflictIntervention() {
+    console.log('\n💌 Testing Sophie 衝突即時介入 (/conflict)');
+    // Runs after the pairing flow, so this.authToken (sender) and
+    // this.partnerToken (recipient) are a real paired couple.
+    const sender = this.authToken;
+    const partner = this.partnerToken;
+
+    await this.test('Conflict — normal message delivers immediately (level 0)', async () => {
+      this.authToken = sender;
+      const res = await this.makeRequest('POST', '/conflict/messages', { content: '今天晚餐吃什麼？' });
+      this.assertStatus(res, 201, 'normal message accepted');
+      this.assertTrue(res.data.delivered === true, 'delivered immediately');
+      this.assertEqual(res.data.level, 0, 'level 0');
+    });
+
+    let heldId = null;
+    await this.test('Conflict — high emotion is held, original preserved verbatim', async () => {
+      this.authToken = sender;
+      const text = '你根本完全不在乎我的感受！';
+      const res = await this.makeRequest('POST', '/conflict/messages', { content: text });
+      this.assertStatus(res, 201, 'held message accepted');
+      this.assertTrue(res.data.held === true, 'message is held, not delivered');
+      this.assertEqual(res.data.intervention.original_text, text, 'original saved unchanged');
+      this.assertEqual(res.data.core_options.length, 6, 'one core question with 6 options');
+      heldId = res.data.intervention.id;
+    });
+
+    await this.test('Conflict — partner cannot see a held message', async () => {
+      this.authToken = partner;
+      const res = await this.makeRequest('GET', '/conflict/inbox');
+      this.assertStatus(res, 200, 'inbox loads');
+      const seen = (res.data.items || []).some((i) => i.id === heldId);
+      this.assertTrue(!seen, 'held message is not in partner inbox');
+    });
+
+    await this.test('Conflict — answer produces a translation, confirm moves to RELEASING', async () => {
+      this.authToken = sender;
+      const ans = await this.makeRequest('POST', `/conflict/${heldId}/answer`, { emotion_key: 'boundary' });
+      this.assertStatus(ans, 200, 'answer accepted');
+      this.assertTrue(!!ans.data.translation, 'translation returned');
+      this.assertEqual(ans.data.intervention.underlying_need, '被尊重', 'need from chosen option');
+      const conf = await this.makeRequest('POST', `/conflict/${heldId}/confirm`, { confirmed: true });
+      this.assertStatus(conf, 200, 'confirm accepted');
+      this.assertTrue(conf.data.intervention.translation_confirmed === true, 'translation confirmed');
+      this.assertEqual(conf.data.intervention.state, 'RELEASING', 'state RELEASING');
+    });
+
+    await this.test('Conflict — release makes the ORIGINAL + translation visible to partner', async () => {
+      this.authToken = sender;
+      const rel = await this.makeRequest('POST', `/conflict/${heldId}/release`);
+      this.assertStatus(rel, 200, 'release accepted');
+      this.assertEqual(rel.data.intervention.message_status, 'RELEASED', 'status RELEASED');
+
+      this.authToken = partner;
+      const inbox = await this.makeRequest('GET', '/conflict/inbox');
+      const got = (inbox.data.items || []).find((i) => i.id === heldId);
+      this.assertTrue(!!got, 'released message now in partner inbox');
+      this.assertEqual(got.original_text, '你根本完全不在乎我的感受！', 'partner sees the original words');
+      this.assertTrue(!!got.emotional_translation, "partner sees Sophie's translation");
+    });
+
+    await this.test('Conflict — partner acknowledges understanding (§14)', async () => {
+      this.authToken = partner;
+      const res = await this.makeRequest('POST', `/conflict/${heldId}/understood`, { understood: true });
+      this.assertStatus(res, 200, 'understood accepted');
+      this.assertTrue(res.data.intervention.partner_understood === true, 'understanding recorded');
+    });
+
+    await this.test('Conflict — never-silence: raw release works with no translation (§24)', async () => {
+      this.authToken = sender;
+      const held = await this.makeRequest('POST', '/conflict/messages', { content: '你每次都這樣，我受夠了！' });
+      this.assertTrue(held.data.held === true, 'escalation held');
+      const id = held.data.intervention.id;
+      const rel = await this.makeRequest('POST', `/conflict/${id}/release`);
+      this.assertEqual(rel.data.intervention.message_status, 'RELEASED', 'released without intervention');
+      this.assertTrue(rel.data.intervention.translation_confirmed === false, 'no confirmed translation');
+    });
+
+    await this.test('Conflict — send response carries Sophie agency copy', async () => {
+      this.authToken = sender;
+      const res = await this.makeRequest('POST', '/conflict/messages', { content: '你每次都這樣，你根本不在乎我！' });
+      this.assertTrue(res.data.held === true, 'held');
+      this.assertTrue(!!res.data.agency && Array.isArray(res.data.agency.intent.options), 'agency copy present');
+      this.assertEqual(res.data.agency.intent.options.length, 3, 'three intent options');
+      this._agencyHeldId = res.data.intervention.id;
+    });
+
+    await this.test('Conflict — agency records fight→hurt and enters ACTIVE_MEDIATION', async () => {
+      this.authToken = sender;
+      const res = await this.makeRequest('POST', `/conflict/${this._agencyHeldId}/agency`, { intent: 'fight', goal: 'hurt' });
+      this.assertStatus(res, 200, 'agency accepted');
+      this.assertEqual(res.data.intervention.agency_intent, 'fight', 'intent recorded');
+      this.assertEqual(res.data.intervention.agency_goal, 'hurt', 'goal recorded');
+      this.assertEqual(res.data.intervention.state, 'ACTIVE_MEDIATION', 'state ACTIVE_MEDIATION');
+    });
+
+    await this.test('Conflict — agency rejects an invalid intent', async () => {
+      this.authToken = sender;
+      const res = await this.makeRequest('POST', `/conflict/${this._agencyHeldId}/agency`, { intent: 'nuke' });
+      this.assertStatus(res, 400, 'invalid intent blocked');
+    });
+
+    await this.test('Conflict — "be_understood" agency then answer produces a translation', async () => {
+      this.authToken = sender;
+      const held = await this.makeRequest('POST', '/conflict/messages', { content: '你從來都不聽我說話，我受夠了！' });
+      const id = held.data.intervention.id;
+      const ag = await this.makeRequest('POST', `/conflict/${id}/agency`, { intent: 'be_understood' });
+      this.assertEqual(ag.data.intervention.agency_intent, 'be_understood', 'be_understood recorded');
+      const ans = await this.makeRequest('POST', `/conflict/${id}/answer`, { emotion_key: 'hurt' });
+      this.assertStatus(ans, 200, 'answer after agency works');
+      this.assertTrue(!!ans.data.translation, 'translation produced from hurt');
+    });
+
+    await this.test('Conflict — event reply: calm message posts straight into the thread', async () => {
+      this.authToken = sender;
+      const ev = await this.makeRequest('POST', '/events', {
+        title: '晚餐的事', summary: '想好好聊聊晚餐怎麼安排',
+        ai_neutral: 'n', ai_firm: 'f', ai_warm: 'w', selected_version: 'warm',
+      });
+      this.assertStatus(ev, 201, 'event created');
+      this._eventId = ev.data.event.id;
+      const res = await this.makeRequest('POST', '/conflict/messages', { content: '今天晚餐吃什麼？', event_id: this._eventId });
+      this.assertTrue(res.data.delivered === true, 'calm reply delivered');
+      const got = await this.makeRequest('GET', `/events/${this._eventId}`);
+      const found = (got.data.event.messages || []).some((m) => m.content === '今天晚餐吃什麼？');
+      this.assertTrue(found, 'calm reply is in the thread');
+    });
+
+    await this.test('Conflict — event reply: heated reply is held, then released into the thread with translation', async () => {
+      this.authToken = sender;
+      const held = await this.makeRequest('POST', '/conflict/messages', { content: '你根本完全不在乎我的感受！', event_id: this._eventId });
+      this.assertTrue(held.data.held === true, 'heated reply held');
+      const id = held.data.intervention.id;
+      this.assertEqual(held.data.intervention.event_id, this._eventId, 'intervention tied to event');
+
+      // Not in the thread while held.
+      let got = await this.makeRequest('GET', `/events/${this._eventId}`);
+      let inThread = (got.data.event.messages || []).some((m) => m.content === '你根本完全不在乎我的感受！');
+      this.assertTrue(!inThread, 'held reply not yet in thread');
+
+      await this.makeRequest('POST', `/conflict/${id}/answer`, { emotion_key: 'boundary' });
+      await this.makeRequest('POST', `/conflict/${id}/confirm`, { confirmed: true });
+      const rel = await this.makeRequest('POST', `/conflict/${id}/release`);
+      this.assertTrue(!!rel.data.thread_message_id, 'release returns a thread message id');
+
+      got = await this.makeRequest('GET', `/events/${this._eventId}`);
+      const msg = (got.data.event.messages || []).find((m) => m.content === '你根本完全不在乎我的感受！');
+      this.assertTrue(!!msg, 'released original is now in the thread');
+      this.assertTrue(!!msg.sophie_translation, 'released message carries Sophie translation inline');
+      this.assertEqual(msg.sophie_need, '被尊重', 'released message carries the need');
+      this.assertTrue(!!msg.sophie_companion, "released message carries the sender's companion name");
+    });
+
+    await this.test('Conflict — event-scoped /active resumes only this thread’s held reply', async () => {
+      this.authToken = sender;
+      await this.makeRequest('POST', '/conflict/messages', { content: '你每次都這樣，我受夠了！', event_id: this._eventId });
+      const act = await this.makeRequest('GET', '/conflict/active', null);
+      // GET with query — use a manual URL since makeRequest has no query support.
+      const scoped = await this.makeRequest('GET', `/conflict/active?event_id=${this._eventId}`);
+      this.assertTrue(!!scoped.data.intervention && scoped.data.intervention.event_id === this._eventId, 'scoped active returns this thread’s held reply');
+      this.assertTrue(!!act.data.intervention, 'unscoped active also returns a held reply');
+      // Clean up: release it so it doesn't linger.
+      await this.makeRequest('POST', `/conflict/${scoped.data.intervention.id}/release`);
+    });
+
+    await this.test('Conflict — safety signal is flagged and NOT delivered (§25)', async () => {
+      this.authToken = sender;
+      const res = await this.makeRequest('POST', '/conflict/messages', { content: '我要打你' });
+      this.assertStatus(res, 201, 'safety message accepted');
+      this.assertTrue(res.data.safety === true, 'flagged as safety');
+      this.assertTrue(res.data.intervention.safety_flag === true, 'safety_flag set');
+      this.assertEqual(res.data.intervention.message_status, 'HELD', 'not delivered');
+      this.assertTrue(Array.isArray(res.data.safety_copy?.resources), 'safety resources returned');
+    });
+
+    await this.test('Conflict — unpaired user is gated with CONFLICT_NOT_PAIRED', async () => {
+      // A fresh solo user with no partner.
+      const solo = {
+        email: `solo_${Date.now()}@example.com`,
+        nickname: `Solo_${Date.now()}`,
+        password: 'TestPassword123!',
+      };
+      const reg = await this.makeRequest('POST', '/auth/register', solo);
+      this.authToken = reg.data.token;
+      const res = await this.makeRequest('POST', '/conflict/messages', { content: '你根本不在乎我！' });
+      this.assertStatus(res, 400, 'unpaired blocked');
+      this.assertEqual(res.data.error_code, 'CONFLICT_NOT_PAIRED', 'specific gate error_code');
+    });
+
+    // Restore the paired sender token for any later shared-state expectations.
+    this.authToken = sender;
   }
 
   async cleanupTestUsers() {
