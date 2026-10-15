@@ -287,6 +287,28 @@ app.get(['/pricing', '/membership', '/plans', '/pricing.html'], (req, res) => {
   res.type('html').send(pricingHtmlCache);
 });
 
+// Public, no-login customer-support page (English by default, with an
+// EN / 繁中 switch; the in-app counterpart is HelpView). App Store review and
+// overseas visitors need a support URL that works without an account, so like
+// /pricing this is a self-contained static page with the same {{SUPPORT_EMAIL}}
+// placeholder substitution. '/support.html' is listed so the raw dist/ copy
+// (Vite copies public/ verbatim) can never be served.
+let supportHtmlCache = null;
+app.get(['/support', '/support.html'], (req, res) => {
+  if (!supportHtmlCache) {
+    supportHtmlCache = fs
+      .readFileSync(path.join(__dirname, 'public', 'support.html'), 'utf8')
+      .replace(/\{\{SUPPORT_EMAIL\}\}/g, SUPPORT_EMAIL);
+  }
+  logInfo('support.page_view', {
+    path: req.path,
+    lang: typeof req.query.lang === 'string' ? req.query.lang.slice(0, 8) : null,
+    acceptLanguage: (req.get('accept-language') || '').slice(0, 32),
+  });
+  res.setHeader('Cache-Control', 'no-cache');
+  res.type('html').send(supportHtmlCache);
+});
+
 // Public, no-login therapist recruitment / sign-up page. The SPA gates most
 // views behind auth, so this explicit route (registered before the static
 // catch-all) serves a self-contained static form that POSTs to the public

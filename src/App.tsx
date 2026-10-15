@@ -55,6 +55,7 @@ import { clientLog } from './utils/telemetry';
 import { useMediaProtection } from './hooks/useMediaProtection';
 import { TimezoneProvider } from './contexts/TimezoneContext';
 import { FeatureFlagsProvider } from './contexts/FeatureFlagsProvider';
+import { useLanguage } from './i18n/LanguageContext';
 import { EngineerModeProvider } from './contexts/EngineerModeProvider';
 import EngineerTextEngine from './components/EngineerTextEngine';
 import { useScrollLock } from './hooks/useScrollLock';
@@ -539,6 +540,8 @@ const PERSISTED_VIEWS = new Set([
 ]);
 
 const LoveTimeApp = () => {
+  // 介面語言（共用外框：導覽列標籤等）。Provider 掛在 main.tsx。
+  const { t, locale } = useLanguage();
   // Persist the active tab across page refreshes so a reload keeps the user on
   // the same page (e.g. 角色扮演) instead of bouncing back to 記錄時光. Only
   // restore known navigable views; transient/result flows handle their own view.
@@ -2385,15 +2388,15 @@ const LoveTimeApp = () => {
   // In counselor mode the couple nav is fully replaced by the single 諮商工作台
   // tab — the two role contexts never share a nav bar (confirmed product stance).
   const navItems = counselorActive
-    ? [{ id: 'counselor', label: '諮商工作台', icon: HeartHandshake }]
+    ? [{ id: 'counselor', label: t('nav.counselor'), icon: HeartHandshake }]
     : [
-        { id: 'home', label: '今天', icon: HomeIcon },
-        { id: 'talk', label: '對話', icon: MessageCircle },
-        { id: 'us', label: '我們', icon: Calendar },
-        { id: 'grow', label: '成長', icon: TrendingUp },
+        { id: 'home', label: t('nav.home'), icon: HomeIcon },
+        { id: 'talk', label: t('nav.talk'), icon: MessageCircle },
+        { id: 'us', label: t('nav.us'), icon: Calendar },
+        { id: 'grow', label: t('nav.grow'), icon: TrendingUp },
         // Pricing is a sales surface for visitors; signed-in users upgrade via the
         // dedicated 'upgrade' view instead, so this tab is logged-out only.
-        ...(!authState.isAuthenticated ? [{ id: 'pricing', label: 'Premium', icon: Crown }] : []),
+        ...(!authState.isAuthenticated ? [{ id: 'pricing', label: t('nav.pricing'), icon: Crown }] : []),
       ];
 
   const renderView = () => {
@@ -3122,13 +3125,13 @@ const LoveTimeApp = () => {
         {!authState.isAuthenticated && currentView !== 'therapists' && (
           <footer className="max-w-6xl mx-auto mt-16 pt-6 border-t border-petal-rule text-center safe-pb">
             <p className="font-body text-xs text-petal-muted">
-              你是諮商師？
+              {t('footer.areYouCounselor')}
               <button
                 onClick={() => setCurrentView('therapists')}
                 data-testid="therapist-footer-link"
                 className="text-pink-600 hover:text-pink-700 underline underline-offset-2"
               >
-                登入
+                {t('footer.counselorSignIn')}
               </button>
               <span className="mx-1.5 text-petal-rule">·</span>
               <a
@@ -3136,7 +3139,7 @@ const LoveTimeApp = () => {
                 data-testid="therapist-signup-link"
                 className="text-pink-600 hover:text-pink-700 underline underline-offset-2"
               >
-                申請入駐
+                {t('footer.counselorApply')}
               </a>
             </p>
           </footer>
@@ -3146,6 +3149,17 @@ const LoveTimeApp = () => {
             baked in by vite.config.ts `define` so every deployed commit
             shows its own build metadata. */}
         <footer className="max-w-6xl mx-auto mt-10 pb-4 text-center safe-pb">
+          {/* Public support page (no login) — the URL App Store / overseas
+              visitors land on. Opens in the visitor's current language. */}
+          <p className="font-body text-xs mb-1.5">
+            <a
+              href={`/support?lang=${locale}`}
+              data-testid="footer-support-link"
+              className="text-pink-600 hover:text-pink-700 underline underline-offset-2"
+            >
+              {t('footer.support')}
+            </a>
+          </p>
           <p className="font-body text-[11px] text-petal-muted/80" data-testid="build-info">
             v{__APP_VERSION__} | {import.meta.env.MODE} |{' '}
             {new Date(__BUILD_TIME__).toLocaleString('zh-TW')} | {__COMMIT_HASH__}

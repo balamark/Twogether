@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en" data-lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Twogether Support</title>
+    <meta
+      name="description"
+      content="Twogether customer support: contact us, account and pairing help, Premium billing and refunds, and privacy questions. Available in English and Traditional Chinese, no login required."
+    />
+    <meta name="robots" content="index, follow" />
+    <!-- Also served at /support.html; canonicalize onto /support. -->
+    <link rel="canonical" href="https://twogether.fun/support" />
+    <link rel="alternate" hreflang="en" href="https://twogether.fun/support?lang=en" />
+    <link rel="alternate" hreflang="zh-Hant" href="https://twogether.fun/support?lang=zh-TW" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#fbf7f2" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Twogether" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="zh_TW" />
+    <meta property="og:title" content="Twogether Support" />
+    <meta property="og:description" content="Contact Twogether support and find answers about accounts, pairing, Premium billing, refunds and privacy." />
+    <meta property="og:url" content="https://twogether.fun/support" />
+    <meta property="og:image" content="https://twogether.fun/images/og-image.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Noto+Serif+TC:wght@500;600&family=Noto+Sans+TC:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Same palette as public/pricing.html and the app's petal-* tokens. */
+      :root {
+        --cream: #fbf7f2;
+        --cream-2: #f2ebdf;
+        --rose: #d4938a;
+        --rose-deep: #b86e64;
+        --sage-deep: #7d8f75;
+        --ink: #2a2520;
+        --ink-soft: #5a4f45;
+        --muted: #8a7e72;
+        --rule: #d9cfc1;
+        --rule-soft: #e8dfd0;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        background: var(--cream);
+        color: var(--ink);
+        font-family: "Noto Sans TC", system-ui, -apple-system, sans-serif;
+        line-height: 1.7;
+        -webkit-font-smoothing: antialiased;
+      }
+      h1, h2, h3 { font-family: "Fraunces", "Noto Serif TC", Georgia, serif; font-weight: 600; }
+      a { color: var(--rose-deep); }
+      .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+
+      /* One page, two languages: every translatable node exists twice and the
+         <html data-lang> attribute decides which one shows. */
+      html[data-lang="en"] .zh, html[data-lang="zh-TW"] .en { display: none !important; }
+
+      header.site { background: var(--cream-2); border-bottom: 1px solid var(--rule-soft); }
+      header.site .wrap {
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        padding-top: 14px; padding-bottom: 14px;
+      }
+      .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
+      .brand .logo { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--rose), var(--sage-deep)); }
+      .brand .name { font-family: "Fraunces", serif; font-size: 20px; font-weight: 600; }
+
+      .lang-switch { display: inline-flex; border: 1px solid var(--rule); border-radius: 999px; padding: 2px; }
+      .lang-switch button {
+        font: inherit; font-size: 13px; font-weight: 500; border: 0; background: transparent; cursor: pointer;
+        color: var(--ink-soft); min-height: 32px; min-width: 44px; padding: 0 10px; border-radius: 999px;
+      }
+      .lang-switch button[aria-checked="true"] { background: var(--ink); color: var(--cream); }
+
+      .hero { padding: 40px 0 16px; }
+      .hero h1 { font-size: 34px; line-height: 1.2; margin: 0 0 10px; }
+      .hero p { color: var(--ink-soft); margin: 0; font-size: 16px; }
+
+      .contact {
+        margin: 24px 0 8px; padding: 20px; border-radius: 18px;
+        background: #fff; border: 1px solid var(--rule-soft);
+      }
+      .contact h2 { margin: 0 0 6px; font-size: 20px; }
+      .contact p { margin: 0 0 12px; color: var(--ink-soft); font-size: 15px; }
+      .btn {
+        display: inline-block; padding: 10px 20px; border-radius: 999px; text-decoration: none;
+        background: var(--rose-deep); color: #fff; font-weight: 600; font-size: 15px; word-break: break-all;
+      }
+      .contact ul { margin: 14px 0 0; padding-left: 20px; color: var(--ink-soft); font-size: 14px; }
+
+      section { padding: 20px 0; }
+      section h2 { font-size: 22px; margin: 0 0 10px; }
+      details {
+        background: #fff; border: 1px solid var(--rule-soft); border-radius: 14px;
+        padding: 0 16px; margin-bottom: 8px;
+      }
+      summary { cursor: pointer; padding: 13px 0; font-weight: 500; list-style: none; }
+      summary::-webkit-details-marker { display: none; }
+      summary::after { content: "+"; float: right; color: var(--muted); }
+      details[open] summary::after { content: "–"; }
+      details p, details ul { margin: 0 0 14px; color: var(--ink-soft); font-size: 15px; }
+
+      footer.site { border-top: 1px solid var(--rule-soft); margin-top: 24px; padding: 20px 0 36px; color: var(--muted); font-size: 13px; }
+      footer.site a { margin-right: 14px; }
+
+      @media (max-width: 520px) {
+        .hero h1 { font-size: 28px; }
+        .brand .name { font-size: 18px; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site">
+      <div class="wrap">
+        <a class="brand" href="/">
+          <span class="logo" aria-hidden="true"></span>
+          <span class="name">Twogether</span>
+        </a>
+        <div class="lang-switch" role="radiogroup" aria-label="Language / 介面語言" data-testid="support-language-switch">
+          <button type="button" role="radio" data-set-lang="en" lang="en" aria-label="English" aria-checked="true">EN</button>
+          <button type="button" role="radio" data-set-lang="zh-TW" lang="zh-Hant" aria-label="繁體中文" aria-checked="false">繁中</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <div class="hero">
+        <h1 data-testid="support-title">
+          <span class="en">How can we help?</span>
+          <span class="zh" lang="zh-Hant">需要什麼協助？</span>
+        </h1>
+        <p>
+          <span class="en">Twogether is an app for couples to record good moments, talk things through and grow together. If something isn't working, we're here.</span>
+          <span class="zh" lang="zh-Hant">Twogether 是陪伴侶記錄美好、把話說開、一起成長的 App。遇到任何問題，我們都在。</span>
+        </p>
+      </div>
+
+      <div class="contact">
+        <h2><span class="en">Contact support</span><span class="zh" lang="zh-Hant">聯絡客服</span></h2>
+        <p>
+          <span class="en">Email us any time. We read every message and will reply as soon as we can.</span>
+          <span class="zh" lang="zh-Hant">隨時來信，每一封我們都會讀，並儘速回覆。</span>
+        </p>
+        <!-- The support-email placeholder is substituted by server.js; the
+             address itself lives in lib/supportContact.json. Don't hardcode it. -->
+        <a class="btn" href="mailto:{{SUPPORT_EMAIL}}" data-testid="support-email">{{SUPPORT_EMAIL}}</a>
+        <ul>
+          <li>
+            <span class="en">Please write from the email you signed up with, so we can find your account.</span>
+            <span class="zh" lang="zh-Hant">請用註冊時的 Email 來信，我們才能找到你的帳號。</span>
+          </li>
+          <li>
+            <span class="en">For payment issues, include the order date and payment method.</span>
+            <span class="zh" lang="zh-Hant">付款問題請附上付款日期與付款方式。</span>
+          </li>
+          <li>
+            <span class="en">Signed in? You can also use <em>Send feedback</em> in the profile menu (top right).</span>
+            <span class="zh" lang="zh-Hant">已登入的話，也可以用右上角個人選單裡的「意見回饋」。</span>
+          </li>
+        </ul>
+      </div>
+
+      <section>
+        <h2><span class="en">Account &amp; pairing</span><span class="zh" lang="zh-Hant">帳號與配對</span></h2>
+        <details>
+          <summary><span class="en">How do I connect with my partner?</span><span class="zh" lang="zh-Hant">怎麼跟另一半配對？</span></summary>
+          <p>
+            <span class="en">Both of you create an account. One of you opens Settings and generates a pairing code; the other enters that code in Settings. Codes expire after 7 days, so generate a new one if it stops working. You can use most features on your own before pairing.</span>
+            <span class="zh" lang="zh-Hant">兩人各自註冊帳號，一人在「設定」產生配對碼，另一人在「設定」輸入這組碼即可。配對碼 7 天後失效，失效了再產生一組就好。還沒配對前，大部分功能也能自己先用。</span>
+          </p>
+        </details>
+        <details>
+          <summary><span class="en">I forgot my password.</span><span class="zh" lang="zh-Hant">忘記密碼了。</span></summary>
+          <p>
+            <span class="en">On the sign-in screen, tap "Forgot password?" and we'll email you a reset link. If it doesn't arrive within a few minutes, check your spam folder, then contact us.</span>
+            <span class="zh" lang="zh-Hant">在登入畫面點「忘記密碼？」，我們會寄重設連結給你。幾分鐘內沒收到的話，請先檢查垃圾郵件，再來信客服。</span>
+          </p>
+        </details>
+        <details>
+          <summary><span class="en">How do I unpair or delete my account?</span><span class="zh" lang="zh-Hant">怎麼解除配對或刪除帳號？</span></summary>
+          <p>
+            <span class="en">Email us from the address on your account and tell us what you'd like to do. Deleting an account permanently removes its pairing, records and messages and cannot be undone, so we'll confirm with you before we do it.</span>
+            <span class="zh" lang="zh-Hant">請用帳號的 Email 來信告訴我們。刪除帳號會永久刪除配對、紀錄與訊息，且無法復原，所以我們會先跟你確認再處理。</span>
+          </p>
+        </details>
+        <details>
+          <summary><span class="en">Can I switch the app between English and Chinese?</span><span class="zh" lang="zh-Hant">App 可以切換中英文嗎？</span></summary>
+          <p>
+            <span class="en">Yes. Use the EN / 繁中 switch in the top-right corner of the app. Your choice is remembered on that device. The menus, navigation and Help &amp; Support are translated; some feature content is still in Traditional Chinese only.</span>
+            <span class="zh" lang="zh-Hant">可以。點 App 右上角的「繁中 / EN」切換，這台裝置會記住你的選擇。目前選單、導覽與使用說明已有英文，部分功能內文仍只有繁體中文。</span>
+          </p>
+        </details>
+      </section>
+
+      <section>
+        <h2><span class="en">Premium, payments &amp; refunds</span><span class="zh" lang="zh-Hant">Premium、付款與退費</span></h2>
+        <details>
+          <summary><span class="en">What does Premium include, and will it auto-renew?</span><span class="zh" lang="zh-Hant">Premium 包含什麼？會自動續訂嗎？</span></summary>
+          <p>
+            <span class="en">Premium raises the daily AI limit (5 → 50 per day) and removes the caps on custom scripts and photo uploads. One purchase covers both partners. Plans are 30, 90 or 365 days and <strong>never auto-renew or charge you again</strong>. When a plan ends you go back to the free tier and all your data stays. See <a href="/pricing">pricing</a> for details.</span>
+            <span class="zh" lang="zh-Hant">Premium 會提高每日 AI 次數（5 → 50 次／天），並取消自訂劇本與照片上傳的上限，情侶雙方同步享有。方案為 30／90／365 天，<strong>不會自動續訂或自動扣款</strong>；到期後回到免費版，資料完整保留。詳見<a href="/pricing">付費方案</a>。</span>
+          </p>
+        </details>
+        <details>
+          <summary><span class="en">How do I pay?</span><span class="zh" lang="zh-Hant">怎麼付款？</span></summary>
+          <p>
+            <span class="en">In the app, open the profile menu → Upgrade to Premium. Payments are processed by ECPay or NewebPay (credit card, LINE Pay, ATM transfer or convenience-store payment). Twogether never stores your card number.</span>
+            <span class="zh" lang="zh-Hant">在 App 右上角個人選單點「升級 Premium」。金流由綠界 ECPay 或藍新 NewebPay 處理，支援信用卡、LINE Pay、ATM 與超商付款；Twogether 不會儲存你的卡號。</span>
+          </p>
+        </details>
+        <details>
+          <summary><span class="en">I paid but Premium isn't active / I was charged twice.</span><span class="zh" lang="zh-Hant">付款了但沒開通／被重複扣款。</span></summary>
+          <p>
+            <span class="en">Premium normally activates right after payment. If it didn't, or you were charged more than once, email us within 7 days of payment with the payment date and method. If we confirm a system error, we'll refund that payment in full.</span>
+            <span class="zh" lang="zh-Hant">Premium 通常付款後立即開通。若沒有開通或被重複扣款，請於付款後 7 日內來信並附上付款日期與方式，經查證屬系統錯誤將全額退還該筆款項。</span>
+          </p>
+        </details>
+        <details>
+          <summary><span class="en">What is the refund policy?</span><span class="zh" lang="zh-Hant">退費政策是什麼？</span></summary>
+          <p>
+            <span class="en">Premium is a digital service that starts as soon as it's activated, so under Taiwan's Consumer Protection Act (Art. 19) the 7-day cooling-off period doesn't generally apply, and days already started aren't refunded. Billing errors (duplicate charges, activation failures) are fully refunded as above. The full terms are on the <a href="/pricing">pricing page</a>.</span>
+            <span class="zh" lang="zh-Hant">Premium 為開通即開始提供的數位服務，依《消費者保護法》第 19 條原則上不適用 7 日鑑賞期，已開始使用的期間恕不退還。系統錯誤（重複扣款、未開通）依上方說明全額退款。完整條款見<a href="/pricing">付費方案頁</a>。</span>
+          </p>
+        </details>
+      </section>
+
+      <section>
+        <h2><span class="en">Privacy &amp; safety</span><span class="zh" lang="zh-Hant">隱私與安全</span></h2>
+        <details>
+          <summary><span class="en">Who can see what I write?</span><span class="zh" lang="zh-Hant">我寫的內容誰看得到？</span></summary>
+          <p>
+            <span class="en">Once paired, your calendar, records and wall are shared between the two of you. In "Talk it through", your raw draft is seen only by the AI; your partner sees only the version you choose to send. Letters to yourself in Emotion deep dive stay private to you. Your email and real name are never shown on public stories.</span>
+            <span class="zh" lang="zh-Hant">配對後，日曆、紀錄與我們的牆是兩人共享的。「說開一件事」的原始草稿只有 AI 看得到，對方只會看到你選擇送出的版本。「情緒深潛」裡寫給自己的信只屬於你。公開故事不會顯示你的 Email 或真實姓名。</span>
+          </p>
+        </details>
+        <details>
+          <summary><span class="en">Is the AI counselor a real therapist?</span><span class="zh" lang="zh-Hant">AI 諮商師是真的諮商師嗎？</span></summary>
+          <p>
+            <span class="en">No. The AI counselor is an AI feature that offers neutral suggestions; it isn't therapy or a diagnosis. For professional help, open Talk → Counselors to book a vetted human counselor. If you or someone else is in danger, contact your local emergency services right away.</span>
+            <span class="zh" lang="zh-Hant">不是。AI 諮商師是提供中立建議的 AI 功能，不是心理治療或診斷。需要專業協助時，可在「對話」→「專業諮商師」預約通過審核的真人諮商師。若你或他人有立即危險，請立刻聯絡當地緊急救援單位。</span>
+          </p>
+        </details>
+      </section>
+    </main>
+
+    <footer class="site">
+      <div class="wrap">
+        <a href="/"><span class="en">Open Twogether</span><span class="zh" lang="zh-Hant">開啟 Twogether</span></a>
+        <a href="/pricing"><span class="en">Pricing</span><span class="zh" lang="zh-Hant">付費方案</span></a>
+        <a href="/therapist-signup"><span class="en">For counselors</span><span class="zh" lang="zh-Hant">成為諮商師</span></a>
+        <div style="margin-top:10px;">© 2026 Twogether</div>
+      </div>
+    </footer>
+
+    <script>
+      // Language: ?lang= wins, then the app's saved choice (same localStorage
+      // key as src/i18n/LanguageContext.ts), else English.
+      (function () {
+        var KEY = 'twogether.locale';
+        function apply(lang, persist) {
+          var root = document.documentElement;
+          root.setAttribute('data-lang', lang);
+          root.setAttribute('lang', lang === 'en' ? 'en' : 'zh-Hant');
+          document.title = lang === 'en' ? 'Twogether Support' : 'Twogether 客服中心';
+          var btns = document.querySelectorAll('[data-set-lang]');
+          for (var i = 0; i < btns.length; i++) {
+            btns[i].setAttribute('aria-checked', btns[i].getAttribute('data-set-lang') === lang ? 'true' : 'false');
+          }
+          if (persist) {
+            try { localStorage.setItem(KEY, lang); } catch (e) { /* private mode */ }
+          }
+        }
+        var initial = 'en';
+        try {
+          var q = new URLSearchParams(location.search).get('lang');
+          var saved = localStorage.getItem(KEY);
+          if (q === 'en' || q === 'zh-TW') initial = q;
+          else if (saved === 'en' || saved === 'zh-TW') initial = saved;
+        } catch (e) { /* fall back to English */ }
+        apply(initial, false);
+        var btns = document.querySelectorAll('[data-set-lang]');
+        for (var i = 0; i < btns.length; i++) {
+          btns[i].addEventListener('click', function () { apply(this.getAttribute('data-set-lang'), true); });
+        }
+      })();
+    </script>
+  </body>
+</html>
