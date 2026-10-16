@@ -3,6 +3,7 @@ import { Users, MessageSquare, ChevronRight } from 'lucide-react';
 import { apiService, type TherapistClientCouple } from '../services/api';
 import type { Notification } from './ErrorNotification';
 import TherapistClientView from './TherapistClientView';
+import { tr } from '../i18n/tr';
 
 // 我輔導的伴侶 — shown only to a logged-in therapist. Lists the couples who added
 // them as their dedicated therapist; opening one shows that couple's 牆 +
@@ -59,12 +60,12 @@ const TherapistClientsPanel: React.FC<Props> = ({ showNotification, autoOpenToke
     <div className="rounded-lg border border-petal-rule bg-petal-cream-2/50 p-5" data-testid="therapist-clients-panel">
       <div className="flex items-center gap-2 mb-3">
         <Users className="w-4 h-4 text-pink-500" strokeWidth={1.5} />
-        <h3 className="font-display text-lg text-petal-ink">我輔導的伴侶</h3>
+        <h3 className="font-display text-lg text-petal-ink">{tr('我輔導的伴侶', 'Couples I support')}</h3>
       </div>
 
       {clients.length === 0 ? (
         <p className="font-body text-sm text-petal-muted">
-          還沒有伴侶把你設為專屬心理師。當有人指定你之後，就能在這裡檢視他們的牆與好好說話。
+          {tr('還沒有伴侶把你設為專屬心理師。當有人指定你之後，就能在這裡檢視他們的牆與好好說話。', 'No couple has chosen you as their dedicated therapist yet. Once someone does, you can view their wall and conversations here.')}
         </p>
       ) : (
         <div className="space-y-2">
@@ -77,15 +78,15 @@ const TherapistClientsPanel: React.FC<Props> = ({ showNotification, autoOpenToke
             >
               <div className="min-w-0">
                 <div className="font-display text-base text-petal-ink truncate">
-                  {c.coupleName || (c.partnerNames.length ? c.partnerNames.join(' & ') : '伴侶')}
+                  {c.coupleName || (c.partnerNames.length ? c.partnerNames.join(' & ') : tr('伴侶', 'Couple'))}
                 </div>
                 <div className="inline-flex items-center gap-1 font-body text-[11px] text-petal-muted mt-0.5">
                   {c.canComment ? (
-                    <><MessageSquare className="w-3 h-3" strokeWidth={1.5} /> 可留言</>
+                    <><MessageSquare className="w-3 h-3" strokeWidth={1.5} /> {tr('可留言', 'Can comment')}</>
                   ) : (
-                    <>唯讀</>
+                    <>{tr('唯讀', 'Read-only')}</>
                   )}
-                  <span>· 自 {new Date(c.since).toLocaleDateString('zh-TW')}</span>
+                  <span>{tr('· 自', '· Since')} {new Date(c.since).toLocaleDateString('zh-TW')}</span>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-petal-muted shrink-0" strokeWidth={1.5} />

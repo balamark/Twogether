@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ChevronRight, HeartHandshake } from 'lucide-react';
+import { tr } from '../i18n/tr';
 
 // The Conflict Intervention message pattern (NOT a variant of 情緒翻譯).
 //
@@ -24,12 +25,12 @@ interface Props {
 const SophieHeader = ({ companion }: { companion: string }) => (
   <div className="flex items-center gap-1.5 text-petal-rose-deep">
     <HeartHandshake className="w-3.5 h-3.5" strokeWidth={1.5} />
-    <span className="font-body text-[11px] font-medium">{companion} 協助表達</span>
+    <span className="font-body text-[11px] font-medium">{companion} {tr('協助表達', 'Helped phrase it')}</span>
   </div>
 );
 
 const SophieMessageCard = ({ original, translation, need, mine, companion }: Props) => {
-  const name = companion || 'AI 諮商師';
+  const name = companion || tr('AI 諮商師', 'AI counselor');
   const [revealed, setRevealed] = useState(false);
 
   // One stable layout: the translation is always primary (top); the original is
@@ -39,23 +40,23 @@ const SophieMessageCard = ({ original, translation, need, mine, companion }: Pro
     <div data-testid="sophie-message-card" data-revealed={revealed ? 'true' : 'false'}>
       {/* Primary: what they really wanted you to know. */}
       <SophieHeader companion={name} />
-      <p className="mt-1 text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">「{translation}」</p>
+      <p className="mt-1 text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">{tr('「', '“')}{translation}{tr('」', '”')}</p>
       {need && (
         <span className="mt-2 inline-flex items-center gap-1.5 rounded bg-amber-50 text-amber-700 border border-amber-200/60 font-body text-[11px] font-medium px-2 py-0.5">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-500" aria-hidden />
-          {mine ? '你' : 'TA'}需要{need}
+          {mine ? tr('你', 'You') : tr('TA', 'They')}{tr('需要', ' need ')}{need}
         </span>
       )}
 
       {/* Secondary: the heated original — always here at the bottom, blurred
           until asked for. */}
       <div className="mt-3 pt-3 border-t border-dashed border-petal-rose-deep/30">
-        <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1">原本的訊息</div>
+        <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1">{tr('原本的訊息', 'Original message')}</div>
         {revealed ? (
           <>
-            <p className="text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">「{original}」</p>
+            <p className="text-sm text-petal-ink leading-relaxed whitespace-pre-wrap">{tr('「', '“')}{original}{tr('」', '”')}</p>
             <p className="font-body text-[11px] text-petal-muted mt-1.5 leading-relaxed">
-              這段話在送出後，{name} 先幫你們暫停了一下。
+              {tr('這段話在送出後，', 'After this was sent, ')}{name} {tr('先幫你們暫停了一下。', ' paused things for a moment.')}
             </p>
           </>
         ) : (
@@ -74,7 +75,7 @@ const SophieMessageCard = ({ original, translation, need, mine, companion }: Pro
           onClick={() => setRevealed((v) => !v)}
           className="mt-1.5 inline-flex items-center gap-1 font-body text-xs text-slate-500 hover:text-slate-800 hover:underline underline-offset-2 cursor-pointer transition-colors"
         >
-          {revealed ? '收合原話' : '查看原本的訊息'}
+          {revealed ? tr('收合原話', 'Hide original') : tr('查看原本的訊息', 'See the original message')}
           <ChevronRight
             className={`w-3.5 h-3.5 transition-transform ${revealed ? 'rotate-90' : ''}`}
             strokeWidth={2}

@@ -5,6 +5,7 @@ import { formatDateTime } from '../utils/datetime';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { clientLog } from '../utils/telemetry';
 import { isPositiveInteraction, POSITIVE_INTERACTION_ACTIONS } from '../content/positiveInteractions';
+import { tr } from '../i18n/tr';
 
 interface Notification {
   id: string;
@@ -58,8 +59,8 @@ const ActivityView: React.FC<ActivityViewProps> = ({ showNotification }) => {
         }, 'error');
         showNotification({
           type: 'warning',
-          title: '最近動態載入失敗',
-          message: '無法載入最近動態，請稍後再試。',
+          title: tr('最近動態載入失敗', 'Couldn\'t load recent activity'),
+          message: tr('無法載入最近動態，請稍後再試。', 'Couldn\'t load recent activity. Please try again in a moment.'),
           duration: 5000,
         });
       })
@@ -72,13 +73,13 @@ const ActivityView: React.FC<ActivityViewProps> = ({ showNotification }) => {
     <div className="space-y-6 sm:space-y-10" data-testid="activity-view">
       <div className="border-b border-petal-rule pb-5 sm:pb-7">
         <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-2 sm:mb-3">
-          — 動態
+          {tr('— 動態', '— Activity')}
         </div>
         <h2 className="font-display text-2xl sm:text-3xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.1] md:leading-[1.05] mb-3">
-          <em className="not-italic font-light italic text-pink-600">最近動態</em>
+          <em className="not-italic font-light italic text-pink-600">{tr('最近動態', 'Recent activity')}</em>
         </h2>
         <p className="font-display italic font-light text-base text-petal-muted">
-          你與另一半最近的足跡。
+          {tr('你與另一半最近的足跡。', 'Recent traces of you and your partner.')}
         </p>
       </div>
 
@@ -89,11 +90,11 @@ const ActivityView: React.FC<ActivityViewProps> = ({ showNotification }) => {
         data-testid="activity-positive-legend"
       >
         <p className="font-body text-sm text-petal-ink leading-relaxed">
-          標有
+          {tr('標有', 'Items marked')}
           <span className="mx-1 inline-flex items-center rounded-full bg-petal-rose-deep px-1.5 py-0.5 align-middle font-body text-[10px] font-semibold text-white">
             +1
           </span>
-          的是<span className="font-medium">正向互動</span> — 每一個都替你們「我們正在愛」的美好存款加 1 分，越多越好。
+          {tr('的是', 'are ')}<span className="font-medium">{tr('正向互動', 'positive interactions')}</span> {tr('— 每一個都替你們「我們正在愛」的美好存款加 1 分，越多越好。', ' — each adds 1 to your "we are loving" savings. The more the better.')}
         </p>
         <ul className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1.5">
           {POSITIVE_INTERACTION_ACTIONS.map((a) => (
@@ -111,13 +112,13 @@ const ActivityView: React.FC<ActivityViewProps> = ({ showNotification }) => {
           </div>
         ) : error ? (
           <p className="font-body text-sm text-petal-muted py-6 text-center">
-            無法載入最近動態，請稍後再試。
+            {tr('無法載入最近動態，請稍後再試。', 'Couldn\'t load recent activity. Please try again in a moment.')}
           </p>
         ) : activities.length === 0 ? (
           <div className="py-10 text-center">
             <Activity className="w-8 h-8 mx-auto text-petal-rule mb-3" strokeWidth={1.5} />
             <p className="font-body text-sm text-petal-muted">
-              還沒有最近動態，開始記錄你們的時光吧。
+              {tr('還沒有最近動態，開始記錄你們的時光吧。', 'No recent activity yet. Start recording your moments together.')}
             </p>
           </div>
         ) : (
@@ -127,14 +128,14 @@ const ActivityView: React.FC<ActivityViewProps> = ({ showNotification }) => {
                 <span className={`mt-1.5 w-2.5 h-2.5 rounded-sm flex-shrink-0 ${dotClass(a.type)}`} />
                 <div className="min-w-0 flex-1">
                   <p className="font-body text-sm text-petal-ink break-words">
-                    <span className="font-medium">{a.isSelf ? '你' : (a.actorNickname || '你們')}</span>
+                    <span className="font-medium">{a.isSelf ? tr('你', 'You') : (a.actorNickname || tr('你們', 'You both'))}</span>
                     {' '}
                     {a.description}
                     {isPositiveInteraction(a.type) && (
                       <span
                         className="ml-1.5 inline-flex items-center rounded-full bg-petal-rose-deep px-1.5 py-0.5 align-middle font-body text-[10px] font-semibold text-white"
                         data-testid="activity-plus-one"
-                        title="正向互動 +1：替你們的美好存款加了 1 分"
+                        title={tr("正向互動 +1：替你們的美好存款加了 1 分", 'Positive interaction +1: added 1 to your savings of good moments')}
                       >
                         +1
                       </span>

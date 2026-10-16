@@ -13,6 +13,7 @@ import { FocusFilter } from './FocusFilter';
 import ParticipantAvatar from './ParticipantAvatar';
 import MarkdownContent from './MarkdownContent';
 import { ROLE_STYLE } from '../utils/threadRoles';
+import { tr } from '../i18n/tr';
 
 // 公開問答 (Public Q&A): a read-only, anonymised browse of consultation chats
 // that both the client and therapist agreed to publish. Helps people with
@@ -44,8 +45,8 @@ const TherapistMini: React.FC<{ therapist: NonNullable<PublicQaThreadSummary['th
 
 // Couple-shared (non-therapist) threads show a source chip instead of a therapist.
 const SOURCE_META: Record<Exclude<PublicQaSource, 'consultation'>, { label: string; icon: typeof MessageSquareHeart }> = {
-  event: { label: '衝突事件 · 匿名分享', icon: MessageSquareHeart },
-  wall: { label: '我們的牆 · 匿名分享', icon: StickyNote },
+  event: { label: tr('衝突事件 · 匿名分享', 'Conflict · shared anonymously'), icon: MessageSquareHeart },
+  wall: { label: tr('我們的牆 · 匿名分享', 'Our wall · shared anonymously'), icon: StickyNote },
 };
 
 const SourceMini: React.FC<{ source: PublicQaSource }> = ({ source }) => {
@@ -79,7 +80,7 @@ const PublicQaView: React.FC<PublicQaViewProps> = ({ isAuthenticated, showNotifi
       setHasMore(res.hasMore);
       setPage(res.page);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '無法取得公開問答列表');
+      setError(err instanceof Error ? err.message : tr('無法取得公開問答列表', 'Couldn\'t load public Q&A. Please try again in a moment.'));
     } finally {
       setLoading(false);
     }
@@ -104,8 +105,7 @@ const PublicQaView: React.FC<PublicQaViewProps> = ({ isAuthenticated, showNotifi
     <div className="space-y-6" data-testid="public-qa-view">
       <div className="text-center max-w-2xl mx-auto">
         <p className="font-body text-sm text-petal-ink-soft">
-          這些是經諮商師與個案雙方同意、<span className="text-petal-ink">匿名公開</span>的對話。
-          也許別人的經驗，正好能幫上你。
+          {tr('這些是經諮商師與個案雙方同意、', 'These conversations were shared with the consent of both the counselor and the clients, ')}<span className="text-petal-ink">{tr('匿名公開', 'anonymously')}</span>{tr('的對話。 也許別人的經驗，正好能幫上你。', '. Someone else\'s experience might be just what helps you.')}
         </p>
       </div>
 
@@ -113,17 +113,17 @@ const PublicQaView: React.FC<PublicQaViewProps> = ({ isAuthenticated, showNotifi
       <FocusFilter value={focus} onChange={setFocus} />
 
       {loading && threads.length === 0 ? (
-        <p className="text-center font-body text-sm text-petal-muted py-12">載入中…</p>
+        <p className="text-center font-body text-sm text-petal-muted py-12">{tr('載入中…', 'Loading…')}</p>
       ) : error ? (
         <div className="text-center py-12">
           <p className="font-body text-sm text-petal-rose-deep mb-3">{error}</p>
           <button onClick={() => load(1, true)} className="font-body text-sm text-petal-ink underline underline-offset-4">
-            重新載入
+            {tr('重新載入', 'Reload')}
           </button>
         </div>
       ) : threads.length === 0 ? (
         <p className="text-center font-body text-sm text-petal-muted py-12">
-          這個領域還沒有公開問答。換個領域看看，或成為第一個分享對話的人。
+          {tr('這個領域還沒有公開問答。換個領域看看，或成為第一個分享對話的人。', 'No public Q&A in this area yet. Try another area, or be the first to share a conversation.')}
         </p>
       ) : (
         <>
@@ -163,7 +163,7 @@ const PublicQaView: React.FC<PublicQaViewProps> = ({ isAuthenticated, showNotifi
                 disabled={loading}
                 className="px-5 py-2 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors font-body text-[13px] font-medium disabled:opacity-50"
               >
-                {loading ? '載入中…' : '載入更多'}
+                {loading ? tr('載入中…', 'Loading…') : tr('載入更多', 'Load more')}
               </button>
             </div>
           )}
@@ -191,13 +191,13 @@ const PublicQaDetail: React.FC<{
     let alive = true;
     apiService.getPublicQaThread(id, source)
       .then((t) => { if (alive) setThread(t); })
-      .catch((err) => { if (alive) setError(err instanceof Error ? err.message : '無法載入公開問答'); });
+      .catch((err) => { if (alive) setError(err instanceof Error ? err.message : tr('無法載入公開問答', 'Couldn\'t load this public Q&A. Please try again in a moment.')); });
     return () => { alive = false; };
   }, [id, source]);
 
   const toggleVote = async () => {
     if (!isAuthenticated) {
-      showNotification({ type: 'info', title: '請先登入', message: '登入後就能標記對你有幫助的公開問答', duration: 3500 });
+      showNotification({ type: 'info', title: tr('請先登入', 'Please sign in'), message: tr('登入後就能標記對你有幫助的公開問答', 'Sign in to mark public Q&A that helped you'), duration: 3500 });
       return;
     }
     if (!thread) return;
@@ -217,7 +217,7 @@ const PublicQaDetail: React.FC<{
       setThread((cur) => (cur ? { ...cur, hasVoted: res.voted, helpfulCount: res.helpfulCount } : cur));
     } catch (err) {
       setThread(prev);
-      showNotification({ type: 'error', title: '操作失敗', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
+      showNotification({ type: 'error', title: tr('操作失敗', 'Something went wrong'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'), duration: 3500 });
     } finally {
       setVoting(false);
     }
@@ -226,13 +226,13 @@ const PublicQaDetail: React.FC<{
   return (
     <div className="space-y-5 max-w-2xl mx-auto">
       <button onClick={onBack} className="inline-flex items-center gap-1 font-body text-sm text-petal-muted hover:text-petal-ink">
-        <ChevronLeft className="w-4 h-4" strokeWidth={1.5} /> 回到公開問答
+        <ChevronLeft className="w-4 h-4" strokeWidth={1.5} /> {tr('回到公開問答', 'Back to public Q&A')}
       </button>
 
       {error ? (
         <p className="text-center font-body text-sm text-petal-rose-deep py-12">{error}</p>
       ) : !thread ? (
-        <p className="text-center font-body text-sm text-petal-muted py-12">載入中…</p>
+        <p className="text-center font-body text-sm text-petal-muted py-12">{tr('載入中…', 'Loading…')}</p>
       ) : (
         <div className="bg-petal-cream rounded-lg border border-petal-rule shadow-petal" data-testid="public-qa-detail">
           <div className="px-5 py-4 border-b border-petal-rule">
@@ -248,7 +248,7 @@ const PublicQaDetail: React.FC<{
               {thread.therapist ? (
                 <>
                   <TherapistMini therapist={thread.therapist} />
-                  <span className="font-body text-[11px] text-petal-muted">回答</span>
+                  <span className="font-body text-[11px] text-petal-muted">{tr('回答', 'answers')}</span>
                 </>
               ) : (
                 <SourceMini source={thread.source} />
@@ -268,11 +268,11 @@ const PublicQaDetail: React.FC<{
                       <ParticipantAvatar
                         size="xs"
                         role={m.isTherapist ? 'therapist' : m.isAi ? 'ai' : 'user'}
-                        name={m.isAi ? 'AI 諮商師' : m.senderName}
+                        name={m.isAi ? tr('AI 諮商師', 'AI counselor') : m.senderName}
                         colorKey={m.senderName}
                       />
                       <span className="font-body text-[11px] text-petal-muted">
-                        {m.isTherapist ? `${m.senderName}（諮商師）` : m.isAi ? 'AI 諮商師' : m.senderName}
+                        {m.isTherapist ? tr(`${m.senderName}（諮商師）`, `${m.senderName} (counselor)`) : m.isAi ? 'AI 諮商師' : m.senderName}
                       </span>
                     </div>
                     <div
@@ -306,10 +306,10 @@ const PublicQaDetail: React.FC<{
                 }`}
               >
                 <ThumbsUp className="w-3.5 h-3.5" strokeWidth={1.5} />
-                有幫助 {thread.helpfulCount > 0 ? thread.helpfulCount : ''}
+                {tr('有幫助', 'Helpful')} {thread.helpfulCount > 0 ? thread.helpfulCount : ''}
               </button>
             ) : (
-              <span className="font-body text-[11px] text-petal-muted">由用戶匿名分享</span>
+              <span className="font-body text-[11px] text-petal-muted">{tr('由用戶匿名分享', 'Shared anonymously by a user')}</span>
             )}
             {onFindTherapist && (
               <button
@@ -317,7 +317,7 @@ const PublicQaDetail: React.FC<{
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-petal-ink text-petal-cream hover:bg-pink-700 transition-colors font-body text-[13px] font-medium"
               >
                 <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
-                找諮商師聊聊
+                {tr('找諮商師聊聊', 'Talk to a counselor')}
               </button>
             )}
           </div>

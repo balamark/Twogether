@@ -5,6 +5,7 @@ import type { Notification } from '../services/api';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatRelativeOrDate } from '../utils/datetime';
+import { tr } from '../i18n/tr';
 
 interface NotificationInboxProps {
   isOpen: boolean;
@@ -39,7 +40,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       }
     } catch (err) {
       console.error('Failed to fetch notifications:', err);
-      setError(err instanceof Error ? err.message : '無法載入通知');
+      setError(err instanceof Error ? err.message : tr('無法載入通知', 'Couldn\'t load notifications. Please try again.'));
     } finally {
       setLoading(false);
     }
@@ -161,7 +162,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
           <div className="flex items-center space-x-3">
             <Bell className="w-6 h-6 text-pink-500" />
-            <h3 className="text-xl font-semibold text-gray-900">通知中心</h3>
+            <h3 className="text-xl font-semibold text-gray-900">{tr('通知中心', 'Notifications')}</h3>
             {unreadCount > 0 && (
               <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
                 {unreadCount}
@@ -188,12 +189,12 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
             {loading ? (
               <div className="p-8 text-center">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
-                <p className="mt-2 text-gray-600">載入通知中...</p>
+                <p className="mt-2 text-gray-600">{tr('載入通知中...', 'Loading notifications...')}</p>
               </div>
             ) : notifications.length === 0 ? (
               <div className="p-8 text-center">
                 <Bell className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">目前沒有通知</p>
+                <p className="text-gray-500">{tr('目前沒有通知', 'No notifications yet')}</p>
               </div>
             ) : (
               notifications.map((notification) => (
@@ -228,7 +229,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
 
                       {notification.relatedUserNickname && (
                         <p className="text-xs text-gray-500 mt-1">
-                          來自：{notification.relatedUserNickname}
+                          {tr('來自：', 'From:')}{notification.relatedUserNickname}
                         </p>
                       )}
                     </div>

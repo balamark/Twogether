@@ -1,6 +1,7 @@
 import React from 'react';
 import { Compass, X } from 'lucide-react';
 import type { DeepDiveJourney } from '../../services/api';
+import { tr } from '../../i18n/tr';
 
 // A gentle, dismissible "繼續你的情緒深潛" banner (the user's core ask: pause
 // now, finish later). Non-blocking (playbook §R4): it never traps the user, and
@@ -17,11 +18,11 @@ function label(journey: Props['journey'], fromNickname?: string | null): { title
   const role = 'role' in journey ? journey.role : 'owner';
   if (role === 'partner' || journey.status === 'shared' || journey.status === 'partner_reading') {
     return {
-      title: `${fromNickname || '另一半'}想讓你更了解 TA 的感受`,
-      cta: '讀讀看',
+      title: tr(`${fromNickname || '另一半'}想讓你更了解 TA 的感受`, `${fromNickname || 'Your partner'} wants you to understand how they feel`),
+      cta: tr('讀讀看', 'Read it'),
     };
   }
-  return { title: '你有一段情緒深潛還沒走完', cta: '繼續探索' };
+  return { title: tr('你有一段情緒深潛還沒走完', 'You have an unfinished emotion deep dive'), cta: tr('繼續探索', 'Continue') };
 }
 
 const DeepDiveResumeBanner: React.FC<Props> = ({ journey, fromNickname, onResume, onDismiss }) => {
@@ -34,7 +35,7 @@ const DeepDiveResumeBanner: React.FC<Props> = ({ journey, fromNickname, onResume
       <Compass className="w-5 h-5 text-petal-rose-deep shrink-0" strokeWidth={1.5} />
       <div className="flex-1 min-w-0">
         <p className="font-body text-sm text-petal-ink truncate">{title}</p>
-        <p className="font-body text-[11px] text-petal-muted">可以先暫停，之後再接著走。</p>
+        <p className="font-body text-[11px] text-petal-muted">{tr('可以先暫停，之後再接著走。', 'You can pause and pick it up later.')}</p>
       </div>
       <button
         type="button"
@@ -47,7 +48,7 @@ const DeepDiveResumeBanner: React.FC<Props> = ({ journey, fromNickname, onResume
       <button
         type="button"
         onClick={onDismiss}
-        aria-label="稍後再說"
+        aria-label={tr("稍後再說", 'Maybe later')}
         className="shrink-0 text-petal-muted hover:text-petal-ink p-1"
         data-testid="deep-dive-resume-dismiss"
       >

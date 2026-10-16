@@ -1,4 +1,5 @@
 import { Star } from 'lucide-react';
+import { tr } from '../i18n/tr';
 
 interface StarRatingProps {
   value: number;
@@ -35,7 +36,7 @@ export default function StarRating({
             ? {
                 type: 'button' as const,
                 onClick: () => onChange?.(star),
-                'aria-label': `${star} 星`,
+                'aria-label': tr(`${star} 星`, `${star} star${star === 1 ? '' : 's'}`),
                 'data-testid': `star-${star}`,
                 className: 'transition-transform hover:scale-110 focus:outline-none',
               }

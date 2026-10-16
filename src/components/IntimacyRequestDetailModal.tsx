@@ -5,6 +5,7 @@ import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
 import { useScrollLock } from '../hooks/useScrollLock';
 import IntimacyRequestActionPanel from './IntimacyRequestActionPanel';
+import { tr } from '../i18n/tr';
 
 interface IntimacyRequestDetailModalProps {
   request: IntimacyRequest | null;
@@ -16,18 +17,18 @@ interface IntimacyRequestDetailModalProps {
 }
 
 const ALTERNATIVE_CATEGORY_LABEL: Record<string, string> = {
-  physical: '肢體親密',
-  emotional: '情感親密',
-  playful: '趣味互動',
-  companionship: '日常陪伴',
-  custom: '自訂',
+  physical: tr('肢體親密', 'Physical intimacy'),
+  emotional: tr('情感親密', 'Emotional intimacy'),
+  playful: tr('趣味互動', 'Playful'),
+  companionship: tr('日常陪伴', 'Everyday time together'),
+  custom: tr('自訂', 'Custom'),
 };
 
 function statusLabel(status: string): string {
-  if (status === 'accepted') return '已接受';
-  if (status === 'rejected' || status === 'declined') return '已拒絕';
-  if (status === 'expired') return '已過期';
-  return '待回應';
+  if (status === 'accepted') return tr('已接受', 'Accepted');
+  if (status === 'rejected' || status === 'declined') return tr('已拒絕', 'Declined');
+  if (status === 'expired') return tr('已過期', 'Expired');
+  return tr('待回應', 'Awaiting reply');
 }
 
 function statusBadgeClass(status: string): string {
@@ -51,7 +52,7 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
 
   const isPending = request.status === 'pending';
   const isRejected = request.status === 'rejected' || request.status === 'declined';
-  const responseTitle = direction === 'sent' ? '對方的回應' : '你的回應';
+  const responseTitle = direction === 'sent' ? tr('對方的回應', 'Their response') : tr('你的回應', 'Your response');
 
   return (
     <div
@@ -66,7 +67,7 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
         <div className="flex items-center justify-between px-5 py-4 border-b border-petal-rule">
           <div className="flex items-center gap-2">
             <h3 className="font-display text-lg font-medium text-petal-ink">
-              {direction === 'sent' ? '我發送的邀請' : '我收到的邀請'}
+              {direction === 'sent' ? tr('我發送的邀請', 'Invitation I sent') : tr('我收到的邀請', 'Invitation I received')}
             </h3>
             <span
               className={`text-xs whitespace-nowrap inline-flex items-center justify-center text-center px-2 py-0.5 rounded-full ${statusBadgeClass(request.status)}`}
@@ -77,7 +78,7 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            aria-label="關閉"
+            aria-label={tr("關閉", 'Close')}
             className="p-1.5 rounded-full hover:bg-petal-cream-2 text-petal-ink"
           >
             <X className="w-5 h-5" />
@@ -88,11 +89,11 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
         <div className="overflow-y-auto px-5 py-4 space-y-5">
           {/* Original invitation */}
           <section>
-            <div className="text-xs uppercase tracking-[0.12em] text-petal-muted mb-1.5">原邀請</div>
+            <div className="text-xs uppercase tracking-[0.12em] text-petal-muted mb-1.5">{tr('原邀請', 'Original invitation')}</div>
             {request.scheduledTime && (
               <div className="inline-flex items-center gap-1.5 text-sm text-petal-ink-soft mb-2">
                 <Calendar className="w-4 h-4" />
-                <span>預約 {formatDateTime(request.scheduledTime, tz, { alwaysShowTz: true })}</span>
+                <span>{tr('預約', 'Scheduled')} {formatDateTime(request.scheduledTime, tz, { alwaysShowTz: true })}</span>
               </div>
             )}
             <p className="text-petal-ink text-sm leading-relaxed whitespace-pre-wrap break-words">
@@ -107,7 +108,7 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
                 data-testid="request-script-context"
               >
                 <div className="text-sm text-petal-ink">
-                  🎭 這是劇本 <span className="font-medium">《{request.scriptTitle}》</span> 的入戲邀請
+                  {tr('🎭 這是劇本', '🎭 This is an in-character invitation for the script')} <span className="font-medium">{tr('《', ' “')}{request.scriptTitle}{tr('》', '”')}</span> {tr('的入戲邀請', '')}
                 </div>
                 {request.scriptScenario && (
                   <p className="text-xs text-petal-muted leading-relaxed">{request.scriptScenario}</p>
@@ -123,16 +124,16 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
                     className="inline-flex items-center gap-1.5 text-sm text-petal-rose-deep hover:text-pink-700 underline underline-offset-2"
                   >
                     <Play className="w-3.5 h-3.5" />
-                    查看劇本內容
+                    {tr('查看劇本內容', 'View script')}
                   </button>
                 )}
               </div>
             )}
 
             <div className="text-xs text-petal-muted mt-2">
-              發送於 {formatDateTime(request.createdAt, tz)}
+              {tr('發送於', 'Sent')} {formatDateTime(request.createdAt, tz)}
               {request.expiresAt && (
-                <> ・效期至 {formatDateTime(request.expiresAt, tz)}</>
+                <> {tr('・效期至', ' ・Valid until')} {formatDateTime(request.expiresAt, tz)}</>
               )}
             </div>
           </section>
@@ -155,11 +156,11 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
                 <div className="rounded-lg border border-petal-rule-soft bg-white p-3 space-y-1.5">
                   <div className="flex items-center gap-1.5 text-xs uppercase tracking-[0.12em] text-petal-muted">
                     <Sparkles className="w-3.5 h-3.5" />
-                    <span>建議的替代方式</span>
+                    <span>{tr('建議的替代方式', 'Suggested alternative')}</span>
                   </div>
                   {request.alternativeType && (
                     <div className="text-xs text-petal-muted">
-                      類型：<span className="text-petal-ink">{ALTERNATIVE_CATEGORY_LABEL[request.alternativeType] || request.alternativeType}</span>
+                      {tr('類型：', 'Type: ')}<span className="text-petal-ink">{ALTERNATIVE_CATEGORY_LABEL[request.alternativeType] || request.alternativeType}</span>
                     </div>
                   )}
                   {request.alternativeContent && (
@@ -170,7 +171,7 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
                   {request.alternativeScheduledTime && (
                     <div className="inline-flex items-center gap-1.5 text-sm text-petal-ink">
                       <Calendar className="w-4 h-4 text-petal-rose-deep" />
-                      <span>改到 {formatDateTime(request.alternativeScheduledTime, tz, { alwaysShowTz: true })}</span>
+                      <span>{tr('改到', 'Moved to')} {formatDateTime(request.alternativeScheduledTime, tz, { alwaysShowTz: true })}</span>
                     </div>
                   )}
                 </div>
@@ -178,7 +179,7 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
 
               {request.respondedAt && (
                 <div className="text-xs text-petal-muted">
-                  回應於 {formatDateTime(request.respondedAt, tz)}
+                  {tr('回應於', 'Responded')} {formatDateTime(request.respondedAt, tz)}
                 </div>
               )}
             </section>
@@ -186,13 +187,13 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
 
           {/* Empty rejected state (responded with no message) */}
           {isRejected && !request.responseMessage && !request.alternativeContent && !request.alternativeScheduledTime && (
-            <p className="text-sm text-petal-muted italic">對方沒有附上額外訊息。</p>
+            <p className="text-sm text-petal-muted italic">{tr('對方沒有附上額外訊息。', 'They didn\'t add a message.')}</p>
           )}
 
           {/* Action panel — only for received pending */}
           {direction === 'received' && isPending && (
             <section>
-              <div className="text-xs uppercase tracking-[0.12em] text-petal-muted mb-2">如何回應</div>
+              <div className="text-xs uppercase tracking-[0.12em] text-petal-muted mb-2">{tr('如何回應', 'How they responded')}</div>
               <IntimacyRequestActionPanel request={request} onResponded={onResponded} />
             </section>
           )}

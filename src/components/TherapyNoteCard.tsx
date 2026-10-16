@@ -1,6 +1,7 @@
 import React from 'react';
 import { NotebookPen, Target, Heart, RefreshCw, Wrench, ArrowRight } from 'lucide-react';
 import type { TherapyNote } from '../services/api';
+import { tr } from '../i18n/tr';
 
 // The post-conflict 治療摘要: a structured therapy note shown on a resolved
 // event. Read-only; the same note is shared to both partners.
@@ -31,22 +32,22 @@ const TherapyNoteCard: React.FC<Props> = ({ note }) => {
     >
       <div className="flex items-center gap-1.5 text-petal-sage-deep">
         <NotebookPen className="w-4 h-4" strokeWidth={1.5} />
-        <span className="font-display italic text-base">治療摘要</span>
+        <span className="font-display italic text-base">{tr('治療摘要', 'Session notes')}</span>
       </div>
 
       {trigger && (
-        <Section icon={<Target className="w-3.5 h-3.5" strokeWidth={1.5} />} title="這次最大的觸發點">
+        <Section icon={<Target className="w-3.5 h-3.5" strokeWidth={1.5} />} title={tr("這次最大的觸發點", 'The biggest trigger this time')}>
           <p className="font-body text-sm text-petal-ink leading-relaxed">{trigger}</p>
         </Section>
       )}
 
       {needs && needs.length > 0 && (
-        <Section icon={<Heart className="w-3.5 h-3.5" strokeWidth={1.5} />} title="真正的需求">
+        <Section icon={<Heart className="w-3.5 h-3.5" strokeWidth={1.5} />} title={tr("真正的需求", 'The real need')}>
           <ul className="space-y-1">
             {needs.map((n, i) => (
               <li key={i} className="font-body text-sm text-petal-ink leading-relaxed">
                 <span className="font-medium">{n.who}</span>
-                <span className="text-petal-muted"> 需要 </span>
+                <span className="text-petal-muted"> {tr('需要', 'Need')} </span>
                 <span className="inline-flex items-center rounded-full bg-petal-rose-deep/10 text-petal-rose-deep text-[12px] px-2 py-0.5">
                   {n.need}
                 </span>
@@ -58,7 +59,7 @@ const TherapyNoteCard: React.FC<Props> = ({ note }) => {
 
       {/* 模式原則：這次落入的負向循環，就是你們反覆卡住的溝通模式。 */}
       {cycle && cycle.length > 0 && (
-        <Section icon={<RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} />} title="你們的溝通模式（這次的負向循環）">
+        <Section icon={<RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} />} title={tr("你們的溝通模式（這次的負向循環）", 'Your communication pattern (this time\'s negative cycle)')}>
           <div className="flex flex-wrap items-center gap-1.5">
             {cycle.map((step, i) => (
               <React.Fragment key={i}>
@@ -75,12 +76,12 @@ const TherapyNoteCard: React.FC<Props> = ({ note }) => {
       )}
 
       {repairs && repairs.length > 0 && (
-        <Section icon={<Wrench className="w-3.5 h-3.5" strokeWidth={1.5} />} title="修復成功的地方">
+        <Section icon={<Wrench className="w-3.5 h-3.5" strokeWidth={1.5} />} title={tr("修復成功的地方", 'What you repaired')}>
           <ul className="space-y-1">
             {repairs.map((r, i) => (
               <li key={i} className="font-body text-sm text-petal-ink leading-relaxed">
                 <span className="font-medium">{r.who}</span>
-                <span className="text-petal-muted">：</span>
+                <span className="text-petal-muted">{tr('：', ': ')}</span>
                 {r.text}
               </li>
             ))}
@@ -92,9 +93,9 @@ const TherapyNoteCard: React.FC<Props> = ({ note }) => {
         <div className="rounded-xl border border-petal-rose-deep/25 bg-petal-cream-2 px-3 py-2">
           <div className="flex items-center gap-1.5 text-petal-rose-deep mb-1">
             <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.5} />
-            <span className="font-body text-[11px] font-medium">下次可以先說</span>
+            <span className="font-body text-[11px] font-medium">{tr('下次可以先說', 'Next time, try opening with')}</span>
           </div>
-          <p className="font-body text-sm text-petal-ink leading-relaxed">「{nextTime}」</p>
+          <p className="font-body text-sm text-petal-ink leading-relaxed">{tr('「', '“')}{nextTime}{tr('」', '”')}</p>
         </div>
       )}
     </div>

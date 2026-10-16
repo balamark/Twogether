@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { formatMonthYear } from '../utils/datetime';
+import { tr } from '../i18n/tr';
 
 interface CalendarDatePickerProps {
   selectedDate: string;
@@ -88,7 +89,7 @@ const CalendarDatePicker = ({ selectedDate, onDateSelect, primaryTimezone }: Cal
       </div>
 
       <div className="grid grid-cols-7 gap-1 mb-2">
-        {['日', '一', '二', '三', '四', '五', '六'].map(day => (
+        {[tr('日', 'Sun'), tr('一', 'Mon'), tr('二', 'Tue'), tr('三', 'Wed'), tr('四', 'Thu'), tr('五', 'Fri'), tr('六', 'Sat')].map(day => (
           <div key={day} className="p-2 text-center font-body text-[10px] font-medium uppercase tracking-[0.14em] text-petal-muted">
             {day}
           </div>

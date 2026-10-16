@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Crown, X } from 'lucide-react';
 import type { BillingStatus } from '../services/api';
+import { tr } from '../i18n/tr';
 
 // Proactive Premium-expiry reminder. Shows a gentle, dismissible banner when a
 // couple's Premium is within EXPIRY_WINDOW_DAYS of lapsing, so they can renew
@@ -85,8 +86,8 @@ const PremiumExpiryBanner: React.FC<Props> = ({ status, onRenew }) => {
 
   const whenLine =
     daysLeft <= 0
-      ? '你的 Premium 今天到期'
-      : `你的 Premium 將於 ${formatDate(expiresAt)}（約 ${daysLeft} 天後）到期`;
+      ? tr('你的 Premium 今天到期', 'Your Premium expires today')
+      : tr(`你的 Premium 將於 ${formatDate(expiresAt)}（約 ${daysLeft} 天後）到期`, `Your Premium expires on ${formatDate(expiresAt)} (in about ${daysLeft} days)`);
 
   return (
     <div className="max-w-6xl mx-auto mb-4">
@@ -102,7 +103,7 @@ const PremiumExpiryBanner: React.FC<Props> = ({ status, onRenew }) => {
         <div className="min-w-0 flex-1">
           <p className="font-body text-sm font-medium">{whenLine}</p>
           <p className="font-body text-[13px] leading-relaxed mt-0.5 opacity-90">
-            到期後 AI 每日次數會回到免費上限（每人每天 5 次），自訂劇本與照片也會回到免費限制。續購即可延續無限額度。
+            {tr('到期後 AI 每日次數會回到免費上限（每人每天 5 次），自訂劇本與照片也會回到免費限制。續購即可延續無限額度。', 'After it expires, daily AI credits return to the free limit (5 per person per day), and custom scripts and photos go back to free limits. Renew to keep unlimited access.')}
           </p>
         </div>
         <button
@@ -111,12 +112,12 @@ const PremiumExpiryBanner: React.FC<Props> = ({ status, onRenew }) => {
           data-testid="premium-expiry-renew"
           className="shrink-0 self-center px-3.5 py-1.5 rounded-full bg-petal-ink text-petal-cream font-body text-xs hover:bg-pink-700 transition-colors"
         >
-          立即續購
+          {tr('立即續購', 'Renew now')}
         </button>
         <button
           type="button"
           onClick={dismiss}
-          aria-label="稍後再說"
+          aria-label={tr("稍後再說", 'Maybe later')}
           data-testid="premium-expiry-dismiss"
           className="shrink-0 -mr-1 -mt-0.5 p-1 rounded hover:bg-black/5 transition-colors"
         >

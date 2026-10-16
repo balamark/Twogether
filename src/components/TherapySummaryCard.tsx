@@ -14,6 +14,7 @@ import { apiService, type TherapySummary, type TherapySummaryHistoryEntry } from
 import type { Notification } from './ErrorNotification';
 import TherapySummaryDetail from './TherapySummaryDetail';
 import { summaryToText } from '../utils/therapySummary';
+import { tr } from '../i18n/tr';
 
 interface Props {
   authState: { isAuthenticated: boolean; partnerConnected: boolean };
@@ -21,8 +22,8 @@ interface Props {
 }
 
 const PERIODS: { days: number; label: string }[] = [
-  { days: 14, label: '最近兩週' },
-  { days: 30, label: '最近 30 天' },
+  { days: 14, label: tr('最近兩週', 'Last 2 weeks') },
+  { days: 30, label: tr('最近 30 天', 'Last 30 days') },
 ];
 
 // Short date for the history list — the couple recognises "which session was
@@ -37,7 +38,7 @@ const TherapySummaryCard: React.FC<Props> = ({ authState, showNotification }) =>
   const [days, setDays] = useState(14);
   const [loading, setLoading] = useState(false);
   const [summary, setSummary] = useState<TherapySummary | null>(null);
-  const [periodLabel, setPeriodLabel] = useState('最近兩週');
+  const [periodLabel, setPeriodLabel] = useState(tr('最近兩週', 'Last 2 weeks'));
   const [eventCount, setEventCount] = useState(0);
   // Guiding empty state (not paired / no events) — never a red error.
   const [notice, setNotice] = useState<string | null>(null);
@@ -78,7 +79,7 @@ const TherapySummaryCard: React.FC<Props> = ({ authState, showNotification }) =>
 
   const generate = async (targetDays: number) => {
     if (!authState.isAuthenticated) {
-      showNotification({ type: 'warning', title: '請先登入', message: '登入後即可整理你們的諮商摘要', duration: 3000 });
+      showNotification({ type: 'warning', title: tr('請先登入', 'Please sign in'), message: tr('登入後即可整理你們的諮商摘要', 'Sign in to put together your counseling summary'), duration: 3000 });
       return;
     }
     setLoading(true);
@@ -100,12 +101,12 @@ const TherapySummaryCard: React.FC<Props> = ({ authState, showNotification }) =>
       }
     } catch (err: unknown) {
       // Quota exhaustion carries its own actionable message + error_code.
-      const message = err instanceof Error ? err.message : '諮商摘要暫時無法產生，請稍後再試';
+      const message = err instanceof Error ? err.message : tr('諮商摘要暫時無法產生，請稍後再試', 'The counseling summary couldn\'t be generated right now. Please try again in a moment.');
       const code = (err as { error_code?: string })?.error_code;
       const quota = code === 'AI_DAILY_LIMIT_REACHED';
       showNotification({
         type: quota ? 'warning' : 'error',
-        title: quota ? '今日 AI 次數已用完' : '無法產生摘要',
+        title: quota ? tr('今日 AI 次數已用完', 'Today\'s AI credits are used up') : tr('無法產生摘要', 'Couldn\'t generate the summary'),
         message,
         duration: 5000,
       });
@@ -121,7 +122,7 @@ const TherapySummaryCard: React.FC<Props> = ({ authState, showNotification }) =>
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      showNotification({ type: 'error', title: '複製失敗', message: '請手動選取文字複製', duration: 3000 });
+      showNotification({ type: 'error', title: tr('複製失敗', 'Couldn\'t copy'), message: tr('請手動選取文字複製', 'Please select the text and copy it manually'), duration: 3000 });
     }
   };
 
@@ -132,15 +133,15 @@ const TherapySummaryCard: React.FC<Props> = ({ authState, showNotification }) =>
     >
       <div className="flex items-center gap-2 text-petal-sage-deep mb-1">
         <ClipboardList className="w-5 h-5" strokeWidth={1.5} />
-        <h3 className="font-display italic text-lg text-petal-ink">諮商摘要</h3>
+        <h3 className="font-display italic text-lg text-petal-ink">{tr('諮商摘要', 'Counseling summary')}</h3>
       </div>
       <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-4">
-        把{periodLabel}記錄的事件，一鍵整理成一份可以帶進諮商室的摘要——最常出現的主題、雙方的情緒、已修復與還沒解決的事，還有三個想和心理師討論的問題。進諮商時不用再從頭回想。
+        {tr('把', 'Turn the events you recorded ( ')}{periodLabel}{tr('記錄的事件，一鍵整理成一份可以帶進諮商室的摘要——最常出現的主題、雙方的情緒、已修復與還沒解決的事，還有三個想和心理師討論的問題。進諮商時不用再從頭回想。', ') into a summary you can bring to counseling with one tap: the most common topics, how you both felt, what\'s repaired and what isn\'t, plus three questions for your therapist. No more reconstructing it all from memory.')}
       </p>
 
       {/* Period selector + generate */}
       <div className="flex flex-wrap items-center gap-2 mb-1">
-        <div className="inline-flex rounded-full bg-petal-cream-2 p-0.5" role="tablist" aria-label="期間">
+        <div className="inline-flex rounded-full bg-petal-cream-2 p-0.5" role="tablist" aria-label={tr("期間", 'Period')}>
           {PERIODS.map((p) => (
             <button
               key={p.days}
@@ -163,7 +164,7 @@ const TherapySummaryCard: React.FC<Props> = ({ authState, showNotification }) =>
           className="inline-flex items-center gap-1.5 rounded-full bg-petal-rose-deep text-white font-body text-sm font-medium px-4 py-2 shadow-sm hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50"
         >
           {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-          {loading ? '整理中…' : summary ? '重新整理' : '整理成諮商摘要'}
+          {loading ? tr('整理中…', 'Summarizing…') : summary ? tr('重新整理', 'Regenerate') : tr('整理成諮商摘要', 'Create counseling summary')}
         </button>
       </div>
 
@@ -177,7 +178,7 @@ const TherapySummaryCard: React.FC<Props> = ({ authState, showNotification }) =>
             className="inline-flex items-center gap-1.5 font-body text-xs text-petal-muted hover:text-petal-ink transition-colors"
           >
             <History className="w-3.5 h-3.5" strokeWidth={1.5} />
-            歷史紀錄（{history.length}）
+            {tr('歷史紀錄（', 'History (')}{history.length}{tr('）', ')')}
             <ChevronDown className={`w-3.5 h-3.5 transition-transform ${historyOpen ? 'rotate-180' : ''}`} />
           </button>
           {historyOpen && (
@@ -199,7 +200,7 @@ const TherapySummaryCard: React.FC<Props> = ({ authState, showNotification }) =>
                         <Clock className="w-3.5 h-3.5 text-petal-muted shrink-0" strokeWidth={1.5} />
                         <span className="font-body text-xs text-petal-ink truncate">
                           {h.periodLabel}
-                          {typeof h.eventCount === 'number' ? ` · 共 ${h.eventCount} 件` : ''}
+                          {typeof h.eventCount === 'number' ? tr(` · 共 ${h.eventCount} 件`, ` · ${h.eventCount} events`) : ''}
                         </span>
                       </span>
                       <span className="font-body text-[11px] text-petal-muted shrink-0">
@@ -212,7 +213,7 @@ const TherapySummaryCard: React.FC<Props> = ({ authState, showNotification }) =>
             </ul>
           )}
           <p className="mt-1.5 font-body text-[11px] text-petal-muted leading-relaxed">
-            點開舊摘要不會重新產生、也不扣 AI 次數。
+            {tr('點開舊摘要不會重新產生、也不扣 AI 次數。', 'Opening an old summary doesn\'t regenerate it or use AI credits.')}
           </p>
         </div>
       )}
@@ -233,14 +234,14 @@ const TherapySummaryCard: React.FC<Props> = ({ authState, showNotification }) =>
         <div className="mt-4 space-y-4" data-testid="therapy-summary-result">
           <div className="flex items-center justify-between gap-2">
             <span className="font-body text-xs text-petal-muted flex items-center gap-2 flex-wrap">
-              <span>{periodLabel} · 共 {eventCount} 件事件</span>
+              <span>{periodLabel} {tr('· 共', '·  ')} {eventCount} {tr('件事件', ' events')}</span>
               {viewingId && viewingDate && (
                 <span
                   data-testid="therapy-summary-historic-badge"
                   className="inline-flex items-center gap-1 rounded-full bg-petal-cream-2 text-petal-ink-soft px-2 py-0.5 text-[11px]"
                 >
                   <History className="w-3 h-3" strokeWidth={1.5} />
-                  歷史紀錄 · {formatHistoryDate(viewingDate)}
+                  {tr('歷史紀錄 ·', 'History ·')} {formatHistoryDate(viewingDate)}
                 </span>
               )}
             </span>
@@ -250,7 +251,7 @@ const TherapySummaryCard: React.FC<Props> = ({ authState, showNotification }) =>
               className="inline-flex items-center gap-1.5 rounded-full border border-petal-rule bg-white text-petal-ink font-body text-xs px-3 py-1.5 hover:border-petal-ink transition-colors"
             >
               {copied ? <Check className="w-3.5 h-3.5 text-petal-sage-deep" /> : <Copy className="w-3.5 h-3.5" />}
-              {copied ? '已複製' : '複製給心理師'}
+              {copied ? tr('已複製', 'Copied') : tr('複製給心理師', 'Copy for my therapist')}
             </button>
           </div>
 

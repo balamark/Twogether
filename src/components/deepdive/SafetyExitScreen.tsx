@@ -1,5 +1,6 @@
 import React from 'react';
 import { LifeBuoy, ArrowLeft } from 'lucide-react';
+import { tr } from '../../i18n/tr';
 
 // The safety exit (PRD §34). When a free-text step trips crisis detection
 // (src/utils/conflictState.ts CRISIS_PATTERNS via detectDraftTone), the journey
@@ -18,15 +19,15 @@ const SafetyExitScreen: React.FC<Props> = ({ onLeave }) => {
     >
       <div className="inline-flex items-center gap-2 text-petal-rose-deep mb-3">
         <LifeBuoy className="w-5 h-5" strokeWidth={1.5} />
-        <span className="font-display italic text-lg">我們先停一下</span>
+        <span className="font-display italic text-lg">{tr('我們先停一下', 'Let\'s pause here')}</span>
       </div>
       <p className="font-body text-sm text-petal-ink leading-relaxed">
-        這個感受現在似乎已經超過了一般的關係反思。我不想繼續帶你往更深的地方走，而讓你一個人承受。
+        {tr('這個感受現在似乎已經超過了一般的關係反思。我不想繼續帶你往更深的地方走，而讓你一個人承受。', 'What you\'re feeling seems to go beyond ordinary relationship reflection right now. I don\'t want to take you deeper and leave you carrying this alone.')}
       </p>
       <p className="font-body text-sm text-petal-ink leading-relaxed mt-3">
-        如果你現在感到不安全，或有想傷害自己的念頭，請立刻聯絡信任的人，或撥打 24 小時安心專線
-        <span className="font-medium">「1925」</span>（依舊愛我）、生命線
-        <span className="font-medium">「1995」</span>。你並不孤單，也值得被好好接住。
+        {tr('如果你現在感到不安全，或有想傷害自己的念頭，請立刻聯絡信任的人，或撥打 24 小時安心專線', 'If you feel unsafe right now or have thoughts of hurting yourself, please reach out to someone you trust, or call a 24-hour helpline. In Taiwan: the Mental Health Support Line ')}
+        <span className="font-medium">{tr('「1925」', '1925')}</span>{tr('（依舊愛我）、生命線', ', or Lifeline ')}
+        <span className="font-medium">{tr('「1995」', '1995')}</span>{tr('。你並不孤單，也值得被好好接住。', '. Outside Taiwan, contact your local emergency number. You\'re not alone, and you deserve to be cared for.')}
       </p>
       <div className="mt-5 flex flex-col sm:flex-row gap-2">
         <a
@@ -34,7 +35,7 @@ const SafetyExitScreen: React.FC<Props> = ({ onLeave }) => {
           className="inline-flex items-center justify-center gap-2 rounded-full bg-petal-ink text-petal-cream px-5 py-2.5 font-medium hover:opacity-90 active:scale-[0.98] transition"
           data-testid="deep-dive-safety-call"
         >
-          撥打安心專線 1925
+          {tr('撥打安心專線 1925', 'Call the 1925 support line')}
         </a>
         <button
           type="button"
@@ -43,11 +44,11 @@ const SafetyExitScreen: React.FC<Props> = ({ onLeave }) => {
           data-testid="deep-dive-safety-leave"
         >
           <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />
-          先離開這裡
+          {tr('先離開這裡', 'Leave for now')}
         </button>
       </div>
       <p className="mt-3 font-body text-[11px] text-petal-muted">
-        你剛才寫下的內容都會幫你保留。等你準備好了，隨時可以回來。
+        {tr('你剛才寫下的內容都會幫你保留。等你準備好了，隨時可以回來。', 'Everything you wrote is saved. Come back whenever you\'re ready.')}
       </p>
     </div>
   );

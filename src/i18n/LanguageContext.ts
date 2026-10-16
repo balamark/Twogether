@@ -5,16 +5,15 @@ import { MESSAGES, type MessageKey } from './messages';
 // context 物件與 hook 放這支 .ts；provider 元件放 LanguageProvider.tsx
 // （沿用 EngineerModeContext.ts / EngineerModeProvider.tsx 的拆檔慣例）。
 //
-// 翻譯範圍：共用外框（Header、使用者選單、主導覽）與「使用說明 / Help &
-// Support」頁。其餘分頁內文仍是繁中；新增或改寫外框文字時，請同時在
-// messages.ts 補上兩種語言。
+// 兩種寫法：共用外框用 t('key')（字串集中在 messages.ts）；其餘各分頁、
+// 彈窗、提示訊息用 tr('繁中', 'English')（見 tr.ts），中英並排寫在原處。
 
 export type Locale = 'zh-TW' | 'en';
 
 export const LOCALES: Locale[] = ['zh-TW', 'en'];
 
 // public/support.html 也讀寫同一個 key，讓 App 與公開客服頁的語言一致。
-export const LOCALE_STORAGE_KEY = 'twogether.locale';
+export { LOCALE_STORAGE_KEY } from './tr';
 
 export interface LanguageValue {
   locale: Locale;

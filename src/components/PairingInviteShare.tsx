@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { tr } from '../i18n/tr';
 
 /**
  * Shown after a pairing invite is sent. Email is the slowest, least reliable
@@ -30,7 +31,7 @@ export const PairingInviteShare: React.FC<PairingInviteShareProps> = ({
 }) => {
   const [copied, setCopied] = useState(false);
 
-  const lineText = `我想和你一起用 Twogether，記錄我們的時光 💕\n${link}`;
+  const lineText = tr(`我想和你一起用 Twogether，記錄我們的時光 💕\n${link}`, `I'd love to use Twogether with you to keep track of our moments together 💕\n${link}`);
   const lineUrl = `${LINE_SHARE_PREFIX}${encodeURIComponent(lineText)}`;
 
   const handleCopy = async () => {
@@ -50,11 +51,11 @@ export const PairingInviteShare: React.FC<PairingInviteShareProps> = ({
     <div className={`border border-petal-rule rounded-xl p-4 bg-petal-cream-2/50 ${className}`}>
       <p className="font-body text-sm text-petal-ink mb-1">
         {emailSent
-          ? `邀請信已寄到 ${recipientEmail || '對方信箱'}。`
-          : '邀請已建立，但目前無法寄信。'}
+          ? tr(`邀請信已寄到 ${recipientEmail || '對方信箱'}。`, `Invitation sent to ${recipientEmail || 'their inbox'}.`)
+          : tr('邀請已建立，但目前無法寄信。', 'The invitation was created, but we couldn\'t send the email right now. Share the link below instead.')}
       </p>
       <p className="font-body text-xs text-petal-muted mb-3">
-        信件可能會被分到垃圾郵件或促銷分頁。想更快一點，直接把下面的連結傳給 TA。
+        {tr('信件可能會被分到垃圾郵件或促銷分頁。想更快一點，直接把下面的連結傳給 TA。', 'Emails sometimes land in spam or promotions. For a faster way, send them the link below directly.')}
       </p>
 
       <div className="bg-white border border-petal-rule rounded-lg px-3 py-2 mb-3">
@@ -68,11 +69,11 @@ export const PairingInviteShare: React.FC<PairingInviteShareProps> = ({
           disabled={sample}
           className="flex-1 py-2.5 rounded-md font-display italic text-sm bg-petal-ink text-petal-cream hover:bg-pink-700 transition-colors disabled:opacity-60"
         >
-          {copied ? '✓ 已複製' : '複製連結'}
+          {copied ? tr('✓ 已複製', '✓ Copied') : tr('複製連結', 'Copy link')}
         </button>
         {sample ? (
           <span className="flex-1 py-2.5 rounded-md font-display italic text-sm text-center border border-petal-rule text-petal-muted">
-            用 LINE 傳給 TA
+            {tr('用 LINE 傳給 TA', 'Send via LINE')}
           </span>
         ) : (
           <a
@@ -81,7 +82,7 @@ export const PairingInviteShare: React.FC<PairingInviteShareProps> = ({
             rel="noopener noreferrer"
             className="flex-1 py-2.5 rounded-md font-display italic text-sm text-center border border-petal-rule text-petal-ink hover:bg-petal-cream-2 transition-colors"
           >
-            用 LINE 傳給 TA
+            {tr('用 LINE 傳給 TA', 'Send via LINE')}
           </a>
         )}
       </div>

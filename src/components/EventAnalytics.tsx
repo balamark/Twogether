@@ -30,6 +30,7 @@ import { getEmotionAcceptance } from '../data/emotionAcceptance';
 import { useScrollLock } from '../hooks/useScrollLock';
 import AiQuotaHint from './AiQuotaHint';
 import { trackAction } from '../utils/track';
+import { tr } from '../i18n/tr';
 
 const PETAL_LINE = '#b86b6b';
 const PETAL_BAR = '#7a8d6f';
@@ -51,7 +52,7 @@ export default function EventAnalytics() {
         if (!cancelled) setData(res);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : '無法取得分析資料');
+        if (!cancelled) setError(err instanceof Error ? err.message : tr('無法取得分析資料', 'Couldn\'t load insights. Please try again in a moment.'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -61,7 +62,7 @@ export default function EventAnalytics() {
     };
   }, []);
 
-  if (loading) return <div className="p-8 text-center text-petal-ink-soft">載入中…</div>;
+  if (loading) return <div className="p-8 text-center text-petal-ink-soft">{tr('載入中…', 'Loading…')}</div>;
   if (error) return <div className="p-6 text-center text-red-500">{error}</div>;
   if (!data) return null;
 
@@ -76,12 +77,12 @@ export default function EventAnalytics() {
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard icon={TrendingUp} label="近 7 日對話" value={data.counts.last7} />
-        <KpiCard icon={BarChart3} label="近 30 日對話" value={data.counts.last30} />
-        <KpiCard icon={CheckCircle2} label="解決率" value={`${data.resolutionRate}%`} />
+        <KpiCard icon={TrendingUp} label={tr("近 7 日對話", 'Conversations, last 7 days')} value={data.counts.last7} />
+        <KpiCard icon={BarChart3} label={tr("近 30 日對話", 'Conversations, last 30 days')} value={data.counts.last30} />
+        <KpiCard icon={CheckCircle2} label={tr("解決率", 'Resolution rate')} value={`${data.resolutionRate}%`} />
         <KpiCard
           icon={Clock3}
-          label="平均解決時數"
+          label={tr("平均解決時數", 'Average hours to resolve')}
           value={data.avgResolutionHours == null ? '—' : `${data.avgResolutionHours}h`}
         />
       </div>
@@ -91,11 +92,11 @@ export default function EventAnalytics() {
 
       {!hasAnyData ? (
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-10 text-center text-petal-ink-soft">
-          目前還沒有足夠資料可分析。累積幾段對話後再回來看看。
+          {tr('目前還沒有足夠資料可分析。累積幾段對話後再回來看看。', 'Not enough data to analyze yet. Come back after a few conversations.')}
         </div>
       ) : (
         <>
-          <ChartCard title="近 30 日對話趨勢">
+          <ChartCard title={tr("近 30 日對話趨勢", 'Conversation trend, last 30 days')}>
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={data.dailyTrend}>
                 <CartesianGrid stroke={GRID} strokeDasharray="3 3" />
@@ -107,7 +108,7 @@ export default function EventAnalytics() {
             </ResponsiveContainer>
           </ChartCard>
 
-          <ChartCard title="對話類型分布">
+          <ChartCard title={tr("對話類型分布", 'Conversation types')}>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={data.tagDistribution}>
                 <CartesianGrid stroke={GRID} strokeDasharray="3 3" />
@@ -123,10 +124,10 @@ export default function EventAnalytics() {
             <div className="bg-petal-cream border border-petal-rule rounded-2xl p-4">
               <div className="flex items-center gap-2 mb-1">
                 <HandHeart className="w-4 h-4 text-petal-rose-deep" />
-                <h3 className="text-sm text-petal-ink">你最常出現的情緒</h3>
+                <h3 className="text-sm text-petal-ink">{tr('你最常出現的情緒', 'Your most frequent feelings')}</h3>
               </div>
               <p className="text-xs text-petal-ink-soft mb-3">
-                點一個情緒，看看下次可以怎麼接住它——先被接住，溝通才開始。
+                {tr('點一個情緒，看看下次可以怎麼接住它——先被接住，溝通才開始。', 'Tap a feeling to see how to hold it next time. Feelings need to be heard before communication can begin.')}
               </p>
               <div className="flex flex-wrap gap-2">
                 {topEmotions.map((e) => (
@@ -146,7 +147,7 @@ export default function EventAnalytics() {
           )}
 
           {data.hotspotHours.length > 0 && (
-            <ChartCard title="容易起衝突的時間">
+            <ChartCard title={tr("容易起衝突的時間", 'When conflicts tend to happen')}>
               <ResponsiveContainer width="100%" height={180}>
                 <BarChart data={[...data.hotspotHours].sort((a, b) => a.hour - b.hour)}>
                   <CartesianGrid stroke={GRID} strokeDasharray="3 3" />
@@ -185,26 +186,26 @@ function EmotionAcceptancePanel({ emotion, onClose }: { emotion: string; onClose
           <div className="flex items-center gap-2">
             <HandHeart className="w-5 h-5 text-petal-rose-deep" />
             <div>
-              <h3 className="text-lg font-serif text-petal-ink">怎麼接住「{emotion}」</h3>
-              <p className="text-xs text-petal-ink-soft mt-1">先接住，再溝通。</p>
+              <h3 className="text-lg font-serif text-petal-ink">{tr('怎麼接住「', 'How to hold "')}{emotion}{tr('」', '"')}</h3>
+              <p className="text-xs text-petal-ink-soft mt-1">{tr('先接住，再溝通。', 'Hold it first, then talk.')}</p>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="text-petal-ink-soft hover:text-petal-ink" aria-label="關閉">
+          <button type="button" onClick={onClose} className="text-petal-ink-soft hover:text-petal-ink" aria-label={tr("關閉", 'Close')}>
             <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="space-y-3">
           <div>
-            <div className="text-xs font-medium text-petal-rose-deep mb-1">這份情緒在說什麼</div>
+            <div className="text-xs font-medium text-petal-rose-deep mb-1">{tr('這份情緒在說什麼', 'What this feeling is saying')}</div>
             <p className="text-sm text-petal-ink leading-relaxed">{guide.meaning}</p>
           </div>
           <div>
-            <div className="text-xs font-medium text-petal-rose-deep mb-1">你可以怎麼接住</div>
+            <div className="text-xs font-medium text-petal-rose-deep mb-1">{tr('你可以怎麼接住', 'How you can hold it')}</div>
             <p className="text-sm text-petal-ink leading-relaxed">{guide.howToReceive}</p>
           </div>
           <div>
-            <div className="text-xs font-medium text-petal-rose-deep mb-1">可以這樣說</div>
+            <div className="text-xs font-medium text-petal-rose-deep mb-1">{tr('可以這樣說', 'You could say')}</div>
             <div className="space-y-2">
               {guide.sampleLines.map((line, i) => (
                 <p
@@ -224,7 +225,7 @@ function EmotionAcceptancePanel({ emotion, onClose }: { emotion: string; onClose
             onClick={onClose}
             className="text-sm px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20"
           >
-            知道了
+            {tr('知道了', 'Got it')}
           </button>
         </div>
       </div>
@@ -273,7 +274,7 @@ function CommunicationPatternCard() {
       // Refresh remaining quota after spending (or not) a credit.
       apiService.getAiUsageToday().then(setQuota).catch(() => {});
     } catch (err) {
-      setError(err instanceof Error ? err.message : '溝通模式暫時無法產生，請稍後再試');
+      setError(err instanceof Error ? err.message : tr('溝通模式暫時無法產生，請稍後再試', 'Communication patterns couldn\'t be generated right now. Please try again in a moment.'));
     } finally {
       setLoading(false);
     }
@@ -286,13 +287,13 @@ function CommunicationPatternCard() {
     >
       <div className="flex items-center gap-2 mb-1">
         <Repeat className="w-4 h-4 text-petal-rose-deep" />
-        <h3 className="text-sm text-petal-ink flex-1">你們的溝通模式</h3>
+        <h3 className="text-sm text-petal-ink flex-1">{tr('你們的溝通模式', 'Your communication patterns')}</h3>
         <span className="font-body text-[10px] uppercase tracking-[0.16em] text-petal-rose-deep border border-petal-rose-soft bg-petal-rose-soft/20 rounded-full px-2 py-0.5">
-          模式
+          {tr('模式', 'Patterns')}
         </span>
       </div>
       <p className="text-xs text-petal-ink-soft mb-3 leading-relaxed">
-        像一個看過你們吵過幾次架的第三方，幫你們認出反覆出現的循環，並給一個一起跳出來的小練習。看見它，才有機會不再重複它。
+        {tr('像一個看過你們吵過幾次架的第三方，幫你們認出反覆出現的循環，並給一個一起跳出來的小練習。看見它，才有機會不再重複它。', 'Like a third party who\'s seen you argue a few times, it helps you spot the cycles that keep repeating, and offers a small exercise to step out together. Seeing it is the first step to not repeating it.')}
       </p>
 
       {/* 尚未生成：一顆會花一次 AI 額度的按鈕＋剩餘次數提示。 */}
@@ -306,7 +307,7 @@ function CommunicationPatternCard() {
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-petal-ink text-petal-cream font-body text-sm font-medium hover:bg-pink-700 transition-colors disabled:opacity-40"
           >
             <Repeat className="w-4 h-4" strokeWidth={1.75} />
-            {loading ? '正在看你們的模式…' : '看我們的溝通模式'}
+            {loading ? tr('正在看你們的模式…', 'Looking at your patterns…') : tr('看我們的溝通模式', 'See our communication patterns')}
           </button>
           <div className="mt-2">
             <AiQuotaHint quota={quota} />
@@ -321,7 +322,7 @@ function CommunicationPatternCard() {
           <p className="text-sm text-petal-ink-soft leading-relaxed">{notReady.message}</p>
           {notReady.progress && (
             <p className="text-xs text-petal-rose-deep mt-2">
-              進度：{notReady.progress.have} / {notReady.progress.need} 件
+              {tr('進度：', 'Progress: ')}{notReady.progress.have} / {notReady.progress.need} {tr('件', '')}
             </p>
           )}
         </div>
@@ -333,7 +334,7 @@ function CommunicationPatternCard() {
           {pattern.recurringCycle.length > 0 && (
             <div>
               <div className="font-body text-[11px] font-medium uppercase tracking-[0.12em] text-petal-muted mb-1.5">
-                你們反覆卡住的循環
+                {tr('你們反覆卡住的循環', 'The cycle you keep getting stuck in')}
               </div>
               <div className="flex flex-wrap items-center gap-1.5">
                 {pattern.recurringCycle.map((step, i) => (
@@ -353,7 +354,7 @@ function CommunicationPatternCard() {
           {pattern.signals.length > 0 && (
             <div>
               <div className="font-body text-[11px] font-medium uppercase tracking-[0.12em] text-petal-muted mb-1.5">
-                容易被忽略的訊號
+                {tr('容易被忽略的訊號', 'Signals that are easy to miss')}
               </div>
               <ul className="space-y-1">
                 {pattern.signals.map((s, i) => (
@@ -369,9 +370,9 @@ function CommunicationPatternCard() {
             <div className="rounded-xl border border-petal-rose-deep/25 bg-petal-cream-2 px-3 py-2">
               <div className="flex items-center gap-1.5 text-petal-rose-deep mb-1">
                 <Lightbulb className="w-3.5 h-3.5" strokeWidth={1.5} />
-                <span className="font-body text-[11px] font-medium">一起跳出這個循環</span>
+                <span className="font-body text-[11px] font-medium">{tr('一起跳出這個循環', 'Step out of this cycle together')}</span>
               </div>
-              <p className="font-body text-sm text-petal-ink leading-relaxed">「{pattern.exitTip}」</p>
+              <p className="font-body text-sm text-petal-ink leading-relaxed">{tr('「', '“')}{pattern.exitTip}{tr('」', '”')}</p>
             </div>
           )}
         </div>

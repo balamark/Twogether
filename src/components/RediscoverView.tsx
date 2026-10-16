@@ -3,6 +3,7 @@ import { Sparkles, ArrowLeft, ArrowRight, RefreshCw, Heart } from 'lucide-react'
 import AutoGrowTextarea from './AutoGrowTextarea';
 import { trackAction } from '../utils/track';
 import type { AuthState } from '../App';
+import { tr } from '../i18n/tr';
 
 interface RediscoverViewProps {
   authState: AuthState;
@@ -23,28 +24,28 @@ interface RediscoverViewProps {
 const buildQuestions = (them: string): { key: string; prompt: string; hint: string }[] => [
   {
     key: 'first-notice',
-    prompt: `還記得第一次注意到${them}的時候嗎？`,
-    hint: '當時是什麼吸引了你？一個眼神、一句話，還是某個瞬間。',
+    prompt: tr(`還記得第一次注意到${them}的時候嗎？`, `Do you remember when you first noticed ${them}?`),
+    hint: tr('當時是什麼吸引了你？一個眼神、一句話，還是某個瞬間。', 'What drew you in back then? A look, something they said, or a single moment.'),
   },
   {
     key: 'impressive-moment',
-    prompt: '有沒有一個「那時候我覺得對方真的很棒」的瞬間？',
-    hint: '那時候做了什麼、說了什麼，讓你印象特別深？',
+    prompt: tr('有沒有一個「那時候我覺得對方真的很棒」的瞬間？', 'Was there a moment when you thought, "they\'re really wonderful"?'),
+    hint: tr('那時候做了什麼、說了什麼，讓你印象特別深？', 'What did they do or say then that stayed with you?'),
   },
   {
     key: 'favorite-trait',
-    prompt: '那時候的你，最喜歡對方身上的哪一個特質？',
-    hint: '不用是什麼大道理，可能只是「讓我覺得人生可以很輕鬆」。',
+    prompt: tr('那時候的你，最喜歡對方身上的哪一個特質？', 'Back then, which quality of theirs did you love most?'),
+    hint: tr('不用是什麼大道理，可能只是「讓我覺得人生可以很輕鬆」。', 'It doesn\'t have to be profound. Maybe just "they made life feel easy".'),
   },
   {
     key: 'still-there',
-    prompt: '現在的對方，還有沒有某些時候，讓你想起那個當年的人？',
-    hint: '哪怕只是一個很小的瞬間也算。',
+    prompt: tr('現在的對方，還有沒有某些時候，讓你想起那個當年的人？', 'Are there still moments now that remind you of the person they were back then?'),
+    hint: tr('哪怕只是一個很小的瞬間也算。', 'Even a tiny moment counts.'),
   },
   {
     key: 'one-line',
-    prompt: '如果要用一句話，告訴現在的對方，你會說什麼？',
-    hint: '這句話之後會留在你們的信裡。',
+    prompt: tr('如果要用一句話，告訴現在的對方，你會說什麼？', 'If you could say one sentence to them now, what would it be?'),
+    hint: tr('這句話之後會留在你們的信裡。', 'This sentence will stay in your letter.'),
   },
 ];
 
@@ -53,7 +54,7 @@ const storageKey = (userId?: string) => `tw:rediscover:${userId || 'anon'}`;
 type Answers = Record<string, string>;
 
 const RediscoverView: React.FC<RediscoverViewProps> = ({ authState, onBack }) => {
-  const them = authState.user?.partnerNickname?.trim() || '對方';
+  const them = authState.user?.partnerNickname?.trim() || tr('對方', 'them');
   const questions = useMemo(() => buildQuestions(them), [them]);
 
   const [answers, setAnswers] = useState<Answers>(() => {
@@ -123,19 +124,19 @@ const RediscoverView: React.FC<RediscoverViewProps> = ({ authState, onBack }) =>
           onClick={onBack}
           className="inline-flex items-center gap-1.5 font-body text-sm text-petal-muted hover:text-petal-ink transition-colors"
         >
-          <ArrowLeft className="w-4 h-4" strokeWidth={1.5} /> 回到我們
+          <ArrowLeft className="w-4 h-4" strokeWidth={1.5} /> {tr('回到我們', 'Back to Us')}
         </button>
 
         <div className="rounded-3xl border border-petal-rose-soft bg-gradient-to-b from-white to-petal-cream p-6 md:p-8 shadow-petal">
           <div className="text-center mb-6">
             <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-2">
-              — 重新認識你
+              {tr('— 重新認識你', '— Rediscover you')}
             </div>
             <h2 className="font-display text-3xl md:text-4xl font-light tracking-tight text-petal-ink leading-[1.1]">
-              💌 我們曾經<em className="not-italic italic text-pink-600">這樣愛過</em>
+              {tr('💌 我們曾經', '💌 How we ')}<em className="not-italic italic text-pink-600">{tr('這樣愛過', 'once loved')}</em>
             </h2>
             <p className="mt-3 font-display italic font-light text-sm text-petal-muted">
-              你當初愛上{them}的樣子，一直都還在。
+              {tr('你當初愛上', 'The way you first fell for ')}{them}{tr('的樣子，一直都還在。', ' is still here.')}
             </p>
           </div>
 
@@ -161,11 +162,11 @@ const RediscoverView: React.FC<RediscoverViewProps> = ({ authState, onBack }) =>
             onClick={restart}
             className="inline-flex items-center gap-1.5 rounded-full border border-petal-rule px-4 py-2 font-body text-sm text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors"
           >
-            <RefreshCw className="w-4 h-4" strokeWidth={1.5} /> 再寫一次
+            <RefreshCw className="w-4 h-4" strokeWidth={1.5} /> {tr('再寫一次', 'Write again')}
           </button>
         </div>
         <p className="text-center font-body text-[12px] text-petal-muted leading-relaxed">
-          這封信只留在你這台裝置上，慢慢寫、隨時回來看。
+          {tr('這封信只留在你這台裝置上，慢慢寫、隨時回來看。', 'This letter stays only on this device. Write slowly and come back any time.')}
         </p>
       </div>
     );
@@ -183,14 +184,14 @@ const RediscoverView: React.FC<RediscoverViewProps> = ({ authState, onBack }) =>
         onClick={handleBack}
         className="inline-flex items-center gap-1.5 font-body text-sm text-petal-muted hover:text-petal-ink transition-colors mb-6"
       >
-        <ArrowLeft className="w-4 h-4" strokeWidth={1.5} /> {step === 0 ? '回到我們' : '上一題'}
+        <ArrowLeft className="w-4 h-4" strokeWidth={1.5} /> {step === 0 ? tr('回到我們', 'Back to Us') : tr('上一題', 'Previous')}
       </button>
 
       <div className="rounded-3xl border border-petal-rule bg-white p-6 md:p-9 shadow-petal">
         <div className="flex items-center gap-2 mb-6">
           <Sparkles className="w-4 h-4 text-petal-rose-deep" strokeWidth={1.5} />
           <span className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted">
-            重新認識你 · 第 {step + 1} / {questions.length} 題
+            {tr('重新認識你 · 第', 'Rediscover you · Question ')} {step + 1} / {questions.length} {tr('題', '')}
           </span>
         </div>
 
@@ -209,7 +210,7 @@ const RediscoverView: React.FC<RediscoverViewProps> = ({ authState, onBack }) =>
         <AutoGrowTextarea
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="慢慢想，沒有標準答案…"
+          placeholder={tr("慢慢想，沒有標準答案…", 'Take your time. There\'s no right answer…')}
           className="w-full rounded-2xl border border-petal-rule bg-petal-cream px-4 py-3 font-body text-base text-petal-ink placeholder:text-petal-muted focus:border-petal-rose-deep focus:outline-none min-h-[120px]"
           data-testid="rediscover-answer"
           autoFocus
@@ -221,7 +222,7 @@ const RediscoverView: React.FC<RediscoverViewProps> = ({ authState, onBack }) =>
             onClick={handleSkip}
             className="font-body text-sm text-petal-muted hover:text-petal-ink transition-colors"
           >
-            這題先跳過
+            {tr('這題先跳過', 'Skip this one')}
           </button>
           <button
             type="button"
@@ -232,11 +233,11 @@ const RediscoverView: React.FC<RediscoverViewProps> = ({ authState, onBack }) =>
           >
             {isLast ? (
               <>
-                <Heart className="w-4 h-4" strokeWidth={1.5} /> 完成這封信
+                <Heart className="w-4 h-4" strokeWidth={1.5} /> {tr('完成這封信', 'Finish the letter')}
               </>
             ) : (
               <>
-                下一題 <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
+                {tr('下一題', 'Next')} <ArrowRight className="w-4 h-4" strokeWidth={1.5} />
               </>
             )}
           </button>

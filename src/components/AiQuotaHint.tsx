@@ -1,5 +1,6 @@
 import { Sparkles } from 'lucide-react';
 import type { AiUsageToday } from '../services/api';
+import { tr } from '../i18n/tr';
 
 // 「今日剩 N 次」hint next to AI buttons (docs/UX_PLAYBOOK.md P1-2 / §6 Q4).
 // The quota is a slope, not a wall: exhausted state explains and points at
@@ -14,8 +15,8 @@ export default function AiQuotaHint({ quota }: { quota: AiUsageToday | null }) {
     >
       <Sparkles className="w-3 h-3" />
       {exhausted
-        ? '今日 AI 次數已用完：明天會自動補上，升級 Premium 可提高每日上限。'
-        : `今日 AI 次數還剩 ${quota.remaining} 次`}
+        ? tr('今日 AI 次數已用完：明天會自動補上，升級 Premium 可提高每日上限。', 'You\'ve used today\'s AI credits. They refill tomorrow, and Premium raises the daily limit.')
+        : tr(`今日 AI 次數還剩 ${quota.remaining} 次`, `${quota.remaining} AI credits left today`)}
     </p>
   );
 }

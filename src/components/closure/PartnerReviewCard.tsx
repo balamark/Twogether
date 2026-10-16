@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CheckCircle2, MessageSquarePlus, Loader2, Pencil } from 'lucide-react';
 import type { EventClosure, ClosureReviewTarget, ClosureReviewVerdict } from '../../services/api';
+import { tr } from '../../i18n/tr';
 
 // Screen 5 — I have submitted; now I see what my partner wrote and respond.
 // 就這樣 or 我想調整一下（附建議）. A change request records a note; it does NOT
@@ -69,7 +70,7 @@ export default function PartnerReviewCard({
           data-testid={`closure-review-note-${target}`}
           value={note}
           onChange={(e) => setNote(e.target.value.slice(0, 300))}
-          placeholder="想怎麼調整？（會傳給對方看到）"
+          placeholder={tr("想怎麼調整？（會傳給對方看到）", 'How would you like to adjust it? (your partner will see this)')}
           rows={2}
           className="w-full text-sm bg-petal-cream border border-petal-rule rounded-xl px-3 py-2 focus:outline-none focus:border-petal-sage-deep"
         />
@@ -81,7 +82,7 @@ export default function PartnerReviewCard({
             onClick={() => submitReview(target, 'request_change')}
             className="text-sm px-3 py-1.5 rounded-full bg-petal-sage-deeper text-white font-medium disabled:opacity-50"
           >
-            {busy ? '送出中⋯' : '送出建議'}
+            {busy ? tr('送出中⋯', 'Sending…') : tr('送出建議', 'Send suggestion')}
           </button>
         </div>
       </div>
@@ -90,15 +91,15 @@ export default function PartnerReviewCard({
   return (
     <div className="space-y-3" data-testid="closure-review-screen">
       <p className="text-sm text-petal-ink-soft">
-        {partnerNickname || '對方'}也寫好了，看看下面這幾件事。你不用同意，只要回應一下。
+        {partnerNickname || tr('對方', 'Your partner')}{tr('也寫好了，看看下面這幾件事。你不用同意，只要回應一下。', ' has finished too. Take a look at these. You don\'t have to agree, just respond.')}
       </p>
 
       {partnerCommitment && (
         <section className="bg-white border border-petal-sage/40 rounded-2xl p-4 space-y-2">
           <div className="flex items-baseline justify-between">
-            <h4 className="font-serif text-petal-ink text-base">{partnerNickname || '對方'}下次願意做的事</h4>
+            <h4 className="font-serif text-petal-ink text-base">{partnerNickname || tr('對方', 'Your partner')}{tr('下次願意做的事', '\'s next-time commitment')}</h4>
             {commitmentAlreadyReviewed ? (
-              <span className="text-xs text-petal-ink-soft">已回應</span>
+              <span className="text-xs text-petal-ink-soft">{tr('已回應', 'Responded')}</span>
             ) : null}
           </div>
           <p
@@ -117,7 +118,7 @@ export default function PartnerReviewCard({
                 className="text-sm px-3 py-1.5 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-1.5"
               >
                 <MessageSquarePlus className="w-3.5 h-3.5" />
-                我想調整一下
+                {tr('我想調整一下', 'I\'d like to adjust')}
               </button>
               <button
                 type="button"
@@ -127,7 +128,7 @@ export default function PartnerReviewCard({
                 className="text-sm px-3 py-1.5 rounded-full bg-petal-sage-deeper text-white font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
               >
                 {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                就這樣
+                {tr('就這樣', 'Agreed')}
               </button>
             </div>
           )}
@@ -139,9 +140,9 @@ export default function PartnerReviewCard({
       {closure.sharedDecision && (
         <section className="bg-white border border-petal-sage/40 rounded-2xl p-4 space-y-2">
           <div className="flex items-baseline justify-between">
-            <h4 className="font-serif text-petal-ink text-base">我們一起決定</h4>
+            <h4 className="font-serif text-petal-ink text-base">{tr('我們一起決定', 'We decided together')}</h4>
             {decisionAlreadyReviewed ? (
-              <span className="text-xs text-petal-ink-soft">已回應</span>
+              <span className="text-xs text-petal-ink-soft">{tr('已回應', 'Responded')}</span>
             ) : null}
           </div>
           <p
@@ -160,7 +161,7 @@ export default function PartnerReviewCard({
                 className="text-sm px-3 py-1.5 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-1.5"
               >
                 <MessageSquarePlus className="w-3.5 h-3.5" />
-                我想調整一下
+                {tr('我想調整一下', 'I\'d like to adjust')}
               </button>
               <button
                 type="button"
@@ -170,7 +171,7 @@ export default function PartnerReviewCard({
                 className="text-sm px-3 py-1.5 rounded-full bg-petal-sage-deeper text-white font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
               >
                 {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
-                就這樣
+                {tr('就這樣', 'Agreed')}
               </button>
             </div>
           )}
@@ -190,7 +191,7 @@ export default function PartnerReviewCard({
           className="text-xs text-petal-ink-soft underline underline-offset-2 hover:text-petal-ink inline-flex items-center gap-1"
         >
           <Pencil className="w-3 h-3" />
-          改一下我的約定
+          {tr('改一下我的約定', 'Edit my commitment')}
         </button>
       </div>
     </div>

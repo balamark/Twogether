@@ -11,6 +11,7 @@ import CommitmentComposer from './CommitmentComposer';
 import ClosureWaitingCard from './ClosureWaitingCard';
 import PartnerReviewCard from './PartnerReviewCard';
 import ClosureSkipModal from './ClosureSkipModal';
+import { tr } from '../../i18n/tr';
 
 interface NotificationInput {
   type: 'success' | 'error' | 'info' | 'warning';
@@ -68,8 +69,8 @@ export default function ClosurePanel({
       }
       showNotification({
         type: 'error',
-        title: '無法取得收尾狀態',
-        message: err instanceof Error ? err.message : '請稍後再試',
+        title: tr('無法取得收尾狀態', 'Couldn\'t load the wrap-up status'),
+        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
       });
     } finally {
       setLoading(false);
@@ -112,8 +113,8 @@ export default function ClosurePanel({
         // user what happened and what they can do, so the button never looks dead.
         showNotification({
           type: 'info',
-          title: 'AI 這次沒想到合適的句子',
-          message: '請再按一次「幫我想一個」，或直接自己寫一句就好。',
+          title: tr('AI 這次沒想到合適的句子', 'The AI couldn\'t come up with a fitting sentence this time'),
+          message: tr('請再按一次「幫我想一個」，或直接自己寫一句就好。', 'Tap "Suggest one" again, or just write a sentence yourself.'),
         });
       }
       return options;
@@ -122,14 +123,14 @@ export default function ClosurePanel({
       if (code === 'AI_DAILY_LIMIT_REACHED') {
         showNotification({
           type: 'warning',
-          title: '今日 AI 次數已用完',
-          message: '幫我想一個次數已達今日上限；你仍然可以自己寫，明天會自動補上。',
+          title: tr('今日 AI 次數已用完', 'Today\'s AI credits are used up'),
+          message: tr('幫我想一個次數已達今日上限；你仍然可以自己寫，明天會自動補上。', 'You\'ve reached today\'s limit for "Suggest one". You can still write your own; it refills tomorrow.'),
         });
       } else {
         showNotification({
           type: 'error',
-          title: '幫我想一個暫時無法使用',
-          message: err instanceof Error ? err.message : '請稍後再試',
+          title: tr('幫我想一個暫時無法使用', '"Suggest one" is unavailable right now'),
+          message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
         });
       }
       return [];
@@ -151,15 +152,15 @@ export default function ClosurePanel({
       if (next.eventStatus === 'resolved') await onResolved();
       showNotification({
         type: 'success',
-        title: '你的約定已送出',
-        message: next.partner.status === 'submitted' ? `${partnerNickname || '對方'}已經寫好了` : `等${partnerNickname || '對方'}也寫好`,
+        title: tr('你的約定已送出', 'Your commitment has been sent'),
+        message: next.partner.status === 'submitted' ? tr(`${partnerNickname || '對方'}已經寫好了`, `${partnerNickname || 'Your partner'} has already finished theirs`) : tr(`等${partnerNickname || '對方'}也寫好`, `Waiting for ${partnerNickname || 'your partner'} to finish too`),
       });
     } catch (err) {
       const code = (err as { error_code?: string })?.error_code;
-      const message = err instanceof Error ? err.message : '請稍後再試';
+      const message = err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment');
       showNotification({
         type: code === 'COMMITMENT_TOO_SHORT' ? 'warning' : 'error',
-        title: code === 'COMMITMENT_TOO_SHORT' ? '約定寫得再具體一點' : '無法送出你的約定',
+        title: code === 'COMMITMENT_TOO_SHORT' ? tr('約定寫得再具體一點', 'Make your commitment a bit more specific') : tr('無法送出你的約定', 'Couldn\'t send your commitment'),
         message,
       });
     } finally {
@@ -180,8 +181,8 @@ export default function ClosurePanel({
     } catch (err) {
       showNotification({
         type: 'error',
-        title: '無法送出你的回應',
-        message: err instanceof Error ? err.message : '請稍後再試',
+        title: tr('無法送出你的回應', 'Couldn\'t send your response'),
+        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
       });
     } finally {
       setBusy(false);
@@ -202,14 +203,14 @@ export default function ClosurePanel({
       if (next.eventStatus === 'resolved') await onResolved();
       showNotification({
         type: 'info',
-        title: '已跳過',
-        message: next.partner.status === 'submitted' ? `${partnerNickname || '對方'}的約定會保留` : `等${partnerNickname || '對方'}的動作`,
+        title: tr('已跳過', 'Skipped'),
+        message: next.partner.status === 'submitted' ? tr(`${partnerNickname || '對方'}的約定會保留`, `${partnerNickname || 'Your partner'}'s commitment will be kept`) : tr(`等${partnerNickname || '對方'}的動作`, `Waiting for ${partnerNickname || 'your partner'}`),
       });
     } catch (err) {
       showNotification({
         type: 'error',
-        title: '無法跳過',
-        message: err instanceof Error ? err.message : '請稍後再試',
+        title: tr('無法跳過', 'Couldn\'t skip'),
+        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
       });
     } finally {
       setBusy(false);
@@ -230,8 +231,8 @@ export default function ClosurePanel({
       const expected = code === 'CLOSURE_FINALIZE_TOO_EARLY' || code === 'CLOSURE_NEEDS_YOUR_PART';
       showNotification({
         type: expected ? 'info' : 'error',
-        title: expected ? '暫時還不能結束' : '無法完成收尾',
-        message: err instanceof Error ? err.message : '請稍後再試',
+        title: expected ? tr('暫時還不能結束', 'It can\'t be closed yet') : tr('無法完成收尾', 'Couldn\'t finish the wrap-up'),
+        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
       });
     } finally {
       setBusy(false);
@@ -256,8 +257,8 @@ export default function ClosurePanel({
     } catch (err) {
       showNotification({
         type: 'error',
-        title: '無法回到對話',
-        message: err instanceof Error ? err.message : '請稍後再試',
+        title: tr('無法回到對話', 'Couldn\'t go back to the conversation'),
+        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
       });
     } finally {
       setCancelling(false);
@@ -271,7 +272,7 @@ export default function ClosurePanel({
         data-testid="event-closure-panel"
       >
         <Loader2 className="w-4 h-4 animate-spin" />
-        載入收尾狀態…
+        {tr('載入收尾狀態…', 'Loading the wrap-up status…')}
       </div>
     );
   }
@@ -309,13 +310,13 @@ export default function ClosurePanel({
           className="bg-white border border-petal-sage/40 rounded-2xl p-3"
           data-testid="closure-recap"
         >
-          <summary className="text-xs text-petal-ink-soft cursor-pointer">上一段對話的重點（點開回顧）</summary>
+          <summary className="text-xs text-petal-ink-soft cursor-pointer">{tr('上一段對話的重點（點開回顧）', 'Highlights from the last conversation (tap to review)')}</summary>
           <div className="mt-2 text-sm text-petal-ink space-y-2">
             {closure.therapyNote.trigger && (
-              <p><span className="text-petal-ink-soft text-xs">觸發：</span>{closure.therapyNote.trigger}</p>
+              <p><span className="text-petal-ink-soft text-xs">{tr('觸發：', 'Trigger: ')}</span>{closure.therapyNote.trigger}</p>
             )}
             {closure.therapyNote.nextTime && (
-              <p><span className="text-petal-ink-soft text-xs">下次先說：</span>{closure.therapyNote.nextTime}</p>
+              <p><span className="text-petal-ink-soft text-xs">{tr('下次先說：', 'Next time, open with: ')}</span>{closure.therapyNote.nextTime}</p>
             )}
           </div>
         </details>
@@ -370,10 +371,10 @@ export default function ClosurePanel({
           className="text-sm px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2 disabled:opacity-50"
         >
           {cancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-          取消收尾，繼續對話
+          {tr('取消收尾，繼續對話', 'Cancel wrap-up and keep talking')}
         </button>
         {!closure.canCancel && (
-          <p className="text-[11px] text-petal-ink-soft">會清空目前寫好的約定，回到原本的對話。</p>
+          <p className="text-[11px] text-petal-ink-soft">{tr('會清空目前寫好的約定，回到原本的對話。', 'This clears the commitments written so far and returns to the conversation.')}</p>
         )}
       </div>
 

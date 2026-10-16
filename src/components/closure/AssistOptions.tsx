@@ -1,4 +1,5 @@
 import { Sparkles, X } from 'lucide-react';
+import { tr } from '../../i18n/tr';
 
 // Screen 2a — three AI-suggested options for the current field. Picking one
 // fills the textarea (owning composer stays in control); each stays editable.
@@ -18,11 +19,11 @@ export default function AssistOptions({
       <div className="flex items-center justify-between">
         <p className="text-xs text-petal-ink-soft inline-flex items-center gap-1.5">
           <Sparkles className="w-3.5 h-3.5 text-petal-sage-deep" />
-          參考幾個寫法（可以直接改）
+          {tr('參考幾個寫法（可以直接改）', 'A few ways to say it (edit freely)')}
         </p>
         <button
           type="button"
-          aria-label="收起"
+          aria-label={tr("收起", 'Collapse')}
           onClick={onDismiss}
           className="text-petal-ink-soft hover:text-petal-ink"
         >

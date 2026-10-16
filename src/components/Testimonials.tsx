@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Star, Quote } from 'lucide-react';
 import { apiService } from '../services/api';
+import { tr } from '../i18n/tr';
 
 export interface Testimonial {
   id: string;
@@ -13,26 +14,26 @@ export interface Testimonial {
 const DEFAULT_TESTIMONIALS: Testimonial[] = [
   {
     id: 'default-1',
-    name: '怡君 & 宥廷',
+    name: tr('怡君 & 宥廷', 'Yi-Chun & Yu-Ting'),
     rating: 5,
-    content: '以前吵架都冷戰好幾天，現在用 AI 開場白先把話說開，和好快多了。記錄時光也讓我們更珍惜每次約會。',
+    content: tr('以前吵架都冷戰好幾天，現在用 AI 開場白先把話說開，和好快多了。記錄時光也讓我們更珍惜每次約會。', 'We used to give each other the silent treatment for days after a fight. Now we use the AI opener to talk it out first, and we make up so much faster. Recording our moments also makes us treasure every date more.'),
   },
   {
     id: 'default-2',
-    name: '小米',
+    name: tr('小米', 'Mi'),
     rating: 5,
-    content: '衝突事件功能太實用了！把委屈寫下來、AI 幫我改成不那麼衝的語氣，對方比較聽得進去。',
+    content: tr('衝突事件功能太實用了！把委屈寫下來、AI 幫我改成不那麼衝的語氣，對方比較聽得進去。', 'The conflict feature is so useful! I write down what hurt, the AI softens the tone, and my partner actually hears it.'),
   },
   {
     id: 'default-3',
     name: 'Ray',
     rating: 4,
-    content: '角色扮演劇本很有創意，幫我們的生活增添不少新鮮感。介面也很溫暖好看。',
+    content: tr('角色扮演劇本很有創意，幫我們的生活增添不少新鮮感。介面也很溫暖好看。', 'The role-play scripts are so creative and add a lot of fun to our life together. The design is warm and lovely too.'),
   },
 ];
 
 const Stars: React.FC<{ rating: number }> = ({ rating }) => (
-  <div className="flex items-center gap-0.5" aria-label={`${rating} 星`}>
+  <div className="flex items-center gap-0.5" aria-label={tr(`${rating} 星`, `${rating} star${rating === 1 ? '' : 's'}`)}>
     {[1, 2, 3, 4, 5].map((i) => (
       <Star
         key={i}
@@ -75,10 +76,10 @@ const Testimonials: React.FC = () => {
     >
       <div className="text-center mb-8">
         <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-          — 用戶心得
+          {tr('— 用戶心得', '— What users say')}
         </div>
         <h2 className="font-display text-2xl md:text-3xl font-light tracking-tight text-petal-ink">
-          聽聽其他用戶<em className="not-italic font-light italic text-pink-600">怎麼說</em>
+          {tr('聽聽其他用戶', 'Hear what other ')}<em className="not-italic font-light italic text-pink-600">{tr('怎麼說', ' users say')}</em>
         </h2>
       </div>
 

@@ -3,6 +3,7 @@ import { Send, Loader2, Sparkles } from 'lucide-react';
 import AiQuotaHint from '../AiQuotaHint';
 import AssistOptions from './AssistOptions';
 import type { AiUsageToday, ClosureAssistField } from '../../services/api';
+import { tr } from '../../i18n/tr';
 
 // Batch 1's minimums mirror routes/event-closure.js MIN/MAX_COMMITMENT_CHARS.
 const MIN_CHARS = 4;
@@ -63,9 +64,9 @@ export default function CommitmentComposer({
     <div className="space-y-3" data-testid="closure-composer-screen">
       <section className="bg-white border border-petal-sage/40 rounded-2xl p-4 space-y-3">
         <div>
-          <h4 className="font-serif text-petal-ink text-base">① 下次我願意做的一件小事</h4>
+          <h4 className="font-serif text-petal-ink text-base">{tr('① 下次我願意做的一件小事', '① One small thing I\'m willing to do next time')}</h4>
           <p className="text-xs text-petal-ink-soft mt-0.5">
-            寫成一個看得見的行動，只寫自己能做的，不寫{partnerNickname || '對方'}要怎麼樣。
+            {tr('寫成一個看得見的行動，只寫自己能做的，不寫', 'Write a visible action, only something you can do yourself, not what ')}{partnerNickname || tr('對方', 'your partner')}{tr('要怎麼樣。', ' should do.')}
           </p>
         </div>
 
@@ -73,7 +74,7 @@ export default function CommitmentComposer({
           data-testid="closure-commitment-input"
           value={commitment}
           onChange={(e) => setCommitment(e.target.value.slice(0, MAX_CHARS))}
-          placeholder="例如：即使很生氣，也不在人前責罵你"
+          placeholder={tr("例如：即使很生氣，也不在人前責罵你", 'e.g. Even when I\'m angry, I won\'t scold you in front of others')}
           rows={3}
           className="w-full text-sm bg-petal-cream border border-petal-rule rounded-xl px-3 py-2 focus:outline-none focus:border-petal-sage-deep"
         />
@@ -83,7 +84,7 @@ export default function CommitmentComposer({
           <span className="text-petal-ink-soft" data-testid="closure-commitment-counter">
             {trimmed.length}/{MAX_CHARS}
             {!commitmentValid && trimmed.length < MIN_CHARS && (
-              <span className="ml-1.5 text-petal-rose-deep">至少 {MIN_CHARS} 個字才能送出</span>
+              <span className="ml-1.5 text-petal-rose-deep">{tr('至少', 'At least ')} {MIN_CHARS} {tr('個字才能送出', ' characters to send')}</span>
             )}
           </span>
           <div className="flex items-center gap-2">
@@ -96,7 +97,7 @@ export default function CommitmentComposer({
               className="px-3 py-1.5 rounded-full bg-petal-sage-deeper text-white text-xs font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
             >
               {assisting === 'commitment' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              幫我想一個
+              {tr('幫我想一個', 'Suggest one')}
             </button>
           </div>
         </div>
@@ -110,9 +111,9 @@ export default function CommitmentComposer({
 
       <section className="bg-white border border-petal-sage/40 rounded-2xl p-4 space-y-3">
         <div>
-          <h4 className="font-serif text-petal-ink text-base">② 我們一起決定（可略）</h4>
+          <h4 className="font-serif text-petal-ink text-base">{tr('② 我們一起決定（可略）', '② Decide together (optional)')}</h4>
           <p className="text-xs text-petal-ink-soft mt-0.5">
-            一件想達成共識的事。{partnerNickname || '對方'}會看到並回應：就這樣、或我想調整。
+            {tr('一件想達成共識的事。', 'Something you\'d like to agree on. ')}{partnerNickname || tr('對方', 'Your partner')}{tr('會看到並回應：就這樣、或我想調整。', ' will see it and respond: agreed, or I\'d like to adjust.')}
           </p>
         </div>
 
@@ -120,7 +121,7 @@ export default function CommitmentComposer({
           data-testid="closure-decision-input"
           value={decision}
           onChange={(e) => setDecision(e.target.value.slice(0, MAX_CHARS))}
-          placeholder="例如：孩子睡著後若沒有立即危險，就不移動"
+          placeholder={tr("例如：孩子睡著後若沒有立即危險，就不移動", 'e.g. If there\'s no immediate danger, we don\'t move the kids once they\'re asleep')}
           rows={2}
           className="w-full text-sm bg-petal-cream border border-petal-rule rounded-xl px-3 py-2 focus:outline-none focus:border-petal-sage-deep"
         />
@@ -136,7 +137,7 @@ export default function CommitmentComposer({
             className="px-3 py-1.5 rounded-full bg-petal-sage-deeper/90 text-white text-xs font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
           >
             {assisting === 'decision' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-            幫我想一個
+            {tr('幫我想一個', 'Suggest one')}
           </button>
         </div>
 
@@ -155,7 +156,7 @@ export default function CommitmentComposer({
             onClick={onCancelRevise}
             className="text-xs text-petal-ink-soft underline underline-offset-2 hover:text-petal-ink"
           >
-            不改了
+            {tr('不改了', 'Keep as is')}
           </button>
         ) : (
           <button
@@ -164,7 +165,7 @@ export default function CommitmentComposer({
             onClick={onSkip}
             className="text-xs text-petal-ink-soft underline underline-offset-2 hover:text-petal-ink"
           >
-            先不寫，跳過這次
+            {tr('先不寫，跳過這次', 'Not now, skip this time')}
           </button>
         )}
         <button
@@ -175,7 +176,7 @@ export default function CommitmentComposer({
           className="px-4 py-2 rounded-full bg-petal-sage-deeper text-white font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
         >
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          {revising ? '更新我的約定' : '送出我的約定'}
+          {revising ? tr('更新我的約定', 'Update my commitment') : tr('送出我的約定', 'Send my commitment')}
         </button>
       </div>
     </div>

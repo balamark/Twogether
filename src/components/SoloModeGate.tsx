@@ -1,5 +1,6 @@
 import { Users, ArrowRight } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { tr } from '../i18n/tr';
 
 // 「單人模式」gate (docs/UX_PLAYBOOK.md P0-3 / §6 Q2): features that need a
 // paired partner don't dead-end into 「請先配對」. Three parts: what the
@@ -43,13 +44,13 @@ export default function SoloModeGate({
           className="mt-5 px-5 py-2.5 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2"
         >
           <Users className="w-4 h-4" />
-          邀請另一半配對
+          {tr('邀請另一半配對', 'Invite your partner to pair')}
         </button>
       </div>
 
       {alternatives.length > 0 && (
         <div className="bg-white border border-petal-rule-soft rounded-2xl p-4">
-          <p className="text-xs text-petal-muted mb-2">配對之前，你可以先：</p>
+          <p className="text-xs text-petal-muted mb-2">{tr('配對之前，你可以先：', 'Before you pair, you can:')}</p>
           <div className="space-y-1.5">
             {alternatives.map((alt) => (
               <button

@@ -1,6 +1,7 @@
 import { HandHeart, Loader2, Lock, X } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
 import ReplyStepBar from './ReplyStepBar';
+import { tr } from '../i18n/tr';
 
 // The private half of Sophie: a backstage wingman only the writer sees. It never
 // posts anything to the shared thread — everything here lands in the writer's own
@@ -36,7 +37,7 @@ export default function PrivateCoachDrawer({
     >
       <button
         type="button"
-        aria-label="關閉"
+        aria-label={tr("關閉", 'Close')}
         onClick={onClose}
         className="absolute inset-0 bg-black/40"
       />
@@ -51,17 +52,17 @@ export default function PrivateCoachDrawer({
             <div className="min-w-0">
               <h3 className="font-serif text-lg text-petal-ink flex items-center gap-1.5">
                 <span aria-hidden>💡</span>
-                {companionName} 私下幫你想
+                {companionName} {tr('私下幫你想', 'Help me privately')}
               </h3>
               <p className="text-[11px] text-petal-ink-soft mt-0.5 inline-flex items-center gap-1">
                 <Lock className="w-3 h-3" strokeWidth={1.75} />
-                只有你看得到，選好的句子會放進你的輸入框，你再決定要不要送出。
+                {tr('只有你看得到，選好的句子會放進你的輸入框，你再決定要不要送出。', 'Only you can see this. The sentence you pick goes into your message box, and you decide whether to send it.')}
               </p>
             </div>
             <button
               type="button"
               onClick={onClose}
-              aria-label="關閉"
+              aria-label={tr("關閉", 'Close')}
               className="flex-shrink-0 text-petal-ink-soft hover:text-petal-ink -m-1 p-1"
             >
               <X className="w-5 h-5" />
@@ -74,11 +75,11 @@ export default function PrivateCoachDrawer({
           {onRequestAcceptance && (
             <section>
               <div className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
-                — 對方剛說了讓你難受的話？
+                {tr('— 對方剛說了讓你難受的話？', '— Did they just say something that hurt?')}
               </div>
               <div className="bg-petal-rose/10 border border-petal-rose/30 rounded-xl p-3.5">
                 <p className="text-sm text-petal-ink-soft leading-relaxed mb-3">
-                  先別急著解釋或解決。讓 {companionName} 教你怎麼「接住」TA的情緒——被接住的那一刻，對話才真的開始。
+                  {tr('先別急著解釋或解決。讓', 'Don\'t rush to explain or fix it. Let ')} {companionName} {tr('教你怎麼「接住」TA的情緒——被接住的那一刻，對話才真的開始。', ' show you how to hold their feelings. The moment they feel heard is when the conversation really begins.')}
                 </p>
                 <button
                   type="button"
@@ -88,7 +89,7 @@ export default function PrivateCoachDrawer({
                   className="inline-flex items-center gap-2 px-4 py-2 rounded-full border border-petal-rose text-petal-rose-deep font-medium bg-white hover:bg-petal-rose hover:text-white transition-colors disabled:opacity-50"
                 >
                   {accepting ? <Loader2 className="w-4 h-4 animate-spin" /> : <HandHeart className="w-4 h-4" />}
-                  <span>如何接住TA的情緒</span>
+                  <span>{tr('如何接住TA的情緒', 'How to hold their feelings')}</span>
                 </button>
               </div>
             </section>
@@ -97,7 +98,7 @@ export default function PrivateCoachDrawer({
           {/* The 8-step guide, grouped into 3 calm stages. */}
           <section>
             <div className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
-              — 找不到話說？照著步驟挑一句
+              {tr('— 找不到話說？照著步驟挑一句', '— Can\'t find the words? Pick one, step by step')}
             </div>
             <ReplyStepBar onInsertPhrase={onInsertPhrase} />
           </section>
