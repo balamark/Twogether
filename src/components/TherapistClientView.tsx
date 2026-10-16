@@ -17,7 +17,7 @@ import { companionName } from '../utils/aiCompanions';
 import { ROLE_STYLE } from '../utils/threadRoles';
 import ParticipantAvatar from './ParticipantAvatar';
 import TherapySummaryDetail from './TherapySummaryDetail';
-import { tr } from '../i18n/tr';
+import { tr, dateLocale } from '../i18n/tr';
 
 // A dedicated therapist's read-only (or read+comment) view of ONE client
 // couple's 牆 and 好好說話. Private items are never returned by the API, so this
@@ -122,7 +122,7 @@ const ClientWall: React.FC<{
         <div key={p.id} className="rounded-lg border border-petal-rule bg-petal-cream p-4">
           <div className="flex items-center justify-between gap-2">
             <span className="font-body text-sm font-medium text-petal-ink">{p.author_nickname || tr('某人', 'Someone')}</span>
-            <span className="font-body text-[11px] text-petal-muted">{new Date(p.created_at).toLocaleDateString('zh-TW')}</span>
+            <span className="font-body text-[11px] text-petal-muted">{new Date(p.created_at).toLocaleDateString(dateLocale())}</span>
           </div>
           {p.mood_tag && (
             <span className="inline-block mt-1 px-2 py-0.5 rounded-full bg-pink-50 border border-pink-200 font-body text-[11px] text-pink-700">
@@ -309,7 +309,7 @@ const ClientEvents: React.FC<{
         >
           <div className="flex items-center justify-between gap-2">
             <span className="font-display text-base text-petal-ink truncate">{e.title}</span>
-            <span className="font-body text-[11px] text-petal-muted shrink-0">{new Date(e.createdAt).toLocaleDateString('zh-TW')}</span>
+            <span className="font-body text-[11px] text-petal-muted shrink-0">{new Date(e.createdAt).toLocaleDateString(dateLocale())}</span>
           </div>
           {e.summary && <p className="mt-1 font-body text-sm text-petal-ink-soft line-clamp-2">{e.summary}</p>}
         </button>

@@ -30,6 +30,9 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   useEffect(() => {
     document.documentElement.lang = locale === 'en' ? 'en' : 'zh-Hant';
+    // index.html ships the 繁中 title (crawlers / link previews); swap it for
+    // English visitors once the app boots.
+    if (locale === 'en') document.title = 'Twogether · A couples practice tool that brings counseling into everyday life';
   }, [locale]);
 
   const value = useMemo(

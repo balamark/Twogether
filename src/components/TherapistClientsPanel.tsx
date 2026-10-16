@@ -3,7 +3,7 @@ import { Users, MessageSquare, ChevronRight } from 'lucide-react';
 import { apiService, type TherapistClientCouple } from '../services/api';
 import type { Notification } from './ErrorNotification';
 import TherapistClientView from './TherapistClientView';
-import { tr } from '../i18n/tr';
+import { tr, dateLocale } from '../i18n/tr';
 
 // 我輔導的伴侶 — shown only to a logged-in therapist. Lists the couples who added
 // them as their dedicated therapist; opening one shows that couple's 牆 +
@@ -86,7 +86,7 @@ const TherapistClientsPanel: React.FC<Props> = ({ showNotification, autoOpenToke
                   ) : (
                     <>{tr('唯讀', 'Read-only')}</>
                   )}
-                  <span>{tr('· 自', '· Since')} {new Date(c.since).toLocaleDateString('zh-TW')}</span>
+                  <span>{tr('· 自', '· Since')} {new Date(c.since).toLocaleDateString(dateLocale())}</span>
                 </div>
               </div>
               <ChevronRight className="w-4 h-4 text-petal-muted shrink-0" strokeWidth={1.5} />

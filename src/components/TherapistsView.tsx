@@ -27,7 +27,7 @@ import DedicatedTherapistPanel from './DedicatedTherapistPanel';
 import TherapistClientsPanel from './TherapistClientsPanel';
 import ParticipantAvatar from './ParticipantAvatar';
 import { ROLE_STYLE } from '../utils/threadRoles';
-import { tr } from '../i18n/tr';
+import { tr, dateLocale } from '../i18n/tr';
 
 interface TherapistsViewProps {
   authState: {
@@ -691,7 +691,7 @@ const MyConsultationsModal: React.FC<{
               {c.preferredTime && (
                 <div className="mt-1.5 inline-flex items-center gap-1 font-body text-xs text-petal-muted">
                   <Clock className="w-3 h-3" strokeWidth={1.5} />
-                  {tr('希望時段：', 'Preferred times: ')}{new Date(c.preferredTime).toLocaleString('zh-TW')}
+                  {tr('希望時段：', 'Preferred times: ')}{new Date(c.preferredTime).toLocaleString(dateLocale())}
                 </div>
               )}
               {c.responseNote && (
@@ -1079,7 +1079,7 @@ const EarningsModal: React.FC<{
               {earnings.sessions.map((s) => (
                 <div key={s.id} className="flex items-center justify-between rounded-md border border-petal-rule px-3 py-2 font-body text-xs">
                   <span className="text-petal-muted">
-                    {s.paidAt ? new Date(s.paidAt).toLocaleDateString('zh-TW') : '—'} {tr('· 平台', '· Platform')} {s.feeRate}%
+                    {s.paidAt ? new Date(s.paidAt).toLocaleDateString(dateLocale()) : '—'} {tr('· 平台', '· Platform')} {s.feeRate}%
                   </span>
                   <span className="text-petal-ink">
                     {formatNtd(s.priceTwd)} → <span className="text-pink-600 font-medium">{tr('實拿', 'You get')} {formatNtd(s.therapistNetTwd)}</span>

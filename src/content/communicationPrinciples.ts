@@ -17,6 +17,7 @@
 
 import { Waves, Repeat, PenLine, type LucideIcon } from 'lucide-react';
 import type { Locale } from '../i18n/LanguageContext';
+import { getLocale } from '../i18n/tr';
 import { COMMUNICATION_PRINCIPLES_EN } from './communicationPrinciples.en';
 
 export interface CommunicationPrinciple {
@@ -75,7 +76,7 @@ export function getPrinciple(
 }
 
 // English copy lives in communicationPrinciples.en.ts (same ids).
-export function getCommunicationPrinciples(locale: Locale = 'zh-TW'): CommunicationPrinciple[] {
+export function getCommunicationPrinciples(locale: Locale = getLocale()): CommunicationPrinciple[] {
   if (locale !== 'en') return COMMUNICATION_PRINCIPLES;
   return COMMUNICATION_PRINCIPLES.map((p) => ({ ...p, ...COMMUNICATION_PRINCIPLES_EN[p.id] }));
 }

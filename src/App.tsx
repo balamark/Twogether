@@ -60,6 +60,7 @@ import { EngineerModeProvider } from './contexts/EngineerModeProvider';
 import EngineerTextEngine from './components/EngineerTextEngine';
 import { useScrollLock } from './hooks/useScrollLock';
 import { usePageTracking } from './hooks/usePageTracking';
+import { tr, dateLocale } from './i18n/tr';
 
 // The accept link for a just-sent pairing invite, surfaced so the inviter can
 // share it directly (LINE, copy/paste) rather than relying on the email
@@ -439,55 +440,55 @@ const WALL_MOOD_TAGS = [
 const defaultWallExamples: WallExample[] = [
   {
     id: 'example-thanks-today',
-    title: '謝謝你今天…',
+    title: tr('謝謝你今天…', 'Thank you for today…'),
     category: 'general',
     mood_tag: '感謝',
-    content: `謝謝你今天＿＿＿（一件很小的事）。
+    content: tr(`謝謝你今天＿＿＿（一件很小的事）。
 
-那個當下我覺得＿＿＿，想讓你知道我有看見。`,
+那個當下我覺得＿＿＿，想讓你知道我有看見。`, `Thank you for ＿＿＿ today (one small thing).\n\nIn that moment I felt ＿＿＿, and I want you to know I noticed.`),
   },
   {
     id: 'example-need-space',
-    title: '我需要一點空間，不是不愛你',
+    title: tr('我需要一點空間，不是不愛你', 'I need a little space; it\'s not that I don\'t love you'),
     category: 'general',
     mood_tag: '需要空間',
-    content: `我現在有點滿，需要自己安靜一下。
+    content: tr(`我現在有點滿，需要自己安靜一下。
 
-這跟你沒有關係，也不是生你的氣。＿＿＿（大概多久）之後我會來找你。`,
+這跟你沒有關係，也不是生你的氣。＿＿＿（大概多久）之後我會來找你。`, `I'm feeling a bit full right now and need some quiet time alone.\n\nIt has nothing to do with you, and I'm not angry at you. I'll come find you in about ＿＿＿ (how long).`),
   },
   {
     id: 'example-want-hug',
-    title: '今天想被抱抱',
+    title: tr('今天想被抱抱', 'I want a hug today'),
     category: 'general',
     mood_tag: '想被抱抱',
-    content: `今天有點累，不用問我發生什麼事，抱我一下就好。
+    content: tr(`今天有點累，不用問我發生什麼事，抱我一下就好。
 
-如果可以，＿＿＿（例如：晚上一起躺著看個影片）。`,
+如果可以，＿＿＿（例如：晚上一起躺著看個影片）。`, `Today was a bit tiring. You don't need to ask what happened; just hug me.\n\nIf you can, ＿＿＿ (e.g. lie down together and watch a video tonight).`),
   },
   {
     id: 'example-missing-you',
-    title: '想念你的一個瞬間',
+    title: tr('想念你的一個瞬間', 'A moment I missed you'),
     category: 'general',
     mood_tag: '想念你',
-    content: `今天＿＿＿（在哪裡／做什麼）的時候突然想到你。
+    content: tr(`今天＿＿＿（在哪裡／做什麼）的時候突然想到你。
 
-想到的是＿＿＿。`,
+想到的是＿＿＿。`, `Today, when I was ＿＿＿ (where / doing what), I suddenly thought of you.\n\nWhat I thought of was ＿＿＿.`),
   },
   {
     id: 'example-small-request',
-    title: '有一件小事，想拜託你',
+    title: tr('有一件小事，想拜託你', 'One small thing I\'d like to ask of you'),
     category: 'important',
     mood_tag: '想溝通',
-    content: `我想拜託你的是：＿＿＿（具體、做得到的一件事）。
+    content: tr(`我想拜託你的是：＿＿＿（具體、做得到的一件事）。
 
-因為這樣我會覺得＿＿＿。不急著現在回答，你想一下再跟我說。`,
+因為這樣我會覺得＿＿＿。不急著現在回答，你想一下再跟我說。`, `What I'd like to ask of you is: ＿＿＿ (one specific, doable thing).\n\nBecause then I'd feel ＿＿＿. No need to answer now; think about it and tell me.`),
   },
   {
     id: 'example-affirm-alternative',
-    title: '當我累了又被靠近時，我希望你這樣回應我',
+    title: tr('當我累了又被靠近時，我希望你這樣回應我', 'When I\'m tired and you come close, here\'s how I hope you\'ll respond'),
     category: 'important',
     mood_tag: '想溝通',
-    content: `（1）先肯定我
+    content: tr(`（1）先肯定我
 「我知道你想靠近我，這樣讓我覺得很甜。」
 
 （2）再給一個解決方式（不一定要做愛）
@@ -508,7 +509,7 @@ const defaultWallExamples: WallExample[] = [
 ・眼神看我一下笑一下
 
 我要你明白：
-我不是要「嘿咻」，我要的是「我被愛、我被放在心上、我不是孤單」。`,
+我不是要「嘿咻」，我要的是「我被愛、我被放在心上、我不是孤單」。`, `(1) Affirm me first\n"I know you want to be close to me. That feels sweet."\n\n(2) Then offer an alternative (it doesn't have to be sex)\n・"I don't have the energy for sex right now, but I can hug you."\n・"I can't right now, but I can hold your hand."\n・"Can we just chat and cuddle instead?"\n\n(3) If I'm really out of energy, give a specific time\n・"I'm completely wiped out. I'll come hug you at 9 tonight."\n・"Let me rest a bit first. I'll come find you in 20 minutes."\n\n(4) Finally, add a little sweetness so I feel loved\nIt doesn't take much effort, just a little:\n・A gentle squeeze of my hand\n・A hug\n・A stroke on the back of my neck\n・Say in a cute voice, "If you keep teasing me like this, I'll miss you~"\n・Look at me and smile\n\nI want you to understand:\nIt's not about sex. It's about "I'm loved, I'm on your mind, I'm not alone".`),
   },
 ];
 
@@ -581,7 +582,7 @@ const LoveTimeApp = () => {
   const [pendingScriptTitle, setPendingScriptTitle] = useState<string | null>(null);
   const [intimateRecords, setIntimateRecords] = useState<IntimateRecord[]>([]);
   const [cycleRecords, setCycleRecords] = useState<CycleRecord[]>([]);
-  const [nicknames, setNicknames] = useState<Nicknames>({ partner1: '親愛的', partner2: '寶貝' });
+  const [nicknames, setNicknames] = useState<Nicknames>({ partner1: tr('親愛的', 'Dear'), partner2: tr('寶貝', 'Babe') });
 
   // Custom game content — user-added items that get merged into the default lists
   // of 回憶倒帶 (questions) and 情緒模仿秀 (emotions) inside 情趣遊戲. Persisted
@@ -903,30 +904,30 @@ const LoveTimeApp = () => {
       id: 'meeting',
       type: 'meeting',
       date: '2024-01-01',
-      title: '我們相遇的日子',
-      description: '命運讓我們相遇，開始了這段美好的愛情故事'
+      title: tr('我們相遇的日子', 'The day we met'),
+      description: tr('命運讓我們相遇，開始了這段美好的愛情故事', 'Fate brought us together and began this beautiful love story')
     },
     {
       id: 'first_date',
       type: 'first_date',
       date: '',
-      title: '開始交往',
-      description: '緊張又興奮的第一次約會，從此心中只有彼此'
+      title: tr('開始交往', 'Started dating'),
+      description: tr('緊張又興奮的第一次約會，從此心中只有彼此', 'A nervous, exciting first date, and since then only each other')
     },
     {
       id: 'first_kiss',
       type: 'first_kiss',
       date: '2024-01-20',
-      title: '初吻',
-      description: '那個讓時間停止的美好瞬間',
+      title: tr('初吻', 'First kiss'),
+      description: tr('那個讓時間停止的美好瞬間', 'The beautiful moment that made time stand still'),
       place: ''
     },
     {
       id: 'first_sex',
       type: 'first_sex',
       date: '',
-      title: '第一次親密場所',
-      description: '愛情昇華的神聖時刻',
+      title: tr('第一次親密場所', 'First intimate place'),
+      description: tr('愛情昇華的神聖時刻', 'A sacred moment when love deepened'),
       place: ''
     }
   ]);
@@ -1004,16 +1005,16 @@ const LoveTimeApp = () => {
       
       showNotification({
         type: 'success',
-        title: '登入成功！',
-        message: `歡迎回來 ${userData.nickname}！`,
+        title: tr('登入成功！', 'Signed in!'),
+        message: tr(`歡迎回來 ${userData.nickname}！`, `Welcome back, ${userData.nickname}!`),
         duration: 5000
       });
     } catch (error: unknown) {
       console.error('Login error:', error);
       showNotification({
         type: 'error',
-        title: '登入失敗',
-        message: (error as Error)?.message || '登入過程中發生錯誤，請檢查帳號密碼',
+        title: tr('登入失敗', 'Couldn\'t sign in'),
+        message: (error as Error)?.message || tr('登入過程中發生錯誤，請檢查帳號密碼', 'Something went wrong while signing in. Please check your email and password'),
         duration: 8000
       });
     }
@@ -1054,16 +1055,16 @@ const LoveTimeApp = () => {
 
       showNotification({
         type: 'success',
-        title: '註冊成功！',
-        message: `歡迎 ${nickname}！已為你創建新帳號`,
+        title: tr('註冊成功！', 'Signed up!'),
+        message: tr(`歡迎 ${nickname}！已為你創建新帳號`, `Welcome, ${nickname}! Your new account is ready`),
         duration: 5000
       });
     } catch (error: unknown) {
       console.error('Registration error:', error);
       showNotification({
         type: 'error',
-        title: '註冊失敗',
-        message: (error as Error)?.message || '註冊過程中發生錯誤，請檢查輸入資料',
+        title: tr('註冊失敗', 'Couldn\'t sign up'),
+        message: (error as Error)?.message || tr('註冊過程中發生錯誤，請檢查輸入資料', 'Something went wrong while signing up. Please check what you entered'),
         duration: 8000
       });
     }
@@ -1107,8 +1108,8 @@ const LoveTimeApp = () => {
         await apiService.resendPairingInvitation(token);
         showNotification({
           type: 'success',
-          title: '邀請已重新寄出',
-          message: '請提醒另一半看一下信箱，也記得看垃圾郵件與促銷分頁。',
+          title: tr('邀請已重新寄出', 'Invitation resent'),
+          message: tr('請提醒另一半看一下信箱，也記得看垃圾郵件與促銷分頁。', 'Remind your partner to check their inbox, including spam and promotions.'),
           duration: 6000,
         });
       } catch (err) {
@@ -1118,23 +1119,23 @@ const LoveTimeApp = () => {
         if (e?.error_code === 'EMAIL_NOT_CONFIGURED') {
           showNotification({
             type: 'warning',
-            title: '目前無法寄信',
-            message: '寄信服務暫時不可用。請按「傳連結給 TA」複製連結，直接傳給另一半。',
+            title: tr('目前無法寄信', 'Can\'t send email right now'),
+            message: tr('寄信服務暫時不可用。請按「傳連結給 TA」複製連結，直接傳給另一半。', 'The email service is temporarily unavailable. Tap "Send them the link" to copy it and send it to your partner directly.'),
             duration: 8000,
           });
         } else if (e?.error_code === 'INVITATION_NOT_FOUND') {
           setPendingPairingInvite(null);
           showNotification({
             type: 'warning',
-            title: '這個邀請已失效',
-            message: '邀請已被接受、取消或過期。請重新邀請另一半。',
+            title: tr('這個邀請已失效', 'This invitation is no longer valid'),
+            message: tr('邀請已被接受、取消或過期。請重新邀請另一半。', 'The invitation was accepted, cancelled or expired. Please invite your partner again.'),
             duration: 8000,
           });
         } else {
           showNotification({
             type: 'error',
-            title: '重新寄送失敗',
-            message: e?.message || '請稍後再試，或按「傳連結給 TA」直接把連結傳過去。',
+            title: tr('重新寄送失敗', 'Couldn\'t resend'),
+            message: e?.message || tr('請稍後再試，或按「傳連結給 TA」直接把連結傳過去。', 'Please try again in a moment, or tap "Send them the link" to send it directly.'),
             duration: 6000,
           });
         }
@@ -1150,8 +1151,8 @@ const LoveTimeApp = () => {
       if (result.requiresAuth) {
         showNotification({
           type: 'info',
-          title: '需要登入',
-          message: '請先登入以接受配對邀請',
+          title: tr('需要登入', 'Sign-in required'),
+          message: tr('請先登入以接受配對邀請', 'Please sign in to accept the pairing invitation'),
           duration: 6000
         });
         return;
@@ -1159,10 +1160,10 @@ const LoveTimeApp = () => {
 
       showNotification({
         type: 'success',
-        title: '配對成功！',
+        title: tr('配對成功！', 'Paired!'),
         message: result.autoResolved
-          ? '配對成功，我們已自動處理重複邀請'
-          : '您已成功與伴侶配對',
+          ? tr('配對成功，我們已自動處理重複邀請', 'Paired! We took care of duplicate invitations automatically')
+          : tr('您已成功與伴侶配對', 'You\'re now paired with your partner'),
         duration: 8000
       });
 
@@ -1174,8 +1175,8 @@ const LoveTimeApp = () => {
       if (errorCode === 'INVITATION_NOT_FOUND') {
         showNotification({
           type: 'error',
-          title: '配對碼無效',
-          message: '配對碼無效或已過期，請確認後再試',
+          title: tr('配對碼無效', 'Invalid pairing code'),
+          message: tr('配對碼無效或已過期，請確認後再試', 'The pairing code is invalid or expired. Please check it and try again'),
           duration: 8000
         });
         return;
@@ -1183,8 +1184,8 @@ const LoveTimeApp = () => {
 
       showNotification({
         type: 'error',
-        title: '配對失敗',
-        message: (error as Error)?.message || '配對失敗，請稍後再試',
+        title: tr('配對失敗', 'Couldn\'t pair'),
+        message: (error as Error)?.message || tr('配對失敗，請稍後再試', 'Pairing failed. Please try again in a moment'),
         duration: 8000
       });
     }
@@ -1223,8 +1224,8 @@ const LoveTimeApp = () => {
     setCounselorMode(false);
     showNotification({
       type: 'info',
-      title: '已登出',
-      message: '感謝使用 Twogether'
+      title: tr('已登出', 'Signed out'),
+      message: tr('感謝使用 Twogether', 'Thanks for using Twogether')
     });
   };
 
@@ -1298,48 +1299,48 @@ const LoveTimeApp = () => {
   const defaultGifts: CoinGift[] = [
     {
       id: 'massage',
-      title: '全身按摩',
-      description: '30分鐘專業按摩服務',
+      title: tr('全身按摩', 'Full-body massage'),
+      description: tr('30分鐘專業按摩服務', 'A 30-minute professional massage'),
       cost: 1500,
       category: 'service',
       icon: '💆‍♀️'
     },
     {
       id: 'dinner',
-      title: '浪漫晚餐',
-      description: '親手準備一頓豐盛晚餐',
+      title: tr('浪漫晚餐', 'Romantic dinner'),
+      description: tr('親手準備一頓豐盛晚餐', 'A lavish dinner made by hand'),
       cost: 2000,
       category: 'service',
       icon: '🍽️'
     },
     {
       id: 'movie_night',
-      title: '電影之夜',
-      description: '一起看最愛的電影加零食',
+      title: tr('電影之夜', 'Movie night'),
+      description: tr('一起看最愛的電影加零食', 'Watch a favorite movie together with snacks'),
       cost: 800,
       category: 'experience',
       icon: '🎬'
     },
     {
       id: 'oral_service',
-      title: '特殊服務',
-      description: '你懂的特別服務',
+      title: tr('特殊服務', 'Special service'),
+      description: tr('你懂的特別服務', 'You know what kind of special service'),
       cost: 3000,
       category: 'intimate',
       icon: '💋'
     },
     {
       id: 'babysitting',
-      title: '帶娃2小時',
-      description: '讓伴侶休息2小時',
+      title: tr('帶娃2小時', 'Childcare for 2 hours'),
+      description: tr('讓伴侶休息2小時', 'Let your partner rest for 2 hours'),
       cost: 2500,
       category: 'service',
       icon: '👶'
     },
     {
       id: 'shopping',
-      title: '購物基金',
-      description: '500元購物預算',
+      title: tr('購物基金', 'Shopping fund'),
+      description: tr('500元購物預算', 'A NT$500 shopping budget'),
       cost: 5000,
       category: 'physical',
       icon: '💰'
@@ -1385,10 +1386,10 @@ const LoveTimeApp = () => {
       setShowAuthModal(true);
       showNotification({
         type: 'warning',
-        title: '登入已過期',
+        title: tr('登入已過期', 'Session expired'),
         message: detail?.reason === 'invalid'
-          ? '登入資訊已失效，請重新登入'
-          : '為了你的帳號安全，請重新登入',
+          ? tr('登入資訊已失效，請重新登入', 'Your sign-in is no longer valid. Please sign in again')
+          : tr('為了你的帳號安全，請重新登入', 'For your account\'s security, please sign in again'),
         duration: 6000
       });
     };
@@ -1402,7 +1403,7 @@ const LoveTimeApp = () => {
   useEffect(() => {
     const handleLimitReached = (event: Event) => {
       const detail = (event as CustomEvent<{ message?: string }>).detail;
-      setUpgradeReason(detail?.message || '已達免費方案上限，升級 Premium 可解除限制');
+      setUpgradeReason(detail?.message || tr('已達免費方案上限，升級 Premium 可解除限制', 'You\'ve reached the free plan\'s limit. Upgrade to Premium to remove it'));
       setCurrentView('upgrade');
     };
     window.addEventListener('billing:limit-reached', handleLimitReached);
@@ -1621,8 +1622,8 @@ const LoveTimeApp = () => {
           // data loss, and how to recover.
           showNotification({
             type: 'warning',
-            title: '劇本載入失敗',
-            message: '無法載入你的自訂劇本，請下拉重新整理或稍後再試；已上傳的劇本不會遺失。',
+            title: tr('劇本載入失敗', 'Couldn\'t load scripts'),
+            message: tr('無法載入你的自訂劇本，請下拉重新整理或稍後再試；已上傳的劇本不會遺失。', 'Couldn\'t load your custom scripts. Pull to refresh or try again later; scripts you\'ve uploaded won\'t be lost.'),
             duration: 6000,
           });
         }
@@ -1677,9 +1678,9 @@ const LoveTimeApp = () => {
       clientLog('media_protection.blocked', { view });
       show({
         type: 'info',
-        title: '照片受保護',
+        title: tr('照片受保護', 'Photos are protected'),
         message:
-          '這裡的照片只屬於你們，已關閉右鍵儲存與拖曳下載。想留存的話，請用你自己手邊的原始檔案。',
+          tr('這裡的照片只屬於你們，已關閉右鍵儲存與拖曳下載。想留存的話，請用你自己手邊的原始檔案。', 'These photos belong to just the two of you, so right-click saving and drag-to-download are off. To keep one, please use your own original file.'),
       });
     }, []),
   );
@@ -1710,8 +1711,8 @@ const LoveTimeApp = () => {
       });
       showNotification({
         type: 'error',
-        title: '操作失敗',
-        message: '無法更新最愛劇本，請稍後再試。',
+        title: tr('操作失敗', 'Something went wrong'),
+        message: tr('無法更新最愛劇本，請稍後再試。', 'Couldn\'t update your favorite scripts. Please try again in a moment.'),
         duration: 4000,
       });
     }
@@ -1741,16 +1742,16 @@ const LoveTimeApp = () => {
     let nextBadge = '';
     
     if (thisWeek < 1) {
-      badgeProgress = `還需 ${1 - thisWeek} 次達成「週間戀人」徽章`;
+      badgeProgress = tr(`還需 ${1 - thisWeek} 次達成「週間戀人」徽章`, `${1 - thisWeek} more to earn the "Weekday lovers" badge`);
       nextBadge = 'weekly_lovers';
     } else if (thisWeek < 3) {
-      badgeProgress = `還需 ${3 - thisWeek} 次達成「熱戀情侶」徽章`;
+      badgeProgress = tr(`還需 ${3 - thisWeek} 次達成「熱戀情侶」徽章`, `${3 - thisWeek} more to earn the "Head over heels" badge`);
       nextBadge = 'passionate_couple';
     } else if (thisWeek < 5) {
-      badgeProgress = `還需 ${5 - thisWeek} 次達成「甜蜜無敵」徽章`;
+      badgeProgress = tr(`還需 ${5 - thisWeek} 次達成「甜蜜無敵」徽章`, `${5 - thisWeek} more to earn the "Unstoppably sweet" badge`);
       nextBadge = 'sweet_invincible';
     } else if (total < 10) {
-      badgeProgress = `還需 ${10 - total} 次達成第10次里程碑`;
+      badgeProgress = tr(`還需 ${10 - total} 次達成第10次里程碑`, `${10 - total} more to reach your 10th milestone`);
       nextBadge = 'milestone_10';
     }
     
@@ -1772,8 +1773,8 @@ const LoveTimeApp = () => {
             id: `intimacy_${count}`,
             type: 'intimacy_milestone',
             date: intimateRecords[count - 1]?.date || formatYmdInTz(new Date(), browserTz()),
-            title: `親密時光第 ${count} 次`,
-            description: `恭喜你們達成了 ${count} 次親密時光的里程碑！`,
+            title: tr(`親密時光第 ${count} 次`, `Intimate moment #${count}`),
+            description: tr(`恭喜你們達成了 ${count} 次親密時光的里程碑！`, `Congrats! You reached a milestone of ${count} intimate moments!`),
             count,
             recordId: intimateRecords[count - 1]?.id
           };
@@ -1833,8 +1834,8 @@ const LoveTimeApp = () => {
           console.error('Photo upload failed:', photoError);
           showNotification({
             type: 'warning',
-            title: '照片上傳失敗',
-            message: '記錄已保存，但照片上傳失敗',
+            title: tr('照片上傳失敗', 'Photo upload failed'),
+            message: tr('記錄已保存，但照片上傳失敗', 'The record was saved, but the photo couldn\'t be uploaded'),
             duration: 7000
           });
         }
@@ -1877,11 +1878,11 @@ const LoveTimeApp = () => {
       const { badgeProgress } = checkBadgeProgress();
       showNotification({
         type: 'success',
-        title: '記錄成功！',
+        title: tr('記錄成功！', 'Recorded!'),
         message: firstRecord && !partnerConnected
-          ? `${badgeProgress} 邀請另一半配對後，這些記錄會自動和 TA 共享。`
+          ? tr(`${badgeProgress} 邀請另一半配對後，這些記錄會自動和 TA 共享。`, `${badgeProgress} Once you pair with your partner, these records are shared with them automatically.`)
           : firstRecord
-            ? `${badgeProgress} 月曆會慢慢看見你們的節奏；也可以到「我們的牆」留句想說的話。`
+            ? tr(`${badgeProgress} 月曆會慢慢看見你們的節奏；也可以到「我們的牆」留句想說的話。`, `${badgeProgress} The calendar will slowly show your rhythm; you can also leave a note on "Our wall".`)
             : badgeProgress,
         coins: coinsEarned,
         duration: firstRecord ? 9000 : 6000
@@ -1890,8 +1891,8 @@ const LoveTimeApp = () => {
       console.error('Error adding intimate record:', error);
       showNotification({
         type: 'error',
-        title: '記錄失敗',
-        message: (error as Error)?.message || '無法保存記錄，請檢查網絡連接',
+        title: tr('記錄失敗', 'Couldn\'t record'),
+        message: (error as Error)?.message || tr('無法保存記錄，請檢查網絡連接', 'Couldn\'t save the record. Please check your connection'),
         duration: 8000
       });
     }
@@ -1915,8 +1916,8 @@ const LoveTimeApp = () => {
       console.error('Error fetching record details:', error);
       showNotification({
         type: 'warning',
-        title: '載入失敗',
-        message: '無法載入記錄詳情',
+        title: tr('載入失敗', 'Couldn\'t load'),
+        message: tr('無法載入記錄詳情', 'Couldn\'t load the record details'),
         duration: 3000
       });
     }
@@ -1933,8 +1934,8 @@ const LoveTimeApp = () => {
     if (!record.apiId) {
       showNotification({
         type: 'warning',
-        title: '記錄還在同步',
-        message: '這則記錄還沒同步完成，重新整理頁面後就能回應了。',
+        title: tr('記錄還在同步', 'The record is still syncing'),
+        message: tr('這則記錄還沒同步完成，重新整理頁面後就能回應了。', 'This record hasn\'t finished syncing. Refresh the page and you\'ll be able to respond.'),
         duration: 5000,
       });
       return;
@@ -1968,8 +1969,8 @@ const LoveTimeApp = () => {
       apply({ myResponse: previous });
       showNotification({
         type: 'error',
-        title: '回應沒有送出',
-        message: error instanceof Error ? error.message : '請稍後再試一次。',
+        title: tr('回應沒有送出', 'Your response didn\'t send'),
+        message: error instanceof Error ? error.message : tr('請稍後再試一次。', 'Please try again in a moment.'),
         duration: 5000,
       });
     }
@@ -1986,7 +1987,7 @@ const LoveTimeApp = () => {
   const handleDeleteRecord = async (record: IntimateRecord) => {
     try {
       if (!record.apiId) {
-        throw new Error('記錄ID缺失');
+        throw new Error(tr('記錄ID缺失', 'Missing record ID'));
       }
       await apiService.deleteIntimateRecord(record.apiId);
       setIntimateRecords(prev => prev.filter(r => r.id !== record.id));
@@ -1994,16 +1995,16 @@ const LoveTimeApp = () => {
       setDeletingRecord(null);
       showNotification({
         type: 'success',
-        title: '已刪除',
-        message: '記錄已成功刪除',
+        title: tr('已刪除', 'Deleted'),
+        message: tr('記錄已成功刪除', 'Record deleted'),
         duration: 3000
       });
     } catch (error: unknown) {
       console.error('Error deleting record:', error);
       showNotification({
         type: 'error',
-        title: '刪除失敗',
-        message: (error as Error)?.message || '無法刪除記錄',
+        title: tr('刪除失敗', 'Couldn\'t delete'),
+        message: (error as Error)?.message || tr('無法刪除記錄', 'Couldn\'t delete the record'),
         duration: 5000
       });
     }
@@ -2052,7 +2053,7 @@ const LoveTimeApp = () => {
         location,
         content,
         tags,
-        duration: '15-30分鐘',
+        duration: tr('15-30分鐘', '15–30 min'),
         photos,
         isPublic,
       });
@@ -2067,7 +2068,7 @@ const LoveTimeApp = () => {
         location: typedScript.location ?? location,
         script: typedScript.script || typedScript.content || content,
         tags: typedScript.tags || tags,
-        duration: typedScript.duration || '15-30分鐘',
+        duration: typedScript.duration || tr('15-30分鐘', '15–30 min'),
         image: typedScript.thumbnailUrl,
         photos: typedScript.photos ?? (typedScript.thumbnailUrl ? [typedScript.thumbnailUrl] : []),
         isCustom: true,
@@ -2092,8 +2093,8 @@ const LoveTimeApp = () => {
 
       showNotification({
         type: 'success',
-        title: '劇本上傳成功！',
-        message: `${title} 已加入你的劇本庫`,
+        title: tr('劇本上傳成功！', 'Script uploaded!'),
+        message: tr(`${title} 已加入你的劇本庫`, `${title} was added to your script library`),
         coins: 200,
         duration: 5000
       });
@@ -2122,18 +2123,18 @@ const LoveTimeApp = () => {
         setEditingScript(null);
         showNotification({
           type: 'warning',
-          title: '已達免費方案劇本上限',
+          title: tr('已達免費方案劇本上限', 'You\'ve reached the free plan\'s script limit'),
           message:
             (error as Error)?.message ||
-            '免費方案的自訂劇本數量已達上限。升級 Premium 或輸入優惠碼後即可繼續，你剛剛的劇本草稿已為你保留。',
+            tr('免費方案的自訂劇本數量已達上限。升級 Premium 或輸入優惠碼後即可繼續，你剛剛的劇本草稿已為你保留。', 'You\'ve reached the free plan\'s limit for custom scripts. Upgrade to Premium or enter a promo code to continue; your script draft has been kept for you.'),
           duration: 7000,
         });
         return;
       }
       showNotification({
         type: 'error',
-        title: '劇本上傳失敗',
-        message: (error as Error)?.message || '無法保存劇本到服務器，請稍後再試',
+        title: tr('劇本上傳失敗', 'Couldn\'t upload the script'),
+        message: (error as Error)?.message || tr('無法保存劇本到服務器，請稍後再試', 'Couldn\'t save the script to the server. Please try again in a moment'),
         duration: 6000
       });
     }
@@ -2198,16 +2199,16 @@ const LoveTimeApp = () => {
 
       showNotification({
         type: 'success',
-        title: '劇本已更新',
-        message: `${updates.title} 的修改已保存`,
+        title: tr('劇本已更新', 'Script updated'),
+        message: tr(`${updates.title} 的修改已保存`, `Your changes to ${updates.title} were saved`),
         duration: 4000,
       });
     } catch (error) {
       console.error('Failed to update custom script:', error);
       showNotification({
         type: 'error',
-        title: '更新失敗',
-        message: (error as Error)?.message || '無法保存修改，請稍後再試',
+        title: tr('更新失敗', 'Couldn\'t update'),
+        message: (error as Error)?.message || tr('無法保存修改，請稍後再試', 'Couldn\'t save your changes. Please try again in a moment'),
         duration: 6000,
       });
     }
@@ -2224,16 +2225,16 @@ const LoveTimeApp = () => {
       setEditingScript(null);
       showNotification({
         type: 'success',
-        title: '劇本已刪除',
-        message: removed ? `已刪除「${removed.title}」` : '自訂劇本已刪除',
+        title: tr('劇本已刪除', 'Script deleted'),
+        message: removed ? tr(`已刪除「${removed.title}」`, `Deleted "${removed.title}"`) : tr('自訂劇本已刪除', 'Custom script deleted'),
         duration: 4000,
       });
     } catch (error) {
       console.error('Failed to delete custom script:', error);
       showNotification({
         type: 'error',
-        title: '刪除失敗',
-        message: (error as Error)?.message || '無法刪除劇本，請稍後再試',
+        title: tr('刪除失敗', 'Couldn\'t delete'),
+        message: (error as Error)?.message || tr('無法刪除劇本，請稍後再試', 'Couldn\'t delete the script. Please try again in a moment'),
         duration: 6000,
       });
     }
@@ -2266,8 +2267,8 @@ const LoveTimeApp = () => {
 
       showNotification({
         type: 'success',
-        title: '禮品已添加！',
-        message: `${title} 已加入禮品商店`,
+        title: tr('禮品已添加！', 'Gift added!'),
+        message: tr(`${title} 已加入禮品商店`, `${title} was added to the gift shop`),
         duration: 3000
       });
 
@@ -2275,8 +2276,8 @@ const LoveTimeApp = () => {
       console.error('Failed to create custom gift:', error);
       showNotification({
         type: 'error',
-        title: '禮品添加失敗',
-        message: '無法保存禮品到服務器，請稍後再試',
+        title: tr('禮品添加失敗', 'Couldn\'t add the gift'),
+        message: tr('無法保存禮品到服務器，請稍後再試', 'Couldn\'t save the gift to the server. Please try again in a moment'),
         duration: 5000
       });
     }
@@ -2291,8 +2292,8 @@ const LoveTimeApp = () => {
 
         showNotification({
           type: 'success',
-          title: '購買成功！',
-          message: `你獲得了 ${gift.title}！記得兌現承諾哦～`,
+          title: tr('購買成功！', 'Purchased!'),
+          message: tr(`你獲得了 ${gift.title}！記得兌現承諾哦～`, `You got ${gift.title}! Remember to keep your promise~`),
           duration: 5000
         });
       } catch (error) {
@@ -2302,16 +2303,16 @@ const LoveTimeApp = () => {
 
         showNotification({
           type: 'success',
-          title: '購買成功！',
-          message: `你獲得了 ${gift.title}！記得兌現承諾哦～`,
+          title: tr('購買成功！', 'Purchased!'),
+          message: tr(`你獲得了 ${gift.title}！記得兌現承諾哦～`, `You got ${gift.title}! Remember to keep your promise~`),
           duration: 5000
         });
       }
     } else {
       showNotification({
         type: 'warning',
-        title: '金幣不足',
-        message: `還需要 ${gift.cost - totalCoins} 枚金幣`,
+        title: tr('金幣不足', 'Not enough coins'),
+        message: tr(`還需要 ${gift.cost - totalCoins} 枚金幣`, `You need ${gift.cost - totalCoins} more coins`),
         duration: 3000
       });
     }
@@ -2364,15 +2365,15 @@ const LoveTimeApp = () => {
       }
       showNotification({
         type: result?.alreadyVerified ? 'info' : 'success',
-        title: result?.alreadyVerified ? 'Email 已驗證' : '驗證信已寄出',
-        message: result?.message || '請到信箱查收驗證連結。',
+        title: result?.alreadyVerified ? tr('Email 已驗證', 'Email verified') : tr('驗證信已寄出', 'Verification email sent'),
+        message: result?.message || tr('請到信箱查收驗證連結。', 'Check your inbox for the verification link.'),
         duration: 6000,
       });
     } catch (error) {
       showNotification({
         type: 'error',
-        title: '寄送失敗',
-        message: (error as Error)?.message || '無法重寄驗證信，請稍後再試。',
+        title: tr('寄送失敗', 'Couldn\'t send'),
+        message: (error as Error)?.message || tr('無法重寄驗證信，請稍後再試。', 'Couldn\'t resend the verification email. Please try again in a moment.'),
         duration: 6000,
       });
     }
@@ -2551,7 +2552,7 @@ const LoveTimeApp = () => {
             primaryTimezone={primaryTimezone}
             onNudgePartner={partnerConnected ? () => setShowIntimacyRequestForm(true) : undefined}
             setRecordResponse={setRecordResponse}
-            partnerNickname={nicknames.partner2 || '對方'}
+            partnerNickname={nicknames.partner2 || tr('對方', 'Partner')}
             autoOpenAddRecord={pendingAddRecord}
             onAutoOpenAddRecordConsumed={() => setPendingAddRecord(false)}
           />
@@ -2873,8 +2874,8 @@ const LoveTimeApp = () => {
             });
             showNotification({
               type: 'success',
-              title: '已選擇 AI 諮商師',
-              message: `${resolveCompanion(companionId).name} 之後會在對話和牆上陪你們聊`,
+              title: tr('已選擇 AI 諮商師', 'AI counselor chosen'),
+              message: tr(`${resolveCompanion(companionId).name} 之後會在對話和牆上陪你們聊`, `${resolveCompanion(companionId).name} will talk with you both in conversations and on the wall`),
               duration: 5000,
             });
           }}
@@ -2900,20 +2901,20 @@ const LoveTimeApp = () => {
           <div className="bg-petal-cream rounded-md p-7 max-w-md w-full shadow-petal border border-petal-rule">
             <div className="text-center mb-6 pb-5 border-b border-petal-rule">
               <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-2">
-                — 配對伴侶
+                {tr('— 配對伴侶', '— Pair with your partner')}
               </div>
               <h2 className="font-display text-2xl font-light tracking-tight text-petal-ink mb-2">
-                邀請<em className="not-italic font-light italic text-pink-600">你的伴侶</em>
+                {tr('邀請', 'Invite ')}<em className="not-italic font-light italic text-pink-600">{tr('你的伴侶', 'your partner')}</em>
               </h2>
               <p className="font-body text-sm text-petal-ink-soft leading-relaxed">
-                配對後，日曆、親密紀錄與成就將自動同步。
+                {tr('配對後，日曆、親密紀錄與成就將自動同步。', 'Once paired, your calendar, intimacy records and achievements sync automatically.')}
               </p>
             </div>
 
             {pairingPromptSent ? (
               <div className="py-2">
-                <p className="font-display italic text-petal-sage-deep mb-1 text-center">邀請已寄出</p>
-                <p className="font-body text-sm text-petal-muted mb-4 text-center">連結 7 天內有效。</p>
+                <p className="font-display italic text-petal-sage-deep mb-1 text-center">{tr('邀請已寄出', 'Invitation sent')}</p>
+                <p className="font-body text-sm text-petal-muted mb-4 text-center">{tr('連結 7 天內有效。', 'The link is valid for 7 days.')}</p>
                 {pairingPromptInvite && (
                   <PairingInviteShare
                     link={pairingPromptInvite.link}
@@ -2931,13 +2932,13 @@ const LoveTimeApp = () => {
                   }}
                   className="font-body text-sm text-petal-muted hover:text-petal-ink transition-colors"
                 >
-                  關閉
+                  {tr('關閉', 'Close')}
                 </button>
               </div>
             ) : (
               <div className="space-y-3">
                 <div>
-                  <label className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">伴侶的 Email</label>
+                  <label className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">{tr('伴侶的 Email', 'Your partner\'s email')}</label>
                   <input
                     type="email"
                     value={pairingPromptEmail}
@@ -2957,7 +2958,7 @@ const LoveTimeApp = () => {
                             // without needing a reload.
                             refreshPendingPairingInvite();
                           } catch (err) {
-                            showNotification({ type: 'error', title: '發送失敗', message: (err as Error)?.message || '請稍後再試', duration: 6000 });
+                            showNotification({ type: 'error', title: tr('發送失敗', 'Couldn\'t send'), message: (err as Error)?.message || tr('請稍後再試', 'Please try again in a moment'), duration: 6000 });
                           } finally {
                             setPairingPromptSending(false);
                           }
@@ -2976,7 +2977,7 @@ const LoveTimeApp = () => {
                       setPairingPromptSent(true);
                       refreshPendingPairingInvite();
                     } catch (err) {
-                      showNotification({ type: 'error', title: '發送失敗', message: (err as Error)?.message || '請稍後再試', duration: 6000 });
+                      showNotification({ type: 'error', title: tr('發送失敗', 'Couldn\'t send'), message: (err as Error)?.message || tr('請稍後再試', 'Please try again in a moment'), duration: 6000 });
                     } finally {
                       setPairingPromptSending(false);
                     }
@@ -2988,7 +2989,7 @@ const LoveTimeApp = () => {
                       : 'bg-petal-ink text-petal-cream hover:bg-pink-700'
                   }`}
                 >
-                  {pairingPromptSending ? '發送中…' : '發送邀請連結 →'}
+                  {pairingPromptSending ? tr('發送中…', 'Sending…') : tr('發送邀請連結 →', 'Send invitation link →')}
                 </button>
                 <button
                   onClick={() => {
@@ -2997,7 +2998,7 @@ const LoveTimeApp = () => {
                   }}
                   className="w-full text-petal-ink py-2 font-body text-sm border border-petal-rule rounded-md hover:bg-petal-cream-2 transition-colors"
                 >
-                  使用配對碼配對
+                  {tr('使用配對碼配對', 'Pair with a code')}
                 </button>
                 <button
                   onClick={() => {
@@ -3007,7 +3008,7 @@ const LoveTimeApp = () => {
                   }}
                   className="w-full text-petal-muted hover:text-petal-ink py-1 font-body text-xs transition-colors"
                 >
-                  稍後再說
+                  {tr('稍後再說', 'Maybe later')}
                 </button>
               </div>
             )}
@@ -3023,7 +3024,7 @@ const LoveTimeApp = () => {
           }`}
         >
           <p className="font-display italic font-light text-base text-petal-muted">
-            為熱戀中的你們 — <span className="text-petal-ink">記錄每一段親密時光</span>
+            {tr('為熱戀中的你們 —', 'For the two of you in love — ')} <span className="text-petal-ink">{tr('記錄每一段親密時光', 'every intimate moment, recorded')}</span>
           </p>
         </div>
 
@@ -3062,14 +3063,14 @@ const LoveTimeApp = () => {
           <div className="max-w-6xl mx-auto mb-4">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-petal-rose-soft/30 border border-petal-rose-soft rounded-md px-4 py-3">
               <p className="flex-1 font-body text-sm text-petal-ink">
-                請驗證你的 Email（{authState.user?.email}）以確保帳號安全。沒收到信？可以重新寄送。
+                {tr('請驗證你的 Email（', 'Please verify your email (')}{authState.user?.email}{tr('）以確保帳號安全。沒收到信？可以重新寄送。', ') to keep your account secure. Didn\'t get it? You can resend it.')}
               </p>
               <button
                 onClick={handleResendVerification}
                 data-testid="resend-verification-button"
                 className="shrink-0 px-4 py-1.5 bg-petal-ink text-petal-cream rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
               >
-                重新寄送驗證信
+                {tr('重新寄送驗證信', 'Resend verification email')}
               </button>
             </div>
           </div>
@@ -3162,7 +3163,7 @@ const LoveTimeApp = () => {
           </p>
           <p className="font-body text-[11px] text-petal-muted/80" data-testid="build-info">
             v{__APP_VERSION__} | {import.meta.env.MODE} |{' '}
-            {new Date(__BUILD_TIME__).toLocaleString('zh-TW')} | {__COMMIT_HASH__}
+            {new Date(__BUILD_TIME__).toLocaleString(dateLocale())} | {__COMMIT_HASH__}
           </p>
         </footer>
       </div>
@@ -3201,7 +3202,7 @@ const LoveTimeApp = () => {
               setPendingScriptDraft(draft);
               setShowScriptUploadModal(false);
               setEditingScript(null);
-              setUpgradeReason(reason || '升級 Premium 即可使用 AI 角色辨識');
+              setUpgradeReason(reason || tr('升級 Premium 即可使用 AI 角色辨識', 'Upgrade to Premium to use AI character detection'));
               setCurrentView('upgrade');
             }}
           />
@@ -3216,8 +3217,8 @@ const LoveTimeApp = () => {
         onSuccess={() => {
           showNotification({
             type: 'success',
-            title: '親密邀請已發送',
-            message: '你的邀請已經發送給伴侶',
+            title: tr('親密邀請已發送', 'Intimacy invitation sent'),
+            message: tr('你的邀請已經發送給伴侶', 'Your invitation was sent to your partner'),
             duration: 3000,
           });
         }}
@@ -3266,7 +3267,7 @@ const LoveTimeApp = () => {
                     — {dayPickerDate}
                   </div>
                   <h3 className="font-display text-2xl font-light tracking-tight text-petal-ink">
-                    這天的<em className="not-italic font-light italic text-pink-600">記錄</em>
+                    {tr('這天的', 'This day\'s ')}<em className="not-italic font-light italic text-pink-600">{tr('記錄', 'records')}</em>
                   </h3>
                 </div>
                 <button
@@ -3315,10 +3316,10 @@ const LoveTimeApp = () => {
               <div className="flex justify-between items-end mb-8 pb-5 border-b border-petal-rule">
                 <div>
                   <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
-                    — 詳情
+                    {tr('— 詳情', '— Details')}
                   </div>
                   <h3 className="font-display text-3xl font-light tracking-tight text-petal-ink">
-                    親密<em className="not-italic font-light italic text-pink-600">時光</em>
+                    {tr('親密', 'Intimate')}<em className="not-italic font-light italic text-pink-600">{tr('時光', ' moment')}</em>
                   </h3>
                 </div>
                 <div className="flex items-center gap-2">
@@ -3357,7 +3358,7 @@ const LoveTimeApp = () => {
                   <div className="text-center">
                     <img
                       src={selectedRecord.photo}
-                      alt="記憶照片"
+                      alt={tr("記憶照片", 'Memory photo')}
                       className="max-w-full max-h-96 rounded-md mx-auto border border-petal-rule"
                     />
                   </div>
@@ -3365,7 +3366,7 @@ const LoveTimeApp = () => {
 
                 {selectedRecord.description && (
                   <div>
-                    <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">描述</h4>
+                    <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">{tr('描述', 'Description')}</h4>
                     <p className="font-body text-[15px] leading-relaxed text-petal-ink">
                       {selectedRecord.description}
                     </p>
@@ -3376,13 +3377,13 @@ const LoveTimeApp = () => {
                   {selectedRecord.duration && (
                     <div className="flex items-center space-x-2">
                       <Clock className="w-5 h-5 text-petal-rose-deep" />
-                      <span className="font-body text-sm text-petal-ink">持續時間: {selectedRecord.duration}</span>
+                      <span className="font-body text-sm text-petal-ink">{tr('持續時間:', 'Duration: ')} {selectedRecord.duration}</span>
                     </div>
                   )}
                   {selectedRecord.location && (
                     <div className="flex items-center space-x-2">
                       <MapPin className="w-5 h-5 text-petal-rose-deep" />
-                      <span className="font-body text-sm text-petal-ink">地點: {selectedRecord.location}</span>
+                      <span className="font-body text-sm text-petal-ink">{tr('地點:', 'Place: ')} {selectedRecord.location}</span>
                     </div>
                   )}
                   {selectedRecord.roleplayScript && (
@@ -3397,20 +3398,20 @@ const LoveTimeApp = () => {
                       className="flex items-center space-x-2 text-left cursor-pointer group focus:outline-none focus-visible:ring-2 focus-visible:ring-petal-sage-deep/40 rounded-sm -mx-1 px-1"
                     >
                       <Play className="w-5 h-5 text-petal-sage-deep" />
-                      <span className="font-body text-sm text-petal-ink group-hover:text-petal-sage-deep group-hover:underline underline-offset-2 transition-colors">劇本: {selectedRecord.roleplayScript}</span>
+                      <span className="font-body text-sm text-petal-ink group-hover:text-petal-sage-deep group-hover:underline underline-offset-2 transition-colors">{tr('劇本:', 'Script: ')} {selectedRecord.roleplayScript}</span>
                     </button>
                   )}
                   {!!selectedRecord.coinsEarned && (
                     <div className="flex items-center space-x-2">
                       <Coins className="w-5 h-5 text-yellow-500" />
-                      <span className="font-body text-sm text-petal-ink">獲得金幣: {selectedRecord.coinsEarned}</span>
+                      <span className="font-body text-sm text-petal-ink">{tr('獲得金幣:', 'Coins earned: ')} {selectedRecord.coinsEarned}</span>
                     </div>
                   )}
                 </div>
 
                 {selectedRecord.notes && (
                   <div>
-                    <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">備註</h4>
+                    <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">{tr('備註', 'Notes')}</h4>
                     <p className="font-display italic font-light text-sm text-petal-ink-soft pl-3 border-l border-petal-rose-soft leading-relaxed">
                       "{selectedRecord.notes}"
                     </p>
@@ -3418,13 +3419,13 @@ const LoveTimeApp = () => {
                 )}
 
                 <div>
-                  <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">快速回應</h4>
+                  <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">{tr('快速回應', 'Quick response')}</h4>
                   <MomentResponseBar
                     // `selectedRecord` is a snapshot taken when the modal opened,
                     // so read the live row for the parts that change under it.
                     record={intimateRecords.find(r => r.id === selectedRecord.id) ?? selectedRecord}
                     partnerConnected={partnerConnected}
-                    partnerNickname={nicknames.partner2 || '對方'}
+                    partnerNickname={nicknames.partner2 || tr('對方', 'Partner')}
                     variant="detail"
                     onRespond={setRecordResponse}
                     onInvitePartner={() => { setShowRecordDetail(false); openPairingPrompt(); }}
@@ -3444,7 +3445,7 @@ const LoveTimeApp = () => {
             <div className="p-5 sm:p-6 md:p-8">
               <div className="mb-6 pb-5 border-b border-petal-rule">
                 <h3 className="font-display text-2xl font-light tracking-tight text-petal-ink">
-                  確認<em className="not-italic font-light italic text-red-500">刪除</em>
+                  {tr('確認', 'Confirm')}<em className="not-italic font-light italic text-red-500">{tr('刪除', ' delete')}</em>
                 </h3>
               </div>
               <div className="flex items-center gap-3 mb-6 p-3 bg-white rounded-md border border-petal-rule">
@@ -3459,20 +3460,20 @@ const LoveTimeApp = () => {
                 </div>
               </div>
               <p className="font-body text-sm text-petal-muted mb-8">
-                確定要刪除這筆親密記錄嗎？此操作無法復原。
+                {tr('確定要刪除這筆親密記錄嗎？此操作無法復原。', 'Delete this intimacy record? This can\'t be undone.')}
               </p>
               <div className="flex space-x-3">
                 <button
                   onClick={() => { setShowDeleteConfirm(false); setDeletingRecord(null); }}
                   className="flex-1 px-4 py-3 border border-petal-rule text-petal-ink rounded-md hover:bg-petal-cream-2 transition-colors font-body text-sm"
                 >
-                  取消
+                  {tr('取消', 'Cancel')}
                 </button>
                 <button
                   onClick={() => handleDeleteRecord(deletingRecord)}
                   className="flex-1 px-4 py-3 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-display italic text-base"
                 >
-                  確認刪除
+                  {tr('確認刪除', 'Confirm delete')}
                 </button>
               </div>
             </div>

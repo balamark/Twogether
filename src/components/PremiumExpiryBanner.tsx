@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Crown, X } from 'lucide-react';
 import type { BillingStatus } from '../services/api';
-import { tr } from '../i18n/tr';
+import { tr, dateLocale } from '../i18n/tr';
 
 // Proactive Premium-expiry reminder. Shows a gentle, dismissible banner when a
 // couple's Premium is within EXPIRY_WINDOW_DAYS of lapsing, so they can renew
@@ -42,7 +42,7 @@ function daysUntil(expiresAt: string): number {
 
 function formatDate(iso: string): string {
   try {
-    return new Date(iso).toLocaleDateString('zh-TW', {
+    return new Date(iso).toLocaleDateString(dateLocale(), {
       year: 'numeric',
       month: 'long',
       day: 'numeric',

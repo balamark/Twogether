@@ -5,6 +5,7 @@ import { useScrollLock } from '../hooks/useScrollLock';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { isVideoUrl, IMAGE_MAX_BYTES, VIDEO_MAX_BYTES, mediaLimitMb } from '../utils/script';
 import { tr } from '../i18n/tr';
+import { moodTagLabel } from '../content/moodTags';
 
 // A YouTube/Google-Photos-style circular upload indicator: the ring fills as
 // bytes go out, and — since large photos/videos can take a while — doubles as
@@ -424,7 +425,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                       </div>
                       <div className="mt-2 flex items-center gap-2">
                         <span className="font-body text-[10px] uppercase tracking-[0.1em] text-petal-muted">
-                          {tpl.mood_tag}
+                          {moodTagLabel(tpl.mood_tag)}
                         </span>
                         {tpl.category === 'important' && (
                           <span className="font-body text-[10px] uppercase tracking-[0.1em] text-petal-rose-deep">
@@ -577,7 +578,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                         : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
                     }`}
                   >
-                    {tag}
+                    {moodTagLabel(tag)}
                   </button>
                 );
               })}

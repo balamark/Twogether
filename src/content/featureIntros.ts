@@ -4,6 +4,7 @@
 // 英文版在 featureIntros.en.ts（同 id），改這裡時請一併更新。
 
 import type { Locale } from '../i18n/LanguageContext';
+import { getLocale } from '../i18n/tr';
 import { FEATURE_INTROS_EN } from './featureIntros.en';
 
 export interface FeatureIntro {
@@ -342,7 +343,7 @@ export const FEATURE_INTROS: FeatureIntro[] = [
   },
 ];
 
-export function getFeatureIntro(viewId: string, locale: Locale = 'zh-TW'): FeatureIntro | null {
+export function getFeatureIntro(viewId: string, locale: Locale = getLocale()): FeatureIntro | null {
   const intro = FEATURE_INTROS.find((f) => f.id === viewId);
   return intro ? localizeIntro(intro, locale) : null;
 }
@@ -353,6 +354,6 @@ function localizeIntro(intro: FeatureIntro, locale: Locale): FeatureIntro {
   return en ? { ...intro, ...en } : intro;
 }
 
-export function getFeatureIntros(locale: Locale = 'zh-TW'): FeatureIntro[] {
+export function getFeatureIntros(locale: Locale = getLocale()): FeatureIntro[] {
   return FEATURE_INTROS.map((f) => localizeIntro(f, locale));
 }

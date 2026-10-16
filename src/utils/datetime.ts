@@ -3,7 +3,7 @@
 // which typically comes from <TimezoneProvider> populated with the couple's primary tz.
 
 import { TIMEZONE_OPTIONS, getTimezoneShortLabel } from './timezone-options';
-import { tr } from '../i18n/tr';
+import { tr, dateLocale } from '../i18n/tr';
 
 export interface DateTimeOptions {
   // When true, always append " (短標籤)" even if tz matches the viewer's browser tz.
@@ -26,7 +26,7 @@ function shouldAppendTz(tz: string, opts?: DateTimeOptions): boolean {
 }
 
 function formatPartsZh(date: Date, opts: Intl.DateTimeFormatOptions): string {
-  return new Intl.DateTimeFormat('zh-TW', opts).format(date);
+  return new Intl.DateTimeFormat(dateLocale(), opts).format(date);
 }
 
 function safeDate(value: string | Date): Date | null {

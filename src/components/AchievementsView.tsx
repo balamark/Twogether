@@ -6,7 +6,7 @@ import type { Notification } from '../App';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { useFeatureFlag } from '../contexts/FeatureFlagsContext';
 import { formatDate, formatYmdInTz } from '../utils/datetime';
-import { tr } from '../i18n/tr';
+import { tr, dateLocale } from '../i18n/tr';
 
 interface IntimateRecord {
   id: number;
@@ -588,7 +588,7 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
                 </span>
               )}
               <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity z-20 whitespace-nowrap pointer-events-none">
-                {day.date.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })}
+                {day.date.toLocaleDateString(dateLocale(), { month: 'short', day: 'numeric' })}
                 <br />
                 {day.count} {tr('次記錄', ' records')}
                 {isPeriod && <><br />{tr('🔴 月經', '🔴 Period')}</>}

@@ -3,7 +3,7 @@ import { Home, Heart, Sparkles, ShieldCheck, Send, StickyNote, TrendingUp, X, Lo
 import { apiService, type RelationshipSummary, type GoodwillGroup, type RelationshipCheckin } from '../services/api';
 import { daysSinceLastNudge } from './AchievementsView';
 import { useScrollLock } from '../hooks/useScrollLock';
-import { tr } from '../i18n/tr';
+import { tr, dateLocale } from '../i18n/tr';
 
 interface NotificationInput {
   type: 'success' | 'error' | 'info' | 'warning';
@@ -423,7 +423,7 @@ const CheckinHistoryModal: React.FC<{ onClose: () => void }> = ({ onClose }) => 
                     {c.isMine ? tr('我', 'Me') : c.nickname}
                   </span>
                   <span className="font-body text-[11px] text-petal-muted">
-                    {new Date(c.createdAt).toLocaleDateString('zh-TW')}
+                    {new Date(c.createdAt).toLocaleDateString(dateLocale())}
                   </span>
                 </div>
                 <div className="grid grid-cols-3 gap-2 mb-1">

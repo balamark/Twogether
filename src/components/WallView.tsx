@@ -33,6 +33,7 @@ import { formatRelativeOrDate } from '../utils/datetime';
 import { isVideoUrl } from '../utils/script';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { tr } from '../i18n/tr';
+import { moodTagLabel } from '../content/moodTags';
 
 interface WallViewProps {
   authState: {
@@ -562,7 +563,7 @@ const WallView: React.FC<WallViewProps> = ({
             </span>
             {post.mood_tag && (
               <span className="font-body text-[11px] text-petal-muted">
-                · {post.mood_tag}
+                · {moodTagLabel(post.mood_tag)}
               </span>
             )}
             <span className="font-body text-[11px] text-petal-muted">

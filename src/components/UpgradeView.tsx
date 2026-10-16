@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Sparkles, Check, Crown, Ticket } from 'lucide-react';
 import { apiService, type BillingStatus, type BillingPlan, type PaymentProvider } from '../services/api';
 import PaymentMethodPicker from './PaymentMethodPicker';
-import { tr } from '../i18n/tr';
+import { tr, dateLocale } from '../i18n/tr';
 
 type Notify = (n: { type: 'success' | 'error' | 'info' | 'warning'; title: string; message: string; duration?: number }) => void;
 
@@ -27,7 +27,7 @@ const PREMIUM_PERKS = [
 function formatDate(iso: string | null): string {
   if (!iso) return '';
   try {
-    return new Date(iso).toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' });
+    return new Date(iso).toLocaleDateString(dateLocale(), { year: 'numeric', month: 'long', day: 'numeric' });
   } catch {
     return '';
   }

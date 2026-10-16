@@ -10,7 +10,7 @@ import PetalSelect from './PetalSelect';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatYmdInTz, formatDate } from '../utils/datetime';
 import { scriptHasUnresolvedGenderTokens, isVideoUrl } from '../utils/script';
-import { tr } from '../i18n/tr';
+import { tr, dateLocale } from '../i18n/tr';
 
 interface RoleplayScript {
   id: string;
@@ -356,7 +356,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   }, [initialScriptTitle, defaultRoleplayScripts, customScripts, handleViewScript, showNotification, onInitialScriptConsumed]);
 
   const recordRoleplay = useCallback((script: RoleplayScript) => {
-    const time = new Date().toLocaleTimeString('zh-TW', {
+    const time = new Date().toLocaleTimeString(dateLocale(), {
       hour: '2-digit',
       minute: '2-digit',
       hour12: false,
