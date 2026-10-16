@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { apiService } from '../services/api';
 import type { Notification } from '../App';
+import { tr } from '../i18n/tr';
 
 interface AuthModalProps {
   onClose: () => void;
@@ -51,8 +52,8 @@ const AuthModal = ({
         if (!emailValue) {
           showNotification({
             type: 'error',
-            title: '驗證錯誤',
-            message: '請輸入電子郵件地址',
+            title: tr('驗證錯誤', 'Check your input'),
+            message: tr('請輸入電子郵件地址', 'Please enter your email address'),
             duration: 6000
           });
           setIsLoading(false);
@@ -61,8 +62,8 @@ const AuthModal = ({
         if (!passwordValue) {
           showNotification({
             type: 'error',
-            title: '驗證錯誤',
-            message: '請輸入密碼',
+            title: tr('驗證錯誤', 'Check your input'),
+            message: tr('請輸入密碼', 'Please enter your password'),
             duration: 6000
           });
           setIsLoading(false);
@@ -73,8 +74,8 @@ const AuthModal = ({
         if (!emailRegex.test(emailValue)) {
           showNotification({
             type: 'error',
-            title: '驗證錯誤',
-            message: '請輸入有效的電子郵件地址',
+            title: tr('驗證錯誤', 'Check your input'),
+            message: tr('請輸入有效的電子郵件地址', 'Please enter a valid email address'),
             duration: 6000
           });
           setIsLoading(false);
@@ -84,8 +85,8 @@ const AuthModal = ({
         if (passwordValue.length < 6) {
           showNotification({
             type: 'error',
-            title: '驗證錯誤',
-            message: '密碼至少需要6個字符',
+            title: tr('驗證錯誤', 'Check your input'),
+            message: tr('密碼至少需要6個字符', 'Password must be at least 6 characters'),
             duration: 6000
           });
           setIsLoading(false);
@@ -97,8 +98,8 @@ const AuthModal = ({
         if (!emailValue) {
           showNotification({
             type: 'error',
-            title: '驗證錯誤',
-            message: '請輸入電子郵件地址',
+            title: tr('驗證錯誤', 'Check your input'),
+            message: tr('請輸入電子郵件地址', 'Please enter your email address'),
             duration: 6000
           });
           setIsLoading(false);
@@ -107,8 +108,8 @@ const AuthModal = ({
         if (!nicknameValue) {
           showNotification({
             type: 'error',
-            title: '驗證錯誤',
-            message: '請輸入暱稱',
+            title: tr('驗證錯誤', 'Check your input'),
+            message: tr('請輸入暱稱', 'Please enter a nickname'),
             duration: 6000
           });
           setIsLoading(false);
@@ -117,8 +118,8 @@ const AuthModal = ({
         if (!passwordValue) {
           showNotification({
             type: 'error',
-            title: '驗證錯誤',
-            message: '請輸入密碼',
+            title: tr('驗證錯誤', 'Check your input'),
+            message: tr('請輸入密碼', 'Please enter a password'),
             duration: 6000
           });
           setIsLoading(false);
@@ -129,8 +130,8 @@ const AuthModal = ({
         if (!emailRegex.test(emailValue)) {
           showNotification({
             type: 'error',
-            title: '驗證錯誤',
-            message: '請輸入有效的電子郵件地址',
+            title: tr('驗證錯誤', 'Check your input'),
+            message: tr('請輸入有效的電子郵件地址', 'Please enter a valid email address'),
             duration: 6000
           });
           setIsLoading(false);
@@ -140,8 +141,8 @@ const AuthModal = ({
         if (nicknameValue.length < 2 || nicknameValue.length > 50) {
           showNotification({
             type: 'error',
-            title: '驗證錯誤',
-            message: '暱稱必須在2-50個字符之間',
+            title: tr('驗證錯誤', 'Check your input'),
+            message: tr('暱稱必須在2-50個字符之間', 'Nickname must be 2–50 characters'),
             duration: 6000
           });
           setIsLoading(false);
@@ -151,8 +152,8 @@ const AuthModal = ({
         if (passwordValue.length < 6) {
           showNotification({
             type: 'error',
-            title: '驗證錯誤',
-            message: '密碼至少需要6個字符',
+            title: tr('驗證錯誤', 'Check your input'),
+            message: tr('密碼至少需要6個字符', 'Password must be at least 6 characters'),
             duration: 6000
           });
           setIsLoading(false);
@@ -161,8 +162,8 @@ const AuthModal = ({
         if (passwordValue !== confirmPasswordValue) {
           showNotification({
             type: 'error',
-            title: '密碼不匹配',
-            message: '請確認兩次輸入的密碼相同',
+            title: tr('密碼不匹配', 'Passwords don\'t match'),
+            message: tr('請確認兩次輸入的密碼相同', 'Please make sure both passwords are the same'),
             duration: 6000
           });
           setIsLoading(false);
@@ -174,8 +175,8 @@ const AuthModal = ({
         if (!partnerCodeValue) {
           showNotification({
             type: 'error',
-            title: '驗證錯誤',
-            message: '請輸入配對碼',
+            title: tr('驗證錯誤', 'Check your input'),
+            message: tr('請輸入配對碼', 'Please enter a pairing code'),
             duration: 6000
           });
           setIsLoading(false);
@@ -200,7 +201,7 @@ const AuthModal = ({
     const formData = new FormData(e.currentTarget);
     const emailValue = (formData.get('email') as string || '').trim();
     if (!emailValue) {
-      showNotification({ type: 'error', title: '驗證錯誤', message: '請輸入電子郵件地址', duration: 6000 });
+      showNotification({ type: 'error', title: tr('驗證錯誤', 'Check your input'), message: tr('請輸入電子郵件地址', 'Please enter your email address'), duration: 6000 });
       return;
     }
     setIsLoading(true);
@@ -208,16 +209,16 @@ const AuthModal = ({
       const result = await apiService.forgotPassword(emailValue);
       showNotification({
         type: 'success',
-        title: '請查收信箱',
-        message: result?.message || '如果這個 Email 有註冊帳號，我們已寄出重設密碼的連結。',
+        title: tr('請查收信箱', 'Check your inbox'),
+        message: result?.message || tr('如果這個 Email 有註冊帳號，我們已寄出重設密碼的連結。', 'If this email has an account, we\'ve sent a link to reset your password.'),
         duration: 7000,
       });
       setAuthMode('login');
     } catch (error) {
       showNotification({
         type: 'error',
-        title: '寄送失敗',
-        message: (error as Error)?.message || '無法寄出重設信，請稍後再試。',
+        title: tr('寄送失敗', 'Couldn\'t send'),
+        message: (error as Error)?.message || tr('無法寄出重設信，請稍後再試。', 'Couldn\'t send the reset email. Please try again in a moment.'),
         duration: 6000,
       });
     } finally {
@@ -231,13 +232,13 @@ const AuthModal = ({
         <div className="flex justify-between items-end mb-6 pb-5 border-b border-petal-rule">
           <div>
             <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
-              — {authMode === 'login' ? '登入' : authMode === 'register' ? '註冊' : authMode === 'forgot' ? '重設密碼' : '連接'}
+              — {authMode === 'login' ? tr('登入', 'Sign in') : authMode === 'register' ? tr('註冊', 'Sign up') : authMode === 'forgot' ? tr('重設密碼', 'Reset password') : tr('連接', 'Connect')}
             </div>
             <h3 data-testid="auth-modal-heading" className="font-display text-2xl font-light tracking-tight text-petal-ink">
-              {authMode === 'login' ? <>登入<em className="not-italic font-light italic text-pink-600">愛的時光</em></> :
-               authMode === 'register' ? <>註冊<em className="not-italic font-light italic text-pink-600">新帳號</em></> :
-               authMode === 'forgot' ? <>重設<em className="not-italic font-light italic text-pink-600">密碼</em></> :
-               <>連接<em className="not-italic font-light italic text-pink-600">伴侶</em></>}
+              {authMode === 'login' ? <>{tr('登入', 'Welcome')}<em className="not-italic font-light italic text-pink-600">{tr('愛的時光', ' back')}</em></> :
+               authMode === 'register' ? <>{tr('註冊', 'Create')}<em className="not-italic font-light italic text-pink-600">{tr('新帳號', ' an account')}</em></> :
+               authMode === 'forgot' ? <>{tr('重設', 'Reset')}<em className="not-italic font-light italic text-pink-600">{tr('密碼', ' password')}</em></> :
+               <>{tr('連接', 'Connect')}<em className="not-italic font-light italic text-pink-600">{tr('伴侶', ' your partner')}</em></>}
             </h3>
           </div>
           <button
@@ -253,7 +254,7 @@ const AuthModal = ({
           <form key="login-form" onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="login-email" className="block text-sm font-medium text-gray-700 mb-2">
-                電子郵件
+                {tr('電子郵件', 'Email')}
               </label>
               <input
                 id="login-email"
@@ -263,7 +264,7 @@ const AuthModal = ({
                 defaultValue={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                placeholder="輸入你的電子郵件"
+                placeholder={tr("輸入你的電子郵件", 'Enter your email')}
                 disabled={isLoading}
                 autoComplete="username"
                 required
@@ -271,7 +272,7 @@ const AuthModal = ({
             </div>
             <div>
               <label htmlFor="login-password" className="block text-sm font-medium text-gray-700 mb-2">
-                密碼
+                {tr('密碼', 'Password')}
               </label>
               <input
                 id="login-password"
@@ -282,7 +283,7 @@ const AuthModal = ({
                 defaultValue={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                placeholder="輸入你的密碼"
+                placeholder={tr("輸入你的密碼", 'Enter your password')}
                 disabled={isLoading}
                 required
               />
@@ -300,10 +301,10 @@ const AuthModal = ({
               {isLoading ? (
                 <div className="flex items-center justify-center space-x-3">
                   <div className="w-4 h-4 border-2 border-petal-muted border-t-transparent rounded-full animate-spin"></div>
-                  <span>登入中…</span>
+                  <span>{tr('登入中…', 'Signing in…')}</span>
                 </div>
               ) : (
-                <span>開始愛的旅程 →</span>
+                <span>{tr('開始愛的旅程 →', 'Start your love journey →')}</span>
               )}
             </button>
           </form>
@@ -313,7 +314,7 @@ const AuthModal = ({
           <form key="register-form" onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="register-email" className="block text-sm font-medium text-gray-700 mb-2">
-                電子郵件
+                {tr('電子郵件', 'Email')}
               </label>
               <input
                 id="register-email"
@@ -322,7 +323,7 @@ const AuthModal = ({
                 defaultValue={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                placeholder="輸入你的電子郵件"
+                placeholder={tr("輸入你的電子郵件", 'Enter your email')}
                 disabled={isLoading}
                 autoComplete="username"
                 required
@@ -330,7 +331,7 @@ const AuthModal = ({
             </div>
             <div>
               <label htmlFor="register-nickname" className="block text-sm font-medium text-gray-700 mb-2">
-                暱稱
+                {tr('暱稱', 'Nickname')}
               </label>
               <input
                 id="register-nickname"
@@ -339,7 +340,7 @@ const AuthModal = ({
                 defaultValue={nickname}
                 onChange={(e) => setNickname(e.target.value)}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                placeholder="輸入你的暱稱"
+                placeholder={tr("輸入你的暱稱", 'Enter your nickname')}
                 disabled={isLoading}
                 autoComplete="nickname"
                 required
@@ -347,7 +348,7 @@ const AuthModal = ({
             </div>
             <div>
               <label htmlFor="register-password" className="block text-sm font-medium text-gray-700 mb-2">
-                密碼
+                {tr('密碼', 'Password')}
               </label>
               <input
                 id="register-password"
@@ -357,14 +358,14 @@ const AuthModal = ({
                 defaultValue={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                placeholder="輸入你的密碼"
+                placeholder={tr("輸入你的密碼", 'Enter your password')}
                 disabled={isLoading}
                 required
               />
             </div>
             <div>
               <label htmlFor="register-confirm-password" className="block text-sm font-medium text-gray-700 mb-2">
-                確認密碼
+                {tr('確認密碼', 'Confirm password')}
               </label>
               <input
                 id="register-confirm-password"
@@ -374,7 +375,7 @@ const AuthModal = ({
                 defaultValue={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                placeholder="再次輸入密碼"
+                placeholder={tr("再次輸入密碼", 'Enter your password again')}
                 disabled={isLoading}
                 required
               />
@@ -392,10 +393,10 @@ const AuthModal = ({
               {isLoading ? (
                 <div className="flex items-center justify-center space-x-3">
                   <div className="w-4 h-4 border-2 border-petal-muted border-t-transparent rounded-full animate-spin"></div>
-                  <span>註冊中…</span>
+                  <span>{tr('註冊中…', 'Signing up…')}</span>
                 </div>
               ) : (
-                <span>註冊帳號 →</span>
+                <span>{tr('註冊帳號 →', 'Create account →')}</span>
               )}
             </button>
           </form>
@@ -405,7 +406,7 @@ const AuthModal = ({
           <form key="partner-form" onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label htmlFor="partner-code" className="block text-sm font-medium text-gray-700 mb-2">
-                伴侶配對碼
+                {tr('伴侶配對碼', 'Partner\'s pairing code')}
               </label>
               <input
                 id="partner-code"
@@ -414,7 +415,7 @@ const AuthModal = ({
                 defaultValue={partnerCode}
                 onChange={(e) => setPartnerCode(e.target.value.toUpperCase())}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                placeholder="輸入伴侶的配對碼"
+                placeholder={tr("輸入伴侶的配對碼", 'Enter your partner\'s pairing code')}
                 disabled={isLoading}
                 required
               />
@@ -432,10 +433,10 @@ const AuthModal = ({
               {isLoading ? (
                 <div className="flex items-center justify-center space-x-3">
                   <div className="w-4 h-4 border-2 border-petal-muted border-t-transparent rounded-full animate-spin"></div>
-                  <span>連接中…</span>
+                  <span>{tr('連接中…', 'Connecting…')}</span>
                 </div>
               ) : (
-                <span>連接伴侶 →</span>
+                <span>{tr('連接伴侶 →', 'Connect partner →')}</span>
               )}
             </button>
           </form>
@@ -444,11 +445,11 @@ const AuthModal = ({
         {authMode === 'forgot' && (
           <form key="forgot-form" onSubmit={handleForgot} className="space-y-4">
             <p className="font-body text-sm text-petal-ink-soft leading-relaxed">
-              輸入你註冊時使用的電子郵件，我們會寄送重設密碼的連結給你。
+              {tr('輸入你註冊時使用的電子郵件，我們會寄送重設密碼的連結給你。', 'Enter the email you signed up with and we\'ll send you a link to reset your password.')}
             </p>
             <div>
               <label htmlFor="forgot-email" className="block text-sm font-medium text-gray-700 mb-2">
-                電子郵件
+                {tr('電子郵件', 'Email')}
               </label>
               <input
                 id="forgot-email"
@@ -458,7 +459,7 @@ const AuthModal = ({
                 defaultValue={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                placeholder="輸入你的電子郵件"
+                placeholder={tr("輸入你的電子郵件", 'Enter your email')}
                 disabled={isLoading}
                 autoComplete="username"
                 required
@@ -477,10 +478,10 @@ const AuthModal = ({
               {isLoading ? (
                 <div className="flex items-center justify-center space-x-3">
                   <div className="w-4 h-4 border-2 border-petal-muted border-t-transparent rounded-full animate-spin"></div>
-                  <span>寄送中…</span>
+                  <span>{tr('寄送中…', 'Sending…')}</span>
                 </div>
               ) : (
-                <span>寄送重設連結 →</span>
+                <span>{tr('寄送重設連結 →', 'Send reset link →')}</span>
               )}
             </button>
           </form>
@@ -496,7 +497,7 @@ const AuthModal = ({
                   isLoading ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
-                還沒帳號？立即註冊
+                {tr('還沒帳號？立即註冊', 'No account yet? Sign up')}
               </button>
               <button
                 onClick={() => setAuthMode('partner')}
@@ -505,7 +506,7 @@ const AuthModal = ({
                   isLoading ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
-                已有帳號？連接伴侶
+                {tr('已有帳號？連接伴侶', 'Have an account? Connect your partner')}
               </button>
               <button
                 onClick={() => setAuthMode('forgot')}
@@ -515,7 +516,7 @@ const AuthModal = ({
                   isLoading ? 'opacity-50 cursor-not-allowed' : ''
                 }`}
               >
-                忘記密碼？
+                {tr('忘記密碼？', 'Forgot password?')}
               </button>
             </>
           )}
@@ -527,7 +528,7 @@ const AuthModal = ({
                 isLoading ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
-              ← 返回登入
+              {tr('← 返回登入', '← Back to sign in')}
             </button>
           )}
           {authMode === 'register' && (
@@ -538,7 +539,7 @@ const AuthModal = ({
                 isLoading ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
-              已有帳號？立即登入
+              {tr('已有帳號？立即登入', 'Already have an account? Sign in')}
             </button>
           )}
           {authMode === 'partner' && (
@@ -549,7 +550,7 @@ const AuthModal = ({
                 isLoading ? 'opacity-50 cursor-not-allowed' : ''
               }`}
             >
-              還沒帳號？立即註冊
+              {tr('還沒帳號？立即註冊', 'No account yet? Sign up')}
             </button>
           )}
         </div>

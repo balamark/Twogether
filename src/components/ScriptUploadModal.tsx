@@ -6,6 +6,7 @@ import { Button } from './ui/Button';
 import { detectScriptSpeakers, applySpeakerAssignments, isVideoUrl, IMAGE_MAX_BYTES, VIDEO_MAX_BYTES, mediaLimitMb } from '../utils/script';
 import { apiService } from '../services/api';
 import type { RoleplayScript } from '../App';
+import { tr } from '../i18n/tr';
 
 type ScriptCategory = 'romantic' | 'adventurous' | 'school' | 'bold';
 
@@ -24,7 +25,7 @@ export interface PendingScriptDraft {
 
 // Suggested 場景地點 values (free text still allowed via the datalist input).
 const COMMON_LOCATIONS = [
-  '家裡', '臥室', '飯店', '教室', '辦公室', '公園', '車上', '海邊', '餐廳', '電影院',
+  tr('家裡', 'Home'), tr('臥室', 'Bedroom'), tr('飯店', 'Hotel'), tr('教室', 'Classroom'), tr('辦公室', 'Office'), tr('公園', 'Park'), tr('車上', 'In the car'), tr('海邊', 'Beach'), tr('餐廳', 'Restaurant'), tr('電影院', 'Cinema'),
 ];
 
 // Per-script photo cap — mirrors MAX_SCRIPT_PHOTOS in routes/custom-scripts.js.
@@ -170,17 +171,17 @@ const ScriptUploadModal = ({
       }
       const applied = Object.keys(next).length;
       if (applied === 0) {
-        setAiStatus({ state: 'error', message: 'AI 無法從內容判斷角色性別，請直接點選下方的男／女按鈕手動指定。' });
+        setAiStatus({ state: 'error', message: tr('AI 無法從內容判斷角色性別，請直接點選下方的男／女按鈕手動指定。', 'The AI couldn\'t tell the characters\' genders from the text. Please assign them with the male/female buttons below.') });
         return;
       }
       setSpeakerAssignments((prev) => ({ ...prev, ...next }));
-      setAiStatus({ state: 'success', message: `AI 已辨識 ${applied} 個角色的性別，請確認下方的角色對應（可再調整）。` });
+      setAiStatus({ state: 'success', message: tr(`AI 已辨識 ${applied} 個角色的性別，請確認下方的角色對應（可再調整）。`, `The AI identified the gender of ${applied} characters. Please check the role mapping below (you can adjust it).`) });
     } catch (error) {
       const err = error as Error & { error_code?: string };
       if (err.error_code === 'AI_ROLE_PARSE_PREMIUM_ONLY') {
         setAiStatus({ state: 'premium', message: err.message });
       } else {
-        setAiStatus({ state: 'error', message: err.message || 'AI 角色辨識暫時無法使用，請稍後再試。' });
+        setAiStatus({ state: 'error', message: err.message || tr('AI 角色辨識暫時無法使用，請稍後再試。', 'AI character detection isn\'t available right now. Please try again in a moment.') });
       }
     }
   };
@@ -196,11 +197,11 @@ const ScriptUploadModal = ({
         // Only fill the title from the doc when the user hasn't typed one.
         title: prev.title.trim() ? prev.title : (suggestedTitle ?? ''),
       }));
-      setGdocStatus({ state: 'success', message: '已匯入文件內容，請確認下方劇本內容與角色對應。' });
+      setGdocStatus({ state: 'success', message: tr('已匯入文件內容，請確認下方劇本內容與角色對應。', 'The document was imported. Please check the script and role mapping below.') });
     } catch (error) {
       setGdocStatus({
         state: 'error',
-        message: (error as Error)?.message || '無法匯入 Google 文件，請稍後再試',
+        message: (error as Error)?.message || tr('無法匯入 Google 文件，請稍後再試', 'Couldn\'t import the Google Doc. Please try again in a moment'),
       });
     }
   };
@@ -218,21 +219,21 @@ const ScriptUploadModal = ({
     // Per-type size caps: videos may be larger than images (stored raw).
     const oversizeVideo = picked.find((f) => f.type.startsWith('video/') && f.size > VIDEO_MAX_BYTES);
     if (oversizeVideo) {
-      alert(`影片大小不能超過 ${mediaLimitMb(VIDEO_MAX_BYTES)}MB，請壓縮或改用較短的片段後再試。`);
+      alert(tr(`影片大小不能超過 ${mediaLimitMb(VIDEO_MAX_BYTES)}MB，請壓縮或改用較短的片段後再試。`, `Videos can't exceed ${mediaLimitMb(VIDEO_MAX_BYTES)}MB. Please compress it or use a shorter clip and try again.`));
       return;
     }
     const oversizeImage = picked.find((f) => !f.type.startsWith('video/') && f.size > IMAGE_MAX_BYTES);
     if (oversizeImage) {
-      alert(`每張照片大小不能超過 ${mediaLimitMb(IMAGE_MAX_BYTES)}MB，請壓縮後再試。`);
+      alert(tr(`每張照片大小不能超過 ${mediaLimitMb(IMAGE_MAX_BYTES)}MB，請壓縮後再試。`, `Each photo can't exceed ${mediaLimitMb(IMAGE_MAX_BYTES)}MB. Please compress it and try again.`));
       return;
     }
     const room = MAX_SCRIPT_PHOTOS - photoCount;
     if (room <= 0) {
-      alert(`每個劇本最多只能上傳 ${MAX_SCRIPT_PHOTOS} 張照片`);
+      alert(tr(`每個劇本最多只能上傳 ${MAX_SCRIPT_PHOTOS} 張照片`, `Each script can have at most ${MAX_SCRIPT_PHOTOS} photos`));
       return;
     }
     if (picked.length > room) {
-      alert(`最多再加 ${room} 張（每個劇本上限 ${MAX_SCRIPT_PHOTOS} 張），已自動取前 ${room} 張`);
+      alert(tr(`最多再加 ${room} 張（每個劇本上限 ${MAX_SCRIPT_PHOTOS} 張），已自動取前 ${room} 張`, `You can add ${room} more (limit ${MAX_SCRIPT_PHOTOS} per script), so the first ${room} were added`));
     }
     setNewPhotos((prev) => [...prev, ...picked.slice(0, room)]);
   };
@@ -280,7 +281,7 @@ const ScriptUploadModal = ({
   // no warning is the worst-case UX here. Confirmed dismissal discards any
   // cap-preserved draft too (handled App-side via onClose).
   const closeAndReset = () => {
-    if (isDirty() && !window.confirm('你有尚未儲存的變更，確定要關閉嗎？變更將不會保存。')) {
+    if (isDirty() && !window.confirm(tr('你有尚未儲存的變更，確定要關閉嗎？變更將不會保存。', 'You have unsaved changes. Close anyway? Your changes won\'t be saved.'))) {
       return;
     }
     onClose();
@@ -335,34 +336,34 @@ const ScriptUploadModal = ({
           <div className="flex justify-between items-end mb-6 pb-5 border-b border-petal-rule">
             <div>
               <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
-                — {isEditMode ? '編輯' : '上傳'}
+                — {isEditMode ? tr('編輯', 'Edit') : tr('上傳', 'Upload')}
               </div>
               {isEditMode ? (
                 <h3 className="font-display text-2xl font-light tracking-tight text-petal-ink">
-                  編輯<em className="not-italic font-light italic text-pink-600">自訂劇本</em>
+                  {tr('編輯', 'Edit')}<em className="not-italic font-light italic text-pink-600">{tr('自訂劇本', ' custom script')}</em>
                 </h3>
               ) : (
                 <h3 className="font-display text-2xl font-light tracking-tight text-petal-ink">
-                  上傳自訂劇本
+                  {tr('上傳自訂劇本', 'Upload a custom script')}
                 </h3>
               )}
             </div>
             <button
               onClick={closeAndReset}
               className="text-petal-muted hover:text-petal-ink transition-colors"
-              aria-label="關閉"
+              aria-label={tr("關閉", 'Close')}
             >
               <X className="w-5 h-5" strokeWidth={1.5} />
             </button>
           </div>
 
           <div className="mb-5 p-4 bg-petal-cream-2/50 border border-petal-rule-soft rounded-md">
-            <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">劇本格式說明</h4>
+            <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">{tr('劇本格式說明', 'Script format')}</h4>
             <ul className="font-body text-sm text-petal-ink-soft space-y-1 leading-relaxed">
-              <li>• 使用 [男]／[女]（或 [他]／[她]）代表男女角色，會依你們在「設定」中的性別自動帶入暱稱</li>
-              <li>• 使用 [partner1] 代表自己、[partner2] 代表另一半</li>
-              <li>• 每行對話格式：角色名: 對話內容</li>
-              <li>• 貼上含角色名的劇本時，可在下方將每個角色指定為男／女</li>
+              <li>{tr('• 使用 [男]／[女]（或 [他]／[她]）代表男女角色，會依你們在「設定」中的性別自動帶入暱稱', '• Use [男] / [女] (or [他] / [她]) for the male and female roles; they\'re replaced with your nicknames based on the genders set in Settings')}</li>
+              <li>{tr('• 使用 [partner1] 代表自己、[partner2] 代表另一半', '• Use [partner1] for yourself and [partner2] for your partner')}</li>
+              <li>{tr('• 每行對話格式：角色名: 對話內容', '• Each line of dialogue: Character name: line')}</li>
+              <li>{tr('• 貼上含角色名的劇本時，可在下方將每個角色指定為男／女', '• When you paste a script with character names, you can set each one to male/female below')}</li>
             </ul>
           </div>
 
@@ -370,7 +371,7 @@ const ScriptUploadModal = ({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label htmlFor="script-title" className="block text-sm font-medium text-gray-700 mb-2">
-                劇本標題
+                {tr('劇本標題', 'Script title')}
               </label>
               <input
                 id="script-title"
@@ -379,14 +380,14 @@ const ScriptUploadModal = ({
                 value={scriptData.title}
                 onChange={(e) => setScriptData(prev => ({ ...prev, title: e.target.value }))}
                 className="w-full px-3 py-2.5 border border-petal-rule rounded-md focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink bg-white"
-                placeholder="例如：浪漫晚餐"
+                placeholder={tr("例如：浪漫晚餐", 'e.g. Romantic dinner')}
                 required
               />
             </div>
 
             <div>
               <label htmlFor="script-category" className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
-                類別
+                {tr('類別', 'Category')}
               </label>
               <select
                 id="script-category"
@@ -396,17 +397,17 @@ const ScriptUploadModal = ({
                 className="w-full px-3 py-2.5 border border-petal-rule rounded-md focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink bg-white"
                 required
               >
-                <option value="romantic">浪漫</option>
-                <option value="adventurous">冒險</option>
-                <option value="school">校園</option>
-                <option value="bold">大膽</option>
+                <option value="romantic">{tr('浪漫', 'Romantic')}</option>
+                <option value="adventurous">{tr('冒險', 'Adventurous')}</option>
+                <option value="school">{tr('校園', 'School')}</option>
+                <option value="bold">{tr('大膽', 'Bold')}</option>
               </select>
             </div>
           </div>
 
           <div>
             <label htmlFor="script-scenario" className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
-              情境描述
+              {tr('情境描述', 'Scenario')}
             </label>
             <input
               id="script-scenario"
@@ -415,14 +416,14 @@ const ScriptUploadModal = ({
               value={scriptData.scenario}
               onChange={(e) => setScriptData(prev => ({ ...prev, scenario: e.target.value }))}
               className="w-full px-3 py-2.5 border border-petal-rule rounded-md focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink bg-white"
-              placeholder="簡短描述這個劇本的情境"
+              placeholder={tr("簡短描述這個劇本的情境", 'Briefly describe this script\'s scenario')}
               required
             />
           </div>
 
           <div>
             <label htmlFor="script-location" className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
-              場景地點（選填）
+              {tr('場景地點（選填）', 'Location (optional)')}
             </label>
             <input
               id="script-location"
@@ -434,7 +435,7 @@ const ScriptUploadModal = ({
               onChange={(e) => setScriptData(prev => ({ ...prev, location: e.target.value }))}
               data-testid="script-location-input"
               className="w-full px-3 py-2.5 border border-petal-rule rounded-md focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink bg-white"
-              placeholder="例如：教室、辦公室、飯店…（可自由輸入）"
+              placeholder={tr("例如：教室、辦公室、飯店…（可自由輸入）", 'e.g. classroom, office, hotel… (type anything)')}
             />
             <datalist id="script-location-options">
               {COMMON_LOCATIONS.map((loc) => (
@@ -445,7 +446,7 @@ const ScriptUploadModal = ({
 
           <div>
             <label htmlFor="script-gdoc-url" className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
-              從 Google 文件匯入（選填）
+              {tr('從 Google 文件匯入（選填）', 'Import from Google Docs (optional)')}
             </label>
             <div className="flex gap-2">
               <input
@@ -459,7 +460,7 @@ const ScriptUploadModal = ({
                 }}
                 data-testid="script-gdoc-url-input"
                 className="flex-1 px-3 py-2.5 border border-petal-rule rounded-md focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink bg-white"
-                placeholder="貼上 docs.google.com/document/d/… 分享連結"
+                placeholder={tr("貼上 docs.google.com/document/d/… 分享連結", 'Paste a docs.google.com/document/d/… share link')}
               />
               <button
                 type="button"
@@ -469,7 +470,7 @@ const ScriptUploadModal = ({
                 className="px-4 py-2.5 border border-petal-rule rounded-md font-body text-sm text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors disabled:opacity-50 flex items-center gap-1.5 flex-shrink-0"
               >
                 <FileDown className="w-4 h-4" strokeWidth={1.5} />
-                {gdocStatus.state === 'loading' ? '匯入中…' : '匯入'}
+                {gdocStatus.state === 'loading' ? tr('匯入中…', 'Importing…') : tr('匯入', 'Import')}
               </button>
             </div>
             {gdocStatus.state === 'error' && (
@@ -483,13 +484,13 @@ const ScriptUploadModal = ({
               </p>
             )}
             <p className="mt-1.5 font-display italic font-light text-xs text-petal-muted">
-              文件需開啟「知道連結的任何人皆可檢視」權限。
+              {tr('文件需開啟「知道連結的任何人皆可檢視」權限。', 'The document must be set to "Anyone with the link can view".')}
             </p>
           </div>
 
           <div>
             <label htmlFor="script-content" className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
-              劇本內容
+              {tr('劇本內容', 'Script content')}
             </label>
             <textarea
               id="script-content"
@@ -497,13 +498,13 @@ const ScriptUploadModal = ({
               value={scriptData.content}
               onChange={(e) => setScriptData(prev => ({ ...prev, content: e.target.value }))}
               className="w-full px-3 py-2.5 border border-petal-rule rounded-md focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink bg-white leading-relaxed"
-              placeholder="[男]: 今晚的月色真美&#10;[女]: 是啊，就像你的眼睛一樣..."
+              placeholder={tr("[男]: 今晚的月色真美\n[女]: 是啊，就像你的眼睛一樣...", '[男]: The moon is beautiful tonight\n[女]: It is, just like your eyes...')}
               rows={10}
               required
             />
             <div className={`mt-1 font-body text-[11px] text-right ${scriptData.content.length > 50000 ? 'text-red-500 font-medium' : 'text-petal-muted'}`}>
-              {scriptData.content.length.toLocaleString()} / 50,000 字
-              {scriptData.content.length > 50000 && ` · 超出 ${(scriptData.content.length - 50000).toLocaleString()} 字`}
+              {scriptData.content.length.toLocaleString()} {tr('/ 50,000 字', '/ 50,000 characters')}
+              {scriptData.content.length > 50000 && tr(` · 超出 ${(scriptData.content.length - 50000).toLocaleString()} 字`, ` · ${(scriptData.content.length - 50000).toLocaleString()} over`)}
             </div>
           </div>
 
@@ -511,7 +512,7 @@ const ScriptUploadModal = ({
             <div className="p-4 bg-petal-cream-2/40 border border-petal-rule-soft rounded-md" data-testid="speaker-assignment-panel">
               <div className="flex items-center justify-between gap-2 mb-1">
                 <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted">
-                  角色對應
+                  {tr('角色對應', 'Role mapping')}
                 </h4>
                 <button
                   type="button"
@@ -520,14 +521,14 @@ const ScriptUploadModal = ({
                   data-testid="ai-parse-roles-button"
                   className="flex items-center gap-1 px-3 py-1.5 rounded-full border border-petal-rose-deep/50 text-petal-rose-deep hover:bg-petal-rose-soft font-body text-xs transition-colors disabled:opacity-50"
                 >
-                  ✨ {aiStatus.state === 'loading' ? 'AI 辨識中…' : 'AI 智慧辨識'}
+                  ✨ {aiStatus.state === 'loading' ? tr('AI 辨識中…', 'AI detecting…') : tr('AI 智慧辨識', 'AI smart detect')}
                   <span className="px-1.5 py-0.5 rounded-full bg-petal-rose-deep text-petal-cream text-[9px] font-medium uppercase tracking-wide">
                     Premium
                   </span>
                 </button>
               </div>
               <p className="font-display italic font-light text-xs text-petal-muted mb-3 leading-relaxed">
-                偵測到以下角色。指定男／女後，劇本會依你們的性別自動帶入暱稱；「保留原名」則照原文顯示。
+                {tr('偵測到以下角色。指定男／女後，劇本會依你們的性別自動帶入暱稱；「保留原名」則照原文顯示。', 'These characters were detected. Set each to male/female and the script fills in your nicknames by gender; "Keep name" shows it as written.')}
               </p>
               {aiStatus.state === 'success' && (
                 <p className="mb-3 font-body text-xs text-petal-sage-deep" data-testid="ai-parse-roles-success">
@@ -552,7 +553,7 @@ const ScriptUploadModal = ({
                       onClick={() => onRequireUpgrade(currentDraft(), aiStatus.message)}
                       className="px-3.5 py-1.5 rounded-md bg-petal-ink text-petal-cream font-body text-xs hover:bg-pink-700 transition-colors"
                     >
-                      升級 Premium →（草稿會保留）
+                      {tr('升級 Premium →（草稿會保留）', 'Upgrade to Premium → (your draft is kept)')}
                     </button>
                   )}
                 </div>
@@ -561,9 +562,9 @@ const ScriptUploadModal = ({
                 {detectedSpeakers.map((speaker, idx) => {
                   const current = speakerAssignments[speaker] ?? 'keep';
                   const options = [
-                    { value: 'male' as const, label: '男' },
-                    { value: 'female' as const, label: '女' },
-                    { value: 'keep' as const, label: '保留原名' },
+                    { value: 'male' as const, label: tr('男', 'Male') },
+                    { value: 'female' as const, label: tr('女', 'Female') },
+                    { value: 'keep' as const, label: tr('保留原名', 'Keep name') },
                   ];
                   return (
                     <div key={speaker} className="flex items-center justify-between gap-3" data-testid={`speaker-row-${idx}`}>
@@ -594,7 +595,7 @@ const ScriptUploadModal = ({
 
           <div>
             <label htmlFor="script-tags" className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
-              標籤 (用逗號分隔)
+              {tr('標籤 (用逗號分隔)', 'Tags (comma-separated)')}
             </label>
             <input
               id="script-tags"
@@ -603,14 +604,14 @@ const ScriptUploadModal = ({
               value={scriptData.tags}
               onChange={(e) => setScriptData(prev => ({ ...prev, tags: e.target.value }))}
               className="w-full px-3 py-2.5 border border-petal-rule rounded-md focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink bg-white"
-              placeholder="浪漫, 晚餐, 月光"
+              placeholder={tr("浪漫, 晚餐, 月光", 'romantic, dinner, moonlight')}
             />
           </div>
 
           <div>
             <label htmlFor="script-thumbnail" className="block font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
-              劇本封面照片／影片（選填，最多 {MAX_SCRIPT_PHOTOS} 個，照片每張最大 {mediaLimitMb(IMAGE_MAX_BYTES)}MB、影片最大 {mediaLimitMb(VIDEO_MAX_BYTES)}MB）
-              <span className="ml-1 normal-case tracking-normal text-petal-muted/80">· 第一個為封面，可用短影片</span>
+              {tr('劇本封面照片／影片（選填，最多', 'Cover photos / videos (optional, up to ')} {MAX_SCRIPT_PHOTOS} {tr('個，照片每張最大', ', photos up to ')} {mediaLimitMb(IMAGE_MAX_BYTES)}{tr('MB、影片最大', 'MB each, videos up to ')} {mediaLimitMb(VIDEO_MAX_BYTES)}{tr('MB）', 'MB)')}
+              <span className="ml-1 normal-case tracking-normal text-petal-muted/80">{tr('· 第一個為封面，可用短影片', '· The first is the cover; a short video works too')}</span>
             </label>
             <input
               id="script-thumbnail"
@@ -637,15 +638,15 @@ const ScriptUploadModal = ({
                         <img src={url} alt={`photo ${idx + 1}`} className="w-full h-full object-cover" />
                       )}
                       {isVideo && (
-                        <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-body">影片</span>
+                        <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-body">{tr('影片', 'Video')}</span>
                       )}
                       {isCover && (
-                        <span className="absolute bottom-0 inset-x-0 bg-petal-ink/70 text-petal-cream text-[10px] text-center py-0.5">封面</span>
+                        <span className="absolute bottom-0 inset-x-0 bg-petal-ink/70 text-petal-cream text-[10px] text-center py-0.5">{tr('封面', 'Cover')}</span>
                       )}
                       <button
                         type="button"
                         onClick={() => removeExistingPhoto(idx)}
-                        aria-label="移除照片"
+                        aria-label={tr("移除照片", 'Remove photo')}
                         className="absolute top-1 right-1 w-5 h-5 inline-flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
                       >
                         <X className="w-3 h-3" strokeWidth={2} />
@@ -664,15 +665,15 @@ const ScriptUploadModal = ({
                         <img src={url} alt={existingPhotos.length === 0 && idx === 0 ? 'thumbnail preview' : `new photo ${idx + 1}`} className="w-full h-full object-cover" />
                       )}
                       {isVideo && (
-                        <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-body">影片</span>
+                        <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-body">{tr('影片', 'Video')}</span>
                       )}
                       {isCover && (
-                        <span className="absolute bottom-0 inset-x-0 bg-petal-ink/70 text-petal-cream text-[10px] text-center py-0.5">封面</span>
+                        <span className="absolute bottom-0 inset-x-0 bg-petal-ink/70 text-petal-cream text-[10px] text-center py-0.5">{tr('封面', 'Cover')}</span>
                       )}
                       <button
                         type="button"
                         onClick={() => removeNewPhoto(idx)}
-                        aria-label="移除照片"
+                        aria-label={tr("移除照片", 'Remove photo')}
                         className="absolute top-1 right-1 w-5 h-5 inline-flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
                       >
                         <X className="w-3 h-3" strokeWidth={2} />
@@ -685,8 +686,8 @@ const ScriptUploadModal = ({
 
             <p className="mt-2 font-display italic font-light text-xs text-petal-muted">
               {photoCount > 0
-                ? `已選 ${photoCount} / ${MAX_SCRIPT_PHOTOS} 個 · 影片封面會靜音循環播放，點開可看全部照片與影片`
-                : '未上傳時，會使用編輯式預設圖。第一個放影片，封面就會動起來。'}
+                ? tr(`已選 ${photoCount} / ${MAX_SCRIPT_PHOTOS} 個 · 影片封面會靜音循環播放，點開可看全部照片與影片`, `${photoCount} / ${MAX_SCRIPT_PHOTOS} selected · Video covers loop muted; tap to see all photos and videos`)
+                : tr('未上傳時，會使用編輯式預設圖。第一個放影片，封面就會動起來。', 'If you don\'t upload anything, an editorial default image is used. Put a video first and the cover comes alive.')}
             </p>
           </div>
 
@@ -701,10 +702,10 @@ const ScriptUploadModal = ({
               />
               <div className="flex-1">
                 <div className="font-body text-sm font-medium text-petal-ink">
-                  分享到創作市集
+                  {tr('分享到創作市集', 'Share to the creator marketplace')}
                 </div>
                 <p className="font-display italic font-light text-xs text-petal-muted mt-0.5 leading-relaxed">
-                  開啟後，其他使用者可以在創作市集看到、評分、收藏這個劇本。
+                  {tr('開啟後，其他使用者可以在創作市集看到、評分、收藏這個劇本。', 'When on, other users can find, rate and save this script in the creator marketplace.')}
                 </p>
               </div>
             </label>
@@ -717,31 +718,31 @@ const ScriptUploadModal = ({
                 onClick={closeAndReset}
                 className="px-5 py-3 border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink rounded-md font-body text-sm transition-colors"
               >
-                取消
+                {tr('取消', 'Cancel')}
               </button>
             )}
             <Button
               type="submit"
               loading={submittingScript}
-              loadingText={isEditMode ? '保存中…' : '上傳中…'}
+              loadingText={isEditMode ? tr('保存中…', 'Saving…') : tr('上傳中…', 'Uploading…')}
               data-testid="script-upload-submit-button"
               className="flex-1 py-3 text-base"
             >
-              {isEditMode ? '保存修改 →' : '上傳劇本 (+200 金幣)'}
+              {isEditMode ? tr('保存修改 →', 'Save changes →') : tr('上傳劇本 (+200 金幣)', 'Upload script (+200 coins)')}
             </Button>
           </div>
           {isEditMode && editingScript && (
             <div className="pt-3 mt-2 border-t border-petal-rule">
               {confirmingDelete ? (
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-body text-sm text-red-700">確定要刪除這個劇本嗎？此動作無法復原。</span>
+                  <span className="font-body text-sm text-red-700">{tr('確定要刪除這個劇本嗎？此動作無法復原。', 'Delete this script? This can\'t be undone.')}</span>
                   <div className="flex gap-2 flex-shrink-0">
                     <button
                       type="button"
                       onClick={() => setConfirmingDelete(false)}
                       className="px-4 py-2 border border-petal-rule text-petal-ink-soft rounded-md font-body text-sm hover:border-petal-ink transition-colors"
                     >
-                      取消
+                      {tr('取消', 'Cancel')}
                     </button>
                     <button
                       type="button"
@@ -749,7 +750,7 @@ const ScriptUploadModal = ({
                       onClick={() => onDeleteScript(editingScript.id)}
                       className="px-4 py-2 bg-red-600 text-white rounded-md font-body text-sm hover:bg-red-700 transition-colors"
                     >
-                      確認刪除
+                      {tr('確認刪除', 'Confirm delete')}
                     </button>
                   </div>
                 </div>
@@ -761,7 +762,7 @@ const ScriptUploadModal = ({
                   className="flex items-center gap-1.5 text-red-600 hover:text-red-700 font-body text-sm transition-colors"
                 >
                   <Trash2 className="w-4 h-4" strokeWidth={1.5} />
-                  刪除這個劇本
+                  {tr('刪除這個劇本', 'Delete this script')}
                 </button>
               )}
             </div>

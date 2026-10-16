@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { ArrowLeft, ArrowRight, Send, Loader2, Lightbulb, ShieldCheck, Tag, CheckCircle2, Sparkles } from 'lucide-react';
 import { apiService, type StorySections, type StoryInsight } from '../services/api';
+import { tr } from '../i18n/tr';
 
 // Guided story template (docs/UX_PLAYBOOK — story archive): one template
 // section per step so authors are never staring at a blank page. Publishes
@@ -16,39 +17,39 @@ interface NotificationInput {
 const SECTION_STEPS: { key: keyof StorySections; label: string; prompt: string; placeholder: string }[] = [
   {
     key: 'context',
-    label: '背景',
-    prompt: '你們是什麼樣的關係？這件事發生前的狀態是？',
-    placeholder: '例如：我們交往三年，平常都約在車站碰面一起回家⋯',
+    label: tr('背景', 'Background'),
+    prompt: tr('你們是什麼樣的關係？這件事發生前的狀態是？', 'What\'s your relationship like? How were things before this happened?'),
+    placeholder: tr('例如：我們交往三年，平常都約在車站碰面一起回家⋯', 'e.g. We\'ve been together three years and usually meet at the station to go home together…'),
   },
   {
     key: 'happened',
-    label: '發生了什麼',
-    prompt: '具體發生了什麼事？當時彼此說了什麼話、做了什麼？',
-    placeholder: '例如：那天他遲到四十分鐘，見面第一句話是「你怎麼又在生氣」⋯',
+    label: tr('發生了什麼', 'What happened'),
+    prompt: tr('具體發生了什麼事？當時彼此說了什麼話、做了什麼？', 'What exactly happened? What did you each say and do?'),
+    placeholder: tr('例如：那天他遲到四十分鐘，見面第一句話是「你怎麼又在生氣」⋯', 'e.g. That day he was forty minutes late, and the first thing he said was "why are you upset again"…'),
   },
   {
     key: 'impact',
-    label: '情緒衝擊',
-    prompt: '這件事讓你（們）有什麼感受？',
-    placeholder: '例如：我覺得自己被當成無理取鬧的人，非常受傷也很委屈⋯',
+    label: tr('情緒衝擊', 'Emotional impact'),
+    prompt: tr('這件事讓你（們）有什麼感受？', 'How did this make you (both) feel?'),
+    placeholder: tr('例如：我覺得自己被當成無理取鬧的人，非常受傷也很委屈⋯', 'e.g. I felt like I was being treated as unreasonable. It really hurt and felt unfair…'),
   },
   {
     key: 'tried',
-    label: '我們試過什麼',
-    prompt: '你們嘗試過哪些方法？哪些沒用、哪些有點用？',
-    placeholder: '例如：一開始我們冷戰了兩天，誰都不想先開口，越拖越僵⋯',
+    label: tr('我們試過什麼', 'What we tried'),
+    prompt: tr('你們嘗試過哪些方法？哪些沒用、哪些有點用？', 'What did you try? What didn\'t work, and what helped a little?'),
+    placeholder: tr('例如：一開始我們冷戰了兩天，誰都不想先開口，越拖越僵⋯', 'e.g. At first we gave each other the silent treatment for two days. Neither wanted to speak first, and it got worse…'),
   },
   {
     key: 'repair',
-    label: '轉捩點與修復',
-    prompt: '真正有效的那一步是什麼？誰做了什麼讓事情開始好轉？',
-    placeholder: '例如：後來他先傳了一句「我知道讓你等很久，你當時一定很難受」⋯',
+    label: tr('轉捩點與修復', 'Turning point & repair'),
+    prompt: tr('真正有效的那一步是什麼？誰做了什麼讓事情開始好轉？', 'What step actually worked? Who did what that started to turn things around?'),
+    placeholder: tr('例如：後來他先傳了一句「我知道讓你等很久，你當時一定很難受」⋯', 'e.g. Then he texted first: "I know I made you wait a long time. You must have felt awful"…'),
   },
   {
     key: 'now',
-    label: '現在的我們',
-    prompt: '現在你們的狀態如何？這件事教會你們什麼？',
-    placeholder: '例如：現在我們約好遲到先講、見面先抱。學到先接住情緒再解釋⋯',
+    label: tr('現在的我們', 'Where we are now'),
+    prompt: tr('現在你們的狀態如何？這件事教會你們什麼？', 'How are you now? What did this teach you?'),
+    placeholder: tr('例如：現在我們約好遲到先講、見面先抱。學到先接住情緒再解釋⋯', 'e.g. Now we agree to say so first if we\'re late, and hug first when we meet. We learned to hold feelings before explaining…'),
   },
 ];
 
@@ -89,7 +90,7 @@ export default function StoryComposeFlow({
   const runStructure = async () => {
     const raw = freeText.trim();
     if (raw.length < 30) {
-      setError('請先寫下你的故事（至少 30 字），AI 才能幫你分段');
+      setError(tr('請先寫下你的故事（至少 30 字），AI 才能幫你分段', 'Please write your story first (at least 30 characters) so the AI can split it into sections'));
       return;
     }
     setError(null);
@@ -103,11 +104,11 @@ export default function StoryComposeFlow({
       if (e.error_code === 'AI_DAILY_LIMIT_REACHED') {
         showNotification({
           type: 'warning',
-          title: '今日 AI 次數已用完',
-          message: '明天會自動補上；你也可以改用「跟著步驟寫」自己分段。',
+          title: tr('今日 AI 次數已用完', 'Today\'s AI credits are used up'),
+          message: tr('明天會自動補上；你也可以改用「跟著步驟寫」自己分段。', 'They refill tomorrow. You can also switch to "Write step by step" and split it yourself.'),
         });
       } else {
-        setError(e.message || 'AI 分段失敗，請稍後再試，或改用逐步填寫');
+        setError(e.message || tr('AI 分段失敗，請稍後再試，或改用逐步填寫', 'The AI couldn\'t split it into sections. Please try again in a moment, or write step by step'));
       }
     } finally {
       setStructuring(false);
@@ -117,7 +118,7 @@ export default function StoryComposeFlow({
   const reviewToMeta = () => {
     for (const s of SECTION_STEPS) {
       if (sections[s.key].trim().length < 10) {
-        setError(`「${s.label}」至少需要 10 個字，補一點細節再繼續`);
+        setError(tr(`「${s.label}」至少需要 10 個字，補一點細節再繼續`, `"${s.label}" needs at least 10 characters. Add a bit more detail to continue`));
         return;
       }
     }
@@ -130,7 +131,7 @@ export default function StoryComposeFlow({
     const s = SECTION_STEPS[stepIndex];
     const val = sections[s.key].trim();
     if (val.length < 10) {
-      setError(`「${s.label}」至少需要 10 個字，寫下一點細節能幫助其他伴侶理解`);
+      setError(tr(`「${s.label}」至少需要 10 個字，寫下一點細節能幫助其他伴侶理解`, `"${s.label}" needs at least 10 characters. A few details help other couples understand`));
       return;
     }
     setError(null);
@@ -141,7 +142,7 @@ export default function StoryComposeFlow({
   const submit = async () => {
     const t = title.trim();
     if (t.length < 4) {
-      setError('標題至少需要 4 個字');
+      setError(tr('標題至少需要 4 個字', 'The title needs at least 4 characters'));
       return;
     }
     // Synchronous lock closes the double-click window that `step`-based
@@ -163,10 +164,10 @@ export default function StoryComposeFlow({
         aiSkipped: res.aiSkipped,
       });
       setStep('done');
-      showNotification({ type: 'success', title: '故事已發表', message: '謝謝你把這段經歷變成別人的地圖' });
+      showNotification({ type: 'success', title: tr('故事已發表', 'Story published'), message: tr('謝謝你把這段經歷變成別人的地圖', 'Thank you for turning your experience into a map for others') });
     } catch (err) {
       const e = err as { message?: string; error_code?: string; section?: string };
-      setError(e.message || '發表失敗，請稍後再試');
+      setError(e.message || tr('發表失敗，請稍後再試', 'Couldn\'t publish. Please try again in a moment'));
       // Jump back to the offending section when the server names one.
       const idx = SECTION_STEPS.findIndex((s) => s.key === (e as { section?: string }).section);
       setStep(idx >= 0 ? idx : 'meta');
@@ -181,10 +182,9 @@ export default function StoryComposeFlow({
         <div className="bg-petal-sage/10 border border-petal-sage rounded-2xl p-4 flex gap-3 items-start">
           <ShieldCheck className="w-5 h-5 text-petal-sage-deep flex-shrink-0 mt-0.5" />
           <div className="text-sm text-petal-ink-soft leading-relaxed">
-            <p>把你們最難的時刻，變成幫助其他伴侶的智慧。依照 6 個引導步驟寫下這段經歷，發表後所有人都能閱讀。</p>
+            <p>{tr('把你們最難的時刻，變成幫助其他伴侶的智慧。依照 6 個引導步驟寫下這段經歷，發表後所有人都能閱讀。', 'Turn your hardest moments into wisdom for other couples. Write it in 6 guided steps; once published, anyone can read it.')}</p>
             <p className="mt-1.5">
-              將以<strong className="text-petal-ink">{showNickname ? '你的暱稱' : '匿名'}</strong>發表
-              （可在「設定」的公開分享選項調整）。
+              {tr('將以', 'It will be published as ')}<strong className="text-petal-ink">{showNickname ? tr('你的暱稱', 'your nickname') : tr('匿名', 'anonymous')}</strong>{tr('發表 （可在「設定」的公開分享選項調整）。', ' (you can change this in Settings under public sharing).')}
             </p>
           </div>
         </div>
@@ -197,10 +197,10 @@ export default function StoryComposeFlow({
             className="w-full text-left rounded-2xl border border-petal-rule bg-white hover:border-petal-rose p-4 transition"
           >
             <div className="flex items-center justify-between">
-              <span className="font-medium text-petal-ink">跟著步驟寫</span>
+              <span className="font-medium text-petal-ink">{tr('跟著步驟寫', 'Write step by step')}</span>
               <ArrowRight className="w-4 h-4 text-petal-muted" />
             </div>
-            <p className="text-xs text-petal-ink-soft mt-1">一步一個問題引導你，適合想被帶著寫的人。共 6 段：{SECTION_STEPS.map((s) => s.label).join('、')}。</p>
+            <p className="text-xs text-petal-ink-soft mt-1">{tr('一步一個問題引導你，適合想被帶著寫的人。共 6 段：', 'One question per step guides you, for those who\'d like to be led. 6 sections: ')}{SECTION_STEPS.map((s) => s.label).join(tr('、', ', '))}{tr('。', '.')}</p>
           </button>
           <button
             type="button"
@@ -211,11 +211,11 @@ export default function StoryComposeFlow({
             <div className="flex items-center justify-between">
               <span className="font-medium text-petal-ink inline-flex items-center gap-1.5">
                 <Sparkles className="w-4 h-4 text-petal-rose-deep" />
-                一次寫完，AI 幫你分段
+                {tr('一次寫完，AI 幫你分段', 'Write it all at once, AI splits it')}
               </span>
               <ArrowRight className="w-4 h-4 text-petal-muted" />
             </div>
-            <p className="text-xs text-petal-ink-soft mt-1">把整個故事一次打完或貼上，AI 會幫你分成 6 段，你再確認、修改即可。</p>
+            <p className="text-xs text-petal-ink-soft mt-1">{tr('把整個故事一次打完或貼上，AI 會幫你分成 6 段，你再確認、修改即可。', 'Type or paste the whole story at once, and the AI splits it into 6 sections for you to check and edit.')}</p>
           </button>
         </div>
         <div className="flex justify-start">
@@ -225,7 +225,7 @@ export default function StoryComposeFlow({
             className="px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
-            返回
+            {tr('返回', 'Back')}
           </button>
         </div>
       </div>
@@ -236,15 +236,15 @@ export default function StoryComposeFlow({
     return (
       <div className="space-y-4" data-testid="story-compose-freeform">
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-5">
-          <h3 className="text-lg font-serif text-petal-ink mb-1">一次寫完你的故事</h3>
+          <h3 className="text-lg font-serif text-petal-ink mb-1">{tr('一次寫完你的故事', 'Write your story all at once')}</h3>
           <p className="text-sm text-petal-ink-soft mb-3">
-            不用管順序，把發生的事、當時的感受、你們怎麼走過來，一次寫完或貼上。AI 會幫你分成 6 段，你再確認修改。
+            {tr('不用管順序，把發生的事、當時的感受、你們怎麼走過來，一次寫完或貼上。AI 會幫你分成 6 段，你再確認修改。', 'Don\'t worry about order. Write or paste what happened, how you felt and how you got through it. The AI splits it into 6 sections for you to check and edit.')}
           </p>
           <textarea
             data-testid="story-freeform-input"
             value={freeText}
             onChange={(e) => setFreeText(e.target.value)}
-            placeholder="例如：我們交往三年，那天他遲到四十分鐘還先怪我生氣，我覺得很受傷，冷戰了兩天，後來他先傳訊息說知道讓我等很久⋯現在我們約好遲到先講、見面先抱。"
+            placeholder={tr("例如：我們交往三年，那天他遲到四十分鐘還先怪我生氣，我覺得很受傷，冷戰了兩天，後來他先傳訊息說知道讓我等很久⋯現在我們約好遲到先講、見面先抱。", 'e.g. We\'ve been together three years. That day he was forty minutes late and blamed me for being upset. I was hurt and we didn\'t talk for two days. Then he texted first to say he knew I\'d waited a long time… Now we agree to say so first if we\'re late, and hug first when we meet.')}
             rows={10}
             maxLength={6000}
             className="w-full p-3 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y"
@@ -262,7 +262,7 @@ export default function StoryComposeFlow({
             className="px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2 disabled:opacity-50"
           >
             <ArrowLeft className="w-4 h-4" />
-            返回
+            {tr('返回', 'Back')}
           </button>
           <button
             type="button"
@@ -272,7 +272,7 @@ export default function StoryComposeFlow({
             className="px-5 py-2 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2 disabled:opacity-50"
           >
             {structuring ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-            AI 幫我分段
+            {tr('AI 幫我分段', 'Let AI split it')}
           </button>
         </div>
       </div>
@@ -285,7 +285,7 @@ export default function StoryComposeFlow({
         <div className="bg-petal-sage/10 border border-petal-sage rounded-2xl p-4 flex gap-3 items-start">
           <Sparkles className="w-5 h-5 text-petal-sage-deep flex-shrink-0 mt-0.5" />
           <p className="text-sm text-petal-ink-soft leading-relaxed">
-            AI 幫你分好 6 段了，讀一遍、有需要就直接改。每段至少 10 個字。
+            {tr('AI 幫你分好 6 段了，讀一遍、有需要就直接改。每段至少 10 個字。', 'The AI split it into 6 sections. Read it through and edit anything you like. Each section needs at least 10 characters.')}
           </p>
         </div>
         {SECTION_STEPS.map((s) => (
@@ -308,7 +308,7 @@ export default function StoryComposeFlow({
             className="px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
-            重寫
+            {tr('重寫', 'Rewrite')}
           </button>
           <button
             type="button"
@@ -316,7 +316,7 @@ export default function StoryComposeFlow({
             onClick={reviewToMeta}
             className="px-5 py-2 rounded-full bg-petal-ink text-petal-cream font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2"
           >
-            下一步
+            {tr('下一步', 'Next')}
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -328,7 +328,7 @@ export default function StoryComposeFlow({
     const s = SECTION_STEPS[step];
     return (
       <div className="space-y-4" data-testid={`story-compose-section-${s.key}`}>
-        <div className="text-xs text-petal-muted">第 {step + 1} / {SECTION_STEPS.length} 步</div>
+        <div className="text-xs text-petal-muted">{tr('第', 'Step ')} {step + 1} / {SECTION_STEPS.length} {tr('步', '')}</div>
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-5">
           <h3 className="text-lg font-serif text-petal-ink mb-1">{s.label}</h3>
           <p className="text-sm text-petal-ink-soft mb-3">{s.prompt}</p>
@@ -353,7 +353,7 @@ export default function StoryComposeFlow({
             className="px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
-            上一步
+            {tr('上一步', 'Previous')}
           </button>
           <button
             type="button"
@@ -361,7 +361,7 @@ export default function StoryComposeFlow({
             onClick={nextFromSection}
             className="px-5 py-2 rounded-full bg-petal-ink text-petal-cream font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2"
           >
-            下一步
+            {tr('下一步', 'Next')}
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -374,12 +374,12 @@ export default function StoryComposeFlow({
       <div className="space-y-4" data-testid="story-compose-meta">
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-5 space-y-4">
           <div>
-            <label className="block text-sm text-petal-ink mb-1.5">給這則故事一個標題</label>
+            <label className="block text-sm text-petal-ink mb-1.5">{tr('給這則故事一個標題', 'Give your story a title')}</label>
             <input
               data-testid="story-title-input"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="例如：車站接送吵架後的修復"
+              placeholder={tr("例如：車站接送吵架後的修復", 'e.g. Making up after a fight over a station pickup')}
               maxLength={120}
               className="w-full p-3 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep"
             />
@@ -387,13 +387,13 @@ export default function StoryComposeFlow({
           <div>
             <label className="text-sm text-petal-ink mb-1.5 inline-flex items-center gap-1.5">
               <Tag className="w-4 h-4 text-petal-muted" />
-              標籤（最多 5 個，以空格或逗號分隔，可留空）
+              {tr('標籤（最多 5 個，以空格或逗號分隔，可留空）', 'Tags (up to 5, separated by spaces or commas, optional)')}
             </label>
             <input
               data-testid="story-tags-input"
               value={tagsInput}
               onChange={(e) => setTagsInput(e.target.value)}
-              placeholder="例如：溝通 遲到 冷戰"
+              placeholder={tr("例如：溝通 遲到 冷戰", 'e.g. communication lateness silence')}
               className="w-full p-3 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep"
             />
           </div>
@@ -407,7 +407,7 @@ export default function StoryComposeFlow({
             className="px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2 disabled:opacity-50"
           >
             <ArrowLeft className="w-4 h-4" />
-            上一步
+            {tr('上一步', 'Previous')}
           </button>
           <button
             type="button"
@@ -417,7 +417,7 @@ export default function StoryComposeFlow({
             className="px-5 py-2 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2 disabled:opacity-50"
           >
             {step === 'submitting' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            發表故事
+            {tr('發表故事', 'Publish story')}
           </button>
         </div>
       </div>
@@ -429,9 +429,9 @@ export default function StoryComposeFlow({
     <div className="space-y-4" data-testid="story-compose-done">
       <div className="bg-petal-sage/15 border border-petal-sage/40 rounded-2xl p-5 text-center">
         <CheckCircle2 className="w-8 h-8 mx-auto mb-2 text-petal-sage-deep" />
-        <p className="text-petal-ink font-medium">故事已發表，謝謝你</p>
+        <p className="text-petal-ink font-medium">{tr('故事已發表，謝謝你', 'Story published, thank you')}</p>
         <p className="text-xs text-petal-ink-soft mt-1">
-          它現在會出現在智慧故事庫中，幫助遇到類似狀況的伴侶。
+          {tr('它現在會出現在智慧故事庫中，幫助遇到類似狀況的伴侶。', 'It now appears in the story library to help couples in similar situations.')}
         </p>
       </div>
 
@@ -439,7 +439,7 @@ export default function StoryComposeFlow({
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-5" data-testid="story-ai-insights">
           <div className="flex items-center gap-2 mb-3 text-petal-rose-deep">
             <Lightbulb className="w-5 h-5" />
-            <h3 className="text-base font-serif text-petal-ink">AI 幫你把故事整理成 3 個重點</h3>
+            <h3 className="text-base font-serif text-petal-ink">{tr('AI 幫你把故事整理成 3 個重點', 'The AI summarized your story into 3 key points')}</h3>
           </div>
           <div className="space-y-3">
             {result.insights.map((i) => (
@@ -452,7 +452,7 @@ export default function StoryComposeFlow({
         </div>
       ) : result?.aiSkipped ? (
         <div className="bg-petal-cream-2 border border-petal-rule rounded-2xl p-4 text-sm text-petal-ink-soft" data-testid="story-ai-skipped">
-          今天的 AI 額度已用完，故事已正常發表；AI 洞察未產生（明天會自動補上額度，升級 Premium 可提高每日上限）。
+          {tr('今天的 AI 額度已用完，故事已正常發表；AI 洞察未產生（明天會自動補上額度，升級 Premium 可提高每日上限）。', 'Today\'s AI credits are used up. Your story was published normally, but AI insights weren\'t generated (credits refill tomorrow, and Premium raises the daily limit).')}
         </div>
       ) : null}
 
@@ -463,7 +463,7 @@ export default function StoryComposeFlow({
           onClick={() => result && onDone(result.id)}
           className="px-5 py-2 rounded-full bg-petal-ink text-petal-cream font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition"
         >
-          查看發表的故事
+          {tr('查看發表的故事', 'View your published story')}
         </button>
       </div>
     </div>

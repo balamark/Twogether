@@ -12,6 +12,7 @@ import { Button } from './ui/Button';
 import MomentResponseBar from './MomentResponseBar';
 import type { CycleRecord, MomentReactionKey } from '../services/api';
 import type { IntimateRecord, AuthState, Notification } from '../App';
+import { tr, isEnglish } from '../i18n/tr';
 
 // Image compression helper — pure, canvas-based. Co-located here since the
 // calendar record form is its only caller.
@@ -70,7 +71,9 @@ const toChineseNum = (n: number): string => {
 const chineseYear = (y: number): string =>
   y.toString().split('').map(c => '〇一二三四五六七八九'[parseInt(c, 10)]).join('');
 const formatChineseDate = (d: Date): string =>
-  `${chineseYear(d.getFullYear())}年${toChineseNum(d.getMonth() + 1)}月${toChineseNum(d.getDate())}日`;
+  isEnglish()
+    ? d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    : `${chineseYear(d.getFullYear())}年${toChineseNum(d.getMonth() + 1)}月${toChineseNum(d.getDate())}日`;
 
 interface CalendarViewProps {
   selectedDate: string;
@@ -291,11 +294,11 @@ const CalendarView = ({
     try {
       await apiService.deleteCycleRecord(periodDayRecord.id);
       setCycleRecords(prev => prev.filter(r => r.id !== periodDayRecord.id));
-      showNotification({ type: 'success', title: '已取消', message: '月經紀錄已移除', duration: 3000 });
+      showNotification({ type: 'success', title: tr('已取消', 'Removed'), message: tr('月經紀錄已移除', 'The period record was removed'), duration: 3000 });
       setPeriodDayRecord(null);
       setPeriodDayDate(null);
     } catch (error: unknown) {
-      showNotification({ type: 'error', title: '移除失敗', message: (error as Error)?.message || '無法移除月經紀錄，請稍後再試', duration: 5000 });
+      showNotification({ type: 'error', title: tr('移除失敗', 'Couldn\'t remove'), message: (error as Error)?.message || tr('無法移除月經紀錄，請稍後再試', 'Couldn\'t remove the period record. Please try again in a moment'), duration: 5000 });
     } finally {
       setDeletingPeriod(false);
     }
@@ -312,8 +315,8 @@ const CalendarView = ({
       console.error('Failed to upload photo:', err);
       showNotification({
         type: 'error',
-        title: '照片上傳失敗',
-        message: '請稍後再試',
+        title: tr('照片上傳失敗', 'Photo upload failed'),
+        message: tr('請稍後再試', 'Please try again in a moment'),
         duration: 3000
       });
     }
@@ -321,7 +324,7 @@ const CalendarView = ({
 
   const handleSubmitRecord = async () => {
     if (!recordForm.date) {
-      showNotification({ type: 'error', title: '驗證錯誤', message: '請選擇日期', duration: 6000 });
+      showNotification({ type: 'error', title: tr('驗證錯誤', 'Check your input'), message: tr('請選擇日期', 'Please choose a date'), duration: 6000 });
       return;
     }
 
@@ -335,9 +338,9 @@ const CalendarView = ({
           notes: recordForm.notes || undefined,
         });
         setCycleRecords(prev => [created, ...prev]);
-        showNotification({ type: 'success', title: '已儲存', message: '週期紀錄已新增', duration: 3000 });
+        showNotification({ type: 'success', title: tr('已儲存', 'Saved'), message: tr('週期紀錄已新增', 'Cycle record added'), duration: 3000 });
       } catch (error: unknown) {
-        showNotification({ type: 'error', title: '建立失敗', message: (error as Error)?.message || '無法建立週期紀錄', duration: 5000 });
+        showNotification({ type: 'error', title: tr('建立失敗', 'Couldn\'t create'), message: (error as Error)?.message || tr('無法建立週期紀錄', 'Couldn\'t create the cycle record'), duration: 5000 });
         return;
       }
       setShowRecordModal(false);
@@ -348,7 +351,7 @@ const CalendarView = ({
     }
 
     if (!recordForm.time) {
-      showNotification({ type: 'error', title: '驗證錯誤', message: '請選擇時間', duration: 6000 });
+      showNotification({ type: 'error', title: tr('驗證錯誤', 'Check your input'), message: tr('請選擇時間', 'Please choose a time'), duration: 6000 });
       return;
     }
 
@@ -378,7 +381,7 @@ const CalendarView = ({
               updates.photoId = up.id;
             } catch (photoErr) {
               console.error('Photo upload failed:', photoErr);
-              showNotification({ type: 'warning', title: '照片上傳失敗', message: '記錄已更新，但照片未能上傳，請稍後再試。', duration: 6000 });
+              showNotification({ type: 'warning', title: tr('照片上傳失敗', 'Photo upload failed'), message: tr('記錄已更新，但照片未能上傳，請稍後再試。', 'The record was updated, but the photo couldn\'t be uploaded. Please try again in a moment.'), duration: 6000 });
             }
           } else if (recordForm.photo === '') {
             updates.photo = '';
@@ -390,10 +393,10 @@ const CalendarView = ({
         setIntimateRecords(prev => prev.map(r =>
           r.id === editingRecord.id ? { ...r, ...updates } : r
         ));
-        showNotification({ type: 'success', title: '已更新', message: '記錄已成功更新', duration: 3000 });
+        showNotification({ type: 'success', title: tr('已更新', 'Updated'), message: tr('記錄已成功更新', 'Record updated'), duration: 3000 });
       } catch (error: unknown) {
         console.error('Error updating record:', error);
-        showNotification({ type: 'error', title: '更新失敗', message: (error as Error)?.message || '無法更新記錄', duration: 5000 });
+        showNotification({ type: 'error', title: tr('更新失敗', 'Couldn\'t update'), message: (error as Error)?.message || tr('無法更新記錄', 'Couldn\'t update the record'), duration: 5000 });
         return;
       }
     } else {
@@ -435,16 +438,16 @@ const CalendarView = ({
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
           <div>
             <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-              — A · 記錄
+              {tr('— A · 記錄', '— A · Records')}
             </div>
             <div className="flex items-center gap-2">
               <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05]">
-                記錄<em className="not-italic font-light italic text-pink-600">時光</em>
+                {tr('記錄', 'Record')}<em className="not-italic font-light italic text-pink-600">{tr('時光', ' moments')}</em>
               </h2>
               <InfoHint viewId="record" />
             </div>
             <p className="mt-3 font-body text-sm text-petal-muted leading-relaxed max-w-md">
-              記下親密時光與心情，月曆會看見你們的節奏。
+              {tr('記下親密時光與心情，月曆會看見你們的節奏。', 'Record intimate moments and moods, and the calendar shows your rhythm.')}
             </p>
           </div>
           <div className="text-left md:text-right font-body text-sm text-petal-muted leading-relaxed">
@@ -453,10 +456,10 @@ const CalendarView = ({
                 <strong className="block text-petal-ink font-display font-semibold text-base tracking-tight mb-0.5">
                   {daysTogether} days together
                 </strong>
-                自{formatChineseDate(togetherSince)}
+                {tr('自', 'since ')}{formatChineseDate(togetherSince)}
               </>
             ) : (
-              <span className="font-display italic">— 開始你們的旅程 —</span>
+              <span className="font-display italic">{tr('— 開始你們的旅程 —', '— Begin your journey —')}</span>
             )}
           </div>
         </div>
@@ -472,15 +475,15 @@ const CalendarView = ({
           <div>
             <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink">
               {viewMode === 'calendar' ? (
-                <>你們的<em className="not-italic font-light italic text-pink-600">節奏</em></>
+                <>{tr('你們的', 'Your ')}<em className="not-italic font-light italic text-pink-600">{tr('節奏', 'rhythm')}</em></>
               ) : (
-                <>親密<em className="not-italic font-light italic text-pink-600">記錄</em></>
+                <>{tr('親密', 'Intimacy')}<em className="not-italic font-light italic text-pink-600">{tr('記錄', ' records')}</em></>
               )}
             </h3>
             <p className="mt-1 font-body text-sm text-petal-muted">
               {viewMode === 'calendar'
-                ? '點月曆任一天新增或查看紀錄'
-                : `一起走過的每一天，共 ${intimateRecords.length} 次`}
+                ? tr('點月曆任一天新增或查看紀錄', 'Tap any day on the calendar to add or view a record')
+                : tr(`一起走過的每一天，共 ${intimateRecords.length} 次`, `Every day you've shared, ${intimateRecords.length} times in all`)}
             </p>
           </div>
           <button
@@ -488,11 +491,11 @@ const CalendarView = ({
             onClick={() => openAddModalForDate(todayYmd())}
             className="self-start sm:self-auto inline-flex items-center gap-1.5 px-5 py-2.5 bg-petal-ink text-petal-cream rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
           >
-            <span className="text-lg leading-none">＋</span> 記錄今天
+            <span className="text-lg leading-none">{tr('＋', '+')}</span> {tr('記錄今天', 'Record today')}
           </button>
         </div>
 
-        <div className="inline-flex rounded-full border border-petal-rule overflow-hidden mb-5" role="tablist" aria-label="檢視方式">
+        <div className="inline-flex rounded-full border border-petal-rule overflow-hidden mb-5" role="tablist" aria-label={tr("檢視方式", 'View')}>
           <button
             type="button"
             role="tab"
@@ -503,7 +506,7 @@ const CalendarView = ({
               viewMode === 'calendar' ? 'bg-petal-ink text-petal-cream' : 'bg-transparent text-petal-ink-soft hover:text-petal-ink'
             }`}
           >
-            <LayoutGrid className="w-3.5 h-3.5" strokeWidth={1.5} /> 月曆
+            <LayoutGrid className="w-3.5 h-3.5" strokeWidth={1.5} /> {tr('月曆', 'Calendar')}
           </button>
           <button
             type="button"
@@ -515,7 +518,7 @@ const CalendarView = ({
               viewMode === 'timeline' ? 'bg-petal-ink text-petal-cream' : 'bg-transparent text-petal-ink-soft hover:text-petal-ink'
             }`}
           >
-            <ListTree className="w-3.5 h-3.5" strokeWidth={1.5} /> 時間軸
+            <ListTree className="w-3.5 h-3.5" strokeWidth={1.5} /> {tr('時間軸', 'Timeline')}
           </button>
         </div>
 
@@ -592,7 +595,7 @@ const CalendarView = ({
                       {record.date} · {record.time}
                       {gapDays !== null && (
                         <span className="text-petal-rose-deep" data-testid="intimacy-gap-days">
-                          {' '}· 距上次相隔 {gapDays} 天
+                          {' '}{tr('· 距上次相隔', '·  ')} {gapDays} {tr('天', ' days since the last')}
                         </span>
                       )}
                     </div>
@@ -629,7 +632,7 @@ const CalendarView = ({
                     {record.photo && (
                       <img
                         src={record.photo}
-                        alt="記憶照片"
+                        alt={tr("記憶照片", 'Memory photo')}
                         className="mt-3 w-24 h-24 rounded-md object-contain bg-petal-cream-2 border border-petal-rule"
                       />
                     )}
@@ -659,10 +662,10 @@ const CalendarView = ({
               }) : (
                 <div className="border border-dashed border-petal-rule rounded-md py-10 px-6 text-center" data-testid="records-empty-state">
                   <p className="font-display italic font-light text-base text-petal-muted">
-                    還沒有記錄：留下的每一筆，之後都是你們的回憶
+                    {tr('還沒有記錄：留下的每一筆，之後都是你們的回憶', 'No records yet. Every one you leave becomes a memory later')}
                   </p>
                   <p className="text-xs text-petal-ink-soft mt-2 leading-relaxed max-w-xs mx-auto">
-                    記下親密時光與心情，月曆會看見你們的節奏；太久沒互動時，也會溫柔提醒彼此多關心。
+                    {tr('記下親密時光與心情，月曆會看見你們的節奏；太久沒互動時，也會溫柔提醒彼此多關心。', 'Record intimate moments and moods, and the calendar shows your rhythm. If it\'s been a while, it gently reminds you both to check in.')}
                   </p>
                   <button
                     type="button"
@@ -670,7 +673,7 @@ const CalendarView = ({
                     onClick={() => setShowRecordModal(true)}
                     className="mt-4 px-4 py-2 rounded-full bg-petal-rose-deep text-white text-sm font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition"
                   >
-                    ＋ 記下第一筆時光
+                    {tr('＋ 記下第一筆時光', '+ Record your first moment')}
                   </button>
                 </div>
               );
@@ -698,10 +701,10 @@ const CalendarView = ({
               <div className="flex justify-between items-end mb-5 pb-4 border-b border-petal-rule">
                 <div>
                   <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
-                    — {editingRecord ? '編輯記錄' : '新的記錄'}
+                    — {editingRecord ? tr('編輯記錄', 'Edit record') : tr('新的記錄', 'New record')}
                   </div>
                   <h3 data-testid="record-modal-heading" className="font-display text-3xl font-light tracking-tight text-petal-ink">
-                    {editingRecord ? '編輯' : '記錄'}<em className="not-italic font-light italic text-pink-600">{recordType === 'period' ? '月經' : '親密時光'}</em>
+                    {editingRecord ? tr('編輯', 'Edit ') : tr('記錄', 'Record ')}<em className="not-italic font-light italic text-pink-600">{recordType === 'period' ? tr('月經', 'period') : tr('親密時光', 'intimate moment')}</em>
                   </h3>
                 </div>
                 <button
@@ -717,20 +720,20 @@ const CalendarView = ({
                 {/* Event type — only when cycle tracking is opted in and creating a new record */}
                 {cycleEnabled && !editingRecord && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">事件類型</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{tr('事件類型', 'Type')}</label>
                     <div className="inline-flex rounded-md border border-petal-rule overflow-hidden" role="tablist">
                       <button
                         type="button"
                         data-testid="record-type-intimacy"
                         onClick={() => setRecordType('intimacy')}
                         className={`px-4 py-2 text-sm font-display italic transition-colors ${recordType === 'intimacy' ? 'bg-petal-ink text-petal-cream' : 'bg-white text-petal-ink hover:bg-petal-cream-2'}`}
-                      >親密時光</button>
+                      >{tr('親密時光', 'Intimate moment')}</button>
                       <button
                         type="button"
                         data-testid="record-type-period"
                         onClick={() => setRecordType('period')}
                         className={`px-4 py-2 text-sm font-display italic transition-colors border-l border-petal-rule ${recordType === 'period' ? 'bg-red-500 text-white' : 'bg-white text-petal-ink hover:bg-petal-cream-2'}`}
-                      >月經</button>
+                      >{tr('月經', 'Period')}</button>
                     </div>
                   </div>
                 )}
@@ -738,7 +741,7 @@ const CalendarView = ({
                 {/* Basic Info */}
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">{recordType === 'period' ? '週期開始日' : '日期選擇'}</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">{recordType === 'period' ? tr('週期開始日', 'Cycle start date') : tr('日期選擇', 'Date')}</label>
                     <CalendarDatePicker
                       selectedDate={recordForm.date}
                       onDateSelect={(date) => setRecordForm({...recordForm, date})}
@@ -747,7 +750,7 @@ const CalendarView = ({
                   </div>
                   {recordType === 'period' && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">月經天數</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">{tr('月經天數', 'Period length (days)')}</label>
                       <input
                         type="text"
                         inputMode="numeric"
@@ -765,7 +768,7 @@ const CalendarView = ({
                         data-testid="record-period-length-input"
                         className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                       />
-                      <p className="text-xs text-petal-muted mt-1">1–14 天，預設 5 天。</p>
+                      <p className="text-xs text-petal-muted mt-1">{tr('1–14 天，預設 5 天。', '1–14 days, 5 by default.')}</p>
                     </div>
                   )}
                 </div>
@@ -782,7 +785,7 @@ const CalendarView = ({
                       className="inline-flex items-center gap-2 px-3 py-2 border border-petal-rule rounded-md text-sm text-petal-ink hover:bg-petal-cream-2 transition-colors"
                     >
                       <Camera className="w-4 h-4" />
-                      {recordForm.photo ? '更換照片' : '上傳照片 (可選)'}
+                      {recordForm.photo ? tr('更換照片', 'Change photo') : tr('上傳照片 (可選)', 'Upload a photo (optional)')}
                     </button>
                     <input
                       ref={fileInputRef}
@@ -795,13 +798,13 @@ const CalendarView = ({
                       <div className="relative">
                         <img
                           src={recordForm.photo}
-                          alt="記憶照片"
+                          alt={tr("記憶照片", 'Memory photo')}
                           className="w-16 h-16 object-cover rounded-md border border-petal-rule"
                         />
                         <button
                           type="button"
                           onClick={() => setRecordForm({...recordForm, photo: ''})}
-                          aria-label="移除照片"
+                          aria-label={tr("移除照片", 'Remove photo')}
                           className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full w-5 h-5 text-xs leading-none flex items-center justify-center"
                         >
                           ×
@@ -813,11 +816,11 @@ const CalendarView = ({
 
                 {/* Description and Details */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">描述你們做了什麼</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{tr('描述你們做了什麼', 'Describe what you did')}</label>
                   <textarea
                     value={recordForm.description}
                     onChange={(e) => setRecordForm({...recordForm, description: e.target.value})}
-                    placeholder="分享這個美好時光的細節..."
+                    placeholder={tr("分享這個美好時光的細節...", 'Share the details of this lovely moment...')}
                     data-testid="record-description-input"
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 h-16"
                   />
@@ -826,13 +829,13 @@ const CalendarView = ({
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <MapPin className="w-4 h-4 inline mr-2" />
-                    地點
+                    {tr('地點', 'Place')}
                   </label>
                   <input
                     type="text"
                     value={recordForm.location}
                     onChange={(e) => setRecordForm({...recordForm, location: e.target.value})}
-                    placeholder="例如：臥室、客廳"
+                    placeholder={tr("例如：臥室、客廳", 'e.g. bedroom, living room')}
                     data-testid="record-location-input"
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                   />
@@ -842,18 +845,18 @@ const CalendarView = ({
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <Clock className="w-4 h-4 inline mr-2" />
-                    時長 (可選)
+                    {tr('時長 (可選)', 'Duration (optional)')}
                   </label>
                   <input
                     type="text"
                     value={recordForm.duration}
                     onChange={(e) => setRecordForm({...recordForm, duration: e.target.value})}
-                    placeholder="例如：15-30分鐘"
+                    placeholder={tr("例如：15-30分鐘", 'e.g. 15–30 min')}
                     data-testid="record-duration-input"
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                   />
                   <div className="flex flex-wrap gap-1.5 mt-2">
-                    {['15-30分鐘', '30-60分鐘', '1小時以上'].map((preset) => (
+                    {[tr('15-30分鐘', '15–30 min'), tr('30-60分鐘', '30–60 min'), tr('1小時以上', 'Over 1 hour')].map((preset) => (
                       <button
                         key={preset}
                         type="button"
@@ -875,7 +878,7 @@ const CalendarView = ({
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     <Play className="w-4 h-4 inline mr-2" />
-                    角色扮演劇本 (可選)
+                    {tr('角色扮演劇本 (可選)', 'Role-play script (optional)')}
                   </label>
                   <select
                     value={recordForm.roleplayScript}
@@ -883,14 +886,14 @@ const CalendarView = ({
                     data-testid="record-roleplay-select"
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                   >
-                    <option value="">未使用劇本</option>
+                    <option value="">{tr('未使用劇本', 'No script')}</option>
                     {/* Default scripts */}
                     {defaultRoleplayScripts.map((script, index) => (
                       <option key={`default-${index}`} value={script.title}>{script.title}</option>
                     ))}
                     {/* Custom scripts */}
                     {customScripts.map((script, index) => (
-                      <option key={`custom-${index}`} value={script.title}>{script.title} (自定義)</option>
+                      <option key={`custom-${index}`} value={script.title}>{script.title} {tr('(自定義)', '(custom)')}</option>
                     ))}
                   </select>
                 </div>
@@ -899,11 +902,11 @@ const CalendarView = ({
                 )}
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">備註</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{tr('備註', 'Notes')}</label>
                   <textarea
                     value={recordForm.notes}
                     onChange={(e) => setRecordForm({...recordForm, notes: e.target.value})}
-                    placeholder="記錄這個特別時刻的感受..."
+                    placeholder={tr("記錄這個特別時刻的感受...", 'Record how this special moment felt...')}
                     data-testid="record-notes-input"
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 h-16"
                   />
@@ -917,16 +920,16 @@ const CalendarView = ({
                   data-testid="record-cancel-button"
                   className="flex-1 px-4 py-3 border border-petal-rule text-petal-ink rounded-md hover:bg-petal-cream-2 transition-colors font-body text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  取消
+                  {tr('取消', 'Cancel')}
                 </button>
                 <Button
                   onClick={submitRecord}
                   loading={submittingRecord}
-                  loadingText={editingRecord ? '更新中…' : '保存中…'}
+                  loadingText={editingRecord ? tr('更新中…', 'Updating…') : tr('保存中…', 'Saving…')}
                   data-testid="record-submit-button"
                   className="flex-1 px-4 py-3 text-base"
                 >
-                  {editingRecord ? '更新記錄' : '保存記錄'}
+                  {editingRecord ? tr('更新記錄', 'Update record') : tr('保存記錄', 'Save record')}
                 </Button>
               </div>
             </div>
@@ -942,10 +945,10 @@ const CalendarView = ({
               <div className="flex justify-between items-end mb-5 pb-4 border-b border-petal-rule">
                 <div>
                   <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
-                    — 月經紀錄
+                    {tr('— 月經紀錄', '— Period record')}
                   </div>
                   <h3 className="font-display text-3xl font-light tracking-tight text-petal-ink">
-                    這一天的<em className="not-italic font-light italic text-red-500">月經</em>
+                    {tr('這一天的', 'This day\'s ')}<em className="not-italic font-light italic text-red-500">{tr('月經', 'period')}</em>
                   </h3>
                 </div>
                 <button
@@ -959,25 +962,25 @@ const CalendarView = ({
 
               <dl className="space-y-2 font-body text-sm text-petal-ink">
                 <div className="flex justify-between gap-4">
-                  <dt className="text-petal-muted">所選日期</dt>
+                  <dt className="text-petal-muted">{tr('所選日期', 'Selected date')}</dt>
                   <dd>{periodDayDate}</dd>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <dt className="text-petal-muted">週期開始日</dt>
+                  <dt className="text-petal-muted">{tr('週期開始日', 'Cycle start')}</dt>
                   <dd>{periodDayRecord.startDate}</dd>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <dt className="text-petal-muted">天數</dt>
-                  <dd>{periodDayRecord.lengthDays} 天</dd>
+                  <dt className="text-petal-muted">{tr('天數', 'Days')}</dt>
+                  <dd>{periodDayRecord.lengthDays} {tr('天', ' days')}</dd>
                 </div>
                 <div className="flex justify-between gap-4">
-                  <dt className="text-petal-muted">涵蓋區間</dt>
-                  <dd>{periodDayRecord.startDate} ～ {addDays(periodDayRecord.startDate, periodDayRecord.lengthDays - 1)}</dd>
+                  <dt className="text-petal-muted">{tr('涵蓋區間', 'Range')}</dt>
+                  <dd>{periodDayRecord.startDate} {tr('～', '–')} {addDays(periodDayRecord.startDate, periodDayRecord.lengthDays - 1)}</dd>
                 </div>
               </dl>
 
               <p className="font-display italic font-light text-sm text-petal-muted mt-4">
-                標記錯了嗎？可以取消這次的月經紀錄。
+                {tr('標記錯了嗎？可以取消這次的月經紀錄。', 'Marked by mistake? You can remove this period record.')}
               </p>
 
               {/* 關閉 is the safe default and gets the wider share; the
@@ -989,7 +992,7 @@ const CalendarView = ({
                   data-testid="period-day-dismiss-button"
                   className="flex-[2] px-4 py-3 min-h-[44px] border border-petal-rule text-petal-ink rounded-md hover:bg-petal-cream-2 transition-colors font-body text-sm"
                 >
-                  關閉
+                  {tr('關閉', 'Close')}
                 </button>
                 <button
                   onClick={handleDeletePeriod}
@@ -997,7 +1000,7 @@ const CalendarView = ({
                   data-testid="period-day-delete-button"
                   className="flex-1 px-4 py-3 min-h-[44px] bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-display italic text-base disabled:opacity-60"
                 >
-                  {deletingPeriod ? '移除中…' : '取消這次月經'}
+                  {deletingPeriod ? tr('移除中…', 'Removing…') : tr('取消這次月經', 'Remove this period')}
                 </button>
               </div>
             </div>
