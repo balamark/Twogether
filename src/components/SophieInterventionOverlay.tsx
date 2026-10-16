@@ -12,6 +12,7 @@ import type {
   SophieSafetyCopy,
 } from '../services/api';
 import type { Notification } from '../App';
+import { tr } from '../i18n/tr';
 
 // The full-screen held-message intervention (pause → core question → agency
 // branches → translation confirm → release), shown when Sophie holds a reply.
@@ -40,12 +41,12 @@ interface Props {
 }
 
 const DEFAULT_OPTIONS: SophieCoreOption[] = [
-  { key: 'not_cared', emoji: '❤️', label: '我覺得自己不被在乎', need: '被在乎' },
-  { key: 'boundary', emoji: '🧱', label: '我覺得我的界線沒有被尊重', need: '被尊重' },
-  { key: 'misunderstood', emoji: '😞', label: '我覺得自己被誤解了', need: '被理解' },
-  { key: 'overloaded', emoji: '🥀', label: '我覺得很多事情都落在我身上', need: '被分擔' },
-  { key: 'hurt', emoji: '💔', label: '我其實很受傷', need: '被安慰' },
-  { key: 'own_words', emoji: '✏️', label: '都不是，我想自己說', need: null },
+  { key: 'not_cared', emoji: '❤️', label: tr('我覺得自己不被在乎', 'I feel like I\'m not cared about'), need: tr('被在乎', 'to feel cared about') },
+  { key: 'boundary', emoji: '🧱', label: tr('我覺得我的界線沒有被尊重', 'I feel like my boundaries aren\'t respected'), need: tr('被尊重', 'to feel respected') },
+  { key: 'misunderstood', emoji: '😞', label: tr('我覺得自己被誤解了', 'I feel misunderstood'), need: tr('被理解', 'to feel understood') },
+  { key: 'overloaded', emoji: '🥀', label: tr('我覺得很多事情都落在我身上', 'I feel like too much falls on me'), need: tr('被分擔', 'to share the load') },
+  { key: 'hurt', emoji: '💔', label: tr('我其實很受傷', 'I\'m actually really hurt'), need: tr('被安慰', 'to be comforted') },
+  { key: 'own_words', emoji: '✏️', label: tr('都不是，我想自己說', 'None of these, I\'ll say it myself'), need: null },
 ];
 
 const ReleaseRawLink = ({ busy, onClick }: { busy: boolean; onClick: () => void }) => (
@@ -56,7 +57,7 @@ const ReleaseRawLink = ({ busy, onClick }: { busy: boolean; onClick: () => void 
     disabled={busy}
     className="w-full text-center font-body text-xs text-petal-muted hover:text-petal-ink underline underline-offset-2 transition-colors py-2"
   >
-    直接讓TA看到原話
+    {tr('直接讓TA看到原話', 'Let them see my original words')}
   </button>
 );
 
@@ -96,8 +97,8 @@ const SophieInterventionOverlay = ({
       const e = err as Error & { error_code?: string };
       showNotification({
         type: 'warning',
-        title: `${companionName} 這次沒能整理好`,
-        message: e.message || '可以再試一次，或直接讓TA看到原話。',
+        title: tr(`${companionName} 這次沒能整理好`, `${companionName} couldn't put this together this time`),
+        message: e.message || tr('可以再試一次，或直接讓TA看到原話。', 'You can try again, or let them see your original words.'),
         duration: 5000,
       });
     } finally {
@@ -124,7 +125,7 @@ const SophieInterventionOverlay = ({
       setActive(updated);
       setPhase('release');
     } catch (err) {
-      showNotification({ type: 'error', title: '無法儲存', message: (err as Error).message, duration: 4000 });
+      showNotification({ type: 'error', title: tr('無法儲存', 'Couldn\'t save'), message: (err as Error).message, duration: 4000 });
     } finally {
       setBusy(false);
     }
@@ -150,7 +151,7 @@ const SophieInterventionOverlay = ({
   const doRelease = async (raw: boolean, skipConfirm = false) => {
     if (raw && !skipConfirm) {
       const ok = window.confirm(
-        '可以。我不會阻止你。\n\n我只是想讓你知道，這句話現在可能比較容易讓TA進入防禦。\n\n要現在就讓TA看到原話嗎？',
+        tr('可以。我不會阻止你。\n\n我只是想讓你知道，這句話現在可能比較容易讓TA進入防禦。\n\n要現在就讓TA看到原話嗎？', 'You can. I won\'t stop you.\n\nI just want you to know these words might make them more likely to get defensive right now.\n\nDo you want them to see your original words now?'),
       );
       if (!ok) return;
     }
@@ -159,15 +160,15 @@ const SophieInterventionOverlay = ({
       await apiService.releaseConflictIntervention(active.id);
       showNotification({
         type: 'success',
-        title: '已送進對話',
+        title: tr('已送進對話', 'Sent to the conversation'),
         message: raw
-          ? '你的原話已經送到對話裡。'
-          : `你的原話送出了，${companionName} 也把你真正想被理解的地方放在旁邊。`,
+          ? tr('你的原話已經送到對話裡。', 'Your original words were sent to the conversation.')
+          : tr(`你的原話送出了，${companionName} 也把你真正想被理解的地方放在旁邊。`, `Your original words were sent, and ${companionName} placed what you really want understood alongside them.`),
         duration: 5000,
       });
       onClose('released');
     } catch (err) {
-      showNotification({ type: 'error', title: '送出失敗', message: (err as Error).message, duration: 4000 });
+      showNotification({ type: 'error', title: tr('送出失敗', 'Couldn\'t send'), message: (err as Error).message, duration: 4000 });
     } finally {
       setBusy(false);
     }
@@ -212,8 +213,8 @@ const SophieInterventionOverlay = ({
     }
     showNotification({
       type: 'info',
-      title: '好，我幫你把這一輪停下來',
-      message: agencyCopy?.afterHurt.holdNote || '原話我幫你留著，等你準備好隨時回來。',
+      title: tr('好，我幫你把這一輪停下來', 'Okay, I\'ll pause this round for you'),
+      message: agencyCopy?.afterHurt.holdNote || tr('原話我幫你留著，等你準備好隨時回來。', 'I\'ll keep your original words. Come back whenever you\'re ready.'),
       duration: 5000,
     });
     onClose('exited');
@@ -228,13 +229,13 @@ const SophieInterventionOverlay = ({
             <Sparkles className="w-5 h-5 text-petal-rose-deep" strokeWidth={1.5} />
             <div>
               <div className="font-body text-[11px] uppercase tracking-[0.18em] text-petal-rose-deep">— {companionName}</div>
-              <div className="font-display text-lg text-petal-ink">即時介入</div>
+              <div className="font-display text-lg text-petal-ink">{tr('即時介入', 'Live support')}</div>
             </div>
           </div>
           <button
             type="button"
             onClick={() => onClose('exited')}
-            aria-label="稍後再說"
+            aria-label={tr("稍後再說", 'Maybe later')}
             className="text-petal-muted hover:text-petal-ink text-3xl leading-none p-2 -m-2"
           >
             ×
@@ -244,9 +245,9 @@ const SophieInterventionOverlay = ({
         {/* Saved-status reassurance — the words never vanish. */}
         {phase !== 'safety' && (
           <div className="flex flex-wrap items-center gap-2 mb-5 font-body text-[11px] text-petal-ink-soft">
-            <span className="inline-flex items-center gap-1 rounded-full bg-white border border-petal-sage/50 text-petal-sage-deep px-2 py-0.5">✓ 已保存原話</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-white border border-petal-sage/50 text-petal-sage-deep px-2 py-0.5">{tr('✓ 已保存原話', '✓ Original words saved')}</span>
             <span className="inline-flex items-center gap-1 rounded-full bg-white border border-petal-rose/50 text-petal-rose-deep px-2 py-0.5">
-              <Pause className="w-3 h-3" strokeWidth={2} /> 還沒送到TA那裡
+              <Pause className="w-3 h-3" strokeWidth={2} /> {tr('還沒送到TA那裡', 'Not sent to them yet')}
             </span>
           </div>
         )}
@@ -277,14 +278,14 @@ const SophieInterventionOverlay = ({
                 disabled={busy}
                 className="w-full px-5 py-3 border border-petal-rule text-petal-ink-soft hover:text-petal-ink hover:border-petal-ink rounded-md font-body text-sm transition-colors"
               >
-                我了解，仍要讓TA看到我的原話
+                {tr('我了解，仍要讓TA看到我的原話', 'I understand, but I still want them to see my original words')}
               </button>
               <button
                 type="button"
                 onClick={() => onClose('exited')}
                 className="w-full px-5 py-3 bg-petal-ink text-petal-cream rounded-md font-body text-sm font-medium hover:bg-pink-700 transition-colors"
               >
-                先不送出，我需要一點時間
+                {tr('先不送出，我需要一點時間', 'Don\'t send yet, I need a moment')}
               </button>
             </div>
           </div>
@@ -318,7 +319,7 @@ const SophieInterventionOverlay = ({
                   className="w-full px-5 py-3 bg-white border-2 border-amber-300 text-amber-800 rounded-md font-body text-sm font-medium hover:bg-amber-50 transition-colors flex items-center justify-center gap-2"
                 >
                   <Flame className="w-4 h-4" strokeWidth={1.75} />
-                  其實我很想回擊
+                  {tr('其實我很想回擊', 'Honestly, I want to hit back')}
                 </button>
               )}
               <ReleaseRawLink busy={busy} onClick={() => doRelease(true)} />
@@ -356,7 +357,7 @@ const SophieInterventionOverlay = ({
             </div>
             {busy && (
               <p className="mt-4 font-body text-xs text-petal-muted flex items-center gap-1.5">
-                <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.75} /> {companionName} 正在陪你…
+                <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.75} /> {companionName} {tr('正在陪你…', 'Here with you…')}
               </p>
             )}
           </div>
@@ -409,7 +410,7 @@ const SophieInterventionOverlay = ({
               ))}
             </div>
             <p className="mt-4 font-body text-xs text-petal-muted leading-relaxed">
-              你可以生氣，但你不用把行為的控制權交給這股情緒。
+              {tr('你可以生氣，但你不用把行為的控制權交給這股情緒。', 'You can be angry, but you don\'t have to hand control of what you do to that feeling.')}
             </p>
           </div>
         )}
@@ -418,12 +419,12 @@ const SophieInterventionOverlay = ({
         {phase === 'question' && (
           <div className="flex-1 flex flex-col">
             <h2 className="font-display text-2xl md:text-3xl font-light text-petal-ink leading-snug mb-6">
-              {coreQuestion || '如果TA現在只能真正理解你一件事，你最希望TA理解什麼？'}
+              {coreQuestion || tr('如果TA現在只能真正理解你一件事，你最希望TA理解什麼？', 'If they could truly understand just one thing about you right now, what would you most want it to be?')}
             </h2>
             {translating ? (
               <div className="flex-1 flex flex-col items-center justify-center text-petal-muted gap-3">
                 <Loader2 className="w-8 h-8 animate-spin text-petal-rose-deep" strokeWidth={1.5} />
-                <p className="font-body text-sm">{companionName} 正在聽你話裡的情緒…</p>
+                <p className="font-body text-sm">{companionName} {tr('正在聽你話裡的情緒…', 'Listening for the feelings in your words…')}</p>
               </div>
             ) : showOwnText ? (
               <div className="space-y-3">
@@ -431,7 +432,7 @@ const SophieInterventionOverlay = ({
                   <AutoGrowTextarea
                     value={ownText}
                     onChange={(e) => setOwnText(e.target.value)}
-                    placeholder="用你自己的話說：我最希望TA理解的是…"
+                    placeholder={tr("用你自己的話說：我最希望TA理解的是…", 'In your own words: what I most want them to understand is…')}
                     maxLength={500}
                     className="w-full font-body text-sm text-petal-ink leading-relaxed bg-transparent border-0 resize-none focus:outline-none placeholder:text-petal-muted/70 min-h-[5rem]"
                   />
@@ -442,7 +443,7 @@ const SophieInterventionOverlay = ({
                     onClick={() => { setShowOwnText(false); setOwnText(''); }}
                     className="px-4 py-2.5 border border-petal-rule text-petal-ink-soft rounded-md font-body text-sm hover:border-petal-ink transition-colors"
                   >
-                    ← 選項
+                    {tr('← 選項', '← Options')}
                   </button>
                   <button
                     type="button"
@@ -454,7 +455,7 @@ const SophieInterventionOverlay = ({
                         : 'bg-vivid-rose text-white hover:bg-vivid-rose-strong'
                     }`}
                   >
-                    讓 {companionName} 幫我整理
+                    {tr('讓', 'Let ')} {companionName} {tr('幫我整理', ' help me put it into words')}
                   </button>
                 </div>
               </div>
@@ -482,7 +483,7 @@ const SophieInterventionOverlay = ({
                     onClick={() => setPhase('agency')}
                     className="w-full text-center font-body text-xs text-amber-700 hover:text-amber-800 underline underline-offset-2 transition-colors py-1"
                   >
-                    其實我現在很想回擊
+                    {tr('其實我現在很想回擊', 'Honestly, right now I really want to hit back')}
                   </button>
                 )}
                 <ReleaseRawLink busy={busy} onClick={() => doRelease(true)} />
@@ -494,17 +495,17 @@ const SophieInterventionOverlay = ({
         {/* CONFIRM */}
         {phase === 'confirm' && translation && (
           <div className="flex-1 flex flex-col">
-            <p className="font-body text-base text-petal-ink-soft leading-relaxed mb-1">我懂了。</p>
+            <p className="font-body text-base text-petal-ink-soft leading-relaxed mb-1">{tr('我懂了。', 'I get it.')}</p>
             <p className="font-body text-base text-petal-ink-soft leading-relaxed mb-4">
-              所以剛才那句話底下，可能有一個更重要的訊息：
+              {tr('所以剛才那句話底下，可能有一個更重要的訊息：', 'So beneath what you just said, there may be a more important message:')}
             </p>
             <div className="mb-3">
-              <div className="font-body text-[11px] uppercase tracking-[0.14em] text-petal-muted mb-1">你原本說的</div>
+              <div className="font-body text-[11px] uppercase tracking-[0.14em] text-petal-muted mb-1">{tr('你原本說的', 'What you said')}</div>
               <p className="font-body text-sm text-petal-ink/70 leading-relaxed bg-white/60 rounded-md border border-petal-rule p-3">
-                「{active.original_text}」
+                {tr('「', '“')}{active.original_text}{tr('」', '”')}
               </p>
             </div>
-            <div className="font-body text-[11px] uppercase tracking-[0.14em] text-petal-rose-deep mb-1">{companionName} 幫你翻成</div>
+            <div className="font-body text-[11px] uppercase tracking-[0.14em] text-petal-rose-deep mb-1">{companionName} {tr('幫你翻成', 'Translated as')}</div>
             {editing ? (
               <div className="bg-white rounded-md border border-petal-rose/40 p-3 mb-2">
                 <AutoGrowTextarea
@@ -517,17 +518,17 @@ const SophieInterventionOverlay = ({
             ) : (
               <div className="bg-white border-2 border-petal-rose/30 rounded-md p-4 mb-2">
                 <p className="font-display text-lg text-petal-ink leading-relaxed">
-                  「{editedTranslation || translation.rewrite || active.original_text}」
+                  {tr('「', '“')}{editedTranslation || translation.rewrite || active.original_text}{tr('」', '”')}
                 </p>
               </div>
             )}
             {translation.need && (
               <span className="self-start inline-flex items-center gap-1.5 rounded bg-amber-50 text-amber-700 border border-amber-200/60 font-body text-[12px] font-medium px-2 py-0.5 mb-4">
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500" aria-hidden />
-                你其實需要{translation.need}
+                {tr('你其實需要', 'What you really need')}{translation.need}
               </span>
             )}
-            <p className="font-body text-sm text-petal-muted mb-4">這有接近你真正想讓TA知道的事嗎？</p>
+            <p className="font-body text-sm text-petal-muted mb-4">{tr('這有接近你真正想讓TA知道的事嗎？', 'Is this close to what you really want them to know?')}</p>
             <div className="mt-auto pt-4 space-y-2.5">
               <button
                 type="button"
@@ -536,7 +537,7 @@ const SophieInterventionOverlay = ({
                 disabled={busy}
                 className="w-full px-5 py-4 bg-vivid-rose text-white rounded-md text-base font-medium hover:bg-vivid-rose-strong transition-colors flex items-center justify-center gap-2"
               >
-                <Heart className="w-4 h-4" strokeWidth={2} /> 對，就是這個
+                <Heart className="w-4 h-4" strokeWidth={2} /> {tr('對，就是這個', 'Yes, that\'s it')}
               </button>
               <div className="flex gap-2.5">
                 <button
@@ -545,7 +546,7 @@ const SophieInterventionOverlay = ({
                   disabled={busy}
                   className="flex-1 px-4 py-3 bg-white border border-petal-rule text-petal-ink rounded-md font-body text-sm hover:border-petal-ink transition-colors"
                 >
-                  ✏️ {editing ? '完成修改' : '我想修改'}
+                  ✏️ {editing ? tr('完成修改', 'Done editing') : tr('我想修改', 'I want to edit it')}
                 </button>
                 <button
                   type="button"
@@ -553,7 +554,7 @@ const SophieInterventionOverlay = ({
                   disabled={busy}
                   className="flex-1 px-4 py-3 bg-white border border-petal-rule text-petal-ink rounded-md font-body text-sm hover:border-petal-ink transition-colors"
                 >
-                  ❌ 不是這個意思
+                  {tr('❌ 不是這個意思', '❌ That\'s not what I meant')}
                 </button>
               </div>
               <ReleaseRawLink busy={busy} onClick={() => doRelease(true)} />
@@ -565,11 +566,11 @@ const SophieInterventionOverlay = ({
         {phase === 'release' && (
           <div className="flex-1 flex flex-col justify-center">
             <h2 className="font-display text-2xl md:text-3xl font-light text-petal-ink leading-snug mb-3 text-center">
-              好，我更懂你剛才真正想說的了。
+              {tr('好，我更懂你剛才真正想說的了。', 'Okay, I understand better what you really wanted to say.')}
             </h2>
             <p className="font-body text-sm text-petal-ink-soft text-center leading-relaxed mb-8">
-              現在我可以讓TA看到你原本說的話，<br />
-              也會把你真正想被理解的地方放在旁邊。
+              {tr('現在我可以讓TA看到你原本說的話，', 'Now I can let them see what you originally said, ')}<br />
+              {tr('也會把你真正想被理解的地方放在旁邊。', 'and I\'ll place what you really want understood alongside it.')}
             </p>
             <div className="space-y-3">
               <button
@@ -580,14 +581,14 @@ const SophieInterventionOverlay = ({
                 className="w-full px-5 py-4 bg-vivid-rose text-white rounded-md text-base font-medium hover:bg-vivid-rose-strong transition-colors flex items-center justify-center gap-2"
               >
                 {busy ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2} /> : <Send className="w-4 h-4" strokeWidth={1.75} />}
-                送進對話
+                {tr('送進對話', 'Send to conversation')}
               </button>
               <button
                 type="button"
                 onClick={() => onClose('exited')}
                 className="w-full px-5 py-3 bg-white border border-petal-rule text-petal-ink-soft rounded-md font-body text-sm hover:border-petal-ink transition-colors"
               >
-                稍後再送
+                {tr('稍後再送', 'Send later')}
               </button>
             </div>
           </div>

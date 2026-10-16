@@ -14,6 +14,7 @@ import AiResponseFeedback from './AiResponseFeedback';
 import ConflictBanner from './ConflictBanner';
 import ParticipantAvatar from './ParticipantAvatar';
 import MarkdownContent from './MarkdownContent';
+import { tr } from '../i18n/tr';
 
 // Reply length cap. Kept in sync with the backend validator in routes/wall.js
 // and the DB CHECK on wall_post_replies.content.
@@ -96,16 +97,16 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
         // a next step, not a red failure.
         onNotify?.({
           type: res.translated === 0 ? 'warning' : 'info',
-          title: res.translated === 0 ? '情緒翻譯這次沒完成' : '情緒翻譯完成一部分',
+          title: res.translated === 0 ? tr('情緒翻譯這次沒完成', 'Emotion translation didn\'t finish this time') : tr('情緒翻譯完成一部分', 'Emotion translation finished partly'),
           message: res.message,
         });
       }
     } catch (err) {
       console.error('[情緒翻譯] wall: load failed', err);
       const code = (err as { error_code?: string })?.error_code;
-      const message = err instanceof Error ? err.message : '情緒翻譯暫時無法產生';
+      const message = err instanceof Error ? err.message : tr('情緒翻譯暫時無法產生', 'Emotion translation couldn\'t be generated right now');
       if (code === 'AI_DAILY_LIMIT_REACHED') {
-        onNotify?.({ type: 'warning', title: 'AI 額度已用完', message });
+        onNotify?.({ type: 'warning', title: tr('AI 額度已用完', 'AI credits are used up'), message });
       } else {
         onError?.(message);
       }
@@ -129,7 +130,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
         }
       } catch (err) {
         if (!cancelled) {
-          onError?.(err instanceof Error ? err.message : '無法載入回覆');
+          onError?.(err instanceof Error ? err.message : tr('無法載入回覆', 'Couldn\'t load replies'));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -150,7 +151,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
       if (next) await loadTranslations();
     } catch (err) {
       setTranslationEnabled(!next);
-      onError?.(err instanceof Error ? err.message : '無法更新情緒翻譯設定');
+      onError?.(err instanceof Error ? err.message : tr('無法更新情緒翻譯設定', 'Couldn\'t update the emotion translation setting'));
     }
   };
 
@@ -168,12 +169,12 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
       // Translate the newcomer so the lens stays complete without a manual retap.
       if (translationEnabled) loadTranslations();
     } catch (err) {
-      onError?.(err instanceof Error ? err.message : '回覆失敗');
+      onError?.(err instanceof Error ? err.message : tr('回覆失敗', 'Couldn\'t send your reply'));
     }
   });
 
   const handleDelete = async (replyId: string) => {
-    if (!confirm('確定要刪除這則回覆嗎？')) return;
+    if (!confirm(tr('確定要刪除這則回覆嗎？', 'Delete this reply?'))) return;
     // Optimistic (playbook §R7): drop the reply immediately, restore on failure.
     const snapshot = replies;
     setReplies((prev) => {
@@ -186,7 +187,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
     } catch (err) {
       setReplies(snapshot);
       onReplyCountChange?.(snapshot.length);
-      onError?.(err instanceof Error ? err.message : '刪除失敗');
+      onError?.(err instanceof Error ? err.message : tr('刪除失敗', 'Couldn\'t delete'));
     }
   };
 
@@ -197,11 +198,11 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
       setAiPreview(comment);
     } catch (err) {
       const code = (err as { error_code?: string })?.error_code;
-      const message = err instanceof Error ? err.message : 'AI 諮商師暫時無法回應';
+      const message = err instanceof Error ? err.message : tr('AI 諮商師暫時無法回應', 'The AI counselor can\'t respond right now');
       // A reached quota is an expected state with a next step (upgrade), not a
       // failure — surface it as a warning rather than a red error toast.
       if (code === 'AI_DAILY_LIMIT_REACHED') {
-        onNotify?.({ type: 'warning', title: 'AI 額度已用完', message });
+        onNotify?.({ type: 'warning', title: tr('AI 額度已用完', 'AI credits are used up'), message });
       } else {
         onError?.(message);
       }
@@ -223,7 +224,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
       });
       setAiPreview(null);
     } catch (err) {
-      onError?.(err instanceof Error ? err.message : '貼上 AI 留言失敗');
+      onError?.(err instanceof Error ? err.message : tr('貼上 AI 留言失敗', 'Couldn\'t post the AI comment'));
     } finally {
       setAiPosting(false);
     }
@@ -235,12 +236,12 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
       data-testid={`wall-thread-${postId}`}
     >
       {loading && (
-        <div className="font-body text-xs text-petal-muted">載入回覆中…</div>
+        <div className="font-body text-xs text-petal-muted">{tr('載入回覆中…', 'Loading replies…')}</div>
       )}
 
       {!loading && replies.length === 0 && (
         <div className="font-body text-xs text-petal-muted italic">
-          還沒有回覆 — 留下第一句話吧。
+          {tr('還沒有回覆 — 留下第一句話吧。', 'No replies yet. Leave the first word.')}
         </div>
       )}
 
@@ -257,22 +258,22 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
         <div className="flex items-center justify-between gap-2 bg-petal-cream-2 border border-petal-rule rounded-xl px-3 py-2">
           <div className="flex items-center gap-1.5 min-w-0">
             <HeartHandshake className="w-4 h-4 text-petal-rose-deep shrink-0" strokeWidth={1.5} />
-            <span className="font-body text-xs text-petal-ink truncate">情緒翻譯</span>
+            <span className="font-body text-xs text-petal-ink truncate">{tr('情緒翻譯', 'Emotion translation')}</span>
             <span
               className="font-body text-[11px] text-petal-muted cursor-help shrink-0"
-              title="開啟後，AI 會在每句話下方顯示背後的情緒與需求，幫你們從「立場」轉向「需求」。兩人都看得到。"
+              title={tr("開啟後，AI 會在每句話下方顯示背後的情緒與需求，幫你們從「立場」轉向「需求」。兩人都看得到。", 'When on, AI shows the feelings and needs beneath each message, helping you move from "positions" to "needs". You both can see it.')}
             >
               (?)
             </span>
             {translationLoading && (
-              <span className="font-body text-[11px] text-petal-muted shrink-0">翻譯中…</span>
+              <span className="font-body text-[11px] text-petal-muted shrink-0">{tr('翻譯中…', 'Translating…')}</span>
             )}
           </div>
           <button
             type="button"
             role="switch"
             aria-checked={translationEnabled}
-            aria-label="情緒翻譯"
+            aria-label={tr("情緒翻譯", 'Emotion translation')}
             onClick={handleToggleTranslation}
             data-testid={`wall-translation-toggle-${postId}`}
             className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
@@ -301,7 +302,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
             onClick={loadTranslations}
             className="font-body text-[11px] text-petal-rose-deep hover:underline shrink-0 whitespace-nowrap"
           >
-            重試
+            {tr('重試', 'Retry')}
           </button>
         </div>
       )}
@@ -335,10 +336,10 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
                   colorKey={reply.author_id}
                   name={
                     isAi
-                      ? (companionName(reply.ai_therapist) || 'AI 諮商師')
+                      ? (companionName(reply.ai_therapist) || tr('AI 諮商師', 'AI counselor'))
                       : isTherapist
-                        ? (reply.author_nickname || '心理師')
-                        : (reply.author_nickname || (isOwn ? '我' : '對方'))
+                        ? (reply.author_nickname || tr('心理師', 'Therapist'))
+                        : (reply.author_nickname || (isOwn ? tr('我', 'Me') : tr('對方', 'Partner')))
                   }
                 />
                 <span
@@ -353,8 +354,8 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
                   {isAi
                     ? counselorLabel(companionName(reply.ai_therapist))
                     : isTherapist
-                      ? (reply.author_nickname ? `${reply.author_nickname}・心理師` : '專屬心理師')
-                      : (reply.author_nickname || (isOwn ? '我' : '對方'))}
+                      ? (reply.author_nickname ? tr(`${reply.author_nickname}・心理師`, `${reply.author_nickname} · Therapist`) : tr('專屬心理師', 'Dedicated therapist'))
+                      : (reply.author_nickname || (isOwn ? tr('我', 'Me') : tr('對方', 'Partner')))}
                 </span>
                 <span className="font-body text-[11px] text-petal-muted">
                   {formatTime(reply.created_at, tz)}
@@ -365,7 +366,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
                   type="button"
                   onClick={() => handleDelete(reply.id)}
                   className="p-1 text-petal-muted hover:text-petal-rose-deep transition-colors"
-                  aria-label="刪除回覆"
+                  aria-label={tr("刪除回覆", 'Delete reply')}
                 >
                   <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
                 </button>
@@ -409,7 +410,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
             data-testid={`wall-ai-comment-btn-${postId}`}
           >
             <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
-            {aiLoading ? `${myCompanion.name} 思考中⋯` : `請 ${myCompanion.name} 看看`}
+            {aiLoading ? tr(`${myCompanion.name} 思考中⋯`, `${myCompanion.name} is thinking…`) : tr(`請 ${myCompanion.name} 看看`, `Ask ${myCompanion.name} to take a look`)}
           </button>
         ) : null}
         {!aiPreview ? (
@@ -423,7 +424,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
           >
             <div className={`flex items-center gap-1.5 font-display text-sm font-medium ${ROLE_STYLE.counselor.label}`}>
               <Sparkles className="w-4 h-4" strokeWidth={1.5} />
-              {myCompanion.name}（AI 諮商師）的建議（僅你看得到，貼出後對方才會看到）
+              {myCompanion.name}{tr('（AI 諮商師）的建議（僅你看得到，貼出後對方才會看到）', ' (AI counselor) suggests (only you can see this; your partner sees it once you post it)')}
             </div>
             <MarkdownContent
               content={aiPreview}
@@ -438,7 +439,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
                 data-testid={`wall-ai-post-${postId}`}
               >
                 <Send className="w-3.5 h-3.5" strokeWidth={1.5} />
-                {aiPosting ? '貼上中⋯' : '貼到對話串'}
+                {aiPosting ? tr('貼上中⋯', 'Posting…') : tr('貼到對話串', 'Post to thread')}
               </button>
               <button
                 type="button"
@@ -448,7 +449,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
                 data-testid={`wall-ai-cancel-${postId}`}
               >
                 <X className="w-3.5 h-3.5" strokeWidth={1.5} />
-                取消
+                {tr('取消', 'Cancel')}
               </button>
             </div>
           </div>
@@ -460,7 +461,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           maxLength={MAX_REPLY}
-          placeholder="回覆⋯（支援 Markdown）"
+          placeholder={tr("回覆⋯（支援 Markdown）", 'Reply… (Markdown supported)')}
           className="flex-1 bg-white border border-petal-rule rounded-md px-3 py-2 font-body text-sm text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-none min-h-[6.5rem] max-h-[40vh] overflow-y-auto"
           data-testid={`wall-reply-input-${postId}`}
           onKeyDown={(e) => {
@@ -475,7 +476,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
           onClick={handleSend}
           disabled={sending || !draft.trim()}
           className="bg-petal-ink text-petal-cream px-3 py-2 rounded-md hover:bg-pink-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          aria-label="送出回覆"
+          aria-label={tr("送出回覆", 'Send reply')}
           data-testid={`wall-reply-send-${postId}`}
         >
           <Send className="w-4 h-4" strokeWidth={1.5} />

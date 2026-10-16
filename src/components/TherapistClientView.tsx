@@ -17,6 +17,7 @@ import { companionName } from '../utils/aiCompanions';
 import { ROLE_STYLE } from '../utils/threadRoles';
 import ParticipantAvatar from './ParticipantAvatar';
 import TherapySummaryDetail from './TherapySummaryDetail';
+import { tr } from '../i18n/tr';
 
 // A dedicated therapist's read-only (or read+comment) view of ONE client
 // couple's 牆 and 好好說話. Private items are never returned by the API, so this
@@ -31,7 +32,7 @@ interface Props {
 type Tab = 'wall' | 'events' | 'topics' | 'summaries';
 
 const coupleTitle = (c: TherapistClientCouple): string =>
-  c.coupleName || (c.partnerNames.length ? c.partnerNames.join(' & ') : '伴侶');
+  c.coupleName || (c.partnerNames.length ? c.partnerNames.join(' & ') : tr('伴侶', 'Couple'));
 
 const TherapistClientView: React.FC<Props> = ({ client, onClose, showNotification }) => {
   useScrollLock(true);
@@ -46,10 +47,10 @@ const TherapistClientView: React.FC<Props> = ({ client, onClose, showNotificatio
             <h3 className="font-display text-lg font-medium text-petal-ink truncate">{coupleTitle(client)}</h3>
             <p className="inline-flex items-center gap-1 font-body text-[11px] text-petal-muted">
               <Lock className="w-3 h-3" strokeWidth={1.5} />
-              {client.canComment ? '可留言・不含私密內容' : '唯讀・不含私密內容'}
+              {client.canComment ? tr('可留言・不含私密內容', 'Can comment · excludes private content') : tr('唯讀・不含私密內容', 'Read-only · excludes private content')}
             </p>
           </div>
-          <button onClick={onClose} className="p-1 text-petal-muted hover:text-petal-ink" aria-label="關閉">
+          <button onClick={onClose} className="p-1 text-petal-muted hover:text-petal-ink" aria-label={tr("關閉", 'Close')}>
             <X className="w-5 h-5" strokeWidth={1.5} />
           </button>
         </div>
@@ -65,7 +66,7 @@ const TherapistClientView: React.FC<Props> = ({ client, onClose, showNotificatio
                 tab === key ? 'text-pink-600 border-b-2 border-pink-500' : 'text-petal-muted hover:text-petal-ink'
               }`}
             >
-              {key === 'wall' ? '牆' : key === 'events' ? '好好說話' : key === 'topics' ? '話題建議' : '諮商摘要'}
+              {key === 'wall' ? tr('牆', 'Wall') : key === 'events' ? tr('好好說話', 'Talk it through') : key === 'topics' ? tr('話題建議', 'Topic suggestions') : tr('諮商摘要', 'Counseling summary')}
             </button>
           ))}
         </div>
@@ -104,7 +105,7 @@ const ClientWall: React.FC<{
       const { posts } = await apiService.getClientWall(coupleId);
       setPosts(posts);
     } catch (err) {
-      showNotification({ type: 'error', title: '無法載入', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
+      showNotification({ type: 'error', title: tr('無法載入', 'Couldn\'t load'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'), duration: 3500 });
     } finally {
       setLoading(false);
     }
@@ -112,15 +113,15 @@ const ClientWall: React.FC<{
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <p className="text-center font-body text-sm text-petal-muted py-10">載入中…</p>;
-  if (posts.length === 0) return <p className="text-center font-body text-sm text-petal-muted py-10">這對伴侶的牆上還沒有內容。</p>;
+  if (loading) return <p className="text-center font-body text-sm text-petal-muted py-10">{tr('載入中…', 'Loading…')}</p>;
+  if (posts.length === 0) return <p className="text-center font-body text-sm text-petal-muted py-10">{tr('這對伴侶的牆上還沒有內容。', 'This couple\'s wall has no posts yet.')}</p>;
 
   return (
     <div className="p-4 space-y-3" data-testid="client-wall">
       {posts.map((p) => (
         <div key={p.id} className="rounded-lg border border-petal-rule bg-petal-cream p-4">
           <div className="flex items-center justify-between gap-2">
-            <span className="font-body text-sm font-medium text-petal-ink">{p.author_nickname || '某人'}</span>
+            <span className="font-body text-sm font-medium text-petal-ink">{p.author_nickname || tr('某人', 'Someone')}</span>
             <span className="font-body text-[11px] text-petal-muted">{new Date(p.created_at).toLocaleDateString('zh-TW')}</span>
           </div>
           {p.mood_tag && (
@@ -156,7 +157,7 @@ const ClientWall: React.FC<{
             data-testid="client-wall-open-thread"
           >
             <MessageCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
-            {openPostId === p.id ? '收合' : `回覆串${p.reply_count > 0 ? ` (${p.reply_count})` : ''}`}
+            {openPostId === p.id ? tr('收合', 'Collapse') : tr(`回覆串${p.reply_count > 0 ? ` (${p.reply_count})` : ''}`, `Replies${p.reply_count > 0 ? ` (${p.reply_count})` : ''}`)}
           </button>
           {openPostId === p.id && (
             <WallThread coupleId={coupleId} postId={p.id} canComment={canComment} onPosted={load} showNotification={showNotification} />
@@ -203,7 +204,7 @@ const WallThread: React.FC<{
       await load();
       onPosted();
     } catch (err) {
-      showNotification({ type: 'error', title: '留言失敗', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
+      showNotification({ type: 'error', title: tr('留言失敗', 'Couldn\'t post your comment'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'), duration: 3500 });
     } finally {
       setSending(false);
     }
@@ -212,9 +213,9 @@ const WallThread: React.FC<{
   return (
     <div className="mt-2 pt-2 border-t border-petal-rule space-y-2">
       {loading ? (
-        <p className="font-body text-xs text-petal-muted">載入回覆中…</p>
+        <p className="font-body text-xs text-petal-muted">{tr('載入回覆中…', 'Loading replies…')}</p>
       ) : replies.length === 0 ? (
-        <p className="font-body text-xs text-petal-muted">還沒有回覆。</p>
+        <p className="font-body text-xs text-petal-muted">{tr('還沒有回覆。', 'No replies yet.')}</p>
       ) : (
         replies.map((r) => (
           <div
@@ -228,7 +229,7 @@ const WallThread: React.FC<{
             }`}
           >
             <div className="font-body text-[11px] text-petal-muted">
-              {r.is_therapist ? `🩺 ${r.author_nickname || '心理師'}（心理師）` : r.is_ai ? 'AI 諮商師' : (r.author_nickname || '某人')}
+              {r.is_therapist ? tr(`🩺 ${r.author_nickname || '心理師'}（心理師）`, `🩺 ${r.author_nickname || 'Therapist'} (therapist)`) : r.is_ai ? tr('AI 諮商師', 'AI counselor') : (r.author_nickname || tr('某人', 'Someone'))}
             </div>
             <div className="font-body text-sm text-petal-ink">{r.content}</div>
           </div>
@@ -240,7 +241,7 @@ const WallThread: React.FC<{
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-            placeholder="以心理師身分留言…"
+            placeholder={tr("以心理師身分留言…", 'Comment as their therapist…')}
             data-testid="client-wall-reply-input"
             className="flex-1 px-3 py-1.5 rounded-full border border-petal-rule bg-petal-cream focus:border-petal-ink focus:outline-none font-body text-sm text-petal-ink"
           />
@@ -275,7 +276,7 @@ const ClientEvents: React.FC<{
       const { events } = await apiService.getClientEvents(coupleId);
       setEvents(events);
     } catch (err) {
-      showNotification({ type: 'error', title: '無法載入', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
+      showNotification({ type: 'error', title: tr('無法載入', 'Couldn\'t load'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'), duration: 3500 });
     } finally {
       setLoading(false);
     }
@@ -283,7 +284,7 @@ const ClientEvents: React.FC<{
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <p className="text-center font-body text-sm text-petal-muted py-10">載入中…</p>;
+  if (loading) return <p className="text-center font-body text-sm text-petal-muted py-10">{tr('載入中…', 'Loading…')}</p>;
   if (openId) {
     return (
       <ClientEventDetail
@@ -295,7 +296,7 @@ const ClientEvents: React.FC<{
       />
     );
   }
-  if (events.length === 0) return <p className="text-center font-body text-sm text-petal-muted py-10">這對伴侶還沒有好好說話的對話。</p>;
+  if (events.length === 0) return <p className="text-center font-body text-sm text-petal-muted py-10">{tr('這對伴侶還沒有好好說話的對話。', 'This couple has no conversations yet.')}</p>;
 
   return (
     <div className="p-4 space-y-2" data-testid="client-events">
@@ -335,7 +336,7 @@ const ClientEventDetail: React.FC<{
       const { event } = await apiService.getClientEventDetail(coupleId, eventId);
       setEvent(event);
     } catch (err) {
-      showNotification({ type: 'error', title: '無法載入', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
+      showNotification({ type: 'error', title: tr('無法載入', 'Couldn\'t load'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'), duration: 3500 });
     } finally {
       setLoading(false);
     }
@@ -352,7 +353,7 @@ const ClientEventDetail: React.FC<{
       setDraft('');
       await load();
     } catch (err) {
-      showNotification({ type: 'error', title: '留言失敗', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
+      showNotification({ type: 'error', title: tr('留言失敗', 'Couldn\'t post your comment'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'), duration: 3500 });
     } finally {
       setSending(false);
     }
@@ -361,29 +362,29 @@ const ClientEventDetail: React.FC<{
   return (
     <div className="flex flex-col h-full" data-testid="client-event-detail">
       <button onClick={onBack} className="flex items-center gap-1 px-4 py-2 font-body text-xs text-petal-muted hover:text-petal-ink">
-        <ChevronLeft className="w-4 h-4" strokeWidth={1.5} /> 返回列表
+        <ChevronLeft className="w-4 h-4" strokeWidth={1.5} /> {tr('返回列表', 'Back to list')}
       </button>
       {loading || !event ? (
-        <p className="text-center font-body text-sm text-petal-muted py-10">載入中…</p>
+        <p className="text-center font-body text-sm text-petal-muted py-10">{tr('載入中…', 'Loading…')}</p>
       ) : (
         <>
           <div className="px-4 pb-3 border-b border-petal-rule">
             <h4 className="font-display text-lg text-petal-ink">{event.title}</h4>
             {event.summary && <p className="mt-1 font-body text-sm text-petal-ink-soft leading-relaxed">{event.summary}</p>}
             {event.status === 'resolved' && (
-              <span className="inline-block mt-2 px-2 py-0.5 rounded-full bg-petal-sage/15 font-body text-[11px] text-petal-sage-deep">已完成</span>
+              <span className="inline-block mt-2 px-2 py-0.5 rounded-full bg-petal-sage/15 font-body text-[11px] text-petal-sage-deep">{tr('已完成', 'Completed')}</span>
             )}
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
             {event.messages.length === 0 ? (
-              <p className="text-center font-body text-sm text-petal-muted py-6">這段對話還沒有訊息。</p>
+              <p className="text-center font-body text-sm text-petal-muted py-6">{tr('這段對話還沒有訊息。', 'This conversation has no messages yet.')}</p>
             ) : (
               event.messages.map((m) => {
                 const who = m.isTherapist
-                  ? '心理師'
+                  ? tr('心理師', 'Therapist')
                   : m.isAi
-                    ? (companionName(m.aiTherapist) ? `${companionName(m.aiTherapist)}・AI 諮商師` : 'AI 諮商師')
-                    : '伴侶';
+                    ? (companionName(m.aiTherapist) ? tr(`${companionName(m.aiTherapist)}・AI 諮商師`, `${companionName(m.aiTherapist)} · AI counselor`) : 'AI 諮商師')
+                    : tr('伴侶', 'Couple');
                 return (
                   <div
                     key={m.id}
@@ -417,7 +418,7 @@ const ClientEventDetail: React.FC<{
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
-                placeholder="以心理師身分留言…"
+                placeholder={tr("以心理師身分留言…", 'Comment as their therapist…')}
                 data-testid="client-event-message-input"
                 className="flex-1 px-3.5 py-2 rounded-full border border-petal-rule bg-petal-cream focus:border-petal-ink focus:outline-none font-body text-sm text-petal-ink"
               />
@@ -440,10 +441,10 @@ const ClientEventDetail: React.FC<{
 // --- 話題建議 tab -----------------------------------------------------------
 
 const STATUS_LABEL: Record<TherapyTopicSelectionStatus | 'none', string> = {
-  selected: '已加入諮商',
-  saved: '先收藏',
-  dismissed: '不相關',
-  none: '尚未決定',
+  selected: tr('已加入諮商', 'Added to session'),
+  saved: tr('先收藏', 'Saved for later'),
+  dismissed: tr('不相關', 'Not relevant'),
+  none: tr('尚未決定', 'Undecided'),
 };
 const STATUS_CLS: Record<TherapyTopicSelectionStatus | 'none', string> = {
   selected: 'bg-petal-rose-deep text-white',
@@ -478,7 +479,7 @@ const TopicReadOnly: React.FC<{
     <p className="font-body text-sm text-petal-ink-soft leading-relaxed">{subtitle}</p>
     {notes && (
       <div className="mt-2 rounded-md bg-pink-50 border border-pink-200 px-3 py-2">
-        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-pink-700 mb-0.5">伴侶想延伸聊的點</div>
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-pink-700 mb-0.5">{tr('伴侶想延伸聊的點', 'Things the couple wants to explore further')}</div>
         <p className="font-body text-sm text-petal-ink whitespace-pre-wrap">{notes}</p>
       </div>
     )}
@@ -497,7 +498,7 @@ const ClientTherapyTopics: React.FC<{
       setLoading(true);
       setData(await apiService.getClientTherapyTopics(coupleId));
     } catch (err) {
-      showNotification({ type: 'error', title: '無法載入', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
+      showNotification({ type: 'error', title: tr('無法載入', 'Couldn\'t load'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'), duration: 3500 });
     } finally {
       setLoading(false);
     }
@@ -505,7 +506,7 @@ const ClientTherapyTopics: React.FC<{
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <p className="text-center font-body text-sm text-petal-muted py-10">載入中…</p>;
+  if (loading) return <p className="text-center font-body text-sm text-petal-muted py-10">{tr('載入中…', 'Loading…')}</p>;
   if (!data) return null;
 
   const hasAiTopics = !!data.topics && data.topics.topics.length > 0;
@@ -516,9 +517,9 @@ const ClientTherapyTopics: React.FC<{
       <div>
         <div className="flex items-center gap-1.5 text-petal-sage-deep mb-2">
           <Compass className="w-4 h-4" strokeWidth={1.5} />
-          <h4 className="font-display text-base text-petal-ink">話題建議</h4>
+          <h4 className="font-display text-base text-petal-ink">{tr('話題建議', 'Topic suggestions')}</h4>
           {hasAiTopics && data.period?.quiet && (
-            <span className="font-body text-[11px] text-petal-muted">・平靜模式</span>
+            <span className="font-body text-[11px] text-petal-muted">{tr('・平靜模式', '・Calm mode')}</span>
           )}
         </div>
         {/* library is always non-empty, so the "no topics yet" state has to be
@@ -534,7 +535,7 @@ const ClientTherapyTopics: React.FC<{
                 <TopicReadOnly
                   key={idx}
                   title={t.title}
-                  subtitleLabel="為什麼會建議這個"
+                  subtitleLabel={tr("為什麼會建議這個", 'Why this is suggested')}
                   subtitle={t.whySuggested}
                   status={data.selections[idx]?.status ?? null}
                   notes={data.selections[idx]?.notes ?? null}
@@ -544,7 +545,7 @@ const ClientTherapyTopics: React.FC<{
           </>
         ) : (
           <p className="font-body text-sm text-petal-muted leading-relaxed">
-            這對伴侶還沒有產生 AI 話題建議。等他們下次整理事件後，這裡會顯示下次諮商可以聊的方向。以下是他們可以直接挑選的話題庫。
+            {tr('這對伴侶還沒有產生 AI 話題建議。等他們下次整理事件後，這裡會顯示下次諮商可以聊的方向。以下是他們可以直接挑選的話題庫。', 'This couple hasn\'t generated AI topic suggestions yet. Once they next summarize their events, directions for your next session will show here. Below is the topic library they can pick from directly.')}
           </p>
         )}
       </div>
@@ -553,14 +554,14 @@ const ClientTherapyTopics: React.FC<{
         <div>
           <div className="flex items-center gap-1.5 text-petal-sage-deep mb-2">
             <Library className="w-4 h-4" strokeWidth={1.5} />
-            <h4 className="font-display text-base text-petal-ink">話題庫</h4>
+            <h4 className="font-display text-base text-petal-ink">{tr('話題庫', 'Topic library')}</h4>
           </div>
           <div className="space-y-2">
             {data.library.map((t) => (
               <TopicReadOnly
                 key={t.id}
                 title={t.title}
-                subtitleLabel="為什麼值得聊聊"
+                subtitleLabel={tr("為什麼值得聊聊", 'Why it\'s worth talking about')}
                 subtitle={t.description}
                 status={data.librarySelections[t.id]?.status ?? null}
                 notes={data.librarySelections[t.id]?.notes ?? null}
@@ -600,7 +601,7 @@ const ClientTherapySummaries: React.FC<{
       // Open the most recent one by default — it's the one they'd bring in.
       setOpenId(rows[0]?.id ?? null);
     } catch (err) {
-      showNotification({ type: 'error', title: '無法載入', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
+      showNotification({ type: 'error', title: tr('無法載入', 'Couldn\'t load'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'), duration: 3500 });
     } finally {
       setLoading(false);
     }
@@ -608,16 +609,16 @@ const ClientTherapySummaries: React.FC<{
 
   useEffect(() => { load(); }, [load]);
 
-  if (loading) return <p className="text-center font-body text-sm text-petal-muted py-10">載入中…</p>;
+  if (loading) return <p className="text-center font-body text-sm text-petal-muted py-10">{tr('載入中…', 'Loading…')}</p>;
   if (summaries.length === 0) {
     return (
       <div className="p-4" data-testid="client-therapy-summaries">
         <div className="rounded-lg border border-petal-rule bg-petal-cream-2/50 p-5 flex items-start gap-3">
           <ClipboardList className="w-5 h-5 text-petal-sage-deep shrink-0 mt-0.5" strokeWidth={1.5} />
           <div>
-            <h4 className="font-display text-base text-petal-ink">還沒有諮商摘要</h4>
+            <h4 className="font-display text-base text-petal-ink">{tr('還沒有諮商摘要', 'No counseling summary yet')}</h4>
             <p className="mt-1 font-body text-sm text-petal-ink-soft leading-relaxed">
-              當這對伴侶把最近的事件整理成一份「諮商摘要」後，就會出現在這裡——最常出現的主題、雙方的情緒、已修復與未解決的事，以及他們想和你討論的問題。你可以在諮商前先讀過，直接切入重點。
+              {tr('當這對伴侶把最近的事件整理成一份「諮商摘要」後，就會出現在這裡——最常出現的主題、雙方的情緒、已修復與未解決的事，以及他們想和你討論的問題。你可以在諮商前先讀過，直接切入重點。', 'Once this couple puts their recent events into a "counseling summary", it\'ll appear here: the most common topics, how they both felt, what\'s repaired and what isn\'t, and questions they want to discuss with you. You can read it before the session and get straight to the point.')}
             </p>
           </div>
         </div>
@@ -641,7 +642,7 @@ const ClientTherapySummaries: React.FC<{
                 <ClipboardList className="w-4 h-4 text-petal-sage-deep shrink-0" strokeWidth={1.5} />
                 <span className="font-body text-sm text-petal-ink truncate">
                   {s.periodLabel}
-                  {typeof s.eventCount === 'number' ? ` · 共 ${s.eventCount} 件` : ''}
+                  {typeof s.eventCount === 'number' ? tr(` · 共 ${s.eventCount} 件`, ` · ${s.eventCount} events`) : ''}
                 </span>
               </span>
               <span className="inline-flex items-center gap-1 font-body text-[11px] text-petal-muted shrink-0">

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Heart, CheckCircle, X, AlertCircle, Mail } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { tr } from '../i18n/tr';
 
 interface PairingInvitationHandlerProps {
   token: string;
@@ -61,11 +62,11 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
       setInvitation(response.invitation);
 
       if (response.invitation.isExpired) {
-        setError('此邀請已過期');
+        setError(tr('此邀請已過期', 'This invitation has expired'));
       }
     } catch (err) {
       console.error('Failed to fetch invitation details:', err);
-      setError((err as Error)?.message || '無法載入邀請詳情');
+      setError((err as Error)?.message || tr('無法載入邀請詳情', 'Couldn\'t load the invitation details'));
     } finally {
       setLoading(false);
     }
@@ -82,8 +83,8 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
     if (!authState.isAuthenticated) {
       showNotification({
         type: 'info',
-        title: '需要登入',
-        message: '請先登入以接受配對邀請',
+        title: tr('需要登入', 'Sign-in required'),
+        message: tr('請先登入以接受配對邀請', 'Please sign in to accept the pairing invitation'),
         duration: 6000
       });
       setShowAuthModal(true);
@@ -98,8 +99,8 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
       if (response.requiresAuth) {
         showNotification({
           type: 'info',
-          title: '需要登入',
-          message: '請先登入以接受配對邀請',
+          title: tr('需要登入', 'Sign-in required'),
+          message: tr('請先登入以接受配對邀請', 'Please sign in to accept the pairing invitation'),
           duration: 6000
         });
         setShowAuthModal(true);
@@ -108,10 +109,10 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
 
       showNotification({
         type: 'success',
-        title: '配對成功！',
+        title: tr('配對成功！', 'Paired!'),
         message: response.autoResolved
-          ? '配對成功，我們已自動處理重複邀請'
-          : response.message || '您已成功與伴侶配對',
+          ? tr('配對成功，我們已自動處理重複邀請', 'Paired! We took care of duplicate invitations automatically')
+          : response.message || tr('您已成功與伴侶配對', 'You\'re now paired with your partner'),
         duration: 8000
       });
 
@@ -125,8 +126,8 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
         if (couple?.id) {
           showNotification({
             type: 'success',
-            title: '配對成功！',
-            message: '你們已成功配對！',
+            title: tr('配對成功！', 'Paired!'),
+            message: tr('你們已成功配對！', 'You two are now paired!'),
             duration: 8000
           });
           onAccepted();
@@ -137,8 +138,8 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
       }
       showNotification({
         type: 'error',
-        title: '接受邀請失敗',
-        message: (err as Error)?.message || '無法接受配對邀請，請稍後再試',
+        title: tr('接受邀請失敗', 'Couldn\'t accept the invitation'),
+        message: (err as Error)?.message || tr('無法接受配對邀請，請稍後再試', 'Couldn\'t accept the pairing invitation. Please try again in a moment'),
         duration: 8000
       });
     } finally {
@@ -162,8 +163,8 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
 
       showNotification({
         type: 'info',
-        title: '已拒絕邀請',
-        message: '您已拒絕此配對邀請',
+        title: tr('已拒絕邀請', 'Invitation declined'),
+        message: tr('您已拒絕此配對邀請', 'You declined this pairing invitation'),
         duration: 6000
       });
 
@@ -173,8 +174,8 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
       console.error('Failed to reject invitation:', err);
       showNotification({
         type: 'error',
-        title: '拒絕邀請失敗',
-        message: (err as Error)?.message || '無法拒絕配對邀請，請稍後再試',
+        title: tr('拒絕邀請失敗', 'Couldn\'t decline the invitation'),
+        message: (err as Error)?.message || tr('無法拒絕配對邀請，請稍後再試', 'Couldn\'t decline the pairing invitation. Please try again in a moment'),
         duration: 8000
       });
     } finally {
@@ -188,7 +189,7 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
         <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500 mx-auto mb-4"></div>
-            <p className="text-gray-600">載入邀請詳情中...</p>
+            <p className="text-gray-600">{tr('載入邀請詳情中...', 'Loading invitation details...')}</p>
           </div>
         </div>
       </div>
@@ -202,14 +203,14 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
           <div className="text-center">
             <AlertCircle className="w-10 h-10 text-petal-rose-deep mx-auto mb-4 opacity-75" strokeWidth={1.2} />
             <h2 className="font-display text-2xl font-light tracking-tight text-petal-ink mb-3">
-              邀請<em className="not-italic font-light italic text-pink-600">無效</em>
+              {tr('邀請', 'Invitation ')}<em className="not-italic font-light italic text-pink-600">{tr('無效', 'invalid')}</em>
             </h2>
             <p className="font-body text-sm text-petal-ink-soft mb-6 leading-relaxed">{error}</p>
             <button
               onClick={onClose}
               className="w-full border border-petal-rule text-petal-ink py-3 rounded-md hover:bg-petal-cream-2 transition-colors font-body text-sm"
             >
-              關閉
+              {tr('關閉', 'Close')}
             </button>
           </div>
         </div>
@@ -225,18 +226,18 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
           <div className="mb-7 pb-6 border-b border-petal-rule">
             <Heart className="w-10 h-10 text-petal-rose-deep mx-auto mb-4 opacity-80" strokeWidth={1.2} />
             <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-2">
-              — 配對邀請
+              {tr('— 配對邀請', '— Pairing invitation')}
             </div>
             <h2 className="font-display text-2xl font-light tracking-tight text-petal-ink mb-2">
-              一份來自 <em className="not-italic font-light italic text-pink-600">Twogether</em> 的邀請
+              {tr('一份來自', 'An invitation from')} <em className="not-italic font-light italic text-pink-600">Twogether</em> {tr('的邀請', '')}
             </h2>
-            <p className="font-display italic font-light text-sm text-petal-muted">您收到了一個配對邀請。</p>
+            <p className="font-display italic font-light text-sm text-petal-muted">{tr('您收到了一個配對邀請。', 'You\'ve received a pairing invitation.')}</p>
           </div>
 
           {/* Invitation Details */}
           <div className="bg-petal-cream-2/40 rounded-md p-5 mb-6 border border-petal-rule-soft">
             <div className="font-body text-[11px] uppercase tracking-[0.14em] text-petal-muted mb-2">
-              <Mail className="inline w-3.5 h-3.5 mr-1.5 text-petal-rose-deep" strokeWidth={1.5} />來自
+              <Mail className="inline w-3.5 h-3.5 mr-1.5 text-petal-rose-deep" strokeWidth={1.5} />{tr('來自', 'From')}
             </div>
             <p className="font-display text-xl font-medium tracking-tight text-petal-ink mb-3">
               {invitation?.senderNickname}
@@ -244,7 +245,7 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
 
             {invitation?.message && (
               <div className="border-t border-petal-rule-soft pt-4 mt-3">
-                <p className="font-body text-[11px] uppercase tracking-[0.14em] text-petal-muted mb-2">個人訊息</p>
+                <p className="font-body text-[11px] uppercase tracking-[0.14em] text-petal-muted mb-2">{tr('個人訊息', 'Personal message')}</p>
                 <p className="font-display italic font-light text-base text-petal-ink-soft leading-relaxed">"{invitation.message}"</p>
               </div>
             )}
@@ -264,12 +265,12 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
               {processing ? (
                 <div className="flex items-center justify-center">
                   <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-petal-muted border-t-transparent mr-2"></div>
-                  處理中…
+                  {tr('處理中…', 'Processing…')}
                 </div>
               ) : (
                 <div className="flex items-center justify-center">
                   <CheckCircle className="w-4 h-4 mr-1.5" strokeWidth={1.5} />
-                  接受邀請 →
+                  {tr('接受邀請 →', 'Accept invitation →')}
                 </div>
               )}
             </button>
@@ -283,10 +284,10 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
                   : 'border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink'
               }`}
             >
-              {processing ? '處理中…' : (
+              {processing ? tr('處理中…', 'Processing…') : (
                 <div className="flex items-center justify-center">
                   <X className="w-5 h-5 mr-2" />
-                  拒絕邀請
+                  {tr('拒絕邀請', 'Decline invitation')}
                 </div>
               )}
             </button>
@@ -296,7 +297,7 @@ const PairingInvitationHandler: React.FC<PairingInvitationHandlerProps> = ({
               disabled={processing}
               className="w-full py-2 text-gray-500 hover:text-gray-700 transition-colors"
             >
-              稍後處理
+              {tr('稍後處理', 'Decide later')}
             </button>
           </div>
         </div>

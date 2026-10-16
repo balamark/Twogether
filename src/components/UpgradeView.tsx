@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Sparkles, Check, Crown, Ticket } from 'lucide-react';
 import { apiService, type BillingStatus, type BillingPlan, type PaymentProvider } from '../services/api';
 import PaymentMethodPicker from './PaymentMethodPicker';
+import { tr } from '../i18n/tr';
 
 type Notify = (n: { type: 'success' | 'error' | 'info' | 'warning'; title: string; message: string; duration?: number }) => void;
 
@@ -18,9 +19,9 @@ interface UpgradeViewProps {
 
 // What premium lifts. Kept in sync with lib/entitlements.js FEATURE_LIMITS.
 const PREMIUM_PERKS = [
-  '每日 AI 整理／改寫次數大幅提升',
-  '無限建立自訂角色扮演劇本',
-  '無限上傳照片',
+  tr('每日 AI 整理／改寫次數大幅提升', 'Many more AI rewrites and summaries per day'),
+  tr('無限建立自訂角色扮演劇本', 'Unlimited custom role-play scripts'),
+  tr('無限上傳照片', 'Unlimited photo uploads'),
 ];
 
 function formatDate(iso: string | null): string {
@@ -48,7 +49,7 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
         if (!cancelled) setStatus(s);
       } catch (err) {
         if (!cancelled) {
-          showNotification?.({ type: 'error', title: '載入失敗', message: (err as Error)?.message || '請稍後再試', duration: 5000 });
+          showNotification?.({ type: 'error', title: tr('載入失敗', 'Couldn\'t load'), message: (err as Error)?.message || tr('請稍後再試', 'Please try again in a moment'), duration: 5000 });
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -61,7 +62,7 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
 
   const handleUpgrade = async (plan: BillingPlan['id']) => {
     if (status && !status.hasCouple) {
-      showNotification?.({ type: 'info', title: '尚未配對', message: '完成情侶配對後即可升級 Premium', duration: 5000 });
+      showNotification?.({ type: 'info', title: tr('尚未配對', 'Not paired yet'), message: tr('完成情侶配對後即可升級 Premium', 'Pair with your partner first, then you can upgrade to Premium'), duration: 5000 });
       return;
     }
     setCheckoutPlan(plan);
@@ -70,7 +71,7 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
       await apiService.startCheckout(plan, provider);
     } catch (err) {
       setCheckoutPlan(null);
-      showNotification?.({ type: 'error', title: '無法付款', message: (err as Error)?.message || '請稍後再試', duration: 6000 });
+      showNotification?.({ type: 'error', title: tr('無法付款', 'Can\'t start payment'), message: (err as Error)?.message || tr('請稍後再試', 'Please try again in a moment'), duration: 6000 });
     }
   };
 
@@ -90,8 +91,8 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
       }
       showNotification?.({
         type: 'success',
-        title: '優惠碼已套用',
-        message: `已啟用 Premium ${result.days} 天，所有功能都解鎖了！`,
+        title: tr('優惠碼已套用', 'Promo code applied'),
+        message: tr(`已啟用 Premium ${result.days} 天，所有功能都解鎖了！`, `Premium is active for ${result.days} days. Everything is unlocked!`),
         duration: 6000,
       });
       onRedeemed?.(result);
@@ -100,8 +101,8 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
       // 已被兌換完畢 / 你們已經使用過這組優惠碼了) — show it verbatim.
       showNotification?.({
         type: 'error',
-        title: '無法套用優惠碼',
-        message: (err as Error)?.message || '請確認優惠碼是否正確後再試一次',
+        title: tr('無法套用優惠碼', 'Couldn\'t apply the promo code'),
+        message: (err as Error)?.message || tr('請確認優惠碼是否正確後再試一次', 'Please check the code and try again'),
         duration: 6000,
       });
     } finally {
@@ -119,10 +120,10 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
           — Premium
         </div>
         <h2 className="font-display text-4xl font-light tracking-tight text-petal-ink leading-tight mb-3">
-          升級 <em className="not-italic italic text-pink-600">Twogether Premium</em>
+          {tr('升級', 'Upgrade')} <em className="not-italic italic text-pink-600">Twogether Premium</em>
         </h2>
         <p className="font-display italic font-light text-base text-petal-muted">
-          解除免費方案的使用上限，為你們的關係解鎖全部功能。
+          {tr('解除免費方案的使用上限，為你們的關係解鎖全部功能。', 'Lift the free plan\'s limits and unlock every feature for your relationship.')}
         </p>
       </div>
 
@@ -142,7 +143,7 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
         >
           <Crown className="w-4 h-4 text-pink-600" strokeWidth={1.5} />
           <span className="font-body text-sm text-petal-ink">
-            目前為 Premium 會員{status?.expiresAt ? `，有效期至 ${formatDate(status.expiresAt)}` : ''}
+            {tr('目前為 Premium 會員', 'You\'re a Premium member')}{status?.expiresAt ? tr(`，有效期至 ${formatDate(status.expiresAt)}`, `, valid until ${formatDate(status.expiresAt)}`) : ''}
           </span>
         </div>
       )}
@@ -150,7 +151,7 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
       {/* Perks */}
       <div className="mb-8 rounded-md border border-petal-rule bg-petal-cream p-5">
         <div className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-3">
-          Premium 包含
+          {tr('Premium 包含', 'Premium includes')}
         </div>
         <ul className="space-y-2">
           {PREMIUM_PERKS.map((perk) => (
@@ -165,14 +166,14 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
       {/* Payment method */}
       <div className="mb-4">
         <div className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2">
-          付款方式
+          {tr('付款方式', 'Payment method')}
         </div>
         <PaymentMethodPicker value={provider} onChange={setProvider} disabled={checkoutPlan !== null} />
       </div>
 
       {/* Plans */}
       {loading ? (
-        <div className="text-center py-10 font-body text-sm text-petal-muted">載入中…</div>
+        <div className="text-center py-10 font-body text-sm text-petal-muted">{tr('載入中…', 'Loading…')}</div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-3">
           {plans.map((plan) => {
@@ -184,11 +185,11 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
                 className="rounded-md border border-petal-rule bg-petal-cream p-5 flex flex-col text-center"
                 data-testid={`plan-${plan.id}`}
               >
-                <div className="font-display text-lg font-light text-petal-ink mb-1">{plan.days} 天</div>
+                <div className="font-display text-lg font-light text-petal-ink mb-1">{plan.days} {tr('天', ' days')}</div>
                 <div className="font-display text-3xl font-light text-petal-ink mb-1">
                   NT${plan.amount}
                 </div>
-                <div className="font-body text-xs text-petal-muted mb-5">約 NT${monthly}／月</div>
+                <div className="font-body text-xs text-petal-muted mb-5">{tr('約 NT$', 'About NT$')}{monthly}{tr('／月', '/month')}</div>
                 <button
                   onClick={() => handleUpgrade(plan.id)}
                   disabled={busy || checkoutPlan !== null}
@@ -199,7 +200,7 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
                       : 'bg-petal-ink text-petal-cream hover:bg-pink-700'
                   }`}
                 >
-                  {busy ? '前往付款…' : isPremium ? '續購' : '升級'}
+                  {busy ? tr('前往付款…', 'Going to payment…') : isPremium ? tr('續購', 'Renew') : tr('升級', 'Upgrade')}
                 </button>
               </div>
             );
@@ -212,11 +213,11 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
         <div className="flex items-center space-x-2 mb-3">
           <Ticket className="w-4 h-4 text-pink-600" strokeWidth={1.5} />
           <span className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted">
-            有優惠碼？
+            {tr('有優惠碼？', 'Have a promo code?')}
           </span>
         </div>
         <p className="font-display italic font-light text-sm text-petal-muted mb-3">
-          輸入優惠碼，立即免費啟用 Premium。
+          {tr('輸入優惠碼，立即免費啟用 Premium。', 'Enter a promo code to activate Premium for free right away.')}
         </p>
         <div className="flex gap-2">
           <input
@@ -224,7 +225,7 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
             value={couponCode}
             onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
             onKeyDown={(e) => { if (e.key === 'Enter') handleRedeem(); }}
-            placeholder="輸入優惠碼"
+            placeholder={tr("輸入優惠碼", 'Enter promo code')}
             data-testid="coupon-input"
             disabled={redeeming}
             autoCapitalize="characters"
@@ -240,14 +241,14 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
                 : 'bg-petal-ink text-petal-cream hover:bg-pink-700'
             }`}
           >
-            {redeeming ? '套用中…' : '套用'}
+            {redeeming ? tr('套用中…', 'Applying…') : tr('套用', 'Apply')}
           </button>
         </div>
       </div>
 
       <p className="mt-6 text-center font-body text-xs text-petal-muted flex items-center justify-center space-x-1.5">
         <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
-        <span>支援信用卡、LINE Pay、ATM 與超商 · 由綠界 ECPay 或藍新金流安全付款 · 一次性購買，不自動續約</span>
+        <span>{tr('支援信用卡、LINE Pay、ATM 與超商 · 由綠界 ECPay 或藍新金流安全付款 · 一次性購買，不自動續約', 'Credit card, LINE Pay, ATM and convenience stores · Secure payment by ECPay or NewebPay · One-time purchase, never auto-renews')}</span>
       </p>
     </div>
   );
@@ -288,23 +289,23 @@ export const BillingResultView: React.FC<{ onDone: () => void }> = ({ onDone }) 
     <div className="min-h-screen bg-petal-cream flex items-center justify-center p-4">
       <div className="max-w-md w-full text-center bg-petal-cream rounded-md border border-petal-rule shadow-petal p-8">
         {checking ? (
-          <p className="font-body text-sm text-petal-muted py-6">確認付款結果中…</p>
+          <p className="font-body text-sm text-petal-muted py-6">{tr('確認付款結果中…', 'Confirming your payment…')}</p>
         ) : success ? (
           <>
             <Crown className="w-8 h-8 text-pink-600 mx-auto mb-3" strokeWidth={1.5} />
-            <h2 className="font-display text-2xl font-light text-petal-ink mb-2">付款成功</h2>
-            <p className="font-body text-sm text-petal-ink-soft mb-1">感謝升級 Premium！</p>
+            <h2 className="font-display text-2xl font-light text-petal-ink mb-2">{tr('付款成功', 'Payment successful')}</h2>
+            <p className="font-body text-sm text-petal-ink-soft mb-1">{tr('感謝升級 Premium！', 'Thanks for upgrading to Premium!')}</p>
             {expiresAt && (
               <p className="font-body text-sm text-petal-muted mb-6">
-                有效期至 {formatDate(expiresAt)}
+                {tr('有效期至', 'Valid until')} {formatDate(expiresAt)}
               </p>
             )}
           </>
         ) : (
           <>
-            <h2 className="font-display text-2xl font-light text-petal-ink mb-2">付款未完成</h2>
+            <h2 className="font-display text-2xl font-light text-petal-ink mb-2">{tr('付款未完成', 'Payment not completed')}</h2>
             <p className="font-body text-sm text-petal-ink-soft mb-6">
-              這次沒有完成付款，你可以稍後再試一次。
+              {tr('這次沒有完成付款，你可以稍後再試一次。', 'The payment wasn\'t completed. You can try again later.')}
             </p>
           </>
         )}
@@ -314,7 +315,7 @@ export const BillingResultView: React.FC<{ onDone: () => void }> = ({ onDone }) 
             data-testid="billing-result-done"
             className="w-full py-3 rounded-md bg-petal-ink text-petal-cream hover:bg-pink-700 transition-colors font-display italic text-base"
           >
-            返回 Twogether →
+            {tr('返回 Twogether →', 'Back to Twogether →')}
           </button>
         )}
       </div>
