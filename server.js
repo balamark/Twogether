@@ -59,6 +59,7 @@ const { requestLogger, errorHandler, asyncHandler } = require('./middleware/logg
 const { requestContext } = require('./middleware/request-context');
 const { JWT_EXPIRES_IN, JWT_EXPIRES_IN_MS } = require('./middleware/auth');
 const { adminAuth } = require('./middleware/adminAuth');
+const { localeMiddleware } = require('./middleware/locale');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -194,6 +195,8 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
+// X-Locale: en → user-facing response strings are translated (middleware/locale.js).
+app.use('/api', localeMiddleware);
 app.use('/api/auth', authRoutes);
 app.use('/api/couples', coupleRoutes);
 app.use('/api/love-moments', loveMomentRoutes);

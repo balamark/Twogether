@@ -31,6 +31,7 @@ const {
   buildJudgeInstruction,
 } = require('../../lib/reflectionJudge');
 const { getCuratedExamples, buildExamplesBlock } = require('../../lib/judgeExamples');
+const { getRequestContext } = require('../../middleware/request-context');
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 
@@ -66,12 +67,37 @@ function estimateCostUSD(model, usage) {
   return (inTok * p.in + outTok * p.out + cacheW * p.cacheWrite + cacheR * p.cacheRead) / 1_000_000;
 }
 
+// Interface language. When the request came from a user who picked English in
+// the top-right switch (X-Locale: en → middleware/locale.js stores it on the
+// request context), every generation gets one extra system block asking for
+// English user-facing text. Fixed labels / enum values / JSON keys the prompts
+// define stay exactly as specified, so parsers keyed on them keep working.
+// Appended LAST so cached system-prompt prefixes stay cache hits.
+const ENGLISH_DIRECTIVE = `Interface language: English.
+The person using the app chose English. Write every piece of natural-language text a user will read (advice, rewrites, summaries, questions, letters, translations of feelings, suggestions) in natural, warm English, even though these instructions and the conversation may be in Chinese.
+Keep the required output format exactly: JSON keys, enum values, ids, and any fixed labels or option values these instructions say to use must stay exactly as specified (do not translate them).
+If you are reviewing another model's output, English output is expected and correct here; do not penalize it for not being Chinese.
+Do not use em dashes.`;
+
+function withInterfaceLanguage(params) {
+  const ctx = getRequestContext();
+  if (!ctx || ctx.locale !== 'en' || !params) return params;
+  const block = { type: 'text', text: ENGLISH_DIRECTIVE };
+  if (Array.isArray(params.system)) return { ...params, system: [...params.system, block] };
+  if (typeof params.system === 'string' && params.system) {
+    return { ...params, system: [{ type: 'text', text: params.system }, block] };
+  }
+  return { ...params, system: [block] };
+}
+
 let client;
 function getClient() {
   if (!client) {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) throw new Error('ANTHROPIC_API_KEY is not set');
     client = new Anthropic({ apiKey });
+    const create = client.messages.create.bind(client.messages);
+    client.messages.create = (params, options) => create(withInterfaceLanguage(params), options);
   }
   return client;
 }

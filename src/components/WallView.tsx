@@ -837,7 +837,7 @@ const WallView: React.FC<WallViewProps> = ({
                   {tr('範例', 'Example')}
                 </span>
                 <span className="font-body text-[10px] uppercase tracking-[0.1em] text-petal-muted">
-                  {demo.mood_tag}
+                  {moodTagLabel(demo.mood_tag)}
                 </span>
               </div>
               <div className="font-display text-sm font-medium text-petal-ink mb-1">

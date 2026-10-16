@@ -48,6 +48,31 @@ test.describe('language switch', () => {
   });
 });
 
+test.describe('English beyond the header', () => {
+  test('logged-out showroom content follows the switch, not just the nav', async ({ page }) => {
+    await page.goto('/');
+    await page.getByTestId('language-switch-en').click();
+    await expect(page.getByTestId('nav-tab-home')).toContainText('Today');
+    // Showroom copy lives in LoggedOutPreview (tr() strings), not messages.ts.
+    await expect(page.getByText('Today, the one thing most')).toBeVisible();
+    await expect(page.getByText('今天，最值得做的')).toHaveCount(0);
+  });
+
+  test('server messages come back in English with X-Locale: en', async () => {
+    const ctx = await request.newContext();
+    const bad = { email: 'not-an-email', password: 'x' };
+
+    const en = await ctx.post(`${SERVER}/api/auth/login`, { data: bad, headers: { 'X-Locale': 'en' } });
+    expect(en.status()).toBe(400);
+    expect(JSON.stringify(await en.json())).toContain('Please enter a valid email address');
+
+    // No header → the original 繁中 message, so existing clients are unaffected.
+    const zh = await ctx.post(`${SERVER}/api/auth/login`, { data: bad });
+    expect(JSON.stringify(await zh.json())).toContain('請輸入有效的電子郵件地址');
+    await ctx.dispose();
+  });
+});
+
 test.describe('public /support page', () => {
   for (const path of ['/support', '/support.html']) {
     test(`${path} is public, English, and carries the real support email`, async () => {
