@@ -57,6 +57,7 @@ import CloseTogetherModal from './closure/CloseTogetherModal';
 import PrivateCoachDrawer from './PrivateCoachDrawer';
 import ClosurePanel from './closure/ClosurePanel';
 import ClosureSummaryCard from './closure/ClosureSummaryCard';
+import { tr } from '../i18n/tr';
 
 interface NotificationInput {
   type: 'success' | 'error' | 'info' | 'warning';
@@ -84,19 +85,19 @@ function statusPill(status: EventStatus) {
     // It behaves like 'open' everywhere: same pill, same 一起收尾 bar.
     case 'open':
     case 'resolve_pending':
-      return <span className="text-xs px-2 py-0.5 rounded-full bg-petal-rose/30 text-petal-ink">未解決</span>;
+      return <span className="text-xs px-2 py-0.5 rounded-full bg-petal-rose/30 text-petal-ink">{tr('未解決', 'Open')}</span>;
     case 'closing':
       return (
         <span className="text-xs px-2 py-0.5 rounded-full bg-petal-sage/20 text-petal-ink inline-flex items-center gap-1">
           <Sprout className="w-3 h-3" />
-          收尾中
+          {tr('收尾中', 'Wrapping up')}
         </span>
       );
     case 'resolved':
       return (
         <span className="text-xs px-2 py-0.5 rounded-full bg-petal-sage/30 text-petal-ink inline-flex items-center gap-1">
           <CheckCircle2 className="w-3 h-3" />
-          已解決
+          {tr('已解決', 'Resolved')}
         </span>
       );
   }
@@ -223,14 +224,14 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       if (code === 'AI_DAILY_LIMIT_REACHED') {
         showNotification({
           type: 'warning',
-          title: '今日 AI 次數已用完',
-          message: '情緒檢測次數已達今日上限，升級 Premium 可提高每日上限，或先用下方的步驟提示自己檢查。',
+          title: tr('今日 AI 次數已用完', 'Today\'s AI credits are used up'),
+          message: tr('情緒檢測次數已達今日上限，升級 Premium 可提高每日上限，或先用下方的步驟提示自己檢查。', 'You\'ve reached today\'s limit for the emotion check. Premium raises the daily limit, or use the step prompts below to check it yourself.'),
         });
       } else {
         showNotification({
           type: 'error',
-          title: '情緒檢測失敗',
-          message: err instanceof Error ? err.message : '請稍後再試',
+          title: tr('情緒檢測失敗', 'The emotion check failed'),
+          message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
         });
       }
     } finally {
@@ -252,22 +253,22 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       if (code === 'AI_DAILY_LIMIT_REACHED') {
         showNotification({
           type: 'warning',
-          title: '今日 AI 次數已用完',
-          message: '明天會自動補上；升級 Premium 可提高每日上限。你也可以直接送出自己寫的版本。',
+          title: tr('今日 AI 次數已用完', 'Today\'s AI credits are used up'),
+          message: tr('明天會自動補上；升級 Premium 可提高每日上限。你也可以直接送出自己寫的版本。', 'They refill tomorrow; Premium raises the daily limit. You can also send the version you wrote yourself.'),
         });
       } else if (code === 'REWRITE_TOO_LONG') {
         // Expected for a very long draft — the model ran out of room to return
         // three full-length versions. Tell them how to get unstuck.
         showNotification({
           type: 'warning',
-          title: 'AI 改寫沒完成',
-          message: err instanceof Error ? err.message : '請縮短草稿，或分成兩則分開改寫送出。',
+          title: tr('AI 改寫沒完成', 'The AI rewrite didn\'t finish'),
+          message: err instanceof Error ? err.message : tr('請縮短草稿，或分成兩則分開改寫送出。', 'Please shorten your draft, or split it into two messages and rewrite each.'),
         });
       } else {
         showNotification({
           type: 'error',
-          title: 'AI 改寫失敗',
-          message: err instanceof Error ? err.message : '請稍後再試',
+          title: tr('AI 改寫失敗', 'The AI rewrite failed'),
+          message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
         });
       }
     } finally {
@@ -287,8 +288,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     if (text.length > REPLY_MAX_CHARS) {
       showNotification({
         type: 'info',
-        title: '這個版本超過字數上限',
-        message: `這個版本 ${text.length} 字，超過 ${REPLY_MAX_CHARS} 字上限，請刪掉 ${text.length - REPLY_MAX_CHARS} 字再送出，或分成兩則送出。`,
+        title: tr('這個版本超過字數上限', 'This version is over the character limit'),
+        message: tr(`這個版本 ${text.length} 字，超過 ${REPLY_MAX_CHARS} 字上限，請刪掉 ${text.length - REPLY_MAX_CHARS} 字再送出，或分成兩則送出。`, `This version is ${text.length} characters, over the ${REPLY_MAX_CHARS}-character limit. Please remove ${text.length - REPLY_MAX_CHARS} characters, or send it as two messages.`),
       });
     }
   };
@@ -308,14 +309,14 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       if (code === 'AI_DAILY_LIMIT_REACHED') {
         showNotification({
           type: 'warning',
-          title: '今日 AI 次數已用完',
-          message: '今天的 AI 接住建議次數已達上限，升級 Premium 可提高每日上限，或先用下方的步驟提示自己回應。',
+          title: tr('今日 AI 次數已用完', 'Today\'s AI credits are used up'),
+          message: tr('今天的 AI 接住建議次數已達上限，升級 Premium 可提高每日上限，或先用下方的步驟提示自己回應。', 'You\'ve reached today\'s limit for AI suggestions on holding their feelings. Premium raises the daily limit, or use the step prompts below to respond yourself.'),
         });
       } else {
         showNotification({
           type: 'error',
-          title: 'AI 接住建議失敗',
-          message: err instanceof Error ? err.message : '請稍後再試',
+          title: tr('AI 接住建議失敗', 'The AI suggestion failed'),
+          message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
         });
       }
     } finally {
@@ -358,7 +359,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
         // a next step, not a red failure.
         showNotification({
           type: res.translated === 0 ? 'warning' : 'info',
-          title: res.translated === 0 ? '情緒翻譯這次沒完成' : '情緒翻譯完成一部分',
+          title: res.translated === 0 ? tr('情緒翻譯這次沒完成', 'Emotion translation didn\'t finish this time') : tr('情緒翻譯完成一部分', 'Emotion translation finished partly'),
           message: res.message,
         });
       }
@@ -368,14 +369,14 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       if (code === 'AI_DAILY_LIMIT_REACHED') {
         showNotification({
           type: 'warning',
-          title: '今日 AI 次數已用完',
-          message: '情緒翻譯次數已達今日上限，升級 Premium 可提高每日上限。',
+          title: tr('今日 AI 次數已用完', 'Today\'s AI credits are used up'),
+          message: tr('情緒翻譯次數已達今日上限，升級 Premium 可提高每日上限。', 'You\'ve reached today\'s limit for emotion translation. Premium raises the daily limit.'),
         });
       } else {
         showNotification({
           type: 'error',
-          title: '情緒翻譯失敗',
-          message: err instanceof Error ? err.message : '請稍後再試',
+          title: tr('情緒翻譯失敗', 'Emotion translation failed'),
+          message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
         });
       }
     } finally {
@@ -401,7 +402,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
         .filter((m) => m.senderId !== currentUserId && !m.readAt)
         .forEach((m) => apiService.markEventMessageRead(eventId, m.id));
     } catch (err) {
-      setError(err instanceof Error ? err.message : '無法取得對話詳情');
+      setError(err instanceof Error ? err.message : tr('無法取得對話詳情', 'Couldn\'t load the conversation. Please try again in a moment.'));
     }
   };
 
@@ -415,8 +416,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       setTranslationEnabled(!next);
       showNotification({
         type: 'error',
-        title: '無法更新情緒翻譯設定',
-        message: err instanceof Error ? err.message : '請稍後再試',
+        title: tr('無法更新情緒翻譯設定', 'Couldn\'t update the emotion translation setting'),
+        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
       });
     }
   };
@@ -431,14 +432,14 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       if (code === 'AI_DAILY_LIMIT_REACHED') {
         showNotification({
           type: 'warning',
-          title: '今日 AI 次數已用完',
-          message: '治療摘要次數已達今日上限，升級 Premium 可提高每日上限，明天也會自動補上。',
+          title: tr('今日 AI 次數已用完', 'Today\'s AI credits are used up'),
+          message: tr('治療摘要次數已達今日上限，升級 Premium 可提高每日上限，明天也會自動補上。', 'You\'ve reached today\'s limit for session notes. Premium raises the daily limit, and it refills tomorrow.'),
         });
       } else {
         showNotification({
           type: 'error',
-          title: '治療摘要暫時無法產生',
-          message: err instanceof Error ? err.message : '請稍後再試',
+          title: tr('治療摘要暫時無法產生', 'Session notes can\'t be generated right now'),
+          message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
         });
       }
     } finally {
@@ -456,26 +457,26 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       if (phase === 'advance') setAdvancePaused(true);
       showNotification({
         type: 'warning',
-        title: '今日 AI 次數已用完',
-        message: '引導練習次數已達今日上限，升級 Premium 可提高每日上限；明天會自動補上，引導也會接著繼續。',
+        title: tr('今日 AI 次數已用完', 'Today\'s AI credits are used up'),
+        message: tr('引導練習次數已達今日上限，升級 Premium 可提高每日上限；明天會自動補上，引導也會接著繼續。', 'You\'ve reached today\'s limit for guided practice. Premium raises the daily limit; it refills tomorrow and the guide picks up where it left off.'),
       });
     } else if (code === 'NOT_PAIRED') {
       showNotification({
         type: 'info',
-        title: '引導模式需要兩個人',
-        message: err instanceof Error ? err.message : '先邀請另一半配對，就能一起練習。',
+        title: tr('引導模式需要兩個人', 'Guided mode needs two people'),
+        message: err instanceof Error ? err.message : tr('先邀請另一半配對，就能一起練習。', 'Invite your partner to pair first, then you can practice together.'),
       });
     } else if (code === 'EVENT_RESOLVED') {
       showNotification({
         type: 'info',
-        title: '這段對話已完成',
-        message: err instanceof Error ? err.message : '如需再談可先重新開啟對話。',
+        title: tr('這段對話已完成', 'This conversation is complete'),
+        message: err instanceof Error ? err.message : tr('如需再談可先重新開啟對話。', 'To talk more, reopen the conversation first.'),
       });
     } else if (code === 'PRIVATE_EVENT') {
       showNotification({
         type: 'info',
-        title: '私人對話不支援引導',
-        message: '引導模式需要兩個人一起參與，私人對話只有你看得到。',
+        title: tr('私人對話不支援引導', 'Private conversations don\'t support guided mode'),
+        message: tr('引導模式需要兩個人一起參與，私人對話只有你看得到。', 'Guided mode needs both of you, and a private conversation is only visible to you.'),
       });
     } else if (code === 'NO_SESSION') {
       // Local state is stale (e.g. the partner ended the session) — resync
@@ -484,8 +485,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     } else {
       showNotification({
         type: 'error',
-        title: '引導暫時無法進行',
-        message: err instanceof Error ? err.message : '請稍後再試',
+        title: tr('引導暫時無法進行', 'The guide can\'t run right now'),
+        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
       });
     }
   };
@@ -532,7 +533,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       // 練習結束就回到對話 —— 時間軸上的標記還在，隨時可以回頭看。
       setGuideOpen(false);
     } catch (err) {
-      showNotification({ type: 'error', title: '無法結束引導', message: err instanceof Error ? err.message : '請稍後再試' });
+      showNotification({ type: 'error', title: tr('無法結束引導', 'Couldn\'t end the guided session'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment') });
     } finally {
       setEndingSession(false);
     }
@@ -593,8 +594,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     } catch (err) {
       showNotification({
         type: 'error',
-        title: '送出失敗',
-        message: err instanceof Error ? err.message : '請稍後再試',
+        title: tr('送出失敗', 'Couldn\'t send'),
+        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
       });
     } finally {
       setSending(false);
@@ -610,8 +611,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     } else {
       showNotification({
         type: 'info',
-        title: '訊息已保存',
-        message: 'Sophie 幫你把這段話留著，隨時可以回來繼續。',
+        title: tr('訊息已保存', 'Message saved'),
+        message: tr('Sophie 幫你把這段話留著，隨時可以回來繼續。', 'Sophie kept these words for you. Come back and continue any time.'),
         duration: 4000,
       });
     }
@@ -627,14 +628,14 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       if (code === 'AI_DAILY_LIMIT_REACHED') {
         showNotification({
           type: 'warning',
-          title: '今日 AI 次數已用完',
-          message: `明天會自動補上；升級 Premium 可提高每日上限。${myCompanion.name} 明天還會在。`,
+          title: tr('今日 AI 次數已用完', 'Today\'s AI credits are used up'),
+          message: tr(`明天會自動補上；升級 Premium 可提高每日上限。${myCompanion.name} 明天還會在。`, `They refill tomorrow; Premium raises the daily limit. ${myCompanion.name} will still be here tomorrow.`),
         });
       } else {
         showNotification({
           type: 'error',
-          title: 'AI 諮商師暫時無法回應',
-          message: err instanceof Error ? err.message : '請稍後再試',
+          title: tr('AI 諮商師暫時無法回應', 'The AI counselor can\'t respond right now'),
+          message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
         });
       }
     } finally {
@@ -665,8 +666,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     } catch (err) {
       showNotification({
         type: 'error',
-        title: '貼上失敗',
-        message: err instanceof Error ? err.message : '請稍後再試',
+        title: tr('貼上失敗', 'Couldn\'t post'),
+        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
       });
     } finally {
       setAiPosting(false);
@@ -685,7 +686,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     const title = headerTitle.trim();
     const summary = headerSummary.trim();
     if (!title || !summary) {
-      showNotification({ type: 'warning', title: '無法儲存', message: '標題與簡介都不能是空白' });
+      showNotification({ type: 'warning', title: tr('無法儲存', 'Couldn\'t save'), message: tr('標題與簡介都不能是空白', 'The title and summary can\'t be empty') });
       return;
     }
     setSavingEdit(true);
@@ -697,8 +698,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       const code = (err as { error_code?: string })?.error_code;
       showNotification({
         type: code === 'EVENT_RESOLVED' ? 'warning' : 'error',
-        title: '編輯失敗',
-        message: err instanceof Error ? err.message : '請稍後再試',
+        title: tr('編輯失敗', 'Couldn\'t save your edit'),
+        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
       });
     } finally {
       setSavingEdit(false);
@@ -714,7 +715,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     if (!editingMessageId) return;
     const content = editingMessageText.trim();
     if (!content) {
-      showNotification({ type: 'warning', title: '無法儲存', message: '訊息內容不能是空白' });
+      showNotification({ type: 'warning', title: tr('無法儲存', 'Couldn\'t save'), message: tr('訊息內容不能是空白', 'The message can\'t be empty') });
       return;
     }
     setSavingEdit(true);
@@ -730,8 +731,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       const code = (err as { error_code?: string })?.error_code;
       showNotification({
         type: code === 'EVENT_RESOLVED' ? 'warning' : 'error',
-        title: '編輯失敗',
-        message: err instanceof Error ? err.message : '請稍後再試',
+        title: tr('編輯失敗', 'Couldn\'t save your edit'),
+        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
       });
     } finally {
       setSavingEdit(false);
@@ -746,11 +747,11 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       setShareWarnOpen(false);
       showNotification({
         type: 'success',
-        title: '已匿名公開',
-        message: '這段對話會以匿名方式顯示在「公開問答」，謝謝你願意幫助別人。',
+        title: tr('已匿名公開', 'Shared anonymously'),
+        message: tr('這段對話會以匿名方式顯示在「公開問答」，謝謝你願意幫助別人。', 'This conversation will appear anonymously in "Public Q&A". Thank you for being willing to help others.'),
       });
     } catch (err) {
-      showNotification({ type: 'error', title: '公開失敗', message: err instanceof Error ? err.message : '請稍後再試' });
+      showNotification({ type: 'error', title: tr('公開失敗', 'Couldn\'t share publicly'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment') });
     } finally {
       setSharing(false);
     }
@@ -766,14 +767,14 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       setSharePartnerOpen(false);
       showNotification({
         type: 'success',
-        title: '已分享給伴侶',
-        message: '伴侶現在看得到這段對話，你們可以一起討論了。',
+        title: tr('已分享給伴侶', 'Shared with your partner'),
+        message: tr('伴侶現在看得到這段對話，你們可以一起討論了。', 'Your partner can see this conversation now, so you can discuss it together.'),
       });
     } catch (err) {
       showNotification({
         type: 'error',
-        title: '分享失敗',
-        message: err instanceof Error ? err.message : '請稍後再試',
+        title: tr('分享失敗', 'Couldn\'t share'),
+        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
       });
     } finally {
       setSharingPartner(false);
@@ -785,9 +786,9 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     try {
       const updated = await apiService.unpublishEvent(eventId);
       setEvent((prev) => (prev ? { ...prev, publicStatus: updated.publicStatus } : prev));
-      showNotification({ type: 'info', title: '已取消公開', message: '這段對話不再顯示於公開問答。' });
+      showNotification({ type: 'info', title: tr('已取消公開', 'No longer public'), message: tr('這段對話不再顯示於公開問答。', 'This conversation no longer appears in Public Q&A.') });
     } catch (err) {
-      showNotification({ type: 'error', title: '操作失敗', message: err instanceof Error ? err.message : '請稍後再試' });
+      showNotification({ type: 'error', title: tr('操作失敗', 'Something went wrong'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment') });
     } finally {
       setSharing(false);
     }
@@ -803,8 +804,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       const code = (err as { error_code?: string })?.error_code;
       showNotification({
         type: code === 'NOT_PAIRED' || code === 'PRIVATE_EVENT' ? 'info' : 'error',
-        title: '無法開始一起收尾',
-        message: err instanceof Error ? err.message : '請稍後再試',
+        title: tr('無法開始一起收尾', 'Couldn\'t start wrapping up together'),
+        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
       });
     } finally {
       setResolving(false);
@@ -852,8 +853,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
       const code = (err as { error_code?: string })?.error_code;
       showNotification({
         type: code === 'AI_DAILY_LIMIT_REACHED' ? 'warning' : 'error',
-        title: code === 'AI_DAILY_LIMIT_REACHED' ? '今日 AI 次數已用完' : '暫時無法產生見解',
-        message: err instanceof Error ? err.message : '請稍後再試',
+        title: code === 'AI_DAILY_LIMIT_REACHED' ? tr('今日 AI 次數已用完', 'Today\'s AI credits are used up') : tr('暫時無法產生見解', 'The insight can\'t be generated right now'),
+        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
       });
     } finally {
       setRetryingInsight(false);
@@ -866,12 +867,12 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     try {
       await apiService.reopenEvent(eventId);
       await refresh();
-      showNotification({ type: 'success', title: '已重新開啟', message: '可以繼續討論這段對話了' });
+      showNotification({ type: 'success', title: tr('已重新開啟', 'Reopened'), message: tr('可以繼續討論這段對話了', 'You can keep discussing this conversation') });
     } catch (err) {
       showNotification({
         type: 'error',
-        title: '操作失敗',
-        message: err instanceof Error ? err.message : '請稍後再試',
+        title: tr('操作失敗', 'Something went wrong'),
+        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
       });
     } finally {
       setResolving(false);
@@ -879,13 +880,13 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   };
 
   if (loading) {
-    return <div className="p-8 text-center text-petal-ink-soft">載入中…</div>;
+    return <div className="p-8 text-center text-petal-ink-soft">{tr('載入中…', 'Loading…')}</div>;
   }
   if (error || !event) {
     return (
       <div className="space-y-3">
         <BackButton onBack={onBack} />
-        <div className="p-6 text-center text-red-500">{error || '找不到對話'}</div>
+        <div className="p-6 text-center text-red-500">{error || tr('找不到對話', 'Conversation not found')}</div>
       </div>
     );
   }
@@ -932,7 +933,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             {event.isPrivate && (
               <span className="text-xs px-2 py-0.5 rounded-full bg-petal-ink/10 text-petal-ink inline-flex items-center gap-1">
                 <Lock className="w-3 h-3" />
-                私人
+                {tr('私人', 'Private')}
               </span>
             )}
             {statusPill(event.status)}
@@ -941,7 +942,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 type="button"
                 data-testid="event-header-edit"
                 onClick={startHeaderEdit}
-                title="編輯標題與簡介"
+                title={tr("編輯標題與簡介", 'Edit title and summary')}
                 className="p-1.5 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink"
               >
                 <Pencil className="w-3.5 h-3.5" />
@@ -950,8 +951,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           </div>
         </div>
         <p className="text-xs text-petal-muted mb-3">
-          {formatTime(event.createdAt, tz)}・{isAuthor ? '你發起' : '伴侶發起'}
-          {event.contentEditedAt && <span>・已編輯</span>}
+          {formatTime(event.createdAt, tz)}・{isAuthor ? tr('你發起', 'Started by you') : tr('伴侶發起', 'Started by your partner')}
+          {event.contentEditedAt && <span>{tr('・已編輯', '・Edited')}</span>}
         </p>
 
         {editingHeader ? (
@@ -971,7 +972,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 disabled={savingEdit}
                 className="px-3 py-1.5 rounded-full border border-petal-rule text-xs text-petal-ink hover:bg-petal-sage/20 disabled:opacity-50"
               >
-                取消
+                {tr('取消', 'Cancel')}
               </button>
               <button
                 type="button"
@@ -981,7 +982,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 className="px-4 py-1.5 rounded-full bg-petal-ink text-petal-cream text-xs inline-flex items-center gap-1.5 disabled:opacity-50"
               >
                 {savingEdit && <Loader2 className="w-3 h-3 animate-spin" />}
-                儲存
+                {tr('儲存', 'Save')}
               </button>
             </div>
           </div>
@@ -1003,9 +1004,9 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               className="w-full flex items-center gap-2 px-3 py-2 bg-petal-cream-2 text-left hover:bg-petal-cream transition-colors"
             >
               <FileText className="w-3.5 h-3.5 text-petal-rose-deep shrink-0" strokeWidth={1.5} />
-              <span className="font-body text-xs font-medium text-petal-ink flex-1">完整經過</span>
+              <span className="font-body text-xs font-medium text-petal-ink flex-1">{tr('完整經過', 'The full story')}</span>
               <span className="font-body text-[11px] text-petal-muted">
-                {detailOpen ? '收合' : '展開'}
+                {detailOpen ? tr('收合', 'Collapse') : tr('展開', 'Expand')}
               </span>
               {detailOpen
                 ? <ChevronUp className="w-3.5 h-3.5 text-petal-muted shrink-0" strokeWidth={1.5} />
@@ -1017,7 +1018,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                   {event.detail}
                 </p>
                 <p className="mt-2 font-body text-[11px] text-petal-muted">
-                  上面的紀錄是中性摘要；這段保留了原文完整的內容，只拿掉了攻擊性的字眼。
+                  {tr('上面的紀錄是中性摘要；這段保留了原文完整的內容，只拿掉了攻擊性的字眼。', 'The record above is a neutral summary; this keeps the full original text with only the hurtful words removed.')}
                 </p>
               </div>
             )}
@@ -1053,10 +1054,10 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               className="text-xs px-3 py-1.5 rounded-full border border-petal-rose text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink inline-flex items-center gap-1.5"
             >
               <Users className="w-3.5 h-3.5" />
-              讓伴侶也看得到
+              {tr('讓伴侶也看得到', 'Let your partner see it too')}
             </button>
             <p className="text-[11px] text-petal-muted leading-relaxed">
-              這段對話目前只有你看得到。讓伴侶看得到後，你們就能一起討論；之後也能選擇匿名公開到「公開問答」。
+              {tr('這段對話目前只有你看得到。讓伴侶看得到後，你們就能一起討論；之後也能選擇匿名公開到「公開問答」。', 'Right now only you can see this conversation. Once your partner can see it, you can discuss it together, and later you can choose to share it anonymously to "Public Q&A".')}
             </p>
           </div>
         )}
@@ -1069,7 +1070,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs text-petal-sage-deep inline-flex items-center gap-1.5">
                   <Globe className="w-3.5 h-3.5" />
-                  已匿名公開到公開問答
+                  {tr('已匿名公開到公開問答', 'Shared anonymously to Public Q&A')}
                 </span>
                 <button
                   type="button"
@@ -1078,7 +1079,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                   disabled={sharing}
                   className="text-xs px-3 py-1.5 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink disabled:opacity-50"
                 >
-                  取消公開
+                  {tr('取消公開', 'Unpublish')}
                 </button>
               </div>
             ) : (
@@ -1089,7 +1090,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 className="text-xs px-3 py-1.5 rounded-full border border-petal-sage text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink inline-flex items-center gap-1.5"
               >
                 <Globe className="w-3.5 h-3.5" />
-                匿名公開到公開問答
+                {tr('匿名公開到公開問答', 'Share anonymously to Public Q&A')}
               </button>
             )}
           </div>
@@ -1118,16 +1119,16 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           <div className="flex items-center justify-between gap-2 bg-petal-cream-2 border border-petal-rule rounded-xl px-3 py-2">
             <div className="flex items-center gap-1.5 min-w-0">
               <HeartHandshake className="w-4 h-4 text-petal-rose-deep shrink-0" strokeWidth={1.5} />
-              <span className="text-xs text-petal-ink truncate">情緒翻譯</span>
+              <span className="text-xs text-petal-ink truncate">{tr('情緒翻譯', 'Emotion translation')}</span>
               <span
                 className="text-[11px] text-petal-muted cursor-help shrink-0"
-                title="開啟後，AI 會在每句話下方顯示背後的情緒與需求，幫你們從「立場」轉向「需求」。兩人都看得到。"
+                title={tr("開啟後，AI 會在每句話下方顯示背後的情緒與需求，幫你們從「立場」轉向「需求」。兩人都看得到。", 'When on, AI shows the feelings and needs beneath each message, helping you move from "positions" to "needs". You both can see it.')}
               >
                 (?)
               </span>
               {translationLoading && (
                 <span className="text-[11px] text-petal-muted shrink-0 inline-flex items-center gap-1">
-                  <Loader2 className="w-3 h-3 animate-spin" />翻譯中…
+                  <Loader2 className="w-3 h-3 animate-spin" />{tr('翻譯中…', 'Translating…')}
                 </span>
               )}
             </div>
@@ -1135,7 +1136,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               type="button"
               role="switch"
               aria-checked={translationEnabled}
-              aria-label="情緒翻譯"
+              aria-label={tr("情緒翻譯", 'Emotion translation')}
               onClick={handleToggleTranslation}
               data-testid="event-translation-toggle"
               className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
@@ -1162,7 +1163,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               className="w-full flex items-center gap-1.5 text-left text-[11px] text-petal-rose-deep hover:underline px-1"
             >
               <Compass className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
-              這個感覺好像不只是現在？深入看看
+              {tr('這個感覺好像不只是現在？深入看看', 'Does this feeling seem to be about more than now? Look deeper')}
             </button>
           )}
           {/* An unfinished batch has to stay explained on screen: the toast
@@ -1178,12 +1179,12 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 onClick={loadTranslations}
                 className="text-[11px] text-petal-rose-deep hover:underline shrink-0 whitespace-nowrap"
               >
-                重試
+                {tr('重試', 'Retry')}
               </button>
             </div>
           )}
           {event.messages.length === 0 && (
-            <p className="text-sm text-petal-ink-soft text-center py-4">尚無訊息</p>
+            <p className="text-sm text-petal-ink-soft text-center py-4">{tr('尚無訊息', 'No messages yet')}</p>
           )}
           {(() => {
             // The creator's opening message was seeded from one of the three
@@ -1207,7 +1208,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                   <span className="h-px flex-1 bg-petal-rule-soft" />
                   <span className="inline-flex items-center gap-1.5 font-body text-[11px] text-petal-muted group-hover:text-petal-rose-deep transition-colors">
                     <Compass className="w-3.5 h-3.5" strokeWidth={1.5} />
-                    引導練習
+                    {tr('引導練習', 'Guided practice')}
                     {meta ? ` · ${meta.emoji} ${meta.label}` : ''}
                     {f.sessionDone ? ' ✓' : ''}
                   </span>
@@ -1226,7 +1227,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                         size="xs"
                         role="ai"
                         companionId={m.aiTherapist}
-                        name={companionName(m.aiTherapist) || 'AI 諮商師'}
+                        name={companionName(m.aiTherapist) || tr('AI 諮商師', 'AI counselor')}
                       />
                       <span className="text-xs font-medium">
                         {counselorLabel(companionName(m.aiTherapist))}
@@ -1245,8 +1246,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 <div key={m.id} className={`flex ${SEAT_ALIGN[SEAT.therapist]}`}>
                   <div className={bubbleClass('therapist')}>
                     <div className={`flex items-center gap-1.5 mb-1 ${ROLE_STYLE.therapist.label}`}>
-                      <ParticipantAvatar size="xs" role="therapist" name="專屬心理師" />
-                      <span className="text-xs font-medium">專屬心理師</span>
+                      <ParticipantAvatar size="xs" role="therapist" name={tr("專屬心理師", 'Dedicated therapist')} />
+                      <span className="text-xs font-medium">{tr('專屬心理師', 'Dedicated therapist')}</span>
                     </div>
                     <p className="text-sm text-petal-ink whitespace-pre-wrap leading-relaxed">{m.content}</p>
                     <p className="text-[10px] text-petal-muted mt-1.5">{formatTime(m.createdAt, tz)}</p>
@@ -1256,7 +1257,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             }
             const mine = m.senderId === currentUserId;
             const isEditing = editingMessageId === m.id;
-            const speakerName = mine ? (myNickname || '我') : (partnerNickname || '對方');
+            const speakerName = mine ? (myNickname || tr('我', 'Me')) : (partnerNickname || tr('對方', 'Partner'));
             const canSwapVersion =
               mine &&
               m.id === firstHumanMessage?.id &&
@@ -1296,16 +1297,16 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                       </div>
                       {editingMessageText.length > REPLY_MAX_CHARS && (
                         <p className="mt-1 font-body text-xs text-red-600">
-                          超過 {editingMessageText.length - REPLY_MAX_CHARS} 字，請刪減後再儲存。
+                          {tr('超過', 'Over ')} {editingMessageText.length - REPLY_MAX_CHARS} {tr('字，請刪減後再儲存。', ' characters. Please shorten it before saving.')}
                         </p>
                       )}
                       {canSwapVersion && (
                         <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                          <span className="text-[10px] text-petal-muted">改用當時的其他版本：</span>
+                          <span className="text-[10px] text-petal-muted">{tr('改用當時的其他版本：', 'Switch to another version from that time: ')}</span>
                           {([
-                            ['neutral', '中性版'],
-                            ['firm', '堅定版'],
-                            ['warm', '善意版'],
+                            ['neutral', tr('中性版', 'Neutral')],
+                            ['firm', tr('堅定版', 'Firm')],
+                            ['warm', tr('善意版', 'Kind')],
                           ] as const).map(([key, label]) =>
                             (event.versions[key] || '').trim().length > 0 ? (
                               <button
@@ -1328,7 +1329,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                           disabled={savingEdit}
                           className="px-3 py-1 rounded-full border border-petal-rule text-xs text-petal-ink hover:bg-petal-sage/20 disabled:opacity-50"
                         >
-                          取消
+                          {tr('取消', 'Cancel')}
                         </button>
                         <button
                           type="button"
@@ -1338,7 +1339,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                           className="px-3 py-1 rounded-full bg-petal-ink text-petal-cream text-xs inline-flex items-center gap-1.5 disabled:opacity-50"
                         >
                           {savingEdit && <Loader2 className="w-3 h-3 animate-spin" />}
-                          儲存
+                          {tr('儲存', 'Save')}
                         </button>
                       </div>
                     </div>
@@ -1362,8 +1363,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                         <ParticipantAvatar size="xs" name={speakerName} colorKey={m.senderId} />
                         <span className="font-medium text-petal-ink-soft">{speakerName}</span>
                         <span>・{formatTime(m.createdAt, tz)}</span>
-                        {m.editedAt && <span>・已編輯</span>}
-                        {mine && m.readAt && <span>・已讀</span>}
+                        {m.editedAt && <span>{tr('・已編輯', '・Edited')}</span>}
+                        {mine && m.readAt && <span>{tr('・已讀', '・Read')}</span>}
                         {/* A mediated message keeps its buffer — editing the raw
                             original in place would defeat the hierarchy. */}
                         {mine && event.status !== 'resolved' && !m.sophieTranslation && (
@@ -1371,7 +1372,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                             type="button"
                             data-testid={`event-message-edit-${m.id}`}
                             onClick={() => startMessageEdit(m.id, m.content)}
-                            title="編輯訊息"
+                            title={tr("編輯訊息", 'Edit message')}
                             className="ml-1 p-0.5 rounded text-petal-muted hover:text-petal-ink"
                           >
                             <Pencil className="w-3 h-3" />
@@ -1416,14 +1417,14 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 onClick={() => setSophieChooserOpen(true)}
                 disabled={aiInviting || facilitating}
                 className="px-5 py-2 rounded-full bg-gradient-to-r from-violet-500 to-vivid-rose text-white font-medium text-sm inline-flex items-center gap-2 shadow-sm shadow-violet-500/25 hover:opacity-95 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
-                title={`請 ${myCompanion.name} 加入，給建議或帶你們做一張練習卡`}
+                title={tr(`請 ${myCompanion.name} 加入，給建議或帶你們做一張練習卡`, `Invite ${myCompanion.name} to give advice or lead you through a practice card`)}
               >
                 {(aiInviting || facilitating) ? <Loader2 className="w-4 h-4 animate-spin" /> : <HeartHandshake className="w-4 h-4" />}
-                <span>請 {myCompanion.name} 加入</span>
+                <span>{tr('請', 'Invite ')} {myCompanion.name} {tr('加入', ' to join')}</span>
               </button>
               <p className="font-body text-[11px] text-petal-muted text-center max-w-sm leading-relaxed inline-flex items-center gap-1 mt-0.5">
                 <Globe className="w-3 h-3 shrink-0" strokeWidth={1.75} />
-                回應會出現在對話裡，兩人都看得到（會用到 AI 次數）。
+                {tr('回應會出現在對話裡，兩人都看得到（會用到 AI 次數）。', 'The response appears in the conversation for both of you to see (uses AI credits).')}
               </p>
             </div>
           )}
@@ -1441,17 +1442,17 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           <span className="min-w-0">
             <span className="flex items-center gap-1.5 font-body text-sm font-medium text-petal-rose-deep">
               <Compass className="w-4 h-4 shrink-0" strokeWidth={1.5} />
-              引導練習進行中
+              {tr('引導練習進行中', 'Guided practice in progress')}
             </span>
             <span className="block font-body text-xs text-petal-ink-soft mt-0.5 truncate">
               {advancePaused
-                ? '今日 AI 次數已用完，明天會自動接續'
+                ? tr('今日 AI 次數已用完，明天會自動接續', 'Today\'s AI credits are used up; it continues automatically tomorrow')
                 : isMyFacilitationTurn
-                  ? `🎯 輪到你了 · ${myCompanion.name} 在等你這一步`
-                  : `⏳ 等待 ${partnerNickname || '對方'} 回應這一步`}
+                  ? tr(`🎯 輪到你了 · ${myCompanion.name} 在等你這一步`, `🎯 Your turn · ${myCompanion.name} is waiting for your step`)
+                  : tr(`⏳ 等待 ${partnerNickname || '對方'} 回應這一步`, `⏳ Waiting for ${partnerNickname || 'your partner'} to respond to this step`)}
             </span>
           </span>
-          <span className="font-body text-xs text-petal-rose-deep shrink-0">開啟 →</span>
+          <span className="font-body text-xs text-petal-rose-deep shrink-0">{tr('開啟 →', 'Open →')}</span>
         </button>
       )}
 
@@ -1469,11 +1470,11 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           >
             <span aria-hidden className="text-base leading-none">💡</span>
             <span className="flex-1 min-w-0 font-body text-sm">
-              不知道怎麼開口？讓 {myCompanion.name} 私下幫你想
+              {tr('不知道怎麼開口？讓', 'Don\'t know how to start? Let ')} {myCompanion.name} {tr('私下幫你想', ' help you privately')}
             </span>
             <span className="shrink-0 inline-flex items-center gap-1 font-body text-[11px] text-petal-muted">
               <Lock className="w-3 h-3" strokeWidth={1.75} />
-              只有你看得到
+              {tr('只有你看得到', 'Only you can see this')}
             </span>
           </button>
 
@@ -1481,7 +1482,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             data-testid="event-reply-input"
             value={reply}
             onChange={(e) => setReply(e.target.value)}
-            placeholder="把心裡的話，好好說出來…"
+            placeholder={tr("把心裡的話，好好說出來…", 'Say what\'s in your heart, well…')}
             maxLength={REPLY_MAX_CHARS}
             className="w-full p-2 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-none min-h-[6.5rem] max-h-[40vh] overflow-y-auto"
           />
@@ -1498,7 +1499,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           </div>
           {replyOver && (
             <p data-testid="event-reply-over-hint" className="font-body text-xs text-red-600">
-              這則留言 {reply.length} / {REPLY_MAX_CHARS} 字，請刪掉 {reply.length - REPLY_MAX_CHARS} 字，或分成兩則送出。
+              {tr('這則留言', 'This message is')} {reply.length} / {REPLY_MAX_CHARS} {tr('字，請刪掉', ' characters. Please remove ')} {reply.length - REPLY_MAX_CHARS} {tr('字，或分成兩則送出。', ' characters, or send it as two messages.')}
             </p>
           )}
           {/* Free, instant tone hint: when the draft reads charged, nudge the
@@ -1532,10 +1533,10 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 onClick={requestDraftAnalysis}
                 disabled={analyzing || reply.trim().length === 0}
                 className="px-3 py-1.5 rounded-full border border-slate-200 bg-white font-body text-xs font-medium text-slate-600 inline-flex items-center gap-1.5 shadow-sm hover:bg-violet-50 hover:text-violet-700 hover:border-violet-300 active:scale-95 transition-all duration-150 cursor-pointer disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-slate-600 disabled:hover:border-slate-200"
-                title="送出前，看看這句話底層的情緒、對方會怎麼聽，以及更好的說法"
+                title={tr("送出前，看看這句話底層的情緒、對方會怎麼聽，以及更好的說法", 'Before sending, see the feelings beneath these words, how they might hear it, and a better way to say it')}
               >
                 {analyzing ? <Loader2 className="w-4 h-4 animate-spin text-amber-500" /> : <Gauge className="w-4 h-4 text-amber-500" strokeWidth={1.75} />}
-                <span>情緒檢測</span>
+                <span>{tr('情緒檢測', 'Emotion check')}</span>
               </button>
               <button
                 type="button"
@@ -1543,10 +1544,10 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 onClick={requestRewrite}
                 disabled={rewriting || reply.trim().length === 0}
                 className="px-3 py-1.5 rounded-full border border-slate-200 bg-white font-body text-xs font-medium text-slate-600 inline-flex items-center gap-1.5 shadow-sm hover:bg-violet-50 hover:text-violet-700 hover:border-violet-300 active:scale-95 transition-all duration-150 cursor-pointer disabled:opacity-40 disabled:shadow-none disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-slate-600 disabled:hover:border-slate-200"
-                title="讓 AI 把你的回覆改得更中性、客觀"
+                title={tr("讓 AI 把你的回覆改得更中性、客觀", 'Let AI rewrite your reply to be more neutral and objective')}
               >
                 {rewriting ? <Loader2 className="w-4 h-4 animate-spin text-violet-500" /> : <Sparkles className="w-4 h-4 text-violet-500" strokeWidth={1.75} />}
-                <span>緩和語氣</span>
+                <span>{tr('緩和語氣', 'Soften the tone')}</span>
               </button>
             </div>
             <button
@@ -1557,7 +1558,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               className="px-5 py-2 rounded-full font-medium inline-flex items-center gap-2 transition-all active:scale-[0.98] bg-vivid-rose text-white shadow-md shadow-vivid-rose/30 hover:bg-vivid-rose-strong cursor-pointer disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none disabled:cursor-not-allowed disabled:pointer-events-none disabled:hover:bg-slate-200"
             >
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              <span>送出</span>
+              <span>{tr('送出', 'Send')}</span>
             </button>
           </div>
         </div>
@@ -1578,10 +1579,10 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
         <SophieInterventionOverlay
           intervention={sophie.intervention}
           pauseCopy={sophie.pause || {
-            heading: '我先暫停一下。',
-            body: ['你的訊息沒有被刪掉，也沒有被改寫，我已經幫你保存下來。', '我想先陪你一下，因為如果現在立刻讓TA看到，你們可能會直接進入下一輪爭吵。'],
-            reassurance: '你可以生氣。我只想幫你確定：在這股生氣下面，你最希望TA真正聽見的是什麼。',
-            cta: '好，先陪我一下',
+            heading: tr('我先暫停一下。', 'Let me pause for a moment.'),
+            body: [tr('你的訊息沒有被刪掉，也沒有被改寫，我已經幫你保存下來。', 'Your message wasn\'t deleted or rewritten. I\'ve saved it for you.'), tr('我想先陪你一下，因為如果現在立刻讓TA看到，你們可能會直接進入下一輪爭吵。', 'I want to stay with you for a moment, because if they see it right now, you might go straight into another round of fighting.')],
+            reassurance: tr('你可以生氣。我只想幫你確定：在這股生氣下面，你最希望TA真正聽見的是什麼。', 'You can be angry. I just want to help you be sure what, beneath this anger, you most want them to really hear.'),
+            cta: tr('好，先陪我一下', 'Okay, stay with me a moment'),
           }}
           coreQuestion={sophie.core_question || ''}
           coreOptions={sophie.core_options || []}
@@ -1702,10 +1703,10 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
             <div className="bg-petal-sage/15 border border-petal-sage/40 rounded-2xl p-4 text-center space-y-2">
               <p className="text-sm text-petal-ink inline-flex items-center gap-1.5">
                 <NotebookPen className="w-4 h-4 text-petal-sage-deep" />
-                想不想讓 AI 幫你們整理這次衝突的「治療摘要」？
+                {tr('想不想讓 AI 幫你們整理這次衝突的「治療摘要」？', 'Would you like AI to put together "session notes" for this conflict?')}
               </p>
               <p className="text-xs text-petal-ink-soft leading-relaxed">
-                看清楚這次的觸發點、彼此真正的需求、你們落入的循環，還有下次可以先說的一句話。
+                {tr('看清楚這次的觸發點、彼此真正的需求、你們落入的循環，還有下次可以先說的一句話。', 'See this time\'s trigger, what each of you really needs, the cycle you fell into, and a sentence you can open with next time.')}
               </p>
               <button
                 type="button"
@@ -1715,7 +1716,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
                 className="px-4 py-2 rounded-full bg-petal-sage-deeper text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2 disabled:opacity-50"
               >
                 {therapyLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <NotebookPen className="w-4 h-4" />}
-                {therapyLoading ? '整理中⋯' : '產生治療摘要'}
+                {therapyLoading ? tr('整理中⋯', 'Summarizing…') : tr('產生治療摘要', 'Create session notes')}
               </button>
             </div>
           )}
@@ -1723,7 +1724,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           <div className="flex flex-col items-center gap-2 text-center bg-petal-sage/15 border border-petal-sage/40 rounded-2xl p-4">
             <p className="text-sm text-petal-ink-soft inline-flex items-center gap-1.5">
               <CheckCircle2 className="w-4 h-4 text-petal-sage-deep" />
-              這段對話已完成。如果還想再聊聊，可以重新開啟。
+              {tr('這段對話已完成。如果還想再聊聊，可以重新開啟。', 'This conversation is complete. If you want to talk more, you can reopen it.')}
             </p>
             <button
               type="button"
@@ -1733,7 +1734,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               className="px-4 py-2 rounded-full bg-petal-sage-deeper text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2 disabled:opacity-50"
             >
               {resolving ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-              重新開啟討論
+              {tr('重新開啟討論', 'Reopen the discussion')}
             </button>
           </div>
         </div>
@@ -1752,7 +1753,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           companionLabel={counselorLabel(companionName(latestGuideTurn?.aiTherapist) || myCompanion.name, 'guide')}
           companionId={latestGuideTurn?.aiTherapist ?? companionId}
           companionShortName={myCompanion.name}
-          partnerName={partnerNickname || '對方'}
+          partnerName={partnerNickname || tr('對方', 'Partner')}
           isMyTurn={isMyFacilitationTurn}
           advancePaused={advancePaused}
           reply={reply}
@@ -1810,7 +1811,7 @@ function SophieHelpChooser({
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
       data-testid="event-sophie-help-chooser"
     >
-      <button type="button" aria-label="取消" onClick={onCancel} className="absolute inset-0 bg-black/40" />
+      <button type="button" aria-label={tr("取消", 'Cancel')} onClick={onCancel} className="absolute inset-0 bg-black/40" />
       <div className="relative w-full sm:max-w-md bg-petal-cream rounded-t-3xl sm:rounded-3xl max-h-[85dvh] overflow-y-auto overscroll-contain safe-pb shadow-xl">
         <div className="sm:hidden flex justify-center pt-2.5 pb-1">
           <span className="h-1 w-10 rounded-full bg-petal-rule" />
@@ -1819,15 +1820,15 @@ function SophieHelpChooser({
           <div className="flex items-start justify-between gap-3 mb-1">
             <h3 className="text-lg font-serif text-petal-ink flex items-center gap-1.5">
               <span aria-hidden>👩‍🏫</span>
-              {name} 可以怎麼幫你們？
+              {name} {tr('可以怎麼幫你們？', 'How can I help you both?')}
             </h3>
-            <button type="button" onClick={onCancel} aria-label="取消" className="flex-shrink-0 -m-1 p-1 text-petal-ink-soft hover:text-petal-ink">
+            <button type="button" onClick={onCancel} aria-label={tr("取消", 'Cancel')} className="flex-shrink-0 -m-1 p-1 text-petal-ink-soft hover:text-petal-ink">
               <X className="w-5 h-5" />
             </button>
           </div>
           <p className="text-[11px] text-petal-ink-soft mb-4 inline-flex items-center gap-1">
             <Globe className="w-3 h-3" strokeWidth={1.75} />
-            兩種都會出現在對話裡、兩人都看得到，各會用到 1 次 AI。
+            {tr('兩種都會出現在對話裡、兩人都看得到，各會用到 1 次 AI。', 'Both appear in the conversation for both of you to see, and each uses 1 AI credit.')}
           </p>
 
           <div className="space-y-2.5">
@@ -1839,10 +1840,10 @@ function SophieHelpChooser({
             >
               <div className="flex items-center gap-2 font-body text-sm font-medium text-petal-ink">
                 <HeartHandshake className="w-4 h-4 text-petal-sage-deep shrink-0" strokeWidth={1.75} />
-                給一段中立的建議
+                {tr('給一段中立的建議', 'Give neutral advice')}
               </div>
               <p className="mt-1 font-body text-xs text-petal-ink-soft leading-relaxed">
-                {name} 讀過你們的對話，給一段不站邊的話，貼到對話裡兩人一起看。
+                {name} {tr('讀過你們的對話，給一段不站邊的話，貼到對話裡兩人一起看。', 'Reads your conversation and offers advice that doesn\'t take sides, posted for you both to see.')}
               </p>
             </button>
 
@@ -1855,10 +1856,10 @@ function SophieHelpChooser({
               >
                 <div className="flex items-center gap-2 font-body text-sm font-medium text-petal-ink">
                   <Compass className="w-4 h-4 text-petal-rose-deep shrink-0" strokeWidth={1.75} />
-                  帶我們做一張練習卡
+                  {tr('帶我們做一張練習卡', 'Lead us through a practice card')}
                 </div>
                 <p className="mt-1 font-body text-xs text-petal-ink-soft leading-relaxed">
-                  {name} 像諮商師一樣，一步一步帶你們做一個小練習（🪞 鏡映、🔄 換位、🫶 肯定…），一次一張卡、指定誰先做。
+                  {name} {tr('像諮商師一樣，一步一步帶你們做一個小練習（🪞 鏡映、🔄 換位、🫶 肯定…），一次一張卡、指定誰先做。', 'Like a counselor, guides you step by step through a small exercise (🪞 mirroring, 🔄 perspective-taking, 🫶 affirmation…), one card at a time, saying who goes first.')}
                 </p>
               </button>
             )}
@@ -1893,11 +1894,11 @@ function AiCounselorPreview({
           <div className="flex items-center gap-2">
             <HeartHandshake className="w-5 h-5 text-petal-sage-deep" />
             <div>
-              <h3 className="text-lg font-serif text-petal-ink">{name}（AI 諮商師）的建議</h3>
-              <p className="text-xs text-petal-ink-soft mt-1">看看這段建議，貼到對話串後雙方都看得到。</p>
+              <h3 className="text-lg font-serif text-petal-ink">{name}{tr('（AI 諮商師）的建議', ' (AI counselor) suggests')}</h3>
+              <p className="text-xs text-petal-ink-soft mt-1">{tr('看看這段建議，貼到對話串後雙方都看得到。', 'Take a look at this suggestion. Once posted to the thread, you\'ll both see it.')}</p>
             </div>
           </div>
-          <button type="button" onClick={onCancel} className="text-petal-ink-soft hover:text-petal-ink" aria-label="取消">
+          <button type="button" onClick={onCancel} className="text-petal-ink-soft hover:text-petal-ink" aria-label={tr("取消", 'Cancel')}>
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -1912,7 +1913,7 @@ function AiCounselorPreview({
             onClick={onCancel}
             className="text-sm px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20"
           >
-            先不要
+            {tr('先不要', 'Not now')}
           </button>
           <button
             type="button"
@@ -1922,7 +1923,7 @@ function AiCounselorPreview({
             className="text-sm px-4 py-2 rounded-full bg-petal-sage-deeper text-petal-cream inline-flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
           >
             {posting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            貼到對話串
+            {tr('貼到對話串', 'Post to thread')}
           </button>
         </div>
       </div>
@@ -1945,14 +1946,13 @@ function ShareWithPartnerWarning({
       <div className="bg-petal-cream rounded-2xl max-w-md w-full p-5">
         <div className="flex items-center gap-2 mb-3">
           <Users className="w-5 h-5 text-petal-rose-deep" />
-          <h3 className="text-lg font-serif text-petal-ink">讓伴侶也看得到</h3>
+          <h3 className="text-lg font-serif text-petal-ink">{tr('讓伴侶也看得到', 'Let your partner see it too')}</h3>
         </div>
         <p className="text-sm text-petal-ink-soft leading-relaxed mb-2">
-          目前這段對話<span className="text-petal-ink font-medium">只有你看得到</span>。
-          分享後，<span className="text-petal-ink font-medium">伴侶會看到標題與內容</span>，你們就能一起討論這件事。
+          {tr('目前這段對話', 'Right now this conversation ')}<span className="text-petal-ink font-medium">{tr('只有你看得到', 'is only visible to you')}</span>{tr('。 分享後，', '. Once shared, ')}<span className="text-petal-ink font-medium">{tr('伴侶會看到標題與內容', 'your partner will see the title and content')}</span>{tr('，你們就能一起討論這件事。', ', so you can discuss it together.')}
         </p>
         <p className="text-sm text-petal-ink-soft leading-relaxed mb-4">
-          這個動作<span className="text-petal-ink font-medium">無法復原</span>——伴侶看過就收不回了。日後如果想幫助其他人，還能再選擇匿名公開到「公開問答」。
+          {tr('這個動作', 'This ')}<span className="text-petal-ink font-medium">{tr('無法復原', 'can\'t be undone')}</span>{tr('——伴侶看過就收不回了。日後如果想幫助其他人，還能再選擇匿名公開到「公開問答」。', ': once your partner has seen it, it can\'t be taken back. If you\'d like to help others later, you can still choose to share it anonymously to "Public Q&A".')}
         </p>
         <div className="flex justify-end gap-2">
           <button
@@ -1960,7 +1960,7 @@ function ShareWithPartnerWarning({
             onClick={onCancel}
             className="text-sm px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20"
           >
-            先不要
+            {tr('先不要', 'Not now')}
           </button>
           <button
             type="button"
@@ -1970,7 +1970,7 @@ function ShareWithPartnerWarning({
             className="text-sm px-4 py-2 rounded-full bg-petal-ink text-petal-cream inline-flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
           >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Users className="w-4 h-4" />}
-            確定分享給伴侶
+            {tr('確定分享給伴侶', 'Share with my partner')}
           </button>
         </div>
       </div>
@@ -1993,14 +1993,14 @@ function ShareWarning({
       <div className="bg-petal-cream rounded-2xl max-w-md w-full p-5">
         <div className="flex items-center gap-2 mb-3">
           <Globe className="w-5 h-5 text-petal-rose-deep" />
-          <h3 className="text-lg font-serif text-petal-ink">公開到「公開問答」</h3>
+          <h3 className="text-lg font-serif text-petal-ink">{tr('公開到「公開問答」', 'Share to "Public Q&A"')}</h3>
         </div>
         <p className="text-sm text-petal-ink-soft leading-relaxed mb-2">
-          公開後，這段對話會<span className="text-petal-ink font-medium">匿名</span>顯示在「公開問答」，
-          <span className="text-petal-ink font-medium">所有人（包含未登入的訪客）都看得到</span>。
+          {tr('公開後，這段對話會', 'Once shared, this conversation will appear ')}<span className="text-petal-ink font-medium">{tr('匿名', 'anonymously')}</span>{tr('顯示在「公開問答」，', ' in "Public Q&A", ')}
+          <span className="text-petal-ink font-medium">{tr('所有人（包含未登入的訪客）都看得到', 'visible to everyone (including visitors who aren\'t signed in)')}</span>{tr('。', '.')}
         </p>
         <p className="text-sm text-petal-ink-soft leading-relaxed mb-4">
-          你們會顯示為「匿名 A / 匿名 B」，不會出現名字。你隨時可以取消公開。
+          {tr('你們會顯示為「匿名 A / 匿名 B」，不會出現名字。你隨時可以取消公開。', 'You\'ll appear as "Anonymous A / Anonymous B", never by name. You can unshare any time.')}
         </p>
         <div className="flex justify-end gap-2">
           <button
@@ -2008,7 +2008,7 @@ function ShareWarning({
             onClick={onCancel}
             className="text-sm px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20"
           >
-            取消
+            {tr('取消', 'Cancel')}
           </button>
           <button
             type="button"
@@ -2018,7 +2018,7 @@ function ShareWarning({
             className="text-sm px-4 py-2 rounded-full bg-petal-ink text-petal-cream inline-flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
           >
             {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
-            確定公開
+            {tr('確定公開', 'Share publicly')}
           </button>
         </div>
       </div>
@@ -2046,11 +2046,11 @@ function AcceptancePicker({
           <div className="flex items-center gap-2">
             <HandHeart className="w-5 h-5 text-petal-rose-deep" />
             <div>
-              <h3 className="text-lg font-serif text-petal-ink">先接住TA的情緒</h3>
-              <p className="text-xs text-petal-ink-soft mt-1">真正的修復，從情緒被接住開始——先別急著解釋或解決。</p>
+              <h3 className="text-lg font-serif text-petal-ink">{tr('先接住TA的情緒', 'Hold their feelings first')}</h3>
+              <p className="text-xs text-petal-ink-soft mt-1">{tr('真正的修復，從情緒被接住開始——先別急著解釋或解決。', 'Real repair begins once feelings are held. Don\'t rush to explain or fix it.')}</p>
             </div>
           </div>
-          <button type="button" onClick={onCancel} className="text-petal-ink-soft hover:text-petal-ink" aria-label="取消">
+          <button type="button" onClick={onCancel} className="text-petal-ink-soft hover:text-petal-ink" aria-label={tr("取消", 'Cancel')}>
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -2077,7 +2077,7 @@ function AcceptancePicker({
                   onClick={() => onInsert(a.text)}
                   className="text-sm px-3 py-1.5 rounded-full bg-petal-ink text-petal-cream hover:opacity-90"
                 >
-                  放進回覆
+                  {tr('放進回覆', 'Add to my reply')}
                 </button>
               </div>
             </div>
@@ -2090,7 +2090,7 @@ function AcceptancePicker({
             onClick={onCancel}
             className="text-sm px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20"
           >
-            先不用
+            {tr('先不用', 'Not now')}
           </button>
         </div>
       </div>
@@ -2106,15 +2106,15 @@ function BackButton({ onBack }: { onBack: () => void }) {
       className="inline-flex items-center gap-1 text-sm text-petal-ink-soft hover:text-petal-ink"
     >
       <ArrowLeft className="w-4 h-4" />
-      回到歷史
+      {tr('回到歷史', 'Back to history')}
     </button>
   );
 }
 
 const VERSION_LABELS: Record<EventVersionKey, { title: string; hint: string }> = {
-  neutral: { title: '中性版', hint: '第三方客觀描述，不示弱也不指責' },
-  firm: { title: '堅定版', hint: '以「我訊息」說感受，不指責' },
-  warm: { title: '善意版', hint: '在堅定的基礎上多一份願意聊聊的善意' },
+  neutral: { title: tr('中性版', 'Neutral'), hint: tr('第三方客觀描述，不示弱也不指責', 'A third-party, objective description that neither gives in nor blames') },
+  firm: { title: tr('堅定版', 'Firm'), hint: tr('以「我訊息」說感受，不指責', 'Say how you feel with "I" statements, without blaming') },
+  warm: { title: tr('善意版', 'Kind'), hint: tr('在堅定的基礎上多一份願意聊聊的善意', 'Firm, plus a little kindness about being open to talking') },
 };
 
 function RewritePicker({
@@ -2135,14 +2135,14 @@ function RewritePicker({
       <div className="bg-petal-cream rounded-2xl max-w-lg w-full max-h-[min(85vh,calc(100dvh-80px))] overflow-y-auto overscroll-contain p-4 sm:p-5">
         <div className="flex items-start justify-between mb-3">
           <div>
-            <h3 className="text-lg font-serif text-petal-ink">AI 幫你改寫的版本</h3>
-            <p className="text-xs text-petal-ink-soft mt-1">挑一個版本套用到你的草稿，或保留原文。</p>
+            <h3 className="text-lg font-serif text-petal-ink">{tr('AI 幫你改寫的版本', 'AI rewrites of your reply')}</h3>
+            <p className="text-xs text-petal-ink-soft mt-1">{tr('挑一個版本套用到你的草稿，或保留原文。', 'Pick a version to apply to your draft, or keep the original.')}</p>
           </div>
           <button
             type="button"
             onClick={onCancel}
             className="text-petal-ink-soft hover:text-petal-ink"
-            aria-label="取消"
+            aria-label={tr("取消", 'Cancel')}
           >
             <X className="w-5 h-5" />
           </button>
@@ -2167,7 +2167,7 @@ function RewritePicker({
                   onClick={() => onApply(key)}
                   className="text-sm px-3 py-1.5 rounded-full bg-petal-ink text-petal-cream hover:opacity-90"
                 >
-                  使用這個版本
+                  {tr('使用這個版本', 'Use this version')}
                 </button>
               </div>
             </div>
@@ -2180,7 +2180,7 @@ function RewritePicker({
             onClick={onCancel}
             className="text-sm px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20"
           >
-            保留原文
+            {tr('保留原文', 'Keep the original')}
           </button>
         </div>
       </div>
