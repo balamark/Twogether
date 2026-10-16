@@ -10,6 +10,7 @@ import PetalSelect from './PetalSelect';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatYmdInTz, formatDate } from '../utils/datetime';
 import { scriptHasUnresolvedGenderTokens, isVideoUrl } from '../utils/script';
+import { tr } from '../i18n/tr';
 
 interface RoleplayScript {
   id: string;
@@ -59,10 +60,10 @@ interface RoleplayViewProps {
 }
 
 const CATEGORY_META: Record<RoleplayScript['category'], { label: string; emoji: string; tint: string }> = {
-  romantic:    { label: '浪漫', emoji: '💕', tint: 'from-petal-rose-soft to-petal-cream-2' },
-  adventurous: { label: '冒險', emoji: '🔥', tint: 'from-petal-rose to-petal-rose-soft' },
-  school:      { label: '校園', emoji: '🏫', tint: 'from-petal-sage/40 to-petal-cream-2' },
-  bold:        { label: '大膽', emoji: '🧨', tint: 'from-petal-rose-deep/30 to-petal-rose-soft' },
+  romantic:    { label: tr('浪漫', 'Romantic'), emoji: '💕', tint: 'from-petal-rose-soft to-petal-cream-2' },
+  adventurous: { label: tr('冒險', 'Adventurous'), emoji: '🔥', tint: 'from-petal-rose to-petal-rose-soft' },
+  school:      { label: tr('校園', 'School'), emoji: '🏫', tint: 'from-petal-sage/40 to-petal-cream-2' },
+  bold:        { label: tr('大膽', 'Bold'), emoji: '🧨', tint: 'from-petal-rose-deep/30 to-petal-rose-soft' },
 };
 
 // Editorial placeholder shown when a script has no thumbnail. Uses the
@@ -132,7 +133,7 @@ const ViewToggle: React.FC<{
       type="button"
       onClick={() => setMode('grid')}
       data-testid={`${idPrefix}-view-toggle-grid`}
-      aria-label="縮圖檢視"
+      aria-label={tr("縮圖檢視", 'Grid view')}
       aria-pressed={mode === 'grid'}
       className={`p-1.5 rounded-md transition-colors ${
         mode === 'grid' ? 'text-petal-ink bg-petal-cream-2' : 'text-petal-muted hover:text-petal-ink'
@@ -144,7 +145,7 @@ const ViewToggle: React.FC<{
       type="button"
       onClick={() => setMode('list')}
       data-testid={`${idPrefix}-view-toggle-list`}
-      aria-label="列表檢視"
+      aria-label={tr("列表檢視", 'List view')}
       aria-pressed={mode === 'list'}
       className={`p-1.5 rounded-md transition-colors ${
         mode === 'list' ? 'text-petal-ink bg-petal-cream-2' : 'text-petal-muted hover:text-petal-ink'
@@ -248,8 +249,8 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     } catch (err) {
       showNotification({
         type: 'error',
-        title: '無法載入創作市集',
-        message: (err as Error)?.message || '請稍後再試',
+        title: tr('無法載入創作市集', 'Couldn\'t load the creator marketplace'),
+        message: (err as Error)?.message || tr('請稍後再試', 'Please try again in a moment'),
         duration: 4000,
       });
     } finally {
@@ -346,8 +347,8 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     } else {
       showNotification({
         type: 'warning',
-        title: '找不到劇本',
-        message: `「${initialScriptTitle}」可能已被刪除或重新命名`,
+        title: tr('找不到劇本', 'Script not found'),
+        message: tr(`「${initialScriptTitle}」可能已被刪除或重新命名`, `"${initialScriptTitle}" may have been deleted or renamed`),
         duration: 4000,
       });
     }
@@ -365,11 +366,11 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
       formatYmdInTz(new Date(), tz),
       time,
       '🔥',
-      `使用角色扮演劇本：${script.title}`,
+      tr(`使用角色扮演劇本：${script.title}`, `Used role-play script: ${script.title}`),
       undefined,
       script.scenario,
-      script.duration || '15-30分鐘',
-      '私人空間',
+      script.duration || tr('15-30分鐘', '15–30 min'),
+      tr('私人空間', 'Private space'),
       script.title,
       'roleplay'
     );
@@ -385,8 +386,8 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     recordRoleplay(script);
     showNotification({
       type: 'success',
-      title: '已開始扮演',
-      message: `已將「${script.title}」記入今晚的愛情日曆`,
+      title: tr('已開始扮演', 'Role play started'),
+      message: tr(`已將「${script.title}」記入今晚的愛情日曆`, `Added "${script.title}" to tonight's love calendar`),
       duration: 4000,
     });
   }, [recordRoleplay, showNotification]);
@@ -407,15 +408,15 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
       const result = await apiService.shareCustomScript(script.id);
       showNotification({
         type: result?.success ? 'success' : 'info',
-        title: result?.success ? '已分享給伴侶' : '尚未分享',
-        message: result?.message || '已將劇本分享到伴侶的信箱。',
+        title: result?.success ? tr('已分享給伴侶', 'Shared with your partner') : tr('尚未分享', 'Not shared yet'),
+        message: result?.message || tr('已將劇本分享到伴侶的信箱。', 'The script was shared to your partner\'s inbox.'),
         duration: 5000,
       });
     } catch (error) {
       showNotification({
         type: 'error',
-        title: '分享失敗',
-        message: (error as Error)?.message || '無法分享劇本，請稍後再試。',
+        title: tr('分享失敗', 'Couldn\'t share'),
+        message: (error as Error)?.message || tr('無法分享劇本，請稍後再試。', 'Couldn\'t share the script. Please try again in a moment.'),
         duration: 5000,
       });
     } finally {
@@ -500,7 +501,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           onToggleFavorite(scriptId);
         }}
         data-testid={`script-favorite-toggle-${scriptId}`}
-        aria-label={isFav ? '取消最愛' : '加入最愛'}
+        aria-label={isFav ? tr('取消最愛', 'Remove from favorites') : tr('加入最愛', 'Add to favorites')}
         aria-pressed={isFav}
         className={`inline-flex items-center justify-center rounded-full transition-colors ${className}`}
       >
@@ -614,13 +615,13 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
       {mainTab !== 'games' && (
       <div className="border-b border-petal-rule pb-7">
         <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-          — 劇本
+          {tr('— 劇本', '— Scripts')}
         </div>
         <h2 className="font-display text-2xl sm:text-3xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.1] md:leading-[1.05] mb-3">
-          角色<em className="not-italic font-light italic text-pink-600">扮演</em>劇本
+          {tr('角色', 'Role')}<em className="not-italic font-light italic text-pink-600">{tr('扮演', ' play')}</em>{tr('劇本', ' scripts')}
         </h2>
         <p className="font-display italic font-light text-base text-petal-muted">
-          點燃激情，重溫浪漫 — 慢慢來。
+          {tr('點燃激情，重溫浪漫 — 慢慢來。', 'Spark passion, relive romance. Take it slow.')}
         </p>
       </div>
       )}
@@ -629,9 +630,9 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           phones and labels never wrap, so 「我的劇本」stays on one line. */}
       <div className="flex items-stretch gap-0.5 sm:gap-1 mb-6 border-b border-petal-rule overflow-x-auto">
         {([
-          { id: 'mine' as const, label: '我的劇本', icon: <FileText className="w-3.5 h-3.5" strokeWidth={1.5} /> },
-          { id: 'marketplace' as const, label: '創作市集', icon: <Store className="w-3.5 h-3.5" strokeWidth={1.5} /> },
-          ...(renderGames ? [{ id: 'games' as const, label: '情趣遊戲', icon: <Gamepad2 className="w-3.5 h-3.5" strokeWidth={1.5} /> }] : []),
+          { id: 'mine' as const, label: tr('我的劇本', 'My scripts'), icon: <FileText className="w-3.5 h-3.5" strokeWidth={1.5} /> },
+          { id: 'marketplace' as const, label: tr('創作市集', 'Creator marketplace'), icon: <Store className="w-3.5 h-3.5" strokeWidth={1.5} /> },
+          ...(renderGames ? [{ id: 'games' as const, label: tr('情趣遊戲', 'Playful games'), icon: <Gamepad2 className="w-3.5 h-3.5" strokeWidth={1.5} /> }] : []),
         ]).map((t) => {
           const isActive = mainTab === t.id;
           return (
@@ -663,7 +664,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             className="bg-petal-ink text-petal-cream px-4 py-2 rounded-full font-body text-sm hover:bg-pink-700 transition-colors flex items-center gap-1.5 flex-shrink-0"
           >
             <Plus className="w-4 h-4" strokeWidth={1.5} />
-            <span>上傳劇本</span>
+            <span>{tr('上傳劇本', 'Upload script')}</span>
           </button>
           <div className="relative flex-1 min-w-[160px]">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-petal-muted" strokeWidth={1.5} />
@@ -672,14 +673,14 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               value={mineQuery}
               onChange={(e) => setMineQuery(e.target.value)}
               data-testid="custom-script-search"
-              placeholder="搜尋劇本（標題、情境、標籤）"
+              placeholder={tr("搜尋劇本（標題、情境、標籤）", 'Search scripts (title, scenario, tags)')}
               className="w-full bg-white border border-petal-rule rounded-full pl-9 pr-9 py-2 font-body text-sm text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose"
             />
             {mineQuery && (
               <button
                 onClick={() => setMineQuery('')}
                 data-testid="custom-script-search-clear"
-                aria-label="清除搜尋"
+                aria-label={tr("清除搜尋", 'Clear search')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-petal-muted hover:text-petal-ink"
               >
                 <X className="w-4 h-4" strokeWidth={1.5} />
@@ -694,13 +695,13 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
         <div className="mb-6">
           <div className="flex flex-wrap gap-1.5" data-testid="roleplay-filter-chips">
             {[
-              { id: 'all', label: '所有', icon: '🌟' },
-              { id: 'romantic', label: '浪漫', icon: '💕' },
-              { id: 'adventurous', label: '冒險', icon: '🔥' },
-              { id: 'school', label: '校園', icon: '🏫' },
-              { id: 'bold', label: '大膽', icon: '🧨' },
-              { id: 'favorites', label: '我的最愛', icon: '♥' },
-              { id: 'custom', label: '自訂', icon: '📄' },
+              { id: 'all', label: tr('所有', 'All'), icon: '🌟' },
+              { id: 'romantic', label: tr('浪漫', 'Romantic'), icon: '💕' },
+              { id: 'adventurous', label: tr('冒險', 'Adventurous'), icon: '🔥' },
+              { id: 'school', label: tr('校園', 'School'), icon: '🏫' },
+              { id: 'bold', label: tr('大膽', 'Bold'), icon: '🧨' },
+              { id: 'favorites', label: tr('我的最愛', 'My favorites'), icon: '♥' },
+              { id: 'custom', label: tr('自訂', 'Custom'), icon: '📄' },
             ].map(f => {
               const isActive = roleplayFilter === f.id;
               return (
@@ -730,7 +731,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                     : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
                 }`}
               >
-                {activeTag ? `#${activeTag}` : '查看所有標籤'}
+                {activeTag ? `#${activeTag}` : tr('查看所有標籤', 'See all tags')}
                 <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showAllTags ? '' : '-rotate-90'}`} strokeWidth={1.5} />
               </button>
             )}
@@ -777,7 +778,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               Click to filter; click the active chip again to clear. */}
           {allLocations.length > 0 && (
             <div className="mt-2 flex flex-wrap items-center gap-1.5" data-testid="roleplay-location-chips">
-              <span className="font-body text-[11px] text-petal-muted mr-0.5">📍 地點</span>
+              <span className="font-body text-[11px] text-petal-muted mr-0.5">{tr('📍 地點', '📍 Location')}</span>
               {allLocations.map((loc) => {
                 const active = activeLocation === loc;
                 return (
@@ -805,12 +806,12 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
         {mineList.length === 0 ? (
           <p data-testid="roleplay-empty" className="font-display italic font-light text-sm text-petal-muted text-center py-10">
             {mineQuery
-              ? `找不到符合「${mineQuery}」的劇本。`
+              ? tr(`找不到符合「${mineQuery}」的劇本。`, `No scripts match "${mineQuery}".`)
               : roleplayFilter === 'custom'
-                ? '還沒有自訂劇本，點擊上方「上傳劇本」開始創作。'
+                ? tr('還沒有自訂劇本，點擊上方「上傳劇本」開始創作。', 'No custom scripts yet. Tap "Upload script" above to create one.')
                 : roleplayFilter === 'favorites'
-                  ? '還沒有最愛的劇本，點擊卡片上的愛心加入最愛。'
-                  : '沒有符合的劇本。'}
+                  ? tr('還沒有最愛的劇本，點擊卡片上的愛心加入最愛。', 'No favorite scripts yet. Tap the heart on a card to add it.')
+                  : tr('沒有符合的劇本。', 'No matching scripts.')}
           </p>
         ) : mineView === 'grid' ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -832,7 +833,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                           {CATEGORY_META[script.category]?.label ?? script.category}
                         </span>
                         {script.isCustom && (
-                          <span data-testid="script-card-custom-badge" className="flex-shrink-0 font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rose-soft bg-petal-rose-soft/40 text-petal-rose-deep">自訂</span>
+                          <span data-testid="script-card-custom-badge" className="flex-shrink-0 font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rose-soft bg-petal-rose-soft/40 text-petal-rose-deep">{tr('自訂', 'Custom')}</span>
                         )}
                         {script.isCustom && isRecentlyCreated(script.createdAt) && (
                           <span data-testid={`script-new-badge-${script.id}`} className="flex-shrink-0 px-1.5 py-0.5 font-body text-[10px] font-medium uppercase tracking-[0.1em] rounded-full bg-petal-rose-deep text-petal-cream">New</span>
@@ -843,7 +844,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                     <p className="font-body text-sm text-petal-ink-soft mt-1 leading-relaxed line-clamp-2">{script.scenario}</p>
                     {script.isCustom && script.createdAt && (
                       <p data-testid={`script-created-date-${script.id}`} className="font-body text-[11px] text-petal-muted mt-1">
-                        建立於 {formatDate(script.createdAt, tz, { year: 'numeric', month: 'numeric', day: 'numeric', withWeekday: false })}
+                        {tr('建立於', 'Created')} {formatDate(script.createdAt, tz, { year: 'numeric', month: 'numeric', day: 'numeric', withWeekday: false })}
                       </p>
                     )}
                   </div>
@@ -854,10 +855,10 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                       onClick={() => onEditScript(script)}
                       data-testid={`script-edit-button-${script.id}`}
                       className="border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors"
-                      aria-label={`編輯 ${script.title}`}
+                      aria-label={tr(`編輯 ${script.title}`, `Edit ${script.title}`)}
                     >
                       <Pencil className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                      編輯
+                      {tr('編輯', 'Edit')}
                     </button>
                   )}
                   {script.isCustom && (
@@ -866,10 +867,10 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                       disabled={sharingId === script.id}
                       data-testid={`script-card-custom-share-button-${script.id}`}
                       className="border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors disabled:opacity-50"
-                      aria-label={`分享 ${script.title} 給伴侶`}
+                      aria-label={tr(`分享 ${script.title} 給伴侶`, `Share ${script.title} with your partner`)}
                     >
                       <Share2 className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                      {sharingId === script.id ? '分享中' : '分享'}
+                      {sharingId === script.id ? tr('分享中', 'Sharing') : tr('分享', 'Share')}
                     </button>
                   )}
                   <button
@@ -878,7 +879,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                     className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                   >
                     <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                    查看
+                    {tr('查看', 'View')}
                   </button>
                 </div>
               </div>
@@ -897,7 +898,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                       {CATEGORY_META[script.category]?.label ?? script.category}
                     </span>
                     {script.isCustom && (
-                      <span data-testid="script-card-custom-badge" className="font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rose-soft bg-petal-rose-soft/40 text-petal-rose-deep flex-shrink-0">自訂</span>
+                      <span data-testid="script-card-custom-badge" className="font-body text-[10px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border border-petal-rose-soft bg-petal-rose-soft/40 text-petal-rose-deep flex-shrink-0">{tr('自訂', 'Custom')}</span>
                     )}
                     {script.isCustom && isRecentlyCreated(script.createdAt) && (
                       <span data-testid={`script-new-badge-${script.id}`} className="px-1.5 py-0.5 font-body text-[10px] font-medium uppercase tracking-[0.1em] rounded-full bg-petal-rose-deep text-petal-cream flex-shrink-0">New</span>
@@ -914,10 +915,10 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                         onClick={() => onEditScript(script)}
                         data-testid={`script-edit-button-${script.id}`}
                         className="hidden sm:inline-flex border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors"
-                        aria-label={`編輯 ${script.title}`}
+                        aria-label={tr(`編輯 ${script.title}`, `Edit ${script.title}`)}
                       >
                         <Pencil className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                        編輯
+                        {tr('編輯', 'Edit')}
                       </button>
                     )}
                     {script.isCustom && (
@@ -926,10 +927,10 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                         disabled={sharingId === script.id}
                         data-testid={`script-card-custom-share-button-${script.id}`}
                         className="hidden sm:inline-flex border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink px-3 py-1 rounded-full font-body text-xs transition-colors disabled:opacity-50"
-                        aria-label={`分享 ${script.title} 給伴侶`}
+                        aria-label={tr(`分享 ${script.title} 給伴侶`, `Share ${script.title} with your partner`)}
                       >
                         <Share2 className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                        {sharingId === script.id ? '分享中' : '分享'}
+                        {sharingId === script.id ? tr('分享中', 'Sharing') : tr('分享', 'Share')}
                       </button>
                     )}
                     <button
@@ -938,7 +939,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                       className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                     >
                       <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                      查看
+                      {tr('查看', 'View')}
                     </button>
                   </>
                 ),
@@ -964,7 +965,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                 />
                 <Heart className="w-4 h-4 mr-2 text-petal-rose-deep fill-petal-rose-deep flex-shrink-0" strokeWidth={1.5} />
                 <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink truncate group-hover:text-petal-rose-deep transition-colors">
-                  收藏<em className="not-italic font-light italic text-pink-600 mx-1">劇本</em>
+                  {tr('收藏', 'Saved')}<em className="not-italic font-light italic text-pink-600 mx-1">{tr('劇本', ' scripts')}</em>
                   <span className="font-display italic font-light text-sm text-petal-muted ml-1">({favoritedMarketplace.length})</span>
                 </h3>
               </button>
@@ -989,7 +990,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                         <div className="flex items-start justify-between gap-2">
                           <h4 className="font-display text-base font-medium tracking-tight text-petal-ink truncate">{m.title}</h4>
                           {!m.isPublic && (
-                            <span className="text-[10px] text-petal-muted italic flex-shrink-0">作者已停止分享</span>
+                            <span className="text-[10px] text-petal-muted italic flex-shrink-0">{tr('作者已停止分享', 'The author stopped sharing')}</span>
                           )}
                         </div>
                         <p className="font-body text-xs text-petal-muted mt-0.5">by {m.authorName}</p>
@@ -1004,7 +1005,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                               className="bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                             >
                               <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                              開始
+                              {tr('開始', 'Start')}
                             </button>
                           </div>
                         </div>
@@ -1028,7 +1029,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                       </div>
                     ),
                     badge: !m.isPublic ? (
-                      <span className="text-[10px] text-petal-muted italic flex-shrink-0">作者已停止分享</span>
+                      <span className="text-[10px] text-petal-muted italic flex-shrink-0">{tr('作者已停止分享', 'The author stopped sharing')}</span>
                     ) : undefined,
                     actions: (
                       <>
@@ -1042,7 +1043,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                           className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                         >
                           <Eye className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                          查看
+                          {tr('查看', 'View')}
                         </button>
                         <button
                           type="button"
@@ -1051,7 +1052,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                           className="hidden sm:inline-flex bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                         >
                           <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                          開始
+                          {tr('開始', 'Start')}
                         </button>
                       </>
                     ),
@@ -1073,12 +1074,12 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               onChange={(v) => setMarketplaceSort(v as 'rating' | 'recent' | 'popular')}
               testId="marketplace-sort"
               optionTestIdPrefix="marketplace-sort"
-              ariaLabel="排序方式"
+              ariaLabel={tr("排序方式", 'Sort by')}
               icon={<ArrowDownWideNarrow className="w-3.5 h-3.5 text-petal-muted" strokeWidth={1.5} />}
               options={[
-                { value: 'rating', label: '評分最高' },
-                { value: 'popular', label: '最熱門' },
-                { value: 'recent', label: '最新' },
+                { value: 'rating', label: tr('評分最高', 'Top rated') },
+                { value: 'popular', label: tr('最熱門', 'Most popular') },
+                { value: 'recent', label: tr('最新', 'Newest') },
               ]}
             />
             <PetalSelect
@@ -1086,14 +1087,14 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               onChange={(v) => setMarketplaceCategory(v as typeof marketplaceCategory)}
               testId="marketplace-category"
               optionTestIdPrefix="marketplace-category"
-              ariaLabel="分類篩選"
+              ariaLabel={tr("分類篩選", 'Filter by category')}
               icon={<Filter className="w-3.5 h-3.5 text-petal-muted" strokeWidth={1.5} />}
               options={[
-                { value: 'all', label: '全部分類' },
-                { value: 'romantic', label: '浪漫' },
-                { value: 'adventurous', label: '冒險' },
-                { value: 'school', label: '校園' },
-                { value: 'bold', label: '大膽' },
+                { value: 'all', label: tr('全部分類', 'All categories') },
+                { value: 'romantic', label: tr('浪漫', 'Romantic') },
+                { value: 'adventurous', label: tr('冒險', 'Adventurous') },
+                { value: 'school', label: tr('校園', 'School') },
+                { value: 'bold', label: tr('大膽', 'Bold') },
               ]}
             />
             <div className="ml-auto">
@@ -1106,14 +1107,14 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                 value={marketplaceQuery}
                 onChange={(e) => setMarketplaceQuery(e.target.value)}
                 data-testid="marketplace-search"
-                placeholder="搜尋市集劇本（標題、情境、地點）"
+                placeholder={tr("搜尋市集劇本（標題、情境、地點）", 'Search marketplace scripts (title, scenario, location)')}
                 className="w-full pl-9 pr-8 py-2 border border-petal-rule rounded-md focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink bg-white"
               />
               {marketplaceQuery && (
                 <button
                   onClick={() => setMarketplaceQuery('')}
                   data-testid="marketplace-search-clear"
-                  aria-label="清除搜尋"
+                  aria-label={tr("清除搜尋", 'Clear search')}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-petal-muted hover:text-petal-ink"
                 >
                   <X className="w-4 h-4" strokeWidth={1.5} />
@@ -1124,13 +1125,13 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
 
           {marketplaceLoading ? (
             <p className="font-display italic font-light text-sm text-petal-muted text-center py-10">
-              載入中…
+              {tr('載入中…', 'Loading…')}
             </p>
           ) : marketplaceScripts.length === 0 ? (
             <p className="font-display italic font-light text-sm text-petal-muted text-center py-10">
               {debouncedMarketplaceQuery
-                ? `找不到符合「${debouncedMarketplaceQuery}」的公開劇本，換個關鍵字試試。`
-                : '目前還沒有公開劇本，第一個發布的就是你！'}
+                ? tr(`找不到符合「${debouncedMarketplaceQuery}」的公開劇本，換個關鍵字試試。`, `No public scripts match "${debouncedMarketplaceQuery}". Try another keyword.`)
+                : tr('目前還沒有公開劇本，第一個發布的就是你！', 'No public scripts yet. Be the first to publish one!')}
             </p>
           ) : (
             marketplaceView === 'grid' ? (
@@ -1163,7 +1164,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                           className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                         >
                           <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                          玩
+                          {tr('玩', 'Play')}
                         </button>
                       </div>
                     </div>
@@ -1194,7 +1195,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                           className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                         >
                           <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                          玩
+                          {tr('玩', 'Play')}
                         </button>
                       </>
                     ),
@@ -1280,7 +1281,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                     type="button"
                     onClick={(e) => { e.stopPropagation(); stepModalPhoto(-1); }}
                     data-testid="roleplay-modal-photo-prev"
-                    aria-label="上一張"
+                    aria-label={tr("上一張", 'Previous')}
                     className="absolute left-2 top-1/2 -translate-y-1/2 w-9 h-9 inline-flex items-center justify-center rounded-full bg-white/80 backdrop-blur-sm border border-petal-rule shadow-sm text-petal-ink hover:bg-white transition-colors"
                   >
                     <ChevronLeft className="w-5 h-5" strokeWidth={1.5} />
@@ -1289,7 +1290,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                     type="button"
                     onClick={(e) => { e.stopPropagation(); stepModalPhoto(1); }}
                     data-testid="roleplay-modal-photo-next"
-                    aria-label="下一張"
+                    aria-label={tr("下一張", 'Next')}
                     className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 inline-flex items-center justify-center rounded-full bg-white/80 backdrop-blur-sm border border-petal-rule shadow-sm text-petal-ink hover:bg-white transition-colors"
                   >
                     <ChevronRight className="w-5 h-5" strokeWidth={1.5} />
@@ -1305,7 +1306,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               <button
                 onClick={(e) => { e.stopPropagation(); closeModal(); }}
                 data-testid="roleplay-modal-close-button"
-                aria-label="關閉"
+                aria-label={tr("關閉", 'Close')}
                 className="absolute top-3 left-3 w-9 h-9 inline-flex items-center justify-center rounded-full bg-white/85 backdrop-blur-sm border border-petal-rule shadow-sm text-petal-ink hover:bg-white transition-colors"
               >
                 <X className="w-4 h-4" strokeWidth={1.5} />
@@ -1322,7 +1323,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             </div>
             <div className="px-5 sm:px-8 pt-5 sm:pt-6 pb-4 sm:pb-5 border-b border-petal-rule">
               <div className="font-body text-xs sm:text-[11px] font-medium uppercase tracking-[0.08em] sm:tracking-[0.16em] text-petal-muted mb-2">
-                — {selectedScript.isCustom ? '自訂劇本' : '劇本'}
+                — {selectedScript.isCustom ? tr('自訂劇本', 'Custom script') : tr('劇本', 'Script')}
               </div>
               <h3 className="font-display text-xl sm:text-2xl font-light tracking-tight text-petal-ink mb-1">
                 {selectedScript.title}
@@ -1339,10 +1340,10 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
               <div className="bg-petal-cream-2/40 p-4 sm:p-6 rounded-md border border-petal-rule-soft">
                 <h4 className="font-body text-xs sm:text-[11px] font-medium uppercase tracking-[0.08em] sm:tracking-[0.14em] text-petal-muted mb-4 flex items-center">
                   <Play className="w-3.5 h-3.5 mr-1.5 text-petal-rose-deep" strokeWidth={1.5} />
-                  劇本對話
+                  {tr('劇本對話', 'Script dialogue')}
                 </h4>
                 <div className="whitespace-pre-line font-body text-petal-ink leading-relaxed text-base">
-                  {selectedScript.script || '劇本內容載入中…'}
+                  {selectedScript.script || tr('劇本內容載入中…', 'Loading script…')}
                 </div>
               </div>
 
@@ -1352,7 +1353,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                   className="mt-4 p-3 bg-petal-cream-2/60 border border-petal-rule rounded-md"
                 >
                   <p className="font-body text-sm text-petal-ink-soft">
-                    此劇本包含男女角色（[男]／[女]）。請你和另一半先到「設定」選擇性別，劇本就會自動帶入你們的暱稱。
+                    {tr('此劇本包含男女角色（[男]／[女]）。請你和另一半先到「設定」選擇性別，劇本就會自動帶入你們的暱稱。', 'This script has male and female roles ([男] / [女]). Have you and your partner choose your genders in Settings first, and the script will fill in your nicknames automatically.')}
                   </p>
                 </div>
               )}
@@ -1361,7 +1362,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                 <div className="mt-5 p-4 bg-petal-sage/10 border border-petal-sage/40 rounded-md">
                   <p className="font-body text-sm text-petal-sage-deep flex items-center">
                     <Heart className="w-3.5 h-3.5 mr-2" strokeWidth={1.5} />
-                    已記錄一次親密時光到你們的愛情日曆中。
+                    {tr('已記錄一次親密時光到你們的愛情日曆中。', 'Recorded an intimate moment in your love calendar.')}
                   </p>
                 </div>
               )}
@@ -1381,7 +1382,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                   className="px-5 py-2 border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink rounded-md font-body text-sm transition-colors"
                 >
                   <Pencil className="w-3.5 h-3.5 inline mr-1.5" strokeWidth={1.5} />
-                  編輯這份劇本
+                  {tr('編輯這份劇本', 'Edit this script')}
                 </button>
               )}
               {!hasBegun ? (
@@ -1391,7 +1392,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                   className="px-6 py-2 bg-petal-ink text-petal-cream rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
                 >
                   <Play className="w-4 h-4 inline mr-1.5" strokeWidth={1.5} />
-                  開始扮演 — 記入今晚
+                  {tr('開始扮演 — 記入今晚', 'Start role play: add to tonight')}
                 </button>
               ) : (
                 <button
@@ -1399,7 +1400,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                   data-testid="roleplay-modal-finish-button"
                   className="px-6 py-2 bg-petal-ink text-petal-cream rounded-md font-display italic text-base hover:bg-pink-700 transition-colors"
                 >
-                  完成 →
+                  {tr('完成 →', 'Done →')}
                 </button>
               )}
             </div>
@@ -1414,13 +1415,13 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             onTouchEnd={(e) => onPhotoSwipeEnd(e, stepLightbox)}
             role="dialog"
             aria-modal="true"
-            aria-label="放大查看劇本照片"
+            aria-label={tr("放大查看劇本照片", 'Enlarge script photo')}
           >
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); setLightboxOpen(false); }}
               data-testid="roleplay-modal-lightbox-close"
-              aria-label="關閉放大檢視"
+              aria-label={tr("關閉放大檢視", 'Close enlarged view')}
               className="fixed top-4 right-4 w-10 h-10 inline-flex items-center justify-center rounded-full bg-white/90 text-petal-ink hover:bg-white shadow-sm z-10"
             >
               <X className="w-5 h-5" strokeWidth={1.5} />
@@ -1432,7 +1433,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i - 1 + lightboxPhotos.length) % lightboxPhotos.length); }}
                   data-testid="roleplay-modal-lightbox-prev"
-                  aria-label="上一張"
+                  aria-label={tr("上一張", 'Previous')}
                   className="fixed left-3 sm:left-6 top-1/2 -translate-y-1/2 w-11 h-11 inline-flex items-center justify-center rounded-full bg-white/90 text-petal-ink hover:bg-white shadow-sm z-10"
                 >
                   <ChevronLeft className="w-6 h-6" strokeWidth={1.5} />
@@ -1441,7 +1442,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                   type="button"
                   onClick={(e) => { e.stopPropagation(); setLightboxIndex((i) => (i + 1) % lightboxPhotos.length); }}
                   data-testid="roleplay-modal-lightbox-next"
-                  aria-label="下一張"
+                  aria-label={tr("下一張", 'Next')}
                   className="fixed right-3 sm:right-6 top-1/2 -translate-y-1/2 w-11 h-11 inline-flex items-center justify-center rounded-full bg-white/90 text-petal-ink hover:bg-white shadow-sm z-10"
                 >
                   <ChevronRight className="w-6 h-6" strokeWidth={1.5} />
@@ -1491,7 +1492,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           type="button"
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           data-testid="roleplay-back-to-top"
-          aria-label="回到最上面"
+          aria-label={tr("回到最上面", 'Back to top')}
           className="fixed bottom-6 right-4 sm:bottom-8 sm:right-8 z-40 w-11 h-11 inline-flex items-center justify-center rounded-full bg-petal-ink text-petal-cream shadow-petal border border-petal-ink/10 hover:bg-pink-700 transition-colors safe-pb"
         >
           <ArrowUp className="w-5 h-5" strokeWidth={1.5} />

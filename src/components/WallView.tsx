@@ -32,6 +32,7 @@ import { useTimezone } from '../contexts/TimezoneContext';
 import { formatRelativeOrDate } from '../utils/datetime';
 import { isVideoUrl } from '../utils/script';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { tr } from '../i18n/tr';
 
 interface WallViewProps {
   authState: {
@@ -48,20 +49,20 @@ interface WallViewProps {
 type WallFilter = 'all' | 'important' | 'general' | 'mood';
 
 const FILTER_TABS: { id: WallFilter; label: string; icon: string }[] = [
-  { id: 'all', label: '全部', icon: '🌿' },
-  { id: 'important', label: '重要', icon: '⭐' },
-  { id: 'general', label: '一般', icon: '📝' },
-  { id: 'mood', label: '帶心情', icon: '💭' },
+  { id: 'all', label: tr('全部', 'All'), icon: '🌿' },
+  { id: 'important', label: tr('重要', 'Important'), icon: '⭐' },
+  { id: 'general', label: tr('一般', 'General'), icon: '📝' },
+  { id: 'mood', label: tr('帶心情', 'With mood'), icon: '💭' },
 ];
 
 // One-tap acknowledgements. Keys must match WALL_REACTIONS in routes/wall.js.
 // These exist because a bare 已讀 makes silence louder: the reader needs a way
 // to say "I saw it, I'm with you" that costs one tap, not a written reply.
 const WALL_REACTIONS: { key: WallReactionKey; emoji: string; label: string }[] = [
-  { key: 'hug', emoji: '🫂', label: '抱抱' },
-  { key: 'understand', emoji: '💛', label: '我懂' },
-  { key: 'thanks', emoji: '🙏', label: '謝謝你說' },
-  { key: 'later', emoji: '⏳', label: '晚點好好回你' },
+  { key: 'hug', emoji: '🫂', label: tr('抱抱', 'Hug') },
+  { key: 'understand', emoji: '💛', label: tr('我懂', 'I get it') },
+  { key: 'thanks', emoji: '🙏', label: tr('謝謝你說', 'Thanks for telling me') },
+  { key: 'later', emoji: '⏳', label: tr('晚點好好回你', 'I\'ll reply properly later') },
 ];
 
 const reactionMeta = (key: WallReactionKey | null | undefined) =>
@@ -126,7 +127,7 @@ const PlusOneCelebration: React.FC<{ onDone: () => void }> = ({ onDone }) => {
         >
           <span className="text-lg leading-none" aria-hidden>💗</span>
           <span className="font-display text-lg font-medium leading-none">+1</span>
-          <span className="font-body text-xs font-medium leading-none">正向互動</span>
+          <span className="font-body text-xs font-medium leading-none">{tr('正向互動', 'Positive interaction')}</span>
         </div>
       </div>
     </div>
@@ -295,8 +296,8 @@ const WallView: React.FC<WallViewProps> = ({
       setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, my_reaction: previous } : p)));
       showNotification({
         type: 'error',
-        title: '心意沒有送出',
-        message: err instanceof Error ? err.message : '請稍後再試一次。',
+        title: tr('心意沒有送出', 'Your reaction didn\'t send'),
+        message: err instanceof Error ? err.message : tr('請稍後再試一次。', 'Please try again in a moment.'),
       });
     } finally {
       setReactionBusyId(null);
@@ -311,8 +312,8 @@ const WallView: React.FC<WallViewProps> = ({
     } catch (err) {
       showNotification({
         type: 'error',
-        title: '無法載入牆',
-        message: err instanceof Error ? err.message : '請稍後再試',
+        title: tr('無法載入牆', 'Couldn\'t load the wall'),
+        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
       });
     } finally {
       setLoading(false);
@@ -358,8 +359,8 @@ const WallView: React.FC<WallViewProps> = ({
         );
         showNotification({
           type: 'success',
-          title: '已更新',
-          message: '貼文已儲存',
+          title: tr('已更新', 'Updated'),
+          message: tr('貼文已儲存', 'Post saved'),
         });
       } else {
         const created = await apiService.createWallPost(input, options);
@@ -371,8 +372,8 @@ const WallView: React.FC<WallViewProps> = ({
         setPlusOneKey((k) => (k ?? 0) + 1);
         showNotification({
           type: 'success',
-          title: '已發布',
-          message: '對方會收到通知',
+          title: tr('已發布', 'Posted'),
+          message: tr('對方會收到通知', 'Your partner will be notified'),
         });
       }
     } catch (err) {
@@ -385,8 +386,8 @@ const WallView: React.FC<WallViewProps> = ({
         await loadPosts();
         showNotification({
           type: 'warning',
-          title: editingPost ? '儲存時間較長' : '上傳時間較長',
-          message: '網路較慢，內容可能已送出。已為你重新整理牆面——若已出現就不用再送一次。',
+          title: editingPost ? tr('儲存時間較長', 'Saving is taking a while') : tr('上傳時間較長', 'Uploading is taking a while'),
+          message: tr('網路較慢，內容可能已送出。已為你重新整理牆面——若已出現就不用再送一次。', 'The connection is slow, so it may have been sent already. We refreshed the wall for you; if it\'s there, no need to send it again.'),
         });
         return; // resolve so the composer closes without an error
       }
@@ -397,7 +398,7 @@ const WallView: React.FC<WallViewProps> = ({
   };
 
   const handleDelete = async (post: WallPost) => {
-    if (!confirm('確定要刪除這則貼文嗎？所有回覆也會一起刪除。')) return;
+    if (!confirm(tr('確定要刪除這則貼文嗎？所有回覆也會一起刪除。', 'Delete this post? All replies will be deleted too.'))) return;
     // Optimistic (playbook §R7): remove it from the wall immediately so the tap
     // feels instant; restore the exact list and notify if the server rejects it.
     const snapshot = posts;
@@ -409,8 +410,8 @@ const WallView: React.FC<WallViewProps> = ({
       setPosts(snapshot);
       showNotification({
         type: 'error',
-        title: '刪除失敗',
-        message: err instanceof Error ? err.message : '請稍後再試',
+        title: tr('刪除失敗', 'Couldn\'t delete'),
+        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
       });
     }
   };
@@ -451,22 +452,22 @@ const WallView: React.FC<WallViewProps> = ({
     const next = !post.is_private;
     // Private → shared is a one-way disclosure: once TA has seen it, hiding it
     // again doesn't undo that. The other direction is safe, so it stays instant.
-    if (!next && !confirm('要把這則貼文分享給TA嗎？\n\nTA會立刻看得到，之後再設回私密也收不回來了。')) return;
+    if (!next && !confirm(tr('要把這則貼文分享給TA嗎？\n\nTA會立刻看得到，之後再設回私密也收不回來了。', 'Share this post with them?\n\nThey\'ll see it right away, and setting it back to private later won\'t take it back.'))) return;
     setPrivacyBusyId(post.id);
     setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, is_private: next } : p)));
     try {
       await apiService.updateWallPost(post.id, { is_private: next });
       showNotification({
         type: 'info',
-        title: next ? '已設為私密' : '已分享給對方',
-        message: next ? '對方看不到這則貼文，也不會收到通知。' : '對方現在看得到這則貼文了。',
+        title: next ? tr('已設為私密', 'Set to private') : tr('已分享給對方', 'Shared with your partner'),
+        message: next ? tr('對方看不到這則貼文，也不會收到通知。', 'Your partner can\'t see this post and won\'t be notified.') : tr('對方現在看得到這則貼文了。', 'Your partner can see this post now.'),
       });
     } catch (err) {
       setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, is_private: !next } : p)));
       showNotification({
         type: 'error',
-        title: '操作失敗',
-        message: err instanceof Error ? err.message : '請稍後再試',
+        title: tr('操作失敗', 'Something went wrong'),
+        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
       });
     } finally {
       setPrivacyBusyId(null);
@@ -488,11 +489,11 @@ const WallView: React.FC<WallViewProps> = ({
       setShareWarnPost(null);
       showNotification({
         type: 'success',
-        title: '已匿名公開',
-        message: '這段對話會以匿名方式顯示在「公開問答」，謝謝你願意幫助別人。',
+        title: tr('已匿名公開', 'Shared anonymously'),
+        message: tr('這段對話會以匿名方式顯示在「公開問答」，謝謝你願意幫助別人。', 'This conversation will appear anonymously in "Public Q&A". Thank you for being willing to help others.'),
       });
     } catch (err) {
-      showNotification({ type: 'error', title: '公開失敗', message: err instanceof Error ? err.message : '請稍後再試' });
+      showNotification({ type: 'error', title: tr('公開失敗', 'Couldn\'t share publicly'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment') });
     } finally {
       setSharingId(null);
     }
@@ -503,9 +504,9 @@ const WallView: React.FC<WallViewProps> = ({
     try {
       await apiService.unpublishWallPost(post.id);
       setPosts((prev) => prev.map((p) => (p.id === post.id ? { ...p, public_status: 'private' } : p)));
-      showNotification({ type: 'info', title: '已取消公開', message: '這段對話不再顯示於公開問答。' });
+      showNotification({ type: 'info', title: tr('已取消公開', 'No longer public'), message: tr('這段對話不再顯示於公開問答。', 'This conversation no longer appears in Public Q&A.') });
     } catch (err) {
-      showNotification({ type: 'error', title: '操作失敗', message: err instanceof Error ? err.message : '請稍後再試' });
+      showNotification({ type: 'error', title: tr('操作失敗', 'Something went wrong'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment') });
     } finally {
       setSharingId(null);
     }
@@ -517,7 +518,7 @@ const WallView: React.FC<WallViewProps> = ({
     const authorName =
       post.author_nickname ||
       (isOwn ? nicknames.partner1 : nicknames.partner2) ||
-      '對方';
+      tr('對方', 'Partner');
     const isImportant = post.category === 'important';
     // Only the partner's shared posts are worth tracking: a private post never
     // reaches them, and reading your own post means nothing.
@@ -544,7 +545,7 @@ const WallView: React.FC<WallViewProps> = ({
             {isImportant && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-petal-rose-soft/50 text-petal-rose-deep font-body text-[10px] uppercase tracking-[0.12em]">
                 <Star className="w-3 h-3 mr-1" strokeWidth={1.5} />
-                重要
+                {tr('重要', 'Important')}
               </span>
             )}
             {post.is_private && (
@@ -553,7 +554,7 @@ const WallView: React.FC<WallViewProps> = ({
                 data-testid={`wall-post-private-badge-${post.id}`}
               >
                 <Lock className="w-3 h-3 mr-1" strokeWidth={1.5} />
-                只有我看得到
+                {tr('只有我看得到', 'Only I can see this')}
               </span>
             )}
             <span className="font-display text-base font-medium text-petal-ink">
@@ -578,7 +579,7 @@ const WallView: React.FC<WallViewProps> = ({
                 type="button"
                 onClick={() => openComposer({ editing: post })}
                 className="p-2.5 min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-md text-petal-muted hover:text-petal-ink hover:bg-petal-cream-2 transition-colors"
-                aria-label="編輯"
+                aria-label={tr("編輯", 'Edit')}
               >
                 <Pencil className="w-4 h-4" strokeWidth={1.5} />
               </button>
@@ -587,7 +588,7 @@ const WallView: React.FC<WallViewProps> = ({
                 type="button"
                 onClick={() => handleDelete(post)}
                 className="p-2.5 min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-md text-petal-muted hover:text-petal-rose-deep hover:bg-petal-cream-2 transition-colors"
-                aria-label="刪除"
+                aria-label={tr("刪除", 'Delete')}
               >
                 <Trash2 className="w-4 h-4" strokeWidth={1.5} />
               </button>
@@ -645,11 +646,11 @@ const WallView: React.FC<WallViewProps> = ({
                   className={`block w-full rounded-md border border-petal-rule bg-petal-cream-2 overflow-hidden focus:outline-none focus:ring-2 focus:ring-petal-rose-deep ${
                     ratio ? '' : 'aspect-video'
                   }`}
-                  aria-label="放大檢視照片"
+                  aria-label={tr("放大檢視照片", 'Enlarge photo')}
                 >
                   <img
                     src={url}
-                    alt={`貼文照片 ${idx + 1}`}
+                    alt={tr(`貼文照片 ${idx + 1}`, `Post photo ${idx + 1}`)}
                     loading="lazy"
                     onLoad={(e) =>
                       rememberRatio(url, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)
@@ -671,7 +672,7 @@ const WallView: React.FC<WallViewProps> = ({
           >
             <span aria-hidden>{partnerReaction.emoji}</span>
             <span className="font-body text-xs text-petal-rose-deep">
-              {authState.partnerConnected ? `${nicknames.partner2 || '對方'}給了你一個「${partnerReaction.label}」` : `「${partnerReaction.label}」`}
+              {authState.partnerConnected ? tr(`${nicknames.partner2 || '對方'}給了你一個「${partnerReaction.label}」`, `${nicknames.partner2 || 'Your partner'} sent you "${partnerReaction.label}"`) : tr(`「${partnerReaction.label}」`, `"${partnerReaction.label}"`)}
             </span>
             {post.partner_reaction && (
               <span className="font-body text-[11px] text-petal-muted">
@@ -724,12 +725,12 @@ const WallView: React.FC<WallViewProps> = ({
               {post.partner_read_at ? (
                 <>
                   <Eye className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
-                  已讀 · {formatShortTime(post.partner_read_at, tz)}
+                  {tr('已讀 ·', 'Read ·')} {formatShortTime(post.partner_read_at, tz)}
                 </>
               ) : (
                 <>
                   <EyeOff className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
-                  對方還沒看到
+                  {tr('對方還沒看到', 'Your partner hasn\'t seen it yet')}
                 </>
               )}
             </span>
@@ -742,7 +743,7 @@ const WallView: React.FC<WallViewProps> = ({
             data-testid={`wall-post-thread-toggle-${post.id}`}
           >
             <MessageCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
-            {post.reply_count > 0 ? `${post.reply_count} 則回覆` : '回覆'}
+            {post.reply_count > 0 ? tr(`${post.reply_count} 則回覆`, `${post.reply_count} ${post.reply_count === 1 ? 'reply' : 'replies'}`) : tr('回覆', 'Reply')}
             {isExpanded ? (
               <ChevronUp className="w-3.5 h-3.5" strokeWidth={1.5} />
             ) : (
@@ -767,7 +768,7 @@ const WallView: React.FC<WallViewProps> = ({
               ) : (
                 <Globe className="w-3.5 h-3.5" strokeWidth={1.5} />
               )}
-              {post.is_private ? '私密・分享給對方' : '設為私密'}
+              {post.is_private ? tr('私密・分享給對方', 'Private · share with partner') : tr('設為私密', 'Make private')}
             </button>
           )}
 
@@ -781,7 +782,7 @@ const WallView: React.FC<WallViewProps> = ({
               className="flex items-center gap-1.5 text-petal-sage-deep hover:text-petal-ink font-body text-xs whitespace-nowrap disabled:opacity-50"
             >
               {sharingId === post.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" strokeWidth={1.5} />}
-              已公開・取消
+              {tr('已公開・取消', 'Public · undo')}
             </button>
           ) : (
             <button
@@ -791,7 +792,7 @@ const WallView: React.FC<WallViewProps> = ({
               className="flex items-center gap-1.5 text-petal-ink-soft hover:text-petal-ink font-body text-xs whitespace-nowrap"
             >
               <Globe className="w-3.5 h-3.5" strokeWidth={1.5} />
-              匿名公開
+              {tr('匿名公開', 'Share anonymously')}
             </button>
           ))}
         </div>
@@ -803,7 +804,7 @@ const WallView: React.FC<WallViewProps> = ({
             companionId={authState.user?.selected_therapist ?? null}
             onReplyCountChange={(newCount) => updateReplyCount(post.id, newCount)}
             onError={(message) =>
-              showNotification({ type: 'error', title: '發生錯誤', message })
+              showNotification({ type: 'error', title: tr('發生錯誤', 'Something went wrong'), message })
             }
             onNotify={(n) => showNotification(n)}
           />
@@ -832,7 +833,7 @@ const WallView: React.FC<WallViewProps> = ({
             >
               <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-petal-sage/30 text-petal-ink-soft font-body text-[10px] uppercase tracking-[0.12em]">
-                  範例
+                  {tr('範例', 'Example')}
                 </span>
                 <span className="font-body text-[10px] uppercase tracking-[0.1em] text-petal-muted">
                   {demo.mood_tag}
@@ -845,16 +846,16 @@ const WallView: React.FC<WallViewProps> = ({
                 {demo.content}
               </div>
               <div className="mt-3 font-display italic text-xs text-petal-rose-deep">
-                用這個開始 →
+                {tr('用這個開始 →', 'Start with this →')}
               </div>
             </button>
           ))}
         </div>
         <p className="font-body text-[11px] text-petal-muted">
-          這些只是示範 — 寫了第一則之後就會消失。
+          {tr('這些只是示範 — 寫了第一則之後就會消失。', 'These are just examples. They disappear once you write your first post.')}
           {defaultWallExamples.length > DEMO_COUNT && (
             <>
-              {' '}還有 {defaultWallExamples.length - DEMO_COUNT} 則範本，在「新貼文」裡看得到。
+              {' '}{tr('還有', 'There are ')} {defaultWallExamples.length - DEMO_COUNT} {tr('則範本，在「新貼文」裡看得到。', ' more templates under "New post".')}
             </>
           )}
         </p>
@@ -876,16 +877,16 @@ const WallView: React.FC<WallViewProps> = ({
     <div className="space-y-8">
       <div className="border-b border-petal-rule pb-7">
         <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-          — 共享筆記
+          {tr('— 共享筆記', '— Shared notes')}
         </div>
         <div className="flex items-end justify-between gap-4 flex-wrap">
           <div>
             <h2 className="font-display text-2xl sm:text-3xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.1] md:leading-[1.05] mb-3">
-              我們的<em className="not-italic font-light italic text-pink-600">牆</em>
+              {tr('我們的', 'Our ')}<em className="not-italic font-light italic text-pink-600">{tr('牆', 'wall')}</em>
               <span className="align-middle ml-2"><InfoHint viewId="wall" /></span>
             </h2>
             <p className="font-display italic font-light text-base text-petal-muted">
-              留下讓你覺得「還好是你」的瞬間，也留下想被好好聽見的話。
+              {tr('留下讓你覺得「還好是你」的瞬間，也留下想被好好聽見的話。', 'Keep the moments that make you think "glad it\'s you", and the words you want truly heard.')}
             </p>
           </div>
           <button
@@ -895,7 +896,7 @@ const WallView: React.FC<WallViewProps> = ({
             data-testid="wall-new-post-button"
           >
             <Plus className="w-4 h-4" strokeWidth={1.5} />
-            新貼文
+            {tr('新貼文', 'New post')}
           </button>
         </div>
       </div>
@@ -906,27 +907,27 @@ const WallView: React.FC<WallViewProps> = ({
             type="button"
             onClick={dismissTutorial}
             className="absolute top-3 right-3 p-1 text-petal-muted hover:text-petal-ink"
-            aria-label="關閉說明"
+            aria-label={tr("關閉說明", 'Close')}
           >
             <X className="w-4 h-4" strokeWidth={1.5} />
           </button>
           <div className="flex items-center gap-2 mb-2">
             <Lightbulb className="w-4 h-4 text-petal-rose-deep" strokeWidth={1.5} />
             <h3 className="font-display text-lg font-medium text-petal-ink">
-              「我們的牆」是什麼？
+              {tr('「我們的牆」是什麼？', 'What is "Our wall"?')}
             </h3>
           </div>
           <ul className="font-body text-sm text-petal-ink-soft space-y-1.5 leading-relaxed list-disc list-inside">
-            <li>一個自由寫下重要話、心情、需求的空間。</li>
+            <li>{tr('一個自由寫下重要話、心情、需求的空間。', 'A space to freely write important words, moods and needs.')}</li>
             <li>
-              試試用<strong className="text-petal-ink">範本</strong>
-              教對方你希望被怎麼對待 — 比直接抱怨更容易被聽見。
+              {tr('試試用', 'Try using a ')}<strong className="text-petal-ink">{tr('範本', 'template')}</strong>
+              {tr('教對方你希望被怎麼對待 — 比直接抱怨更容易被聽見。', ' to show them how you\'d like to be treated. It\'s easier to hear than a complaint.')}
             </li>
             <li>
-              標記為<strong className="text-petal-ink">「重要」</strong>
-              的貼文會 pin 在最上面，提醒彼此。
+              {tr('標記為', 'Posts marked ')}<strong className="text-petal-ink">{tr('「重要」', '"Important"')}</strong>
+              {tr('的貼文會 pin 在最上面，提醒彼此。', ' are pinned to the top as a reminder for you both.')}
             </li>
-            <li>對方會收到通知，可以在貼文下面回覆形成對話。</li>
+            <li>{tr('對方會收到通知，可以在貼文下面回覆形成對話。', 'Your partner is notified and can reply under the post to start a conversation.')}</li>
           </ul>
           <div className="mt-3 text-right">
             <button
@@ -934,7 +935,7 @@ const WallView: React.FC<WallViewProps> = ({
               onClick={dismissTutorial}
               className="font-display italic text-sm text-petal-ink hover:text-petal-rose-deep"
             >
-              我懂了 →
+              {tr('我懂了 →', 'Got it →')}
             </button>
           </div>
         </div>
@@ -964,7 +965,7 @@ const WallView: React.FC<WallViewProps> = ({
 
       {loading ? (
         <div className="text-center py-12 font-body text-sm text-petal-muted">
-          載入中⋯
+          {tr('載入中⋯', 'Loading…')}
         </div>
       ) : hasNoRealPosts ? (
         <div className="space-y-5">
@@ -974,21 +975,21 @@ const WallView: React.FC<WallViewProps> = ({
               strokeWidth={1.2}
             />
             <p className="font-display italic font-light text-base text-petal-muted">
-              還沒有貼文 — 挑一則範例改成你的話，或直接寫下你的第一則。
+              {tr('還沒有貼文 — 挑一則範例改成你的話，或直接寫下你的第一則。', 'No posts yet. Pick an example and make it your own, or write your first post.')}
             </p>
           </div>
           {renderDemoCards()}
         </div>
       ) : filteredPosts.length === 0 ? (
         <div className="text-center py-12 font-body text-sm text-petal-muted">
-          這個分類下還沒有貼文。
+          {tr('這個分類下還沒有貼文。', 'No posts in this category yet.')}
         </div>
       ) : (
         <div className="space-y-6">
           {importantPosts.length > 0 && (
             <div className="space-y-3">
               <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-rose-deep">
-                ⭐ 重要 ({importantPosts.length})
+                {tr('⭐ 重要 (', '⭐ Important (')}{importantPosts.length})
               </div>
               {importantPosts.map(renderPostCard)}
             </div>
@@ -997,7 +998,7 @@ const WallView: React.FC<WallViewProps> = ({
             <div className="space-y-3">
               {importantPosts.length > 0 && (
                 <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted pt-2">
-                  最近
+                  {tr('最近', 'Recent')}
                 </div>
               )}
               {generalPosts.map(renderPostCard)}
@@ -1026,14 +1027,14 @@ const WallView: React.FC<WallViewProps> = ({
           <div className="bg-petal-cream rounded-2xl max-w-md w-full p-5">
             <div className="flex items-center gap-2 mb-3">
               <Globe className="w-5 h-5 text-petal-rose-deep" />
-              <h3 className="text-lg font-serif text-petal-ink">公開到「公開問答」</h3>
+              <h3 className="text-lg font-serif text-petal-ink">{tr('公開到「公開問答」', 'Share to "Public Q&A"')}</h3>
             </div>
             <p className="text-sm text-petal-ink-soft leading-relaxed mb-2">
-              公開後，這則貼文與底下的回覆會<span className="text-petal-ink font-medium">匿名</span>顯示在「公開問答」，
-              <span className="text-petal-ink font-medium">所有人（包含未登入的訪客）都看得到</span>。
+              {tr('公開後，這則貼文與底下的回覆會', 'Once shared, this post and its replies will appear ')}<span className="text-petal-ink font-medium">{tr('匿名', 'anonymously')}</span>{tr('顯示在「公開問答」，', ' in "Public Q&A", ')}
+              <span className="text-petal-ink font-medium">{tr('所有人（包含未登入的訪客）都看得到', 'visible to everyone (including visitors who aren\'t signed in)')}</span>{tr('。', '.')}
             </p>
             <p className="text-sm text-petal-ink-soft leading-relaxed mb-4">
-              你們會顯示為「匿名 A / 匿名 B」，不會出現名字。你隨時可以取消公開。
+              {tr('你們會顯示為「匿名 A / 匿名 B」，不會出現名字。你隨時可以取消公開。', 'You\'ll appear as "Anonymous A / Anonymous B", never by name. You can unshare any time.')}
             </p>
             <div className="flex justify-end gap-2">
               <button
@@ -1041,7 +1042,7 @@ const WallView: React.FC<WallViewProps> = ({
                 onClick={() => setShareWarnPost(null)}
                 className="text-sm px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20"
               >
-                取消
+                {tr('取消', 'Cancel')}
               </button>
               <button
                 type="button"
@@ -1051,7 +1052,7 @@ const WallView: React.FC<WallViewProps> = ({
                 className="text-sm px-4 py-2 rounded-full bg-petal-ink text-petal-cream inline-flex items-center gap-2 hover:opacity-90 disabled:opacity-50"
               >
                 {sharingId === shareWarnPost.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Globe className="w-4 h-4" />}
-                確定公開
+                {tr('確定公開', 'Share publicly')}
               </button>
             </div>
           </div>
@@ -1067,14 +1068,14 @@ const WallView: React.FC<WallViewProps> = ({
           <button
             type="button"
             onClick={() => setLightboxUrl(null)}
-            aria-label="關閉"
+            aria-label={tr("關閉", 'Close')}
             className="absolute top-4 right-4 w-9 h-9 inline-flex items-center justify-center rounded-full bg-white/15 text-white hover:bg-white/25"
           >
             <X className="w-5 h-5" strokeWidth={1.5} />
           </button>
           <img
             src={lightboxUrl}
-            alt="放大檢視"
+            alt={tr("放大檢視", 'Enlarge')}
             className="max-w-full max-h-full object-contain"
             onClick={(e) => e.stopPropagation()}
           />
