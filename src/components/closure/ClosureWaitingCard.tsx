@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Clock, Loader2, Pencil } from 'lucide-react';
 import { formatDateTime } from '../../utils/datetime';
 import { useTimezone } from '../../contexts/TimezoneContext';
+import { tr } from '../../i18n/tr';
 
 // Screen 4 — after I submit but before my partner does. Naming the auto-finish
 // time («大約⋯») is what turns limbo into a wait. The 先這樣完成 button appears
@@ -41,15 +42,15 @@ export default function ClosureWaitingCard({
     >
       <p className="text-sm text-petal-ink inline-flex items-center gap-1.5 justify-center">
         <Clock className="w-4 h-4 text-petal-sage-deep" />
-        你的約定已送出，等{partnerNickname || '對方'}也寫好。
+        {tr('你的約定已送出，等', 'Your commitment is in. Waiting for ')}{partnerNickname || tr('對方', 'your partner')}{tr('也寫好。', ' to finish theirs.')}
       </p>
       {/* The old string read 「阿哲 8/9 14:00 前還沒動作，你就可以…」, which parses
           as a broken sentence. Lead with 若 so the condition is signposted
           before the clause it governs. */}
       <p className="text-xs text-petal-ink-soft leading-relaxed">
         {canFinalizeNow
-          ? `${partnerNickname || '對方'}還沒動作。你可以先這樣完成，或再等等。`
-          : `若${partnerNickname || '對方'}${graceLabel ? `到 ${graceLabel}` : ''}都還沒動作，你就可以「先這樣完成」。${deadlineLabel} 前都沒回應的話，系統會安全地為你們結束。`}
+          ? tr(`${partnerNickname || '對方'}還沒動作。你可以先這樣完成，或再等等。`, `${partnerNickname || 'Your partner'} hasn't responded yet. You can finish as-is now, or wait a little longer.`)
+          : tr(`若${partnerNickname || '對方'}${graceLabel ? `到 ${graceLabel}` : ''}都還沒動作，你就可以「先這樣完成」。${deadlineLabel} 前都沒回應的話，系統會安全地為你們結束。`, `If ${partnerNickname || 'your partner'} still hasn't responded${graceLabel ? ` by ${graceLabel}` : ''}, you can "finish as-is". If there's no response by ${deadlineLabel}, it will close safely for you both.`)}
       </p>
       <div className="flex justify-center gap-2 pt-1">
         {/* 我先跳過 read as "skip my own part" — but I already wrote it. The
@@ -62,7 +63,7 @@ export default function ClosureWaitingCard({
           className="text-xs text-petal-ink-soft underline underline-offset-2 hover:text-petal-ink inline-flex items-center gap-1"
         >
           <Pencil className="w-3 h-3" />
-          改一下我的約定
+          {tr('改一下我的約定', 'Edit my commitment')}
         </button>
         {canFinalizeNow && (
           <button
@@ -73,7 +74,7 @@ export default function ClosureWaitingCard({
             className="px-3 py-1.5 rounded-full bg-petal-sage-deeper text-white text-xs font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
           >
             {finalizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-            先這樣完成
+            {tr('先這樣完成', 'Finish as-is')}
           </button>
         )}
       </div>

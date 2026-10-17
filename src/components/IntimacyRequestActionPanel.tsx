@@ -10,6 +10,7 @@ import type {
 import { useTimezone } from '../contexts/TimezoneContext';
 import { localInputToIsoInTz, formatDateTime } from '../utils/datetime';
 import { getTimezoneShortLabel } from '../utils/timezone-options';
+import { tr } from '../i18n/tr';
 
 interface IntimacyRequestActionPanelProps {
   request: IntimacyRequest;
@@ -17,16 +18,16 @@ interface IntimacyRequestActionPanelProps {
 }
 
 const AFFIRMATION_SUGGESTIONS = [
-  '謝謝你想到我 ❤️',
-  '我也很想跟你親近',
-  '很開心你願意主動邀我',
+  tr('謝謝你想到我 ❤️', 'Thanks for thinking of me ❤️'),
+  tr('我也很想跟你親近', 'I\'d love to be close to you too'),
+  tr('很開心你願意主動邀我', 'So happy you asked me'),
 ];
 
 const CLOSING_SUGGESTIONS = [
-  '到時見 💕',
-  '等不及了',
-  '我也想你',
-  '抱抱',
+  tr('到時見 💕', 'See you then 💕'),
+  tr('等不及了', 'Can\'t wait'),
+  tr('我也想你', 'Miss you too'),
+  tr('抱抱', 'Hugs'),
 ];
 
 const getCategoryIcon = (category: string) => {
@@ -41,10 +42,10 @@ const getCategoryIcon = (category: string) => {
 
 const getCategoryName = (category: string) => {
   switch (category) {
-    case 'physical': return '肢體親密';
-    case 'emotional': return '情感親密';
-    case 'playful': return '趣味互動';
-    case 'companionship': return '日常陪伴';
+    case 'physical': return tr('肢體親密', 'Physical intimacy');
+    case 'emotional': return tr('情感親密', 'Emotional intimacy');
+    case 'playful': return tr('趣味互動', 'Playful');
+    case 'companionship': return tr('日常陪伴', 'Everyday time together');
     default: return category;
   }
 };
@@ -57,7 +58,7 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
 }) => {
   const tz = useTimezone();
   const [mode, setMode] = useState<Mode>('choice');
-  const [acceptMessage, setAcceptMessage] = useState<string>('接受你的邀請 💕');
+  const [acceptMessage, setAcceptMessage] = useState<string>(tr('接受你的邀請 💕', 'I accept your invitation 💕'));
 
   // 4-step alternative flow state
   const [affirmation, setAffirmation] = useState<string>('');
@@ -80,7 +81,7 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
         .then(setAlternativeOptions)
         .catch((err) => {
           console.error('Failed to fetch alternative options:', err);
-          setError('無法載入替代選項');
+          setError(tr('無法載入替代選項', 'Couldn\'t load the alternative options'));
         });
     }
   }, [mode, alternativeOptions]);
@@ -97,7 +98,7 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
       });
       onResponded();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '回應失敗');
+      setError(err instanceof Error ? err.message : tr('回應失敗', 'Couldn\'t send your response'));
     } finally {
       setLoading(false);
       respondLockRef.current = false;
@@ -127,7 +128,7 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
       await apiService.respondToIntimacyRequest(request.id, response);
       onResponded();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '回應失敗');
+      setError(err instanceof Error ? err.message : tr('回應失敗', 'Couldn\'t send your response'));
     } finally {
       setLoading(false);
       respondLockRef.current = false;
@@ -151,7 +152,7 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
             className="flex-1 min-w-[8rem] px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:bg-pink-300 transition-colors flex items-center justify-center gap-2"
           >
             <Check className="w-4 h-4" />
-            <span>接受邀請</span>
+            <span>{tr('接受邀請', 'Accept invitation')}</span>
           </button>
           <button
             data-testid="intimacy-show-alternative-button"
@@ -159,7 +160,7 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
             disabled={loading}
             className="flex-1 min-w-[8rem] px-4 py-2 border border-pink-300 text-pink-700 bg-white rounded-lg hover:bg-pink-50 transition-colors"
           >
-            想改一下方式
+            {tr('想改一下方式', 'Suggest a change')}
           </button>
         </div>
       )}
@@ -167,12 +168,12 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
       {mode === 'accept' && (
         <div className="space-y-3">
           <div>
-            <label className="block text-sm text-gray-700 mb-1">給對方的回覆（可自訂）</label>
+            <label className="block text-sm text-gray-700 mb-1">{tr('給對方的回覆（可自訂）', 'Your reply (you can edit it)')}</label>
             <input
               type="text"
               value={acceptMessage}
               onChange={(e) => setAcceptMessage(e.target.value)}
-              placeholder="例如：我好期待，今晚就從你的劇本開始吧"
+              placeholder={tr("例如：我好期待，今晚就從你的劇本開始吧", 'e.g. Can\'t wait! Let\'s start with your script tonight')}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-200"
             />
           </div>
@@ -182,7 +183,7 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
               disabled={loading}
               className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              返回
+              {tr('返回', 'Back')}
             </button>
             <button
               data-testid="intimacy-accept-button"
@@ -191,7 +192,7 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
               className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:bg-pink-300 transition-colors flex items-center gap-2"
             >
               <Check className="w-4 h-4" />
-              <span>{loading ? '送出中…' : '送出接受'}</span>
+              <span>{loading ? tr('送出中…', 'Sending…') : tr('送出接受', 'Send acceptance')}</span>
             </button>
           </div>
         </div>
@@ -200,12 +201,12 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
       {mode === 'alternative' && (
         <div className="space-y-5">
           <p className="text-xs text-pink-700 bg-white border border-pink-200 rounded-md px-3 py-2">
-            想改一下方式時，依下面四個步驟回應，讓對方感受到被在乎：先肯定 → 想試試的方式 → 想改到的時間 → 結尾甜蜜話。
+            {tr('想改一下方式時，依下面四個步驟回應，讓對方感受到被在乎：先肯定 → 想試試的方式 → 想改到的時間 → 結尾甜蜜話。', 'To suggest a change, reply in four steps so they feel cared for: appreciate first → a way you\'d like to try → a time you\'d prefer → a sweet closing line.')}
           </p>
 
           {/* Step 1 — affirmation */}
           <section>
-            <h5 className="font-medium text-gray-900 text-sm mb-1">① 先謝謝對方</h5>
+            <h5 className="font-medium text-gray-900 text-sm mb-1">{tr('① 先謝謝對方', '① Thank them first')}</h5>
             <div className="flex flex-wrap gap-1.5 mb-2">
               {AFFIRMATION_SUGGESTIONS.map((s) => (
                 <button
@@ -223,7 +224,7 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
               value={affirmation}
               onChange={(e) => setAffirmation(e.target.value)}
               rows={2}
-              placeholder="例如：謝謝你想到我"
+              placeholder={tr("例如：謝謝你想到我", 'e.g. Thanks for thinking of me')}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-200 text-sm resize-none"
             />
           </section>
@@ -231,10 +232,10 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
           {/* Step 2 — alternative activity (optional) */}
           <section>
             <h5 className="font-medium text-gray-900 text-sm mb-1">
-              ② 想試試這個方式 <span className="text-xs text-gray-500 font-normal">（選填，可保持原邀請）</span>
+              {tr('② 想試試這個方式', '② I\'d like to try this')} <span className="text-xs text-gray-500 font-normal">{tr('（選填，可保持原邀請）', ' (optional, you can keep the original)')}</span>
             </h5>
             {!alternativeOptions ? (
-              <div className="py-3 text-sm text-gray-500">載入中…</div>
+              <div className="py-3 text-sm text-gray-500">{tr('載入中…', 'Loading…')}</div>
             ) : (
               <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
                 {Object.entries(alternativeOptions).map(([category, options]) => (
@@ -278,7 +279,7 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
           {/* Step 3 — required new time */}
           <section>
             <h5 className="font-medium text-gray-900 text-sm mb-1">
-              ③ 想改到這個時間 <span className="text-xs text-red-500 font-normal">必填</span>
+              {tr('③ 想改到這個時間', '③ I\'d prefer this time')} <span className="text-xs text-red-500 font-normal">{tr('必填', 'Required')}</span>
             </h5>
             <input
               data-testid="intimacy-alt-scheduled-time"
@@ -288,16 +289,16 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-200 text-sm"
             />
             <p className="text-xs text-gray-500 mt-1">
-              以共用時區（{getTimezoneShortLabel(tz)}）顯示。
+              {tr('以共用時區（', 'Shown in your shared time zone (')}{getTimezoneShortLabel(tz)}{tr('）顯示。', ').')}
               {altScheduledLocal && (
-                <> 對方會看到：<span className="text-gray-700">{formatDateTime(localInputToIsoInTz(altScheduledLocal, tz), tz, { alwaysShowTz: true })}</span></>
+                <> {tr('對方會看到：', 'They\'ll see:')}<span className="text-gray-700">{formatDateTime(localInputToIsoInTz(altScheduledLocal, tz), tz, { alwaysShowTz: true })}</span></>
               )}
             </p>
           </section>
 
           {/* Step 4 — closing */}
           <section>
-            <h5 className="font-medium text-gray-900 text-sm mb-1">④ 結尾一句甜蜜</h5>
+            <h5 className="font-medium text-gray-900 text-sm mb-1">{tr('④ 結尾一句甜蜜', '④ A sweet closing line')}</h5>
             <div className="flex flex-wrap gap-1.5 mb-2">
               {CLOSING_SUGGESTIONS.map((s) => (
                 <button
@@ -315,7 +316,7 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
               value={closing}
               onChange={(e) => setClosing(e.target.value)}
               rows={2}
-              placeholder="例如：到時見 💕"
+              placeholder={tr("例如：到時見 💕", 'e.g. See you then 💕')}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-200 text-sm resize-none"
             />
           </section>
@@ -326,7 +327,7 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
               disabled={loading}
               className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
             >
-              返回
+              {tr('返回', 'Back')}
             </button>
             <button
               data-testid="intimacy-send-alternative-button"
@@ -334,7 +335,7 @@ const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
               disabled={!canSendAlternative || loading}
               className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:bg-pink-300 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? '送出中…' : '送出回應'}
+              {loading ? tr('送出中…', 'Sending…') : tr('送出回應', 'Send response')}
             </button>
           </div>
         </div>

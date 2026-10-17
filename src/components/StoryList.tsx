@@ -5,6 +5,7 @@ import { useTimezone } from '../contexts/TimezoneContext';
 import { formatRelativeOrDate } from '../utils/datetime';
 import { CURATED_READINGS } from '../content/curatedReadings';
 import CuratedReadingCard from './CuratedReadingCard';
+import { tr } from '../i18n/tr';
 
 // 好文 · 故事 archive list: pinned editorial reading + 本週精選 shelf + search +
 // kind filter (all/article/story) + sort + paginated cards. Publicly readable;
@@ -14,15 +15,15 @@ type SortKey = 'latest' | 'helpful' | 'most_read';
 type KindFilter = 'all' | 'article' | 'story';
 
 const SORTS: { key: SortKey; label: string }[] = [
-  { key: 'latest', label: '最新' },
-  { key: 'helpful', label: '最有幫助' },
-  { key: 'most_read', label: '最多人讀' },
+  { key: 'latest', label: tr('最新', 'Latest') },
+  { key: 'helpful', label: tr('最有幫助', 'Most helpful') },
+  { key: 'most_read', label: tr('最多人讀', 'Most read') },
 ];
 
 const KIND_FILTERS: { key: KindFilter; label: string }[] = [
-  { key: 'all', label: '全部' },
-  { key: 'article', label: '好文' },
-  { key: 'story', label: '故事' },
+  { key: 'all', label: tr('全部', 'All') },
+  { key: 'article', label: tr('好文', 'Reads') },
+  { key: 'story', label: tr('故事', 'Stories') },
 ];
 
 // Small pill marking whether a card is a shared article or a guided story.
@@ -36,7 +37,7 @@ function KindBadge({ kind }: { kind: StoryKind }) {
       }`}
     >
       <Icon className="w-3 h-3" strokeWidth={1.5} />
-      {isArticle ? '好文' : '故事'}
+      {isArticle ? tr('好文', 'Read') : tr('故事', 'Story')}
     </span>
   );
 }
@@ -161,13 +162,13 @@ export default function StoryList({
             data-testid="story-search"
             value={q}
             onChange={(e) => search(e.target.value)}
-            placeholder="搜尋好文或故事（主題、關鍵字⋯）"
+            placeholder={tr("搜尋好文或故事（主題、關鍵字⋯）", 'Search reads or stories (topics, keywords…)')}
             className="w-full pl-9 pr-8 py-2 rounded-full border border-petal-rule bg-white text-sm text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep"
           />
           {searching && (
             <button
               type="button"
-              aria-label="清除搜尋"
+              aria-label={tr("清除搜尋", 'Clear search')}
               onClick={() => search('')}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-petal-muted hover:text-petal-ink"
             >
@@ -233,8 +234,8 @@ export default function StoryList({
             <div data-testid="story-featured" className="space-y-2">
               <div className="flex items-center gap-1.5 text-petal-ink">
                 <Crown className="w-4 h-4 text-amber-500" />
-                <span className="text-sm font-medium">本週精選</span>
-                <span className="text-[11px] text-petal-muted">最近 7 天最被肯定的故事</span>
+                <span className="text-sm font-medium">{tr('本週精選', 'This week\'s picks')}</span>
+                <span className="text-[11px] text-petal-muted">{tr('最近 7 天最被肯定的故事', 'The most appreciated stories of the last 7 days')}</span>
               </div>
               <div className="space-y-2">
                 {featured.map((s) => (
@@ -249,13 +250,13 @@ export default function StoryList({
           {stories.length === 0 ? (
             searching ? (
               <div className="py-10 text-center text-petal-ink-soft" data-testid="story-search-empty">
-                <p className="text-sm">找不到和「{q.trim()}」有關的好文或故事。</p>
+                <p className="text-sm">{tr('找不到和「', 'No reads or stories found about "')}{q.trim()}{tr('」有關的好文或故事。', '".')}</p>
                 <button
                   type="button"
                   onClick={() => search('')}
                   className="mt-3 px-4 py-2 rounded-full border border-petal-rule text-sm text-petal-ink hover:bg-petal-sage/20"
                 >
-                  清除搜尋
+                  {tr('清除搜尋', 'Clear search')}
                 </button>
               </div>
             ) : (
@@ -263,13 +264,13 @@ export default function StoryList({
                 <PenLine className="w-8 h-8 mx-auto mb-3 text-petal-rose-deep" />
                 <p className="text-petal-ink font-medium">
                   {kindFilter === 'article'
-                    ? '讀到一篇對關係有幫助的好文？分享給其他伴侶'
-                    : '你們走過的難關，可能正是另一對伴侶需要的地圖'}
+                    ? tr('讀到一篇對關係有幫助的好文？分享給其他伴侶', 'Read something that helped your relationship? Share it with other couples')
+                    : tr('你們走過的難關，可能正是另一對伴侶需要的地圖', 'The hard times you got through may be exactly the map another couple needs')}
                 </p>
                 <p className="text-xs text-petal-ink-soft mt-1.5 leading-relaxed max-w-sm mx-auto">
                   {kindFilter === 'article'
-                    ? '把好文章純文字貼上、附上出處，就能分享給大家。也可以依引導模板寫下你們自己的真實故事。'
-                    : '依引導模板寫下一段真實經歷：發生了什麼、怎麼修復、學到什麼；或分享一篇你讀到的好文。內容會匿名發表（除非你選擇顯示暱稱），幫助遇到同樣狀況的人。'}
+                    ? tr('把好文章純文字貼上、附上出處，就能分享給大家。也可以依引導模板寫下你們自己的真實故事。', 'Paste a good article as plain text with its source to share it. You can also write your own real story using the guided template.')
+                    : tr('依引導模板寫下一段真實經歷：發生了什麼、怎麼修復、學到什麼；或分享一篇你讀到的好文。內容會匿名發表（除非你選擇顯示暱稱），幫助遇到同樣狀況的人。', 'Write a real experience with the guided template: what happened, how you repaired it, what you learned. Or share an article you read. It\'s posted anonymously (unless you choose to show your nickname) to help people in the same situation.')}
                 </p>
                 <button
                   type="button"
@@ -277,16 +278,16 @@ export default function StoryList({
                   onClick={onCompose}
                   className="mt-4 px-4 py-2 rounded-full bg-petal-rose-deep text-white text-sm font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition"
                 >
-                  {kindFilter === 'article' ? '分享第一篇好文' : '分享你的第一則故事'}
+                  {kindFilter === 'article' ? tr('分享第一篇好文', 'Share your first read') : tr('分享你的第一則故事', 'Share your first story')}
                 </button>
                 {/* Static sample so an empty archive still shows what a story looks like */}
                 <div className="mt-5 text-left bg-petal-cream-2 border border-petal-rule rounded-xl p-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-petal-ink">車站接送吵架後的修復</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-petal-rose/20 text-petal-ink">範例</span>
+                    <span className="text-sm font-medium text-petal-ink">{tr('車站接送吵架後的修復', 'Making up after a fight over a station pickup')}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-petal-rose/20 text-petal-ink">{tr('範例', 'Example')}</span>
                   </div>
                   <p className="text-xs text-petal-ink-soft mt-1 leading-relaxed">
-                    他遲到四十分鐘還先怪我生氣⋯⋯冷戰兩天後，一句「我知道讓你等很久，你一定很難受」成了轉捩點。
+                    {tr('他遲到四十分鐘還先怪我生氣⋯⋯冷戰兩天後，一句「我知道讓你等很久，你一定很難受」成了轉捩點。', 'He was forty minutes late and still blamed me for being upset… After two days of silence, one sentence, "I know you waited a long time, that must have been hard," was the turning point.')}
                   </p>
                 </div>
               </div>
@@ -309,7 +310,7 @@ export default function StoryList({
                 className="px-4 py-2 rounded-full border border-petal-rule text-sm text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2 disabled:opacity-50"
               >
                 {loadingMore && <Loader2 className="w-4 h-4 animate-spin" />}
-                載入更多
+                {tr('載入更多', 'Load more')}
               </button>
             </div>
           )}
@@ -324,11 +325,11 @@ export default function StoryList({
                 className="px-5 py-2.5 rounded-full bg-petal-rose-deep text-white text-sm font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2"
               >
                 <HeartHandshake className="w-4 h-4" />
-                分享你的故事
+                {tr('分享你的故事', 'Share your story')}
               </button>
               <p className="text-[11px] text-petal-muted mt-1.5 inline-flex items-center gap-1">
                 <Wrench className="w-3 h-3" />
-                把你們最難的時刻，變成幫助其他伴侶的智慧
+                {tr('把你們最難的時刻，變成幫助其他伴侶的智慧', 'Turn your hardest moments into wisdom for other couples')}
               </p>
             </div>
           )}

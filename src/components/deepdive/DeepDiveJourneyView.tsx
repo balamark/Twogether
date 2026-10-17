@@ -8,6 +8,7 @@ import type { DeepDiveJourney, DeepDiveStep, DeepDiveState, DeepDiveValidation }
 import { useScrollLock } from '../../hooks/useScrollLock';
 import { detectDraftTone } from '../../utils/conflictState';
 import SafetyExitScreen from './SafetyExitScreen';
+import { tr } from '../../i18n/tr';
 
 // 情緒深潛 — the full-screen focus layer for the guided journey.
 //
@@ -32,18 +33,20 @@ interface Props {
   companionShortName?: string;
 }
 
-const EMOTION_CHIPS = ['不被重視', '被忽略', '不安全', '孤單', '被拒絕', '無助', '失望', '不被理解', '害怕', '委屈'];
+const EMOTION_CHIPS = [tr('不被重視', 'Not valued'), tr('被忽略', 'Ignored'), tr('不安全', 'Unsafe'), tr('孤單', 'Lonely'), tr('被拒絕', 'Rejected'), tr('無助', 'Helpless'), tr('失望', 'Disappointed'), tr('不被理解', 'Misunderstood'), tr('害怕', 'Scared'), tr('委屈', 'Wronged')];
 const FAMILIARITY_OPTIONS: { value: string; hint: string }[] = [
-  { value: '很熟悉', hint: '我以前常有這種感覺。' },
-  { value: '好像有一點', hint: '但我說不出來是什麼。' },
-  { value: '不太熟悉', hint: '我覺得這次就是現在的事情。' },
-  { value: '我不知道', hint: '' },
+  { value: tr('很熟悉', 'Very familiar'), hint: tr('我以前常有這種感覺。', 'I used to feel this way a lot.') },
+  { value: tr('好像有一點', 'A little'), hint: tr('但我說不出來是什麼。', 'But I can\'t say what it is.') },
+  { value: tr('不太熟悉', 'Not really'), hint: tr('我覺得這次就是現在的事情。', 'I think this is just about now.') },
+  { value: tr('我不知道', 'I don\'t know'), hint: '' },
 ];
-const PAST_PERSON_OPTIONS = ['爸爸', '媽媽', '以前的自己', '其他人', '我不知道'];
-const NEED_CHIPS = ['聽我說完', '安慰我', '告訴我他理解了', '給我一個擁抱', '不要急著解釋', '向我道歉', '給我安全感'];
-const PAST_STARTERS = ['我那時候最難過的是……', '我其實很希望你……', '我當時以為……', '我最想問你的是……', '我從來沒有機會告訴你……'];
+const PAST_PERSON_OPTIONS = [tr('爸爸', 'Dad'), tr('媽媽', 'Mom'), tr('以前的自己', 'My younger self'), tr('其他人', 'Someone else'), tr('我不知道', 'I don\'t know')];
+const NEED_CHIPS = [tr('聽我說完', 'Hear me out'), tr('安慰我', 'Comfort me'), tr('告訴我他理解了', 'Tell me they understand'), tr('給我一個擁抱', 'Give me a hug'), tr('不要急著解釋', 'Don\'t rush to explain'), tr('向我道歉', 'Apologize to me'), tr('給我安全感', 'Make me feel safe')];
+const PAST_STARTERS = [tr('我那時候最難過的是……', 'What hurt me most back then was……'), tr('我其實很希望你……', 'What I really wished you would……'), tr('我當時以為……', 'Back then I thought……'), tr('我最想問你的是……', 'What I most want to ask you is……'), tr('我從來沒有機會告訴你……', 'I never had the chance to tell you……')];
 
-const FAMILIAR = new Set(['很熟悉', '好像有一點']);
+// Both languages: a session started in 繁中 and resumed in English (or vice
+// versa) keeps its stored familiarity answer, so match either spelling.
+const FAMILIAR = new Set(['很熟悉', '好像有一點', 'Very familiar', 'A little']);
 function isFamiliar(state: DeepDiveState | undefined): boolean {
   return !!state && FAMILIAR.has(state.familiarity || '');
 }
@@ -206,7 +209,7 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
         if (!cancelled) hydrate(j);
       } catch (err) {
         if (!cancelled) {
-          onNotify({ type: 'error', title: '打不開情緒深潛', message: (err as Error)?.message || '請稍後再試一次。' });
+          onNotify({ type: 'error', title: tr('打不開情緒深潛', 'Couldn\'t open the emotion deep dive'), message: (err as Error)?.message || tr('請稍後再試一次。', 'Please try again in a moment.') });
           onClose();
         }
       } finally {
@@ -246,7 +249,7 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
       setReflection(null);
       onChanged?.();
     } catch (err) {
-      onNotify({ type: 'error', title: '這一步存不起來', message: (err as Error)?.message || '你寫的內容還在，請再試一次。' });
+      onNotify({ type: 'error', title: tr('這一步存不起來', 'This step couldn\'t be saved'), message: (err as Error)?.message || tr('你寫的內容還在，請再試一次。', 'What you wrote is still here. Please try again.') });
     } finally {
       setBusy(false);
       lockRef.current = false;
@@ -282,9 +285,9 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
       setReflection(r);
     } catch (err) {
       const msg = (err as Error & { error_code?: string })?.error_code === 'DEEP_DIVE_AI_QUOTA'
-        ? '今天的 AI 次數用完了，你還是可以自己寫，你寫的內容都在。'
-        : (err as Error)?.message || 'AI 暫時想不出來。';
-      onNotify({ type: 'info', title: 'AI 先休息一下', message: msg });
+        ? tr('今天的 AI 次數用完了，你還是可以自己寫，你寫的內容都在。', 'Today\'s AI credits are used up. You can still write it yourself; everything you wrote is still here.')
+        : (err as Error)?.message || tr('AI 暫時想不出來。', 'The AI can\'t think of anything right now.');
+      onNotify({ type: 'info', title: tr('AI 先休息一下', 'The AI is taking a break'), message: msg });
     } finally {
       setAiLoading(false);
     }
@@ -299,9 +302,9 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
       setForm((f) => ({ ...f, [kind === 'compassion' ? 'compassionLetter' : 'partnerLetter']: r.letter }));
     } catch (err) {
       const msg = (err as Error & { error_code?: string })?.error_code === 'DEEP_DIVE_AI_QUOTA'
-        ? '今天的 AI 次數用完了，你可以自己寫，你寫的內容都在。'
-        : (err as Error)?.message || 'AI 暫時想不出來。';
-      onNotify({ type: 'info', title: 'AI 先休息一下', message: msg });
+        ? tr('今天的 AI 次數用完了，你可以自己寫，你寫的內容都在。', 'Today\'s AI credits are used up. You can write it yourself; everything you wrote is still here.')
+        : (err as Error)?.message || tr('AI 暫時想不出來。', 'The AI can\'t think of anything right now.');
+      onNotify({ type: 'info', title: tr('AI 先休息一下', 'The AI is taking a break'), message: msg });
     } finally {
       setAiLoading(false);
     }
@@ -322,13 +325,13 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
       setJourney(updated);
       setStep(updated.current_step);
       onChanged?.();
-      onNotify({ type: 'success', title: '已經分享給另一半', message: '接下來 TA 會先讀完，再用自己的話回應你。' });
+      onNotify({ type: 'success', title: tr('已經分享給另一半', 'Shared with your partner'), message: tr('接下來 TA 會先讀完，再用自己的話回應你。', 'Next, they\'ll read it through first, then respond in their own words.') });
     } catch (err) {
       const e = err as Error & { error_code?: string };
       if (e?.error_code === 'NOT_PAIRED') {
-        onNotify({ type: 'warning', title: '先和另一半配對', message: e.message });
+        onNotify({ type: 'warning', title: tr('先和另一半配對', 'Pair with your partner first'), message: e.message });
       } else {
-        onNotify({ type: 'error', title: '暫時沒辦法分享', message: e?.message || '你的信已經存好了，請稍後再試。' });
+        onNotify({ type: 'error', title: tr('暫時沒辦法分享', 'Can\'t share right now'), message: e?.message || tr('你的信已經存好了，請稍後再試。', 'Your letter is saved. Please try again in a moment.') });
       }
     } finally {
       setBusy(false);
@@ -340,11 +343,11 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
     if (!journey) return;
     try {
       await apiService.saveDeepDiveLetter(journey.id, 'partner', form.partnerLetter);
-      onNotify({ type: 'success', title: '已保存', message: '這封信先留給你自己，之後想分享隨時可以回來。' });
+      onNotify({ type: 'success', title: tr('已保存', 'Saved'), message: tr('這封信先留給你自己，之後想分享隨時可以回來。', 'This letter is kept just for you for now. Come back any time you\'d like to share it.') });
       onChanged?.();
       onClose();
     } catch (err) {
-      onNotify({ type: 'error', title: '存不起來', message: (err as Error)?.message || '請再試一次。' });
+      onNotify({ type: 'error', title: tr('存不起來', 'Couldn\'t save'), message: (err as Error)?.message || tr('請再試一次。', 'Please try again.') });
     }
   }, [journey, form.partnerLetter, onNotify, onChanged, onClose]);
 
@@ -358,7 +361,7 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
       setPartnerStep(next);
       onChanged?.();
     } catch (err) {
-      onNotify({ type: 'error', title: '暫時存不起來', message: (err as Error)?.message || '你寫的內容還在，請再試一次。' });
+      onNotify({ type: 'error', title: tr('暫時存不起來', 'Couldn\'t save right now'), message: (err as Error)?.message || tr('你寫的內容還在，請再試一次。', 'What you wrote is still here. Please try again.') });
     } finally {
       setBusy(false);
       lockRef.current = false;
@@ -375,10 +378,10 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
       });
       setJourney(updated);
       onChanged?.();
-      onNotify({ type: 'success', title: '完成這次對話', message: '你們一起走完了這一段，先為彼此的努力停一下。' });
+      onNotify({ type: 'success', title: tr('完成這次對話', 'Conversation complete'), message: tr('你們一起走完了這一段，先為彼此的努力停一下。', 'You walked through this together. Take a moment to appreciate each other\'s effort.') });
       onClose();
     } catch (err) {
-      onNotify({ type: 'error', title: '存不起來', message: (err as Error)?.message || '請再試一次。' });
+      onNotify({ type: 'error', title: tr('存不起來', 'Couldn\'t save'), message: (err as Error)?.message || tr('請再試一次。', 'Please try again.') });
     } finally {
       setBusy(false);
     }
@@ -387,7 +390,7 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
   if (!open) return null;
 
   const stepIndex = SELF_PATH.indexOf(step);
-  const progress = stepIndex >= 0 ? `第 ${stepIndex + 1} 步` : '';
+  const progress = stepIndex >= 0 ? tr(`第 ${stepIndex + 1} 步`, `Step ${stepIndex + 1}`) : '';
 
   const toggle = (arr: string[], v: string): string[] => (arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
 
@@ -397,20 +400,20 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
       {!opts?.hidePrev && step !== 'CURRENT_EMOTION' ? (
         <button type="button" onClick={goPrev} disabled={busy}
           className="inline-flex items-center gap-1.5 text-sm font-body text-petal-ink-soft hover:text-petal-ink disabled:opacity-40" data-testid="deep-dive-prev">
-          <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />上一步
+          <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />{tr('上一步', 'Previous')}
         </button>
       ) : <span />}
       <div className="flex items-center gap-3">
         {SKIPPABLE.has(step) && (
           <button type="button" onClick={() => goNext({ skip: true })} disabled={busy}
             className="text-sm font-body text-petal-muted hover:text-petal-ink disabled:opacity-40" data-testid="deep-dive-skip">
-            跳過這一步
+            {tr('跳過這一步', 'Skip this step')}
           </button>
         )}
         <button type="button" onClick={() => goNext()} disabled={busy || opts?.nextDisabled}
           className="inline-flex items-center gap-2 rounded-full bg-petal-ink text-petal-cream px-5 py-2.5 font-medium disabled:opacity-40 hover:opacity-90 active:scale-[0.98] transition" data-testid="deep-dive-next">
           {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" strokeWidth={1.5} />}
-          {opts?.nextLabel || '下一步'}
+          {opts?.nextLabel || tr('下一步', 'Next')}
         </button>
       </div>
     </div>
@@ -420,7 +423,7 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
     <button type="button" onClick={() => runReflect(kind, draft)} disabled={aiLoading}
       className="inline-flex items-center gap-1.5 text-sm font-body text-petal-rose-deep hover:opacity-80 disabled:opacity-40" data-testid="deep-dive-ai-reflect">
       {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" strokeWidth={1.5} />}
-      請 {companionShortName} 陪我看看
+      {tr('請', 'Ask ')} {companionShortName} {tr('陪我看看', ' to explore with me')}
     </button>
   );
 
@@ -458,11 +461,11 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
           <Frame footer={
             <button type="button" onClick={() => partnerAdvance(() => apiService.deepDivePartnerRead(journey.id), 'mirror')} disabled={busy}
               className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-petal-ink text-petal-cream px-5 py-3 font-medium disabled:opacity-40" data-testid="deep-dive-partner-read-done">
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" strokeWidth={1.5} />}我讀完了
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" strokeWidth={1.5} />}{tr('我讀完了', 'I\'ve finished reading')}
             </button>
           }>
-            <div className="inline-flex items-center gap-2 text-petal-rose-deep mb-2"><Heart className="w-5 h-5" strokeWidth={1.5} /><span className="font-display italic text-lg">TA 想讓你更了解 TA</span></div>
-            <p className="font-body text-sm text-petal-muted mb-4">這不是一封要求你解決問題的信。先花一點時間讀完，現在不需要解釋，也不需要辯護。</p>
+            <div className="inline-flex items-center gap-2 text-petal-rose-deep mb-2"><Heart className="w-5 h-5" strokeWidth={1.5} /><span className="font-display italic text-lg">{tr('TA 想讓你更了解 TA', 'They want you to understand them better')}</span></div>
+            <p className="font-body text-sm text-petal-muted mb-4">{tr('這不是一封要求你解決問題的信。先花一點時間讀完，現在不需要解釋，也不需要辯護。', 'This isn\'t a letter asking you to fix anything. Take some time to read it through. You don\'t need to explain or defend yourself right now.')}</p>
             <Card testid="deep-dive-partner-letter">
               <p className="font-body text-sm text-petal-ink whitespace-pre-wrap leading-relaxed">{letter}</p>
             </Card>
@@ -474,17 +477,17 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
           <Frame footer={
             <button type="button" onClick={() => partnerAdvance(() => apiService.deepDivePartnerMirror(journey.id, mirror), 'validation')} disabled={busy || mirror.trim().length === 0}
               className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-petal-ink text-petal-cream px-5 py-3 font-medium disabled:opacity-40" data-testid="deep-dive-partner-mirror-next">
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" strokeWidth={1.5} />}下一步
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" strokeWidth={1.5} />}{tr('下一步', 'Next')}
             </button>
           }>
-            <h3 className="font-display italic text-lg text-petal-ink mb-1">你聽見了什麼？</h3>
-            <p className="font-body text-sm text-petal-muted mb-2">不需要判斷誰對誰錯。先用自己的話說說看，你覺得 TA 真正想讓你知道的是什麼。</p>
+            <h3 className="font-display italic text-lg text-petal-ink mb-1">{tr('你聽見了什麼？', 'What did you hear?')}</h3>
+            <p className="font-body text-sm text-petal-muted mb-2">{tr('不需要判斷誰對誰錯。先用自己的話說說看，你覺得 TA 真正想讓你知道的是什麼。', 'No need to decide who\'s right. In your own words, what do you think they really want you to know?')}</p>
             <button type="button" onClick={() => runReflect('partner_mirror')} disabled={aiLoading}
               className="inline-flex items-center gap-1.5 text-sm text-petal-rose-deep hover:opacity-80 disabled:opacity-40" data-testid="deep-dive-ai-reflect">
-              {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" strokeWidth={1.5} />}需要一點提示
+              {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" strokeWidth={1.5} />}{tr('需要一點提示', 'I\'d like a hint')}
             </button>
             {reflectionCard}
-            <textarea value={mirror} onChange={(e) => setMirror(e.target.value)} placeholder="我聽見你其實……" rows={5} maxLength={2000}
+            <textarea value={mirror} onChange={(e) => setMirror(e.target.value)} placeholder={tr("我聽見你其實……", 'I hear that you actually……')} rows={5} maxLength={2000}
               data-testid="deep-dive-partner-mirror-input"
               className="w-full mt-3 p-3 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y font-body text-sm" />
           </Frame>
@@ -493,18 +496,18 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
       if (partnerStep === 'validation') {
         const set = (k: keyof DeepDiveValidation, v: string) => setValidation((s) => ({ ...s, [k]: v }));
         const fields: { k: keyof DeepDiveValidation; label: string }[] = [
-          { k: 'knew_now', label: '我現在知道……' },
-          { k: 'didnt_know', label: '我以前不知道……' },
-          { k: 'want_you_to_know', label: '我想讓你知道……' },
+          { k: 'knew_now', label: tr('我現在知道……', 'Now I know……') },
+          { k: 'didnt_know', label: tr('我以前不知道……', 'I didn\'t know before that……') },
+          { k: 'want_you_to_know', label: tr('我想讓你知道……', 'I want you to know……') },
         ];
         return (
           <Frame footer={
             <button type="button" onClick={() => partnerAdvance(() => apiService.deepDivePartnerValidation(journey.id, validation), 'response')} disabled={busy}
               className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-petal-ink text-petal-cream px-5 py-3 font-medium disabled:opacity-40" data-testid="deep-dive-partner-validation-next">
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" strokeWidth={1.5} />}下一步
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" strokeWidth={1.5} />}{tr('下一步', 'Next')}
             </button>
           }>
-            <div className="inline-flex items-center gap-2 text-petal-rose-deep mb-1"><Heart className="w-5 h-5" strokeWidth={1.5} /><span className="font-display italic text-lg">告訴 TA：你理解了什麼</span></div>
+            <div className="inline-flex items-center gap-2 text-petal-rose-deep mb-1"><Heart className="w-5 h-5" strokeWidth={1.5} /><span className="font-display italic text-lg">{tr('告訴 TA：你理解了什麼', 'Tell them what you understood')}</span></div>
             <div className="space-y-3 mt-3">
               {fields.map((f) => (
                 <div key={f.k}>
@@ -523,12 +526,12 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
           <Frame footer={
             <button type="button" onClick={() => partnerAdvance(() => apiService.deepDivePartnerResponse(journey.id, response), 'done')} disabled={busy || response.trim().length === 0}
               className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-petal-ink text-petal-cream px-5 py-3 font-medium disabled:opacity-40" data-testid="deep-dive-partner-response-send">
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Heart className="w-4 h-4" strokeWidth={1.5} />}回應這封信
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Heart className="w-4 h-4" strokeWidth={1.5} />}{tr('回應這封信', 'Respond to this letter')}
             </button>
           }>
-            <h3 className="font-display italic text-lg text-petal-ink mb-1">回應這封信</h3>
-            <p className="font-body text-sm text-petal-muted mb-2">可以分享你的感受。但先不要急著證明自己沒有錯。可以試試：我現在更了解你…／我以前沒有意識到…／我很抱歉讓你感受到…／下次我可以試著…</p>
-            <textarea value={response} onChange={(e) => setResponse(e.target.value)} placeholder="我現在更了解你……" rows={6} maxLength={4000}
+            <h3 className="font-display italic text-lg text-petal-ink mb-1">{tr('回應這封信', 'Respond to this letter')}</h3>
+            <p className="font-body text-sm text-petal-muted mb-2">{tr('可以分享你的感受。但先不要急著證明自己沒有錯。可以試試：我現在更了解你…／我以前沒有意識到…／我很抱歉讓你感受到…／下次我可以試著…', 'You can share how you feel, but don\'t rush to prove you weren\'t wrong. Try: Now I understand you better… / I didn\'t realize before… / I\'m sorry I made you feel… / Next time I can try…')}</p>
+            <textarea value={response} onChange={(e) => setResponse(e.target.value)} placeholder={tr("我現在更了解你……", 'Now I understand you better……')} rows={6} maxLength={4000}
               data-testid="deep-dive-partner-response-input"
               className="w-full mt-1 p-3 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y font-body text-sm" />
           </Frame>
@@ -537,12 +540,12 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
       // done
       return (
         <Frame footer={
-          <button type="button" onClick={onClose} className="w-full rounded-full bg-petal-ink text-petal-cream px-5 py-3 font-medium" data-testid="deep-dive-partner-done">完成</button>
+          <button type="button" onClick={onClose} className="w-full rounded-full bg-petal-ink text-petal-cream px-5 py-3 font-medium" data-testid="deep-dive-partner-done">{tr('完成', 'Done')}</button>
         }>
           <div className="text-center py-8">
             <Heart className="w-10 h-10 text-petal-rose-deep mx-auto mb-3" strokeWidth={1.5} />
-            <p className="font-display italic text-lg text-petal-ink">你回應了 TA</p>
-            <p className="font-body text-sm text-petal-muted mt-2">你願意先聽、再回應，這對你們很重要。</p>
+            <p className="font-display italic text-lg text-petal-ink">{tr('你回應了 TA', 'You responded to them')}</p>
+            <p className="font-body text-sm text-petal-muted mt-2">{tr('你願意先聽、再回應，這對你們很重要。', 'You were willing to listen first and respond after. That matters a lot for you both.')}</p>
           </div>
         </Frame>
       );
@@ -556,25 +559,25 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
           <Frame footer={
             <button type="button" onClick={doRepair} disabled={busy}
               className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-petal-ink text-petal-cream px-5 py-3 font-medium disabled:opacity-40" data-testid="deep-dive-repair-done">
-              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" strokeWidth={1.5} />}完成這次對話
+              {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" strokeWidth={1.5} />}{tr('完成這次對話', 'Conversation complete')}
             </button>
           }>
-            <div className="inline-flex items-center gap-2 text-petal-sage mb-2"><Heart className="w-5 h-5" strokeWidth={1.5} /><span className="font-display italic text-lg">回到現在</span></div>
+            <div className="inline-flex items-center gap-2 text-petal-sage mb-2"><Heart className="w-5 h-5" strokeWidth={1.5} /><span className="font-display italic text-lg">{tr('回到現在', 'Back to now')}</span></div>
             {pr?.response && (
               <Card testid="deep-dive-owner-partner-response">
-                <p className="font-body text-[11px] uppercase tracking-wider text-petal-muted mb-1">另一半的回應</p>
+                <p className="font-body text-[11px] uppercase tracking-wider text-petal-muted mb-1">{tr('另一半的回應', 'Your partner\'s response')}</p>
                 <p className="font-body text-sm text-petal-ink whitespace-pre-wrap leading-relaxed">{pr.response}</p>
               </Card>
             )}
             <div className="mt-4 space-y-3">
               <div>
-                <label className="font-body text-sm text-petal-ink-soft">我們現在都知道了……</label>
+                <label className="font-body text-sm text-petal-ink-soft">{tr('我們現在都知道了……', 'Now we both know……')}</label>
                 <textarea value={form.repair_understanding} onChange={(e) => setForm((f) => ({ ...f, repair_understanding: e.target.value }))} rows={2} maxLength={2000}
                   data-testid="deep-dive-repair-understanding"
                   className="w-full mt-1 p-3 rounded-xl border border-petal-rule bg-white text-petal-ink focus:outline-none focus:border-petal-rose-deep resize-y font-body text-sm" />
               </div>
               <div>
-                <label className="font-body text-sm text-petal-ink-soft">下次我們可以試著……</label>
+                <label className="font-body text-sm text-petal-ink-soft">{tr('下次我們可以試著……', 'Next time we can try……')}</label>
                 <textarea value={form.repair_action} onChange={(e) => setForm((f) => ({ ...f, repair_action: e.target.value }))} rows={2} maxLength={2000}
                   data-testid="deep-dive-repair-action"
                   className="w-full mt-1 p-3 rounded-xl border border-petal-rule bg-white text-petal-ink focus:outline-none focus:border-petal-rose-deep resize-y font-body text-sm" />
@@ -585,11 +588,11 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
       }
       // shared / partner_reading — waiting for the partner.
       return (
-        <Frame footer={<button type="button" onClick={onClose} className="w-full rounded-full border border-petal-rule text-petal-ink px-5 py-3 font-body" data-testid="deep-dive-owner-waiting-close">先離開，等 TA 讀完</button>}>
+        <Frame footer={<button type="button" onClick={onClose} className="w-full rounded-full border border-petal-rule text-petal-ink px-5 py-3 font-body" data-testid="deep-dive-owner-waiting-close">{tr('先離開，等 TA 讀完', 'Leave for now, wait for them to read it')}</button>}>
           <div className="text-center py-8">
             <Compass className="w-10 h-10 text-petal-rose-deep mx-auto mb-3" strokeWidth={1.5} />
-            <p className="font-display italic text-lg text-petal-ink">已經分享給另一半</p>
-            <p className="font-body text-sm text-petal-muted mt-2">TA 會先好好讀完，再用自己的話回應你。回應之後你會收到通知。</p>
+            <p className="font-display italic text-lg text-petal-ink">{tr('已經分享給另一半', 'Shared with your partner')}</p>
+            <p className="font-body text-sm text-petal-muted mt-2">{tr('TA 會先好好讀完，再用自己的話回應你。回應之後你會收到通知。', 'They\'ll read it carefully first, then respond in their own words. You\'ll be notified when they do.')}</p>
           </div>
         </Frame>
       );
@@ -599,14 +602,14 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
     switch (step) {
       case 'CURRENT_EMOTION':
         return (
-          <Frame footer={ownerFooter({ nextDisabled: form.current_emotions.length === 0 && form.situation.trim().length === 0, nextLabel: '開始探索' })}>
-            <div className="inline-flex items-center gap-2 text-petal-rose-deep mb-1"><Compass className="w-5 h-5" strokeWidth={1.5} /><span className="font-display italic text-lg">深入這個感覺</span></div>
-            <p className="font-body text-sm text-petal-muted mb-3">現在的事情之所以特別痛，有時是因為它碰到了過去的感受。先看看它是什麼。</p>
+          <Frame footer={ownerFooter({ nextDisabled: form.current_emotions.length === 0 && form.situation.trim().length === 0, nextLabel: tr('開始探索', 'Start exploring') })}>
+            <div className="inline-flex items-center gap-2 text-petal-rose-deep mb-1"><Compass className="w-5 h-5" strokeWidth={1.5} /><span className="font-display italic text-lg">{tr('深入這個感覺', 'Go deeper into this feeling')}</span></div>
+            <p className="font-body text-sm text-petal-muted mb-3">{tr('現在的事情之所以特別痛，有時是因為它碰到了過去的感受。先看看它是什麼。', 'Sometimes what\'s happening now hurts so much because it touches feelings from the past. Let\'s look at what it is.')}</p>
             <textarea value={form.situation} onChange={(e) => { setForm((f) => ({ ...f, situation: e.target.value })); guard(e.target.value); }}
-              placeholder="現在發生了什麼事？（簡單描述就好）" rows={2} maxLength={2000} data-testid="deep-dive-situation"
+              placeholder={tr("現在發生了什麼事？（簡單描述就好）", 'What\'s happening right now? (a short description is fine)')} rows={2} maxLength={2000} data-testid="deep-dive-situation"
               className="w-full mb-3 p-3 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y font-body text-sm" />
             <div className="flex items-center justify-between gap-2 mb-2">
-              <label className="font-body text-sm text-petal-ink">除了生氣，你還感覺到什麼？<span className="text-petal-muted">（可多選）</span></label>
+              <label className="font-body text-sm text-petal-ink">{tr('除了生氣，你還感覺到什麼？', 'Besides anger, what else do you feel?')}<span className="text-petal-muted">{tr('（可多選）', ' (choose any)')}</span></label>
               {aiReflectButton('emotion')}
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -620,8 +623,8 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
       case 'FAMILIARITY_CHECK':
         return (
           <Frame footer={ownerFooter({ nextDisabled: !form.familiarity })}>
-            <h3 className="font-display italic text-lg text-petal-ink mb-1">這個感覺熟悉嗎？</h3>
-            <p className="font-body text-sm text-petal-muted mb-4">「沒有過去的連結」也是完全可以的答案，不用勉強去找。</p>
+            <h3 className="font-display italic text-lg text-petal-ink mb-1">{tr('這個感覺熟悉嗎？', 'Does this feeling feel familiar?')}</h3>
+            <p className="font-body text-sm text-petal-muted mb-4">{tr('「沒有過去的連結」也是完全可以的答案，不用勉強去找。', '"No link to the past" is a perfectly fine answer. There\'s no need to force it.')}</p>
             <div className="space-y-2">
               {FAMILIARITY_OPTIONS.map((o) => (
                 <button key={o.value} type="button" onClick={() => setForm((f) => ({ ...f, familiarity: o.value }))}
@@ -637,20 +640,20 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
       case 'MEMORY_EXPLORATION':
         return (
           <Frame footer={ownerFooter()}>
-            <h3 className="font-display italic text-lg text-petal-ink mb-1">第一個浮現的畫面是什麼？</h3>
-            <p className="font-body text-sm text-petal-muted mb-2">不需要想得很完整。一個人、一個地方、一句話，甚至一個很模糊的畫面都可以。</p>
+            <h3 className="font-display italic text-lg text-petal-ink mb-1">{tr('第一個浮現的畫面是什麼？', 'What\'s the first image that comes up?')}</h3>
+            <p className="font-body text-sm text-petal-muted mb-2">{tr('不需要想得很完整。一個人、一個地方、一句話，甚至一個很模糊的畫面都可以。', 'It doesn\'t need to be complete. A person, a place, a sentence, even a blurry image is fine.')}</p>
             {aiReflectButton('memory')}
             {reflectionCard}
             <textarea value={form.memory_text} onChange={(e) => { setForm((f) => ({ ...f, memory_text: e.target.value })); guard(e.target.value); }}
-              placeholder="寫下你想到的事情……" rows={5} maxLength={2000} data-testid="deep-dive-memory"
+              placeholder={tr("寫下你想到的事情……", 'Write what comes to mind……')} rows={5} maxLength={2000} data-testid="deep-dive-memory"
               className="w-full mt-3 p-3 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y font-body text-sm" />
           </Frame>
         );
       case 'PAST_PERSON':
         return (
           <Frame footer={ownerFooter()}>
-            <h3 className="font-display italic text-lg text-petal-ink mb-1">這段記憶裡，你最想對誰說？</h3>
-            <p className="font-body text-sm text-petal-muted mb-4">選了誰，都不代表這一切是那個人造成的。只是你想起了一種熟悉的感覺。</p>
+            <h3 className="font-display italic text-lg text-petal-ink mb-1">{tr('這段記憶裡，你最想對誰說？', 'In this memory, who do you most want to speak to?')}</h3>
+            <p className="font-body text-sm text-petal-muted mb-4">{tr('選了誰，都不代表這一切是那個人造成的。只是你想起了一種熟悉的感覺。', 'Whoever you choose doesn\'t mean they caused all of this. It\'s just a familiar feeling you remembered.')}</p>
             <div className="flex flex-wrap gap-2">
               {PAST_PERSON_OPTIONS.map((p) => (
                 <Chip key={p} label={p} active={form.past_person === p} onClick={() => setForm((f) => ({ ...f, past_person: p }))} testid={`deep-dive-person-${p}`} />
@@ -661,9 +664,9 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
       case 'PAST_LETTER':
         return (
           <Frame footer={ownerFooter()}>
-            <h3 className="font-display italic text-lg text-petal-ink mb-1">寫一封給過去的信</h3>
-            <p className="font-body text-sm text-petal-muted mb-1">把當時沒有說出口的話，寫下來。這封信只有你看得到。</p>
-            <div className="inline-flex items-center gap-1 text-[11px] text-petal-muted"><Lock className="w-3 h-3" strokeWidth={1.5} />私人，不會分享給任何人</div>
+            <h3 className="font-display italic text-lg text-petal-ink mb-1">{tr('寫一封給過去的信', 'Write a letter to the past')}</h3>
+            <p className="font-body text-sm text-petal-muted mb-1">{tr('把當時沒有說出口的話，寫下來。這封信只有你看得到。', 'Write down what you couldn\'t say back then. Only you can see this letter.')}</p>
+            <div className="inline-flex items-center gap-1 text-[11px] text-petal-muted"><Lock className="w-3 h-3" strokeWidth={1.5} />{tr('私人，不會分享給任何人', 'Private, never shared with anyone')}</div>
             <div className="flex flex-wrap gap-1.5 mt-3">
               {PAST_STARTERS.map((s) => (
                 <button key={s} type="button" onClick={() => setForm((f) => ({ ...f, pastLetter: f.pastLetter ? f.pastLetter : s }))}
@@ -672,51 +675,51 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
             </div>
             {aiReflectButton('past', form.pastLetter)}
             {reflectionCard}
-            {letterEditor(form.pastLetter, (v) => setForm((f) => ({ ...f, pastLetter: v })), '「那時候的我，其實很想讓你知道……」', 'deep-dive-past-letter')}
+            {letterEditor(form.pastLetter, (v) => setForm((f) => ({ ...f, pastLetter: v })), tr('「那時候的我，其實很想讓你知道……」', '"Back then, what I really wanted you to know was……"'), 'deep-dive-past-letter')}
           </Frame>
         );
       case 'COMPASSION_LETTER':
         return (
           <Frame footer={ownerFooter()}>
-            <h3 className="font-display italic text-lg text-petal-ink mb-1">寫一封你當時很需要收到的信</h3>
-            <p className="font-body text-sm text-petal-muted mb-2">不代表那個人真的會這樣說。這是一封寫給當時的你的理解與愛。如果當時有一個真正理解你的大人陪在你身邊，你希望 TA 怎麼回應你？</p>
-            <div className="inline-flex items-center gap-1 text-[11px] text-petal-muted mb-2"><Lock className="w-3 h-3" strokeWidth={1.5} />私人，不會分享給任何人</div>
+            <h3 className="font-display italic text-lg text-petal-ink mb-1">{tr('寫一封你當時很需要收到的信', 'Write the letter you needed to receive back then')}</h3>
+            <p className="font-body text-sm text-petal-muted mb-2">{tr('不代表那個人真的會這樣說。這是一封寫給當時的你的理解與愛。如果當時有一個真正理解你的大人陪在你身邊，你希望 TA 怎麼回應你？', 'This doesn\'t mean that person would actually say this. It\'s a letter of understanding and love to who you were then. If a grown-up who truly understood you had been by your side, how would you have wanted them to respond?')}</p>
+            <div className="inline-flex items-center gap-1 text-[11px] text-petal-muted mb-2"><Lock className="w-3 h-3" strokeWidth={1.5} />{tr('私人，不會分享給任何人', 'Private, never shared with anyone')}</div>
             <div>
               <button type="button" onClick={() => runLetterAi('compassion')} disabled={aiLoading}
                 className="inline-flex items-center gap-1.5 text-sm text-petal-rose-deep hover:opacity-80 disabled:opacity-40" data-testid="deep-dive-ai-letter">
-                {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" strokeWidth={1.5} />}請 {companionShortName} 幫我起個頭
+                {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" strokeWidth={1.5} />}{tr('請', 'Ask ')} {companionShortName} {tr('幫我起個頭', ' to help me start')}
               </button>
             </div>
-            {letterEditor(form.compassionLetter, (v) => setForm((f) => ({ ...f, compassionLetter: v })), '親愛的那時候的我，你的感受沒有錯……', 'deep-dive-compassion-letter')}
+            {letterEditor(form.compassionLetter, (v) => setForm((f) => ({ ...f, compassionLetter: v })), tr('親愛的那時候的我，你的感受沒有錯……', 'Dear younger me, your feelings were not wrong……'), 'deep-dive-compassion-letter')}
           </Frame>
         );
       case 'CURRENT_NEED':
         return (
           <Frame footer={ownerFooter({ nextDisabled: !form.need_type && form.need_custom.trim().length === 0 })}>
-            <div className="inline-flex items-center gap-2 text-petal-rose-deep mb-2"><Compass className="w-5 h-5" strokeWidth={1.5} /><span className="font-display italic text-lg">回到現在</span></div>
-            <p className="font-body text-sm text-petal-muted mb-4">今天伴侶的行為不一定和過去一樣，但它似乎碰到了相似的感受。現在的你，最需要伴侶做什麼？</p>
+            <div className="inline-flex items-center gap-2 text-petal-rose-deep mb-2"><Compass className="w-5 h-5" strokeWidth={1.5} /><span className="font-display italic text-lg">{tr('回到現在', 'Back to now')}</span></div>
+            <p className="font-body text-sm text-petal-muted mb-4">{tr('今天伴侶的行為不一定和過去一樣，但它似乎碰到了相似的感受。現在的你，最需要伴侶做什麼？', 'Your partner\'s behavior today may not be the same as the past, but it seems to touch a similar feeling. What do you most need from your partner right now?')}</p>
             <div className="flex flex-wrap gap-2">
               {NEED_CHIPS.map((n) => (
                 <Chip key={n} label={n} active={form.need_type === n} onClick={() => setForm((f) => ({ ...f, need_type: n }))} testid={`deep-dive-need-${n}`} />
               ))}
             </div>
-            <input value={form.need_custom} onChange={(e) => setForm((f) => ({ ...f, need_custom: e.target.value }))} placeholder="或用自己的話說……" maxLength={200}
+            <input value={form.need_custom} onChange={(e) => setForm((f) => ({ ...f, need_custom: e.target.value }))} placeholder={tr("或用自己的話說……", 'Or say it in your own words……')} maxLength={200}
               data-testid="deep-dive-need-custom"
               className="w-full mt-3 p-3 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep font-body text-sm" />
           </Frame>
         );
       case 'PARTNER_LETTER':
         return (
-          <Frame footer={ownerFooter({ nextLabel: '預覽並分享' })}>
-            <div className="inline-flex items-center gap-2 text-petal-rose-deep mb-1"><Heart className="w-5 h-5" strokeWidth={1.5} /><span className="font-display italic text-lg">寫給伴侶的一封信</span></div>
-            <p className="font-body text-sm text-petal-muted mb-2">不是告訴 TA「你做錯了什麼」，而是讓 TA 知道：這件事情碰到了你心裡什麼地方。</p>
+          <Frame footer={ownerFooter({ nextLabel: tr('預覽並分享', 'Preview and share') })}>
+            <div className="inline-flex items-center gap-2 text-petal-rose-deep mb-1"><Heart className="w-5 h-5" strokeWidth={1.5} /><span className="font-display italic text-lg">{tr('寫給伴侶的一封信', 'A letter to your partner')}</span></div>
+            <p className="font-body text-sm text-petal-muted mb-2">{tr('不是告訴 TA「你做錯了什麼」，而是讓 TA 知道：這件事情碰到了你心裡什麼地方。', 'It\'s not about telling them "what you did wrong". It\'s letting them know what place in your heart this touched.')}</p>
             <div>
               <button type="button" onClick={() => runLetterAi('partner')} disabled={aiLoading}
                 className="inline-flex items-center gap-1.5 text-sm text-petal-rose-deep hover:opacity-80 disabled:opacity-40" data-testid="deep-dive-ai-letter">
-                {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" strokeWidth={1.5} />}請 {companionShortName} 幫我整理成一封信
+                {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" strokeWidth={1.5} />}{tr('請', 'Ask ')} {companionShortName} {tr('幫我整理成一封信', ' to turn it into a letter')}
               </button>
             </div>
-            {letterEditor(form.partnerLetter, (v) => setForm((f) => ({ ...f, partnerLetter: v })), '當你 ______ 的時候，我表面上感覺到的是 ______。但我後來發現，這件事情也讓我想起 ______。', 'deep-dive-partner-letter-edit')}
+            {letterEditor(form.partnerLetter, (v) => setForm((f) => ({ ...f, partnerLetter: v })), tr('當你 ______ 的時候，我表面上感覺到的是 ______。但我後來發現，這件事情也讓我想起 ______。', 'When you ______, what I felt on the surface was ______. But I later realized it also reminded me of ______.'), 'deep-dive-partner-letter-edit')}
           </Frame>
         );
       case 'SHARED':
@@ -726,17 +729,17 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
             <div className="flex flex-col gap-2">
               <button type="button" onClick={doShare} disabled={busy || form.partnerLetter.trim().length === 0}
                 className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-petal-ink text-petal-cream px-5 py-3 font-medium disabled:opacity-40" data-testid="deep-dive-share">
-                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Heart className="w-4 h-4" strokeWidth={1.5} />}分享給伴侶
+                {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Heart className="w-4 h-4" strokeWidth={1.5} />}{tr('分享給伴侶', 'Share with my partner')}
               </button>
               <button type="button" onClick={saveOnly} disabled={busy}
-                className="w-full rounded-full border border-petal-rule text-petal-ink px-5 py-3 font-body disabled:opacity-40" data-testid="deep-dive-save-only">只保存，不分享</button>
-              <button type="button" onClick={goPrev} className="text-sm text-petal-ink-soft hover:text-petal-ink mt-1" data-testid="deep-dive-prev">回去修改</button>
+                className="w-full rounded-full border border-petal-rule text-petal-ink px-5 py-3 font-body disabled:opacity-40" data-testid="deep-dive-save-only">{tr('只保存，不分享', 'Just save, don\'t share')}</button>
+              <button type="button" onClick={goPrev} className="text-sm text-petal-ink-soft hover:text-petal-ink mt-1" data-testid="deep-dive-prev">{tr('回去修改', 'Go back and edit')}</button>
             </div>
           }>
-            <h3 className="font-display italic text-lg text-petal-ink mb-1">準備好讓 TA 看見真正的你了嗎？</h3>
-            <p className="font-body text-sm text-petal-muted mb-3">這是 TA 會讀到的信。前面寫給過去的信，只留給你自己。</p>
+            <h3 className="font-display italic text-lg text-petal-ink mb-1">{tr('準備好讓 TA 看見真正的你了嗎？', 'Ready to let them see the real you?')}</h3>
+            <p className="font-body text-sm text-petal-muted mb-3">{tr('這是 TA 會讀到的信。前面寫給過去的信，只留給你自己。', 'This is the letter they\'ll read. The letters to your past stay with you alone.')}</p>
             <Card testid="deep-dive-share-preview">
-              <p className="font-body text-sm text-petal-ink whitespace-pre-wrap leading-relaxed">{form.partnerLetter || '（還沒有內容，回去補上幾句話吧）'}</p>
+              <p className="font-body text-sm text-petal-ink whitespace-pre-wrap leading-relaxed">{form.partnerLetter || tr('（還沒有內容，回去補上幾句話吧）', '(Nothing here yet. Go back and add a few lines.)')}</p>
             </Card>
           </Frame>
         );
@@ -749,11 +752,11 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
         <div className="flex items-start justify-between gap-3 mb-5">
           <button type="button" onClick={pauseAndClose} data-testid="deep-dive-pause"
             className="inline-flex items-center gap-1.5 font-body text-sm text-petal-ink-soft hover:text-petal-ink p-2 -m-2">
-            <PauseCircle className="w-4 h-4" strokeWidth={1.5} />暫停，稍後再走
+            <PauseCircle className="w-4 h-4" strokeWidth={1.5} />{tr('暫停，稍後再走', 'Pause, continue later')}
           </button>
           <div className="text-right">
             <div className="font-body text-[11px] uppercase tracking-[0.18em] text-petal-rose-deep mb-0.5 inline-flex items-center gap-1">
-              <Compass className="w-3.5 h-3.5" strokeWidth={1.5} />情緒深潛
+              <Compass className="w-3.5 h-3.5" strokeWidth={1.5} />{tr('情緒深潛', 'Emotion deep dive')}
             </div>
             {journey?.role === 'owner' && journey.status === 'in_progress' && progress && (
               <div className="font-body text-xs text-petal-muted" data-testid="deep-dive-progress">{progress}</div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { clientLog, getLastRequestId } from '../utils/telemetry';
+import { tr } from '../i18n/tr';
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -61,7 +62,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   render() {
     if (!this.state.hasError) return this.props.children;
 
-    const message = this.state.error?.message || '發生未知錯誤';
+    const message = this.state.error?.message || tr('發生未知錯誤', 'An unknown error occurred');
 
     if (this.props.inline) {
       return (
@@ -69,13 +70,13 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
           className="rounded-md border border-red-200 bg-red-50 p-5 text-center"
           data-testid="error-boundary-inline"
         >
-          <h4 className="font-body text-sm font-medium text-red-800 mb-1">這個區塊發生錯誤</h4>
+          <h4 className="font-body text-sm font-medium text-red-800 mb-1">{tr('這個區塊發生錯誤', 'Something went wrong in this section')}</h4>
           <p className="font-body text-xs text-red-700/90 mb-4 break-words">{message}</p>
           <button
             onClick={this.handleReset}
             className="px-4 py-2 rounded-md bg-petal-ink text-petal-cream hover:bg-pink-700 transition-colors font-display italic text-sm"
           >
-            關閉並重試
+            {tr('關閉並重試', 'Close and retry')}
           </button>
         </div>
       );
@@ -87,16 +88,16 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
         data-testid="error-boundary-fallback"
       >
         <div className="max-w-md w-full text-center bg-petal-cream rounded-md border border-petal-rule shadow-petal p-8">
-          <h2 className="font-display text-2xl font-light text-petal-ink mb-2">頁面發生錯誤</h2>
+          <h2 className="font-display text-2xl font-light text-petal-ink mb-2">{tr('頁面發生錯誤', 'This page hit an error')}</h2>
           <p className="font-body text-sm text-petal-ink-soft mb-1">
-            畫面遇到了一個問題，你的資料並未遺失。請重新整理頁面再試一次。
+            {tr('畫面遇到了一個問題，你的資料並未遺失。請重新整理頁面再試一次。', 'The screen ran into a problem, but your data is safe. Please refresh the page and try again.')}
           </p>
           <p className="font-body text-xs text-petal-muted mb-6 break-words">{message}</p>
           <button
             onClick={() => window.location.reload()}
             className="w-full py-3 rounded-md bg-petal-ink text-petal-cream hover:bg-pink-700 transition-colors font-display italic text-base"
           >
-            重新整理頁面 →
+            {tr('重新整理頁面 →', 'Refresh the page →')}
           </button>
         </div>
       </div>

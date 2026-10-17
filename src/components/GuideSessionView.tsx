@@ -5,6 +5,7 @@ import type { FacilitationSession, MessageFacilitation } from '../services/api';
 import TherapistTurnCard from './TherapistTurnCard';
 import SessionProgress from './SessionProgress';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { tr } from '../i18n/tr';
 
 // 引導模式的全螢幕專注層。
 //
@@ -93,7 +94,7 @@ const GuideSessionView: React.FC<Props> = ({
             className="inline-flex items-center gap-1.5 font-body text-sm text-petal-ink-soft hover:text-petal-ink p-2 -m-2"
           >
             <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />
-            回到對話
+            {tr('回到對話', 'Back to conversation')}
           </button>
           <div className="text-right">
             <div className="font-body text-[11px] uppercase tracking-[0.18em] text-petal-rose-deep mb-0.5 inline-flex items-center gap-1">
@@ -101,7 +102,7 @@ const GuideSessionView: React.FC<Props> = ({
               {companionLabel}
             </div>
             <div className="font-body text-xs text-petal-muted">
-              {active ? `第 ${stepNumber} 步` : '已結束'}
+              {active ? tr(`第 ${stepNumber} 步`, `Step ${stepNumber}`) : tr('已結束', 'Ended')}
             </div>
           </div>
         </div>
@@ -118,7 +119,7 @@ const GuideSessionView: React.FC<Props> = ({
           />
         ) : (
           <div className="rounded-2xl border border-petal-rule bg-white p-4 font-body text-sm text-petal-ink-soft">
-            {companionShortName} 正在準備下一步…
+            {companionShortName} {tr('正在準備下一步…', 'Preparing the next step…')}
           </div>
         )}
 
@@ -132,14 +133,14 @@ const GuideSessionView: React.FC<Props> = ({
         {active && (
         <div className="mt-4 font-body text-xs space-y-0.5" data-testid="facilitation-turn-hint">
           {advancePaused ? (
-            <span className="text-petal-muted">⏸️ 今日 AI 次數已用完，明天會自動接續引導。你們仍可自由回覆。</span>
+            <span className="text-petal-muted">{tr('⏸️ 今日 AI 次數已用完，明天會自動接續引導。你們仍可自由回覆。', '⏸️ Today\'s AI credits are used up. The guide will continue tomorrow automatically. You can still reply freely.')}</span>
           ) : isMyTurn ? (
-            <span className="text-petal-rose-deep">🎯 輪到你了：照著上面 {companionShortName} 的引導回應。</span>
+            <span className="text-petal-rose-deep">{tr('🎯 輪到你了：照著上面', '🎯 Your turn: respond following ')} {companionShortName} {tr('的引導回應。', '\'s guide above.')}</span>
           ) : (
             <>
-              <span className="text-petal-muted block">⏳ 等待 {partnerName} 回應這一步…</span>
+              <span className="text-petal-muted block">{tr('⏳ 等待', '⏳ Waiting for ')} {partnerName} {tr('回應這一步…', ' to respond to this step…')}</span>
               <span className="text-petal-muted block">
-                你也可以先自由回覆，練習會等 {partnerName} 完成這一步再繼續。
+                {tr('你也可以先自由回覆，練習會等', 'You can reply freely in the meantime. The practice will continue once ')} {partnerName} {tr('完成這一步再繼續。', ' finishes this step.')}
               </span>
             </>
           )}
@@ -154,7 +155,7 @@ const GuideSessionView: React.FC<Props> = ({
             data-testid="guide-reply-input"
             value={reply}
             onChange={(e) => onReplyChange(e.target.value)}
-            placeholder={isMyTurn ? '照著這一步回應…' : '先寫下你想說的…'}
+            placeholder={isMyTurn ? tr('照著這一步回應…', 'Respond following this step…') : tr('先寫下你想說的…', 'Write what you want to say first…')}
             rows={3}
             maxLength={maxChars}
             className="w-full p-2 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y"
@@ -174,12 +175,12 @@ const GuideSessionView: React.FC<Props> = ({
               className="px-4 py-2 rounded-full bg-petal-ink text-petal-cream font-medium shadow-sm inline-flex items-center gap-2 disabled:opacity-40 disabled:shadow-none hover:opacity-90 active:scale-[0.98] transition"
             >
               {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              <span>送出</span>
+              <span>{tr('送出', 'Send')}</span>
             </button>
           </div>
           {over && (
             <p className="mt-1 font-body text-xs text-red-600">
-              這則回應 {reply.length} / {maxChars} 字，請刪掉 {reply.length - maxChars} 字再送出。
+              {tr('這則回應', 'This reply is')} {reply.length} / {maxChars} {tr('字，請刪掉', ' characters. Please remove ')} {reply.length - maxChars} {tr('字再送出。', ' characters before sending.')}
             </p>
           )}
         </div>
@@ -187,8 +188,8 @@ const GuideSessionView: React.FC<Props> = ({
 
         <p className="mt-3 font-body text-[11px] text-petal-muted">
           {active
-            ? `送出後 ${companionShortName} 會接著給下一步。想先看看你們剛剛說了什麼，可以隨時「回到對話」——練習會留在這裡。`
-            : `這次練習已經結束。想再練一次，回到對話請 ${companionShortName} 加入、選「帶一張練習卡」。`}
+            ? tr(`送出後 ${companionShortName} 會接著給下一步。想先看看你們剛剛說了什麼，可以隨時「回到對話」——練習會留在這裡。`, `After you send, ${companionShortName} will give the next step. To look back at what you just said, "Back to conversation" any time. The practice stays here.`)
+            : tr(`這次練習已經結束。想再練一次，回到對話請 ${companionShortName} 加入、選「帶一張練習卡」。`, `This practice has ended. To practice again, go back to the conversation, invite ${companionShortName}, and choose "Lead a practice card".`)}
         </p>
       </div>
     </div>,

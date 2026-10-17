@@ -59,6 +59,7 @@ const { requestLogger, errorHandler, asyncHandler } = require('./middleware/logg
 const { requestContext } = require('./middleware/request-context');
 const { JWT_EXPIRES_IN, JWT_EXPIRES_IN_MS } = require('./middleware/auth');
 const { adminAuth } = require('./middleware/adminAuth');
+const { localeMiddleware } = require('./middleware/locale');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -194,6 +195,8 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
+// X-Locale: en → user-facing response strings are translated (middleware/locale.js).
+app.use('/api', localeMiddleware);
 app.use('/api/auth', authRoutes);
 app.use('/api/couples', coupleRoutes);
 app.use('/api/love-moments', loveMomentRoutes);
@@ -285,6 +288,28 @@ app.get(['/pricing', '/membership', '/plans', '/pricing.html'], (req, res) => {
   }
   res.setHeader('Cache-Control', 'no-cache');
   res.type('html').send(pricingHtmlCache);
+});
+
+// Public, no-login customer-support page (English by default, with an
+// EN / 繁中 switch; the in-app counterpart is HelpView). App Store review and
+// overseas visitors need a support URL that works without an account, so like
+// /pricing this is a self-contained static page with the same {{SUPPORT_EMAIL}}
+// placeholder substitution. '/support.html' is listed so the raw dist/ copy
+// (Vite copies public/ verbatim) can never be served.
+let supportHtmlCache = null;
+app.get(['/support', '/support.html'], (req, res) => {
+  if (!supportHtmlCache) {
+    supportHtmlCache = fs
+      .readFileSync(path.join(__dirname, 'public', 'support.html'), 'utf8')
+      .replace(/\{\{SUPPORT_EMAIL\}\}/g, SUPPORT_EMAIL);
+  }
+  logInfo('support.page_view', {
+    path: req.path,
+    lang: typeof req.query.lang === 'string' ? req.query.lang.slice(0, 8) : null,
+    acceptLanguage: (req.get('accept-language') || '').slice(0, 32),
+  });
+  res.setHeader('Cache-Control', 'no-cache');
+  res.type('html').send(supportHtmlCache);
 });
 
 // Public, no-login therapist recruitment / sign-up page. The SPA gates most

@@ -3,6 +3,7 @@ import { formatRelativeOrDate } from '../utils/datetime';
 import type { MomentReactionKey } from '../services/api';
 import type { IntimateRecord } from '../App';
 import AutoGrowTextarea from './AutoGrowTextarea';
+import { tr } from '../i18n/tr';
 
 // 快速回應 on a 親密記錄. Keys must match MOMENT_REACTIONS in
 // routes/love-moments.js. These exist because a record used to be a row nobody
@@ -15,10 +16,10 @@ import AutoGrowTextarea from './AutoGrowTextarea';
 // affordance; the quiet is bought back by leaving unselected pills as a hairline
 // on white, so a row of them still recedes until one is chosen and fills rose.
 const MOMENT_REACTIONS: { key: MomentReactionKey; label: string }[] = [
-  { key: 'love', label: '愛你' },
-  { key: 'fire', label: '意猶未盡' },
-  { key: 'hug', label: '想再抱一次' },
-  { key: 'memorable', label: '很難忘' },
+  { key: 'love', label: tr('愛你', 'Love you') },
+  { key: 'fire', label: tr('意猶未盡', 'Can\'t get enough') },
+  { key: 'hug', label: tr('想再抱一次', 'Want another hug') },
+  { key: 'memorable', label: tr('很難忘', 'Unforgettable') },
 ];
 
 const reactionMeta = (key: MomentReactionKey | null | undefined) =>
@@ -75,9 +76,9 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
         className="rounded-md border border-dashed border-petal-rule px-4 py-3"
         data-testid={`moment-response-gate-${record.id}`}
       >
-        <p className="font-body text-sm text-petal-ink">還沒配對，這則記錄只有你看得到。</p>
+        <p className="font-body text-sm text-petal-ink">{tr('還沒配對，這則記錄只有你看得到。', 'Not paired yet, so only you can see this record.')}</p>
         <p className="font-body text-xs text-petal-ink-soft mt-1 leading-relaxed">
-          你還是可以先把心情記下來；配對之後，你們就能互相回應這些時光。
+          {tr('你還是可以先把心情記下來；配對之後，你們就能互相回應這些時光。', 'You can still note how you feel. Once you pair, you can respond to each other\'s moments.')}
         </p>
         {onInvitePartner && (
           <button
@@ -86,7 +87,7 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
             data-testid={`moment-response-invite-${record.id}`}
             className="mt-3 px-4 py-2 rounded-full bg-petal-rose-deep text-white text-sm font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition"
           >
-            邀請另一半
+            {tr('邀請另一半', 'Invite your partner')}
           </button>
         )}
       </div>
@@ -154,7 +155,7 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
         data-testid={testId}
       >
         <span className="font-body text-xs text-petal-rose-deep truncate">
-          {response.note ? `${who}：${response.note}` : `${who}給了一個「${meta?.label ?? '心意'}」`}
+          {response.note ? tr(`${who}：${response.note}`, `${who}: ${response.note}`) : tr(`${who}給了一個「${meta?.label ?? '心意'}」`, `${who} sent "${meta?.label ?? 'love'}"`)}
         </span>
         <span className="font-body text-[11px] text-petal-muted whitespace-nowrap">
           · {formatRelativeOrDate(response.updated_at, timezone, { month: 'short', day: 'numeric' })}
@@ -163,7 +164,7 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
     );
   };
 
-  const theirName = theirs?.nickname || partnerNickname || '對方';
+  const theirName = theirs?.nickname || partnerNickname || tr('對方', 'Partner');
 
   if (variant === 'row') {
     // No onClick={stop} on the wrapper: only the four words swallow the tap.
@@ -174,7 +175,7 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
         {(theirs || mine) && (
           <div className="flex flex-wrap gap-1.5">
             {theirs && responsePill(theirs, theirName, `moment-response-partner-${record.id}`)}
-            {mine?.note && responsePill(mine, '你', `moment-response-mine-${record.id}`)}
+            {mine?.note && responsePill(mine, tr('你', 'You'), `moment-response-mine-${record.id}`)}
           </div>
         )}
         {chips}
@@ -201,7 +202,7 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
             onChange={(e) => setDraft(e.target.value)}
             maxLength={NOTE_MAX}
             autoFocus
-            placeholder="想說一句什麼？"
+            placeholder={tr("想說一句什麼？", 'Want to say something?')}
             data-testid={`moment-note-input-${record.id}`}
             className="w-full rounded-md border border-petal-rule bg-petal-cream px-3 py-2 font-body text-sm text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-none min-h-[6.5rem] max-h-[40vh] overflow-y-auto"
           />
@@ -215,7 +216,7 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
                 onClick={() => setEditingNote(false)}
                 className="font-body text-xs text-petal-muted hover:text-petal-ink transition-colors"
               >
-                取消
+                {tr('取消', 'Cancel')}
               </button>
               <button
                 type="button"
@@ -227,7 +228,7 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
                 data-testid={`moment-note-submit-${record.id}`}
                 className="px-3 py-1.5 rounded-full bg-petal-rose-deep text-white font-body text-xs font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition disabled:opacity-50"
               >
-                送出
+                {tr('送出', 'Send')}
               </button>
             </div>
           </div>
@@ -246,7 +247,7 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
               onClick={() => setEditingNote(true)}
               className="font-body text-xs text-petal-muted hover:text-petal-ink transition-colors"
             >
-              編輯
+              {tr('編輯', 'Edit')}
             </button>
             <button
               type="button"
@@ -254,7 +255,7 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
               onClick={() => void send({ note: '' })}
               className="font-body text-xs text-petal-muted hover:text-red-500 transition-colors disabled:opacity-50"
             >
-              清除
+              {tr('清除', 'Clear')}
             </button>
           </div>
         </div>
@@ -265,7 +266,7 @@ const MomentResponseBar: React.FC<MomentResponseBarProps> = ({
           data-testid={`moment-note-open-${record.id}`}
           className="font-body text-[13px] text-petal-muted hover:text-petal-rose-deep transition-colors"
         >
-          說一句（{NOTE_MAX} 字以內）
+          {tr('說一句（', 'Say something (up to ')}{NOTE_MAX} {tr('字以內）', ' characters)')}
         </button>
       )}
     </div>

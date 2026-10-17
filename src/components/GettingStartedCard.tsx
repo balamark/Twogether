@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { CheckCircle2, Circle, ChevronDown, ChevronUp, HeartHandshake, Users, CalendarPlus, MessageSquareHeart, X } from 'lucide-react';
+import { tr } from '../i18n/tr';
 
 // 「開始三步驟」first-run checklist (docs/UX_PLAYBOOK.md P0-1). Shown at the
 // top of 記錄時光 until all steps are done or the user dismisses it. Steps
@@ -59,7 +60,7 @@ export default function GettingStartedCard({
           className="flex items-center gap-2 text-left"
           data-testid="getting-started-toggle"
         >
-          <span className="font-display text-base text-petal-ink">開始三步驟</span>
+          <span className="font-display text-base text-petal-ink">{tr('開始三步驟', 'Three steps to start')}</span>
           <span className="text-xs px-2 py-0.5 rounded-full bg-petal-rose/20 text-petal-ink">
             {doneCount} / {steps.length}
           </span>
@@ -68,8 +69,8 @@ export default function GettingStartedCard({
         <button
           type="button"
           onClick={dismiss}
-          title="不再顯示"
-          aria-label="不再顯示"
+          title={tr("不再顯示", 'Don\'t show again')}
+          aria-label={tr("不再顯示", 'Don\'t show again')}
           data-testid="getting-started-dismiss"
           className="p-1 rounded text-petal-muted hover:text-petal-ink"
         >
@@ -83,7 +84,7 @@ export default function GettingStartedCard({
           <div className="flex items-center gap-2.5">
             <StepIcon done={companionPicked} />
             <span className={`text-sm flex-1 ${companionPicked ? 'text-petal-muted line-through' : 'text-petal-ink'}`}>
-              選擇你的 AI 諮商師
+              {tr('選擇你的 AI 諮商師', 'Choose your AI counselor')}
             </span>
             {!companionPicked && (
               <button
@@ -93,7 +94,7 @@ export default function GettingStartedCard({
                 className="text-xs px-3 py-1.5 rounded-full bg-petal-sage-deeper text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-1.5"
               >
                 <HeartHandshake className="w-3.5 h-3.5" />
-                去選擇
+                {tr('去選擇', 'Choose')}
               </button>
             )}
           </div>
@@ -102,7 +103,7 @@ export default function GettingStartedCard({
           <div className="flex items-center gap-2.5">
             <StepIcon done={paired} />
             <span className={`text-sm flex-1 ${paired ? 'text-petal-muted line-through' : 'text-petal-ink'}`}>
-              邀請另一半配對（日曆與紀錄會自動同步）
+              {tr('邀請另一半配對（日曆與紀錄會自動同步）', 'Invite your partner to pair (calendar and records sync automatically)')}
             </span>
             {!paired && (
               <button
@@ -112,7 +113,7 @@ export default function GettingStartedCard({
                 className="text-xs px-3 py-1.5 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-1.5"
               >
                 <Users className="w-3.5 h-3.5" />
-                邀請
+                {tr('邀請', 'Invite')}
               </button>
             )}
           </div>
@@ -121,7 +122,7 @@ export default function GettingStartedCard({
           <div className="flex items-center gap-2.5">
             <StepIcon done={hasFirstEntry} />
             <span className={`text-sm flex-1 ${hasFirstEntry ? 'text-petal-muted line-through' : 'text-petal-ink'}`}>
-              記下第一筆，或把想說的事說開
+              {tr('記下第一筆，或把想說的事說開', 'Record your first moment, or talk something through')}
             </span>
           </div>
           {!hasFirstEntry && (
@@ -133,7 +134,7 @@ export default function GettingStartedCard({
                 className="text-xs px-3 py-1.5 rounded-full bg-petal-ink text-petal-cream font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-1.5"
               >
                 <CalendarPlus className="w-3.5 h-3.5" />
-                記下第一筆時光
+                {tr('記下第一筆時光', 'Record your first moment')}
               </button>
               <button
                 type="button"
@@ -142,7 +143,7 @@ export default function GettingStartedCard({
                 className="text-xs px-3 py-1.5 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-1.5"
               >
                 <MessageSquareHeart className="w-3.5 h-3.5" />
-                開始第一段對話
+                {tr('開始第一段對話', 'Start your first conversation')}
               </button>
             </div>
           )}

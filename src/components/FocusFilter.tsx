@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { FOCUS_AREAS } from './therapistShared';
 import { FilterChip } from './FilterChip';
 import type { TherapistFocusArea } from '../services/api';
+import { tr } from '../i18n/tr';
 
 // Focus-area filter that shows a few common tags collapsed, with a "更多" toggle
 // for the rest — keeps the 心理諮商 / 公開問答 header from being clogged by all 14.
@@ -26,7 +27,7 @@ export const FocusFilter: React.FC<FocusFilterProps> = ({ value, onChange }) => 
 
   return (
     <div className="flex flex-wrap justify-center gap-1.5">
-      <FilterChip active={value === 'all'} onClick={() => onChange('all')} label="全部" emoji="✨" />
+      <FilterChip active={value === 'all'} onClick={() => onChange('all')} label={tr("全部", 'All')} emoji="✨" />
       {visible.map((f) => (
         <FilterChip
           key={f.id}
@@ -43,7 +44,7 @@ export const FocusFilter: React.FC<FocusFilterProps> = ({ value, onChange }) => 
           data-testid="focus-filter-toggle"
           className="px-3 py-1.5 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors font-body text-[13px]"
         >
-          {expanded ? '收起' : `更多 ＋${hiddenCount}`}
+          {expanded ? tr('收起', 'Less') : tr(`更多 ＋${hiddenCount}`, `More +${hiddenCount}`)}
         </button>
       )}
     </div>

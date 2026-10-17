@@ -6,6 +6,7 @@ import { apiService } from '../services/api';
 import MarriageCheckup from './MarriageCheckup';
 import type { Notification } from '../App';
 import AutoGrowTextarea from './AutoGrowTextarea';
+import { tr } from '../i18n/tr';
 
 interface ConflictViewProps {
   showNotification: (notification: Omit<Notification, 'id'>) => void;
@@ -30,30 +31,30 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
     {
       key: 'angry',
       emoji: '😡',
-      label: '生氣',
-      sub: '想反擊',
-      phrase: '我現在有點激動，我怕我會講出傷人的話，我想先停一下，但我不是不在乎你。',
+      label: tr('生氣', 'Angry'),
+      sub: tr('想反擊', 'Want to hit back'),
+      phrase: tr('我現在有點激動，我怕我會講出傷人的話，我想先停一下，但我不是不在乎你。', 'I\'m getting worked up and I\'m afraid I\'ll say something hurtful. I want to pause for a moment, but it\'s not that I don\'t care about you.'),
     },
     {
       key: 'hurt',
       emoji: '😞',
-      label: '受傷',
-      sub: '想被理解',
-      phrase: '我現在其實有點難過，我需要你先聽我講完，不然我會更失落。',
+      label: tr('受傷', 'Hurt'),
+      sub: tr('想被理解', 'Want to be understood'),
+      phrase: tr('我現在其實有點難過，我需要你先聽我講完，不然我會更失落。', 'I\'m actually feeling a bit sad right now. I need you to hear me out first, or I\'ll feel even more let down.'),
     },
     {
       key: 'cold',
       emoji: '😐',
-      label: '冷掉',
-      sub: '不想講了',
-      phrase: '我現在腦袋有點關機，我需要一點時間消化，但我會回來，不是不在乎。',
+      label: tr('冷掉', 'Shut down'),
+      sub: tr('不想講了', 'Don\'t want to talk'),
+      phrase: tr('我現在腦袋有點關機，我需要一點時間消化，但我會回來，不是不在乎。', 'My brain has kind of shut down. I need some time to process, but I\'ll come back. It\'s not that I don\'t care.'),
     },
     {
       key: 'overwhelmed',
       emoji: '😣',
-      label: '快爆了',
-      sub: '撐不住了',
-      phrase: '我快撐不住了，我需要先暫停喘口氣，這不是不想處理，是先讓自己冷靜。',
+      label: tr('快爆了', 'About to explode'),
+      sub: tr('撐不住了', 'Can\'t hold on'),
+      phrase: tr('我快撐不住了，我需要先暫停喘口氣，這不是不想處理，是先讓自己冷靜。', 'I can\'t hold on much longer. I need to pause and catch my breath first. It\'s not that I don\'t want to deal with it; I need to calm down.'),
     },
   ];
 
@@ -78,7 +79,7 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
   const [customExpanded, setCustomExpanded] = useState<Record<string, boolean>>({});
 
   // Toolkit content — 4-step interactive flow for active conflict.
-  const emotionFullMessage = '我聽到你了，但我現在情緒有點滿，需要先停一下。我等一下會回來跟你說。';
+  const emotionFullMessage = tr('我聽到你了，但我現在情緒有點滿，需要先停一下。我等一下會回來跟你說。', 'I hear you, but I\'m feeling a bit overwhelmed and need to pause. I\'ll come back and talk to you in a bit.');
 
   const partnerNeedsItems: {
     key: string;
@@ -90,28 +91,28 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
     {
       key: 'pause-no-explain',
       icon: '①',
-      title: '先停下來，不要解釋，不要辯論',
-      body: '我現在聽不進理性內容，你越解釋，我越痛。你只要先停下來，我會比較快冷靜。',
+      title: tr('先停下來，不要解釋，不要辯論', 'Stop first. Don\'t explain, don\'t argue'),
+      body: tr('我現在聽不進理性內容，你越解釋，我越痛。你只要先停下來，我會比較快冷靜。', 'I can\'t take in reasoning right now; the more you explain, the more it hurts. Just stop first and I\'ll calm down faster.'),
     },
     {
       key: 'affirm-feeling',
       icon: '②',
-      title: '用一句肯定我情緒的話（一定要有）',
-      body: '我不是要你道歉，是要你讓我覺得「你有看見我」。',
+      title: tr('用一句肯定我情緒的話（一定要有）', 'One sentence that acknowledges my feeling (a must)'),
+      body: tr('我不是要你道歉，是要你讓我覺得「你有看見我」。', 'I\'m not asking you to apologize. I need to feel that you see me.'),
       suggestions: [
-        '我知道我剛的話讓你不舒服了。',
-        '我看得出來你在生氣。',
-        '我先陪你一下。',
+        tr('我知道我剛的話讓你不舒服了。', 'I know what I said made you uncomfortable.'),
+        tr('我看得出來你在生氣。', 'I can see you\'re angry.'),
+        tr('我先陪你一下。', 'Let me be with you for a moment.'),
       ],
     },
     {
       key: 'give-step-down',
       icon: '③',
-      title: '給我一個台階：你願意等我',
-      body: '有台階，我就會回頭。沒有台階，我只會越走越遠。',
+      title: tr('給我一個台階：你願意等我', 'Give me a way back: you\'re willing to wait for me'),
+      body: tr('有台階，我就會回頭。沒有台階，我只會越走越遠。', 'With a way back, I\'ll come around. Without one, I\'ll only drift further.'),
       suggestions: [
-        '你先休息一下，我在這裡等你。',
-        '等你準備好了，我們再一起聊。',
+        tr('你先休息一下，我在這裡等你。', 'Take a break. I\'m right here waiting for you.'),
+        tr('等你準備好了，我們再一起聊。', 'When you\'re ready, we\'ll talk together.'),
       ],
     },
   ];
@@ -120,51 +121,51 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
     {
       key: 'pause-10min',
       numeral: '1️⃣',
-      label: '暫停 10 分鐘',
-      message: '我會離開一下下，十分鐘後我們再回到同一個話題。',
+      label: tr('暫停 10 分鐘', 'Pause for 10 minutes'),
+      message: tr('我會離開一下下，十分鐘後我們再回到同一個話題。', 'I\'ll step away for a bit, and in ten minutes we\'ll come back to the same topic.'),
     },
     {
       key: 'pause-until-calm',
       numeral: '2️⃣',
-      label: '暫停到情緒穩定',
-      message: '我現在想先讓情緒平穩，等我冷靜，我會主動來找你。',
+      label: tr('暫停到情緒穩定', 'Pause until we\'re calm'),
+      message: tr('我現在想先讓情緒平穩，等我冷靜，我會主動來找你。', 'I want to let my feelings settle first. Once I\'ve calmed down, I\'ll come find you.'),
     },
     {
       key: 'switch-to-text',
       numeral: '3️⃣',
-      label: '用文字聊代替現場聊',
-      message: '我現在用說的會越來越激動，我們改用訊息聊，好讓彼此舒服。',
+      label: tr('用文字聊代替現場聊', 'Text instead of talking face to face'),
+      message: tr('我現在用說的會越來越激動，我們改用訊息聊，好讓彼此舒服。', 'Talking out loud is making me more worked up. Let\'s switch to messages so we\'re both more comfortable.'),
     },
   ];
 
   const tenderPhrases: string[] = [
-    '我沒有要跟你對立，我想靠近你。',
-    '你的感受我放在心上。',
-    '我在這裡，你慢慢來。',
+    tr('我沒有要跟你對立，我想靠近你。', 'I\'m not trying to be against you. I want to be close to you.'),
+    tr('你的感受我放在心上。', 'I\'m holding your feelings in my heart.'),
+    tr('我在這裡，你慢慢來。', 'I\'m here. Take your time.'),
   ];
 
   const soothingEmojis: string[] = ['🤝', '🫶', '🌙', '🤍', '🐻', '✨'];
 
-  const caringQuestion = '現在我能怎麼讓你舒服一點？';
+  const caringQuestion = tr('現在我能怎麼讓你舒服一點？', 'What can I do right now to make you feel a little better?');
 
   const caringReplyOptions: string[] = [
-    '給我 5 分鐘就好。',
-    '說一句讓我安心的話。',
-    '先抱一下我。',
+    tr('給我 5 分鐘就好。', 'Just give me 5 minutes.'),
+    tr('說一句讓我安心的話。', 'Say something that makes me feel safe.'),
+    tr('先抱一下我。', 'Hug me first.'),
   ];
 
   const handleSendPhrase = async (phrase: string, key: string) => {
     if (!partnerConnected) {
       showNotification({
         type: 'warning',
-        title: '尚未配對伴侶',
-        message: '需要先配對伴侶才能直接傳訊息給對方。',
+        title: tr('尚未配對伴侶', 'Not paired yet'),
+        message: tr('需要先配對伴侶才能直接傳訊息給對方。', 'You need to pair with your partner before sending them a message directly.'),
         duration: 4000,
       });
       return;
     }
     if (phraseStatus[key] === 'sending' || phraseStatus[key] === 'sent') return;
-    const confirmed = window.confirm(`確定要把這句話傳給TA嗎？\n\n「${phrase}」`);
+    const confirmed = window.confirm(tr(`確定要把這句話傳給TA嗎？\n\n「${phrase}」`, `Send this to them?\n\n"${phrase}"`));
     if (!confirmed) return;
     setPhraseStatus(prev => ({ ...prev, [key]: 'sending' }));
     try {
@@ -175,16 +176,16 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
       setPhraseStatus(prev => ({ ...prev, [key]: 'sent' }));
       showNotification({
         type: 'success',
-        title: '已送給TA',
-        message: '訊息已送到對方的邀請紀錄。',
+        title: tr('已送給TA', 'Sent to them'),
+        message: tr('訊息已送到對方的邀請紀錄。', 'The message was sent to their invitation history.'),
         duration: 3000,
       });
     } catch (err) {
       setPhraseStatus(prev => ({ ...prev, [key]: 'idle' }));
       showNotification({
         type: 'error',
-        title: '送出失敗',
-        message: (err as Error)?.message || '請稍後再試。',
+        title: tr('送出失敗', 'Couldn\'t send'),
+        message: (err as Error)?.message || tr('請稍後再試。', 'Please try again in a moment.'),
         duration: 4000,
       });
     }
@@ -197,8 +198,8 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
     if (!draft) {
       showNotification({
         type: 'warning',
-        title: '訊息不能為空',
-        message: '請先寫一些字再送出。',
+        title: tr('訊息不能為空', 'The message can\'t be empty'),
+        message: tr('請先寫一些字再送出。', 'Please write something before sending.'),
         duration: 3000,
       });
       return;
@@ -206,14 +207,14 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
     if (!partnerConnected) {
       showNotification({
         type: 'warning',
-        title: '尚未配對伴侶',
-        message: '需要先配對伴侶才能直接傳訊息給對方。',
+        title: tr('尚未配對伴侶', 'Not paired yet'),
+        message: tr('需要先配對伴侶才能直接傳訊息給對方。', 'You need to pair with your partner before sending them a message directly.'),
         duration: 4000,
       });
       return;
     }
     if (phraseStatus[key] === 'sending') return;
-    const confirmed = window.confirm(`確定要把這則自訂訊息傳給TA嗎？\n\n「${draft}」`);
+    const confirmed = window.confirm(tr(`確定要把這則自訂訊息傳給TA嗎？\n\n「${draft}」`, `Send this custom message to them?\n\n"${draft}"`));
     if (!confirmed) return;
     setPhraseStatus(prev => ({ ...prev, [key]: 'sending' }));
     try {
@@ -223,8 +224,8 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
       });
       showNotification({
         type: 'success',
-        title: '已送給TA',
-        message: '自訂訊息已送到對方的邀請紀錄。',
+        title: tr('已送給TA', 'Sent to them'),
+        message: tr('自訂訊息已送到對方的邀請紀錄。', 'Your custom message was sent to their invitation history.'),
         duration: 3000,
       });
       setPhraseStatus(prev => ({ ...prev, [key]: 'idle' }));
@@ -234,15 +235,15 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
       setPhraseStatus(prev => ({ ...prev, [key]: 'idle' }));
       showNotification({
         type: 'error',
-        title: '送出失敗',
-        message: (err as Error)?.message || '請稍後再試。',
+        title: tr('送出失敗', 'Couldn\'t send'),
+        message: (err as Error)?.message || tr('請稍後再試。', 'Please try again in a moment.'),
         duration: 4000,
       });
     }
   };
 
   // Inline custom-message composer — collapsed button by default, expands to textarea + send.
-  const renderCustomComposer = (key: string, placeholder = '寫一句自己想說的話傳給TA…') => {
+  const renderCustomComposer = (key: string, placeholder = tr('寫一句自己想說的話傳給TA…', 'Write something you want to say to them…')) => {
     const draft = customDrafts[key] || '';
     const expanded = !!customExpanded[key];
     const status = phraseStatus[key] || 'idle';
@@ -256,7 +257,7 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-body text-xs font-medium border border-dashed border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink hover:bg-white/70 transition-colors"
         >
           <Plus className="w-3.5 h-3.5" strokeWidth={1.75} />
-          寫自己的訊息
+          {tr('寫自己的訊息', 'Write my own message')}
         </button>
       );
     }
@@ -288,13 +289,13 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
               disabled={isSending}
               className="px-3 py-1.5 rounded-full font-body text-xs text-petal-muted hover:text-petal-ink transition-colors"
             >
-              取消
+              {tr('取消', 'Cancel')}
             </button>
             <button
               type="button"
               onClick={() => handleSendCustom(key)}
               disabled={!canSend}
-              title={!partnerConnected ? '需要先配對伴侶' : ''}
+              title={!partnerConnected ? tr('需要先配對伴侶', 'Pair with your partner first') : ''}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-body text-xs font-medium border transition-colors ${
                 isSending
                   ? 'border-petal-rule bg-white text-petal-muted cursor-wait'
@@ -306,12 +307,12 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
               {isSending ? (
                 <>
                   <span className="w-3.5 h-3.5 border-2 border-petal-muted border-t-transparent rounded-full animate-spin" />
-                  傳送中
+                  {tr('傳送中', 'Sending')}
                 </>
               ) : (
                 <>
                   <Send className="w-3.5 h-3.5" strokeWidth={1.75} />
-                  傳給TA
+                  {tr('傳給TA', 'Send to them')}
                 </>
               )}
             </button>
@@ -328,10 +329,10 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
   };
 
   const sectionNav: { id: string; label: string }[] = [
-    { id: 'conflict-lead', label: '先接住情緒' },
-    { id: 'conflict-pause', label: '正在爭吵中' },
-    { id: 'conflict-toolkit', label: '應對工具' },
-    { id: 'conflict-checkup', label: '婚姻檢查' },
+    { id: 'conflict-lead', label: tr('先接住情緒', 'Hold feelings first') },
+    { id: 'conflict-pause', label: tr('正在爭吵中', 'In the middle of a fight') },
+    { id: 'conflict-toolkit', label: tr('應對工具', 'Tools') },
+    { id: 'conflict-checkup', label: tr('婚姻檢查', 'Relationship check-in') },
   ];
 
   // Tick timer while on Step 3
@@ -403,16 +404,16 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
   <div className="space-y-10">
     <div className="border-b border-petal-rule pb-7">
       <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-        — 接住
+        {tr('— 接住', '— Hold')}
       </div>
       {/* Title matches the sub-tab chip you tapped (接住情緒・檢查) — before this
           the chip said one thing and the page said 和諧相處. */}
       <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
-        接住<em className="not-italic font-light italic text-pink-600">情緒</em>
+        {tr('接住', 'Holding')}<em className="not-italic font-light italic text-pink-600">{tr('情緒', ' feelings')}</em>
         <span className="align-middle ml-2"><InfoHint viewId="conflict" /></span>
       </h2>
       <p className="font-display italic font-light text-base text-petal-muted">
-        化解矛盾，增進理解 — 把急切的話留到明天再說。
+        {tr('化解矛盾，增進理解 — 把急切的話留到明天再說。', 'Resolve conflict, deepen understanding. Save the urgent words for tomorrow.')}
       </p>
     </div>
 
@@ -420,7 +421,7 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
         it stacks *below* 好好說話's sticky sub-tab row (App.tsx) instead of
         replacing it; otherwise one scroll hid the way back to 說開一件事. */}
     <nav
-      aria-label="頁面區塊"
+      aria-label={tr("頁面區塊", 'Page sections')}
       className="sticky top-[52px] z-20 -mt-6 -mx-4 px-4 py-2.5 bg-petal-cream/95 backdrop-blur-sm border-b border-petal-rule"
     >
       <div className="flex gap-1.5 overflow-x-auto no-scrollbar -mx-1 px-1">
@@ -449,15 +450,13 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
         </div>
         <div className="flex-1 min-w-0">
           <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-2">
-            — 先接住情緒，溝通才開始
+            {tr('— 先接住情緒，溝通才開始', '— Feelings need to be held before communication can begin')}
           </div>
           <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-2">
-            被接住的那一刻，<em className="not-italic font-light italic text-pink-600">修復才開始</em>
+            {tr('被接住的那一刻，', 'The moment you feel held ')}<em className="not-italic font-light italic text-pink-600">{tr('修復才開始', 'is when repair begins')}</em>
           </h3>
           <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-4">
-            當情緒沒有被接納，人會覺得自己被否定。所以在講道理、找解法之前，先讓彼此的感受被看見、被接住。
-            把心裡的情緒寫下來，AI 幫你說得不傷人；對方收到後，AI 也會教他怎麼接住你的情緒。
-            用寫的，比當下用說的更容易把話說對：急切的話留到明天，傷害留在草稿裡。
+            {tr('當情緒沒有被接納，人會覺得自己被否定。所以在講道理、找解法之前，先讓彼此的感受被看見、被接住。 把心裡的情緒寫下來，AI 幫你說得不傷人；對方收到後，AI 也會教他怎麼接住你的情緒。 用寫的，比當下用說的更容易把話說對：急切的話留到明天，傷害留在草稿裡。', 'When feelings aren\'t accepted, people feel rejected. So before reasoning or finding solutions, let each other\'s feelings be seen and held. Write down what you feel and AI helps you say it without hurting; when your partner receives it, AI also shows them how to hold your feelings. Writing makes it easier to get the words right than speaking in the moment: urgent words wait until tomorrow, and the hurt stays in the draft.')}
           </p>
           <button
             type="button"
@@ -470,7 +469,7 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-petal-ink text-petal-cream font-body text-sm font-medium hover:bg-pink-700 transition-colors"
           >
             <HandHeart className="w-4 h-4" strokeWidth={1.75} />
-            寫下我的情緒，讓對方接住
+            {tr('寫下我的情緒，讓對方接住', 'Write down my feelings so they can hold them')}
           </button>
         </div>
       </div>
@@ -482,10 +481,10 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
         <div className="flex-1">
           <h3 className="font-display text-lg font-medium tracking-tight text-amber-900 mb-1 flex items-center">
             <Pause className="w-4 h-4 mr-2 fill-amber-700 text-amber-700" strokeWidth={1.5} />
-            正在爭吵中？
+            {tr('正在爭吵中？', 'In the middle of a fight?')}
           </h3>
           <p className="font-body text-sm text-amber-900/80 leading-relaxed">
-            進入<b className="not-italic font-medium">冷靜連結模式</b>：4 步引導你們先降溫、再說話，而不是讓溝通變成武器。
+            {tr('進入', 'Enter ')}<b className="not-italic font-medium">{tr('冷靜連結模式', 'calm connection mode')}</b>{tr('：4 步引導你們先降溫、再說話，而不是讓溝通變成武器。', ': 4 steps guide you to cool down first, then talk, so communication doesn\'t become a weapon.')}
           </p>
         </div>
         <button
@@ -494,7 +493,7 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
           className="px-5 py-3 bg-amber-600 text-white rounded-md text-base font-medium hover:bg-amber-700 transition-colors whitespace-nowrap flex-shrink-0 flex items-center justify-center gap-2"
         >
           <Pause className="w-4 h-4 fill-white" strokeWidth={1.5} />
-          暫停一下
+          {tr('暫停一下', 'Take a pause')}
         </button>
       </div>
     </div>
@@ -503,16 +502,16 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
     <section id="conflict-toolkit" className="scroll-mt-20">
       <header className="mb-6">
         <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-          — 衝突進行中的工具箱
+          {tr('— 衝突進行中的工具箱', '— Toolbox for when conflict is happening')}
         </div>
         <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink mb-2">
-          雙方衝突時的<em className="not-italic font-light italic text-pink-600">應對工具</em>
+          {tr('雙方衝突時的', 'Tools for ')}<em className="not-italic font-light italic text-pink-600">{tr('應對工具', 'when you\'re in conflict')}</em>
         </h3>
         <p className="font-body text-sm text-petal-ink-soft leading-relaxed">
-          四個小步驟，從「我滿了」走到「我們重新靠近」。每一步都有一鍵就能送到TA那裡的訊息。
+          {tr('四個小步驟，從「我滿了」走到「我們重新靠近」。每一步都有一鍵就能送到TA那裡的訊息。', 'Four small steps, from "I\'m full" to "we\'re close again". Each step has a message you can send them with one tap.')}
           {!partnerConnected && (
             <span className="block mt-1.5 text-petal-muted text-xs">
-              配對伴侶後，點任何「傳給TA」按鈕即可直接送出。
+              {tr('配對伴侶後，點任何「傳給TA」按鈕即可直接送出。', 'Once paired, tap any "Send to them" button to send it directly.')}
             </span>
           )}
         </p>
@@ -527,22 +526,22 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
               Step 1
             </span>
             <h4 className="font-display text-lg md:text-xl font-medium text-petal-ink leading-snug">
-              我現在情緒滿了
+              {tr('我現在情緒滿了', 'I\'m emotionally full right now')}
             </h4>
           </header>
           <p className="font-body text-[13px] text-petal-ink-soft mb-4 leading-relaxed">
-            用一句話讓TA知道你需要空間 — 不是生氣、不是不想聽，只是情緒太滿了。
+            {tr('用一句話讓TA知道你需要空間 — 不是生氣、不是不想聽，只是情緒太滿了。', 'Let them know in one sentence that you need space. You\'re not angry and you\'re not refusing to listen; your feelings are just too full.')}
           </p>
           <blockquote className="font-display italic text-[15px] text-petal-ink bg-white/70 rounded-md p-4 border border-white mb-4 leading-relaxed">
-            「我現在需要一下下的空間，不是生你的氣，也不是不想聽，只是情緒太滿了。」
+            {tr('「我現在需要一下下的空間，不是生你的氣，也不是不想聽，只是情緒太滿了。」', '"I need a little space right now. I\'m not angry at you, and it\'s not that I don\'t want to listen. My feelings are just too full."')}
           </blockquote>
 
           <div className="bg-white/80 rounded-md p-4 border border-violet-200/50">
             <div className="font-body text-[11px] uppercase tracking-[0.14em] text-violet-800/80 mb-2">
-              📩 一鍵傳送（自動訊息）
+              {tr('📩 一鍵傳送（自動訊息）', '📩 One-tap send (automatic message)')}
             </div>
             <p className="font-display italic text-[14px] text-petal-ink mb-3 leading-relaxed">
-              「{emotionFullMessage}」
+              {tr('「', '“')}{emotionFullMessage}{tr('」', '”')}
             </p>
             {(() => {
               const key = 'toolkit-step1-notify';
@@ -565,17 +564,17 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
                   {status === 'sent' ? (
                     <>
                       <Check className="w-4 h-4" strokeWidth={2} />
-                      已傳送：情緒已滿的通知
+                      {tr('已傳送：情緒已滿的通知', 'Sent: I\'m-full notice')}
                     </>
                   ) : status === 'sending' ? (
                     <>
                       <span className="w-4 h-4 border-2 border-petal-muted border-t-transparent rounded-full animate-spin" />
-                      傳送中…
+                      {tr('傳送中…', 'Sending…')}
                     </>
                   ) : (
                     <>
                       <Send className="w-4 h-4" strokeWidth={1.75} />
-                      傳送：情緒已滿的通知
+                      {tr('傳送：情緒已滿的通知', 'Send: I\'m-full notice')}
                     </>
                   )}
                 </button>
@@ -584,7 +583,7 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
           </div>
 
           <div className="mt-4">
-            {renderCustomComposer('toolkit-step1-custom', '想用自己的話告訴TA「我滿了」？寫在這…')}
+            {renderCustomComposer('toolkit-step1-custom', tr('想用自己的話告訴TA「我滿了」？寫在這…', 'Want to tell them "I\'m full" in your own words? Write it here…'))}
           </div>
         </article>
 
@@ -596,11 +595,11 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
               Step 2
             </span>
             <h4 className="font-display text-lg md:text-xl font-medium text-petal-ink leading-snug">
-              給TA看的：3 件我最需要的事情
+              {tr('給TA看的：3 件我最需要的事情', 'For them: 3 things I need most')}
             </h4>
           </header>
           <p className="font-body text-[13px] text-petal-ink-soft mb-4 leading-relaxed">
-            點開每一項，讓TA了解你最需要什麼。展開後的建議話語可以一鍵傳給TA。
+            {tr('點開每一項，讓TA了解你最需要什麼。展開後的建議話語可以一鍵傳給TA。', 'Open each one so they understand what you need most. The suggested words inside can be sent to them with one tap.')}
           </p>
 
           <div className="space-y-2">
@@ -631,7 +630,7 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
                       {item.suggestions && (
                         <>
                           <div className="font-body text-[11px] uppercase tracking-[0.14em] text-sky-800/80 mb-2">
-                            建議話語
+                            {tr('建議話語', 'Suggested words')}
                           </div>
                           <ul className="space-y-2">
                             {item.suggestions.map((s, i) => {
@@ -643,13 +642,13 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
                                   className="flex flex-col sm:flex-row sm:items-start gap-2 bg-white rounded-md p-3 border border-sky-100"
                                 >
                                   <blockquote className="font-display text-[14px] text-petal-ink leading-relaxed flex-1">
-                                    「{s}」
+                                    {tr('「', '“')}{s}{tr('」', '”')}
                                   </blockquote>
                                   <button
                                     type="button"
                                     onClick={() => handleSendPhrase(s, key)}
                                     disabled={status === 'sending' || status === 'sent'}
-                                    title={partnerConnected ? '傳送這句話給TA' : '需要先配對伴侶'}
+                                    title={partnerConnected ? tr('傳送這句話給TA', 'Send this to them') : tr('需要先配對伴侶', 'Pair with your partner first')}
                                     className={`flex-shrink-0 self-end sm:self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-body text-xs font-medium border transition-colors ${
                                       status === 'sent'
                                         ? 'border-petal-sage bg-petal-sage/15 text-petal-sage-deep cursor-default'
@@ -663,17 +662,17 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
                                     {status === 'sent' ? (
                                       <>
                                         <Check className="w-3.5 h-3.5" strokeWidth={2} />
-                                        已送出
+                                        {tr('已送出', 'Sent')}
                                       </>
                                     ) : status === 'sending' ? (
                                       <>
                                         <span className="w-3.5 h-3.5 border-2 border-petal-muted border-t-transparent rounded-full animate-spin" />
-                                        傳送中
+                                        {tr('傳送中', 'Sending')}
                                       </>
                                     ) : (
                                       <>
                                         <Send className="w-3.5 h-3.5" strokeWidth={1.75} />
-                                        傳給TA
+                                        {tr('傳給TA', 'Send to them')}
                                       </>
                                     )}
                                   </button>
@@ -691,7 +690,7 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
           </div>
 
           <div className="mt-4">
-            {renderCustomComposer('toolkit-step2-custom', '想自己跟TA說「我最需要的是…」？寫在這…')}
+            {renderCustomComposer('toolkit-step2-custom', tr('想自己跟TA說「我最需要的是…」？寫在這…', 'Want to tell them yourself "what I need most is…"? Write it here…'))}
           </div>
         </article>
 
@@ -703,11 +702,11 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
               Step 3
             </span>
             <h4 className="font-display text-lg md:text-xl font-medium text-petal-ink leading-snug">
-              衝突升起時的退場流程
+              {tr('衝突升起時的退場流程', 'How to step out when conflict rises')}
             </h4>
           </header>
           <p className="font-body text-[13px] text-petal-ink-soft mb-4 leading-relaxed">
-            選一種暫停方式，一鍵把對應的暫停訊息送給TA。
+            {tr('選一種暫停方式，一鍵把對應的暫停訊息送給TA。', 'Choose a way to pause, and send them the matching pause message with one tap.')}
           </p>
 
           <div className="space-y-3">
@@ -723,13 +722,13 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
                     </span>
                   </div>
                   <p className="font-display italic text-[14px] text-petal-ink-soft mb-3 leading-relaxed">
-                    「{opt.message}」
+                    {tr('「', '“')}{opt.message}{tr('」', '”')}
                   </p>
                   <button
                     type="button"
                     onClick={() => handleSendPhrase(opt.message, key)}
                     disabled={status === 'sending' || status === 'sent'}
-                    title={partnerConnected ? '傳送這個暫停訊息給TA' : '需要先配對伴侶'}
+                    title={partnerConnected ? tr('傳送這個暫停訊息給TA', 'Send this pause message to them') : tr('需要先配對伴侶', 'Pair with your partner first')}
                     className={`inline-flex items-center gap-2 px-4 py-2 rounded-md font-body text-sm font-medium border transition-colors ${
                       status === 'sent'
                         ? 'border-petal-sage bg-petal-sage/15 text-petal-sage-deep cursor-default'
@@ -743,17 +742,17 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
                     {status === 'sent' ? (
                       <>
                         <Check className="w-4 h-4" strokeWidth={2} />
-                        已傳送
+                        {tr('已傳送', 'Sent')}
                       </>
                     ) : status === 'sending' ? (
                       <>
                         <span className="w-4 h-4 border-2 border-petal-muted border-t-transparent rounded-full animate-spin" />
-                        傳送中…
+                        {tr('傳送中…', 'Sending…')}
                       </>
                     ) : (
                       <>
                         <Send className="w-4 h-4" strokeWidth={1.75} />
-                        選這個 — 傳給TA
+                        {tr('選這個 — 傳給TA', 'Choose this: send to them')}
                       </>
                     )}
                   </button>
@@ -763,7 +762,7 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
           </div>
 
           <div className="mt-4">
-            {renderCustomComposer('toolkit-step3-custom', '想自己寫一個暫停的方式？例如「等我洗完澡再聊」…')}
+            {renderCustomComposer('toolkit-step3-custom', tr('想自己寫一個暫停的方式？例如「等我洗完澡再聊」…', 'Want to write your own way to pause? e.g. "Let\'s talk after I shower"…'))}
           </div>
         </article>
 
@@ -775,18 +774,18 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
               Step 4
             </span>
             <h4 className="font-display text-lg md:text-xl font-medium text-petal-ink leading-snug">
-              讓我冷靜後願意回來的關鍵
+              {tr('讓我冷靜後願意回來的關鍵', 'What makes me willing to come back once I\'ve calmed down')}
             </h4>
           </header>
           <p className="font-body text-[13px] text-petal-ink-soft mb-5 leading-relaxed">
-            當你準備好靠近TA時 — 或想告訴TA「這樣對我最有效」 — 這三件小事最能拉近距離。
+            {tr('當你準備好靠近TA時 — 或想告訴TA「這樣對我最有效」 — 這三件小事最能拉近距離。', 'When you\'re ready to get close to them, or want to tell them "this works best for me", these three small things bring you closest.')}
           </p>
 
           {/* Task 1 — tender phrase */}
           <div className="mb-6">
             <div className="font-body text-[12px] font-semibold tracking-tight text-amber-900 mb-2 flex items-center gap-1.5">
               <span aria-hidden>✔</span>
-              任務 1 — 傳一句溫柔語氣
+              {tr('任務 1 — 傳一句溫柔語氣', 'Task 1: Send something in a gentle tone')}
             </div>
             <ul className="space-y-2">
               {tenderPhrases.map((p, i) => {
@@ -798,13 +797,13 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
                     className="flex flex-col sm:flex-row sm:items-start gap-2 bg-white/80 rounded-md p-3 border border-amber-200/50"
                   >
                     <blockquote className="font-display text-[14px] text-petal-ink leading-relaxed flex-1">
-                      「{p}」
+                      {tr('「', '“')}{p}{tr('」', '”')}
                     </blockquote>
                     <button
                       type="button"
                       onClick={() => handleSendPhrase(p, key)}
                       disabled={status === 'sending' || status === 'sent'}
-                      title={partnerConnected ? '傳送這句話給TA' : '需要先配對伴侶'}
+                      title={partnerConnected ? tr('傳送這句話給TA', 'Send this to them') : tr('需要先配對伴侶', 'Pair with your partner first')}
                       className={`flex-shrink-0 self-end sm:self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-body text-xs font-medium border transition-colors ${
                         status === 'sent'
                           ? 'border-petal-sage bg-petal-sage/15 text-petal-sage-deep cursor-default'
@@ -818,17 +817,17 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
                       {status === 'sent' ? (
                         <>
                           <Check className="w-3.5 h-3.5" strokeWidth={2} />
-                          已送出
+                          {tr('已送出', 'Sent')}
                         </>
                       ) : status === 'sending' ? (
                         <>
                           <span className="w-3.5 h-3.5 border-2 border-petal-muted border-t-transparent rounded-full animate-spin" />
-                          傳送中
+                          {tr('傳送中', 'Sending')}
                         </>
                       ) : (
                         <>
                           <Send className="w-3.5 h-3.5" strokeWidth={1.75} />
-                          傳給TA
+                          {tr('傳給TA', 'Send to them')}
                         </>
                       )}
                     </button>
@@ -842,10 +841,10 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
           <div className="mb-6">
             <div className="font-body text-[12px] font-semibold tracking-tight text-amber-900 mb-2 flex items-center gap-1.5">
               <span aria-hidden>✔</span>
-              任務 2 — 傳一個安撫 emoji
+              {tr('任務 2 — 傳一個安撫 emoji', 'Task 2: Send a soothing emoji')}
             </div>
             <p className="font-body text-xs text-petal-ink-soft mb-3 leading-relaxed">
-              點一個 emoji 就送出，不用任何文字。
+              {tr('點一個 emoji 就送出，不用任何文字。', 'Tap an emoji to send it, no words needed.')}
             </p>
             <div className="flex flex-wrap gap-2">
               {soothingEmojis.map((emoji, i) => {
@@ -860,7 +859,7 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
                     onClick={() => handleSendPhrase(emoji, key)}
                     disabled={isSent || isSending}
                     title={
-                      isSent ? '已送出' : partnerConnected ? `傳送 ${emoji} 給TA` : '需要先配對伴侶'
+                      isSent ? tr('已送出', 'Sent') : partnerConnected ? tr(`傳送 ${emoji} 給TA`, `Send ${emoji} to them`) : tr('需要先配對伴侶', 'Pair with your partner first')
                     }
                     className={`w-12 h-12 text-2xl rounded-full border-2 flex items-center justify-center transition-colors ${
                       isSent
@@ -883,11 +882,11 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
           <div>
             <div className="font-body text-[12px] font-semibold tracking-tight text-amber-900 mb-2 flex items-center gap-1.5">
               <span aria-hidden>✔</span>
-              任務 3 — 問一個貼心小問題
+              {tr('任務 3 — 問一個貼心小問題', 'Task 3: Ask a caring little question')}
             </div>
             <div className="bg-white/80 rounded-md p-4 border border-amber-200/50">
               <blockquote className="font-display italic text-[15px] text-petal-ink mb-3 leading-relaxed">
-                「{caringQuestion}」
+                {tr('「', '“')}{caringQuestion}{tr('」', '”')}
               </blockquote>
               {(() => {
                 const key = 'toolkit-step4-question';
@@ -897,7 +896,7 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
                     type="button"
                     onClick={() => handleSendPhrase(caringQuestion, key)}
                     disabled={status === 'sending' || status === 'sent'}
-                    title={partnerConnected ? '把這個問題傳給TA' : '需要先配對伴侶'}
+                    title={partnerConnected ? tr('把這個問題傳給TA', 'Send this question to them') : tr('需要先配對伴侶', 'Pair with your partner first')}
                     className={`inline-flex items-center gap-2 px-4 py-2 rounded-md font-body text-sm font-medium border transition-colors ${
                       status === 'sent'
                         ? 'border-petal-sage bg-petal-sage/15 text-petal-sage-deep cursor-default'
@@ -911,17 +910,17 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
                     {status === 'sent' ? (
                       <>
                         <Check className="w-4 h-4" strokeWidth={2} />
-                        已傳送
+                        {tr('已傳送', 'Sent')}
                       </>
                     ) : status === 'sending' ? (
                       <>
                         <span className="w-4 h-4 border-2 border-petal-muted border-t-transparent rounded-full animate-spin" />
-                        傳送中…
+                        {tr('傳送中…', 'Sending…')}
                       </>
                     ) : (
                       <>
                         <Send className="w-4 h-4" strokeWidth={1.75} />
-                        傳這句話給TA
+                        {tr('傳這句話給TA', 'Send this to them')}
                       </>
                     )}
                   </button>
@@ -929,7 +928,7 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
               })()}
 
               <div className="font-body text-[11px] uppercase tracking-[0.14em] text-petal-muted mt-5 mb-2">
-                你可以選的回覆（一鍵送出）
+                {tr('你可以選的回覆（一鍵送出）', 'Replies you can choose (one tap to send)')}
               </div>
               <ul className="space-y-2">
                 {caringReplyOptions.map((r, i) => {
@@ -941,13 +940,13 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
                       className="flex flex-col sm:flex-row sm:items-start gap-2 bg-white rounded-md p-3 border border-amber-100"
                     >
                       <blockquote className="font-display text-[14px] text-petal-ink leading-relaxed flex-1">
-                        「{r}」
+                        {tr('「', '“')}{r}{tr('」', '”')}
                       </blockquote>
                       <button
                         type="button"
                         onClick={() => handleSendPhrase(r, key)}
                         disabled={status === 'sending' || status === 'sent'}
-                        title={partnerConnected ? '把這個回覆送給TA' : '需要先配對伴侶'}
+                        title={partnerConnected ? tr('把這個回覆送給TA', 'Send this reply to them') : tr('需要先配對伴侶', 'Pair with your partner first')}
                         className={`flex-shrink-0 self-end sm:self-start inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full font-body text-xs font-medium border transition-colors ${
                           status === 'sent'
                             ? 'border-petal-sage bg-petal-sage/15 text-petal-sage-deep cursor-default'
@@ -961,17 +960,17 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
                         {status === 'sent' ? (
                           <>
                             <Check className="w-3.5 h-3.5" strokeWidth={2} />
-                            已送出
+                            {tr('已送出', 'Sent')}
                           </>
                         ) : status === 'sending' ? (
                           <>
                             <span className="w-3.5 h-3.5 border-2 border-petal-muted border-t-transparent rounded-full animate-spin" />
-                            傳送中
+                            {tr('傳送中', 'Sending')}
                           </>
                         ) : (
                           <>
                             <Send className="w-3.5 h-3.5" strokeWidth={1.75} />
-                            傳給TA
+                            {tr('傳給TA', 'Send to them')}
                           </>
                         )}
                       </button>
@@ -983,13 +982,13 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
           </div>
 
           <div className="mt-5 pt-5 border-t border-amber-200/60">
-            {renderCustomComposer('toolkit-step4-custom', '想自己寫一句靠近TA的話？寫在這…')}
+            {renderCustomComposer('toolkit-step4-custom', tr('想自己寫一句靠近TA的話？寫在這…', 'Want to write your own words to get closer? Write it here…'))}
           </div>
         </article>
       </div>
 
       <p className="font-display italic text-center text-sm text-petal-muted mt-6 leading-relaxed">
-        工具是橋 — 一步步走，回到彼此身邊。
+        {tr('工具是橋 — 一步步走，回到彼此身邊。', 'These tools are bridges. Walk them step by step, back to each other.')}
       </p>
     </section>
 
@@ -1007,14 +1006,14 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
           {/* Top bar */}
           <div className="flex items-start justify-between mb-8">
             <div>
-              <div className="font-body text-[11px] uppercase tracking-[0.18em] text-amber-700 mb-1">— 暫停模式</div>
-              <div className="font-display text-xl text-petal-ink">冷靜連結模式</div>
+              <div className="font-body text-[11px] uppercase tracking-[0.18em] text-amber-700 mb-1">{tr('— 暫停模式', '— Pause mode')}</div>
+              <div className="font-display text-xl text-petal-ink">{tr('冷靜連結模式', 'Calm connection mode')}</div>
               <div className="font-body text-xs text-petal-muted mt-0.5">Step {pauseStep} / 4</div>
             </div>
             <button
               type="button"
               onClick={closePause}
-              aria-label="關閉"
+              aria-label={tr("關閉", 'Close')}
               className="text-petal-muted hover:text-petal-ink text-3xl leading-none p-2 -m-2"
             >
               ×
@@ -1025,10 +1024,10 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
           {pauseStep === 1 && (
             <div className="flex-1 flex flex-col">
               <h2 className="font-display text-2xl md:text-3xl font-light text-petal-ink leading-snug mb-2">
-                你現在比較像哪一種狀態？
+                {tr('你現在比較像哪一種狀態？', 'Which state are you closest to right now?')}
               </h2>
               <p className="font-body text-sm text-petal-ink-soft mb-8">
-                選一個最接近的。這一步不是分析，是讓情緒被命名。
+                {tr('選一個最接近的。這一步不是分析，是讓情緒被命名。', 'Pick the closest one. This isn\'t analysis; it\'s giving the feeling a name.')}
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 flex-1">
                 {EMOTION_OPTIONS.map((opt) => (
@@ -1055,18 +1054,18 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
           {pauseStep === 2 && selectedPhrase && (
             <div className="flex-1 flex flex-col">
               <div className="font-body text-xs uppercase tracking-[0.14em] text-petal-muted mb-3">
-                你選的狀態：{selectedPhrase.emoji} {selectedPhrase.label}
+                {tr('你選的狀態：', 'The state you chose: ')}{selectedPhrase.emoji} {selectedPhrase.label}
               </div>
               <h2 className="font-display text-2xl md:text-3xl font-light text-petal-ink leading-snug mb-2">
-                照念這句話給對方聽
+                {tr('照念這句話給對方聽', 'Read this sentence aloud to them')}
               </h2>
               <p className="font-body text-sm text-petal-ink-soft mb-8">
-                不用自己想，直接念。重點是把界線講清楚，又不切斷連結。
+                {tr('不用自己想，直接念。重點是把界線講清楚，又不切斷連結。', 'No need to think it up; just read it. The point is to make the boundary clear without cutting the connection.')}
               </p>
 
               <div className="bg-white border-2 border-amber-300 rounded-md p-6 md:p-8 mb-8 flex-1 flex items-center">
                 <p className="font-display text-xl md:text-2xl font-light text-petal-ink leading-relaxed text-center w-full">
-                  「{selectedPhrase.phrase}」
+                  {tr('「', '“')}{selectedPhrase.phrase}{tr('」', '”')}
                 </p>
               </div>
 
@@ -1076,14 +1075,14 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
                   onClick={() => setPauseStep(1)}
                   className="px-5 py-3 border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink rounded-md font-body text-sm transition-colors"
                 >
-                  ← 換一個情緒
+                  {tr('← 換一個情緒', '← Pick another feeling')}
                 </button>
                 <button
                   type="button"
                   onClick={enterTurnTaking}
                   className="flex-1 px-5 py-3 bg-amber-600 text-white rounded-md text-base font-medium hover:bg-amber-700 transition-colors"
                 >
-                  我念完了，開始輪流說 →
+                  {tr('我念完了，開始輪流說 →', 'I\'ve read it, start taking turns →')}
                 </button>
               </div>
             </div>
@@ -1093,20 +1092,20 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
           {pauseStep === 3 && (
             <div className="flex-1 flex flex-col">
               <div className="font-body text-xs uppercase tracking-[0.14em] text-petal-muted mb-2">
-                第 {pauseRound} 輪 / 共 2 輪
+                {tr('第', 'Round ')} {pauseRound} {tr('輪 / 共 2 輪', ' of 2')}
               </div>
               <h2 className="font-display text-2xl md:text-3xl font-light text-petal-ink leading-snug mb-1">
-                現在輪到：<span className="text-amber-700">{pauseRound === 1 ? 'A 方' : 'B 方'}</span> 說話
+                {tr('現在輪到：', 'Now speaking: ')}<span className="text-amber-700">{pauseRound === 1 ? tr('A 方', 'Partner A') : tr('B 方', 'Partner B')}</span> {tr('說話', '')}
               </h2>
               <p className="font-body text-sm text-petal-ink-soft mb-6">
                 {pauseRound === 1
-                  ? 'A 方＝剛剛選擇情緒的那位。另一方只能聽，不能打斷。'
-                  : 'B 方＝另一位。同樣只能聽，不能打斷。'}
+                  ? tr('A 方＝剛剛選擇情緒的那位。另一方只能聽，不能打斷。', 'Partner A = the one who just chose a feeling. The other only listens, no interrupting.')
+                  : tr('B 方＝另一位。同樣只能聽，不能打斷。', 'Partner B = the other one. Same rule: only listen, no interrupting.')}
               </p>
 
               {/* Timer */}
               <div className="bg-white border-2 border-amber-200 rounded-md p-6 mb-6 text-center">
-                <div className="font-body text-xs uppercase tracking-[0.14em] text-petal-muted mb-2">剩餘時間</div>
+                <div className="font-body text-xs uppercase tracking-[0.14em] text-petal-muted mb-2">{tr('剩餘時間', 'Time left')}</div>
                 <div className="font-display text-5xl md:text-6xl font-light text-amber-700 tabular-nums tracking-wide">
                   {formatTime(pauseSeconds)}
                 </div>
@@ -1121,24 +1120,24 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
               {/* Listener reactions */}
               <div className="flex-1">
                 <p className="font-body text-xs uppercase tracking-[0.14em] text-petal-muted mb-3 text-center">
-                  聆聽者只能回應 — 不能打斷
+                  {tr('聆聽者只能回應 — 不能打斷', 'The listener can only respond, not interrupt')}
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => handleListenerReact('我在聽')}
+                    onClick={() => handleListenerReact(tr('我在聽', 'I\'m listening'))}
                     className="bg-white border-2 border-petal-rule rounded-md p-4 hover:border-amber-400 hover:bg-amber-50/40 transition-colors text-petal-ink font-body text-base"
                   >
                     <span className="text-2xl mr-2" aria-hidden>👍</span>
-                    我在聽
+                    {tr('我在聽', 'I\'m listening')}
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleListenerReact('我理解你在努力說')}
+                    onClick={() => handleListenerReact(tr('我理解你在努力說', 'I can see you\'re trying hard to say this'))}
                     className="bg-white border-2 border-petal-rule rounded-md p-4 hover:border-amber-400 hover:bg-amber-50/40 transition-colors text-petal-ink font-body text-base"
                   >
                     <span className="text-2xl mr-2" aria-hidden>💛</span>
-                    我理解你在努力說
+                    {tr('我理解你在努力說', 'I can see you\'re trying hard to say this')}
                   </button>
                 </div>
                 {listenerNudge && (
@@ -1155,7 +1154,7 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
                   onClick={skipTurn}
                   className="font-body text-xs text-petal-muted hover:text-petal-ink transition-colors"
                 >
-                  {pauseRound === 1 ? '已經講完，換對方 →' : '已經講完，進入收尾 →'}
+                  {pauseRound === 1 ? tr('已經講完，換對方 →', 'Done talking, your turn →') : tr('已經講完，進入收尾 →', 'Done talking, wrap up →')}
                 </button>
               </div>
             </div>
@@ -1165,11 +1164,11 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
           {pauseStep === 4 && (
             <div className="flex-1 flex flex-col justify-center">
               <h2 className="font-display text-2xl md:text-3xl font-light text-petal-ink leading-snug mb-2 text-center">
-                你們做到了。
+                {tr('你們做到了。', 'You did it.')}
               </h2>
               <p className="font-body text-sm text-petal-ink-soft text-center mb-10 leading-relaxed">
-                不一定要現在解決所有事，<br />
-                能夠暫停、聽到彼此，已經是進展。
+                {tr('不一定要現在解決所有事，', 'You don\'t have to solve everything right now. ')}<br />
+                {tr('能夠暫停、聽到彼此，已經是進展。', 'Being able to pause and hear each other is already progress.')}
               </p>
 
               <div className="space-y-3">
@@ -1179,7 +1178,7 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
                   className="w-full px-5 py-4 bg-amber-600 text-white rounded-md text-base font-medium hover:bg-amber-700 transition-colors flex items-center justify-center gap-2"
                 >
                   <span className="text-xl" aria-hidden>🤝</span>
-                  我理解你現在的感覺
+                  {tr('我理解你現在的感覺', 'I understand how you feel right now')}
                 </button>
                 <button
                   type="button"
@@ -1187,7 +1186,7 @@ const ConflictView = ({ showNotification, partnerConnected, onNavigate, onCompos
                   className="w-full px-5 py-4 bg-white border-2 border-amber-300 text-amber-900 rounded-md text-base font-medium hover:bg-amber-50 transition-colors flex items-center justify-center gap-2"
                 >
                   <Pause className="w-4 h-4 fill-amber-700 text-amber-700" strokeWidth={1.5} />
-                  我們先暫停 10 分鐘
+                  {tr('我們先暫停 10 分鐘', 'Let\'s pause for 10 minutes')}
                 </button>
               </div>
             </div>

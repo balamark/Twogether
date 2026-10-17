@@ -3,6 +3,7 @@ import { Home, Heart, Sparkles, ShieldCheck, Send, StickyNote, TrendingUp, X, Lo
 import { apiService, type RelationshipSummary, type GoodwillGroup, type RelationshipCheckin } from '../services/api';
 import { daysSinceLastNudge } from './AchievementsView';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { tr, dateLocale } from '../i18n/tr';
 
 interface NotificationInput {
   type: 'success' | 'error' | 'info' | 'warning';
@@ -45,9 +46,9 @@ function rankNudges(
     if (tier >= 1) {
       out.push({
         kind: 'intimacy', severity: 1 + tier, emoji: '💗',
-        title: `已經 ${di} 天沒有親密了`,
-        body: tier >= 3 ? '主動關心一下另一半，給彼此一點靠近的時間吧。' : '找個時間靠近一下，重新連結彼此。',
-        cta: handlers.intimacy ? { label: '傳個親密邀請', action: handlers.intimacy } : null,
+        title: tr(`已經 ${di} 天沒有親密了`, `It's been ${di} days without intimacy`),
+        body: tier >= 3 ? tr('主動關心一下另一半，給彼此一點靠近的時間吧。', 'Reach out to your partner and make a little time to be close.') : tr('找個時間靠近一下，重新連結彼此。', 'Find a moment to be close and reconnect.'),
+        cta: handlers.intimacy ? { label: tr('傳個親密邀請', 'Send an intimacy invitation'), action: handlers.intimacy } : null,
       });
     }
   }
@@ -56,9 +57,9 @@ function rankNudges(
     const d = s.checkin.myLastDays;
     out.push({
       kind: 'checkin', severity: d === null ? 4 : d >= 14 ? 4 : 3, emoji: '🏡',
-      title: d === null ? '做第一次關係檢視' : '該做本週的關係檢視了',
-      body: '花兩分鐘為「信賴」與「奉獻」打個分數，照顧你們的關係之屋。',
-      cta: { label: '開始檢視', action: handlers.checkin },
+      title: d === null ? tr('做第一次關係檢視', 'Do your first relationship check') : tr('該做本週的關係檢視了', 'Time for this week\'s relationship check'),
+      body: tr('花兩分鐘為「信賴」與「奉獻」打個分數，照顧你們的關係之屋。', 'Take two minutes to rate "trust" and "commitment" and look after your relationship house.'),
+      cta: { label: tr('開始檢視', 'Start the check'), action: handlers.checkin },
     });
   }
 
@@ -66,9 +67,9 @@ function rankNudges(
   if (da !== null && da >= 7) {
     out.push({
       kind: 'appreciation', severity: da >= 14 ? 3 : 2, emoji: '🌱',
-      title: '存一筆好感吧',
-      body: '這陣子還沒對 TA 說一句欣賞的話。一句真誠的稱讚，就是替關係存好感。',
-      cta: { label: '寫一句稱讚', action: handlers.praise },
+      title: tr('存一筆好感吧', 'Make a goodwill deposit'),
+      body: tr('這陣子還沒對 TA 說一句欣賞的話。一句真誠的稱讚，就是替關係存好感。', 'You haven\'t said anything appreciative to them lately. One sincere compliment is a deposit in your relationship.'),
+      cta: { label: tr('寫一句稱讚', 'Write a compliment'), action: handlers.praise },
     });
   }
 
@@ -77,9 +78,9 @@ function rankNudges(
   if (neg > 0 && pos < neg * 5) {
     out.push({
       kind: 'goodwill', severity: pos <= neg ? 4 : 2, emoji: '⚖️',
-      title: '好感存款偏低',
-      body: `近兩週正向互動 ${pos} 次、衝突 ${neg} 次。多累積一些美好回憶，衝突會更好化解。`,
-      cta: { label: '寫一句稱讚', action: handlers.praise },
+      title: tr('好感存款偏低', 'Goodwill balance is low'),
+      body: tr(`近兩週正向互動 ${pos} 次、衝突 ${neg} 次。多累積一些美好回憶，衝突會更好化解。`, `Last 2 weeks: ${pos} positive interactions, ${neg} conflicts. Build up more good memories and conflicts get easier to resolve.`),
+      cta: { label: tr('寫一句稱讚', 'Write a compliment'), action: handlers.praise },
     });
   }
 
@@ -87,9 +88,9 @@ function rankNudges(
 }
 
 const SCORE_ROWS: { key: 'trust' | 'commitment' | 'connection'; label: string; hint: string }[] = [
-  { key: 'trust', label: '信賴', hint: '我相信 TA 會把我放在心上' },
-  { key: 'commitment', label: '奉獻', hint: '我們都願意為這段關係努力' },
-  { key: 'connection', label: '連結', hint: '最近我感覺和 TA 很靠近' },
+  { key: 'trust', label: tr('信賴', 'Trust'), hint: tr('我相信 TA 會把我放在心上', 'I believe they keep me in mind') },
+  { key: 'commitment', label: tr('奉獻', 'Commitment'), hint: tr('我們都願意為這段關係努力', 'We\'re both willing to work on this relationship') },
+  { key: 'connection', label: tr('連結', 'Connection'), hint: tr('最近我感覺和 TA 很靠近', 'Lately I feel close to them') },
 ];
 
 const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
@@ -169,8 +170,8 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
         className="w-full flex items-center gap-2 bg-petal-cream border border-petal-rule rounded-2xl px-4 py-3 mb-5 text-left hover:border-petal-ink transition-colors"
       >
         <Home className="w-4 h-4 text-petal-rose-deep" strokeWidth={1.5} />
-        <h3 className="font-display text-sm text-petal-ink">關係之屋</h3>
-        <span className="font-body text-[11px] text-petal-muted">經營信賴與奉獻</span>
+        <h3 className="font-display text-sm text-petal-ink">{tr('關係之屋', 'Relationship house')}</h3>
+        <span className="font-body text-[11px] text-petal-muted">{tr('經營信賴與奉獻', 'Build trust and commitment')}</span>
         <span className="ml-auto font-body text-xs text-petal-muted" aria-hidden="true">›</span>
       </button>
     );
@@ -180,13 +181,13 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
     <div className="bg-petal-cream border border-petal-rule rounded-2xl p-4 sm:p-5 mb-5" data-testid="relationship-dashboard">
       <div className="flex items-center gap-2 mb-3">
         <Home className="w-4 h-4 text-petal-rose-deep" strokeWidth={1.5} />
-        <h3 className="font-display text-base text-petal-ink">關係之屋</h3>
-        <span className="font-body text-[11px] text-petal-muted">經營信賴與奉獻</span>
+        <h3 className="font-display text-base text-petal-ink">{tr('關係之屋', 'Relationship house')}</h3>
+        <span className="font-body text-[11px] text-petal-muted">{tr('經營信賴與奉獻', 'Build trust and commitment')}</span>
         <button
           type="button"
           onClick={dismiss}
           data-testid="relationship-dashboard-dismiss"
-          aria-label="稍後再說"
+          aria-label={tr("稍後再說", 'Maybe later')}
           className="ml-auto p-1 rounded-full text-petal-muted hover:text-petal-ink transition-colors"
         >
           <X className="w-4 h-4" strokeWidth={1.5} />
@@ -219,8 +220,8 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
         </div>
       ) : (
         <div className="rounded-xl p-4 mb-3 bg-petal-sage/15 border border-petal-sage/40" data-testid="relationship-all-good">
-          <div className="font-body text-sm font-medium text-petal-ink">💛 你們的關係之屋很穩固</div>
-          <p className="font-body text-xs text-petal-ink-soft mt-0.5">繼續保持親密、欣賞與檢視的好習慣！</p>
+          <div className="font-body text-sm font-medium text-petal-ink">{tr('💛 你們的關係之屋很穩固', '💛 Your relationship house is solid')}</div>
+          <p className="font-body text-xs text-petal-ink-soft mt-0.5">{tr('繼續保持親密、欣賞與檢視的好習慣！', 'Keep up the good habits of closeness, appreciation and check-ins!')}</p>
         </div>
       )}
 
@@ -233,11 +234,11 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
             data-testid="goodwill-details-button"
             className="font-body text-[11px] text-petal-muted inline-flex items-center gap-1 hover:text-petal-ink"
           >
-            <TrendingUp className="w-3.5 h-3.5" /> 好感存款（近兩週）
-            <span className="underline underline-offset-2">明細</span>
+            <TrendingUp className="w-3.5 h-3.5" /> {tr('好感存款（近兩週）', 'Goodwill balance (last 2 weeks)')}
+            <span className="underline underline-offset-2">{tr('明細', 'Details')}</span>
           </button>
           <span className="font-body text-[11px] text-petal-ink">
-            正向 {pos} ＋ ／ 衝突 {neg} −
+            {tr('正向', 'Positive')} {pos} {tr('＋ ／ 衝突', ' + / Conflicts')} {neg} −
           </span>
         </div>
         <div className="h-2 rounded-full bg-petal-cream-2 overflow-hidden">
@@ -252,7 +253,7 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
           data-testid="goodwill-ratio-hint-toggle"
           className="font-body text-[10px] text-petal-muted mt-1 inline-flex items-center gap-1 hover:text-petal-ink"
         >
-          健康關係的正向：衝突約為 5：1
+          {tr('健康關係的正向：衝突約為 5：1', 'Healthy relationships: positive to conflict is about 5:1')}
           <HelpCircle className="w-3 h-3" strokeWidth={1.5} />
         </button>
         {ratioHint && (
@@ -260,9 +261,8 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
             className="mt-1.5 font-body text-[11px] text-petal-ink-soft leading-relaxed bg-petal-cream-2 rounded-md p-2.5"
             data-testid="goodwill-ratio-hint"
           >
-            心理學家 Gottman 的研究發現：穩定幸福的伴侶，平常的<span className="text-petal-ink">正向互動</span>
-            （稱讚、陪伴、親密、體貼）大約是<span className="text-petal-ink">負向互動</span>（爭執、冷漠）的 5 倍。
-            平時多存一點好感，吵架時才有本錢化解。點上方「明細」看是哪些事加分或扣分。
+            {tr('心理學家 Gottman 的研究發現：穩定幸福的伴侶，平常的', 'Psychologist Gottman\'s research found that in stable, happy couples, everyday ')}<span className="text-petal-ink">{tr('正向互動', 'positive interactions')}</span>
+            {tr('（稱讚、陪伴、親密、體貼）大約是', ' (compliments, time together, intimacy, care) outnumber ')}<span className="text-petal-ink">{tr('負向互動', 'negative interactions')}</span>{tr('（爭執、冷漠）的 5 倍。 平時多存一點好感，吵架時才有本錢化解。點上方「明細」看是哪些事加分或扣分。', ' (arguments, coldness) about 5 to 1. Build up goodwill day to day, and you\'ll have the reserves to resolve fights. Tap "Details" above to see what added or subtracted.')}
           </p>
         )}
       </div>
@@ -275,7 +275,7 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
           data-testid="relationship-checkin-button"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors font-body text-xs"
         >
-          <ShieldCheck className="w-3.5 h-3.5" /> 關係檢視
+          <ShieldCheck className="w-3.5 h-3.5" /> {tr('關係檢視', 'Relationship check')}
           {summary.checkin?.overdue && <span className="w-1.5 h-1.5 rounded-full bg-petal-rose-deep" />}
         </button>
         <button
@@ -284,14 +284,14 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
           data-testid="relationship-history-button"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors font-body text-xs"
         >
-          <History className="w-3.5 h-3.5" /> 檢視結果
+          <History className="w-3.5 h-3.5" /> {tr('檢視結果', 'Check results')}
         </button>
         <button
           type="button"
           onClick={onGoToWall}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors font-body text-xs"
         >
-          <Sparkles className="w-3.5 h-3.5" /> 稱讚 TA
+          <Sparkles className="w-3.5 h-3.5" /> {tr('稱讚 TA', 'Compliment them')}
         </button>
         {onNudgePartner && (
           <button
@@ -299,7 +299,7 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
             onClick={onNudgePartner}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors font-body text-xs"
           >
-            <Heart className="w-3.5 h-3.5" /> 親密邀請
+            <Heart className="w-3.5 h-3.5" /> {tr('親密邀請', 'Intimacy invitation')}
           </button>
         )}
       </div>
@@ -335,7 +335,7 @@ const GoodwillModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         <span className="font-body text-sm font-medium text-petal-ink">
           <span className={sign === '+' ? 'text-petal-sage-deep' : 'text-petal-rose-deep'}>{sign}</span> {g.label}
         </span>
-        <span className="font-body text-xs text-petal-muted">近兩週 {g.count}</span>
+        <span className="font-body text-xs text-petal-muted">{tr('近兩週', 'Last 2 weeks')} {g.count}</span>
       </div>
       <p className="font-body text-[11px] text-petal-muted mt-0.5">{g.why}</p>
       {g.items.length > 0 && (
@@ -343,7 +343,7 @@ const GoodwillModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           {g.items.map((it, i) => (
             <li key={i} className="font-body text-xs text-petal-ink-soft flex items-baseline gap-1.5">
               <span className="text-petal-muted">·</span>
-              <span className="truncate">{it.who ? `${it.who}：` : ''}{it.text}</span>
+              <span className="truncate">{it.who ? tr(`${it.who}：`, `${it.who}: `) : ''}{it.text}</span>
             </li>
           ))}
         </ul>
@@ -357,23 +357,23 @@ const GoodwillModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         <div className="flex items-start justify-between mb-1">
           <div className="flex items-center gap-2">
             <TrendingUp className="w-5 h-5 text-petal-rose-deep" />
-            <h3 className="text-lg font-serif text-petal-ink">好感存款明細</h3>
+            <h3 className="text-lg font-serif text-petal-ink">{tr('好感存款明細', 'Goodwill details')}</h3>
           </div>
-          <button type="button" onClick={onClose} className="text-petal-ink-soft hover:text-petal-ink" aria-label="關閉">
+          <button type="button" onClick={onClose} className="text-petal-ink-soft hover:text-petal-ink" aria-label={tr("關閉", 'Close')}>
             <X className="w-5 h-5" />
           </button>
         </div>
-        <p className="font-body text-xs text-petal-muted mb-4">近兩週哪些事讓好感加分或扣分。</p>
+        <p className="font-body text-xs text-petal-muted mb-4">{tr('近兩週哪些事讓好感加分或扣分。', 'What added to or subtracted from your goodwill over the last 2 weeks.')}</p>
         {!data ? (
-          <p className="text-center font-body text-sm text-petal-muted py-6">載入中…</p>
+          <p className="text-center font-body text-sm text-petal-muted py-6">{tr('載入中…', 'Loading…')}</p>
         ) : (
           <div className="space-y-4">
             <div className="space-y-2">
-              <div className="font-body text-xs font-medium text-petal-sage-deep">加分（＋）</div>
+              <div className="font-body text-xs font-medium text-petal-sage-deep">{tr('加分（＋）', 'Added (+)')}</div>
               {data.positive.map((g) => renderGroup(g, '+'))}
             </div>
             <div className="space-y-2">
-              <div className="font-body text-xs font-medium text-petal-rose-deep">扣分（−）</div>
+              <div className="font-body text-xs font-medium text-petal-rose-deep">{tr('扣分（−）', 'Subtracted (−)')}</div>
               {data.negative.map((g) => renderGroup(g, '−'))}
             </div>
           </div>
@@ -384,9 +384,9 @@ const GoodwillModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 };
 
 const PILLARS: { key: 'trust' | 'commitment' | 'connection'; label: string }[] = [
-  { key: 'trust', label: '信賴' },
-  { key: 'commitment', label: '奉獻' },
-  { key: 'connection', label: '連結' },
+  { key: 'trust', label: tr('信賴', 'Trust') },
+  { key: 'commitment', label: tr('奉獻', 'Commitment') },
+  { key: 'connection', label: tr('連結', 'Connection') },
 ];
 
 // View past 本週關係檢視 results — both partners' scores + notes over time.
@@ -403,27 +403,27 @@ const CheckinHistoryModal: React.FC<{ onClose: () => void }> = ({ onClose }) => 
         <div className="flex items-start justify-between mb-1">
           <div className="flex items-center gap-2">
             <History className="w-5 h-5 text-petal-rose-deep" />
-            <h3 className="text-lg font-serif text-petal-ink">關係檢視結果</h3>
+            <h3 className="text-lg font-serif text-petal-ink">{tr('關係檢視結果', 'Relationship check results')}</h3>
           </div>
-          <button type="button" onClick={onClose} className="text-petal-ink-soft hover:text-petal-ink" aria-label="關閉">
+          <button type="button" onClick={onClose} className="text-petal-ink-soft hover:text-petal-ink" aria-label={tr("關閉", 'Close')}>
             <X className="w-5 h-5" />
           </button>
         </div>
-        <p className="font-body text-xs text-petal-muted mb-4">你和另一半每次檢視的評分與留言（最近在前）。</p>
+        <p className="font-body text-xs text-petal-muted mb-4">{tr('你和另一半每次檢視的評分與留言（最近在前）。', 'The scores and notes from each check by you and your partner (latest first).')}</p>
         {!items ? (
-          <p className="text-center font-body text-sm text-petal-muted py-6">載入中…</p>
+          <p className="text-center font-body text-sm text-petal-muted py-6">{tr('載入中…', 'Loading…')}</p>
         ) : items.length === 0 ? (
-          <p className="text-center font-body text-sm text-petal-muted py-6">還沒有檢視紀錄，做一次檢視就會出現在這裡。</p>
+          <p className="text-center font-body text-sm text-petal-muted py-6">{tr('還沒有檢視紀錄，做一次檢視就會出現在這裡。', 'No checks yet. Do one and it\'ll show up here.')}</p>
         ) : (
           <div className="space-y-3">
             {items.map((c) => (
               <div key={c.id} className="bg-white border border-petal-rule rounded-md p-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-body text-sm font-medium text-petal-ink">
-                    {c.isMine ? '我' : c.nickname}
+                    {c.isMine ? tr('我', 'Me') : c.nickname}
                   </span>
                   <span className="font-body text-[11px] text-petal-muted">
-                    {new Date(c.createdAt).toLocaleDateString('zh-TW')}
+                    {new Date(c.createdAt).toLocaleDateString(dateLocale())}
                   </span>
                 </div>
                 <div className="grid grid-cols-3 gap-2 mb-1">
@@ -434,7 +434,7 @@ const CheckinHistoryModal: React.FC<{ onClose: () => void }> = ({ onClose }) => 
                     </div>
                   ))}
                 </div>
-                {c.note && <p className="font-body text-xs text-petal-ink-soft mt-1.5">「{c.note}」</p>}
+                {c.note && <p className="font-body text-xs text-petal-ink-soft mt-1.5">{tr('「', '“')}{c.note}{tr('」', '”')}</p>}
               </div>
             ))}
           </div>
@@ -457,16 +457,16 @@ const CheckinModal: React.FC<{
 
   const submit = async () => {
     if (!complete) {
-      showNotification({ type: 'warning', title: '還沒評分', message: '請為每個項目選一個分數（1–5）。' });
+      showNotification({ type: 'warning', title: tr('還沒評分', 'Not rated yet'), message: tr('請為每個項目選一個分數（1–5）。', 'Please choose a score (1–5) for each item.') });
       return;
     }
     setSaving(true);
     try {
       await apiService.submitCheckin({ ...scores, note: note.trim() || undefined });
-      showNotification({ type: 'success', title: '已記錄', message: '本週的關係檢視已儲存，謝謝你用心經營。' });
+      showNotification({ type: 'success', title: tr('已記錄', 'Saved'), message: tr('本週的關係檢視已儲存，謝謝你用心經營。', 'This week\'s relationship check is saved. Thanks for putting in the care.') });
       onSaved();
     } catch (err) {
-      showNotification({ type: 'error', title: '儲存失敗', message: err instanceof Error ? err.message : '請稍後再試' });
+      showNotification({ type: 'error', title: tr('儲存失敗', 'Couldn\'t save'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment') });
     } finally {
       setSaving(false);
     }
@@ -478,13 +478,13 @@ const CheckinModal: React.FC<{
         <div className="flex items-start justify-between mb-1">
           <div className="flex items-center gap-2">
             <Home className="w-5 h-5 text-petal-rose-deep" />
-            <h3 className="text-lg font-serif text-petal-ink">本週關係檢視</h3>
+            <h3 className="text-lg font-serif text-petal-ink">{tr('本週關係檢視', 'This week\'s relationship check')}</h3>
           </div>
-          <button type="button" onClick={onClose} className="text-petal-ink-soft hover:text-petal-ink" aria-label="關閉">
+          <button type="button" onClick={onClose} className="text-petal-ink-soft hover:text-petal-ink" aria-label={tr("關閉", 'Close')}>
             <X className="w-5 h-5" />
           </button>
         </div>
-        <p className="font-body text-xs text-petal-ink-soft mb-4">為這三個支柱打分（1 = 需要加油，5 = 很穩固）。只有你們倆看得到。</p>
+        <p className="font-body text-xs text-petal-ink-soft mb-4">{tr('為這三個支柱打分（1 = 需要加油，5 = 很穩固）。只有你們倆看得到。', 'Rate these three pillars (1 = needs work, 5 = rock solid). Only the two of you can see this.')}</p>
 
         <div className="space-y-4">
           {SCORE_ROWS.map((row) => (
@@ -518,7 +518,7 @@ const CheckinModal: React.FC<{
           value={note}
           onChange={(e) => setNote(e.target.value.slice(0, 1000))}
           rows={3}
-          placeholder="想對 TA 或對自己說的一句話（選填）…"
+          placeholder={tr("想對 TA 或對自己說的一句話（選填）…", 'Something you want to say to them or yourself (optional)…')}
           data-testid="checkin-note"
           className="w-full mt-4 p-3 rounded-md border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y text-sm"
         />
@@ -531,7 +531,7 @@ const CheckinModal: React.FC<{
           className="w-full mt-4 flex items-center justify-center gap-2 bg-petal-ink text-petal-cream py-3 rounded-md hover:bg-pink-700 transition-colors font-display italic disabled:opacity-60"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-          {saving ? '儲存中…' : '完成檢視'}
+          {saving ? tr('儲存中…', 'Saving…') : tr('完成檢視', 'Finish the check')}
         </button>
       </div>
     </div>

@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { AiResponseFeedbackInput } from '../services/api';
+import { tr } from '../i18n/tr';
 
 // A tiny 👍/👎 footer for AI-generated responses (情緒翻譯 / AI 諮商師). Thumb up
 // posts immediately (optimistic); thumb down opens an optional reason box and
@@ -74,7 +75,7 @@ const AiResponseFeedback: React.FC<Props> = ({
           className={`p-1 rounded-md transition-colors ${
             rated === 'up' ? 'bg-green-100 text-green-600' : 'text-petal-muted hover:bg-petal-cream-2'
           }`}
-          aria-label="這個回應很好"
+          aria-label={tr("這個回應很好", 'This response was good')}
         >
           <ThumbsUp className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
@@ -85,18 +86,18 @@ const AiResponseFeedback: React.FC<Props> = ({
           className={`p-1 rounded-md transition-colors ${
             rated === 'down' ? 'bg-rose-100 text-rose-600' : 'text-petal-muted hover:bg-petal-cream-2'
           }`}
-          aria-label="這個回應不通順或不合理"
+          aria-label={tr("這個回應不通順或不合理", 'This response was confusing or off')}
         >
           <ThumbsDown className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
-        {rated && <span className="font-body text-[11px] text-petal-muted ml-0.5">已回饋，謝謝！</span>}
+        {rated && <span className="font-body text-[11px] text-petal-muted ml-0.5">{tr('已回饋，謝謝！', 'Thanks for the feedback!')}</span>}
       </div>
       {downOpen && (
         <div className="mt-1.5 space-y-1.5">
           <textarea
             value={downText}
             onChange={(e) => setDownText(e.target.value)}
-            placeholder="哪裡不通順或不合理嗎？（選填，幫我們改進）"
+            placeholder={tr("哪裡不通順或不合理嗎？（選填，幫我們改進）", 'What felt confusing or off? (optional, helps us improve)')}
             rows={2}
             className="w-full p-2 font-body text-sm border border-petal-rule rounded-md focus:ring-1 focus:ring-petal-rose-deep resize-none"
           />
@@ -109,7 +110,7 @@ const AiResponseFeedback: React.FC<Props> = ({
               }}
               className="px-3 py-1 font-body text-xs text-petal-muted hover:text-petal-ink"
             >
-              取消
+              {tr('取消', 'Cancel')}
             </button>
             <button
               type="button"
@@ -117,7 +118,7 @@ const AiResponseFeedback: React.FC<Props> = ({
               onClick={submitDown}
               className="px-3 py-1 font-body text-xs rounded-md bg-petal-rose-deep text-white hover:opacity-90"
             >
-              送出
+              {tr('送出', 'Send')}
             </button>
           </div>
         </div>

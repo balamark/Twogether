@@ -11,6 +11,7 @@ import {
   type LoveLanguageCode,
   type LoveLanguageScores,
 } from '../data/loveLanguage';
+import { tr } from '../i18n/tr';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -98,10 +99,10 @@ const LoveLanguageView: React.FC<LoveLanguageViewProps> = ({ authState, showNoti
       setSaving(true);
       try {
         await apiService.saveAssessment(ASSESSMENT_TYPE, top, next);
-        showNotification({ type: 'success', title: '測驗完成', message: '你的愛之語已記錄在個人檔案。' });
+        showNotification({ type: 'success', title: tr('測驗完成', 'Quiz complete'), message: tr('你的愛之語已記錄在個人檔案。', 'Your love language has been saved to your profile.') });
       } catch (err) {
         const e = err as { message?: string };
-        showNotification({ type: 'error', title: '儲存失敗', message: e?.message || '結果無法儲存，但你仍可查看。' });
+        showNotification({ type: 'error', title: tr('儲存失敗', 'Couldn\'t save'), message: e?.message || tr('結果無法儲存，但你仍可查看。', 'Your result couldn\'t be saved, but you can still see it.') });
       } finally {
         setSaving(false);
       }
@@ -110,7 +111,7 @@ const LoveLanguageView: React.FC<LoveLanguageViewProps> = ({ authState, showNoti
   };
 
   if (phase === 'loading') {
-    return <div className="max-w-md mx-auto py-16 text-center font-body text-sm text-petal-muted">載入中…</div>;
+    return <div className="max-w-md mx-auto py-16 text-center font-body text-sm text-petal-muted">{tr('載入中…', 'Loading…')}</div>;
   }
 
   return (
@@ -156,13 +157,13 @@ const Intro: React.FC<{ onStart: () => void; isAuthenticated: boolean; onLogin: 
       <Heart className="w-6 h-6" strokeWidth={1.5} />
     </div>
     <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-      — 愛的語言
+      {tr('— 愛的語言', '— Love languages')}
     </div>
     <h2 className="font-display text-3xl font-light tracking-tight text-petal-ink mb-3">
-      你最渴望被愛的<em className="not-italic font-light italic text-pink-600">方式</em>
+      {tr('你最渴望被愛的', 'How you most long to ')}<em className="not-italic font-light italic text-pink-600">{tr('方式', 'be loved')}</em>
     </h2>
     <p className="font-body text-sm text-petal-ink-soft leading-relaxed max-w-sm mx-auto mb-8">
-      每個人渴望被愛的方式不同。花兩分鐘做完這個小測驗，了解你的「愛之語」，也讓另一半知道怎麼愛你最有感。
+      {tr('每個人渴望被愛的方式不同。花兩分鐘做完這個小測驗，了解你的「愛之語」，也讓另一半知道怎麼愛你最有感。', 'Everyone longs to be loved in a different way. Take this two-minute quiz to discover your love language, and let your partner know how to love you in the way that means the most.')}
     </p>
     <div className="grid grid-cols-5 gap-2 mb-8">
       {LOVE_LANGUAGE_ORDER.map((c) => (
@@ -178,13 +179,13 @@ const Intro: React.FC<{ onStart: () => void; isAuthenticated: boolean; onLogin: 
       className="inline-flex items-center gap-2 bg-petal-ink text-petal-cream px-7 py-3 rounded-md hover:bg-pink-700 transition-colors font-display italic text-base"
     >
       <Sparkles className="w-4 h-4" strokeWidth={1.5} />
-      開始測驗（15 題）
+      {tr('開始測驗（15 題）', 'Start the quiz (15 questions)')}
     </button>
     {!isAuthenticated && (
       <p className="font-body text-xs text-petal-muted mt-3">
-        想把結果存進個人檔案？
+        {tr('想把結果存進個人檔案？', 'Want to save your result to your profile?')}
         <button onClick={onLogin} className="text-pink-600 hover:text-pink-700 underline underline-offset-2 ml-1">
-          登入
+          {tr('登入', 'Sign in')}
         </button>
       </p>
     )}
@@ -207,7 +208,7 @@ const Quiz: React.FC<{ step: number; onChoose: (c: LoveLanguageCode) => void; on
           disabled={step === 0}
           className="inline-flex items-center gap-1 font-body text-sm text-petal-muted hover:text-petal-ink disabled:opacity-40"
         >
-          <ArrowLeft className="w-4 h-4" /> 上一題
+          <ArrowLeft className="w-4 h-4" /> {tr('上一題', 'Previous')}
         </button>
         <span className="font-body text-xs text-petal-muted">
           {step + 1} / {total}
@@ -247,7 +248,7 @@ const Result: React.FC<{
     <div data-testid="love-language-result">
       <div className="text-center mb-6">
         <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-          — 你的愛之語
+          {tr('— 你的愛之語', '— Your love language')}
         </div>
         <div className="text-5xl mb-2">{meta.emoji}</div>
         <h2 className="font-display text-3xl font-light text-petal-ink">{meta.label}</h2>
@@ -260,7 +261,7 @@ const Result: React.FC<{
 
       {/* Score breakdown */}
       <div className="bg-petal-cream border border-petal-rule rounded-md p-5 mb-4 space-y-2.5">
-        <div className="font-body text-xs text-petal-muted mb-1">完整分布</div>
+        <div className="font-body text-xs text-petal-muted mb-1">{tr('完整分布', 'Full breakdown')}</div>
         {LOVE_LANGUAGE_ORDER.map((c) => (
           <div key={c} className="flex items-center gap-2">
             <span className="font-body text-xs text-petal-ink w-20 shrink-0">
@@ -281,10 +282,10 @@ const Result: React.FC<{
       {partner && (
         <div className="bg-petal-rose-soft/25 border border-petal-rose-soft rounded-md p-5 mb-4">
           <div className="font-body text-xs text-petal-rose-deep mb-1">
-            {partner.nickname} 的愛之語是 {LOVE_LANGUAGES[partner.result].emoji} {LOVE_LANGUAGES[partner.result].label}
+            {partner.nickname} {tr('的愛之語是', '— love language:')} {LOVE_LANGUAGES[partner.result].emoji} {LOVE_LANGUAGES[partner.result].label}
           </div>
           <p className="font-body text-sm text-petal-ink leading-relaxed">
-            想讓 {partner.nickname} 感受到愛：{LOVE_LANGUAGES[partner.result].partnerTip}
+            {tr('想讓', 'To help ')} {partner.nickname} {tr('感受到愛：', ' feel loved:')}{LOVE_LANGUAGES[partner.result].partnerTip}
           </p>
         </div>
       )}
@@ -297,7 +298,7 @@ const Result: React.FC<{
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors font-body text-sm disabled:opacity-50"
         >
           <RotateCcw className="w-4 h-4" strokeWidth={1.5} />
-          重新測驗
+          {tr('重新測驗', 'Retake the quiz')}
         </button>
       </div>
     </div>
@@ -339,7 +340,7 @@ const LoveActions: React.FC<{
       setMine((p) => [wish, ...p]);
       setDraft('');
     } catch (err) {
-      showNotification({ type: 'error', title: '新增失敗', message: err instanceof Error ? err.message : '請稍後再試' });
+      showNotification({ type: 'error', title: tr('新增失敗', 'Couldn\'t add'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment') });
     } finally {
       setBusy(false);
     }
@@ -364,12 +365,12 @@ const LoveActions: React.FC<{
       {/* How to make the partner feel loved */}
       {partnerConnected && (
         <div className="bg-petal-rose-soft/20 border border-petal-rose-soft rounded-md p-5">
-          <h3 className="font-display text-base text-petal-ink mb-1">💞 怎麼讓 {partnerName} 感受到愛</h3>
+          <h3 className="font-display text-base text-petal-ink mb-1">{tr('💞 怎麼讓', '💞 How to help ')} {partnerName} {tr('感受到愛', ' feel loved')}</h3>
           {partner ? (
             <>
               <p className="font-body text-xs text-petal-muted mb-3">
-                {partnerName} 的愛之語是 {LOVE_LANGUAGES[partner.result].emoji}{' '}
-                {LOVE_LANGUAGES[partner.result].label}。做這些，幫你「賺」到 TA 的好感：
+                {partnerName} {tr('的愛之語是', '— love language:')} {LOVE_LANGUAGES[partner.result].emoji}{' '}
+                {LOVE_LANGUAGES[partner.result].label}{tr('。做這些，幫你「賺」到 TA 的好感：', '. Doing these earns you their affection:')}
               </p>
               <ul className="space-y-2">
                 {partnerActions.map((a) => (
@@ -383,7 +384,7 @@ const LoveActions: React.FC<{
                     <Sparkles className="w-3.5 h-3.5 text-petal-rose-deep mt-0.5 shrink-0" strokeWidth={1.5} />
                     {w.content}
                     <span className="font-body text-[10px] text-petal-muted border border-petal-rule rounded-full px-1.5 py-0.5 shrink-0">
-                      {partnerName} 提出
+                      {partnerName} {tr('提出', 'suggested by ')}
                     </span>
                   </li>
                 ))}
@@ -391,7 +392,7 @@ const LoveActions: React.FC<{
             </>
           ) : (
             <p className="font-body text-sm text-petal-ink-soft">
-              邀請 {partnerName} 一起做測驗，就能看到專屬 TA 的「愛的行動」建議。
+              {tr('邀請', 'Invite ')} {partnerName} {tr('一起做測驗，就能看到專屬 TA 的「愛的行動」建議。', ' to take the quiz too, and you\'ll see "acts of love" suggestions made just for them.')}
             </p>
           )}
         </div>
@@ -399,9 +400,9 @@ const LoveActions: React.FC<{
 
       {/* My own wishlist — propose what makes you feel loved */}
       <div className="bg-petal-cream border border-petal-rule rounded-md p-5">
-        <h3 className="font-display text-base text-petal-ink mb-1">🌟 我希望的方式</h3>
+        <h3 className="font-display text-base text-petal-ink mb-1">{tr('🌟 我希望的方式', '🌟 What I\'d love')}</h3>
         <p className="font-body text-xs text-petal-muted mb-3">
-          提出能讓你感受到愛的小事，{partnerConnected ? '另一半會看到。' : '配對後另一半會看到。'}
+          {tr('提出能讓你感受到愛的小事，', 'Suggest little things that make you feel loved. ')}{partnerConnected ? tr('另一半會看到。', 'Your partner will see them.') : tr('配對後另一半會看到。', 'Your partner will see them once you\'re paired.')}
         </p>
         <div className="flex gap-2 mb-3">
           <input
@@ -409,7 +410,7 @@ const LoveActions: React.FC<{
             value={draft}
             onChange={(e) => setDraft(e.target.value.slice(0, 200))}
             onKeyDown={(e) => e.key === 'Enter' && add()}
-            placeholder="例如：忙的時候傳一句「我想你」"
+            placeholder={tr("例如：忙的時候傳一句「我想你」", 'e.g. When I\'m busy, send me a quick "thinking of you"')}
             data-testid="love-wish-input"
             className="flex-1 p-2.5 rounded-md border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep text-sm"
           />
@@ -424,7 +425,7 @@ const LoveActions: React.FC<{
           </button>
         </div>
         {mine.length === 0 ? (
-          <p className="font-body text-xs text-petal-muted">還沒有項目。新增幾項，讓 TA 知道怎麼愛你最有感。</p>
+          <p className="font-body text-xs text-petal-muted">{tr('還沒有項目。新增幾項，讓 TA 知道怎麼愛你最有感。', 'Nothing here yet. Add a few so they know how to love you best.')}</p>
         ) : (
           <ul className="space-y-2">
             {mine.map((w) => (
@@ -433,7 +434,7 @@ const LoveActions: React.FC<{
                 <button
                   type="button"
                   onClick={() => remove(w.id)}
-                  aria-label="刪除"
+                  aria-label={tr("刪除", 'Delete')}
                   className="text-petal-muted hover:text-petal-rose-deep shrink-0"
                 >
                   <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />

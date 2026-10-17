@@ -3,6 +3,7 @@ import { Tag, CheckCircle2, Sprout, Lock, MessageSquareHeart } from 'lucide-reac
 import apiService, { type EventRecord, type EventStatus } from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
+import { tr } from '../i18n/tr';
 
 interface EventHistoryListProps {
   onOpenEvent: (id: string) => void;
@@ -16,10 +17,10 @@ interface EventHistoryListProps {
 // filter chip that can only ever match legacy rows is noise. Those rows still
 // list under 未解決 (see statusPill).
 const STATUS_OPTIONS: { value: EventStatus | 'all'; label: string }[] = [
-  { value: 'all', label: '全部' },
-  { value: 'open', label: '未解決' },
-  { value: 'closing', label: '收尾中' },
-  { value: 'resolved', label: '已解決' },
+  { value: 'all', label: tr('全部', 'All') },
+  { value: 'open', label: tr('未解決', 'Open') },
+  { value: 'closing', label: tr('收尾中', 'Wrapping up') },
+  { value: 'resolved', label: tr('已解決', 'Resolved') },
 ];
 
 function statusPill(status: EventStatus) {
@@ -28,19 +29,19 @@ function statusPill(status: EventStatus) {
     // reads as 未解決 — exactly how the detail view treats it too.
     case 'open':
     case 'resolve_pending':
-      return <span className="text-xs px-2 py-0.5 rounded-full bg-petal-rose/30 text-petal-ink">未解決</span>;
+      return <span className="text-xs px-2 py-0.5 rounded-full bg-petal-rose/30 text-petal-ink">{tr('未解決', 'Open')}</span>;
     case 'closing':
       return (
         <span className="text-xs px-2 py-0.5 rounded-full bg-petal-sage/20 text-petal-ink inline-flex items-center gap-1">
           <Sprout className="w-3 h-3" />
-          收尾中
+          {tr('收尾中', 'Wrapping up')}
         </span>
       );
     case 'resolved':
       return (
         <span className="text-xs px-2 py-0.5 rounded-full bg-petal-sage/30 text-petal-ink inline-flex items-center gap-1">
           <CheckCircle2 className="w-3 h-3" />
-          已解決
+          {tr('已解決', 'Resolved')}
         </span>
       );
   }
@@ -77,7 +78,7 @@ export default function EventHistoryList({
         if (!cancelled) setEvents(res.events);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : '無法取得對話列表');
+        if (!cancelled) setError(err instanceof Error ? err.message : tr('無法取得對話列表', 'Couldn\'t load conversations. Please try again in a moment.'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -88,7 +89,7 @@ export default function EventHistoryList({
   }, [status]);
 
   if (loading) {
-    return <div className="p-8 text-center text-petal-ink-soft">載入中…</div>;
+    return <div className="p-8 text-center text-petal-ink-soft">{tr('載入中…', 'Loading…')}</div>;
   }
   if (error) {
     return <div className="p-6 text-center text-red-500">{error}</div>;
@@ -127,14 +128,14 @@ export default function EventHistoryList({
             className="bg-white border border-petal-rule-soft rounded-2xl p-8 text-center text-petal-ink-soft"
             data-testid="events-filter-empty-state"
           >
-            <p className="text-petal-ink font-medium">目前沒有{activeLabel}的對話</p>
+            <p className="text-petal-ink font-medium">{tr('目前沒有', 'No ')}{activeLabel}{tr('的對話', ' conversations right now')}</p>
             <button
               type="button"
               data-testid="events-filter-reset"
               onClick={() => setStatus('all')}
               className="mt-4 px-4 py-2 rounded-full border border-petal-rule text-petal-ink text-sm font-medium hover:bg-petal-sage/20 transition"
             >
-              看全部
+              {tr('看全部', 'See all')}
             </button>
           </div>
         ) : (
@@ -143,10 +144,9 @@ export default function EventHistoryList({
             data-testid="events-empty-state"
           >
             <MessageSquareHeart className="w-8 h-8 mx-auto mb-3 text-petal-rose-deep" />
-            <p className="text-petal-ink font-medium">說不出口的委屈，寫在這裡</p>
+            <p className="text-petal-ink font-medium">{tr('說不出口的委屈，寫在這裡', 'What\'s hard to say out loud, write it here')}</p>
             <p className="text-xs mt-1.5 leading-relaxed max-w-xs mx-auto">
-              把當下的情緒原封不動寫下來（可以罵、可以很火），AI 會幫你整理成對方
-              聽得進去的說法，你挑一個版本再送出。
+              {tr('把當下的情緒原封不動寫下來（可以罵、可以很火），AI 會幫你整理成對方 聽得進去的說法，你挑一個版本再送出。', 'Write down how you feel exactly as it is (vent, be angry). The AI shapes it into words your partner can hear, and you pick a version before sending.')}
             </p>
             {onCompose && (
               <button
@@ -155,10 +155,10 @@ export default function EventHistoryList({
                 onClick={onCompose}
                 className="mt-4 px-4 py-2 rounded-full bg-petal-rose-deep text-white text-sm font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition"
               >
-                寫下第一件想說開的事
+                {tr('寫下第一件想說開的事', 'Write the first thing you want to talk through')}
               </button>
             )}
-            <p className="text-[11px] text-petal-muted mt-3">也可以只存成私人對話，對方不會看到。</p>
+            <p className="text-[11px] text-petal-muted mt-3">{tr('也可以只存成私人對話，對方不會看到。', 'You can also save it as a private note your partner won\'t see.')}</p>
           </div>
         )}
       </div>
@@ -180,9 +180,9 @@ export default function EventHistoryList({
             <h3 className="font-serif text-petal-ink truncate flex-1 leading-snug">{event.title}</h3>
             <div className="flex items-center gap-1.5 flex-shrink-0">
               {event.isPrivate && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-petal-ink/10 text-petal-ink inline-flex items-center gap-1" title="私人">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-petal-ink/10 text-petal-ink inline-flex items-center gap-1" title={tr("私人", 'Private')}>
                   <Lock className="w-3 h-3" />
-                  <span className="hidden sm:inline">私人</span>
+                  <span className="hidden sm:inline">{tr('私人', 'Private')}</span>
                 </span>
               )}
               {statusPill(event.status)}
@@ -193,7 +193,7 @@ export default function EventHistoryList({
                   data-testid="closure-your-turn-chip"
                   className="text-xs px-2 py-0.5 rounded-full bg-petal-rose-deep text-white font-medium"
                 >
-                  輪到你了
+                  {tr('輪到你了', 'Your turn')}
                 </span>
               )}
               {event.unreadCount > 0 && (
@@ -206,7 +206,7 @@ export default function EventHistoryList({
 
           <p className="text-xs text-petal-muted mt-1">
             {formatDate(event.createdAt, tz)}
-            {event.createdBy === currentUserId ? '・你發起' : '・伴侶發起'}
+            {event.createdBy === currentUserId ? tr('・你發起', '・Started by you') : tr('・伴侶發起', '・Started by your partner')}
           </p>
 
           {event.lastMessagePreview && (

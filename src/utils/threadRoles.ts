@@ -1,3 +1,5 @@
+import { tr } from '../i18n/tr';
+
 // Twogether 的對話視覺文法 —— 所有多方對話介面共用的單一來源。
 //
 //     位置辨識誰，Label 辨識角色，Component 辨識行為，顏色只做輔助。
@@ -105,6 +107,6 @@ export function bubbleClass(role: ThreadRole): string {
 
 // Luma 的顯示名稱。counselor / guide 是同一個人的兩種 mode，所以字尾不同、名字相同。
 export function counselorLabel(name: string | null | undefined, mode: CounselorMode = 'counselor'): string {
-  const suffix = mode === 'guide' ? '引導' : 'AI 諮商師';
+  const suffix = mode === 'guide' ? tr('引導', 'Guide') : tr('AI 諮商師', 'AI counselor');
   return name ? `${name}・${suffix}` : suffix;
 }

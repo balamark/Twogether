@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { tr } from '../i18n/tr';
 
 // The persistent switcher for the 對話 family. 對話 lands straight on 說開一件事
 // (its core); this thin sticky row is how you reach — and hop between — the
@@ -12,11 +13,11 @@ import React, { useEffect, useRef } from 'react';
 // on a 390px screen the current destination is always the one you can see.
 
 const DESTINATIONS: { key: string; label: string; testId: string }[] = [
-  { key: 'events', label: '說開一件事', testId: 'talk-events-entry' },
-  { key: 'conflict', label: '情緒檢查', testId: 'talk-conflict-entry' },
-  { key: 'roleplay', label: '角色扮演', testId: 'talk-roleplay-entry' },
-  { key: 'wall', label: '我們的牆', testId: 'talk-wall-entry' },
-  { key: 'therapists', label: '專業諮商師', testId: 'talk-therapists-entry' },
+  { key: 'events', label: tr('說開一件事', 'Talk it through'), testId: 'talk-events-entry' },
+  { key: 'conflict', label: tr('情緒檢查', 'Emotion check'), testId: 'talk-conflict-entry' },
+  { key: 'roleplay', label: tr('角色扮演', 'Role play'), testId: 'talk-roleplay-entry' },
+  { key: 'wall', label: tr('我們的牆', 'Our wall'), testId: 'talk-wall-entry' },
+  { key: 'therapists', label: tr('專業諮商師', 'Counselors'), testId: 'talk-therapists-entry' },
 ];
 
 interface TalkSwitcherProps {
@@ -47,7 +48,7 @@ const TalkSwitcher: React.FC<TalkSwitcherProps> = ({ current, onNavigate }) => {
         ref={scrollRef}
         className="no-scrollbar max-w-4xl mx-auto px-4 md:px-6 py-2 flex gap-2 overflow-x-auto"
         role="tablist"
-        aria-label="對話"
+        aria-label={tr("對話", 'Talk')}
       >
         {DESTINATIONS.map((d) => {
           const active = d.key === current;

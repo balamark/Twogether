@@ -4,6 +4,8 @@ import { apiService, type UploadProgressOptions, type WallPost, type WallPostCat
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { isVideoUrl, IMAGE_MAX_BYTES, VIDEO_MAX_BYTES, mediaLimitMb } from '../utils/script';
+import { tr } from '../i18n/tr';
+import { moodTagLabel } from '../content/moodTags';
 
 // A YouTube/Google-Photos-style circular upload indicator: the ring fills as
 // bytes go out, and — since large photos/videos can take a while — doubles as
@@ -29,7 +31,7 @@ const UploadProgressRing: React.FC<{ percent: number; indeterminate?: boolean; o
     <button
       type="button"
       onClick={onCancel}
-      aria-label={indeterminate ? '取消上傳（處理中）' : `取消上傳（已完成 ${clamped}%）`}
+      aria-label={indeterminate ? tr('取消上傳（處理中）', 'Cancel upload (processing)') : tr(`取消上傳（已完成 ${clamped}%）`, `Cancel upload (${clamped}% done)`)}
       data-testid="wall-composer-upload-cancel"
       className="relative w-11 h-11 min-w-[44px] min-h-[44px] flex-shrink-0 inline-flex items-center justify-center rounded-full group"
     >
@@ -208,11 +210,11 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
   const { run: handleSubmit, pending: submitting } = useAsyncAction(async () => {
     const totalMedia = existingMedia.length + newMedia.length;
     if (!content.trim() && totalMedia === 0) {
-      setError('請輸入內容，或至少上傳一張照片或影片');
+      setError(tr('請輸入內容，或至少上傳一張照片或影片', 'Please enter something, or upload at least one photo or video'));
       return;
     }
     if (content.length > MAX_CONTENT) {
-      setError(`內容不能超過 ${MAX_CONTENT} 字`);
+      setError(tr(`內容不能超過 ${MAX_CONTENT} 字`, `Content can't exceed ${MAX_CONTENT} characters`));
       return;
     }
     setError(null);
@@ -260,7 +262,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
       // A deliberate cancel via the progress ring — not a failure, so no red
       // error text. Draft + media stay in place so they can just hit 送出 again.
       if (code !== 'CANCELED') {
-        setError(err instanceof Error ? err.message : '發布失敗，請稍後再試');
+        setError(err instanceof Error ? err.message : tr('發布失敗，請稍後再試', 'Couldn\'t post. Please try again in a moment'));
       }
     } finally {
       abortControllerRef.current = null;
@@ -323,25 +325,25 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
     // Per-type size caps: videos may be larger than images (stored raw).
     const oversizeVideo = picked.find((f) => f.type.startsWith('video/') && f.size > VIDEO_MAX_BYTES);
     if (oversizeVideo) {
-      setError(`影片大小不能超過 ${mediaLimitMb(VIDEO_MAX_BYTES)}MB，請壓縮或改用較短的片段後再試。`);
+      setError(tr(`影片大小不能超過 ${mediaLimitMb(VIDEO_MAX_BYTES)}MB，請壓縮或改用較短的片段後再試。`, `Videos can't exceed ${mediaLimitMb(VIDEO_MAX_BYTES)}MB. Please compress it or use a shorter clip and try again.`));
       return;
     }
     const oversizeImage = picked.find((f) => !f.type.startsWith('video/') && f.size > IMAGE_MAX_BYTES);
     if (oversizeImage) {
-      setError(`每張照片大小不能超過 ${mediaLimitMb(IMAGE_MAX_BYTES)}MB，請壓縮後再試。`);
+      setError(tr(`每張照片大小不能超過 ${mediaLimitMb(IMAGE_MAX_BYTES)}MB，請壓縮後再試。`, `Each photo can't exceed ${mediaLimitMb(IMAGE_MAX_BYTES)}MB. Please compress it and try again.`));
       return;
     }
     const room = WALL_MAX_MEDIA - mediaCount;
     if (room <= 0) {
-      setError(`每則貼文最多 ${WALL_MAX_MEDIA} 個，先移除一個才能再加。`);
+      setError(tr(`每則貼文最多 ${WALL_MAX_MEDIA} 個，先移除一個才能再加。`, `Up to ${WALL_MAX_MEDIA} per post. Remove one before adding another.`));
       return;
     }
     setError(null);
     // Taking only what fits used to happen silently — the extra files just
     // vanished with no explanation. Say which ones didn't make it.
     if (picked.length > room) {
-      const dropped = picked.slice(room).map((f) => f.name).join('、');
-      setError(`每則貼文最多 ${WALL_MAX_MEDIA} 個，這次只加入了前 ${room} 個。未加入：${dropped}`);
+      const dropped = picked.slice(room).map((f) => f.name).join(tr('、', ', '));
+      setError(tr(`每則貼文最多 ${WALL_MAX_MEDIA} 個，這次只加入了前 ${room} 個。未加入：${dropped}`, `Up to ${WALL_MAX_MEDIA} per post, so only the first ${room} were added. Not added: ${dropped}`));
     }
     setNewMedia((prev) => [...prev, ...picked.slice(0, room)]);
   };
@@ -374,13 +376,13 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-petal-rule">
           <h2 className="font-display text-2xl font-light tracking-tight text-petal-ink">
-            {editingPost ? '編輯貼文' : '新貼文'}
+            {editingPost ? tr('編輯貼文', 'Edit post') : tr('新貼文', 'New post')}
           </h2>
           <button
             onClick={onClose}
             disabled={submitting}
             className="p-2.5 min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-md hover:bg-petal-cream-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            aria-label="關閉"
+            aria-label={tr("關閉", 'Close')}
           >
             <X className="w-5 h-5 text-petal-ink-soft" strokeWidth={1.5} />
           </button>
@@ -399,7 +401,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                 }`}
               >
                 <Sparkles className="w-3.5 h-3.5 mr-2 text-petal-rose-deep" strokeWidth={1.5} />
-                {showTemplates ? '從範本開始' : '沒靈感？看看範本'} ({examples.length})
+                {showTemplates ? tr('從範本開始', 'Start from a template') : tr('沒靈感？看看範本', 'No ideas? See templates')} ({examples.length})
                 <span className="ml-2 text-[10px]">{showTemplates ? '▾' : '▸'}</span>
               </button>
               {showTemplates && (
@@ -423,11 +425,11 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                       </div>
                       <div className="mt-2 flex items-center gap-2">
                         <span className="font-body text-[10px] uppercase tracking-[0.1em] text-petal-muted">
-                          {tpl.mood_tag}
+                          {moodTagLabel(tpl.mood_tag)}
                         </span>
                         {tpl.category === 'important' && (
                           <span className="font-body text-[10px] uppercase tracking-[0.1em] text-petal-rose-deep">
-                            重要
+                            {tr('重要', 'Important')}
                           </span>
                         )}
                       </div>
@@ -441,7 +443,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                     data-testid="wall-composer-templates-dismiss"
                     className="font-body text-[11px] text-petal-muted hover:text-petal-ink underline underline-offset-2"
                   >
-                    我自己寫就好，下次別自動展開
+                    {tr('我自己寫就好，下次別自動展開', 'I\'ll write my own, don\'t open this automatically next time')}
                   </button>
                 </div>
                 </>
@@ -451,26 +453,26 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
 
           <div>
             <label className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-2 block">
-              想說的話
+              {tr('想說的話', 'What you want to say')}
             </label>
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
               maxLength={MAX_CONTENT}
               rows={8}
-              placeholder="把想說的、想念的、需要的，留在這裡⋯"
+              placeholder={tr("把想說的、想念的、需要的，留在這裡⋯", 'Leave what you want to say, what you miss, what you need, here…')}
               className="w-full bg-white border border-petal-rule rounded-md px-4 py-3 font-body text-sm text-petal-ink placeholder:text-petal-muted leading-relaxed focus:outline-none focus:border-petal-rose-deep resize-y"
               data-testid="wall-composer-content"
             />
             <div className="mt-1 flex items-center justify-between font-body text-[11px] text-petal-muted">
-              <span>支援 Markdown（**粗體**、# 標題、- 清單、[連結]）</span>
+              <span>{tr('支援 Markdown（**粗體**、# 標題、- 清單、[連結]）', 'Markdown supported (**bold**, # heading, - list, [link])')}</span>
               <span>{content.length} / {MAX_CONTENT}</span>
             </div>
           </div>
 
           <div>
             <label className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-2 block">
-              照片／影片（可選，最多 {WALL_MAX_MEDIA} 個）
+              {tr('照片／影片（可選，最多', 'Photos / videos (optional, up to ')} {WALL_MAX_MEDIA} {tr('個）', ')')}
             </label>
             {/* A real button driving the input via ref, not a <label> wrapping
                 a `display: none` input. The nested-label form re-dispatches the
@@ -485,7 +487,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
               className="inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-md border border-petal-rule font-body text-sm text-petal-ink-soft transition-colors disabled:opacity-50 disabled:cursor-not-allowed enabled:hover:border-petal-rose-deep enabled:hover:text-petal-ink"
             >
               <ImagePlus className="w-4 h-4" strokeWidth={1.5} />
-              新增照片／影片
+              {tr('新增照片／影片', 'Add photos / videos')}
             </button>
             <input
               ref={fileInputRef}
@@ -498,9 +500,9 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
               data-testid="wall-composer-media-input"
             />
             <p className="mt-1 font-body text-[11px] text-petal-muted">
-              {atMediaCap && `已達 ${WALL_MAX_MEDIA} 個上限，先移除一個才能再加。`}
+              {atMediaCap && tr(`已達 ${WALL_MAX_MEDIA} 個上限，先移除一個才能再加。`, `Reached the limit of ${WALL_MAX_MEDIA}. Remove one before adding another.`)}
               {atMediaCap && <br />}
-              {`照片每張最大 ${mediaLimitMb(IMAGE_MAX_BYTES)}MB、影片最大 ${mediaLimitMb(VIDEO_MAX_BYTES)}MB`}
+              {tr(`照片每張最大 ${mediaLimitMb(IMAGE_MAX_BYTES)}MB、影片最大 ${mediaLimitMb(VIDEO_MAX_BYTES)}MB`, `Photos up to ${mediaLimitMb(IMAGE_MAX_BYTES)}MB each, videos up to ${mediaLimitMb(VIDEO_MAX_BYTES)}MB`)}
             </p>
 
             {mediaCount > 0 && (
@@ -513,15 +515,15 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                     {isVideoUrl(url) ? (
                       <video src={url} className="w-full h-full object-contain" muted loop playsInline autoPlay />
                     ) : (
-                      <img src={url} alt={`附件 ${idx + 1}`} className="w-full h-full object-contain" />
+                      <img src={url} alt={tr(`附件 ${idx + 1}`, `Attachment ${idx + 1}`)} className="w-full h-full object-contain" />
                     )}
                     {isVideoUrl(url) && (
-                      <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-body">影片</span>
+                      <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-body">{tr('影片', 'Video')}</span>
                     )}
                     <button
                       type="button"
                       onClick={() => removeExistingMedia(idx)}
-                      aria-label="移除"
+                      aria-label={tr("移除", 'Remove')}
                       className="absolute top-1 right-1 w-8 h-8 inline-flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
                     >
                       <X className="w-4 h-4" strokeWidth={2} />
@@ -538,15 +540,15 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                       {isVideo ? (
                         <video src={url} className="w-full h-full object-contain" muted loop playsInline autoPlay />
                       ) : (
-                        <img src={url} alt={`新附件 ${idx + 1}`} className="w-full h-full object-contain" />
+                        <img src={url} alt={tr(`新附件 ${idx + 1}`, `New attachment ${idx + 1}`)} className="w-full h-full object-contain" />
                       )}
                       {isVideo && (
-                        <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-body">影片</span>
+                        <span className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-black/60 text-white text-[9px] font-body">{tr('影片', 'Video')}</span>
                       )}
                       <button
                         type="button"
                         onClick={() => removeNewMedia(idx)}
-                        aria-label="移除"
+                        aria-label={tr("移除", 'Remove')}
                         className="absolute top-1 right-1 w-8 h-8 inline-flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80"
                       >
                         <X className="w-4 h-4" strokeWidth={2} />
@@ -560,7 +562,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
 
           <div>
             <label className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-2 block">
-              心情標籤（可選）
+              {tr('心情標籤（可選）', 'Mood tag (optional)')}
             </label>
             <div className="flex flex-wrap gap-1.5">
               {[...moodTags, ...customChips].map((tag) => {
@@ -576,7 +578,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                         : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
                     }`}
                   >
-                    {tag}
+                    {moodTagLabel(tag)}
                   </button>
                 );
               })}
@@ -598,7 +600,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                       setCustomInput('');
                     }
                   }}
-                  placeholder="自訂心情…"
+                  placeholder={tr("自訂心情…", 'Custom mood…')}
                   data-testid="wall-composer-custom-mood-input"
                   className="px-3.5 py-2 min-h-[40px] rounded-full border border-petal-ink bg-white font-body text-[13px] text-petal-ink placeholder:text-petal-muted focus:outline-none w-32"
                 />
@@ -610,7 +612,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                   className="inline-flex items-center gap-1 px-3.5 py-2 min-h-[40px] rounded-full border border-dashed border-petal-rule font-body text-[13px] text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors"
                 >
                   <Plus className="w-3 h-3" strokeWidth={2} />
-                  自訂
+                  {tr('自訂', 'Custom')}
                 </button>
               )}
             </div>
@@ -618,7 +620,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
 
           <div>
             <label className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-2 block">
-              類別
+              {tr('類別', 'Category')}
             </label>
             <div className="grid grid-cols-2 gap-3">
               <button
@@ -630,9 +632,9 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                     : 'bg-white border-petal-rule hover:border-petal-ink'
                 }`}
               >
-                <div className="font-display text-sm font-medium text-petal-ink">一般</div>
+                <div className="font-display text-sm font-medium text-petal-ink">{tr('一般', 'General')}</div>
                 <div className="font-body text-[11px] text-petal-muted mt-0.5">
-                  日常筆記、想念、心情
+                  {tr('日常筆記、想念、心情', 'Everyday notes, missing you, moods')}
                 </div>
               </button>
               <button
@@ -646,10 +648,10 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
               >
                 <div className="font-display text-sm font-medium text-petal-ink flex items-center">
                   <Star className="w-3.5 h-3.5 mr-1 text-petal-rose-deep" strokeWidth={1.5} />
-                  重要
+                  {tr('重要', 'Important')}
                 </div>
                 <div className="font-body text-[11px] text-petal-muted mt-0.5">
-                  會 pin 在最上面，提醒彼此
+                  {tr('會 pin 在最上面，提醒彼此', 'Pinned to the top as a reminder for you both')}
                 </div>
               </button>
             </div>
@@ -669,9 +671,9 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
               <div className="flex items-start gap-2.5">
                 <Lock className="w-4 h-4 mt-0.5 text-petal-ink-soft" strokeWidth={1.5} />
                 <div>
-                  <div className="font-display text-sm font-medium text-petal-ink">只有我看得到（私密）</div>
+                  <div className="font-display text-sm font-medium text-petal-ink">{tr('只有我看得到（私密）', 'Only I can see this (private)')}</div>
                   <div className="font-body text-[11px] text-petal-muted mt-0.5">
-                    {isPrivate ? '對方看不到這則貼文，也不會收到通知。' : '關閉時，貼文會分享給對方。'}
+                    {isPrivate ? tr('對方看不到這則貼文，也不會收到通知。', 'Your partner can\'t see this post and won\'t be notified.') : tr('關閉時，貼文會分享給對方。', 'When off, the post is shared with your partner.')}
                   </div>
                 </div>
               </div>
@@ -702,8 +704,8 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
             <div className="flex items-center gap-3" data-testid="wall-composer-upload-progress">
               <UploadProgressRing percent={uploadProgress} indeterminate={processingUpload} onCancel={cancelUpload} />
               <span className="font-body text-sm text-petal-ink-soft">
-                {processingUpload ? '處理中，快完成了…' : `上傳中… ${uploadProgress}%`}
-                <span className="block text-[11px] text-petal-muted">點擊圈圈可取消</span>
+                {processingUpload ? tr('處理中，快完成了…', 'Processing, almost done…') : tr(`上傳中… ${uploadProgress}%`, `Uploading… ${uploadProgress}%`)}
+                <span className="block text-[11px] text-petal-muted">{tr('點擊圈圈可取消', 'Tap the circle to cancel')}</span>
               </span>
             </div>
           ) : (
@@ -713,7 +715,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                 disabled={submitting}
                 className="px-4 py-2 rounded-md font-display italic text-sm text-petal-ink-soft hover:text-petal-ink transition-colors disabled:opacity-50"
               >
-                取消
+                {tr('取消', 'Cancel')}
               </button>
               <button
                 onClick={handleSubmit}
@@ -721,7 +723,7 @@ const WallPostComposer: React.FC<WallPostComposerProps> = ({
                 className="bg-petal-ink text-petal-cream px-5 py-2 rounded-md font-display italic text-sm hover:bg-pink-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="wall-composer-submit"
               >
-                {submitting ? '送出中…' : editingPost ? '儲存' : '發布'}
+                {submitting ? tr('送出中…', 'Sending…') : editingPost ? tr('儲存', 'Save') : tr('發布', 'Post')}
               </button>
             </>
           )}

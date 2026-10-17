@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ShieldCheck, Heart, MessageSquare } from 'lucide-react';
 import { apiService, type DedicatedTherapist } from '../services/api';
 import type { Notification } from './ErrorNotification';
+import { tr } from '../i18n/tr';
 
 // 你們的專屬心理師 — the couple-facing card at the top of the 心理諮商 tab. Shows
 // either a mini-onboarding empty state (pick one from the directory below) or the
@@ -45,12 +46,12 @@ const DedicatedTherapistPanel: React.FC<Props> = ({ reloadKey, isAuthenticated, 
       setDedicated({ ...dedicated, canComment: next });
       showNotification({
         type: 'success',
-        title: '已更新',
-        message: next ? '已允許心理師在牆與好好說話留言' : '已關閉心理師的留言權限',
+        title: tr('已更新', 'Updated'),
+        message: next ? tr('已允許心理師在牆與好好說話留言', 'Your therapist can now comment on your wall and conversations') : tr('已關閉心理師的留言權限', 'Therapist comments are turned off'),
         duration: 2800,
       });
     } catch (err) {
-      showNotification({ type: 'error', title: '更新失敗', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
+      showNotification({ type: 'error', title: tr('更新失敗', 'Couldn\'t update'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'), duration: 3500 });
     } finally {
       setBusy(false);
     }
@@ -62,9 +63,9 @@ const DedicatedTherapistPanel: React.FC<Props> = ({ reloadKey, isAuthenticated, 
       setBusy(true);
       await apiService.removeDedicatedTherapist();
       setDedicated(null);
-      showNotification({ type: 'success', title: '已解除', message: '已解除專屬心理師，他將無法再檢視你們的內容', duration: 3000 });
+      showNotification({ type: 'success', title: tr('已解除', 'Removed'), message: tr('已解除專屬心理師，他將無法再檢視你們的內容', 'Your dedicated therapist was removed and can no longer view your content'), duration: 3000 });
     } catch (err) {
-      showNotification({ type: 'error', title: '解除失敗', message: err instanceof Error ? err.message : '請稍後再試', duration: 3500 });
+      showNotification({ type: 'error', title: tr('解除失敗', 'Couldn\'t remove'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'), duration: 3500 });
     } finally {
       setBusy(false);
     }
@@ -80,15 +81,14 @@ const DedicatedTherapistPanel: React.FC<Props> = ({ reloadKey, isAuthenticated, 
         <div className="flex items-start gap-3" data-testid="dedicated-empty">
           <ShieldCheck className="w-5 h-5 text-pink-500 shrink-0 mt-0.5" strokeWidth={1.5} />
           <div>
-            <h3 className="font-display text-lg text-petal-ink">你們的專屬心理師</h3>
+            <h3 className="font-display text-lg text-petal-ink">{tr('你們的專屬心理師', 'Your dedicated therapist')}</h3>
             <p className="mt-1 font-body text-sm text-petal-ink-soft leading-relaxed">
-              指定一位諮商師成為你們的專屬心理師，他就能看見你們平常在
-              <strong className="text-petal-ink">「牆」</strong>與
-              <strong className="text-petal-ink">「好好說話」</strong>累積的內容，
-              更了解你們的關係脈絡。私密內容不會被看到，你們也可以隨時解除。
+              {tr('指定一位諮商師成為你們的專屬心理師，他就能看見你們平常在', 'Choose a counselor as your dedicated therapist and they can see what builds up on your ')}
+              <strong className="text-petal-ink">{tr('「牆」', 'wall')}</strong>{tr('與', ' and in ')}
+              <strong className="text-petal-ink">{tr('「好好說話」', 'Talk it through')}</strong>{tr('累積的內容， 更了解你們的關係脈絡。私密內容不會被看到，你們也可以隨時解除。', ', so they understand your relationship\'s context. Private content is never visible, and you can remove them any time.')}
             </p>
             <p className="mt-2 font-body text-xs text-petal-muted">
-              從下方名錄挑一位諮商師，點「完整檔案」即可設為專屬。
+              {tr('從下方名錄挑一位諮商師，點「完整檔案」即可設為專屬。', 'Pick a counselor from the directory below and tap "Full profile" to make them your dedicated therapist.')}
             </p>
           </div>
         </div>
@@ -112,25 +112,25 @@ const DedicatedTherapistPanel: React.FC<Props> = ({ reloadKey, isAuthenticated, 
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-pink-600">
-            你們的專屬心理師
+            {tr('你們的專屬心理師', 'Your dedicated therapist')}
           </div>
           <div className="flex items-baseline gap-2 flex-wrap mt-0.5">
             <h3 className="font-display text-xl text-petal-ink">{dedicated.displayName}</h3>
             {dedicated.title && <span className="font-body text-xs text-petal-muted">{dedicated.title}</span>}
           </div>
           <p className="mt-1.5 font-body text-xs text-petal-ink-soft leading-relaxed">
-            可檢視：你們的<strong>牆</strong>與<strong>好好說話</strong>（不含私密內容）
-            {dedicated.canComment ? '，並可在其中留言' : ''}。
+            {tr('可檢視：你們的', 'Can view: your ')}<strong>{tr('牆', 'wall')}</strong>{tr('與', ' and ')}<strong>{tr('好好說話', 'Talk it through')}</strong>{tr('（不含私密內容）', ' (excluding private content)')}
+            {dedicated.canComment ? tr('，並可在其中留言', ', and can comment there') : ''}{tr('。', '.')}
           </p>
 
           {/* 允許留言 toggle */}
           <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-pink-200 bg-petal-cream px-3 py-2">
             <div className="min-w-0">
               <div className="inline-flex items-center gap-1.5 font-body text-sm text-petal-ink">
-                <MessageSquare className="w-3.5 h-3.5 text-pink-500" strokeWidth={1.5} /> 允許心理師留言
+                <MessageSquare className="w-3.5 h-3.5 text-pink-500" strokeWidth={1.5} /> {tr('允許心理師留言', 'Allow therapist comments')}
               </div>
               <div className="font-body text-[11px] text-petal-muted mt-0.5">
-                開啟後，心理師可在你們的牆與好好說話回覆
+                {tr('開啟後，心理師可在你們的牆與好好說話回覆', 'When on, your therapist can reply on your wall and in Talk it through')}
               </div>
             </div>
             <button
@@ -160,7 +160,7 @@ const DedicatedTherapistPanel: React.FC<Props> = ({ reloadKey, isAuthenticated, 
               data-testid="dedicated-revoke"
               className="font-body text-xs text-petal-muted hover:text-petal-rose-deep underline underline-offset-2 disabled:opacity-50"
             >
-              解除專屬心理師
+              {tr('解除專屬心理師', 'Remove dedicated therapist')}
             </button>
           </div>
         </div>

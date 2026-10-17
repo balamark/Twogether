@@ -4,6 +4,7 @@ import { apiService } from '../services/api';
 import { AI_COMPANIONS, DEFAULT_COMPANION_ID, type AiCompanion } from '../utils/aiCompanions';
 import { NOT_A_SUBSTITUTE } from '../content/positioning';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { tr } from '../i18n/tr';
 
 // Selectable list of AI 諮商師 companions. Shared by the onboarding modal
 // (below) and the Settings「AI 諮商師」section.
@@ -17,7 +18,7 @@ export function AiCompanionList({
   disabled?: boolean;
 }) {
   return (
-    <div className="space-y-2" role="radiogroup" aria-label="選擇 AI 諮商師">
+    <div className="space-y-2" role="radiogroup" aria-label={tr("選擇 AI 諮商師", 'Choose an AI counselor')}>
       {AI_COMPANIONS.map((c: AiCompanion) => {
         const selected = c.id === selectedId;
         return (
@@ -40,7 +41,7 @@ export function AiCompanionList({
               <span className="font-medium text-petal-ink">{c.name}</span>
               {c.recommended && (
                 <span className="inline-flex items-center gap-0.5 text-[11px] px-2 py-0.5 rounded-full bg-petal-rose-deep text-white">
-                  <Star className="w-3 h-3" /> 推薦
+                  <Star className="w-3 h-3" /> {tr('推薦', 'Recommended')}
                 </span>
               )}
               <span className="text-xs text-petal-ink-soft">{c.tagline}</span>
@@ -119,7 +120,7 @@ export default function AiCompanionOnboarding({
       await apiService.updateAiCompanion(selectedId);
       onDone(selectedId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '儲存失敗，請稍後再試');
+      setError(err instanceof Error ? err.message : tr('儲存失敗，請稍後再試', 'Couldn\'t save. Please try again in a moment.'));
     } finally {
       setSaving(false);
     }
@@ -133,10 +134,10 @@ export default function AiCompanionOnboarding({
       >
         <div className="flex items-center gap-2 text-petal-rose-deep mb-1">
           <HeartHandshake className="w-5 h-5" />
-          <h2 className="font-display text-lg text-petal-ink">認識你的 AI 諮商師</h2>
+          <h2 className="font-display text-lg text-petal-ink">{tr('認識你的 AI 諮商師', 'Meet your AI counselor')}</h2>
         </div>
         <p className="text-sm text-petal-ink-soft mb-3">
-          選一位之後最常陪你們聊的 AI 諮商師。每一位的溝通風格不同，但都受過同樣的訓練：不選邊站、幫你們把話說開。之後隨時可以在「設定」裡更換。
+          {tr('選一位之後最常陪你們聊的 AI 諮商師。每一位的溝通風格不同，但都受過同樣的訓練：不選邊站、幫你們把話說開。之後隨時可以在「設定」裡更換。', 'Pick the AI counselor who\'ll talk with you most often. Each has a different style, but all share the same training: never take sides, and help you talk things through. You can change this any time in Settings.')}
         </p>
         <p className="text-xs text-petal-muted leading-relaxed mb-4 rounded-xl bg-petal-cream-2 border border-petal-rule px-3 py-2">
           {NOT_A_SUBSTITUTE}
@@ -153,7 +154,7 @@ export default function AiCompanionOnboarding({
             className="text-sm text-petal-muted hover:text-petal-ink px-2 py-2"
             data-testid="ai-companion-skip"
           >
-            稍後再說
+            {tr('稍後再說', 'Maybe later')}
           </button>
           <button
             type="button"
@@ -163,7 +164,7 @@ export default function AiCompanionOnboarding({
             className="px-6 py-2.5 rounded-full bg-petal-rose-deep text-white font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-2 disabled:opacity-50"
           >
             {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            繼續
+            {tr('繼續', 'Continue')}
           </button>
         </div>
       </div>

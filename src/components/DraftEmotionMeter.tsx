@@ -1,6 +1,7 @@
 import React from 'react';
 import { Gauge, Ear, Heart, Sparkles, X } from 'lucide-react';
 import type { DraftAnalysis } from '../services/api';
+import { tr } from '../i18n/tr';
 
 // The per-message emotion meter shown for a reply draft before it is sent.
 // Read-only diagnostic + a one-tap rewrite. Reuses petal styling.
@@ -20,16 +21,16 @@ const DraftEmotionMeter: React.FC<Props> = ({ analysis, onUseRewrite, onClose })
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-petal-rose-deep">
           <Gauge className="w-4 h-4" strokeWidth={1.5} />
-          <span className="font-display italic text-base">送出前，先看看這句話</span>
+          <span className="font-display italic text-base">{tr('送出前，先看看這句話', 'Before sending, take a look at this')}</span>
           {/* 冰山原則：看見這句話底下的情緒與需求，再決定要不要這樣送出。 */}
           <span className="font-body text-[10px] uppercase tracking-[0.14em] text-petal-rose-deep/70 border border-petal-rose-deep/25 rounded-full px-1.5 py-0.5">
-            冰山
+            {tr('冰山', 'Iceberg')}
           </span>
         </div>
         <button
           type="button"
           onClick={onClose}
-          aria-label="關閉"
+          aria-label={tr("關閉", 'Close')}
           data-testid="draft-emotion-meter-close"
           className="p-1 text-petal-muted hover:text-petal-ink transition-colors"
         >
@@ -40,7 +41,7 @@ const DraftEmotionMeter: React.FC<Props> = ({ analysis, onUseRewrite, onClose })
       {emotions.length > 0 && (
         <div>
           <div className="font-body text-[11px] font-medium uppercase tracking-[0.12em] text-petal-muted mb-1.5">
-            這句話底層的情緒
+            {tr('這句話底層的情緒', 'The feelings beneath these words')}
           </div>
           <div className="space-y-1.5">
             {emotions.map((e, i) => (
@@ -65,7 +66,7 @@ const DraftEmotionMeter: React.FC<Props> = ({ analysis, onUseRewrite, onClose })
         <div>
           <div className="flex items-center gap-1.5 font-body text-[11px] font-medium uppercase tracking-[0.12em] text-petal-muted mb-1.5">
             <Ear className="w-3.5 h-3.5" strokeWidth={1.5} />
-            對方可能聽成
+            {tr('對方可能聽成', 'They might hear it as')}
           </div>
           {partnerHears.misread && (
             <p className="font-body text-sm text-petal-ink leading-relaxed">
@@ -86,7 +87,7 @@ const DraftEmotionMeter: React.FC<Props> = ({ analysis, onUseRewrite, onClose })
         <div className="flex items-center gap-1.5">
           <Heart className="w-3.5 h-3.5 text-petal-rose-deep" strokeWidth={1.5} />
           <span className="font-body text-sm text-petal-ink">
-            你其實需要
+            {tr('你其實需要', 'What you really need')}
             <span className="ml-1 inline-flex items-center rounded-full bg-petal-rose-deep/10 text-petal-rose-deep text-[12px] px-2 py-0.5">
               {need}
             </span>
@@ -96,8 +97,8 @@ const DraftEmotionMeter: React.FC<Props> = ({ analysis, onUseRewrite, onClose })
 
       {rewrite && (
         <div className="rounded-xl border border-petal-rose-deep/25 bg-petal-cream-2 px-3 py-2.5">
-          <div className="font-body text-[11px] font-medium text-petal-rose-deep mb-1">試著這樣說</div>
-          <p className="font-body text-sm text-petal-ink leading-relaxed">「{rewrite}」</p>
+          <div className="font-body text-[11px] font-medium text-petal-rose-deep mb-1">{tr('試著這樣說', 'Try saying it like this')}</div>
+          <p className="font-body text-sm text-petal-ink leading-relaxed">{tr('「', '“')}{rewrite}{tr('」', '”')}</p>
           <button
             type="button"
             data-testid="draft-emotion-meter-use"
@@ -105,7 +106,7 @@ const DraftEmotionMeter: React.FC<Props> = ({ analysis, onUseRewrite, onClose })
             className="mt-2 inline-flex items-center gap-1.5 bg-petal-rose-deep text-white font-medium shadow-sm rounded-full px-3 py-1.5 font-body text-xs hover:opacity-90 active:scale-[0.98] transition"
           >
             <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
-            採用這句
+            {tr('採用這句', 'Use this')}
           </button>
         </div>
       )}

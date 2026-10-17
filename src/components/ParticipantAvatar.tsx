@@ -1,5 +1,6 @@
 import React from 'react';
 import { getCompanion } from '../utils/aiCompanions';
+import { tr } from '../i18n/tr';
 
 // A small circular avatar that makes each speaker in a multi-party conversation
 // identifiable at a glance. Humans get a stable color (hashed from a per-person
@@ -71,7 +72,7 @@ const ParticipantAvatar: React.FC<ParticipantAvatarProps> = ({
       <span
         className={`${base} bg-petal-rose-soft/50 border border-petal-rose-soft`}
         role="img"
-        aria-label={name || 'AI 諮商師'}
+        aria-label={name || tr('AI 諮商師', 'AI counselor')}
         data-testid="participant-avatar"
       >
         <span aria-hidden>{emoji}</span>
@@ -84,7 +85,7 @@ const ParticipantAvatar: React.FC<ParticipantAvatarProps> = ({
       <span
         className={`${base} bg-white border border-petal-rule`}
         role="img"
-        aria-label={name || '諮商師'}
+        aria-label={name || tr('諮商師', 'Counselor')}
         data-testid="participant-avatar"
       >
         <span aria-hidden>🩺</span>
@@ -98,7 +99,7 @@ const ParticipantAvatar: React.FC<ParticipantAvatarProps> = ({
       className={`${base} text-white font-medium`}
       style={{ backgroundColor: bg }}
       role="img"
-      aria-label={name || '參與者'}
+      aria-label={name || tr('參與者', 'Participant')}
       data-testid="participant-avatar"
     >
       <span aria-hidden>{firstGrapheme(name || '')}</span>

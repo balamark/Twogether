@@ -1,3 +1,5 @@
+import { tr } from '../i18n/tr';
+
 // Curated IANA timezone list shared by the Settings dropdown and the date formatter.
 // Keep in sync with lib/timezone-options.js (server-side validation).
 
@@ -8,17 +10,17 @@ export interface TimezoneOption {
 }
 
 export const TIMEZONE_OPTIONS: ReadonlyArray<TimezoneOption> = [
-  { value: 'Asia/Taipei',         label: '台北 (GMT+8)',     short: '台北' },
-  { value: 'Asia/Hong_Kong',      label: '香港 (GMT+8)',     short: '香港' },
-  { value: 'Asia/Shanghai',       label: '中國 (GMT+8)',     short: '上海' },
-  { value: 'Asia/Tokyo',          label: '東京 (GMT+9)',     short: '東京' },
-  { value: 'Asia/Seoul',          label: '首爾 (GMT+9)',     short: '首爾' },
-  { value: 'Asia/Singapore',      label: '新加坡 (GMT+8)',   short: '新加坡' },
-  { value: 'America/Los_Angeles', label: '美西 (PT)',        short: '美西' },
-  { value: 'America/New_York',    label: '美東 (ET)',        short: '美東' },
-  { value: 'Europe/London',       label: '倫敦 (GMT/BST)',   short: '倫敦' },
-  { value: 'Europe/Paris',        label: '歐陸 (CET)',       short: '歐陸' },
-  { value: 'Australia/Sydney',    label: '雪梨 (AET)',       short: '雪梨' },
+  { value: 'Asia/Taipei',         label: tr('台北 (GMT+8)', 'Taipei (GMT+8)'),     short: tr('台北', 'Taipei') },
+  { value: 'Asia/Hong_Kong',      label: tr('香港 (GMT+8)', 'Hong Kong (GMT+8)'),     short: tr('香港', 'Hong Kong') },
+  { value: 'Asia/Shanghai',       label: tr('中國 (GMT+8)', 'China (GMT+8)'),     short: tr('上海', 'Shanghai') },
+  { value: 'Asia/Tokyo',          label: tr('東京 (GMT+9)', 'Tokyo (GMT+9)'),     short: tr('東京', 'Tokyo') },
+  { value: 'Asia/Seoul',          label: tr('首爾 (GMT+9)', 'Seoul (GMT+9)'),     short: tr('首爾', 'Seoul') },
+  { value: 'Asia/Singapore',      label: tr('新加坡 (GMT+8)', 'Singapore (GMT+8)'),   short: tr('新加坡', 'Singapore') },
+  { value: 'America/Los_Angeles', label: tr('美西 (PT)', 'US Pacific (PT)'),        short: tr('美西', 'US Pacific') },
+  { value: 'America/New_York',    label: tr('美東 (ET)', 'US Eastern (ET)'),        short: tr('美東', 'US Eastern') },
+  { value: 'Europe/London',       label: tr('倫敦 (GMT/BST)', 'London (GMT/BST)'),   short: tr('倫敦', 'London') },
+  { value: 'Europe/Paris',        label: tr('歐陸 (CET)', 'Central Europe (CET)'),       short: tr('歐陸', 'Central Europe') },
+  { value: 'Australia/Sydney',    label: tr('雪梨 (AET)', 'Sydney (AET)'),       short: tr('雪梨', 'Sydney') },
 ];
 
 export function getTimezoneShortLabel(value: string): string {

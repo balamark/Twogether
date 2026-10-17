@@ -5,6 +5,7 @@ import { useAsyncAction } from '../hooks/useAsyncAction';
 import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
 import type { CoinGift } from '../App';
+import { tr } from '../i18n/tr';
 
 interface CoinShopViewProps {
   totalCoins: number;
@@ -71,26 +72,26 @@ const CoinShopView = ({
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
           <div>
             <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-              — 商店
+              {tr('— 商店', '— Shop')}
             </div>
             <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
-              金幣<em className="not-italic font-light italic text-pink-600">商店</em>
+              {tr('金幣', 'Coin')}<em className="not-italic font-light italic text-pink-600">{tr('商店', ' shop')}</em>
             </h2>
             <p className="font-display italic font-light text-base text-petal-muted">
-              用愛賺來的金幣，兌換特別禮品。
+              {tr('用愛賺來的金幣，兌換特別禮品。', 'Trade the coins you earned with love for special gifts.')}
             </p>
           </div>
           <div className="flex flex-col items-start md:items-end gap-2">
             <div className="font-display italic font-light text-2xl text-petal-ink">
               <Coins className="inline w-4 h-4 mr-1.5 text-petal-rose-deep" strokeWidth={1.5} />
-              <b className="not-italic font-medium">{totalCoins}</b> <span className="text-base text-petal-muted">枚</span>
+              <b className="not-italic font-medium">{totalCoins}</b> <span className="text-base text-petal-muted">{tr('枚', 'coins')}</span>
             </div>
             <button
               onClick={() => setShowAddGiftModal(true)}
               className="px-4 py-1.5 border border-petal-rule rounded-full text-xs font-body text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors flex items-center space-x-1.5"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>自訂禮品</span>
+              <span>{tr('自訂禮品', 'Custom gift')}</span>
             </button>
           </div>
         </div>
@@ -107,9 +108,9 @@ const CoinShopView = ({
 
             <div className="flex items-center justify-between mb-4">
               <span className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted">
-                {gift.category === 'service' ? '服務' :
-                 gift.category === 'experience' ? '體驗' :
-                 gift.category === 'physical' ? '實物' : '親密'}
+                {gift.category === 'service' ? tr('服務', 'Service') :
+                 gift.category === 'experience' ? tr('體驗', 'Experience') :
+                 gift.category === 'physical' ? tr('實物', 'Physical') : tr('親密', 'Intimate')}
               </span>
               <div className="font-display italic font-light text-base text-petal-ink">
                 <Coins className="inline w-3.5 h-3.5 mr-1 text-petal-rose-deep" strokeWidth={1.5} />
@@ -127,7 +128,7 @@ const CoinShopView = ({
               }`}
             >
               {purchasingId === gift.id && <Spinner />}
-              {totalCoins >= gift.cost ? (purchasingId === gift.id ? '兌換中…' : '立即兌換 →') : '金幣不足'}
+              {totalCoins >= gift.cost ? (purchasingId === gift.id ? tr('兌換中…', 'Redeeming…') : tr('立即兌換 →', 'Redeem now →')) : tr('金幣不足', 'Not enough coins')}
             </button>
           </div>
         ))}
@@ -138,7 +139,7 @@ const CoinShopView = ({
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-yellow-700">添加自訂禮品</h3>
+              <h3 className="text-xl font-bold text-yellow-700">{tr('添加自訂禮品', 'Add a custom gift')}</h3>
               <button
                 onClick={() => setShowAddGiftModal(false)}
                 className="text-gray-500 hover:text-gray-700"
@@ -150,7 +151,7 @@ const CoinShopView = ({
             <form onSubmit={submitGift} className="space-y-4">
               <div>
                 <label htmlFor="gift-title" className="block text-sm font-medium text-gray-700 mb-2">
-                  禮品名稱
+                  {tr('禮品名稱', 'Gift name')}
                 </label>
                 <input
                   id="gift-title"
@@ -159,14 +160,14 @@ const CoinShopView = ({
                   value={newGift.title}
                   onChange={(e) => setNewGift(prev => ({ ...prev, title: e.target.value }))}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500"
-                  placeholder="例如：按摩服務"
+                  placeholder={tr("例如：按摩服務", 'e.g. A massage')}
                   required
                 />
               </div>
 
               <div>
                 <label htmlFor="gift-description" className="block text-sm font-medium text-gray-700 mb-2">
-                  描述
+                  {tr('描述', 'Description')}
                 </label>
                 <textarea
                   id="gift-description"
@@ -174,7 +175,7 @@ const CoinShopView = ({
                   value={newGift.description}
                   onChange={(e) => setNewGift(prev => ({ ...prev, description: e.target.value }))}
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500"
-                  placeholder="詳細描述這個禮品"
+                  placeholder={tr("詳細描述這個禮品", 'Describe this gift in detail')}
                   rows={3}
                   required
                 />
@@ -183,7 +184,7 @@ const CoinShopView = ({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="gift-cost" className="block text-sm font-medium text-gray-700 mb-2">
-                    金幣價格
+                    {tr('金幣價格', 'Price in coins')}
                   </label>
                   <input
                     id="gift-cost"
@@ -200,7 +201,7 @@ const CoinShopView = ({
 
                 <div>
                   <label htmlFor="gift-icon" className="block text-sm font-medium text-gray-700 mb-2">
-                    圖示
+                    {tr('圖示', 'Icon')}
                   </label>
                   <input
                     id="gift-icon"
@@ -217,7 +218,7 @@ const CoinShopView = ({
 
               <div>
                 <label htmlFor="gift-category" className="block text-sm font-medium text-gray-700 mb-2">
-                  類別
+                  {tr('類別', 'Category')}
                 </label>
                 <select
                   id="gift-category"
@@ -227,20 +228,20 @@ const CoinShopView = ({
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500"
                   required
                 >
-                  <option value="service">服務</option>
-                  <option value="experience">體驗</option>
-                  <option value="physical">實物</option>
-                  <option value="intimate">親密</option>
+                  <option value="service">{tr('服務', 'Service')}</option>
+                  <option value="experience">{tr('體驗', 'Experience')}</option>
+                  <option value="physical">{tr('實物', 'Physical')}</option>
+                  <option value="intimate">{tr('親密', 'Intimate')}</option>
                 </select>
               </div>
 
               <Button
                 type="submit"
                 loading={addingGift}
-                loadingText="添加中…"
+                loadingText={tr("添加中…", 'Adding…')}
                 className="w-full py-3 text-base"
               >
-                添加禮品
+                {tr('添加禮品', 'Add gift')}
               </Button>
             </form>
           </div>

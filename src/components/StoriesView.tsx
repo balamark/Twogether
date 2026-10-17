@@ -8,6 +8,7 @@ import MyStories from './MyStories';
 import PublicQaView from './PublicQaView';
 import PollsView from './PollsView';
 import InfoHint from './InfoHint';
+import { tr } from '../i18n/tr';
 
 // 真實故事 main tab: the public-facing community surface. Sub-tabs:
 // 智慧故事 (guided-template story archive, new) / 公開問答 (moved here from
@@ -53,8 +54,8 @@ export default function StoriesView({
   const requireLoginForCompose = () => {
     showNotification({
       type: 'info',
-      title: '請先登入',
-      message: '註冊或登入後就能分享你們的故事，單人（還沒配對）也可以發表',
+      title: tr('請先登入', 'Please sign in'),
+      message: tr('註冊或登入後就能分享你們的故事，單人（還沒配對）也可以發表', 'Sign up or sign in to share your story. Solo users (not yet paired) can post too'),
     });
     setShowAuthModal(true);
   };
@@ -68,14 +69,14 @@ export default function StoriesView({
     <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-5" data-testid="stories-view">
       <header className="text-center">
         <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-          — 社群
+          {tr('— 社群', '— Community')}
         </div>
         <h2 className="font-display text-3xl md:text-4xl font-light tracking-tight text-petal-ink leading-[1.1] mb-2">
-          真實<em className="not-italic italic text-pink-600">故事</em>
+          {tr('真實', 'Real')}<em className="not-italic italic text-pink-600">{tr('故事', 'stories')}</em>
           <span className="align-middle ml-2"><InfoHint viewId="stories" /></span>
         </h2>
         <p className="font-display italic font-light text-base text-petal-muted">
-          把你們最難的時刻、讀過的好文，變成幫助其他伴侶的智慧。
+          {tr('把你們最難的時刻、讀過的好文，變成幫助其他伴侶的智慧。', 'Turn your hardest moments and the best things you\'ve read into wisdom for other couples.')}
         </p>
       </header>
 
@@ -90,7 +91,7 @@ export default function StoriesView({
               tab === 'wisdom' ? 'bg-petal-ink text-petal-cream' : 'text-petal-ink-soft hover:text-petal-ink'
             }`}
           >
-            <BookOpen className="w-3.5 h-3.5" strokeWidth={1.5} /> 好文 · 故事
+            <BookOpen className="w-3.5 h-3.5" strokeWidth={1.5} /> {tr('好文 · 故事', 'Reads & stories')}
           </button>
           <button
             type="button"
@@ -100,7 +101,7 @@ export default function StoriesView({
               tab === 'polls' ? 'bg-petal-ink text-petal-cream' : 'text-petal-ink-soft hover:text-petal-ink'
             }`}
           >
-            <Vote className="w-3.5 h-3.5" strokeWidth={1.5} /> 大家怎麼做
+            <Vote className="w-3.5 h-3.5" strokeWidth={1.5} /> {tr('大家怎麼做', 'What would you do')}
           </button>
           <button
             type="button"
@@ -110,7 +111,7 @@ export default function StoriesView({
               tab === 'qa' ? 'bg-petal-ink text-petal-cream' : 'text-petal-ink-soft hover:text-petal-ink'
             }`}
           >
-            <Globe className="w-3.5 h-3.5" strokeWidth={1.5} /> 公開問答
+            <Globe className="w-3.5 h-3.5" strokeWidth={1.5} /> {tr('公開問答', 'Public Q&A')}
           </button>
           {authState.isAuthenticated && (
             <button
@@ -121,7 +122,7 @@ export default function StoriesView({
                 tab === 'mine' ? 'bg-petal-ink text-petal-cream' : 'text-petal-ink-soft hover:text-petal-ink'
               }`}
             >
-              <UserIcon className="w-3.5 h-3.5" strokeWidth={1.5} /> 我的故事
+              <UserIcon className="w-3.5 h-3.5" strokeWidth={1.5} /> {tr('我的故事', 'My stories')}
             </button>
           )}
         </div>
@@ -146,7 +147,7 @@ export default function StoriesView({
 
       {tab === 'wisdom' && wisdomView.kind === 'compose-choose' && (
         <div className="space-y-3" data-testid="stories-compose-choose">
-          <p className="text-center text-sm text-petal-ink-soft">你想分享哪一種？</p>
+          <p className="text-center text-sm text-petal-ink-soft">{tr('你想分享哪一種？', 'What would you like to share?')}</p>
           <button
             type="button"
             data-testid="compose-choose-story"
@@ -154,10 +155,10 @@ export default function StoriesView({
             className="w-full text-left rounded-2xl border border-petal-rule bg-white hover:border-petal-rose p-4 transition"
           >
             <div className="flex items-center justify-between">
-              <span className="font-medium text-petal-ink">分享你們的故事</span>
+              <span className="font-medium text-petal-ink">{tr('分享你們的故事', 'Share your story')}</span>
               <ArrowRight className="w-4 h-4 text-petal-muted" />
             </div>
-            <p className="text-xs text-petal-ink-soft mt-1">依 6 個引導步驟，寫下你們走過的一段真實經歷。</p>
+            <p className="text-xs text-petal-ink-soft mt-1">{tr('依 6 個引導步驟，寫下你們走過的一段真實經歷。', 'Write about a real experience you went through, in 6 guided steps.')}</p>
           </button>
           <button
             type="button"
@@ -168,11 +169,11 @@ export default function StoriesView({
             <div className="flex items-center justify-between">
               <span className="font-medium text-petal-ink inline-flex items-center gap-1.5">
                 <FileText className="w-4 h-4 text-petal-rose-deep" />
-                分享一篇好文章
+                {tr('分享一篇好文章', 'Share an article')}
               </span>
               <ArrowRight className="w-4 h-4 text-petal-muted" />
             </div>
-            <p className="text-xs text-petal-ink-soft mt-1">看到對關係有幫助的好文？純文字貼上，分享給其他伴侶。</p>
+            <p className="text-xs text-petal-ink-soft mt-1">{tr('看到對關係有幫助的好文？純文字貼上，分享給其他伴侶。', 'Found something helpful for relationships? Paste the text and share it with other couples.')}</p>
           </button>
           <div className="flex justify-start pt-1">
             <button
@@ -181,7 +182,7 @@ export default function StoriesView({
               className="px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
-              返回
+              {tr('返回', 'Back')}
             </button>
           </div>
         </div>

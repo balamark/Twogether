@@ -1,6 +1,7 @@
 import { Sprout, Sparkles, Loader2 } from 'lucide-react';
 import type { EventClosure } from '../../services/api';
 import CommitmentCard from './CommitmentCard';
+import { tr } from '../../i18n/tr';
 
 // Screen 6 — the resolved-event summary. Sibling of TherapyNoteCard: same
 // shell, different content. Shows both commitments (server has revealed the
@@ -20,8 +21,8 @@ export default function ClosureSummaryCard({
   retryingInsight: boolean;
   onRetryInsight: () => void;
 }) {
-  const myLabel = myNickname || '我';
-  const partnerLabel = partnerNickname || '對方';
+  const myLabel = myNickname || tr('我', 'Me');
+  const partnerLabel = partnerNickname || tr('對方', 'Partner');
   const myCommitment = closure.me.commitment;
   const partnerCommitment = closure.partner.commitment;
   // Both skipped: there are no commitments, so writeClosureInsight bails with
@@ -37,10 +38,10 @@ export default function ClosureSummaryCard({
       >
         <div className="flex items-center gap-2">
           <Sprout className="w-4 h-4 text-petal-sage-deep" />
-          <h4 className="font-serif text-petal-ink text-base">這次你們都先跳過了</h4>
+          <h4 className="font-serif text-petal-ink text-base">{tr('這次你們都先跳過了', 'You both skipped this time')}</h4>
         </div>
         <p className="text-sm text-petal-ink-soft leading-relaxed" data-testid="closure-both-skipped">
-          這次你們都先跳過了，隨時可以重新開啟討論再補上約定。
+          {tr('這次你們都先跳過了，隨時可以重新開啟討論再補上約定。', 'You both skipped this time. You can reopen the conversation any time to add commitments.')}
         </p>
       </div>
     );
@@ -53,7 +54,7 @@ export default function ClosureSummaryCard({
     >
       <div className="flex items-center gap-2">
         <Sprout className="w-4 h-4 text-petal-sage-deep" />
-        <h4 className="font-serif text-petal-ink text-base">你們一起定下的下一步</h4>
+        <h4 className="font-serif text-petal-ink text-base">{tr('你們一起定下的下一步', 'Your next steps, decided together')}</h4>
       </div>
 
       <div className="space-y-2">
@@ -77,7 +78,7 @@ export default function ClosureSummaryCard({
 
       {closure.sharedDecision && (
         <div className="bg-white border border-petal-sage/40 rounded-xl p-3">
-          <p className="text-xs text-petal-ink-soft mb-1">我們一起決定</p>
+          <p className="text-xs text-petal-ink-soft mb-1">{tr('我們一起決定', 'We decided together')}</p>
           <p className="text-sm text-petal-ink">{closure.sharedDecision}</p>
           {closure.sharedDecisionNote && (
             <p className="text-xs text-petal-ink-soft border-l-2 border-petal-rose/50 pl-2 mt-1">
@@ -90,7 +91,7 @@ export default function ClosureSummaryCard({
       <div className="bg-white border border-petal-sage/40 rounded-xl p-3">
         <p className="text-xs text-petal-ink-soft inline-flex items-center gap-1 mb-1">
           <Sparkles className="w-3 h-3 text-petal-sage-deep" />
-          小小的觀察
+          {tr('小小的觀察', 'A small observation')}
         </p>
         {closure.insight ? (
           <p
@@ -101,7 +102,7 @@ export default function ClosureSummaryCard({
           </p>
         ) : (
           <div className="flex items-center justify-between gap-2">
-            <p className="text-sm text-petal-ink-soft">見解暫時沒能產生，你可以再試一次。</p>
+            <p className="text-sm text-petal-ink-soft">{tr('見解暫時沒能產生，你可以再試一次。', 'The insight couldn\'t be generated this time. You can try again.')}</p>
             <button
               type="button"
               disabled={retryingInsight}
@@ -109,7 +110,7 @@ export default function ClosureSummaryCard({
               className="text-xs px-3 py-1.5 rounded-full bg-petal-sage-deeper text-white font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
             >
               {retryingInsight ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-              再試一次
+              {tr('再試一次', 'Try again')}
             </button>
           </div>
         )}

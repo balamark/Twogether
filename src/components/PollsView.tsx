@@ -3,6 +3,7 @@ import { Users, MessageCircle, Loader2, Send, Flag, ChevronDown, ChevronUp } fro
 import { apiService, type CommunityPoll, type PollVoice } from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatRelativeOrDate } from '../utils/datetime';
+import { tr } from '../i18n/tr';
 
 // 真實情侶會怎麼做: open-ended scenario polls. Vote among options, see the
 // split, and leave a short 心聲. Public read; write actions prompt sign-in.
@@ -40,7 +41,7 @@ function PollCard({
 
   const vote = async (optionId: string) => {
     if (!isAuthenticated) {
-      showNotification({ type: 'info', title: '請先登入', message: '登入後就能投票、留下你的心聲' });
+      showNotification({ type: 'info', title: tr('請先登入', 'Please sign in'), message: tr('登入後就能投票、留下你的心聲', 'Sign in to vote and share your thoughts') });
       onRequireLogin();
       return;
     }
@@ -67,7 +68,7 @@ function PollCard({
       setPoll((p) => ({ ...updated, voiceCount: p.voiceCount, voices: p.voices }));
     } catch (err) {
       setPoll(prev);
-      showNotification({ type: 'error', title: '投票失敗', message: err instanceof Error ? err.message : '請稍後再試' });
+      showNotification({ type: 'error', title: tr('投票失敗', 'Couldn\'t vote'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment') });
     } finally {
       setVoting(false);
     }
@@ -91,7 +92,7 @@ function PollCard({
 
   const sendVoice = async () => {
     if (!isAuthenticated) {
-      showNotification({ type: 'info', title: '請先登入', message: '登入後就能留下你的心聲' });
+      showNotification({ type: 'info', title: tr('請先登入', 'Please sign in'), message: tr('登入後就能留下你的心聲', 'Sign in to share your thoughts') });
       onRequireLogin();
       return;
     }
@@ -104,7 +105,7 @@ function PollCard({
       setPoll((p) => ({ ...p, voiceCount: (p.voiceCount || 0) + 1 }));
       setVoiceText('');
     } catch (err) {
-      showNotification({ type: 'error', title: '送出失敗', message: err instanceof Error ? err.message : '請稍後再試' });
+      showNotification({ type: 'error', title: tr('送出失敗', 'Couldn\'t send'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment') });
     } finally {
       setSendingVoice(false);
     }
@@ -119,10 +120,10 @@ function PollCard({
     reportedRef.current.add(voiceId);
     try {
       await apiService.reportPollVoice(voiceId, 'inappropriate');
-      showNotification({ type: 'success', title: '已收到你的檢舉', message: '我們會盡快處理' });
+      showNotification({ type: 'success', title: tr('已收到你的檢舉', 'Report received'), message: tr('我們會盡快處理', 'We\'ll look into it as soon as possible') });
     } catch (err) {
       reportedRef.current.delete(voiceId); // allow retry on failure
-      showNotification({ type: 'error', title: '檢舉失敗', message: err instanceof Error ? err.message : '請稍後再試' });
+      showNotification({ type: 'error', title: tr('檢舉失敗', 'Couldn\'t report'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment') });
     }
   };
 
@@ -166,7 +167,7 @@ function PollCard({
       </div>
 
       <div className="flex items-center gap-3 mt-3 text-[11px] text-petal-muted">
-        <span className="inline-flex items-center gap-1"><Users className="w-3 h-3" />{poll.totalVotes} 人投票</span>
+        <span className="inline-flex items-center gap-1"><Users className="w-3 h-3" />{poll.totalVotes} {tr('人投票', ' votes')}</span>
         <button
           type="button"
           data-testid="poll-voices-toggle"
@@ -174,10 +175,10 @@ function PollCard({
           className="inline-flex items-center gap-1 hover:text-petal-ink"
         >
           <MessageCircle className="w-3 h-3" />
-          {poll.voiceCount || 0} 則心聲
+          {poll.voiceCount || 0} {tr('則心聲', ' comments')}
           {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         </button>
-        {!isAuthenticated && <span className="ml-auto">登入後也能投票、留言</span>}
+        {!isAuthenticated && <span className="ml-auto">{tr('登入後也能投票、留言', 'Sign in to vote and comment too')}</span>}
       </div>
 
       {expanded && (
@@ -187,7 +188,7 @@ function PollCard({
               data-testid="poll-voice-input"
               value={voiceText}
               onChange={(e) => setVoiceText(e.target.value)}
-              placeholder="說說你會怎麼做，或為什麼這樣選⋯"
+              placeholder={tr("說說你會怎麼做，或為什麼這樣選⋯", 'Say what you would do, or why you chose this…')}
               maxLength={500}
               className="flex-1 p-2.5 rounded-xl border border-petal-rule bg-white text-sm text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep"
             />
@@ -215,7 +216,7 @@ function PollCard({
                     <button
                       type="button"
                       onClick={() => reportVoice(v.id)}
-                      title="檢舉"
+                      title={tr("檢舉", 'Report')}
                       className="ml-auto text-petal-muted hover:text-petal-rose-deep"
                     >
                       <Flag className="w-3 h-3" />
@@ -226,7 +227,7 @@ function PollCard({
               </div>
             ))
           ) : (
-            <p className="text-xs text-petal-ink-soft text-center py-2">還沒有人留下心聲，當第一個說出想法的人。</p>
+            <p className="text-xs text-petal-ink-soft text-center py-2">{tr('還沒有人留下心聲，當第一個說出想法的人。', 'No one has shared yet. Be the first to say what you think.')}</p>
           )}
         </div>
       )}
@@ -261,11 +262,11 @@ export default function PollsView({
   return (
     <div className="space-y-3" data-testid="polls-view">
       <p className="text-sm text-petal-ink-soft leading-relaxed">
-        真實情侶會怎麼做？選一個你的答案，看看大家的選擇，也留下你的心聲。沒有標準答案，只有真實的聲音。
+        {tr('真實情侶會怎麼做？選一個你的答案，看看大家的選擇，也留下你的心聲。沒有標準答案，只有真實的聲音。', 'What would real couples do? Pick your answer, see what others chose, and share your thoughts. There\'s no right answer, only real voices.')}
       </p>
       {polls.length === 0 ? (
         <div className="bg-white border border-petal-rule-soft rounded-2xl p-8 text-center text-petal-ink-soft">
-          目前還沒有投票，晚點再來看看。
+          {tr('目前還沒有投票，晚點再來看看。', 'No polls yet. Check back later.')}
         </div>
       ) : (
         polls.map((p) => (

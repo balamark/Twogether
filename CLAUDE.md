@@ -32,6 +32,21 @@ sign-up — a feature that only exists behind the login wall can't attract anyon
 - Keep samples static (no auth'd data fetches) and follow the image rule below
   (`object-contain`, never crop).
 
+## Bilingual UI (繁中 / English)
+
+The top-right switch flips the whole app between 繁中 and English. Every new
+user-facing string must ship in both:
+
+- **Frontend**: wrap it as `tr('繁中', 'English')` from `src/i18n/tr.ts`
+  (shared header/menu chrome uses `t('key')` + `src/i18n/messages.ts`). Never
+  wrap logic values (ids, enum/mood values stored in the DB, strings compared
+  with `===`, AI prompt text). Switching language reloads the page, so
+  module-level `tr()` constants are fine. Dates: `dateLocale()`.
+- **Backend**: keep writing 繁中 in routes; add the English to
+  `lib/i18n/serverMessages.en.json` (`exact`, or `patterns` with `{0}`…).
+  `middleware/locale.js` translates whitelisted response keys when the client
+  sends `X-Locale: en`, and AI replies follow the same language automatically.
+
 ## Image handling
 
 **Never crop images.** Always show the full image.

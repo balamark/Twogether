@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { conflictPhraseTiers, type ConflictStep } from '../data/conflictSteps';
+import { tr } from '../i18n/tr';
 
 interface ReplyStepBarProps {
   onInsertPhrase: (phrase: string) => void;
@@ -20,20 +21,20 @@ interface Stage {
 const STAGES: Stage[] = [
   {
     key: 'self',
-    title: '先穩住自己',
-    hint: '停一下、承認情緒',
+    title: tr('先穩住自己', 'Steady yourself'),
+    hint: tr('停一下、承認情緒', 'Pause, name the feeling'),
     stepKeys: ['pause', 'acknowledge'],
   },
   {
     key: 'deescalate',
-    title: '幫彼此降溫',
-    hint: '放軟語氣、安撫、給保證',
+    title: tr('幫彼此降溫', 'Cool things down'),
+    hint: tr('放軟語氣、安撫、給保證', 'Soften, reassure, offer safety'),
     stepKeys: ['soften', 'soothe', 'reassure'],
   },
   {
     key: 'reconnect',
-    title: '重新靠近',
-    hint: '給台階、靠近、溫柔收尾',
+    title: tr('重新靠近', 'Come back together'),
+    hint: tr('給台階、靠近、溫柔收尾', 'Offer a way back, get closer, end gently'),
     stepKeys: ['step-down', 'tender', 'affirm'],
   },
 ];
@@ -50,7 +51,7 @@ export default function ReplyStepBar({ onInsertPhrase }: ReplyStepBarProps) {
   return (
     <div data-testid="reply-step-bar">
       <div className="text-xs text-petal-ink-soft mb-2">
-        不確定怎麼回？照著三個階段，一步一步靠近彼此：
+        {tr('不確定怎麼回？照著三個階段，一步一步靠近彼此：', 'Not sure how to reply? Follow three stages to move back toward each other:')}
       </div>
 
       <div className="space-y-2">

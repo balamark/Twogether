@@ -2,6 +2,7 @@ import React from 'react';
 import { ArrowRight, Compass } from 'lucide-react';
 import type { MessageFacilitation } from '../services/api';
 import ParticipantAvatar from './ParticipantAvatar';
+import { tr } from '../i18n/tr';
 
 // One AI facilitator turn, rendered as a therapist "card" rather than a plain
 // bubble: a coloured card-label chip, what the therapist says, the one small
@@ -37,9 +38,9 @@ const CHIP: Record<string, string> = {
 };
 
 const VERDICT: Record<string, { label: string; cls: string }> = {
-  accurate: { label: '✅ 做到了', cls: 'bg-petal-sage/20 text-petal-sage-deep border-petal-sage' },
-  partial: { label: '🟡 差一點', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-  off: { label: '❌ 再試一次', cls: 'bg-petal-rose-soft/30 text-petal-rose-deep border-petal-rose-soft' },
+  accurate: { label: tr('✅ 做到了', '✅ Nailed it'), cls: 'bg-petal-sage/20 text-petal-sage-deep border-petal-sage' },
+  partial: { label: tr('🟡 差一點', '🟡 Almost'), cls: 'bg-amber-50 text-amber-700 border-amber-200' },
+  off: { label: tr('❌ 再試一次', '❌ Try again'), cls: 'bg-petal-rose-soft/30 text-petal-rose-deep border-petal-rose-soft' },
 };
 
 const TherapistTurnCard: React.FC<Props> = ({
@@ -83,7 +84,7 @@ const TherapistTurnCard: React.FC<Props> = ({
         <p className="font-body text-[13px] text-petal-muted leading-relaxed">
           {/* Name the exercise being graded — the badge sits on the NEXT card's
               turn, so without this it reads as grading the new card. */}
-          {evaluatedCardMeta ? `${evaluatedCardMeta.emoji} ${evaluatedCardMeta.label}：${evaluation.note}` : evaluation.note}
+          {evaluatedCardMeta ? tr(`${evaluatedCardMeta.emoji} ${evaluatedCardMeta.label}：${evaluation.note}`, `${evaluatedCardMeta.emoji} ${evaluatedCardMeta.label}: ${evaluation.note}`) : evaluation.note}
         </p>
       )}
 
@@ -93,7 +94,7 @@ const TherapistTurnCard: React.FC<Props> = ({
         <div className={`rounded-xl px-3 py-2.5 border ${isMyTurn ? 'border-petal-rose-deep bg-petal-rose-soft/20' : 'border-petal-rule bg-petal-cream-2'}`}>
           <div className="flex items-center gap-1.5 font-body text-[11px] font-medium text-petal-rose-deep mb-1">
             <ArrowRight className="w-3.5 h-3.5" strokeWidth={1.5} />
-            {isMyTurn ? '換你了' : '這一步'}
+            {isMyTurn ? tr('換你了', 'Your turn') : tr('這一步', 'This step')}
           </div>
           <p className="font-body text-sm text-petal-ink leading-relaxed">{instruction}</p>
           {isMyTurn && quickReplies.length > 0 && (

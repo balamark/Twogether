@@ -8,6 +8,7 @@
 // Keep this list in sync with the positive14 query in routes/relationship.js.
 
 import type { ActivityType } from '../services/api';
+import { tr } from '../i18n/tr';
 
 // Activity-feed rows that ARE a +1 positive interaction. The feed shows event
 // *creation*（「開始了對話」）, which is not itself positive — only resolving a
@@ -26,7 +27,7 @@ export const isPositiveInteraction = (type: ActivityType): boolean =>
 // compact form for inline sentences（「留言、記錄美好、化解衝突」）; `label` the
 // fuller line for a bulleted list.
 export const POSITIVE_INTERACTION_ACTIONS: { emoji: string; short: string; label: string }[] = [
-  { emoji: '📝', short: '留言', label: '在牆上留一則言' },
-  { emoji: '💗', short: '記錄美好', label: '記錄一段美好時光' },
-  { emoji: '🤝', short: '化解衝突', label: '化解一次衝突' },
+  { emoji: '📝', short: tr('留言', 'Note'), label: tr('在牆上留一則言', 'Left a note on the wall') },
+  { emoji: '💗', short: tr('記錄美好', 'Good moment'), label: tr('記錄一段美好時光', 'Recorded a good moment') },
+  { emoji: '🤝', short: tr('化解衝突', 'Resolved'), label: tr('化解一次衝突', 'Resolved a conflict') },
 ];

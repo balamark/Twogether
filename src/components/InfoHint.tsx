@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { HelpCircle } from 'lucide-react';
 import { getFeatureIntro } from '../content/featureIntros';
+import { useLanguage } from '../i18n/LanguageContext';
 
 // Per-page (?) hint (docs/UX_PLAYBOOK.md P0-4): tap to see what this tab is
 // for, sourced from src/content/featureIntros.ts. Place next to page titles.
@@ -8,7 +9,8 @@ import { getFeatureIntro } from '../content/featureIntros';
 export default function InfoHint({ viewId }: { viewId: string }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const intro = getFeatureIntro(viewId);
+  const { locale, t } = useLanguage();
+  const intro = getFeatureIntro(viewId, locale);
 
   useEffect(() => {
     if (!open) return;
@@ -25,7 +27,7 @@ export default function InfoHint({ viewId }: { viewId: string }) {
     <div className="relative inline-flex" ref={ref}>
       <button
         type="button"
-        aria-label={`關於${intro.title}`}
+        aria-label={t('hint.about', { title: intro.title })}
         data-testid={`info-hint-${viewId}`}
         onClick={() => setOpen((o) => !o)}
         className="p-1 rounded-full text-petal-muted hover:text-petal-rose-deep transition"
@@ -42,7 +44,7 @@ export default function InfoHint({ viewId }: { viewId: string }) {
               <span className="font-medium">{intro.faqs[0].q}</span> {intro.faqs[0].a}
             </p>
           )}
-          <p className="text-[11px] text-petal-muted mt-2">更多說明在個人選單的「使用說明」。</p>
+          <p className="text-[11px] text-petal-muted mt-2">{t('hint.more')}</p>
         </div>
       )}
     </div>

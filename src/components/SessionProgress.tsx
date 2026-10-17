@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Check, ChevronDown, ChevronUp, Gauge, X } from 'lucide-react';
 import type { FacilitationSession } from '../services/api';
+import { tr } from '../i18n/tr';
 
 // The 今日練習 tray: which exercises this session has practised (checklist) and
 // the running 關係技巧分數. Makes therapy feel measurable — like learning, not a
@@ -46,18 +47,18 @@ const SessionProgress: React.FC<Props> = ({ eventId, session, onEnd, ending }) =
         type="button"
         onClick={toggleOpen}
         aria-expanded={open}
-        aria-label={open ? '收合今日練習' : '展開今日練習'}
+        aria-label={open ? tr('收合今日練習', 'Collapse today\'s practice') : tr('展開今日練習', 'Expand today\'s practice')}
         className="w-full flex items-center justify-between py-1"
       >
         <span className="inline-flex items-center gap-1.5 font-display italic text-base text-petal-ink">
           <Gauge className="w-4 h-4 text-petal-rose-deep" strokeWidth={1.5} />
-          今日練習
+          {tr('今日練習', 'Today\'s practice')}
         </span>
         <span className="inline-flex items-center gap-2">
           <span className="font-body text-xs text-petal-muted">
-            關係技巧分數{' '}
+            {tr('關係技巧分數', 'Relationship skill score')}{' '}
             <span className="font-display italic text-petal-rose-deep text-sm">
-              {skillScore === null ? '尚未開始' : `${skillScore}%`}
+              {skillScore === null ? tr('尚未開始', 'Not started') : `${skillScore}%`}
             </span>
           </span>
           {open ? <ChevronUp className="w-4 h-4 text-petal-muted" /> : <ChevronDown className="w-4 h-4 text-petal-muted" />}
@@ -67,7 +68,7 @@ const SessionProgress: React.FC<Props> = ({ eventId, session, onEnd, ending }) =
       {open && (
         <div className="mt-3 space-y-2">
           {rows.length === 0 ? (
-            <p className="font-body text-xs text-petal-muted">引導開始後，練習過的技巧會顯示在這裡。</p>
+            <p className="font-body text-xs text-petal-muted">{tr('引導開始後，練習過的技巧會顯示在這裡。', 'Skills you practice will appear here once a guided session starts.')}</p>
           ) : (
             <ul className="space-y-1.5">
               {rows.map(({ meta, done }) => (
@@ -80,7 +81,7 @@ const SessionProgress: React.FC<Props> = ({ eventId, session, onEnd, ending }) =
                     {done ? <Check className="w-3 h-3" strokeWidth={2.5} /> : <span className="text-[10px]">…</span>}
                   </span>
                   <span>{meta.emoji} {meta.label}</span>
-                  {!done && <span className="font-body text-[11px] text-petal-rose-deep">進行中</span>}
+                  {!done && <span className="font-body text-[11px] text-petal-rose-deep">{tr('進行中', 'In progress')}</span>}
                 </li>
               ))}
             </ul>
@@ -95,7 +96,7 @@ const SessionProgress: React.FC<Props> = ({ eventId, session, onEnd, ending }) =
               className="mt-1 inline-flex items-center gap-1 font-body text-xs text-petal-muted hover:text-petal-ink disabled:opacity-50 transition px-2 py-2 -mx-2 rounded-lg"
             >
               <X className="w-3.5 h-3.5" strokeWidth={1.5} />
-              結束這次引導
+              {tr('結束這次引導', 'End this guided session')}
             </button>
           )}
         </div>

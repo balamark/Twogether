@@ -3,6 +3,7 @@ import { ArrowLeft, ThumbsUp, HeartHandshake, Wrench, Lightbulb, Send, Loader2, 
 import { apiService, type StoryDetailData, type StoryVoteType } from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatRelativeOrDate } from '../utils/datetime';
+import { tr } from '../i18n/tr';
 
 // Single story page: labeled template sections, AI insight card, three vote
 // pills, cross-couple comments, report. Publicly readable; write actions
@@ -16,25 +17,25 @@ interface NotificationInput {
 }
 
 const SECTION_LABELS: { key: keyof StoryDetailData['sections']; label: string }[] = [
-  { key: 'context', label: '背景' },
-  { key: 'happened', label: '發生了什麼' },
-  { key: 'impact', label: '情緒衝擊' },
-  { key: 'tried', label: '我們試過什麼' },
-  { key: 'repair', label: '轉捩點與修復' },
-  { key: 'now', label: '現在的我們' },
+  { key: 'context', label: tr('背景', 'Background') },
+  { key: 'happened', label: tr('發生了什麼', 'What happened') },
+  { key: 'impact', label: tr('情緒衝擊', 'Emotional impact') },
+  { key: 'tried', label: tr('我們試過什麼', 'What we tried') },
+  { key: 'repair', label: tr('轉捩點與修復', 'Turning point & repair') },
+  { key: 'now', label: tr('現在的我們', 'Where we are now') },
 ];
 
 const VOTE_META: { type: StoryVoteType; label: string; icon: typeof ThumbsUp }[] = [
-  { type: 'helpful', label: '有幫助', icon: ThumbsUp },
-  { type: 'resonate', label: '有共鳴', icon: HeartHandshake },
-  { type: 'repair_worked', label: '修復有效', icon: Wrench },
+  { type: 'helpful', label: tr('有幫助', 'Helpful'), icon: ThumbsUp },
+  { type: 'resonate', label: tr('有共鳴', 'Relatable'), icon: HeartHandshake },
+  { type: 'repair_worked', label: tr('修復有效', 'Repair worked'), icon: Wrench },
 ];
 
 const REPORT_REASONS: { value: string; label: string }[] = [
-  { value: 'inappropriate', label: '不當內容' },
-  { value: 'spam', label: '垃圾訊息' },
-  { value: 'privacy', label: '洩露隱私' },
-  { value: 'other', label: '其他' },
+  { value: 'inappropriate', label: tr('不當內容', 'Inappropriate content') },
+  { value: 'spam', label: tr('垃圾訊息', 'Spam') },
+  { value: 'privacy', label: tr('洩露隱私', 'Privacy leak') },
+  { value: 'other', label: tr('其他', 'Other') },
 ];
 
 export default function StoryDetail({
@@ -66,13 +67,13 @@ export default function StoryDetail({
     apiService
       .getStory(storyId)
       .then((s) => { if (!cancelled) setStory(s); })
-      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : '無法載入故事'); })
+      .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : tr('無法載入故事', 'Couldn\'t load this story')); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [storyId]);
 
   const requireLogin = () => {
-    showNotification({ type: 'info', title: '請先登入', message: '登入後就能投票、留言，讓作者知道這則故事幫到了你' });
+    showNotification({ type: 'info', title: tr('請先登入', 'Please sign in'), message: tr('登入後就能投票、留言，讓作者知道這則故事幫到了你', 'Sign in to vote and comment, and let the author know this story helped you') });
     onRequireLogin();
   };
 
@@ -80,7 +81,7 @@ export default function StoryDetail({
     if (!isAuthenticated) return requireLogin();
     if (!story || voting) return;
     if (story.isMine) {
-      showNotification({ type: 'info', title: '這是你的故事', message: '不能為自己的故事投票，把機會留給被你幫助的人' });
+      showNotification({ type: 'info', title: tr('這是你的故事', 'This is your story'), message: tr('不能為自己的故事投票，把機會留給被你幫助的人', 'You can\'t vote on your own story. Leave that to the people you\'ve helped') });
       return;
     }
     // Optimistic (playbook §R7): flip the vote and its count instantly, then
@@ -106,7 +107,7 @@ export default function StoryDetail({
       });
     } catch (err) {
       setStory(prev);
-      showNotification({ type: 'error', title: '投票失敗', message: err instanceof Error ? err.message : '請稍後再試' });
+      showNotification({ type: 'error', title: tr('投票失敗', 'Couldn\'t vote'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment') });
     } finally {
       setVoting(false);
     }
@@ -122,7 +123,7 @@ export default function StoryDetail({
       setStory({ ...story, comments: [...story.comments, c] });
       setComment('');
     } catch (err) {
-      showNotification({ type: 'error', title: '留言失敗', message: err instanceof Error ? err.message : '請稍後再試' });
+      showNotification({ type: 'error', title: tr('留言失敗', 'Couldn\'t post your comment'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment') });
     } finally {
       setSending(false);
     }
@@ -134,10 +135,10 @@ export default function StoryDetail({
     setReporting(true);
     try {
       await apiService.reportStory(story.id, reason);
-      showNotification({ type: 'success', title: '已收到你的檢舉', message: '我們會盡快處理，謝謝你維護這個空間' });
+      showNotification({ type: 'success', title: tr('已收到你的檢舉', 'Report received'), message: tr('我們會盡快處理，謝謝你維護這個空間', 'We\'ll look into it as soon as possible. Thanks for keeping this space safe') });
       setReportOpen(false);
     } catch (err) {
-      showNotification({ type: 'error', title: '檢舉失敗', message: err instanceof Error ? err.message : '請稍後再試' });
+      showNotification({ type: 'error', title: tr('檢舉失敗', 'Couldn\'t report'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment') });
     } finally {
       setReporting(false);
     }
@@ -149,9 +150,9 @@ export default function StoryDetail({
   if (error || !story) {
     return (
       <div className="py-10 text-center text-petal-ink-soft">
-        <p className="text-sm">{error || '找不到這則故事'}</p>
+        <p className="text-sm">{error || tr('找不到這則故事', 'Story not found')}</p>
         <button type="button" onClick={onBack} className="mt-3 px-4 py-2 rounded-full border border-petal-rule text-sm text-petal-ink hover:bg-petal-sage/20">
-          回到故事列表
+          {tr('回到故事列表', 'Back to stories')}
         </button>
       </div>
     );
@@ -166,7 +167,7 @@ export default function StoryDetail({
         className="text-sm text-petal-ink-soft hover:text-petal-ink inline-flex items-center gap-1.5"
       >
         <ArrowLeft className="w-4 h-4" />
-        回到故事列表
+        {tr('回到故事列表', 'Back to stories')}
       </button>
 
       <div className="bg-petal-cream border border-petal-rule rounded-2xl p-5">
@@ -174,7 +175,7 @@ export default function StoryDetail({
         <div className="flex flex-wrap items-center gap-3 mt-2 text-[11px] text-petal-muted">
           <span>{story.authorName}</span>
           <span>{formatRelativeOrDate(story.createdAt, tz, { month: 'short', day: 'numeric' })}</span>
-          <span className="inline-flex items-center gap-0.5"><Eye className="w-3 h-3" />已被閱讀 {story.viewCount} 次</span>
+          <span className="inline-flex items-center gap-0.5"><Eye className="w-3 h-3" />{tr('已被閱讀', 'Read')} {story.viewCount} {tr('次', ' times')}</span>
           {story.tags.map((t) => (
             <span key={t} className="px-2 py-0.5 rounded-full bg-petal-sage/20 text-petal-ink">{t}</span>
           ))}
@@ -186,7 +187,7 @@ export default function StoryDetail({
         <div className="bg-white border border-petal-rule-soft rounded-2xl p-5" data-testid="article-body">
           {(story.sourceUrl || story.sourceAuthor) && (
             <div className="mb-3 pb-3 border-b border-petal-rule-soft text-xs text-petal-muted flex flex-wrap items-center gap-x-3 gap-y-1">
-              {story.sourceAuthor && <span>原作者／出處：{story.sourceAuthor}</span>}
+              {story.sourceAuthor && <span>{tr('原作者／出處：', 'Original author / source: ')}{story.sourceAuthor}</span>}
               {story.sourceUrl && (
                 <a
                   href={story.sourceUrl}
@@ -194,14 +195,14 @@ export default function StoryDetail({
                   rel="noopener noreferrer nofollow"
                   className="inline-flex items-center gap-1 text-petal-rose-deep hover:underline"
                 >
-                  <LinkIcon className="w-3 h-3" /> 原文連結
+                  <LinkIcon className="w-3 h-3" /> {tr('原文連結', 'Original link')}
                 </a>
               )}
             </div>
           )}
           <p className="text-[15px] text-petal-ink leading-loose whitespace-pre-wrap">{story.body}</p>
           <p className="mt-4 pt-3 border-t border-petal-rule-soft text-[11px] text-petal-muted">
-            由 {story.authorName} 分享。內容版權屬原作者所有。
+            {tr('由', 'Shared by')} {story.authorName} {tr('分享。內容版權屬原作者所有。', '. Copyright belongs to the original author.')}
           </p>
         </div>
       ) : (
@@ -220,7 +221,7 @@ export default function StoryDetail({
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-5" data-testid="story-detail-insights">
           <div className="flex items-center gap-2 mb-3 text-petal-rose-deep">
             <Lightbulb className="w-5 h-5" />
-            <h3 className="text-base font-serif text-petal-ink">AI 重點整理</h3>
+            <h3 className="text-base font-serif text-petal-ink">{tr('AI 重點整理', 'AI highlights')}</h3>
           </div>
           <div className="space-y-3">
             {story.aiInsights.insights.map((i) => (
@@ -260,9 +261,9 @@ export default function StoryDetail({
 
       {/* Comments */}
       <div className="bg-petal-cream border border-petal-rule rounded-2xl p-4 space-y-3">
-        <h3 className="text-sm font-medium text-petal-ink">留言（{story.comments.length}）</h3>
+        <h3 className="text-sm font-medium text-petal-ink">{tr('留言（', 'Comments (')}{story.comments.length}{tr('）', ')')}</h3>
         {story.comments.length === 0 && (
-          <p className="text-xs text-petal-ink-soft">還沒有留言。說說這則故事哪裡幫到了你，作者會收到通知。</p>
+          <p className="text-xs text-petal-ink-soft">{tr('還沒有留言。說說這則故事哪裡幫到了你，作者會收到通知。', 'No comments yet. Tell them how this story helped you; the author will be notified.')}</p>
         )}
         {story.comments.map((c) => (
           <div key={c.id} className="bg-white border border-petal-rule-soft rounded-xl p-3">
@@ -278,7 +279,7 @@ export default function StoryDetail({
             data-testid="story-comment-input"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="這則故事哪裡幫到了你？"
+            placeholder={tr("這則故事哪裡幫到了你？", 'How did this story help you?')}
             maxLength={1000}
             className="flex-1 p-2.5 rounded-xl border border-petal-rule bg-white text-sm text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep"
           />
@@ -290,7 +291,7 @@ export default function StoryDetail({
             className="px-4 py-2 rounded-full bg-petal-ink text-petal-cream text-sm font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition inline-flex items-center gap-1.5 disabled:opacity-40 disabled:shadow-none"
           >
             {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-            送出
+            {tr('送出', 'Send')}
           </button>
         </div>
       </div>
@@ -299,7 +300,7 @@ export default function StoryDetail({
       <div className="text-right">
         {reportOpen ? (
           <div className="inline-flex flex-wrap items-center gap-1.5 text-xs" data-testid="story-report-reasons">
-            <span className="text-petal-muted">檢舉原因：</span>
+            <span className="text-petal-muted">{tr('檢舉原因：', 'Reason for report:')}</span>
             {REPORT_REASONS.map((r) => (
               <button
                 key={r.value}
@@ -312,7 +313,7 @@ export default function StoryDetail({
               </button>
             ))}
             <button type="button" onClick={() => setReportOpen(false)} className="px-2 py-1 text-petal-muted hover:text-petal-ink">
-              取消
+              {tr('取消', 'Cancel')}
             </button>
           </div>
         ) : (
@@ -323,7 +324,7 @@ export default function StoryDetail({
             className="text-[11px] text-petal-muted hover:text-petal-ink inline-flex items-center gap-1"
           >
             <Flag className="w-3 h-3" />
-            檢舉這則故事
+            {tr('檢舉這則故事', 'Report this story')}
           </button>
         )}
       </div>

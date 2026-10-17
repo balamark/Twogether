@@ -4,6 +4,7 @@ import './index.css'
 import App from './App.tsx'
 import ErrorBoundary from './components/ErrorBoundary.tsx'
 import { initTelemetry } from './utils/telemetry'
+import { LanguageProvider } from './i18n/LanguageProvider'
 
 // Catch-all client error reporting (uncaught errors + unhandled rejections) so
 // we don't hand-write a clientLog in every component.
@@ -12,7 +13,9 @@ initTelemetry()
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary context="app">
-      <App />
+      <LanguageProvider>
+        <App />
+      </LanguageProvider>
     </ErrorBoundary>
   </StrictMode>,
 )

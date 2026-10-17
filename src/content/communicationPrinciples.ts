@@ -16,6 +16,9 @@
 //   writing → 「說開一件事」EventsView / 我們的牆 WallView / ConflictView 用文字聊
 
 import { Waves, Repeat, PenLine, type LucideIcon } from 'lucide-react';
+import type { Locale } from '../i18n/LanguageContext';
+import { getLocale } from '../i18n/tr';
+import { COMMUNICATION_PRINCIPLES_EN } from './communicationPrinciples.en';
 
 export interface CommunicationPrinciple {
   id: 'iceberg' | 'pattern' | 'writing';
@@ -70,4 +73,10 @@ export function getPrinciple(
   id: CommunicationPrinciple['id'],
 ): CommunicationPrinciple | null {
   return COMMUNICATION_PRINCIPLES.find((p) => p.id === id) || null;
+}
+
+// English copy lives in communicationPrinciples.en.ts (same ids).
+export function getCommunicationPrinciples(locale: Locale = getLocale()): CommunicationPrinciple[] {
+  if (locale !== 'en') return COMMUNICATION_PRINCIPLES;
+  return COMMUNICATION_PRINCIPLES.map((p) => ({ ...p, ...COMMUNICATION_PRINCIPLES_EN[p.id] }));
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Eye, ThumbsUp, MessageCircle, Trash2, Loader2, PenLine, BookOpen, FileText } from 'lucide-react';
 import { apiService, type MyStoriesResult } from '../services/api';
+import { tr } from '../i18n/tr';
 
 // 我的故事: the author's impact dashboard. Visible-impact stats are the core
 // contributor incentive (「你的故事已被閱讀 X 次」).
@@ -41,11 +42,11 @@ export default function MyStories({
     setDeleting(true);
     try {
       await apiService.deleteStory(id);
-      showNotification({ type: 'success', title: '已刪除', message: '已從「好文 · 故事」移除' });
+      showNotification({ type: 'success', title: tr('已刪除', 'Deleted'), message: tr('已從「好文 · 故事」移除', 'Removed from "Reads & stories"') });
       setConfirmDeleteId(null);
       load();
     } catch (err) {
-      showNotification({ type: 'error', title: '刪除失敗', message: err instanceof Error ? err.message : '請稍後再試' });
+      showNotification({ type: 'error', title: tr('刪除失敗', 'Couldn\'t delete'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment') });
     } finally {
       setDeleting(false);
     }
@@ -62,9 +63,9 @@ export default function MyStories({
     return (
       <div className="bg-white border border-petal-rule-soft rounded-2xl p-8 text-center" data-testid="my-stories-empty">
         <PenLine className="w-8 h-8 mx-auto mb-3 text-petal-rose-deep" />
-        <p className="text-petal-ink font-medium">你還沒有發表過故事</p>
+        <p className="text-petal-ink font-medium">{tr('你還沒有發表過故事', 'You haven\'t posted a story yet')}</p>
         <p className="text-xs text-petal-ink-soft mt-1.5 leading-relaxed max-w-sm mx-auto">
-          寫下一段你們走過的難關：它會匿名幫助遇到同樣狀況的伴侶，你也會看到它被閱讀、被肯定的次數。
+          {tr('寫下一段你們走過的難關：它會匿名幫助遇到同樣狀況的伴侶，你也會看到它被閱讀、被肯定的次數。', 'Write about a hard time you two got through. It anonymously helps couples facing the same thing, and you\'ll see how often it\'s read and appreciated.')}
         </p>
         <button
           type="button"
@@ -72,7 +73,7 @@ export default function MyStories({
           onClick={onCompose}
           className="mt-4 px-4 py-2 rounded-full bg-petal-rose-deep text-white text-sm font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition"
         >
-          分享第一則故事
+          {tr('分享第一則故事', 'Share your first story')}
         </button>
       </div>
     );
@@ -83,10 +84,10 @@ export default function MyStories({
       {/* Impact stats */}
       <div className="bg-petal-cream border border-petal-rule rounded-2xl p-4" data-testid="my-stories-impact">
         <p className="text-sm text-petal-ink">
-          你的故事已被閱讀 <strong>{totals.reads}</strong> 次、獲得 <strong>{totals.votes}</strong> 個投票、
-          <strong>{totals.comments}</strong> 則留言
+          {tr('你的故事已被閱讀', 'Your stories have been read')} <strong>{totals.reads}</strong> {tr('次、獲得', ' times, received')} <strong>{totals.votes}</strong> {tr('個投票、', ' votes and')}
+          <strong>{totals.comments}</strong> {tr('則留言', ' comments')}
         </p>
-        <p className="text-[11px] text-petal-muted mt-1">每一次閱讀，都是一對伴侶在你們的經歷裡找方向。</p>
+        <p className="text-[11px] text-petal-muted mt-1">{tr('每一次閱讀，都是一對伴侶在你們的經歷裡找方向。', 'Every read is a couple finding direction in what you went through.')}</p>
       </div>
 
       <div className="space-y-2">
@@ -102,10 +103,10 @@ export default function MyStories({
                 }`}
               >
                 {s.kind === 'article' ? <FileText className="w-3 h-3" strokeWidth={1.5} /> : <BookOpen className="w-3 h-3" strokeWidth={1.5} />}
-                {s.kind === 'article' ? '好文' : '故事'}
+                {s.kind === 'article' ? tr('好文', 'Read') : tr('故事', 'Story')}
               </span>
               {s.status === 'hidden' && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 shrink-0">已隱藏</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 shrink-0">{tr('已隱藏', 'Hidden')}</span>
               )}
             </div>
             <div className="flex items-center gap-3 mt-2 text-[11px] text-petal-muted">
@@ -117,7 +118,7 @@ export default function MyStories({
               <span className="ml-auto">
                 {confirmDeleteId === s.id ? (
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="text-petal-ink">確定刪除？</span>
+                    <span className="text-petal-ink">{tr('確定刪除？', 'Delete this?')}</span>
                     <button
                       type="button"
                       data-testid="my-story-delete-confirm"
@@ -125,10 +126,10 @@ export default function MyStories({
                       onClick={() => remove(s.id)}
                       className="px-2 py-0.5 rounded-full bg-red-600 text-white disabled:opacity-50"
                     >
-                      刪除
+                      {tr('刪除', 'Delete')}
                     </button>
                     <button type="button" onClick={() => setConfirmDeleteId(null)} className="px-2 py-0.5 text-petal-muted hover:text-petal-ink">
-                      取消
+                      {tr('取消', 'Cancel')}
                     </button>
                   </span>
                 ) : (
@@ -136,7 +137,7 @@ export default function MyStories({
                     type="button"
                     data-testid="my-story-delete"
                     onClick={() => setConfirmDeleteId(s.id)}
-                    title="刪除故事"
+                    title={tr("刪除故事", 'Delete story')}
                     className="p-1 rounded text-petal-muted hover:text-red-600"
                   >
                     <Trash2 className="w-3.5 h-3.5" />

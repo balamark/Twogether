@@ -1,0 +1,1643 @@
+{
+"exact": {
+"初戀": "First love",
+"記錄第一次親密時光": "Record your first intimate moment",
+"一週年": "One year together",
+"在一起一週年": "Together for one year",
+"月月相愛": "Love every month",
+"連續記錄30天": "Record 30 days in a row",
+"攝影師": "Photographer",
+"上傳第一張照片": "Upload your first photo",
+"金幣收集家": "Coin collector",
+"累積100金幣": "Collect 100 coins",
+"親密達人": "Intimacy pro",
+"記錄100次親密時光": "Record 100 intimate moments",
+"完美情侶": "Perfect couple",
+"完成所有成就": "Complete every achievement",
+"說故事的人": "Storyteller",
+"發表第一則真實故事": "Publish your first real story",
+"智慧守護者": "Keeper of wisdom",
+"發表 3 則真實故事": "Publish 3 real stories",
+"修復領航員": "Repair navigator",
+"你的故事累積獲得 10 個「修復有效」": "Your stories have received 10 \"Repair worked\" votes in total",
+"獲取成就失敗": "Couldn't load achievements",
+"您還沒有情侶關係": "You're not in a couple yet",
+"檢查成就失敗": "Couldn't check achievements",
+"無法獲取最近動態": "Couldn't load recent activity",
+"回饋對象無效": "Invalid feedback target",
+"rating 必須為 up 或 down": "rating must be up or down",
+"referenceId 需為有效 UUID": "referenceId must be a valid UUID",
+"說明請在 1000 字以內": "Please keep the note under 1000 characters",
+"回饋送出失敗，請稍後再試。": "Couldn't send your feedback. Please try again in a moment.",
+"無法取得 AI 使用次數": "Couldn't load AI usage",
+"無法載入測驗結果，請稍後再試。": "Couldn't load your quiz results. Please try again in a moment.",
+"伴侶": "Partner",
+"無法載入伴侶的測驗結果，請稍後再試。": "Couldn't load your partner's quiz results. Please try again in a moment.",
+"未知的測驗類型": "Unknown quiz type",
+"缺少測驗結果": "Missing quiz result",
+"測驗結果已儲存": "Quiz result saved",
+"儲存測驗結果失敗，請稍後再試。": "Couldn't save the quiz result. Please try again in a moment.",
+"無法載入愛的行動清單，請稍後再試。": "Couldn't load the acts-of-love list. Please try again in a moment.",
+"請輸入 1–200 字": "Please enter 1–200 characters",
+"新增失敗，請稍後再試。": "Couldn't add. Please try again in a moment.",
+"刪除失敗，請稍後再試。": "Couldn't delete. Please try again in a moment.",
+"暱稱必須在2-50個字符之間": "Nickname must be 2–50 characters",
+"請輸入有效的電子郵件地址": "Please enter a valid email address",
+"密碼至少需要6個字符": "Password must be at least 6 characters",
+"驗證失敗": "Validation failed",
+"此電子郵件已被註冊": "This email is already registered",
+"註冊成功": "Signed up",
+"註冊失敗，請稍後再試": "Couldn't sign up. Please try again in a moment",
+"請輸入密碼": "Please enter your password",
+"電子郵件或密碼錯誤": "Incorrect email or password",
+"登入成功": "Signed in",
+"登入失敗，請稍後再試": "Couldn't sign in. Please try again in a moment",
+"用戶不存在": "User not found",
+"獲取用戶信息失敗": "Couldn't load user information",
+"你的 Email 已經驗證過了。": "Your email is already verified.",
+"剛剛才寄出驗證信，請稍候一分鐘再試。": "A verification email was just sent. Please wait a minute and try again.",
+"驗證信已重新寄出，請到信箱查收。": "Verification email resent. Please check your inbox.",
+"重寄驗證信失敗，請稍後再試。": "Couldn't resend the verification email. Please try again in a moment.",
+"如果這個 Email 有註冊帳號，我們已寄出重設密碼的連結。": "If this email has an account, we've sent a link to reset your password.",
+"性別必須是 male、female 或 other": "Gender must be male, female or other",
+"更新了性別設定": "updated their gender setting",
+"性別設定已更新": "Gender setting updated",
+"更新性別設定失敗": "Couldn't update the gender setting",
+"請選擇有效的 AI 諮商師": "Please choose a valid AI counselor",
+"更新 AI 諮商師失敗，請稍後再試": "Couldn't update the AI counselor. Please try again in a moment",
+"email_notifications_enabled 必須為布林值": "email_notifications_enabled must be a boolean",
+"電子郵件通知設定已更新": "Email notification settings updated",
+"更新電子郵件通知設定失敗": "Couldn't update email notification settings",
+"請輸入目前的密碼": "Please enter your current password",
+"請輸入有效的電子郵件地址與目前的密碼": "Please enter a valid email address and your current password",
+"目前密碼不正確，請重新輸入後再變更 Email": "Your current password is incorrect. Please re-enter it before changing your email",
+"這已經是你目前的 Email 了": "That's already your current email",
+"此電子郵件已被其他帳號使用，請改用別的信箱": "This email is already used by another account. Please use a different one",
+"剛剛才寄出確認信，請稍候一分鐘再試。": "A confirmation email was just sent. Please wait a minute and try again.",
+"我們已寄出確認信到新的 Email，請點擊信中連結完成變更。在你確認之前，請繼續使用目前的 Email 登入。": "We've sent a confirmation email to the new address. Click the link in it to complete the change. Until you confirm, keep signing in with your current email.",
+"變更 Email 失敗，請稍後再試": "Couldn't change the email. Please try again in a moment",
+"public_share_show_nickname 必須為布林值": "public_share_show_nickname must be a boolean",
+"公開分享顯示設定已更新": "Public sharing display setting updated",
+"更新公開分享設定失敗": "Couldn't update the public sharing setting",
+"cycle_tracking_enabled 必須為布林值": "cycle_tracking_enabled must be a boolean",
+"週期追蹤設定已更新": "Cycle tracking setting updated",
+"更新週期追蹤設定失敗": "Couldn't update the cycle tracking setting",
+"birth_date 必須為日期字串或 null": "birth_date must be a date string or null",
+"birth_date 必須為 YYYY-MM-DD 格式": "birth_date must be in YYYY-MM-DD format",
+"birth_date 無效": "birth_date is invalid",
+"birth_date 年份太早": "birth_date year is too early",
+"birth_date 不可為未來日期": "birth_date can't be in the future",
+"更新了生日資訊": "updated their birthday",
+"生日已更新": "Birthday updated",
+"更新生日失敗": "Couldn't update the birthday",
+"timezone 必須為字串或 null": "timezone must be a string or null",
+"timezone 不在允許清單中": "timezone isn't in the allowed list",
+"更新了所在時區": "updated their time zone",
+"時區已更新": "Time zone updated",
+"更新時區失敗": "Couldn't update the time zone",
+"Twogether Premium 30 天": "Twogether Premium 30 days",
+"Twogether Premium 90 天": "Twogether Premium 90 days",
+"Twogether Premium 365 天": "Twogether Premium 365 days",
+"無法取得訂閱狀態": "Couldn't load your subscription status",
+"請輸入優惠碼": "Please enter a promo code",
+"配對情侶後才能使用優惠碼": "You need to be paired to use a promo code",
+"優惠碼無效": "Invalid promo code",
+"優惠碼已過期": "This promo code has expired",
+"優惠碼已被兌換完畢": "This promo code has been fully redeemed",
+"你們已經使用過這組優惠碼了": "You've already used this promo code",
+"無法兌換優惠碼，請稍後再試": "Couldn't redeem the promo code. Please try again in a moment",
+"無效的方案": "Invalid plan",
+"無效的付款方式": "Invalid payment method",
+"藍新金流暫時無法使用，請改用綠界 ECPay 付款": "NewebPay is temporarily unavailable. Please pay with ECPay instead",
+"您還沒有完整的情侶關係，配對後即可升級": "Your couple isn't fully set up yet. You can upgrade once you're paired",
+"無法建立付款，請稍後再試": "Couldn't create the payment. Please try again in a moment",
+"獲取金幣餘額失敗": "Couldn't load your coin balance",
+"獲取金幣交易記錄失敗": "Couldn't load coin transactions",
+"金幣數量必須是正整數": "The coin amount must be a positive integer",
+"原因描述必須在1-200個字符之間": "The reason must be 1–200 characters",
+"獲得來源不能超過100個字符": "The source can't exceed 100 characters",
+"添加金幣失敗": "Couldn't add coins",
+"交易類型無效": "Invalid transaction type",
+"金幣餘額不足": "Not enough coins",
+"花費金幣失敗": "Couldn't spend coins",
+"今日已經領取過每日金幣": "You've already claimed today's daily coins",
+"領取每日金幣失敗": "Couldn't claim daily coins",
+"交易類型必須是 earn 或 spend": "Transaction type must be earn or spend",
+"描述必須在1-200個字符之間": "Description must be 1–200 characters",
+"idempotency_key 格式錯誤": "idempotency_key has an invalid format",
+"獲得": "Earned",
+"花費": "Spent",
+"金幣交易失敗": "The coin transaction failed",
+"伴侶回覆了你們的對話": "Your partner replied in your conversation",
+"TA有一段話想讓你聽見": "They have something they want you to hear",
+"Sophie 陪TA整理過情緒後，把原話交給你": "After Sophie helped them sort through their feelings, they handed you their original words",
+"訊息需在 1–2000 字之間，請刪減後再送出，或分成兩則送出": "Messages must be 1–2000 characters. Please shorten it, or send it as two messages",
+"Sophie 的即時介入需要先配對伴侶才能運作（訊息要有人可以收）。你可以先到「說開一件事」把情緒寫成草稿，配對成功後再送出。": "Sophie's live support needs a paired partner to work (the message needs someone to receive it). You can write your feelings as a draft in \"Talk it through\" first and send it once you're paired.",
+"找不到對話或沒有權限": "Conversation not found, or you don't have access",
+"這段對話已完成，無法新增訊息": "This conversation is complete, so new messages can't be added",
+"Sophie 暫時無法處理這則訊息，請稍後再試": "Sophie can't handle this message right now. Please try again in a moment",
+"無法載入進行中的對話": "Couldn't load the conversation in progress",
+"這則訊息已經送出，無法再修改。": "This message has already been sent and can't be edited.",
+"Sophie 暫時無法處理，請稍後再試": "Sophie can't handle this right now. Please try again in a moment",
+"想被理解": "To feel understood",
+"Sophie 這次沒能整理出你想說的話（沒有扣用今日額度）。可以再試一次，或直接讓TA看到原話。": "Sophie couldn't put together what you want to say this time (today's credits weren't used). You can try again, or let them see your original words.",
+"Sophie 暫時無法整理這段話，請稍後再試": "Sophie can't put this together right now. Please try again in a moment",
+"無法儲存，請稍後再試": "Couldn't save. Please try again in a moment",
+"無法送出，請稍後再試": "Couldn't send. Please try again in a moment",
+"無法載入收件匣": "Couldn't load the inbox",
+"找不到訊息": "Message not found",
+"無法更新狀態": "Couldn't update the status",
+"TA說：我理解了": "They said: I understand",
+"你剛才想讓TA聽見的，TA收到了": "What you wanted them to hear, they received",
+"無法送出回應": "Couldn't send the response",
+"情侶名稱不能超過100個字符": "The couple name can't exceed 100 characters",
+"請輸入有效的日期格式": "Please enter a valid date format",
+"配對碼必須是6-8個字符": "The pairing code must be 6–8 characters",
+"請先登入以完成配對": "Please sign in to complete pairing",
+"成功加入情侶關係": "Joined the couple",
+"您已經在一個情侶關係中": "You're already in a couple",
+"已有未完成的情侶關係": "There's already an unfinished couple setup",
+"情侶關係創建成功": "Couple created",
+"創建情侶關係失敗": "Couldn't create the couple",
+"生成配對碼失敗": "Couldn't create a pairing code",
+"獲取情侶信息失敗": "Couldn't load couple details",
+"沒有提供要更新的欄位": "No fields provided to update",
+"你們的情侶旅程資訊有更新": "Your couple journey details were updated",
+"情侶旅程更新成功": "Couple journey updated",
+"更新情侶旅程失敗": "Couldn't update the couple journey",
+"primary_timezone 必須為字串或 null": "primary_timezone must be a string or null",
+"primary_timezone 不在允許清單中": "primary_timezone isn't in the allowed list",
+"共用時區已更新": "Shared time zone updated",
+"更新共用時區失敗": "Couldn't update the shared time zone",
+"請提供有效的暱稱": "Please provide a valid nickname",
+"暱稱更新成功": "Nickname updated",
+"更新暱稱失敗": "Couldn't update the nickname",
+"無法獲取自訂禮品": "Couldn't load custom gifts",
+"標題必須在1-100個字符之間": "Title must be 1–100 characters",
+"描述必須在1-500個字符之間": "Description must be 1–500 characters",
+"花費必須是1-10000之間的整數": "Cost must be an integer from 1 to 10000",
+"無效的禮品類別": "Invalid gift category",
+"圖標不能超過10個字符": "The icon can't exceed 10 characters",
+"禮品創建成功": "Gift created",
+"創建禮品失敗": "Couldn't create the gift",
+"找不到禮品或無權限修改": "Gift not found, or you don't have permission to edit it",
+"沒有提供有效的更新字段": "No valid fields provided to update",
+"禮品更新成功": "Gift updated",
+"更新禮品失敗": "Couldn't update the gift",
+"找不到禮品或無權限刪除": "Gift not found, or you don't have permission to delete it",
+"禮品刪除成功": "Gift deleted",
+"刪除禮品失敗": "Couldn't delete the gift",
+"15-30分鐘": "15–30 min",
+"無法獲取自訂劇本": "Couldn't load custom scripts",
+"無效的劇本類別": "Invalid script category",
+"情境描述必須在1-500個字符之間": "The scenario must be 1–500 characters",
+"場景地點不能超過50個字符": "The location can't exceed 50 characters",
+"劇本內容必須在1-50000個字符之間": "The script content must be 1–50000 characters",
+"時長描述不能超過50個字符": "The duration can't exceed 50 characters",
+"isPublic 必須是布林值": "isPublic must be a boolean",
+"劇本創建成功": "Script created",
+"創建劇本失敗": "Couldn't create the script",
+"找不到劇本或無權限修改": "Script not found, or you don't have permission to edit it",
+"劇本更新成功": "Script updated",
+"更新劇本失敗": "Couldn't update the script",
+"找不到劇本或無權限刪除": "Script not found, or you don't have permission to delete it",
+"劇本刪除成功": "Script deleted",
+"刪除劇本失敗": "Couldn't delete the script",
+"找不到劇本或無權限分享": "Script not found, or you don't have permission to share it",
+"你還沒有配對伴侶，無法分享。": "You haven't paired with a partner yet, so you can't share.",
+"找不到伴侶的電子郵件地址，請請伴侶更新資訊。": "We couldn't find your partner's email address. Please ask your partner to update their details.",
+"你的伴侶已關閉 Email 通知，目前無法分享。": "Your partner has turned off email notifications, so you can't share right now.",
+"信件服務尚未設定，因此暫時無法分享。": "The email service isn't set up yet, so sharing isn't available right now.",
+"你的伴侶": "Your partner",
+"分享失敗，請稍後再試。": "Couldn't share. Please try again in a moment.",
+"請先貼上劇本內容再使用 AI 角色辨識": "Please paste the script content before using AI character detection",
+"AI 角色辨識是 Premium 專屬功能。升級後，匯入劇本時 AI 會自動判斷每個角色的性別並帶入你們的暱稱。": "AI character detection is a Premium feature. Once you upgrade, AI automatically detects each character's gender when you import a script and fills in your nicknames.",
+"AI 角色辨識暫時無法使用，請稍後再試，或直接在「角色對應」手動指定男／女。": "AI character detection isn't available right now. Please try again in a moment, or assign male/female manually under \"Role mapping\".",
+"請提供 Google 文件連結": "Please provide a Google Docs link",
+"這不是有效的 Google 文件連結。請貼上 docs.google.com/document/d/… 開頭的分享連結。": "That isn't a valid Google Docs link. Please paste a share link starting with docs.google.com/document/d/….",
+"無法讀取這份文件。請在 Google 文件按「共用」，把權限設為「知道連結的任何人皆可檢視」後再試一次。": "We couldn't read this document. In Google Docs, tap \"Share\", set access to \"Anyone with the link can view\", then try again.",
+"這份文件是空的，沒有內容可以匯入。": "This document is empty, so there's nothing to import.",
+"讀取 Google 文件逾時，請稍後再試，或直接複製文件內容貼到「劇本內容」。": "Reading the Google Doc timed out. Please try again in a moment, or copy the document's text into \"Script content\".",
+"暫時無法連線到 Google 文件，請稍後再試，或直接複製文件內容貼到「劇本內容」。": "We can't reach Google Docs right now. Please try again in a moment, or copy the document's text into \"Script content\".",
+"start_date 必須為 YYYY-MM-DD 格式": "start_date must be in YYYY-MM-DD format",
+"length_days 必須為 1 到 14 之間的整數": "length_days must be an integer from 1 to 14",
+"備註不能超過 1000 個字符": "Notes can't exceed 1000 characters",
+"週期紀錄已儲存": "Cycle record saved",
+"建立週期紀錄失敗": "Couldn't create the cycle record",
+"獲取週期紀錄失敗": "Couldn't load cycle records",
+"找不到週期紀錄或您沒有權限修改": "Cycle record not found, or you don't have permission to edit it",
+"週期紀錄已更新": "Cycle record updated",
+"更新週期紀錄失敗": "Couldn't update the cycle record",
+"找不到週期紀錄或您沒有權限刪除": "Cycle record not found, or you don't have permission to delete it",
+"週期紀錄已刪除": "Cycle record deleted",
+"刪除週期紀錄失敗": "Couldn't delete the cycle record",
+"暫時沒辦法開始情緒深潛，請稍後再試一次。": "Couldn't start the emotion deep dive right now. Please try again in a moment.",
+"暫時讀不到你的情緒深潛進度。": "Couldn't load your emotion deep dive progress right now.",
+"暫時讀不到伴侶分享的內容。": "Couldn't load what your partner shared right now.",
+"找不到這段情緒深潛或沒有權限": "This emotion deep dive wasn't found, or you don't have access",
+"暫時讀不到這段情緒深潛。": "Couldn't load this emotion deep dive right now.",
+"未知的步驟": "Unknown step",
+"只有開始這段深潛的人可以編輯它。": "Only the person who started this deep dive can edit it.",
+"這段深潛已經分享或完成了，沒辦法再改前面的步驟。想重新探索可以開始一段新的。": "This deep dive has already been shared or completed, so earlier steps can't be changed. To explore again, start a new one.",
+"這一步暫時存不起來，你寫的內容還在，請再試一次。": "This step couldn't be saved right now. What you wrote is still here; please try again.",
+"只有開始這段深潛的人可以寫這封信。": "Only the person who started this deep dive can write this letter.",
+"這封信已經分享或完成，沒辦法再改了。": "This letter has already been shared or completed and can't be changed.",
+"這封信暫時存不起來，你寫的內容還在，請再試一次。": "This letter couldn't be saved right now. What you wrote is still here; please try again.",
+"AI 暫時想不出來，你還是可以自己寫。": "The AI can't think of anything right now. You can still write it yourself.",
+"只有開始這段深潛的人可以分享它。": "Only the person who started this deep dive can share it.",
+"分享這封信需要先和另一半配對。你寫的內容都已經幫你存好了，先邀請另一半，配對之後就能分享；在那之前，你也可以只保存給自己。": "Sharing this letter requires pairing with your partner first. Everything you wrote is saved. Invite your partner, and you can share once you're paired; until then, you can keep it just for yourself.",
+"還沒有寫給伴侶的信可以分享。先在「寫給伴侶」那一步寫下幾句話，再分享給 TA。": "There's no letter to your partner to share yet. Write a few lines in the \"To my partner\" step first, then share it with them.",
+"打開 App，先花點時間讀完 TA 想讓你了解的感受。": "Open the app and take some time to read the feelings they want you to understand.",
+"暫時沒辦法分享，你的信已經存好了，請稍後再試一次。": "Can't share right now. Your letter is saved; please try again in a moment.",
+"這一步是留給收到信的另一半做的。": "This step is for the partner who received the letter.",
+"暫時存不起來，請再試一次。": "Couldn't save right now. Please try again.",
+"暫時存不起來，你寫的內容還在，請再試一次。": "Couldn't save right now. What you wrote is still here; please try again.",
+"打開 App 看看 TA 的理解與回應。": "Open the app to see their understanding and response.",
+"只有開始這段深潛的人可以收尾它。": "Only the person who started this deep dive can wrap it up.",
+"只有開始這段深潛的人可以結束它。": "Only the person who started this deep dive can end it.",
+"暫時沒辦法結束，請再試一次。": "Couldn't finish right now. Please try again.",
+"私人對話沒有收尾流程。想和伴侶一起定下下次的約定，可以先把它改成雙方都看得到的對話。": "Private conversations don't have a wrap-up. To agree on next steps with your partner, first make it a conversation you can both see.",
+"收尾需要兩個人一起寫。先邀請另一半配對，配對之後就能一起定下下次的約定。": "Wrapping up takes both of you. Invite your partner to pair first, and then you can agree on next steps together.",
+"你們已經完成這次收尾了。想再補上約定可以先重新開啟討論。": "You've already finished this wrap-up. To add commitments, reopen the discussion first.",
+"這段對話還沒進入收尾。先按「一起收尾」，你們就能各自寫下下次願意做的事。": "This conversation isn't wrapping up yet. Tap \"Wrap up together\" first, and you can each write what you're willing to do next time.",
+"你們一起定下了下次的約定": "You agreed on your next steps together",
+"你們的收尾先幫你們留著了": "We've kept your wrap-up for you",
+"無法開始收尾，請稍後再試": "Couldn't start the wrap-up. Please try again in a moment",
+"這段對話還沒有收尾紀錄。按「一起收尾」就能開始。": "This conversation has no wrap-up yet. Tap \"Wrap up together\" to start.",
+"無法載入收尾進度，請稍後再試": "Couldn't load the wrap-up progress. Please try again in a moment",
+"某人": "Someone",
+"AI 暫時想不出來，你還是可以自己寫一句。": "The AI can't think of anything right now. You can still write a sentence yourself.",
+"這個約定有點短。試著寫成一個看得見的行動，例如「即使很生氣，也不在人前責罵你」。": "This commitment is a bit short. Try writing a visible action, like \"Even when I'm angry, I won't scold you in front of others\".",
+"這次收尾已經完成了。想調整約定可以先重新開啟討論。": "This wrap-up is already complete. To adjust commitments, reopen the discussion first.",
+"無法送出你的約定，請稍後再試": "Couldn't send your commitment. Please try again in a moment",
+"先寫下你自己的約定，才看得到對方寫的。": "Write your own commitment first, then you can see theirs.",
+"對方還沒寫下他的約定，等他寫好你就能看到。": "Your partner hasn't written their commitment yet. You'll see it once they do.",
+"這次收尾還沒有共同決定可以回應。": "There's no shared decision to respond to in this wrap-up yet.",
+"無法送出你的回應，請稍後再試": "Couldn't send your response. Please try again in a moment",
+"無法跳過收尾，請稍後再試": "Couldn't skip the wrap-up. Please try again in a moment",
+"已經有人寫下約定了，不能取消這次收尾。你可以先跳過，或直接完成。": "Someone has already written a commitment, so this wrap-up can't be cancelled. You can skip for now, or finish it.",
+"好，先繼續聊。想收尾的時候隨時可以再按一次。": "Okay, let's keep talking. Tap again whenever you want to wrap up.",
+"無法回到討論，請稍後再試": "Couldn't return to the discussion. Please try again in a moment",
+"先寫下你自己的約定，才能完成這次收尾。": "Write your own commitment first to finish this wrap-up.",
+"無法完成收尾，請稍後再試": "Couldn't finish the wrap-up. Please try again in a moment",
+"無法取得 AI 見解，請稍後再試": "Couldn't get the AI insight. Please try again in a moment",
+"金錢": "Money",
+"原始文字需在 1–4000 字之間": "The original text must be 1–4000 characters",
+"AI 解析失敗，請稍後再試": "The AI couldn't process this. Please try again in a moment",
+"開場訊息需在 1–2000 字之間": "The opening message must be 1–2000 characters",
+"您還沒有完整的情侶關係": "Your couple isn't fully set up yet",
+"伴侶分享了一個情境": "Your partner shared a situation",
+"建立對話失敗": "Couldn't create the conversation",
+"無法取得分析資料": "Couldn't load insights",
+"最近兩週": "Last 2 weeks",
+"諮商摘要會整理你們兩人一起記錄的事件。先和另一半配對，累積幾件事後就能一鍵整理成帶去諮商的摘要。": "The counseling summary organizes the events you both recorded. Pair with your partner first; once you've recorded a few, you can turn them into a summary for counseling with one tap.",
+"諮商摘要暫時無法產生，請稍後再試": "The counseling summary can't be generated right now. Please try again in a moment",
+"溝通模式會從你們一起說開的幾件事裡，看出反覆出現的循環。先和另一半配對，累積幾次之後就能一起看見。": "Communication patterns are spotted from several issues you've talked through together. Pair with your partner first; after a few, you'll see them together.",
+"溝通模式暫時無法產生，請稍後再試": "Communication patterns can't be generated right now. Please try again in a moment",
+"無法載入諮商摘要紀錄，請稍後再試": "Couldn't load counseling summary history. Please try again in a moment",
+"話題建議會從你們最近記錄的事件裡，主動整理出下次諮商可以聊的方向。先和另一半配對，就能開始收到建議。": "Topic suggestions pull directions for your next session from the events you've recorded recently. Pair with your partner to start receiving suggestions.",
+"平靜模式・": "Calm mode・",
+"話題建議暫時無法產生，請稍後再試": "Topic suggestions can't be generated right now. Please try again in a moment",
+"筆記需在 500 字以內": "Notes must be within 500 characters",
+"請提供 status 或 notes 其中之一": "Please provide either status or notes",
+"找不到這批話題建議": "This batch of topic suggestions wasn't found",
+"找不到這個話題": "This topic wasn't found",
+"更新失敗，請稍後再試": "Couldn't update. Please try again in a moment",
+"無法載入話題庫，請稍後再試": "Couldn't load the topic library. Please try again in a moment",
+"請先和另一半配對，才能標記話題庫的話題": "Please pair with your partner before marking topics from the library",
+"無法載入話題建議紀錄，請稍後再試": "Couldn't load topic suggestion history. Please try again in a moment",
+"無法取得對話列表": "Couldn't load conversations",
+"此為私人對話": "This is a private conversation",
+"無法取得對話詳情": "Couldn't load the conversation details",
+"標題需在 1–120 字之間": "The title must be 1–120 characters",
+"簡介需在 1–1000 字之間": "The summary must be 1–1000 characters",
+"沒有可更新的欄位": "Nothing to update",
+"只有發起人可以編輯對話內容": "Only the person who started it can edit the conversation",
+"你們正在收尾，先一起完成約定。想改內容可以重新開啟討論。": "You're wrapping up, so finish your commitments together first. To change the content, reopen the discussion.",
+"這段對話已完成，無法編輯": "This conversation is complete and can't be edited",
+"編輯對話失敗，請稍後再試": "Couldn't edit the conversation. Please try again in a moment",
+"訊息需在 1–2000 字之間": "Messages must be 1–2000 characters",
+"你們正在收尾，先一起完成約定。想改訊息可以重新開啟討論。": "You're wrapping up, so finish your commitments together first. To change messages, reopen the discussion.",
+"這段對話已完成，無法編輯訊息": "This conversation is complete, so messages can't be edited",
+"AI 諮商師的留言無法編輯": "The AI counselor's comments can't be edited",
+"只能編輯自己送出的訊息": "You can only edit messages you sent",
+"編輯訊息失敗，請稍後再試": "Couldn't edit the message. Please try again in a moment",
+"無法新增訊息": "Couldn't add the message",
+"回覆需在 1–2000 字之間": "Replies must be 1–2000 characters",
+"AI 改寫失敗，請稍後再試": "The AI rewrite failed. Please try again in a moment",
+"內容需在 1–2000 字之間": "Content must be 1–2000 characters",
+"找不到事件或沒有權限": "Event not found, or you don't have access",
+"情緒檢測暫時無法產生，請稍後再試": "The emotion check can't be generated right now. Please try again in a moment",
+"私人對話不支援 AI 接住情緒建議": "Private conversations don't support AI suggestions for holding feelings",
+"AI 接住情緒建議暫時無法產生，請稍後再試": "AI suggestions for holding feelings can't be generated right now. Please try again in a moment",
+"發起人": "Started by",
+"AI 諮商師暫時無法回應，請稍後再試": "The AI counselor can't respond right now. Please try again in a moment",
+"無法新增 AI 留言": "Couldn't add the AI comment",
+"私人對話無法開啟情緒翻譯": "Emotion translation can't be turned on for private conversations",
+"無法更新情緒翻譯設定，請稍後再試": "Couldn't update the emotion translation setting. Please try again in a moment",
+"私人對話無法使用情緒翻譯": "Emotion translation isn't available in private conversations",
+"AI 諮商師": "AI counselor",
+"情緒翻譯暫時無法產生，請稍後再試": "Emotion translation can't be generated right now. Please try again in a moment",
+"私人對話沒有治療摘要": "Private conversations don't have session notes",
+"先按「一起收尾」，AI 才會為你們整理這次衝突的治療摘要。": "Tap \"Wrap up together\" first, and then AI will put together session notes for this conflict.",
+"治療摘要暫時無法產生，請稍後再試": "Session notes can't be generated right now. Please try again in a moment",
+"無法更新已讀狀態": "Couldn't update the read status",
+"這段對話伴侶已經看得到了。": "Your partner can already see this conversation.",
+"這是對方的私人對話，只有建立者可以決定要不要讓你看得到。": "This is your partner's private conversation; only its creator can decide whether you can see it.",
+"已讓伴侶看得到這段對話，你們可以一起討論了。": "Your partner can now see this conversation, so you can discuss it together.",
+"分享失敗，請稍後再試": "Couldn't share. Please try again in a moment",
+"請先讓伴侶看得到這段對話，才能匿名公開到公開問答。": "Please let your partner see this conversation first before sharing it anonymously to Public Q&A.",
+"已匿名公開到公開問答，謝謝你願意幫助其他人。": "Shared anonymously to Public Q&A. Thank you for being willing to help others.",
+"公開失敗，請稍後再試": "Couldn't publish. Please try again in a moment",
+"已取消公開，這個對話不再顯示於公開問答。": "Unpublished. This conversation no longer appears in Public Q&A.",
+"取消公開失敗，請稍後再試": "Couldn't unpublish. Please try again in a moment",
+"私人對話無法重新開啟": "Private conversations can't be reopened",
+"只有已解決或收尾中的對話可以重新開啟": "Only resolved or wrapping-up conversations can be reopened",
+"伴侶想繼續聊聊這個情境": "Your partner wants to keep talking about this situation",
+"無法重新開啟對話": "Couldn't reopen the conversation",
+"夥伴 A": "Partner A",
+"私人對話無法使用引導模式": "Guided mode isn't available in private conversations",
+"這段對話已完成，如需再談可先重新開啟對話": "This conversation is complete. To talk more, reopen it first",
+"你們正在收尾，先一起完成約定；還想再練習可以重新開啟對話。": "You're wrapping up, so finish your commitments together first. To practice more, reopen the conversation.",
+"引導模式需要兩個人一起練習。先邀請另一半配對，配對後就能一起進行；在那之前，你仍可用「請 AI 諮商師加入」聽聽建議。": "Guided mode needs both of you. Invite your partner to pair first, and you can do it together once paired; until then, you can still \"Invite the AI counselor\" for advice.",
+"無法載入引導進度，請稍後再試": "Couldn't load the guided practice progress. Please try again in a moment",
+"無法開始引導，請稍後再試": "Couldn't start the guided practice. Please try again in a moment",
+"目前沒有進行中的引導": "There's no guided practice in progress",
+"引導暫時無法繼續，請稍後再試": "The guided practice can't continue right now. Please try again in a moment",
+"無法結束引導，請稍後再試": "Couldn't end the guided practice. Please try again in a moment",
+"無法載入你的評價，請稍後再試。": "Couldn't load your review. Please try again in a moment.",
+"請給 1 到 5 顆星的評分": "Please give a rating from 1 to 5 stars",
+"評價內容請介於 1 到 2000 字": "Reviews must be 1–2000 characters",
+"匿名用戶": "Anonymous user",
+"感謝你的回饋！審核通過後就會顯示在首頁。": "Thanks for your feedback! It'll appear on the home page once approved.",
+"送出評價失敗，請稍後再試。": "Couldn't submit your review. Please try again in a moment.",
+"最近有幾次親密邀請被婉拒或沒有回應。我很重視我們的連結，也想了解你的感受。也許我們可以找個時間聊聊，看看怎麼讓彼此都感到被愛與被理解？": "A few of my recent intimacy invitations were declined or went unanswered. I really value our connection and want to understand how you feel. Could we find a time to talk about how we can both feel loved and understood?",
+"最近有幾次親密邀請被你婉拒，我很想知道你的想法，因為我在乎你的舒適與感受。願意找個時刻聊聊，讓我們找到彼此都安心的步調嗎？": "You've declined a few of my recent intimacy invitations, and I'd really like to know what you're thinking, because I care about your comfort and feelings. Would you be open to finding a moment to talk, so we can find a pace we both feel good about?",
+"最近有幾次親密邀請一直等不到你的回覆，我會擔心是不是哪裡讓你不舒服。你的想法對我很重要，我們可以聊聊，一起打造舒服的親密氛圍嗎？": "A few of my recent intimacy invitations are still waiting for your reply, and I worry something might be making you uncomfortable. What you think matters a lot to me. Could we talk and create an intimate atmosphere we're both comfortable with?",
+"訊息不能超過1000個字符": "Messages can't exceed 1000 characters",
+"請求類型無效": "Invalid request type",
+"scheduled_time 必須為 ISO8601 字串": "scheduled_time must be an ISO8601 string",
+"roleplay_category 過長": "roleplay_category is too long",
+"script_title 過長": "script_title is too long",
+"script_scenario 過長": "script_scenario is too long",
+"一般邀請": "General invitation",
+"浪漫時光": "Romantic time",
+"玩鬧互動": "Playful",
+"驚喜": "Surprise",
+"讚美": "Compliment",
+"親密時光": "Intimate moment",
+"和好邀請": "Make-up invitation",
+"情緒指引": "Emotion guide",
+"親密請求已發送": "Intimacy invitation sent",
+"發送親密請求失敗": "Couldn't send the intimacy invitation",
+"劇本標題為必填": "The script title is required",
+"劇本資料不完整，請重新選擇劇本": "The script details are incomplete. Please choose the script again",
+"AI 暫時無法生成這個劇本的建議訊息，請稍後再試，或直接自行輸入邀請內容": "The AI can't suggest messages for this script right now. Please try again in a moment, or write your invitation yourself",
+"AI 暫時無法生成建議訊息，請稍後再試，或直接自行輸入邀請內容": "The AI can't suggest a message right now. Please try again in a moment, or write your invitation yourself",
+"回饋資料無效": "Invalid feedback data",
+"回饋送出失敗，請稍後再試": "Couldn't send your feedback. Please try again in a moment",
+"請選擇和解強度": "Please choose a make-up intensity",
+"對話 ID 格式錯誤": "Invalid conversation ID format",
+"請先選擇和解強度再產生開場白": "Please choose a make-up intensity before generating an opener",
+"找不到這段對話，可能已被刪除。你可以改選其他對話，或不選對話直接產生開場白。": "This conversation wasn't found and may have been deleted. You can choose another conversation, or generate an opener without one.",
+"AI 暫時想不出合適的開場白，請稍後再試，或直接自行輸入和解內容。": "The AI can't come up with a good opener right now. Please try again in a moment, or write your message yourself.",
+"AI 暫時無法產生開場白，請稍後再試，或直接自行輸入和解內容。": "The AI can't generate an opener right now. Please try again in a moment, or write your message yourself.",
+"天數格式錯誤": "Invalid number of days",
+"無法取得天數，請重新整理後再試": "Couldn't get the number of days. Please refresh and try again",
+"需要先完成配對，才能讓 Twogether 幫你溫柔提醒另一半。": "You need to be paired before Twogether can gently remind your partner.",
+"暫時無法產生提醒句子，請稍後再試，或直接自行傳訊息給另一半。": "Reminder messages can't be generated right now. Please try again in a moment, or message your partner directly.",
+"提醒內容不能為空": "The reminder can't be empty",
+"請先選擇一則提醒句子": "Please choose a reminder message first",
+"需要先完成配對，才能把提醒送給另一半。": "You need to be paired to send your partner a reminder.",
+"親愛的": "Dear",
+"已把溫柔提醒送到TA的邀請紀錄，也寄了一封貼心提醒信 💌": "Your gentle reminder was sent to their invitation history, along with a caring reminder email 💌",
+"已把溫柔提醒送到TA的邀請紀錄 💗": "Your gentle reminder was sent to their invitation history 💗",
+"送出提醒時發生錯誤，請稍後再試。": "Something went wrong sending the reminder. Please try again in a moment.",
+"無法獲取邀請統計": "Couldn't load invitation stats",
+"目前的回應狀況穩定，不需要特別提醒。": "Your responses look steady right now, so no reminder is needed.",
+"尚未找到完整的情侶關係，請先完成配對。": "We couldn't find a complete couple. Please finish pairing first.",
+"你的伴侶已關閉 Email 通知，目前無法寄出提醒。": "Your partner has turned off email notifications, so a reminder can't be sent right now.",
+"信件服務尚未設定，因此暫時無法寄出提醒。": "The email service isn't set up yet, so reminders can't be sent right now.",
+"已寄出貼心提醒信，祝你們的對話順利💌": "A caring reminder email was sent. Wishing you a good conversation 💌",
+"寄送提醒信時發生錯誤，請稍後再試。": "Something went wrong sending the reminder email. Please try again in a moment.",
+"獲取親密請求失敗": "Couldn't load intimacy invitations",
+"回應必須是 accepted、declined 或 rejected": "The response must be accepted, declined or rejected",
+"回應訊息不能超過500個字符": "The response message can't exceed 500 characters",
+"alternative_scheduled_time 必須為 ISO8601 字串": "alternative_scheduled_time must be an ISO8601 string",
+"這個邀請已被撤回或無法回應，請重新整理頁面": "This invitation was withdrawn or can't be responded to. Please refresh the page",
+"此請求已經被回應過了": "This invitation has already been responded to",
+"邀請被接受 💕": "Invitation accepted 💕",
+"邀請被婉拒": "Invitation declined",
+"你的親密邀請被接受了！": "Your intimacy invitation was accepted!",
+"你的親密邀請被婉拒了": "Your intimacy invitation was declined",
+"接受了你的親密邀請 💚": "accepted your intimacy invitation 💚",
+"對你的親密邀請提出了替代方案": "suggested an alternative to your intimacy invitation",
+"婉拒了你的親密邀請": "declined your intimacy invitation",
+"回應成功但無法獲取更新後的請求信息": "The response was saved, but we couldn't load the updated invitation",
+"請求已接受": "Invitation accepted",
+"請求已拒絕": "Invitation declined",
+"回應親密請求失敗": "Couldn't respond to the intimacy invitation",
+"找不到指定的請求或您沒有權限刪除": "Invitation not found, or you don't have permission to delete it",
+"親密請求已刪除": "Intimacy invitation deleted",
+"刪除親密請求失敗": "Couldn't delete the intimacy invitation",
+"獲取未讀通知數量失敗": "Couldn't load the unread notification count",
+"獲取親密模板失敗": "Couldn't load intimacy templates",
+"獲取分類親密模板失敗": "Couldn't load intimacy templates for this category",
+"獲取替代親密選項失敗": "Couldn't load alternative intimacy options",
+"獲取通知失敗": "Couldn't load notifications",
+"至少需要提供一個通知ID": "At least one notification ID is required",
+"標記通知為已讀失敗": "Couldn't mark notifications as read",
+"暫時讀不到你們的故事，請稍後再試。": "Couldn't load your story right now. Please try again in a moment.",
+"照片格式不支援": "This photo format isn't supported",
+"照片太大，請換一張": "This photo is too large. Please choose another",
+"請填一個標題": "Please enter a title",
+"日期格式錯誤": "Invalid date format",
+"格式錯誤": "Invalid format",
+"暫時存不了這段回憶，請稍後再試。": "Couldn't save this memory right now. Please try again in a moment.",
+"id 格式錯誤": "Invalid id format",
+"找不到這段回憶，可能已被刪除。": "This memory wasn't found and may have been deleted.",
+"暫時存不了這次修改，請稍後再試。": "Couldn't save this change right now. Please try again in a moment.",
+"暫時刪不掉，請稍後再試。": "Couldn't delete right now. Please try again in a moment.",
+"暫時存不了照片與回憶，請稍後再試。": "Couldn't save the photo and memory right now. Please try again in a moment.",
+"歡迎加入 Twogether 通知！\n請回到 App 的「設定 → LINE 通知」取得綁定碼，把它傳給我就能開始接收通知。": "Welcome to Twogether notifications!\nGo back to \"Settings → LINE notifications\" in the app to get your link code, then send it to me to start receiving notifications.",
+"這組綁定碼無效或已過期。請到 App 的「設定 → LINE 通知」重新取得綁定碼。": "This link code is invalid or expired. Please get a new one in the app under \"Settings → LINE notifications\".",
+"✅ 綁定成功！之後伴侶的重要通知（對話回覆、親密邀請等）都會傳到這裡。\n想關閉可到「設定 → LINE 通知」。": "✅ Linked! Your partner's important updates (conversation replies, intimacy invitations and more) will now come here.\nTo turn this off, go to \"Settings → LINE notifications\".",
+"LINE 通知尚未啟用": "LINE notifications aren't enabled yet",
+"無法產生綁定碼，請稍後再試": "Couldn't create a link code. Please try again in a moment",
+"無法取得 LINE 綁定狀態": "Couldn't load the LINE link status",
+"無法更新 LINE 通知設定": "Couldn't update LINE notification settings",
+"已解除 LINE 綁定": "LINE unlinked",
+"無法解除綁定": "Couldn't unlink",
+"愛你": "Love you",
+"意猶未盡": "Can't get enough",
+"想再抱一次": "Want another hug",
+"很難忘": "Unforgettable",
+"對方回應了你們的記錄": "Your partner responded to your record",
+"請輸入有效的日期時間格式": "Please enter a valid date and time",
+"備註不能超過1000個字符": "Notes can't exceed 1000 characters",
+"描述不能超過500個字符": "The description can't exceed 500 characters",
+"持續時間不能超過50個字符": "The duration can't exceed 50 characters",
+"地點不能超過200個字符": "The location can't exceed 200 characters",
+"角色扮演劇本不能超過2000個字符": "The role-play script can't exceed 2000 characters",
+"愛情時刻記錄成功": "Love moment recorded",
+"記錄愛情時刻失敗": "Couldn't record the love moment",
+"獲取愛情時刻失敗": "Couldn't load love moments",
+"找不到指定的愛情時刻": "Love moment not found",
+"這個回應已經不支援了，請重新選一個心意。": "This response isn't supported anymore. Please choose another.",
+"找不到這則記錄，它可能已經被刪除了。": "This record wasn't found. It may have been deleted.",
+"無法送出回應，請稍後再試一次。": "Couldn't send your response. Please try again in a moment.",
+"找不到指定的愛情時刻或您沒有權限修改": "Love moment not found, or you don't have permission to edit it",
+"愛情時刻更新成功": "Love moment updated",
+"更新愛情時刻失敗": "Couldn't update the love moment",
+"找不到指定的愛情時刻或您沒有權限刪除": "Love moment not found, or you don't have permission to delete it",
+"愛情時刻刪除成功": "Love moment deleted",
+"刪除愛情時刻失敗": "Couldn't delete the love moment",
+"格式錯誤，請重新整理後再試": "Invalid format. Please refresh and try again",
+"AI 一時想不出新問題，先用現有的問題，等等再試一次。": "The AI couldn't think of new questions just now. Use the current ones and try again in a bit.",
+"AI 暫時無法產生新問題，先用現有的問題，稍後再試一次。": "The AI can't generate new questions right now. Use the current ones and try again later.",
+"無法載入創作市集劇本": "Couldn't load creator marketplace scripts",
+"劇本 ID 必須是 UUID": "The script ID must be a UUID",
+"找不到劇本": "Script not found",
+"無法載入劇本詳情": "Couldn't load the script details",
+"無法載入評論": "Couldn't load reviews",
+"星等必須是 1-5": "The rating must be 1–5",
+"評論不能超過 500 字": "Reviews can't exceed 500 characters",
+"不能評自己的劇本": "You can't rate your own script",
+"此劇本未公開": "This script isn't public",
+"無法送出評分": "Couldn't submit the rating",
+"無法刪除評分": "Couldn't delete the rating",
+"無法送出檢舉": "Couldn't send the report",
+"無法載入收藏": "Couldn't load saved scripts",
+"溝通": "Communication",
+"親密": "Intimacy",
+"家務分工": "Chores",
+"情緒支持": "Emotional support",
+"共同未來": "Shared future",
+"需要先和伴侶配對，才能一起做婚姻檢查。": "You need to pair with your partner before doing a relationship check-in together.",
+"無法載入婚姻檢查，請稍後再試。": "Couldn't load the relationship check-in. Please try again in a moment.",
+"無法載入歷史紀錄，請稍後再試。": "Couldn't load history. Please try again in a moment.",
+"找不到這份婚姻檢查。": "This relationship check-in wasn't found.",
+"無法開始婚姻檢查，請稍後再試。": "Couldn't start the relationship check-in. Please try again in a moment.",
+"answers 必須是物件": "answers must be an object",
+"這份婚姻檢查已經完成並揭曉，無法再修改答案。": "This relationship check-in has been completed and revealed, so answers can't be changed.",
+"無法送出答案，請稍後再試。": "Couldn't send your answers. Please try again in a moment.",
+"今日 AI 次數已達上限，這次先看看彼此的答案，過了今天再回來看 AI 的中立總結，或升級 Premium 提高每日上限。": "You've reached today's AI limit. For now, look at each other's answers, and come back after today for the AI's neutral summary, or upgrade to Premium for a higher daily limit.",
+"AI 暫時無法產生總結，但你們還是可以先看看彼此的答案、聊聊看。稍後可以再回來看看 AI 的建議。": "The AI can't generate a summary right now, but you can still look at each other's answers and talk. Come back later for the AI's suggestions.",
+"配對邀請已發送": "Pairing invitation sent",
+"發送配對邀請失敗": "Couldn't send the pairing invitation",
+"邀請類型必須是 email 或 code": "Invitation type must be email or code",
+"個人訊息不能超過500個字符": "The personal message can't exceed 500 characters",
+"請先登入或註冊以接受配對邀請": "Please sign in or sign up to accept the pairing invitation",
+"配對成功！歡迎加入 Twogether": "Paired! Welcome to Twogether",
+"接受配對邀請失敗": "Couldn't accept the pairing invitation",
+"請輸入配對碼": "Please enter a pairing code",
+"你們已成功配對！": "You two are now paired!",
+"配對邀請不存在或已處理": "The pairing invitation doesn't exist or has already been handled",
+"已拒絕配對邀請": "Pairing invitation declined",
+"拒絕配對邀請失敗": "Couldn't decline the pairing invitation",
+"無法獲取邀請詳情": "Couldn't load the invitation details",
+"找不到可取消的邀請": "No invitation found to cancel",
+"已取消配對邀請": "Pairing invitation cancelled",
+"取消配對邀請失敗": "Couldn't cancel the pairing invitation",
+"找不到可重新發送的邀請": "No invitation found to resend",
+"郵件服務尚未設定": "The email service isn't set up yet",
+"邀請已重新發送": "Invitation resent",
+"重新發送邀請失敗": "Couldn't resend the invitation",
+"無法獲取邀請列表": "Couldn't load invitations",
+"只允許上傳圖片文件 (jpg, jpeg, png, gif, webp)": "Only image files can be uploaded (jpg, jpeg, png, gif, webp)",
+"請選擇要上傳的圖片": "Please choose an image to upload",
+"圖片上傳成功": "Image uploaded",
+"圖片上傳失敗": "Image upload failed",
+"獲取圖片失敗": "Couldn't load the image",
+"找不到指定的圖片或您沒有權限刪除": "Image not found, or you don't have permission to delete it",
+"圖片刪除成功": "Image deleted",
+"刪除圖片失敗": "Couldn't delete the image",
+"無法載入投票，請稍後再試": "Couldn't load polls. Please try again in a moment",
+"找不到這則投票": "This poll wasn't found",
+"匿名": "Anonymous",
+"無法載入投票內容": "Couldn't load the poll",
+"找不到這個選項": "This option wasn't found",
+"投票失敗，請稍後再試": "Couldn't vote. Please try again in a moment",
+"心聲需在 1 到 500 字之間": "Your thoughts must be 1–500 characters",
+"心聲送出失敗，請稍後再試": "Couldn't send your thoughts. Please try again in a moment",
+"找不到這則心聲": "This comment wasn't found",
+"已收到你的檢舉，我們會盡快處理": "Report received. We'll look into it as soon as possible",
+"檢舉送出失敗，請稍後再試": "Couldn't send the report. Please try again in a moment",
+"本週的關係檢視": "This week's relationship check",
+"花兩分鐘檢視你們的「信賴」與「奉獻」，照顧關係之屋。": "Take two minutes to check your \"trust\" and \"commitment\" and look after your relationship house.",
+"好久沒有親密了": "It's been a while since you were intimate",
+"存一筆好感吧": "Make a goodwill deposit",
+"對 TA 說一句欣賞的話，替你們的關係存好感。": "Say something appreciative to them and make a deposit in your relationship.",
+"無法載入關係概況，請稍後再試。": "Couldn't load the relationship overview. Please try again in a moment.",
+"請為每個項目評分（1–5）": "Please rate each item (1–5)",
+"需要先完成伴侶配對才能做關係檢視": "You need to pair with your partner before doing a relationship check",
+"已記錄本週的關係檢視": "This week's relationship check is saved",
+"儲存關係檢視失敗，請稍後再試。": "Couldn't save the relationship check. Please try again in a moment.",
+"無法載入關係檢視紀錄，請稍後再試。": "Couldn't load relationship check history. Please try again in a moment.",
+"牆上的話": "Words on the wall",
+"正向的分享與留言，是關係的存款。": "Positive sharing and notes are deposits in your relationship.",
+"身體與情感的連結加深親密感。": "Physical and emotional connection deepens intimacy.",
+"記錄了一次親密時光": "Recorded an intimate moment",
+"化解的衝突": "Resolved conflicts",
+"一起把問題解決，修復了關係。": "Solving a problem together repaired the relationship.",
+"衝突事件": "Conflicts",
+"未化解的摩擦會慢慢消耗好感。": "Unresolved friction slowly wears down goodwill.",
+"無法載入好感存款明細，請稍後再試。": "Couldn't load goodwill details. Please try again in a moment.",
+"無法獲取最愛劇本": "Couldn't load favorite scripts",
+"劇本 ID 必須是 1-100 字元的字串": "The script ID must be a 1–100 character string",
+"無法加入最愛劇本": "Couldn't add to favorite scripts",
+"無法移除最愛劇本": "Couldn't remove from favorite scripts",
+"獲取統計數據失敗": "Couldn't load stats",
+"獲取成就統計失敗": "Couldn't load achievement stats",
+"背景": "Background",
+"發生了什麼": "What happened",
+"情緒衝擊": "Emotional impact",
+"我們試過什麼": "What we tried",
+"轉捩點與修復": "Turning point & repair",
+"現在的我們": "Where we are now",
+"無法載入故事，請稍後再試": "Couldn't load stories. Please try again in a moment",
+"無法載入你的故事": "Couldn't load your stories",
+"找不到這則故事，可能已被移除": "This story wasn't found and may have been removed",
+"無法載入故事內容": "Couldn't load the story",
+"請先寫下你的故事（至少 30 字），AI 才能幫你分段": "Please write your story first (at least 30 characters) so the AI can split it into sections",
+"AI 分段失敗，請稍後再試，或改用逐步填寫": "The AI couldn't split it into sections. Please try again in a moment, or write step by step",
+"標題需在 4 到 120 字之間": "The title must be 4–120 characters",
+"發表失敗，請稍後再試": "Couldn't publish. Please try again in a moment",
+"原文連結格式不正確，請貼上完整網址": "The original link isn't valid. Please paste the full URL",
+"找不到這則故事": "Story not found",
+"不能為自己的故事投票，把機會留給被你幫助的人": "You can't vote on your own story. Leave that to the people you've helped",
+"留言需在 1 到 1000 字之間": "Comments must be 1–1000 characters",
+"留言失敗，請稍後再試": "Couldn't post your comment. Please try again in a moment",
+"找不到這則故事或沒有權限": "Story not found, or you don't have access",
+"故事已刪除": "Story deleted",
+"刪除失敗，請稍後再試": "Couldn't delete. Please try again in a moment",
+"找不到這則留言": "This comment wasn't found",
+"大頭照只接受 jpg、jpeg、png、webp 圖片格式": "Profile photos must be jpg, jpeg, png or webp",
+"證明文件只接受 jpg、jpeg、png、webp 或 pdf 格式": "Documents must be jpg, jpeg, png, webp or pdf",
+"focus 無效": "Invalid focus",
+"無法取得諮商師列表": "Couldn't load counselors",
+"上傳太頻繁了，請稍等一分鐘再試": "Too many uploads. Please wait a minute and try again",
+"請選擇要上傳的大頭照": "Please choose a profile photo to upload",
+"請選擇要上傳的證明文件": "Please choose a document to upload",
+"上傳失敗，請稍後再試": "Upload failed. Please try again in a moment",
+"你還沒有諮商師檔案": "You don't have a counselor profile yet",
+"無法取得諮商師檔案": "Couldn't load the counselor profile",
+"姓名長度需為 1-120 字": "Name must be 1–120 characters",
+"請至少選擇一個專長領域": "Please choose at least one specialty",
+"年資無效": "Invalid years of experience",
+"費率無效": "Invalid rate",
+"時長無效": "Invalid duration",
+"你還沒有諮商師檔案，請先申請成為諮商師": "You don't have a counselor profile yet. Please apply to become a counselor first",
+"請至少選擇一個有效的專長領域": "Please choose at least one valid specialty",
+"沒有要更新的欄位": "Nothing to update",
+"檔案已更新": "Profile updated",
+"更新檔案失敗，請稍後再試": "Couldn't update the profile. Please try again in a moment",
+"文件網址無效": "Invalid document URL",
+"文件已上傳，等待管理員審核": "Document uploaded, waiting for admin review",
+"上傳文件失敗，請稍後再試": "Couldn't upload the document. Please try again in a moment",
+"無法取得預約紀錄": "Couldn't load bookings",
+"找不到這個諮商室": "This counseling room wasn't found",
+"你沒有權限進入這個諮商室": "You don't have access to this counseling room",
+"無法載入訊息": "Couldn't load messages",
+"訊息長度需為 1-2000 字": "Messages must be 1–2000 characters",
+"eventId 無效": "Invalid eventId",
+"你沒有權限在這個諮商室發言": "You don't have permission to post in this counseling room",
+"引用的對話無效": "The quoted conversation is invalid",
+"諮商師": "Counselor",
+"對方": "Partner",
+"送出訊息失敗": "Couldn't send the message",
+"action 無效": "Invalid action",
+"找不到這個預約": "Booking not found",
+"只有諮商師可以回覆預約": "Only the counselor can respond to bookings",
+"回覆預約失敗": "Couldn't respond to the booking",
+"你沒有權限公開這個對話": "You don't have permission to publish this conversation",
+"這個對話已經公開了": "This conversation is already public",
+"已經有一方提議公開，等待另一方同意中": "Publishing has already been proposed and is waiting for the other side to agree",
+"已提議公開，等待個案同意。同意後會匿名顯示在公開問答。": "Publishing proposed, waiting for the client to agree. Once they do, it appears anonymously in Public Q&A.",
+"已提議公開，等待諮商師同意。同意後會匿名顯示在公開問答。": "Publishing proposed, waiting for the counselor to agree. Once they do, it appears anonymously in Public Q&A.",
+"提議公開失敗，請稍後再試": "Couldn't propose publishing. Please try again in a moment",
+"目前沒有待同意的公開提議": "There's no publishing proposal waiting for agreement",
+"需要由諮商師同意才能公開": "The counselor needs to agree before it can be published",
+"需要由個案同意才能公開": "The client needs to agree before it can be published",
+"對話已匿名公開為公開問答，謝謝你願意幫助其他人。": "The conversation was published anonymously as public Q&A. Thank you for being willing to help others.",
+"同意公開失敗，請稍後再試": "Couldn't agree to publish. Please try again in a moment",
+"你沒有權限變更這個對話": "You don't have permission to change this conversation",
+"這個對話本來就是私密的": "This conversation is already private",
+"無法取得申請紀錄": "Couldn't load applications",
+"page 無效": "Invalid page",
+"無法取得公開問答列表": "Couldn't load public Q&A",
+"匿名 A": "Anonymous A",
+"匿名 B": "Anonymous B",
+"匿名 C": "Anonymous C",
+"找不到這則公開問答，或它已被取消公開": "This public Q&A wasn't found, or it has been unpublished",
+"匿名個案": "Anonymous client",
+"無法載入公開問答": "Couldn't load this public Q&A",
+"找不到這則公開問答": "This public Q&A wasn't found",
+"操作失敗，請稍後再試": "Something went wrong. Please try again in a moment",
+"無法取得專屬心理師資訊": "Couldn't load dedicated therapist details",
+"therapistId 無效": "Invalid therapistId",
+"請先建立你們的關係後，再指定專屬心理師": "Please set up your couple first, then choose a dedicated therapist",
+"此心理師目前無法被指定為專屬心理師": "This therapist can't be chosen as a dedicated therapist right now",
+"你們新增了專屬心理師": "You added a dedicated therapist",
+"，並可留言": ", and can comment",
+"有伴侶將你設為專屬心理師": "A couple chose you as their dedicated therapist",
+"你可以在「我輔導的伴侶」檢視他們的牆與好好說話": "You can view their wall and conversations under \"Couples I support\"",
+"已設定專屬心理師": "Dedicated therapist set",
+"設定專屬心理師失敗，請稍後再試": "Couldn't set the dedicated therapist. Please try again in a moment",
+"canComment 需為布林值": "canComment must be a boolean",
+"請先建立你們的關係": "Please set up your couple first",
+"你們還沒有專屬心理師": "You don't have a dedicated therapist yet",
+"已允許心理師留言": "Therapist comments allowed",
+"已關閉心理師留言權限": "Therapist comments turned off",
+"更新權限失敗，請稍後再試": "Couldn't update permissions. Please try again in a moment",
+"你們目前沒有專屬心理師": "You don't currently have a dedicated therapist",
+"已解除專屬心理師": "Dedicated therapist removed",
+"解除失敗，請稍後再試": "Couldn't remove. Please try again in a moment",
+"無法取得個案列表": "Couldn't load the client list",
+"你不是這對伴侶的專屬心理師": "You're not this couple's dedicated therapist",
+"無法取得牆內容": "Couldn't load the wall",
+"找不到貼文": "Post not found",
+"無法取得回覆": "Couldn't load replies",
+"回覆內容必須在 1-1000 字之間": "Replies must be 1–1000 characters",
+"這對伴侶尚未開放留言權限給你": "This couple hasn't allowed you to comment yet",
+"你們的專屬心理師在牆上留言": "Your dedicated therapist commented on your wall",
+"找不到對話": "Conversation not found",
+"無法取得話題建議": "Couldn't load topic suggestions",
+"無法取得諮商摘要": "Couldn't load the counseling summary",
+"內容需在 1-2000 字之間": "Content must be 1–2000 characters",
+"你們的專屬心理師回覆了對話": "Your dedicated therapist replied in your conversation",
+"找不到這位諮商師": "This counselor wasn't found",
+"無法取得諮商師資料": "Couldn't load the counselor's details",
+"請填寫姓名": "Please enter your name",
+"請填寫有效的聯絡 Email": "Please enter a valid contact email",
+"這個帳號已經有一份諮商師申請或檔案了。請登入後到「我的諮商師檔案」編輯，不需重複申請。": "This account already has a counselor application or profile. Sign in and edit it under \"My counselor profile\"; there's no need to apply again.",
+"申請已送出，我們會在審核後與你聯繫": "Application sent. We'll contact you after review",
+"送出申請失敗，請稍後再試": "Couldn't submit the application. Please try again in a moment",
+"focusArea 無效": "Invalid focusArea",
+"Email 格式錯誤": "Invalid email format",
+"時間格式錯誤": "Invalid time format",
+"預約已送出，諮商師將盡快與你聯繫": "Booking sent. The counselor will contact you as soon as possible",
+"預約失敗，請稍後再試": "Couldn't book. Please try again in a moment",
+"來源無效": "Invalid source",
+"這位諮商師目前暫不開放新案預約": "This counselor isn't taking new clients right now",
+"已建立預約，請完成付款以確認時段。": "Booking created. Please complete payment to confirm your time.",
+"provider 無效": "Invalid provider",
+"請貼上有效的會議連結": "Please paste a valid meeting link",
+"只有諮商師可以設定會議連結": "Only the counselor can set the meeting link",
+"請先接受預約，再設定會議連結": "Please accept the booking before setting the meeting link",
+"會議連結已提供給對方。": "The meeting link has been shared.",
+"設定會議連結失敗，請稍後再試": "Couldn't set the meeting link. Please try again in a moment",
+"只有預約方可以付款": "Only the person who booked can pay",
+"這不是付費視訊預約": "This isn't a paid video booking",
+"這個預約已經付款了": "This booking has already been paid",
+"預約金額異常，請重新預約": "The booking amount looks wrong. Please book again",
+"Twogether 視訊諮商": "Twogether video session",
+"無法取得收入資料": "Couldn't load earnings data",
+"無法取得評價": "Couldn't load reviews",
+"評價內容需為 1-4000 字": "Reviews must be 1–4000 characters",
+"評分需為 1-5": "The rating must be 1–5",
+"不能評價自己的檔案": "You can't review your own profile",
+"與這位諮商師預約過後，才能留下評價": "You can leave a review after booking with this counselor",
+"你已經評價過這位諮商師了": "You've already reviewed this counselor",
+"感謝你的評價！我們會在審核後公開顯示。": "Thanks for your review! It'll be shown publicly after review.",
+"送出評價失敗，請稍後再試": "Couldn't submit your review. Please try again in a moment",
+"抱抱": "Hug",
+"我懂": "I get it",
+"謝謝你說": "Thanks for telling me",
+"晚點好好回你": "I'll reply properly later",
+"對方回應了你的貼文": "Your partner responded to your post",
+"無法獲取貼文": "Couldn't load posts",
+"無法獲取心情標籤": "Couldn't load mood tags",
+"這是你自己的貼文，心意回應是留給另一半的。你可以直接補一則回覆。": "This is your own post; reactions are for your partner. You can add a reply instead.",
+"無法送出心意回應": "Couldn't send the reaction",
+"內容不能超過 6000 字": "Content can't exceed 6000 characters",
+"心情標籤不能超過 32 字": "Mood tags can't exceed 32 characters",
+"無效的類別": "Invalid category",
+"尚未配對，無法在牆上發文": "You're not paired yet, so you can't post on the wall",
+"請輸入內容，或至少上傳一張照片或影片": "Please enter something, or upload at least one photo or video",
+"對方留下了重要的話 ⭐": "Your partner left something important ⭐",
+"對方在牆上留言": "Your partner posted on the wall",
+"貼文發布成功": "Post published",
+"發布貼文失敗": "Couldn't publish the post",
+"找不到貼文或無權限修改": "Post not found, or you don't have permission to edit it",
+"請輸入內容，或至少保留一張照片或影片": "Please enter something, or keep at least one photo or video",
+"貼文更新成功": "Post updated",
+"更新貼文失敗": "Couldn't update the post",
+"找不到貼文或無權限刪除": "Post not found, or you don't have permission to delete it",
+"貼文已刪除": "Post deleted",
+"刪除貼文失敗": "Couldn't delete the post",
+"無法獲取回覆": "Couldn't load replies",
+"回覆內容必須在 1-3000 字之間": "Replies must be 1–3000 characters",
+"對方回覆了你的貼文": "Your partner replied to your post",
+"回覆成功": "Replied",
+"發送回覆失敗": "Couldn't send the reply",
+"AI 留言內容必須在 1-3000 字之間": "AI comments must be 1–3000 characters",
+"AI 留言已貼到對話串": "The AI comment was posted to the thread",
+"貼上 AI 留言失敗": "Couldn't post the AI comment",
+"貼文": "Post",
+"找不到回覆或無權限刪除": "Reply not found, or you don't have permission to delete it",
+"回覆已刪除": "Reply deleted",
+"刪除回覆失敗": "Couldn't delete the reply",
+"這是私密貼文。請先關閉私密（分享給對方），才能匿名公開。": "This is a private post. Turn off private (share it with your partner) before publishing it anonymously.",
+"我們的牆分享": "Shared from Our wall",
+"溫柔的傾聽者": "The gentle listener",
+"Sophie 會先建立情緒上的安全感。她在給建議之前，一定先接住你的感受，鼓勵你們對彼此坦露脆弱。": "Sophie builds emotional safety first. Before any advice, she always holds your feelings, and encourages you both to be open about what's vulnerable.",
+"溫暖": "Warm",
+"輕柔": "Gentle",
+"有同理心": "Empathetic",
+"善於映照感受": "Reflects feelings well",
+"不急著給解法": "Doesn't rush to fix",
+"鼓勵你的朋友": "The encouraging friend",
+"Emma 像一位真心希望你們幸福的好朋友，用日常的語言陪你們聊，為每一點進步喝采。": "Emma is like a good friend who truly wants you to be happy. She talks with you in everyday language and cheers every bit of progress.",
+"正向": "Positive",
+"安心": "Reassuring",
+"有盼望": "Hopeful",
+"慶祝每個進步": "Celebrates every step forward",
+"用日常語言": "Everyday language",
+"務實的教練": "The practical coach",
+"Kai 專注於可行的下一步和健康的溝通習慣，給你們具體、清楚的建議。": "Kai focuses on doable next steps and healthy communication habits, with clear, concrete advice.",
+"直接": "Direct",
+"有條理": "Structured",
+"清楚": "Clear",
+"以解法為導向": "Solution-focused",
+"給具體建議": "Concrete advice",
+"睿智的引導者": "The wise guide",
+"Sage 幫你們看見更大的圖像，理解關係中一再出現的模式。": "Sage helps you see the bigger picture and understand the patterns that keep coming back in your relationship.",
+"沉穩": "Grounded",
+"深思": "Thoughtful",
+"有洞察": "Insightful",
+"溫和地反思": "Gently reflective",
+"培養自我覺察": "Builds self-awareness",
+"關係的加油者": "The relationship cheerleader",
+"Ember 帶著溫暖與樂觀，在對話變得疏離時，幫你們重新靠近彼此。": "Ember brings warmth and optimism, helping you find your way back to each other when things feel distant.",
+"有活力": "Energetic",
+"鼓舞人心": "Uplifting",
+"歌頌你們的愛": "Celebrates your love",
+"促進重新連結": "Encourages reconnection",
+"溫柔的和平使者": "The gentle peacemaker",
+"Aiko 幫衝突慢下來，創造讓雙方都感到被尊重的空間。": "Aiko slows conflicts down and makes space where you both feel respected.",
+"有耐心": "Patient",
+"尊重": "Respectful",
+"用安撫的語言": "Soothing language",
+"避免讓緊張升溫": "Keeps tension from rising",
+"正念的陪伴者": "The mindful companion",
+"Hana 鼓勵你們先安在當下、保持好奇，理解之後再回應。": "Hana encourages you to be present and curious first, and respond once you understand.",
+"平靜": "Calm",
+"好奇": "Curious",
+"不批判": "Non-judgmental",
+"帶正念色彩": "Mindful",
+"善用反思性提問": "Uses reflective questions",
+"溫暖的引路人": "The warm guide",
+"Mei 在善意與引導之間取得平衡：深深地聽，也溫柔地幫你們一起成長。": "Mei balances kindness and guidance: she listens deeply and gently helps you grow together.",
+"鼓勵": "Encouraging",
+"平衡": "Balanced",
+"給體貼的建議": "Thoughtful suggestions",
+"溫柔的督促": "Gentle nudges",
+"沉穩的關係陪伴者": "The steady relationship companion",
+"Luma 不選邊站。她讓雙方都感到被聽見，幫困難的對話慢下來，在解決問題之前先幫你們理解彼此。": "Luma doesn't take sides. She makes you both feel heard, slows hard conversations down, and helps you understand each other before solving the problem.",
+"中立": "Neutral",
+"情緒智慧高": "Emotionally wise",
+"同時接住雙方": "Holds you both",
+"鼓勵好奇": "Encourages curiosity",
+"先理解再解決": "Understand first, then solve",
+"語氣平靜安定": "Calm, steady tone",
+"溫柔關心": "Gentle care",
+"中立系統": "Neutral system",
+"鼓勵連結": "Encourage connection",
+"輕鬆幽默": "Light and playful",
+"科學感": "Science-y",
+"浪漫風": "Romantic",
+"完全無壓力": "Zero pressure",
+"不只談性": "Not just about sex",
+"像朋友提醒": "Like a friend's reminder",
+"成就感": "Sense of achievement",
+"AI 助理風": "AI assistant",
+"極簡版": "Minimal",
+"一段時間": "A while",
+"孩子之外，我們還是伴侶嗎？": "Beyond the kids, are we still partners?",
+"成為父母之後，很容易把所有時間都花在「一起帶小孩」，卻忘了單純當彼此的伴侶。": "After becoming parents, it's easy to spend all your time \"raising the kids together\" and forget to simply be each other's partner.",
+"最近我們有沒有只做「兩個人的事情」？": "Lately, have we done anything that's just for the two of us?",
+"上一次真正的約會是什麼時候？": "When was our last real date?",
+"我們最近談最多的是孩子，還是彼此？": "Lately, do we talk more about the kids, or about each other?",
+"如果沒有孩子這個共同任務，我們還會怎麼相處？": "Without the shared task of the kids, how would we be together?",
+"我們是不是把所有能量都給了孩子？": "Are we giving all our energy to the kids?",
+"把孩子的需求放在第一位是自然的，但久了也可能讓彼此的耐心和連結被悄悄耗掉。": "Putting the kids' needs first is natural, but over time it can quietly wear down your patience and connection.",
+"我們是不是把孩子的需求永遠放在第一位？": "Do we always put the kids' needs first?",
+"我們有沒有因此忽略彼此？": "Have we neglected each other because of it?",
+"照顧孩子的過程中，我們有沒有開始對彼此失去耐心？": "While caring for the kids, have we started losing patience with each other?",
+"我們怎麼同時成為好父母，也成為好的伴侶？": "How can we be good parents and good partners at the same time?",
+"我們平常有沒有在維護這段關係？": "Do we actively look after this relationship?",
+"關係和其他重要的事一樣，需要固定花心力維護，不會因為沒有吵架就自動變好。": "Like anything important, a relationship needs regular care. It doesn't get better on its own just because you're not fighting.",
+"我們多久有一次真正的約會？": "How often do we have a real date?",
+"我們多久有一次不談孩子、不談工作的聊天？": "How often do we talk without discussing the kids or work?",
+"最近一次讓對方感受到「我愛你」是什麼時候？": "When did you last make your partner feel \"I love you\"?",
+"我們現在的關係是靠什麼維持的？": "What's keeping our relationship going right now?",
+"鏡映": "Mirroring",
+"先重複你聽到的，不加上自己的解讀（「我聽到你說的是…」）。": "Repeat what you heard first, without adding your interpretation (\"What I heard you say is…\").",
+"換位": "Perspective-taking",
+"站在對方的角度，替對方把想說的說出來（「我想我是在告訴你…」）。": "Stand in their shoes and say what they're trying to say (\"I think I'm telling you…\").",
+"肯定": "Affirmation",
+"不需要同意，也能肯定對方的感受（「我可以理解你為什麼會覺得…」）。": "You can affirm their feelings without agreeing (\"I can understand why you'd feel…\").",
+"情緒標記": "Naming feelings",
+"為對方此刻的情緒選一個名字，再讓對方確認是否準確。": "Name their feeling right now, then let them confirm whether it's accurate.",
+"需求翻譯": "Translating needs",
+"把「你從來都…」翻譯成「我需要…」。": "Turn \"you never…\" into \"I need…\".",
+"慢下來": "Slow down",
+"先暫停、深呼吸，一次只說一句話。": "Pause, take a deep breath, and say one sentence at a time.",
+"修復": "Repair",
+"主動提出一個小小的修復（一句道歉、一個示好、一個玩笑）。": "Offer a small repair (an apology, a gesture of goodwill, a joke).",
+"欣賞": "Appreciation",
+"說出一件此刻你欣賞、或感謝對方的事。": "Say one thing you appreciate or are grateful for about them right now.",
+"新增了一則愛的記錄": "added a love record",
+"打開 App 看看你們的甜蜜時光": "Open the app to see your sweet moments",
+"更新了一則愛的記錄": "updated a love record",
+"打開 App 看看更新後的記錄": "Open the app to see the updated record",
+"刪除了一則愛的記錄": "deleted a love record",
+"一則愛的記錄已被移除": "A love record was removed",
+"新增了一筆週期紀錄": "added a cycle record",
+"打開 App 查看週期紀錄": "Open the app to see the cycle record",
+"更新了週期紀錄": "updated a cycle record",
+"打開 App 查看最新的週期紀錄": "Open the app to see the latest cycle record",
+"刪除了一筆週期紀錄": "deleted a cycle record",
+"一筆週期紀錄已被移除": "A cycle record was removed",
+"建立了一個自訂劇本": "created a custom script",
+"打開 App 看看新的劇本": "Open the app to see the new script",
+"更新了一個自訂劇本": "updated a custom script",
+"打開 App 看看更新後的劇本": "Open the app to see the updated script",
+"刪除了一個自訂劇本": "deleted a custom script",
+"一個自訂劇本已被移除": "A custom script was removed",
+"新增了一個客製禮物": "added a custom gift",
+"打開 App 看看新的禮物": "Open the app to see the new gift",
+"更新了一個客製禮物": "updated a custom gift",
+"打開 App 看看更新後的禮物": "Open the app to see the updated gift",
+"刪除了一個客製禮物": "deleted a custom gift",
+"一個客製禮物已被移除": "A custom gift was removed",
+"更新了關係評估": "updated the relationship assessment",
+"打開 App 看看 TA 的評估結果": "Open the app to see their assessment",
+"許下了一個愛的願望": "made a love wish",
+"打開 App 看看 TA 的願望": "Open the app to see their wish",
+"移除了一個愛的願望": "removed a love wish",
+"一個愛的願望已被移除": "A love wish was removed",
+"發起了一次婚姻健檢": "started a relationship check-in",
+"打開 App 一起完成健檢": "Open the app to finish the check-in together",
+"回覆了婚姻健檢": "responded to the relationship check-in",
+"打開 App 查看 TA 的回覆": "Open the app to see their response",
+"想讓你更了解 TA 的感受": "wants you to understand how they feel",
+"打開 App，先花點時間讀完 TA 想分享的": "Open the app and take some time to read what they want to share",
+"回應了你分享的感受": "responded to the feelings you shared",
+"打開 App 看看 TA 的理解與回應": "Open the app to see their understanding and response",
+"更新了你們的共同設定": "updated your shared settings",
+"打開 App 查看更新後的設定": "Open the app to see the updated settings",
+"更新了個人資料": "updated their profile",
+"打開 App 看看 TA 的更新": "Open the app to see their update",
+"你的另一半": "Your partner",
+"生成配對碼失敗，請稍後再試": "Couldn't create a pairing code. Please try again in a moment",
+"無效的邀請類型": "Invalid invitation type",
+"您已經在一個情侶關係中，無法發送新的配對邀請": "You're already in a couple, so you can't send a new pairing invitation",
+"請提供對方的電子郵件地址": "Please provide your partner's email address",
+"不能向自己發送配對邀請": "You can't send a pairing invitation to yourself",
+"您已經向這個電子郵件地址發送過配對邀請，請等待對方回應": "You've already sent a pairing invitation to this email. Please wait for their response",
+"這個用戶已經在一個情侶關係中": "This user is already in a couple",
+"配對邀請不存在": "The pairing invitation doesn't exist",
+"配對邀請不存在或已過期": "The pairing invitation doesn't exist or has expired",
+"配對邀請已過期": "The pairing invitation has expired",
+"只有受邀請的用戶才能接受此邀請": "Only the invited user can accept this invitation",
+"無法與自己配對": "You can't pair with yourself",
+"發送邀請的用戶已經與其他人建立了情侶關係": "The user who sent the invitation is already in a couple with someone else",
+"請輸入有效的配對碼": "Please enter a valid pairing code",
+"無效或過期的配對碼": "Invalid or expired pairing code",
+"已達免費方案上限，升級 Premium 可解除限制": "You've reached the free plan's limit. Upgrade to Premium to remove it",
+"只允許上傳圖片 (jpg, png, webp, gif) 或影片 (mp4, webm, mov)": "Only images (jpg, png, webp, gif) or videos (mp4, webm, mov) can be uploaded",
+"上傳的檔案數量或格式不符，請確認後再試。": "The number or format of uploaded files isn't right. Please check and try again.",
+"上傳的檔案格式不支援。": "This file format isn't supported.",
+"這串對話比較長，AI 這次沒能完成情緒翻譯（沒有扣用今日額度）。請按「重試」，通常再試一次就會成功。": "This thread is quite long, and the AI couldn't finish the emotion translation this time (today's credits weren't used). Tap \"Retry\"; it usually works the second time.",
+"周平均統計卡片": "Weekly average stats card",
+"在「記錄時光」顯示親密次數的周平均統計卡片。預設關閉，可在此開啟試用。": "Shows a weekly average intimacy stats card in \"Calendar\". Off by default; turn it on here to try it."
+},
+"patterns": [
+[
+"{0} {1}rating 必須為 up 或 down",
+"{0} {1} rating must be up or down"
+],
+[
+"{0}rating 必須為 up 或 down",
+"{0} rating must be up or down"
+],
+[
+"{0} {1}referenceId 需為有效 UUID",
+"{0} {1} referenceId must be a valid UUID"
+],
+[
+"{0}referenceId 需為有效 UUID",
+"{0} referenceId must be a valid UUID"
+],
+[
+"最多只能新增 {0} 項",
+"You can add up to {0} items"
+],
+[
+"{0} {1}更新了性別設定",
+"{0} {1} updated their gender setting"
+],
+[
+"{0}更新了性別設定",
+"{0} updated their gender setting"
+],
+[
+"選擇了 {0} 作為 AI 諮商師",
+"chose {0} as the AI counselor"
+],
+[
+"已選擇 {0} 作為你的 AI 諮商師",
+"{0} is now your AI counselor"
+],
+[
+"{0} {1}email_notifications_enabled 必須為布林值",
+"{0} {1} email_notifications_enabled must be a boolean"
+],
+[
+"{0}email_notifications_enabled 必須為布林值",
+"{0} email_notifications_enabled must be a boolean"
+],
+[
+"{0} {1}public_share_show_nickname 必須為布林值",
+"{0} {1} public_share_show_nickname must be a boolean"
+],
+[
+"{0}public_share_show_nickname 必須為布林值",
+"{0} public_share_show_nickname must be a boolean"
+],
+[
+"{0} {1}cycle_tracking_enabled 必須為布林值",
+"{0} {1} cycle_tracking_enabled must be a boolean"
+],
+[
+"{0}cycle_tracking_enabled 必須為布林值",
+"{0} cycle_tracking_enabled must be a boolean"
+],
+[
+"{0} {1}birth_date 必須為日期字串或 null",
+"{0} {1} birth_date must be a date string or null"
+],
+[
+"{0}birth_date 必須為日期字串或 null",
+"{0} birth_date must be a date string or null"
+],
+[
+"{0} {1}birth_date 必須為 YYYY-MM-DD 格式",
+"{0} {1} birth_date must be in YYYY-MM-DD format"
+],
+[
+"{0}birth_date 必須為 YYYY-MM-DD 格式",
+"{0} birth_date must be in YYYY-MM-DD format"
+],
+[
+"{0} {1}birth_date 無效",
+"{0} {1} birth_date is invalid"
+],
+[
+"{0}birth_date 無效",
+"{0} birth_date is invalid"
+],
+[
+"{0} {1}birth_date 年份太早",
+"{0} {1} birth_date year is too early"
+],
+[
+"{0}birth_date 年份太早",
+"{0} birth_date year is too early"
+],
+[
+"{0} {1}birth_date 不可為未來日期",
+"{0} {1} birth_date can't be in the future"
+],
+[
+"{0}birth_date 不可為未來日期",
+"{0} birth_date can't be in the future"
+],
+[
+"{0} {1}更新了生日資訊",
+"{0} {1} updated their birthday"
+],
+[
+"{0}更新了生日資訊",
+"{0} updated their birthday"
+],
+[
+"{0} {1}timezone 必須為字串或 null",
+"{0} {1} timezone must be a string or null"
+],
+[
+"{0}timezone 必須為字串或 null",
+"{0} timezone must be a string or null"
+],
+[
+"{0} {1}timezone 不在允許清單中",
+"{0} {1} timezone isn't in the allowed list"
+],
+[
+"{0}timezone 不在允許清單中",
+"{0} timezone isn't in the allowed list"
+],
+[
+"更新了所在時區為 {0}",
+"updated their time zone to {0}"
+],
+[
+"{0} {1}更新了所在時區",
+"{0} {1} updated their time zone"
+],
+[
+"{0}更新了所在時區",
+"{0} updated their time zone"
+],
+[
+"已啟用 Premium {0} 天",
+"Premium activated for {0} days"
+],
+[
+"獲得 {0} 金幣！",
+"Earned {0} coins!"
+],
+[
+"花費 {0} 金幣",
+"Spent {0} coins"
+],
+[
+"領取每日 {0} 金幣！",
+"Claimed {0} daily coins!"
+],
+[
+"{0} {1}idempotency_key 格式錯誤",
+"{0} {1} idempotency_key has an invalid format"
+],
+[
+"{0}idempotency_key 格式錯誤",
+"{0} idempotency_key has an invalid format"
+],
+[
+"{0} {1} 金幣",
+"{0} {1} coins"
+],
+[
+"{0} {1}primary_timezone 必須為字串或 null",
+"{0} {1} primary_timezone must be a string or null"
+],
+[
+"{0}primary_timezone 必須為字串或 null",
+"{0} primary_timezone must be a string or null"
+],
+[
+"{0} {1}primary_timezone 不在允許清單中",
+"{0} {1} primary_timezone isn't in the allowed list"
+],
+[
+"{0}primary_timezone 不在允許清單中",
+"{0} primary_timezone isn't in the allowed list"
+],
+[
+"共用時區已更新為 {0}",
+"Shared time zone updated to {0}"
+],
+[
+"暱稱已更新為「{0}」",
+"Nickname updated to \"{0}\""
+],
+[
+"{0} {1}isPublic 必須是布林值",
+"{0} {1} isPublic must be a boolean"
+],
+[
+"{0}isPublic 必須是布林值",
+"{0} isPublic must be a boolean"
+],
+[
+"每個劇本最多只能上傳 {0} 張照片",
+"Each script can have at most {0} photos"
+],
+[
+"已將「{0}」分享到伴侶的信箱。",
+"Shared \"{0}\" to your partner's inbox."
+],
+[
+"文件內容約 {0} 字，超過劇本 50,000 字上限。請先在文件中縮短內容再匯入。",
+"The document is about {0} characters, over the 50,000-character script limit. Please shorten it in the document first, then import."
+],
+[
+"{0} {1}start_date 必須為 YYYY-MM-DD 格式",
+"{0} {1} start_date must be in YYYY-MM-DD format"
+],
+[
+"{0}start_date 必須為 YYYY-MM-DD 格式",
+"{0} start_date must be in YYYY-MM-DD format"
+],
+[
+"{0} {1}length_days 必須為 1 到 14 之間的整數",
+"{0} {1} length_days must be an integer from 1 to 14"
+],
+[
+"{0}length_days 必須為 1 到 14 之間的整數",
+"{0} length_days must be an integer from 1 to 14"
+],
+[
+"週期開始日：{0}",
+"Cycle start date: {0}"
+],
+[
+"{0} 想和你一起想想下次怎麼做",
+"{0} wants to think together about what to do next time"
+],
+[
+"{0} 寫好了下次願意做的事",
+"{0} wrote what they're willing to do next time"
+],
+[
+"再給對方一點時間。{0} 之後你就可以自己先完成這次收尾。",
+"Give them a little more time. After {0} you can finish this wrap-up on your own."
+],
+[
+"{0} 這次沒能整理出想法，晚點再試一次就好。你們的約定已經留下來了。",
+"{0} couldn't put an observation together this time. Just try again later. Your commitments have been saved."
+],
+[
+"最近 {0} 天",
+"Last {0} days"
+],
+[
+"{0}還沒有可整理的事件。在「好好說話」記錄幾件最近發生的事，這裡就會幫你們整理成一份帶去諮商的摘要。",
+"{0} has no events to summarize yet. Record a few recent things in \"Talk it through\" and we'll turn them into a summary for counseling."
+],
+[
+"再多說開幾件事，就能看見你們的溝通模式了。目前已完成 {0} 件，累積 {1} 件（已標記解決、有治療摘要）後就會出現。",
+"Talk through a few more issues and you'll see your communication patterns. {0} done so far; they appear once you have {1} (marked resolved, with session notes)."
+],
+[
+"AI 諮商師 {0} 在對話中留言",
+"AI counselor {0} commented in the conversation"
+],
+[
+"{0} 開始了一段引導練習",
+"{0} started a guided practice"
+],
+[
+"{0} 在引導練習中留言",
+"{0} commented in the guided practice"
+],
+[
+"{0} {1}scheduled_time 必須為 ISO8601 字串",
+"{0} {1} scheduled_time must be an ISO8601 string"
+],
+[
+"{0}scheduled_time 必須為 ISO8601 字串",
+"{0} scheduled_time must be an ISO8601 string"
+],
+[
+"{0} {1}roleplay_category 過長",
+"{0} {1} roleplay_category is too long"
+],
+[
+"{0}roleplay_category 過長",
+"{0} roleplay_category is too long"
+],
+[
+"{0} {1}script_title 過長",
+"{0} {1} script_title is too long"
+],
+[
+"{0}script_title 過長",
+"{0} script_title is too long"
+],
+[
+"{0} {1}script_scenario 過長",
+"{0} {1} script_scenario is too long"
+],
+[
+"{0}script_scenario 過長",
+"{0} script_scenario is too long"
+],
+[
+"💌 Twogether｜{0} 傳來親密邀請",
+"💌 Twogether | {0} sent you an intimacy invitation"
+],
+[
+"類型：{0}{1}",
+"Type: {0}{1}"
+],
+[
+"・劇本《{0}》",
+" · Script \"{0}\""
+],
+[
+"{0} {1}alternative_scheduled_time 必須為 ISO8601 字串",
+"{0} {1} alternative_scheduled_time must be an ISO8601 string"
+],
+[
+"{0}alternative_scheduled_time 必須為 ISO8601 字串",
+"{0} alternative_scheduled_time must be an ISO8601 string"
+],
+[
+"{0} {1}接受了你的親密邀請 💚",
+"{0} {1} accepted your intimacy invitation 💚"
+],
+[
+"{0}接受了你的親密邀請 💚",
+"{0} accepted your intimacy invitation 💚"
+],
+[
+"{0} {1}對你的親密邀請提出了替代方案",
+"{0} {1} suggested an alternative to your intimacy invitation"
+],
+[
+"{0}對你的親密邀請提出了替代方案",
+"{0} suggested an alternative to your intimacy invitation"
+],
+[
+"{0} {1}婉拒了你的親密邀請",
+"{0} {1} declined your intimacy invitation"
+],
+[
+"{0}婉拒了你的親密邀請",
+"{0} declined your intimacy invitation"
+],
+[
+"💌 Twogether｜對方{0}",
+"💌 Twogether | Your partner {0}"
+],
+[
+"替代方案：{0}",
+"Alternative: {0}"
+],
+[
+"已標記 {0} 個通知為已讀",
+"Marked {0} notifications as read"
+],
+[
+"{0} 給了這則記錄一個「{1}」",
+"{0} gave this record a \"{1}\""
+],
+[
+"一句話回應最多 {0} 字。想說更多的話，寫進這則記錄的備註裡更適合。",
+"A one-line response can be at most {0} characters. To say more, the notes on this record are a better fit."
+],
+[
+"{0} {1}answers 必須是物件",
+"{0} {1} answers must be an object"
+],
+[
+"{0}answers 必須是物件",
+"{0} answers must be an object"
+],
+[
+"已經 {0} 天了，主動關心一下另一半吧。",
+"It's been {0} days. Reach out to your partner."
+],
+[
+"「{0}」至少需要 10 個字，寫下一點細節能幫助其他伴侶理解",
+"\"{0}\" needs at least 10 characters. A few details help other couples understand"
+],
+[
+"「{0}」超過 2000 字上限，請精簡後再送出",
+"\"{0}\" is over the 2000-character limit. Please shorten it before sending"
+],
+[
+"每天最多發表 {0} 則故事，明天再回來分享吧",
+"You can publish up to {0} stories a day. Come back tomorrow to share more"
+],
+[
+"文章內容需在 {0} 到 {1} 字之間",
+"The article must be {0}–{1} characters"
+],
+[
+"每天最多分享 {0} 篇好文，明天再回來分享吧",
+"You can share up to {0} articles a day. Come back tomorrow to share more"
+],
+[
+"標題長度需為 1-{0} 字",
+"The title must be 1–{0} characters"
+],
+[
+"{0} 現在可以檢視你們的牆與好好說話{1}",
+"{0} can now view your wall and conversations{1}"
+],
+[
+"{0} {1}canComment 需為布林值",
+"{0} {1} canComment must be a boolean"
+],
+[
+"{0}canComment 需為布林值",
+"{0} canComment must be a boolean"
+],
+[
+"視訊諮商 — {0}",
+"Video session — {0}"
+],
+[
+"TA 給了你一個「{0}」{1}",
+"They sent you a \"{0}\"{1}"
+],
+[
+"傳送了 {0} 個照片／影片",
+"Sent {0} photos/videos"
+],
+[
+"每則貼文最多 {0} 個，先移除一個才能再加。",
+"Up to {0} per post. Remove one before adding another."
+],
+[
+"AI 諮商師 {0} 在你們的牆上留言",
+"AI counselor {0} commented on your wall"
+],
+[
+"AI 諮商師 {0}",
+"AI counselor {0}"
+],
+[
+"Twogether 注意到，你們已經 {days} 天沒有記錄親密時光了。如果最近生活比較忙，不妨找個舒服的時間，好好陪伴彼此。",
+"Twogether noticed it's been {days} days since you recorded an intimate moment. If life's been busy lately, find a comfortable time to really be with each other."
+],
+[
+"距離上次親密時光已經 {days} 天。每段關係都有自己的步調，如果覺得合適，可以安排一點屬於彼此的時間。",
+"It's been {days} days since your last intimate moment. Every relationship has its own pace; if it feels right, make a little time for each other."
+],
+[
+"已經 {days} 天沒有記錄親密時光。一個擁抱、一場散步，或一段沒有打擾的聊天，都能讓彼此更靠近。",
+"It's been {days} days since you recorded an intimate moment. A hug, a walk, or an uninterrupted chat can all bring you closer."
+],
+[
+"親密能量已經 {days} 天沒有補充囉！找個適合的時機，幫你們的關係充充電吧。✨",
+"Your intimacy energy hasn't been recharged in {days} days! Find a good moment to recharge your relationship. ✨"
+],
+[
+"距離上次親密時光：{days} 天。穩定的親密互動，有助於維持情感連結。",
+"Time since your last intimate moment: {days} days. Steady intimacy helps maintain your emotional connection."
+],
+[
+"已經 {days} 天沒有記錄親密時光了。今晚，也許是個重新感受彼此溫度的好時機。",
+"It's been {days} days since you recorded an intimate moment. Tonight might be a good time to feel each other's warmth again."
+],
+[
+"距離上次親密時光已經 {days} 天。不需要急著改變什麼，只希望你們別忘了照顧彼此。",
+"It's been {days} days since your last intimate moment. No need to rush to change anything; we just hope you don't forget to take care of each other."
+],
+[
+"已經有 {days} 天沒有記錄親密時光了。親密不一定只有性愛，也可以是一個擁抱、一句關心，或一起度過的一段時光。",
+"It's been {days} days since you recorded an intimate moment. Intimacy isn't only sex; it can be a hug, a caring word, or time spent together."
+],
+[
+"最近是不是有點忙？已經 {days} 天沒有記錄親密時光了，不妨找個時間，好好陪陪彼此。",
+"Been a bit busy lately? It's been {days} days since you recorded an intimate moment. Find some time to really be with each other."
+],
+[
+"每一次親密互動，都是關係的一次加分。距離上次記錄已經 {days} 天，準備好創造下一個美好時刻了嗎？",
+"Every intimate moment is a plus for your relationship. It's been {days} days since your last record. Ready to create the next good moment?"
+],
+[
+"你們已經 {days} 天沒有記錄親密時光了。如果最近生活忙碌，不妨安排一點只屬於彼此的時間。",
+"It's been {days} days since you recorded an intimate moment. If life's been busy, plan a little time just for the two of you."
+],
+[
+"距離上次親密時光：{days} 天。找個時間，重新靠近彼此吧。",
+"Time since your last intimate moment: {days} days. Find a moment to get close again."
+],
+[
+"{0} {1}新增了一則愛的記錄",
+"{0} {1} added a love record"
+],
+[
+"{0}新增了一則愛的記錄",
+"{0} added a love record"
+],
+[
+"{0} {1}更新了一則愛的記錄",
+"{0} {1} updated a love record"
+],
+[
+"{0}更新了一則愛的記錄",
+"{0} updated a love record"
+],
+[
+"{0} {1}刪除了一則愛的記錄",
+"{0} {1} deleted a love record"
+],
+[
+"{0}刪除了一則愛的記錄",
+"{0} deleted a love record"
+],
+[
+"{0} {1}新增了一筆週期紀錄",
+"{0} {1} added a cycle record"
+],
+[
+"{0}新增了一筆週期紀錄",
+"{0} added a cycle record"
+],
+[
+"{0} {1}更新了週期紀錄",
+"{0} {1} updated a cycle record"
+],
+[
+"{0}更新了週期紀錄",
+"{0} updated a cycle record"
+],
+[
+"{0} {1}刪除了一筆週期紀錄",
+"{0} {1} deleted a cycle record"
+],
+[
+"{0}刪除了一筆週期紀錄",
+"{0} deleted a cycle record"
+],
+[
+"{0} {1}建立了一個自訂劇本",
+"{0} {1} created a custom script"
+],
+[
+"{0}建立了一個自訂劇本",
+"{0} created a custom script"
+],
+[
+"{0} {1}更新了一個自訂劇本",
+"{0} {1} updated a custom script"
+],
+[
+"{0}更新了一個自訂劇本",
+"{0} updated a custom script"
+],
+[
+"{0} {1}刪除了一個自訂劇本",
+"{0} {1} deleted a custom script"
+],
+[
+"{0}刪除了一個自訂劇本",
+"{0} deleted a custom script"
+],
+[
+"{0} {1}新增了一個客製禮物",
+"{0} {1} added a custom gift"
+],
+[
+"{0}新增了一個客製禮物",
+"{0} added a custom gift"
+],
+[
+"{0} {1}更新了一個客製禮物",
+"{0} {1} updated a custom gift"
+],
+[
+"{0}更新了一個客製禮物",
+"{0} updated a custom gift"
+],
+[
+"{0} {1}刪除了一個客製禮物",
+"{0} {1} deleted a custom gift"
+],
+[
+"{0}刪除了一個客製禮物",
+"{0} deleted a custom gift"
+],
+[
+"{0} {1}更新了關係評估",
+"{0} {1} updated the relationship assessment"
+],
+[
+"{0}更新了關係評估",
+"{0} updated the relationship assessment"
+],
+[
+"{0} {1}許下了一個愛的願望",
+"{0} {1} made a love wish"
+],
+[
+"{0}許下了一個愛的願望",
+"{0} made a love wish"
+],
+[
+"{0} {1}移除了一個愛的願望",
+"{0} {1} removed a love wish"
+],
+[
+"{0}移除了一個愛的願望",
+"{0} removed a love wish"
+],
+[
+"{0} {1}發起了一次婚姻健檢",
+"{0} {1} started a relationship check-in"
+],
+[
+"{0}發起了一次婚姻健檢",
+"{0} started a relationship check-in"
+],
+[
+"{0} {1}回覆了婚姻健檢",
+"{0} {1} responded to the relationship check-in"
+],
+[
+"{0}回覆了婚姻健檢",
+"{0} responded to the relationship check-in"
+],
+[
+"{0} {1}想讓你更了解 TA 的感受",
+"{0} {1} wants you to understand how they feel"
+],
+[
+"{0}想讓你更了解 TA 的感受",
+"{0} wants you to understand how they feel"
+],
+[
+"{0} {1}回應了你分享的感受",
+"{0} {1} responded to the feelings you shared"
+],
+[
+"{0}回應了你分享的感受",
+"{0} responded to the feelings you shared"
+],
+[
+"{0} {1}更新了你們的共同設定",
+"{0} {1} updated your shared settings"
+],
+[
+"{0}更新了你們的共同設定",
+"{0} updated your shared settings"
+],
+[
+"{0} {1}更新了個人資料",
+"{0} {1} updated their profile"
+],
+[
+"{0}更新了個人資料",
+"{0} updated their profile"
+],
+[
+"今日 AI 整理次數已達上限（{0} 次／天），升級 Premium 可提高上限",
+"You've reached today's AI limit ({0} per day). Upgrade to Premium for a higher limit"
+],
+[
+"免費方案最多建立 {0} 個自訂劇本，升級 Premium 即可無限建立",
+"The free plan allows up to {0} custom scripts. Upgrade to Premium for unlimited scripts"
+],
+[
+"免費方案最多上傳 {0} 張照片，升級 Premium 即可無限上傳",
+"The free plan allows up to {0} photos. Upgrade to Premium for unlimited uploads"
+],
+[
+"影片大小不能超過 {0}MB，請壓縮或改用較短的片段後再試。",
+"Videos can't exceed {0}MB. Please compress it or use a shorter clip and try again."
+],
+[
+"每張照片大小不能超過 {0}MB，請壓縮後再試。",
+"Each photo can't exceed {0}MB. Please compress it and try again."
+],
+[
+"影片大小不能超過 {0}MB，照片不能超過 {1}MB，請壓縮後再試。",
+"Videos can't exceed {0}MB and photos can't exceed {1}MB. Please compress them and try again."
+],
+[
+"已完成 {0} / {1} 則，較長的留言這次沒翻完。按「重試」可補齊其餘幾則。",
+"{0} / {1} done. Some longer messages weren't translated this time. Tap \"Retry\" to finish the rest."
+],
+[
+"情境：{0}",
+"Scenario: {0}"
+]
+]
+}

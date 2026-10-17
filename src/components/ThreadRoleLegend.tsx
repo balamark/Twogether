@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
+import { tr } from '../i18n/tr';
 
 // 第一次進入對話時出現一次的角色圖例。
 //
@@ -45,32 +46,32 @@ const ThreadRoleLegend: React.FC<Props> = ({ companionName, partnerName }) => {
       <button
         type="button"
         onClick={dismiss}
-        aria-label="知道了"
+        aria-label={tr("知道了", 'Got it')}
         data-testid="thread-role-legend-dismiss"
         className="absolute top-2 right-2 p-1.5 text-petal-muted hover:text-petal-ink transition-colors"
       >
         <X className="w-3.5 h-3.5" strokeWidth={1.5} />
       </button>
-      <p className="font-body text-[11px] uppercase tracking-[0.18em] text-petal-muted mb-2">這段對話怎麼看</p>
+      <p className="font-body text-[11px] uppercase tracking-[0.18em] text-petal-muted mb-2">{tr('這段對話怎麼看', 'How to read this conversation')}</p>
       <div className="flex items-start justify-between gap-2 text-center">
         <div className="flex-1 min-w-0">
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-white border border-petal-rule" />
-          <p className="font-body text-xs text-petal-ink mt-1 truncate">{partnerName || '對方'}</p>
-          <p className="font-body text-[11px] text-petal-muted">靠左</p>
+          <p className="font-body text-xs text-petal-ink mt-1 truncate">{partnerName || tr('對方', 'Partner')}</p>
+          <p className="font-body text-[11px] text-petal-muted">{tr('靠左', 'Left')}</p>
         </div>
         <div className="flex-1 min-w-0">
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-petal-rose-soft border border-petal-rose-soft" />
           <p className="font-body text-xs text-petal-rose-deep mt-1 truncate">{companionName}</p>
-          <p className="font-body text-[11px] text-petal-muted">置中</p>
+          <p className="font-body text-[11px] text-petal-muted">{tr('置中', 'Center')}</p>
         </div>
         <div className="flex-1 min-w-0">
           <span className="inline-block w-2.5 h-2.5 rounded-full bg-petal-cream-2 border border-petal-rule-soft" />
-          <p className="font-body text-xs text-petal-ink mt-1">我</p>
-          <p className="font-body text-[11px] text-petal-muted">靠右</p>
+          <p className="font-body text-xs text-petal-ink mt-1">{tr('我', 'Me')}</p>
+          <p className="font-body text-[11px] text-petal-muted">{tr('靠右', 'Right')}</p>
         </div>
       </div>
       <p className="font-body text-[11px] text-petal-muted mt-2 leading-relaxed">
-        {companionName} 不站在任何一方，所以坐在你們兩個中間。
+        {companionName} {tr('不站在任何一方，所以坐在你們兩個中間。', 'They don\'t take sides, so they sit between you two.')}
       </p>
     </div>
   );

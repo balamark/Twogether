@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertCircle, CheckCircle, Info, AlertTriangle, X, Coins, Star } from 'lucide-react';
+import { tr } from '../i18n/tr';
 
 export interface Notification {
   id: string;
@@ -98,7 +99,7 @@ const ErrorNotification: React.FC<ErrorNotificationProps> = ({ notification, onC
           {notification.badge && (
             <div className="flex items-center space-x-1 mt-2">
               <Star className={`w-4 h-4 ${getTextColor()}`} />
-              <span className={`text-xs ${getTextColor()}`}>獲得徽章: {notification.badge}</span>
+              <span className={`text-xs ${getTextColor()}`}>{tr('獲得徽章:', 'Badge earned:')} {notification.badge}</span>
             </div>
           )}
         </div>

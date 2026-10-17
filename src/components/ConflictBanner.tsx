@@ -6,6 +6,7 @@ import {
   type ConflictLevel,
   type ConflictMessage,
 } from '../utils/conflictState';
+import { tr } from '../i18n/tr';
 
 // Stage 0 safety banner. Reads the thread, and when it detects escalation /
 // flooding / crisis, shows a gentle, dismissible nudge above the conversation.
@@ -86,7 +87,7 @@ const ConflictBanner: React.FC<Props> = ({ messages, threadKey }) => {
       <button
         type="button"
         onClick={dismiss}
-        aria-label="稍後再說"
+        aria-label={tr("稍後再說", 'Maybe later')}
         data-testid="conflict-banner-dismiss"
         className="shrink-0 -mr-1 -mt-0.5 p-1 rounded hover:bg-black/5 transition-colors"
       >

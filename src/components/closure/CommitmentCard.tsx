@@ -2,6 +2,7 @@ import { Sprout } from 'lucide-react';
 import type { ClosureCommitment } from '../../services/api';
 import { formatDateTime } from '../../utils/datetime';
 import { useTimezone } from '../../contexts/TimezoneContext';
+import { tr } from '../../i18n/tr';
 
 // Batch 1's read-only commitment row. Reused by Batches 2–3 (playbook and
 // follow-up), so keep it dumb: no click handlers, no menus, no fetches. The
@@ -25,10 +26,10 @@ export default function CommitmentCard({
       <div className="flex items-center justify-between">
         <p className="text-xs text-petal-ink-soft inline-flex items-center gap-1">
           <Sprout className="w-3 h-3 text-petal-sage-deep" />
-          {ownerLabel}的約定
+          {ownerLabel}{tr('的約定', '\'s commitment')}
         </p>
         {dueLabel && (
-          <span className="text-[11px] text-petal-ink-soft">預計 {dueLabel} 前回顧</span>
+          <span className="text-[11px] text-petal-ink-soft">{tr('預計', 'Review by')} {dueLabel} {tr('前回顧', '')}</span>
         )}
       </div>
       <p className="text-sm text-petal-ink">{commitment.text}</p>

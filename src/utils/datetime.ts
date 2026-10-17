@@ -3,6 +3,7 @@
 // which typically comes from <TimezoneProvider> populated with the couple's primary tz.
 
 import { TIMEZONE_OPTIONS, getTimezoneShortLabel } from './timezone-options';
+import { tr, dateLocale } from '../i18n/tr';
 
 export interface DateTimeOptions {
   // When true, always append " (短標籤)" even if tz matches the viewer's browser tz.
@@ -25,7 +26,7 @@ function shouldAppendTz(tz: string, opts?: DateTimeOptions): boolean {
 }
 
 function formatPartsZh(date: Date, opts: Intl.DateTimeFormatOptions): string {
-  return new Intl.DateTimeFormat('zh-TW', opts).format(date);
+  return new Intl.DateTimeFormat(dateLocale(), opts).format(date);
 }
 
 function safeDate(value: string | Date): Date | null {
@@ -110,10 +111,10 @@ export function formatRelativeOrDate(
   const day = 24 * hour;
   const week = 7 * day;
 
-  if (diffMs < minute) return '剛剛';
-  if (diffMs < hour) return `${Math.floor(diffMs / minute)} 分鐘前`;
-  if (diffMs < day) return `${Math.floor(diffMs / hour)} 小時前`;
-  if (diffMs < week) return `${Math.floor(diffMs / day)} 天前`;
+  if (diffMs < minute) return tr('剛剛', 'Just now');
+  if (diffMs < hour) return tr(`${Math.floor(diffMs / minute)} 分鐘前`, `${Math.floor(diffMs / minute)} min ago`);
+  if (diffMs < day) return tr(`${Math.floor(diffMs / hour)} 小時前`, `${Math.floor(diffMs / hour)} h ago`);
+  if (diffMs < week) return tr(`${Math.floor(diffMs / day)} 天前`, `${Math.floor(diffMs / day)} d ago`);
 
   const opts: Intl.DateTimeFormatOptions = fallbackOpts
     ? { ...fallbackOpts, timeZone: tz }

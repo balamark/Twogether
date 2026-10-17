@@ -6,6 +6,7 @@ import apiService, {
 } from '../services/api';
 import { useAiQuota } from '../hooks/useAiQuota';
 import AiQuotaHint from './AiQuotaHint';
+import { tr } from '../i18n/tr';
 
 type Step = 'input' | 'loading' | 'select' | 'submitting';
 
@@ -25,20 +26,20 @@ interface ComposeEventFlowProps {
 const VERSION_META: { key: EventVersionKey; label: string; desc: string; accent: string }[] = [
   {
     key: 'neutral',
-    label: '中性版',
-    desc: '用你自己的口吻，平靜、就事論事地說出這件事與感受，作為開場訊息。',
+    label: tr('中性版', 'Neutral'),
+    desc: tr('用你自己的口吻，平靜、就事論事地說出這件事與感受，作為開場訊息。', 'In your own voice, calmly and factually describe what happened and how you feel, as the opening message.'),
     accent: 'border-petal-sage bg-petal-sage/10',
   },
   {
     key: 'firm',
-    label: '堅定不攻擊版',
-    desc: '說出自己的感受與影響，不指責、不請求、不討好。',
+    label: tr('堅定不攻擊版', 'Firm, not attacking'),
+    desc: tr('說出自己的感受與影響，不指責、不請求、不討好。', 'Say how you feel and how it affected you, without blaming, demanding or pleasing.'),
     accent: 'border-petal-rose bg-petal-rose/10',
   },
   {
     key: 'warm',
-    label: '善意版',
-    desc: '在堅定的基礎上多一句願意聊聊的善意（可選）。',
+    label: tr('善意版', 'Kind'),
+    desc: tr('在堅定的基礎上多一句願意聊聊的善意（可選）。', 'Firm, plus one kind line about being open to talking (optional).'),
     accent: 'border-petal-rose-deep bg-petal-cream-2',
   },
 ];
@@ -63,11 +64,11 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
   const submitInput = async () => {
     const trimmed = rawText.trim();
     if (trimmed.length < 1) {
-      setError('請先寫下你目前的感受');
+      setError(tr('請先寫下你目前的感受', 'Please write down how you feel right now'));
       return;
     }
     if (trimmed.length > 4000) {
-      setError('內容超過 4000 字');
+      setError(tr('內容超過 4000 字', 'Over the 4000-character limit'));
       return;
     }
     setError(null);
@@ -80,7 +81,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
       setEditingSummary(false);
       setStep('select');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'AI 解析失敗';
+      const msg = err instanceof Error ? err.message : tr('AI 解析失敗', 'The AI couldn\'t process this. Please try again');
       setError(msg);
       setStep('input');
     } finally {
@@ -95,22 +96,22 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
     if (submitLockRef.current) return;
     const summary = summaryDraft.trim();
     if (summary.length === 0) {
-      setError('對話簡介不可為空');
+      setError(tr('對話簡介不可為空', 'The conversation summary can\'t be empty'));
       return;
     }
     if (summary.length > 1000) {
-      setError('對話簡介超過 1000 字，請縮短後再送出');
+      setError(tr('對話簡介超過 1000 字，請縮短後再送出', 'The conversation summary is over 1000 characters. Please shorten it and send again'));
       return;
     }
     let openingMessage: string | null = null;
     if (!isPrivate && selected) {
       openingMessage = (drafts?.[selected] ?? preview.versions[selected]).trim();
       if (openingMessage.length === 0) {
-        setError('開場訊息不可為空，請輸入內容或改存私人對話');
+        setError(tr('開場訊息不可為空，請輸入內容或改存私人對話', 'The opening message can\'t be empty. Enter something, or save it as a private conversation'));
         return;
       }
       if (openingMessage.length > 2000) {
-        setError('開場訊息超過 2000 字，請縮短後再送出');
+        setError(tr('開場訊息超過 2000 字，請縮短後再送出', 'The opening message is over 2000 characters. Please shorten it and send again'));
         return;
       }
     }
@@ -138,17 +139,17 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
       if (firstEvent) localStorage.setItem('nudgeFirstEventDone', 'true');
       showNotification({
         type: 'success',
-        title: '對話已建立',
+        title: tr('對話已建立', 'Conversation created'),
         message: isPrivate
-          ? '已儲存為私人對話'
+          ? tr('已儲存為私人對話', 'Saved as a private conversation')
           : firstEvent
-            ? '已送出給對方。等待回覆時，可以打開對話試試「如何接住TA的情緒」，先練習怎麼回應。'
-            : '已送出選定版本給對方',
+            ? tr('已送出給對方。等待回覆時，可以打開對話試試「如何接住TA的情緒」，先練習怎麼回應。', 'Sent to your partner. While you wait, open the conversation and try "How to hold their feelings" to practice your response.')
+            : tr('已送出選定版本給對方', 'Sent the version you chose to your partner'),
         duration: firstEvent ? 9000 : undefined,
       });
       onCreated(event.id);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '建立對話失敗';
+      const msg = err instanceof Error ? err.message : tr('建立對話失敗', 'Couldn\'t create the conversation');
       setError(msg);
       setStep('select');
     } finally {
@@ -160,7 +161,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
     return (
       <div className="bg-petal-cream border border-petal-rule rounded-2xl p-10 text-center">
         <Loader2 className="w-8 h-8 mx-auto mb-3 animate-spin text-petal-rose-deep" />
-        <p className="text-petal-ink-soft">AI 正在整理你的感受…</p>
+        <p className="text-petal-ink-soft">{tr('AI 正在整理你的感受…', 'The AI is organizing your feelings…')}</p>
       </div>
     );
   }
@@ -171,20 +172,20 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
         <div className="bg-petal-sage/10 border border-petal-sage rounded-2xl p-4 flex gap-3 items-start">
           <ShieldCheck className="w-5 h-5 text-petal-sage-deep flex-shrink-0 mt-0.5" />
           <p className="text-sm text-petal-ink-soft leading-relaxed">
-            你輸入的內容<strong>不會直接傳給對方</strong>，會先由 AI 協助整理。可以罵、可以抱怨、可以很火。
+            {tr('你輸入的內容', 'What you write here')}<strong>{tr('不會直接傳給對方', ' is not sent to your partner directly')}</strong>{tr('，會先由 AI 協助整理。可以罵、可以抱怨、可以很火。', '; the AI helps shape it first. Vent, complain, be angry.')}
             <br />
             {/* 書寫原則：說者無心、聽者有意；先寫下來，才有機會把話說對。 */}
-            <span className="text-petal-muted">用寫的，你有時間把話說對：急切的話留在草稿裡，不會脫口而出變成傷害。</span>
+            <span className="text-petal-muted">{tr('用寫的，你有時間把話說對：急切的話留在草稿裡，不會脫口而出變成傷害。', 'Writing gives you time to get the words right: urgent words stay in the draft instead of slipping out and hurting.')}</span>
           </p>
         </div>
 
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-5">
-          <label className="block text-sm text-petal-ink mb-2">把你現在的感受寫下來</label>
+          <label className="block text-sm text-petal-ink mb-2">{tr('把你現在的感受寫下來', 'Write down how you feel right now')}</label>
           <textarea
             data-testid="compose-raw-input"
             value={rawText}
             onChange={(e) => setRawText(e.target.value)}
-            placeholder="例如：今天早上耳鼻喉科那件事讓我覺得他根本沒在聽我的話…"
+            placeholder={tr("例如：今天早上耳鼻喉科那件事讓我覺得他根本沒在聽我的話…", 'e.g. That thing at the ENT clinic this morning made me feel like he wasn\'t listening to me at all…')}
             rows={8}
             maxLength={4000}
             className="w-full p-3 rounded-xl border border-petal-rule bg-white text-petal-ink placeholder:text-petal-muted focus:outline-none focus:border-petal-rose-deep resize-y"
@@ -205,7 +206,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
             className="px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>取消</span>
+            <span>{tr('取消', 'Cancel')}</span>
           </button>
           <button
             type="button"
@@ -214,7 +215,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
             disabled={rawText.trim().length === 0}
           >
             <Sparkles className="w-4 h-4" />
-            <span>讓 AI 整理</span>
+            <span>{tr('讓 AI 整理', 'Let AI organize it')}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -233,7 +234,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
           {preview.toxicityFlags.length > 0 && (
             <span className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-100 px-2 py-1 rounded-full">
               <AlertTriangle className="w-3 h-3" />
-              偵測到較強烈用語
+              {tr('偵測到較強烈用語', 'Strong language detected')}
             </span>
           )}
         </div>
@@ -241,9 +242,9 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
         <div className="bg-white border border-petal-rule rounded-xl p-3 mb-3" data-testid="compose-event-summary">
           <div className="flex items-center justify-between mb-1">
             <div className="text-[11px] text-petal-muted">
-              對話簡介（雙方都會看到的中性紀錄）
+              {tr('對話簡介（雙方都會看到的中性紀錄）', 'Conversation summary (a neutral record you both see)')}
               {summaryDraft.trim() !== preview.summary.trim() && (
-                <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-petal-rose/20 text-petal-ink">已編輯</span>
+                <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full bg-petal-rose/20 text-petal-ink">{tr('已編輯', 'Edited')}</span>
               )}
             </div>
             {!editingSummary && (
@@ -251,7 +252,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
                 type="button"
                 data-testid="compose-summary-edit"
                 onClick={() => setEditingSummary(true)}
-                title="編輯對話簡介"
+                title={tr("編輯對話簡介", 'Edit conversation summary')}
                 className="p-1 rounded text-petal-muted hover:text-petal-ink"
               >
                 <Pencil className="w-3.5 h-3.5" />
@@ -275,7 +276,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
                   onClick={() => setEditingSummary(false)}
                   className="px-3 py-1 rounded-full bg-petal-ink text-petal-cream text-xs font-medium hover:opacity-90"
                 >
-                  完成
+                  {tr('完成', 'Done')}
                 </button>
               </div>
             </div>
@@ -301,7 +302,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
         </div>
       </div>
 
-      <h3 className="text-sm text-petal-ink-soft px-1">選一個版本送出（也可以不送出，存為私人對話）</h3>
+      <h3 className="text-sm text-petal-ink-soft px-1">{tr('選一個版本送出（也可以不送出，存為私人對話）', 'Pick a version to send (or don\'t send, and save it as a private conversation)')}</h3>
 
       <div className="space-y-3">
         {VERSION_META.map((v) => {
@@ -331,7 +332,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
                 {edited && (
                   <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-petal-rose/20 text-petal-ink inline-flex items-center gap-1">
                     <Pencil className="w-2.5 h-2.5" />
-                    已編輯
+                    {tr('已編輯', 'Edited')}
                   </span>
                 )}
               </div>
@@ -346,7 +347,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-4">
           <label className="flex items-center gap-2 text-sm text-petal-ink mb-2">
             <Pencil className="w-4 h-4 text-petal-rose-deep" />
-            送出前可以修改這段訊息
+            {tr('送出前可以修改這段訊息', 'You can edit this message before sending')}
           </label>
           <textarea
             data-testid="compose-opening-editor"
@@ -368,7 +369,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
           className="mt-1 accent-petal-ink"
         />
         <span className="text-sm text-petal-ink-soft">
-          也可以不送出（儲存為私人對話，對方看不到）
+          {tr('也可以不送出（儲存為私人對話，對方看不到）', 'Or don\'t send it (save as a private conversation your partner can\'t see)')}
         </span>
       </label>
 
@@ -381,7 +382,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
           className="px-4 py-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 inline-flex items-center gap-2"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>回去修改</span>
+          <span>{tr('回去修改', 'Go back and edit')}</span>
         </button>
         <button
           type="button"
@@ -394,7 +395,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
           ) : (
             <Send className="w-4 h-4" />
           )}
-          <span>{isPrivate ? '儲存私人對話' : '送出'}</span>
+          <span>{isPrivate ? tr('儲存私人對話', 'Save private conversation') : tr('送出', 'Send')}</span>
         </button>
       </div>
     </div>

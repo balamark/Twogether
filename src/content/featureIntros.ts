@@ -1,6 +1,11 @@
 // 各分頁功能介紹與 FAQ 的單一事實來源（docs/UX_PLAYBOOK.md P0-4）。
 // 使用處：HelpView（使用說明頁）、各分頁的 (?) 提示。文案原則見 playbook §R2：
 // 先講對感情的價值，再講功能；不用術語；不用破折號。
+// 英文版在 featureIntros.en.ts（同 id），改這裡時請一併更新。
+
+import type { Locale } from '../i18n/LanguageContext';
+import { getLocale } from '../i18n/tr';
+import { FEATURE_INTROS_EN } from './featureIntros.en';
 
 export interface FeatureIntro {
   id: string; // App.tsx currentView id
@@ -338,6 +343,17 @@ export const FEATURE_INTROS: FeatureIntro[] = [
   },
 ];
 
-export function getFeatureIntro(viewId: string): FeatureIntro | null {
-  return FEATURE_INTROS.find((f) => f.id === viewId) || null;
+export function getFeatureIntro(viewId: string, locale: Locale = getLocale()): FeatureIntro | null {
+  const intro = FEATURE_INTROS.find((f) => f.id === viewId);
+  return intro ? localizeIntro(intro, locale) : null;
+}
+
+// English copy lives in featureIntros.en.ts; an id missing there falls back to zh-TW.
+function localizeIntro(intro: FeatureIntro, locale: Locale): FeatureIntro {
+  const en = locale === 'en' ? FEATURE_INTROS_EN[intro.id] : undefined;
+  return en ? { ...intro, ...en } : intro;
+}
+
+export function getFeatureIntros(locale: Locale = getLocale()): FeatureIntro[] {
+  return FEATURE_INTROS.map((f) => localizeIntro(f, locale));
 }

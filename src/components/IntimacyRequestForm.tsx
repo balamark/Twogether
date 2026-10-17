@@ -13,6 +13,7 @@ import { useScrollLock } from '../hooks/useScrollLock';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime, localInputToIsoInTz } from '../utils/datetime';
 import { getTimezoneShortLabel } from '../utils/timezone-options';
+import { tr } from '../i18n/tr';
 
 // Minimal shape we need from a roleplay script — structurally satisfied by both
 // the built-in defaults and custom/marketplace scripts passed in from App.
@@ -47,17 +48,17 @@ const RECONCILE_INTENSITIES: {
   desc: string;
   dot: string;
 }[] = [
-  { key: 'goodwill', label: '先釋出善意', emoji: '🌱', desc: '還沒準備好談，但想先破冰', dot: 'bg-green-400' },
-  { key: 'reflect', label: '各退一步', emoji: '🤝', desc: '我也有需要調整的地方', dot: 'bg-amber-400' },
-  { key: 'talk', label: '想好好談談', emoji: '💬', desc: '真心想化解、好好溝通', dot: 'bg-rose-500' },
+  { key: 'goodwill', label: tr('先釋出善意', 'Extend goodwill first'), emoji: '🌱', desc: tr('還沒準備好談，但想先破冰', 'Not ready to talk yet, but want to break the ice'), dot: 'bg-green-400' },
+  { key: 'reflect', label: tr('各退一步', 'Meet halfway'), emoji: '🤝', desc: tr('我也有需要調整的地方', 'I have things to adjust too'), dot: 'bg-amber-400' },
+  { key: 'talk', label: tr('想好好談談', 'Let\'s really talk'), emoji: '💬', desc: tr('真心想化解、好好溝通', 'I truly want to resolve this and communicate well'), dot: 'bg-rose-500' },
 ];
 
 const SCRIPT_CATEGORY_TABS: { id: 'all' | FormScript['category']; label: string; icon: string }[] = [
-  { id: 'all', label: '全部', icon: '🌟' },
-  { id: 'romantic', label: '浪漫', icon: '💕' },
-  { id: 'adventurous', label: '冒險', icon: '🔥' },
-  { id: 'school', label: '校園', icon: '🏫' },
-  { id: 'bold', label: '大膽', icon: '🧨' },
+  { id: 'all', label: tr('全部', 'All'), icon: '🌟' },
+  { id: 'romantic', label: tr('浪漫', 'Romantic'), icon: '💕' },
+  { id: 'adventurous', label: tr('冒險', 'Adventurous'), icon: '🔥' },
+  { id: 'school', label: tr('校園', 'School'), icon: '🏫' },
+  { id: 'bold', label: tr('大膽', 'Bold'), icon: '🧨' },
 ];
 
 // Visual intensity for each AI suggestion level (low → high).
@@ -113,11 +114,11 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
   const tz = useTimezone();
 
   const categories = [
-    { id: 'compliment', name: '甜蜜讚美', emoji: '💕', description: '發送溫馨的讚美和愛意給伴侶' },
-    { id: 'reconciliation', name: '真心和解', emoji: '🤝', description: '冷戰／吵架後，AI 幫你想一句中性、給台階的破冰開場白' },
-    { id: 'guidance', name: '情緒指引', emoji: '🧭', description: '把「當我情緒上來時，你可以這樣接住我」的指引挑幾句傳給對方' },
-    { id: 'roleplay', name: '角色扮演', emoji: '🎭', description: '選擇你們的劇本，AI 幫你想 5 句入戲開場邀請' },
-    { id: 'custom', name: '自訂訊息', emoji: '✨', description: '完全客製化你的親密邀請' },
+    { id: 'compliment', name: tr('甜蜜讚美', 'Sweet compliment'), emoji: '💕', description: tr('發送溫馨的讚美和愛意給伴侶', 'Send your partner warm compliments and love') },
+    { id: 'reconciliation', name: tr('真心和解', 'Make up for real'), emoji: '🤝', description: tr('冷戰／吵架後，AI 幫你想一句中性、給台階的破冰開場白', 'After a cold war or a fight, AI helps you find a neutral opener that offers a way back') },
+    { id: 'guidance', name: tr('情緒指引', 'Emotion guide'), emoji: '🧭', description: tr('把「當我情緒上來時，你可以這樣接住我」的指引挑幾句傳給對方', 'Pick a few lines from "when my feelings rise, here\'s how you can hold me" and send them') },
+    { id: 'roleplay', name: tr('角色扮演', 'Role play'), emoji: '🎭', description: tr('選擇你們的劇本，AI 幫你想 5 句入戲開場邀請', 'Pick your script, and AI suggests 5 in-character opening invitations') },
+    { id: 'custom', name: tr('自訂訊息', 'Custom message'), emoji: '✨', description: tr('完全客製化你的親密邀請', 'Fully customize your intimacy invitation') },
   ];
 
   const isRoleplay = selectedCategory === 'roleplay';
@@ -167,7 +168,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
       const categoryTemplates = await apiService.getIntimacyTemplatesByCategory(selectedCategory);
       setTemplates(categoryTemplates);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '無法載入模板';
+      const errorMessage = err instanceof Error ? err.message : tr('無法載入模板', 'Couldn\'t load templates');
       setError(errorMessage);
       console.error('Failed to fetch intimacy templates by category:', err);
     } finally {
@@ -275,13 +276,13 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
       });
     }
     if (lines.length === 0) return;
-    setCustomMessage(`想讓你知道，當我情緒上來時，你可以這樣接住我：\n\n${lines.join('\n')}`);
+    setCustomMessage(tr(`想讓你知道，當我情緒上來時，你可以這樣接住我：\n\n${lines.join('\n')}`, `I want you to know: when my feelings rise, here's how you can hold me:\n\n${lines.join('\n')}`));
     setCurrentStep('customize');
   };
 
   const handleTemplateSelect = function (template: IntimacyTemplate) {
     setSelectedTemplate(template);
-    setCustomMessage(`${template.timeHint}，${template.roleplaySetup}`);
+    setCustomMessage(tr(`${template.timeHint}，${template.roleplaySetup}`, `${template.timeHint}, ${template.roleplaySetup}`));
     setCurrentStep('customize');
   };
 
@@ -311,7 +312,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
       setError(
         err instanceof Error
           ? err.message
-          : 'AI 暫時無法生成建議訊息，請稍後再試，或直接自行輸入邀請內容',
+          : tr('AI 暫時無法生成建議訊息，請稍後再試，或直接自行輸入邀請內容', 'The AI can\'t suggest a message right now. Please try again in a moment, or write your invitation yourself'),
       );
     } finally {
       setAiLoading(false);
@@ -380,7 +381,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
       setError(
         err instanceof Error
           ? err.message
-          : 'AI 暫時無法產生開場白，請稍後再試，或直接自行輸入和解內容。',
+          : tr('AI 暫時無法產生開場白，請稍後再試，或直接自行輸入和解內容。', 'The AI can\'t come up with an opener right now. Please try again in a moment, or write your message yourself.'),
       );
     } finally {
       setReconcileLoading(false);
@@ -403,7 +404,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
 
       const messageContent = customMessage.trim();
       if (!messageContent) {
-        setError('請輸入邀請內容');
+        setError(tr('請輸入邀請內容', 'Please enter your invitation'));
         return;
       }
 
@@ -430,7 +431,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
       resetForm();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '發送失敗');
+      setError(err instanceof Error ? err.message : tr('發送失敗', 'Couldn\'t send'));
     } finally {
       setLoading(false);
       sendLockRef.current = false;
@@ -491,7 +492,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
           <div className="flex items-center space-x-3">
             <Heart className="w-6 h-6 text-pink-500" />
-            <h3 className="text-xl font-semibold text-gray-900">發送親密邀請</h3>
+            <h3 className="text-xl font-semibold text-gray-900">{tr('發送親密邀請', 'Send an intimacy invitation')}</h3>
           </div>
           <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X className="w-6 h-6" />
@@ -537,7 +538,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
           {/* Step 1: Category Selection */}
           {currentStep === 'category' && (
             <div className="space-y-4">
-              <h4 className="text-lg font-medium text-gray-900 mb-4">選擇邀請類型</h4>
+              <h4 className="text-lg font-medium text-gray-900 mb-4">{tr('選擇邀請類型', 'Choose an invitation type')}</h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {categories.map((category) => (
                   <button
@@ -561,9 +562,9 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
           {currentStep === 'script' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h4 className="text-lg font-medium text-gray-900">選擇劇本</h4>
+                <h4 className="text-lg font-medium text-gray-900">{tr('選擇劇本', 'Choose a script')}</h4>
                 <button onClick={() => setCurrentStep('category')} className="text-sm text-pink-600 hover:text-pink-700">
-                  返回選擇類型
+                  {tr('返回選擇類型', 'Back to types')}
                 </button>
               </div>
 
@@ -595,7 +596,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                       !scriptTag ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200'
                     }`}
                   >
-                    全部標籤
+                    {tr('全部標籤', 'All tags')}
                   </button>
                   {allTags.map((tag) => (
                     <button
@@ -639,8 +640,8 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                 </div>
               ) : (
                 <div className="text-center py-10 text-gray-500 text-sm">
-                  <p>這個分類／標籤下還沒有你擁有的劇本。</p>
-                  <p className="mt-1">可以到「角色扮演」建立自訂劇本，或從創作市集收藏劇本後再回來。</p>
+                  <p>{tr('這個分類／標籤下還沒有你擁有的劇本。', 'You don\'t have any scripts in this category/tag yet.')}</p>
+                  <p className="mt-1">{tr('可以到「角色扮演」建立自訂劇本，或從創作市集收藏劇本後再回來。', 'Create a custom script in "Role play", or save one from the creator marketplace and come back.')}</p>
                 </div>
               )}
             </div>
@@ -651,33 +652,33 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-lg font-medium text-gray-900 flex items-center gap-2">
-                  <Wand2 className="w-5 h-5 text-pink-500" /> AI 入戲開場邀請
+                  <Wand2 className="w-5 h-5 text-pink-500" /> {tr('AI 入戲開場邀請', 'AI in-character invitations')}
                 </h4>
                 <button onClick={() => setCurrentStep('script')} className="text-sm text-pink-600 hover:text-pink-700">
-                  返回選劇本
+                  {tr('返回選劇本', 'Back to scripts')}
                 </button>
               </div>
 
               {selectedScript && (
                 <p className="text-sm text-gray-500">
-                  劇本：<span className="font-medium text-gray-700">{selectedScript.title}</span>
+                  {tr('劇本：', 'Script: ')}<span className="font-medium text-gray-700">{selectedScript.title}</span>
                 </p>
               )}
 
               {aiLoading ? (
                 <div className="text-center py-12">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
-                  <p className="mt-2 text-gray-600">AI 正在融入劇本，生成 5 句漸進式邀請…</p>
+                  <p className="mt-2 text-gray-600">{tr('AI 正在融入劇本，生成 5 句漸進式邀請…', 'AI is getting into character and writing 5 escalating invitations…')}</p>
                 </div>
               ) : aiMessages.length > 0 ? (
                 <div className="space-y-3">
                   {aiSummary && (
                     <div className="bg-pink-50 border border-pink-100 rounded-lg p-3">
-                      <p className="text-xs font-medium text-pink-600 mb-1">情境設定</p>
+                      <p className="text-xs font-medium text-pink-600 mb-1">{tr('情境設定', 'Scenario')}</p>
                       <p className="text-sm text-gray-700" data-testid="roleplay-ai-summary">{aiSummary}</p>
                     </div>
                   )}
-                  <p className="text-xs text-gray-500">暗示強度由弱到強，挑一句你喜歡的；選好後下一步可自由編輯。</p>
+                  <p className="text-xs text-gray-500">{tr('暗示強度由弱到強，挑一句你喜歡的；選好後下一步可自由編輯。', 'From subtle to bold. Pick one you like; you can edit it freely in the next step.')}</p>
                   {aiMessages.map((m) => {
                     const style = LEVEL_STYLE[m.level] || LEVEL_STYLE.normal;
                     const rated = feedbackGiven[m.level];
@@ -703,14 +704,14 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                         </button>
                         {/* Feedback footer (siblings of the select button — no nested buttons) */}
                         <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border-t border-gray-100">
-                          <span className="text-xs text-gray-400">這句如何？</span>
+                          <span className="text-xs text-gray-400">{tr('這句如何？', 'How\'s this one?')}</span>
                           <button
                             data-testid={`roleplay-thumbup-${m.level}`}
                             onClick={() => handleThumbUp(m)}
                             className={`p-1.5 rounded-md transition-colors ${
                               rated === 'up' ? 'bg-green-100 text-green-600' : 'text-gray-400 hover:bg-gray-100'
                             }`}
-                            aria-label="讚"
+                            aria-label={tr("讚", 'Like')}
                           >
                             <ThumbsUp className="w-4 h-4" />
                           </button>
@@ -720,18 +721,18 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                             className={`p-1.5 rounded-md transition-colors ${
                               rated === 'down' ? 'bg-rose-100 text-rose-600' : 'text-gray-400 hover:bg-gray-100'
                             }`}
-                            aria-label="不喜歡"
+                            aria-label={tr("不喜歡", 'Dislike')}
                           >
                             <ThumbsDown className="w-4 h-4" />
                           </button>
-                          {rated && <span className="text-xs text-gray-400 ml-1">已回饋，謝謝！</span>}
+                          {rated && <span className="text-xs text-gray-400 ml-1">{tr('已回饋，謝謝！', 'Thanks for the feedback!')}</span>}
                         </div>
                         {downOpenLevel === m.level && (
                           <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 space-y-2">
                             <textarea
                               value={downText}
                               onChange={(e) => setDownText(e.target.value)}
-                              placeholder="想告訴我們哪裡不喜歡嗎？（選填）"
+                              placeholder={tr("想告訴我們哪裡不喜歡嗎？（選填）", 'Want to tell us what you didn\'t like? (optional)')}
                               rows={2}
                               className="w-full p-2 text-sm border border-gray-300 rounded-md focus:ring-1 focus:ring-pink-400 resize-none"
                             />
@@ -743,13 +744,13 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                                 }}
                                 className="px-3 py-1 text-xs text-gray-500 hover:text-gray-700"
                               >
-                                取消
+                                {tr('取消', 'Cancel')}
                               </button>
                               <button
                                 onClick={() => submitDownFeedback(m)}
                                 className="px-3 py-1 text-xs bg-gray-800 text-white rounded-md hover:bg-gray-700"
                               >
-                                送出回饋
+                                {tr('送出回饋', 'Send feedback')}
                               </button>
                             </div>
                           </div>
@@ -764,7 +765,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                       data-testid="roleplay-regenerate"
                       className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm"
                     >
-                      <RefreshCw className="w-4 h-4" /> 重新生成
+                      <RefreshCw className="w-4 h-4" /> {tr('重新生成', 'Regenerate')}
                     </button>
                     <button
                       onClick={() => {
@@ -774,19 +775,19 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                       }}
                       className="px-4 py-2 text-pink-600 hover:text-pink-700 transition-colors flex items-center gap-2 text-sm"
                     >
-                      <Sparkles className="w-4 h-4" /> 自行輸入
+                      <Sparkles className="w-4 h-4" /> {tr('自行輸入', 'Write my own')}
                     </button>
                   </div>
                 </div>
               ) : (
                 <div className="text-center py-10 text-gray-500 text-sm space-y-3">
-                  <p>AI 暫時無法生成這個劇本的建議訊息。</p>
+                  <p>{tr('AI 暫時無法生成這個劇本的建議訊息。', 'The AI can\'t suggest messages for this script right now.')}</p>
                   <div className="flex justify-center gap-3">
                     <button
                       onClick={() => selectedScript && generateMessages(selectedScript, true)}
                       className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2"
                     >
-                      <RefreshCw className="w-4 h-4" /> 重新生成
+                      <RefreshCw className="w-4 h-4" /> {tr('重新生成', 'Regenerate')}
                     </button>
                     <button
                       onClick={() => {
@@ -795,7 +796,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                       }}
                       className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 transition-colors"
                     >
-                      自行輸入邀請內容
+                      {tr('自行輸入邀請內容', 'Write my invitation myself')}
                     </button>
                   </div>
                 </div>
@@ -808,24 +809,24 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
             <div className="space-y-5">
               <div className="flex items-center justify-between">
                 <h4 className="text-lg font-medium text-gray-900 flex items-center gap-2">
-                  <Wand2 className="w-5 h-5 text-pink-500" /> AI 破冰開場白
+                  <Wand2 className="w-5 h-5 text-pink-500" /> {tr('AI 破冰開場白', 'AI icebreaker')}
                 </h4>
                 <button onClick={() => setCurrentStep('category')} className="text-sm text-pink-600 hover:text-pink-700">
-                  返回選擇類型
+                  {tr('返回選擇類型', 'Back to types')}
                 </button>
               </div>
 
               <p className="text-sm text-gray-500">
-                吵架後拉不下臉？挑一個強度，AI 幫你想一句中性、給對方台階的第一句話，試試對方願不願意開啟對話。
+                {tr('吵架後拉不下臉？挑一個強度，AI 幫你想一句中性、給對方台階的第一句話，試試對方願不願意開啟對話。', 'Can\'t bring yourself to speak first after a fight? Pick an intensity, and AI suggests a neutral first line that offers them a way back, to see if they\'re open to talking.')}
               </p>
 
               {/* (Optional) pick a related event for context */}
               <div className="space-y-2">
                 <p className="text-sm font-medium text-gray-700">
-                  選一個相關對話 <span className="text-gray-400 font-normal">（可略過）</span>
+                  {tr('選一個相關對話', 'Pick a related conversation')} <span className="text-gray-400 font-normal">{tr('（可略過）', ' (optional)')}</span>
                 </p>
                 {reconcileEventsLoading ? (
-                  <p className="text-sm text-gray-400">載入對話中…</p>
+                  <p className="text-sm text-gray-400">{tr('載入對話中…', 'Loading conversations…')}</p>
                 ) : reconcileEvents.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -837,7 +838,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                           : 'bg-white text-gray-500 border-gray-200 hover:border-pink-300'
                       }`}
                     >
-                      不選，直接想開場白
+                      {tr('不選，直接想開場白', 'Skip, just suggest an opener')}
                     </button>
                     {reconcileEvents.map((ev) => (
                       <button
@@ -857,14 +858,14 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                   </div>
                 ) : (
                   <p className="text-sm text-gray-400">
-                    目前沒有可參考的對話，沒關係，直接挑一個強度就能產生通用的破冰開場白。
+                    {tr('目前沒有可參考的對話，沒關係，直接挑一個強度就能產生通用的破冰開場白。', 'No conversations to reference right now. That\'s fine; pick an intensity to get a general icebreaker.')}
                   </p>
                 )}
               </div>
 
               {/* Pick an intensity */}
               <div className="space-y-2">
-                <p className="text-sm font-medium text-gray-700">選擇強度</p>
+                <p className="text-sm font-medium text-gray-700">{tr('選擇強度', 'Choose intensity')}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {RECONCILE_INTENSITIES.map((lvl) => (
                     <button
@@ -893,11 +894,11 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
               {reconcileLoading ? (
                 <div className="text-center py-10">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
-                  <p className="mt-2 text-gray-600">AI 正在想幾句適合的破冰開場白…</p>
+                  <p className="mt-2 text-gray-600">{tr('AI 正在想幾句適合的破冰開場白…', 'AI is thinking of a few good icebreakers…')}</p>
                 </div>
               ) : reconcileOpeners.length > 0 ? (
                 <div className="space-y-3">
-                  <p className="text-xs text-gray-500">挑一句你喜歡的，下一步可自由編輯後再送出。</p>
+                  <p className="text-xs text-gray-500">{tr('挑一句你喜歡的，下一步可自由編輯後再送出。', 'Pick one you like; you can edit it freely before sending.')}</p>
                   {reconcileOpeners.map((o, i) => (
                     <button
                       key={i}
@@ -917,7 +918,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                       data-testid="reconcile-regenerate"
                       className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2 text-sm"
                     >
-                      <RefreshCw className="w-4 h-4" /> 重新生成
+                      <RefreshCw className="w-4 h-4" /> {tr('重新生成', 'Regenerate')}
                     </button>
                     <button
                       onClick={() => {
@@ -926,7 +927,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                       }}
                       className="px-4 py-2 text-pink-600 hover:text-pink-700 transition-colors flex items-center gap-2 text-sm"
                     >
-                      <Sparkles className="w-4 h-4" /> 自行輸入
+                      <Sparkles className="w-4 h-4" /> {tr('自行輸入', 'Write my own')}
                     </button>
                   </div>
                 </div>
@@ -937,7 +938,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                   disabled={!reconcileIntensity}
                   className="w-full px-6 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
                 >
-                  <Wand2 className="w-5 h-5" /> 讓 AI 想開場白
+                  <Wand2 className="w-5 h-5" /> {tr('讓 AI 想開場白', 'Let AI suggest an opener')}
                 </button>
               )}
             </div>
@@ -947,13 +948,13 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
           {currentStep === 'guidance' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <h4 className="text-lg font-medium text-gray-900">情緒指引</h4>
+                <h4 className="text-lg font-medium text-gray-900">{tr('情緒指引', 'Emotion guide')}</h4>
                 <button onClick={() => setCurrentStep('category')} className="text-sm text-pink-600 hover:text-pink-700">
-                  返回選擇類型
+                  {tr('返回選擇類型', 'Back to types')}
                 </button>
               </div>
               <p className="text-sm text-gray-600">
-                這不是要對方道歉或認錯，而是讓 TA 知道：當你情緒上來時，怎麼做能讓你比較好受。挑幾句你最想說的，傳給對方。
+                {tr('這不是要對方道歉或認錯，而是讓 TA 知道：當你情緒上來時，怎麼做能讓你比較好受。挑幾句你最想說的，傳給對方。', 'This isn\'t about getting them to apologize or admit fault. It\'s letting them know what helps you feel better when your feelings rise. Pick the lines you most want to say and send them.')}
               </p>
 
               <div className="space-y-4">
@@ -1007,7 +1008,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                 className="w-full px-6 py-3 bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
               >
                 <Send className="w-5 h-5" />
-                已選 {guidanceSelected.size} 句，繼續
+                {tr('已選', 'Selected')} {guidanceSelected.size} {tr('句，繼續', ' lines, continue')}
               </button>
             </div>
           )}
@@ -1018,20 +1019,20 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
               <div className="flex items-center justify-between">
                 <h4 className="text-lg font-medium text-gray-900">
                   {selectedCategory === 'compliment'
-                    ? '選擇讚美訊息'
+                    ? tr('選擇讚美訊息', 'Choose a compliment')
                     : selectedCategory === 'reconciliation'
-                    ? '選擇和解訊息'
-                    : '選擇訊息模板'}
+                    ? tr('選擇和解訊息', 'Choose a make-up message')
+                    : tr('選擇訊息模板', 'Choose a message template')}
                 </h4>
                 <button onClick={() => setCurrentStep('category')} className="text-sm text-pink-600 hover:text-pink-700">
-                  返回選擇類型
+                  {tr('返回選擇類型', 'Back to types')}
                 </button>
               </div>
 
               {loading ? (
                 <div className="text-center py-8">
                   <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
-                  <p className="mt-2 text-gray-600">載入模板中...</p>
+                  <p className="mt-2 text-gray-600">{tr('載入模板中...', 'Loading templates...')}</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1066,16 +1067,16 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                     })
                   ) : selectedCategory === 'compliment' || selectedCategory === 'reconciliation' ? (
                     [
-                      { timeHint: '甜蜜時光', roleplaySetup: '你好溫柔，你是我的女神 💕' },
-                      { timeHint: '愛的告白', roleplaySetup: '你是我見過最美麗的人，每天和你在一起都是幸福 ✨' },
-                      { timeHint: '溫馨時刻', roleplaySetup: '你的笑容是我最愛的風景，能讓我的心瞬間溫暖 😊' },
-                      { timeHint: '深情表達', roleplaySetup: '謝謝你一直在我身邊，你是我生命中最珍貴的禮物 🎁' },
-                      { timeHint: '浪漫情話', roleplaySetup: '和你在一起的每一天，都比昨天更愛你一點 💖' },
-                      { timeHint: '貼心話語', roleplaySetup: '你總是這麼體貼，讓我覺得自己是世界上最幸運的人 🍀' },
-                      { timeHint: '愛意滿滿', roleplaySetup: '你的溫柔像春風，你的愛像暖陽，照亮了我的整個世界 🌞' },
-                      { timeHint: '真心話', roleplaySetup: '遇見你是我這輩子最美好的事，願意和你走過每個春夏秋冬 🌸' },
-                      { timeHint: '甜蜜宣言', roleplaySetup: '你不只是我的戀人，更是我的最佳朋友和靈魂伴侶 👫' },
-                      { timeHint: '愛的承諾', roleplaySetup: '無論什麼時候，你都是我心中最特別的那個人 💝' },
+                      { timeHint: tr('甜蜜時光', 'Sweet time'), roleplaySetup: tr('你好溫柔，你是我的女神 💕', 'You\'re so gentle. You\'re my goddess 💕') },
+                      { timeHint: tr('愛的告白', 'Declaration of love'), roleplaySetup: tr('你是我見過最美麗的人，每天和你在一起都是幸福 ✨', 'You\'re the most beautiful person I\'ve ever met. Every day with you is happiness ✨') },
+                      { timeHint: tr('溫馨時刻', 'Warm moment'), roleplaySetup: tr('你的笑容是我最愛的風景，能讓我的心瞬間溫暖 😊', 'Your smile is my favorite view. It warms my heart in an instant 😊') },
+                      { timeHint: tr('深情表達', 'Heartfelt'), roleplaySetup: tr('謝謝你一直在我身邊，你是我生命中最珍貴的禮物 🎁', 'Thank you for always being by my side. You\'re the most precious gift in my life 🎁') },
+                      { timeHint: tr('浪漫情話', 'Sweet nothings'), roleplaySetup: tr('和你在一起的每一天，都比昨天更愛你一點 💖', 'Every day with you, I love you a little more than yesterday 💖') },
+                      { timeHint: tr('貼心話語', 'Caring words'), roleplaySetup: tr('你總是這麼體貼，讓我覺得自己是世界上最幸運的人 🍀', 'You\'re always so thoughtful. You make me feel like the luckiest person in the world 🍀') },
+                      { timeHint: tr('愛意滿滿', 'Full of love'), roleplaySetup: tr('你的溫柔像春風，你的愛像暖陽，照亮了我的整個世界 🌞', 'Your gentleness is like a spring breeze, your love like warm sunshine. You light up my whole world 🌞') },
+                      { timeHint: tr('真心話', 'From the heart'), roleplaySetup: tr('遇見你是我這輩子最美好的事，願意和你走過每個春夏秋冬 🌸', 'Meeting you is the best thing that ever happened to me. I want to share every season with you 🌸') },
+                      { timeHint: tr('甜蜜宣言', 'Sweet promise'), roleplaySetup: tr('你不只是我的戀人，更是我的最佳朋友和靈魂伴侶 👫', 'You\'re not just my partner, you\'re my best friend and soulmate 👫') },
+                      { timeHint: tr('愛的承諾', 'Love\'s promise'), roleplaySetup: tr('無論什麼時候，你都是我心中最特別的那個人 💝', 'No matter when, you\'ll always be the most special person in my heart 💝') },
                     ].map((template, index) => (
                       <button
                         key={index}
@@ -1096,7 +1097,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                     ))
                   ) : (
                     <div className="text-center py-8 text-gray-500">
-                      <p>無可用模板</p>
+                      <p>{tr('無可用模板', 'No templates available')}</p>
                     </div>
                   )}
 
@@ -1108,10 +1109,10 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                       <Sparkles className="w-5 h-5 text-pink-500" />
                       <span className="text-gray-900 font-medium">
                         {selectedCategory === 'compliment'
-                          ? '自訂讚美訊息'
+                          ? tr('自訂讚美訊息', 'Custom compliment')
                           : selectedCategory === 'reconciliation'
-                          ? '自訂和解訊息'
-                          : '自訂訊息內容'}
+                          ? tr('自訂和解訊息', 'Custom make-up message')
+                          : tr('自訂訊息內容', 'Custom message')}
                       </span>
                     </div>
                   </button>
@@ -1126,30 +1127,30 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
               <div className="flex items-center justify-between">
                 <h4 className="text-lg font-medium text-gray-900">
                   {selectedCategory === 'compliment'
-                    ? '自訂讚美內容'
+                    ? tr('自訂讚美內容', 'Custom compliment')
                     : selectedCategory === 'reconciliation'
-                    ? '自訂和解內容'
-                    : '自訂邀請內容'}
+                    ? tr('自訂和解內容', 'Custom make-up message')
+                    : tr('自訂邀請內容', 'Custom invitation')}
                 </h4>
                 <button onClick={() => setCurrentStep(customizeBackStep)} className="text-sm text-pink-600 hover:text-pink-700">
-                  返回
+                  {tr('返回', 'Back')}
                 </button>
               </div>
 
               {isRoleplay && selectedAiLevel && (
                 <p className="text-xs text-gray-500">
-                  已選用 AI 建議
+                  {tr('已選用 AI 建議', 'Using the AI suggestion')}
                   <span className="text-pink-600 font-medium">
                     {' '}
                     {aiMessages.find((m) => m.level === selectedAiLevel)?.label || ''}
                   </span>
-                  ，可自由修改。
+                  {tr('，可自由修改。', '; edit it freely.')}
                 </p>
               )}
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">邀請類型</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{tr('邀請類型', 'Invitation type')}</label>
                   <div className="flex space-x-4">
                     <label className="flex items-center">
                       <input
@@ -1159,7 +1160,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                         onChange={(e) => setRequestType(e.target.value as 'intimate')}
                         className="mr-2"
                       />
-                      <span>立即邀請</span>
+                      <span>{tr('立即邀請', 'Invite now')}</span>
                     </label>
                     <label className="flex items-center">
                       <input
@@ -1169,7 +1170,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                         onChange={(e) => setRequestType(e.target.value as 'scheduled')}
                         className="mr-2"
                       />
-                      <span>預約時間</span>
+                      <span>{tr('預約時間', 'Schedule')}</span>
                     </label>
                   </div>
                 </div>
@@ -1177,7 +1178,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                 {requestType === 'scheduled' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      預約時間（以 {getTimezoneShortLabel(tz)} 顯示）
+                      {tr('預約時間（以', 'Scheduled time (shown in ')} {getTimezoneShortLabel(tz)} {tr('顯示）', ')')}
                     </label>
                     <input
                       type="datetime-local"
@@ -1186,14 +1187,14 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                       className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                     />
                     <p className="mt-1 text-xs text-gray-500">
-                      💡 雙方都會看到此時間以共用時區（{getTimezoneShortLabel(tz)}）為準，可在設定中調整。
+                      {tr('💡 雙方都會看到此時間以共用時區（', '💡 You\'ll both see this time in your shared time zone (')}{getTimezoneShortLabel(tz)}{tr('）為準，可在設定中調整。', '). You can change it in Settings.')}
                     </p>
                   </div>
                 )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {selectedCategory === 'compliment' ? '讚美內容 *' : selectedCategory === 'reconciliation' ? '和解內容 *' : '邀請內容 *'}
+                    {selectedCategory === 'compliment' ? tr('讚美內容 *', 'Compliment *') : selectedCategory === 'reconciliation' ? tr('和解內容 *', 'Make-up message *') : tr('邀請內容 *', 'Invitation *')}
                   </label>
                   <textarea
                     data-testid="intimacy-message-input"
@@ -1201,15 +1202,15 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                     onChange={(e) => setCustomMessage(e.target.value)}
                     placeholder={
                       selectedCategory === 'compliment'
-                        ? '輸入你想對伴侶說的甜蜜讚美...'
+                        ? tr('輸入你想對伴侶說的甜蜜讚美...', 'Write a sweet compliment for your partner...')
                         : selectedCategory === 'reconciliation'
-                        ? '輸入你的真誠道歉和和解訊息...'
-                        : '輸入你的親密邀請內容...'
+                        ? tr('輸入你的真誠道歉和和解訊息...', 'Write your sincere apology and make-up message...')
+                        : tr('輸入你的親密邀請內容...', 'Write your intimacy invitation...')
                     }
                     rows={4}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent resize-none"
                   />
-                  <p className="mt-1 text-xs text-gray-500">{customMessage.length}/1000 字符</p>
+                  <p className="mt-1 text-xs text-gray-500">{customMessage.length}{tr('/1000 字符', '/1000 characters')}</p>
                 </div>
 
                 <div className="flex justify-end space-x-3">
@@ -1219,7 +1220,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                     disabled={!customMessage.trim()}
                     className="px-6 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                   >
-                    預覽邀請
+                    {tr('預覽邀請', 'Preview invitation')}
                   </button>
                 </div>
               </div>
@@ -1231,10 +1232,10 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-lg font-medium text-gray-900">
-                  {selectedCategory === 'compliment' ? '確認讚美內容' : selectedCategory === 'reconciliation' ? '確認和解內容' : '確認邀請內容'}
+                  {selectedCategory === 'compliment' ? tr('確認讚美內容', 'Confirm your compliment') : selectedCategory === 'reconciliation' ? tr('確認和解內容', 'Confirm your make-up message') : tr('確認邀請內容', 'Confirm your invitation')}
                 </h4>
                 <button onClick={() => setCurrentStep('customize')} className="text-sm text-pink-600 hover:text-pink-700">
-                  編輯內容
+                  {tr('編輯內容', 'Edit')}
                 </button>
               </div>
 
@@ -1243,16 +1244,16 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                   <Heart className="w-6 h-6 text-pink-500 mt-1" />
                   <div className="flex-1">
                     <h5 className="font-medium text-gray-900 mb-2">
-                      {selectedCategory === 'compliment' ? '你的甜蜜讚美' : selectedCategory === 'reconciliation' ? '你的真心和解' : '你的親密邀請'}
+                      {selectedCategory === 'compliment' ? tr('你的甜蜜讚美', 'Your sweet compliment') : selectedCategory === 'reconciliation' ? tr('你的真心和解', 'Your heartfelt make-up message') : tr('你的親密邀請', 'Your intimacy invitation')}
                     </h5>
                     {isRoleplay && selectedScript && (
-                      <p className="text-xs text-pink-600 mb-2">劇本：{selectedScript.title}</p>
+                      <p className="text-xs text-pink-600 mb-2">{tr('劇本：', 'Script: ')}{selectedScript.title}</p>
                     )}
                     <p className="text-gray-700 whitespace-pre-wrap">{customMessage}</p>
                     {requestType === 'scheduled' && scheduledTime && (
                       <div className="mt-3 flex items-center space-x-2 text-sm text-gray-600">
                         <Clock className="w-4 h-4" />
-                        <span>預約時間：{formatDateTime(localInputToIsoInTz(scheduledTime, tz), tz, { alwaysShowTz: true })}</span>
+                        <span>{tr('預約時間：', 'Scheduled time: ')}{formatDateTime(localInputToIsoInTz(scheduledTime, tz), tz, { alwaysShowTz: true })}</span>
                       </div>
                     )}
                   </div>
@@ -1264,7 +1265,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                   onClick={handleClose}
                   className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
-                  取消
+                  {tr('取消', 'Cancel')}
                 </button>
                 <button
                   data-testid="intimacy-send-btn"
@@ -1277,7 +1278,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                   ) : (
                     <Send className="w-4 h-4" />
                   )}
-                  <span>{loading ? '發送中...' : selectedCategory === 'compliment' ? '發送讚美' : selectedCategory === 'reconciliation' ? '發送和解' : '發送邀請'}</span>
+                  <span>{loading ? tr('發送中...', 'Sending...') : selectedCategory === 'compliment' ? tr('發送讚美', 'Send compliment') : selectedCategory === 'reconciliation' ? tr('發送和解', 'Send make-up message') : tr('發送邀請', 'Send invitation')}</span>
                 </button>
               </div>
             </div>

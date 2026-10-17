@@ -1,3 +1,5 @@
+import { tr } from '../i18n/tr';
+
 // Stage 0 — 危機偵測 (Safety Check).
 //
 // A couples therapist's first move is not to reply, but to read the room. This
@@ -71,19 +73,19 @@ function hasExclamationBurst(text: string): boolean {
 
 const COPY: Record<Exclude<ConflictLevel, 'connection'>, { title: string; message: string }> = {
   escalation: {
-    title: '對話開始升溫',
+    title: tr('對話開始升溫', 'The conversation is heating up'),
     message:
-      '你們的對話開始出現一些指責的說法（例如「你總是⋯」「都是你⋯」）。這通常代表彼此都很在乎，只是話說出口變成了攻擊。試著先說出自己的感受與需要，會比指出對方的錯更靠近彼此。',
+      tr('你們的對話開始出現一些指責的說法（例如「你總是⋯」「都是你⋯」）。這通常代表彼此都很在乎，只是話說出口變成了攻擊。試著先說出自己的感受與需要，會比指出對方的錯更靠近彼此。', 'Some blaming phrases are showing up ("you always…", "it\'s all your fault…"). That usually means you both care a lot, and it\'s coming out as attack. Try naming your own feelings and needs first; it brings you closer than pointing out what the other did wrong.'),
   },
   flooding: {
-    title: '先暫停一下',
+    title: tr('先暫停一下', 'Let\'s pause for a moment'),
     message:
-      '我注意到你們現在比較像是在保護自己，而不是理解彼此。情緒滿出來的時候，很難好好聽對方說話。要不要先暫停十分鐘、深呼吸一下，等身體平靜一點再繼續？這不是逃避，而是為了不說出會後悔的話。',
+      tr('我注意到你們現在比較像是在保護自己，而不是理解彼此。情緒滿出來的時候，很難好好聽對方說話。要不要先暫停十分鐘、深呼吸一下，等身體平靜一點再繼續？這不是逃避，而是為了不說出會後悔的話。', 'It looks like you\'re both protecting yourselves more than trying to understand each other right now. When emotions overflow, it\'s hard to really listen. How about a ten-minute break and a few deep breaths, then continue once your body has calmed down? This isn\'t running away; it\'s so neither of you says something you\'ll regret.'),
   },
   crisis: {
-    title: '這一刻，先照顧好彼此',
+    title: tr('這一刻，先照顧好彼此', 'Right now, take care of each other first'),
     message:
-      '這段對話已經很激烈，甚至出現了讓彼此很受傷的話。現在不是做重大決定的時候。先各自冷靜、把身體和情緒安頓好，明天再談也不遲。如果你感到不安全，或有人可能受到傷害，請立刻尋求信任的人或專業協助。',
+      tr('這段對話已經很激烈，甚至出現了讓彼此很受傷的話。現在不是做重大決定的時候。先各自冷靜、把身體和情緒安頓好，明天再談也不遲。如果你感到不安全，或有人可能受到傷害，請立刻尋求信任的人或專業協助。', 'This conversation has become very intense, and some words have really hurt. Now isn\'t the time for big decisions. Each of you take time to calm down and settle your body and feelings; it\'s fine to talk tomorrow. If you feel unsafe or someone might get hurt, please reach out to someone you trust or a professional right away.'),
   },
 };
 
@@ -152,11 +154,11 @@ export function detectDraftTone(text: string): ConflictLevel {
 export function draftToneHint(level: ConflictLevel): string {
   switch (level) {
     case 'crisis':
-      return '這句話很重，送出前先深呼吸一下。要不要看看對方會怎麼聽？';
+      return tr('這句話很重，送出前先深呼吸一下。要不要看看對方會怎麼聽？', 'These words are heavy. Take a deep breath before sending. Want to see how your partner might hear it?');
     case 'flooding':
-      return '這句話帶著滿出來的情緒。送出前要不要先看看對方會怎麼聽？';
+      return tr('這句話帶著滿出來的情緒。送出前要不要先看看對方會怎麼聽？', 'These words carry a lot of emotion. Before sending, want to see how your partner might hear it?');
     case 'escalation':
-      return '這句話帶有一點指責的語氣。送出前要不要看看對方會怎麼聽？';
+      return tr('這句話帶有一點指責的語氣。送出前要不要看看對方會怎麼聽？', 'These words sound a little blaming. Before sending, want to see how your partner might hear it?');
     default:
       return '';
   }

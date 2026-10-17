@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
 import type { CuratedReading } from '../content/curatedReadings';
+import { tr } from '../i18n/tr';
 
 // Read-only, collapsible card for a single editorial curated reading. Pinned at
 // the top of the 好文 · 故事 list (StoryList) — no votes/comments/report.
@@ -13,7 +14,7 @@ export default function CuratedReadingCard({ reading }: { reading: CuratedReadin
     >
       <header className={expanded ? 'mb-6 pb-4 border-b border-petal-rule-soft' : ''}>
         <div className="flex items-center gap-1.5 font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-rose-deep mb-2">
-          <BookOpen className="w-3.5 h-3.5" strokeWidth={1.5} /> 編輯精選
+          <BookOpen className="w-3.5 h-3.5" strokeWidth={1.5} /> {tr('編輯精選', 'Editor\'s pick')}
         </div>
         <h3 className="font-display text-2xl md:text-3xl font-light tracking-tight text-petal-ink leading-[1.15] mb-2">
           {reading.title}
@@ -32,7 +33,7 @@ export default function CuratedReadingCard({ reading }: { reading: CuratedReadin
             onClick={() => setExpanded(true)}
             className="inline-flex items-center justify-center gap-1.5 px-4 py-2 border border-petal-rule rounded-md font-body text-sm text-petal-rose-deep hover:border-petal-rose-deep hover:bg-petal-cream-2/40 transition-colors self-start sm:self-auto"
           >
-            閱讀全文
+            {tr('閱讀全文', 'Read more')}
             <ChevronDown className="w-4 h-4" strokeWidth={1.5} />
           </button>
         </div>
@@ -48,7 +49,7 @@ export default function CuratedReadingCard({ reading }: { reading: CuratedReadin
               className="inline-flex items-center gap-1.5 px-4 py-2 border border-petal-rule rounded-md font-body text-sm text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink transition-colors"
             >
               <ChevronUp className="w-4 h-4" strokeWidth={1.5} />
-              收起
+              {tr('收起', 'Collapse')}
             </button>
           </div>
         </div>

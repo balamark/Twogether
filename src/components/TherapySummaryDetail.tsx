@@ -2,6 +2,7 @@ import React from 'react';
 import { Hash, HeartPulse, CheckCircle2, CircleDashed, HelpCircle } from 'lucide-react';
 import type { TherapySummary } from '../services/api';
 import { NOT_A_SUBSTITUTE_SHORT } from '../content/positioning';
+import { tr } from '../i18n/tr';
 
 // Shared, read-only rendering of a 諮商摘要 (therapy summary). Used both by the
 // couple's own TherapySummaryCard and by the dedicated therapist's client view,
@@ -42,21 +43,21 @@ const TherapySummaryDetail: React.FC<{ summary: TherapySummary; showDisclaimer?:
 
     {summary.themes.length > 0 && (
       <div>
-        <SectionTitle icon={<Hash className="w-3.5 h-3.5" strokeWidth={1.5} />}>最常出現的衝突主題</SectionTitle>
+        <SectionTitle icon={<Hash className="w-3.5 h-3.5" strokeWidth={1.5} />}>{tr('最常出現的衝突主題', 'Most common conflict topics')}</SectionTitle>
         <Chips items={summary.themes} />
       </div>
     )}
 
     {summary.emotions.length > 0 && (
       <div>
-        <SectionTitle icon={<HeartPulse className="w-3.5 h-3.5" strokeWidth={1.5} />}>雙方最常感受到的情緒</SectionTitle>
+        <SectionTitle icon={<HeartPulse className="w-3.5 h-3.5" strokeWidth={1.5} />}>{tr('雙方最常感受到的情緒', 'Feelings you both felt most often')}</SectionTitle>
         <Chips items={summary.emotions} />
       </div>
     )}
 
     {summary.repaired.length > 0 && (
       <div>
-        <SectionTitle icon={<CheckCircle2 className="w-3.5 h-3.5" strokeWidth={1.5} />}>已經成功修復的事件</SectionTitle>
+        <SectionTitle icon={<CheckCircle2 className="w-3.5 h-3.5" strokeWidth={1.5} />}>{tr('已經成功修復的事件', 'Issues you\'ve repaired')}</SectionTitle>
         <ul className="space-y-1.5">
           {summary.repaired.map((r, i) => (
             <li key={i} className="font-body text-sm text-petal-ink leading-relaxed">
@@ -70,7 +71,7 @@ const TherapySummaryDetail: React.FC<{ summary: TherapySummary; showDisclaimer?:
 
     {summary.unresolved.length > 0 && (
       <div>
-        <SectionTitle icon={<CircleDashed className="w-3.5 h-3.5" strokeWidth={1.5} />}>還沒解決的事件</SectionTitle>
+        <SectionTitle icon={<CircleDashed className="w-3.5 h-3.5" strokeWidth={1.5} />}>{tr('還沒解決的事件', 'Issues not yet resolved')}</SectionTitle>
         <ul className="space-y-1.5">
           {summary.unresolved.map((r, i) => (
             <li key={i} className="font-body text-sm text-petal-ink leading-relaxed">
@@ -84,7 +85,7 @@ const TherapySummaryDetail: React.FC<{ summary: TherapySummary; showDisclaimer?:
 
     {summary.questions.length > 0 && (
       <div className="rounded-xl bg-petal-rose-soft/20 border border-petal-rose-soft px-4 py-3">
-        <SectionTitle icon={<HelpCircle className="w-3.5 h-3.5" strokeWidth={1.5} />}>想帶去和心理師討論的三個問題</SectionTitle>
+        <SectionTitle icon={<HelpCircle className="w-3.5 h-3.5" strokeWidth={1.5} />}>{tr('想帶去和心理師討論的三個問題', 'Three questions to bring to your therapist')}</SectionTitle>
         <ol className="space-y-1.5 list-decimal list-inside">
           {summary.questions.map((q, i) => (
             <li key={i} className="font-body text-sm text-petal-ink leading-relaxed">{q}</li>

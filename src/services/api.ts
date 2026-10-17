@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { formatYmdInTz, browserTz } from '../utils/datetime';
 import { setLastRequestId } from '../utils/telemetry';
+import { tr, getLocale } from '../i18n/tr';
 
 // Opt a single request OUT of the global `billing:limit-reached` → paywall
 // redirect on a 429. For calls where the AI is an optional convenience rather
@@ -1386,7 +1387,7 @@ const uploadTimeoutFor = (files: readonly File[]): number => {
 // proactive-logout timer in App.tsx doesn't need to decode the JWT.
 function persistAuth(token: unknown, user: unknown, tokenExpiresAt?: unknown): void {
   if (typeof token !== 'string' || token.split('.').length !== 3) {
-    throw new Error('登錄失敗：伺服器回傳的憑證格式異常');
+    throw new Error(tr('登錄失敗：伺服器回傳的憑證格式異常', 'Sign-in failed: the server returned credentials in an unexpected format'));
   }
   localStorage.setItem('authToken', token);
   localStorage.setItem('authUser', JSON.stringify(user));
@@ -1403,6 +1404,9 @@ apiClient.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    // Interface language → the server translates user-facing `message` fields
+    // (middleware/locale.js) and lets AI replies follow the same language.
+    config.headers['X-Locale'] = getLocale();
     console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`, config.data);
     return config;
   },
@@ -1427,7 +1431,7 @@ apiClient.interceptors.response.use(
     // an intentional stop. Give it its own error_code so callers can treat it
     // as silent/expected instead of surfacing a red "上傳失敗" toast.
     if (axios.isCancel(error) || error.code === 'ERR_CANCELED') {
-      const canceledError = new Error('已取消上傳') as Error & { error_code?: string };
+      const canceledError = new Error(tr('已取消上傳', 'Upload cancelled')) as Error & { error_code?: string };
       canceledError.error_code = 'CANCELED';
       throw canceledError;
     }
@@ -1436,7 +1440,7 @@ apiClient.interceptors.response.use(
       // Server responded with error status
       const { status, data } = error.response;
       // Extract error message from nested structure
-      const errorMessage = data?.error?.message || data?.message || data?.error || '未知錯誤';
+      const errorMessage = data?.error?.message || data?.message || data?.error || tr('未知錯誤', 'Unknown error');
       const errorCode = data?.error_code || data?.error?.code || data?.error?.error_code;
       const requestUrl = error.config?.url || '';
       
@@ -1451,7 +1455,7 @@ apiClient.interceptors.response.use(
       if (status === 401) {
         // Check if this is a login/register request - don't clear tokens for these
         if (isAuthEndpoint) {
-          const authError = new Error('登錄信息錯誤，請檢查郵箱和密碼') as Error & { error_code?: string; status?: number; data?: unknown };
+          const authError = new Error(tr('登錄信息錯誤，請檢查郵箱和密碼', 'Sign-in details are incorrect. Please check your email and password')) as Error & { error_code?: string; status?: number; data?: unknown };
           authError.error_code = errorCode;
           authError.status = status;
           authError.data = data;
@@ -1460,7 +1464,7 @@ apiClient.interceptors.response.use(
           // Token expired or invalid for authenticated requests
           clearAuthStorage();
           dispatchSessionExpired('expired');
-          const authError = new Error('登錄已過期，請重新登錄') as Error & { error_code?: string; status?: number; data?: unknown };
+          const authError = new Error(tr('登錄已過期，請重新登錄', 'Your session has expired. Please sign in again')) as Error & { error_code?: string; status?: number; data?: unknown };
           authError.error_code = errorCode;
           authError.status = status;
           authError.data = data;
@@ -1481,13 +1485,13 @@ apiClient.interceptors.response.use(
         if (!isAuthEndpoint && tokenIssue) {
           clearAuthStorage();
           dispatchSessionExpired(errorCode === 'TOKEN_EXPIRED' ? 'expired' : 'invalid');
-          const authError = new Error('登錄已過期，請重新登錄') as Error & { error_code?: string; status?: number; data?: unknown };
+          const authError = new Error(tr('登錄已過期，請重新登錄', 'Your session has expired. Please sign in again')) as Error & { error_code?: string; status?: number; data?: unknown };
           authError.error_code = errorCode;
           authError.status = status;
           authError.data = data;
           throw authError;
         }
-        const forbiddenError = new Error('沒有權限執行此操作') as Error & { error_code?: string; status?: number; data?: unknown };
+        const forbiddenError = new Error(tr('沒有權限執行此操作', 'You don\'t have permission to do this')) as Error & { error_code?: string; status?: number; data?: unknown };
         forbiddenError.error_code = errorCode;
         forbiddenError.status = status;
         forbiddenError.data = data;
@@ -1497,7 +1501,7 @@ apiClient.interceptors.response.use(
         // so the user knows what to do, falling back to a generic string
         // only when the body has none.
         const backendMessage = data?.message || data?.error?.message;
-        const notFoundError = new Error(backendMessage || '請求的資源不存在') as Error & { error_code?: string; status?: number; data?: unknown };
+        const notFoundError = new Error(backendMessage || tr('請求的資源不存在', 'The requested resource doesn\'t exist')) as Error & { error_code?: string; status?: number; data?: unknown };
         notFoundError.error_code = errorCode;
         notFoundError.status = status;
         notFoundError.data = data;
@@ -1534,7 +1538,7 @@ apiClient.interceptors.response.use(
         // one (e.g. "回應親密請求失敗") so the user sees what feature failed
         // instead of a featureless "服務器內部錯誤".
         const backendMessage = data?.message || data?.error?.message;
-        const serverError = new Error(backendMessage || '服務器內部錯誤，請稍後再試') as Error & { error_code?: string; status?: number; data?: unknown };
+        const serverError = new Error(backendMessage || tr('服務器內部錯誤，請稍後再試', 'Something went wrong on our server. Please try again in a moment')) as Error & { error_code?: string; status?: number; data?: unknown };
         serverError.error_code = errorCode;
         serverError.status = status;
         serverError.data = data;
@@ -1565,18 +1569,18 @@ apiClient.interceptors.response.use(
         /timeout/i.test(error.message || '');
       if (isTimeout) {
         const timeoutError = new Error(
-          '連線逾時。你的操作可能已經送出——請重新整理確認，先不要重複送出以免重複。'
+          tr('連線逾時。你的操作可能已經送出——請重新整理確認，先不要重複送出以免重複。', 'The connection timed out. Your action may already have gone through. Please refresh to check, and don\'t resend yet to avoid duplicates.')
         ) as Error & { error_code?: string };
         timeoutError.error_code = 'TIMEOUT';
         throw timeoutError;
       }
       // Genuine network error (request left, nothing came back, not a timeout).
-      const networkError = new Error('網絡連接失敗，請檢查網絡連接') as Error & { error_code?: string };
+      const networkError = new Error(tr('網絡連接失敗，請檢查網絡連接', 'Network connection failed. Please check your connection')) as Error & { error_code?: string };
       networkError.error_code = 'NETWORK_ERROR';
       throw networkError;
     } else {
       // Other error
-      const requestError = new Error(`請求失敗：${error.message}`) as Error & { error_code?: string };
+      const requestError = new Error(tr(`請求失敗：${error.message}`, `Request failed: ${error.message}`)) as Error & { error_code?: string };
       requestError.error_code = 'REQUEST_FAILED';
       throw requestError;
     }
@@ -1970,7 +1974,7 @@ class ApiService {
       const loveMoments = response.data?.love_moments || response.data;
       if (!Array.isArray(loveMoments)) {
         console.error('Expected array but got:', typeof loveMoments, loveMoments);
-        throw new Error('獲取記錄數據格式錯誤');
+        throw new Error(tr('獲取記錄數據格式錯誤', 'The record data came back in an unexpected format'));
       }
       
       return loveMoments.map((record, index) => {
@@ -1978,25 +1982,25 @@ class ApiService {
           return this.transformApiRecord(record);
         } catch (transformError) {
           console.error(`Error transforming record at index ${index}:`, transformError, record);
-          throw new Error(`記錄轉換失敗 (索引 ${index})`);
+          throw new Error(tr(`記錄轉換失敗 (索引 ${index})`, `Couldn't convert a record (index ${index})`));
         }
       });
     } catch (error: unknown) {
       console.error('Failed to fetch intimate records:', error);
-      this.throwApiError(error, '無法獲取愛的時光記錄');
+      this.throwApiError(error, tr('無法獲取愛的時光記錄', 'Couldn\'t load your moments'));
     }
   }
 
   async getIntimateRecord(id: string): Promise<IntimateRecord> {
     try {
       if (!id) {
-        throw new Error('記錄ID不能為空');
+        throw new Error(tr('記錄ID不能為空', 'The record ID can\'t be empty'));
       }
       const response = await apiClient.get(`/love-moments/${id}`);
       return this.transformApiRecord(response.data);
     } catch (error: unknown) {
       console.error('Failed to fetch intimate record:', error);
-      this.throwApiError(error, '無法獲取記錄詳情');
+      this.throwApiError(error, tr('無法獲取記錄詳情', 'Couldn\'t load the record details'));
     }
   }
 
@@ -2019,7 +2023,7 @@ class ApiService {
     try {
       // Validate required fields
       if (!record.date || !record.time) {
-        throw new Error('請填寫必要的記錄信息（日期、時間）');
+        throw new Error(tr('請填寫必要的記錄信息（日期、時間）', 'Please fill in the required details (date, time)'));
       }
 
       const apiPayload = {
@@ -2042,13 +2046,13 @@ class ApiService {
       return this.transformApiRecord(recordData);
     } catch (error: unknown) {
       console.error('Failed to create intimate record:', error);
-      this.throwApiError(error, '無法創建愛的時光記錄');
+      this.throwApiError(error, tr('無法創建愛的時光記錄', 'Couldn\'t create the record'));
     }
   }
 
   async updateIntimateRecord(id: string, record: Partial<IntimateRecord>): Promise<void> {
     try {
-      if (!id) throw new Error('記錄ID不能為空');
+      if (!id) throw new Error(tr('記錄ID不能為空', 'The record ID can\'t be empty'));
 
       const apiPayload: Record<string, unknown> = {};
       if (record.date && record.time) {
@@ -2065,17 +2069,17 @@ class ApiService {
       await apiClient.put(`/love-moments/${id}`, apiPayload);
     } catch (error: unknown) {
       console.error('Failed to update intimate record:', error);
-      this.throwApiError(error, '無法更新記錄');
+      this.throwApiError(error, tr('無法更新記錄', 'Couldn\'t update the record'));
     }
   }
 
   async deleteIntimateRecord(id: string): Promise<void> {
     try {
-      if (!id) throw new Error('記錄ID不能為空');
+      if (!id) throw new Error(tr('記錄ID不能為空', 'The record ID can\'t be empty'));
       await apiClient.delete(`/love-moments/${id}`);
     } catch (error: unknown) {
       console.error('Failed to delete intimate record:', error);
-      this.throwApiError(error, '無法刪除記錄');
+      this.throwApiError(error, tr('無法刪除記錄', 'Couldn\'t delete the record'));
     }
   }
 
@@ -2086,7 +2090,7 @@ class ApiService {
       return (response.data?.activities || []) as ActivityItem[];
     } catch (error: unknown) {
       console.error('Failed to fetch activity feed:', error);
-      this.throwApiError(error, '無法獲取最近動態');
+      this.throwApiError(error, tr('無法獲取最近動態', 'Couldn\'t load recent activity'));
     }
   }
 
@@ -2098,13 +2102,13 @@ class ApiService {
       return rows.map(this.transformCycleRecord);
     } catch (error: unknown) {
       console.error('Failed to fetch cycle records:', error);
-      this.throwApiError(error, '無法獲取週期紀錄');
+      this.throwApiError(error, tr('無法獲取週期紀錄', 'Couldn\'t load cycle records'));
     }
   }
 
   async createCycleRecord(input: { startDate: string; lengthDays?: number; notes?: string }): Promise<CycleRecord> {
     try {
-      if (!input.startDate) throw new Error('請選擇週期開始日');
+      if (!input.startDate) throw new Error(tr('請選擇週期開始日', 'Please choose a cycle start date'));
       const response = await apiClient.post('/cycle-records', {
         start_date: input.startDate,
         length_days: input.lengthDays ?? 5,
@@ -2114,13 +2118,13 @@ class ApiService {
       return this.transformCycleRecord(row);
     } catch (error: unknown) {
       console.error('Failed to create cycle record:', error);
-      this.throwApiError(error, '無法建立週期紀錄');
+      this.throwApiError(error, tr('無法建立週期紀錄', 'Couldn\'t create the cycle record'));
     }
   }
 
   async updateCycleRecord(id: string, input: Partial<{ startDate: string; lengthDays: number; notes: string }>): Promise<void> {
     try {
-      if (!id) throw new Error('紀錄ID不能為空');
+      if (!id) throw new Error(tr('紀錄ID不能為空', 'The record ID can\'t be empty'));
       const payload: Record<string, unknown> = {};
       if (input.startDate !== undefined) payload.start_date = input.startDate;
       if (input.lengthDays !== undefined) payload.length_days = input.lengthDays;
@@ -2128,17 +2132,17 @@ class ApiService {
       await apiClient.put(`/cycle-records/${id}`, payload);
     } catch (error: unknown) {
       console.error('Failed to update cycle record:', error);
-      this.throwApiError(error, '無法更新週期紀錄');
+      this.throwApiError(error, tr('無法更新週期紀錄', 'Couldn\'t update the cycle record'));
     }
   }
 
   async deleteCycleRecord(id: string): Promise<void> {
     try {
-      if (!id) throw new Error('紀錄ID不能為空');
+      if (!id) throw new Error(tr('紀錄ID不能為空', 'The record ID can\'t be empty'));
       await apiClient.delete(`/cycle-records/${id}`);
     } catch (error: unknown) {
       console.error('Failed to delete cycle record:', error);
-      this.throwApiError(error, '無法刪除週期紀錄');
+      this.throwApiError(error, tr('無法刪除週期紀錄', 'Couldn\'t delete the cycle record'));
     }
   }
 
@@ -2158,19 +2162,19 @@ class ApiService {
     try {
       // Validate file
       if (!file) {
-        throw new Error('請選擇要上傳的照片');
+        throw new Error(tr('請選擇要上傳的照片', 'Please choose a photo to upload'));
       }
       
       // Check file size (max 10MB)
       const maxSize = 10 * 1024 * 1024;
       if (file.size > maxSize) {
-        throw new Error('照片文件大小不能超過10MB');
+        throw new Error(tr('照片文件大小不能超過10MB', 'Photos can\'t be larger than 10MB'));
       }
       
       // Check file type
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
       if (!allowedTypes.includes(file.type)) {
-        throw new Error('只支持 JPEG、PNG 和 WebP 格式的照片');
+        throw new Error(tr('只支持 JPEG、PNG 和 WebP 格式的照片', 'Only JPEG, PNG and WebP photos are supported'));
       }
 
       const formData = new FormData();
@@ -2190,13 +2194,13 @@ class ApiService {
       // Backend returns { success, photo: { id, file_path, ... } }.
       const photo = response.data?.photo;
       if (!photo?.id || !photo?.file_path) {
-        throw new Error('上傳成功但未獲取到照片資訊');
+        throw new Error(tr('上傳成功但未獲取到照片資訊', 'The upload succeeded but no photo details came back'));
       }
 
       return { id: photo.id, url: photo.file_path };
     } catch (error: unknown) {
       console.error('Failed to upload photo:', error);
-      this.throwApiError(error, '照片上傳失敗');
+      this.throwApiError(error, tr('照片上傳失敗', 'Photo upload failed'));
     }
   }
 
@@ -2228,21 +2232,21 @@ class ApiService {
       const authUserRaw = localStorage.getItem('authUser');
       const currentUserId = authUserRaw ? JSON.parse(authUserRaw)?.id : null;
 
-      let currentUserNickname = '親愛的';
-      let partnerNickname = '寶貝';
+      let currentUserNickname = tr('親愛的', 'Dear');
+      let partnerNickname = tr('寶貝', 'Babe');
       let currentUserGender: string | undefined;
       let partnerGender: string | undefined;
 
       if (currentUserId && couple) {
         // Determine which user in the couple is the current user
         if (couple.user1Id === currentUserId) {
-          currentUserNickname = couple.user1Nickname || '親愛的';
-          partnerNickname = couple.user2Nickname || '寶貝';
+          currentUserNickname = couple.user1Nickname || tr('親愛的', 'Dear');
+          partnerNickname = couple.user2Nickname || tr('寶貝', 'Babe');
           currentUserGender = couple.user1Gender;
           partnerGender = couple.user2Gender;
         } else if (couple.user2Id === currentUserId) {
-          currentUserNickname = couple.user2Nickname || '親愛的';
-          partnerNickname = couple.user1Nickname || '寶貝';
+          currentUserNickname = couple.user2Nickname || tr('親愛的', 'Dear');
+          partnerNickname = couple.user1Nickname || tr('寶貝', 'Babe');
           currentUserGender = couple.user2Gender;
           partnerGender = couple.user1Gender;
         }
@@ -2257,7 +2261,7 @@ class ApiService {
     } catch {
       // Not paired yet or error — backend is the only source of truth, so
       // surface the defaults instead of caching client-side.
-      return { partner1: '親愛的', partner2: '寶貝' };
+      return { partner1: tr('親愛的', 'Dear'), partner2: tr('寶貝', 'Babe') };
     }
   }
 
@@ -2317,7 +2321,7 @@ class ApiService {
       await apiClient.post('/coins/transaction', {
         amount: Math.abs(amount),
         transaction_type: amount > 0 ? 'earn' : 'spend',
-        description: amount > 0 ? '記錄愛的時光' : '購買禮品',
+        description: amount > 0 ? tr('記錄愛的時光', 'Recorded a moment of love') : tr('購買禮品', 'Bought a gift'),
         ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
       });
     } catch (error) {
@@ -2627,7 +2631,7 @@ class ApiService {
       return this.transformCoupleResponse(response.data.couple);
     } catch (error: unknown) {
       console.error('Failed to create couple:', error);
-      this.throwApiError(error, '無法創建情侶關係');
+      this.throwApiError(error, tr('無法創建情侶關係', 'Couldn\'t create the couple'));
     }
   }
 
@@ -2653,7 +2657,7 @@ class ApiService {
       return this.transformCoupleResponse(response.data.couple);
     } catch (error: unknown) {
       console.error('Failed to get couple:', error);
-      this.throwApiError(error, '無法獲取情侶信息');
+      this.throwApiError(error, tr('無法獲取情侶信息', 'Couldn\'t load couple details'));
     }
   }
 
@@ -2667,7 +2671,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to generate pairing code:', error);
-      this.throwApiError(error, '無法生成配對碼');
+      this.throwApiError(error, tr('無法生成配對碼', 'Couldn\'t create a pairing code'));
     }
   }
 
@@ -2681,7 +2685,7 @@ class ApiService {
       return response.data;
     } catch (error: unknown) {
       console.error('Failed to send pairing invitation:', error);
-      this.throwApiError(error, '無法發送配對邀請');
+      this.throwApiError(error, tr('無法發送配對邀請', 'Couldn\'t send the pairing invitation'));
     }
   }
 
@@ -2691,7 +2695,7 @@ class ApiService {
       return response.data;
     } catch (error: unknown) {
       console.error('Failed to create pairing code invite:', error);
-      this.throwApiError(error, '無法生成配對碼');
+      this.throwApiError(error, tr('無法生成配對碼', 'Couldn\'t create a pairing code'));
     }
   }
 
@@ -2701,7 +2705,7 @@ class ApiService {
       return response.data;
     } catch (error: unknown) {
       console.error('Failed to accept pairing invitation:', error);
-      this.throwApiError(error, '無法接受配對邀請');
+      this.throwApiError(error, tr('無法接受配對邀請', 'Couldn\'t accept the pairing invitation'));
     }
   }
 
@@ -2711,7 +2715,7 @@ class ApiService {
       return response.data;
     } catch (error: unknown) {
       console.error('Failed to accept pairing code:', error);
-      this.throwApiError(error, '無法接受配對邀請');
+      this.throwApiError(error, tr('無法接受配對邀請', 'Couldn\'t accept the pairing invitation'));
     }
   }
 
@@ -2721,7 +2725,7 @@ class ApiService {
       return response.data;
     } catch (error: unknown) {
       console.error('Failed to reject pairing invitation:', error);
-      this.throwApiError(error, '無法拒絕配對邀請');
+      this.throwApiError(error, tr('無法拒絕配對邀請', 'Couldn\'t decline the pairing invitation'));
     }
   }
 
@@ -2744,7 +2748,7 @@ class ApiService {
       return response.data;
     } catch (error: unknown) {
       console.error('Failed to get pairing invitation:', error);
-      this.throwApiError(error, '無法獲取配對邀請詳情');
+      this.throwApiError(error, tr('無法獲取配對邀請詳情', 'Couldn\'t load the pairing invitation details'));
     }
   }
 
@@ -2769,7 +2773,7 @@ class ApiService {
       });
     } catch (error: unknown) {
       console.error('Failed to get my pairing invitations:', error);
-      this.throwApiError(error, '無法獲取配對邀請狀態');
+      this.throwApiError(error, tr('無法獲取配對邀請狀態', 'Couldn\'t load the pairing invitation status'));
     }
   }
 
@@ -2781,7 +2785,7 @@ class ApiService {
       console.error('Failed to resend pairing invitation:', error);
       // Keep error_code intact — the banner branches on EMAIL_NOT_CONFIGURED
       // vs INVITATION_NOT_FOUND to tell the user what to do next.
-      this.throwApiError(error, '重新寄送邀請失敗');
+      this.throwApiError(error, tr('重新寄送邀請失敗', 'Couldn\'t resend the invitation'));
     }
   }
 
@@ -2857,7 +2861,7 @@ class ApiService {
       return this.transformIntimacyRequest(response.data.intimacy_request || response.data);
     } catch (error: unknown) {
       console.error('Failed to create intimacy request:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法發送親密邀請');
+      throw new Error((error as ApiErrorResponse)?.message || tr('無法發送親密邀請', 'Couldn\'t send the intimacy invitation'));
     }
   }
 
@@ -2880,7 +2884,7 @@ class ApiService {
       await apiClient.put('/auth/user/gender', { gender });
     } catch (error: unknown) {
       console.error('Failed to update user gender:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '更新性別設定失敗');
+      throw new Error((error as ApiErrorResponse)?.message || tr('更新性別設定失敗', 'Couldn\'t update the gender setting'));
     }
   }
 
@@ -2890,7 +2894,7 @@ class ApiService {
       await apiClient.put('/auth/user/ai-companion', { companion });
     } catch (error: unknown) {
       console.error('Failed to update AI companion:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '更新 AI 諮商師失敗，請稍後再試');
+      throw new Error((error as ApiErrorResponse)?.message || tr('更新 AI 諮商師失敗，請稍後再試', 'Couldn\'t update the AI counselor. Please try again in a moment'));
     }
   }
 
@@ -2908,7 +2912,7 @@ class ApiService {
       return res.data;
     } catch (error: unknown) {
       console.error('[LINE] link code failed', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法產生綁定碼，請稍後再試');
+      throw new Error((error as ApiErrorResponse)?.message || tr('無法產生綁定碼，請稍後再試', 'Couldn\'t create a link code. Please try again in a moment'));
     }
   }
 
@@ -2927,7 +2931,7 @@ class ApiService {
       await apiClient.put('/auth/user/birth-date', { birth_date: birthDate });
     } catch (error: unknown) {
       console.error('Failed to update user birth date:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '更新生日失敗');
+      throw new Error((error as ApiErrorResponse)?.message || tr('更新生日失敗', 'Couldn\'t update your birthday'));
     }
   }
 
@@ -2936,7 +2940,7 @@ class ApiService {
       await apiClient.put('/auth/user/timezone', { timezone });
     } catch (error: unknown) {
       console.error('Failed to update user timezone:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '更新時區失敗');
+      throw new Error((error as ApiErrorResponse)?.message || tr('更新時區失敗', 'Couldn\'t update the time zone'));
     }
   }
 
@@ -2945,7 +2949,7 @@ class ApiService {
       await apiClient.put('/couples/primary-timezone', { primary_timezone: timezone });
     } catch (error: unknown) {
       console.error('Failed to update couple primary timezone:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '更新共用時區失敗');
+      throw new Error((error as ApiErrorResponse)?.message || tr('更新共用時區失敗', 'Couldn\'t update the shared time zone'));
     }
   }
 
@@ -2956,7 +2960,7 @@ class ApiService {
       });
     } catch (error: unknown) {
       console.error('Failed to update email notifications pref:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '更新電子郵件通知設定失敗');
+      throw new Error((error as ApiErrorResponse)?.message || tr('更新電子郵件通知設定失敗', 'Couldn\'t update email notification settings'));
     }
   }
 
@@ -2969,7 +2973,7 @@ class ApiService {
         new_email: newEmail,
         password,
       });
-      return { message: response.data?.message || '我們已寄出確認信到新的 Email，請點擊信中連結完成變更。' };
+      return { message: response.data?.message || tr('我們已寄出確認信到新的 Email，請點擊信中連結完成變更。', 'We\'ve sent a confirmation email to the new address. Click the link in it to complete the change.') };
     } catch (error: unknown) {
       console.error('Failed to change user email:', error);
       throw error;
@@ -2983,7 +2987,7 @@ class ApiService {
       });
     } catch (error: unknown) {
       console.error('Failed to update public-share nickname pref:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '更新公開分享設定失敗');
+      throw new Error((error as ApiErrorResponse)?.message || tr('更新公開分享設定失敗', 'Couldn\'t update public sharing settings'));
     }
   }
 
@@ -2994,7 +2998,7 @@ class ApiService {
       });
     } catch (error: unknown) {
       console.error('Failed to update cycle tracking pref:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '更新週期追蹤設定失敗');
+      throw new Error((error as ApiErrorResponse)?.message || tr('更新週期追蹤設定失敗', 'Couldn\'t update cycle tracking settings'));
     }
   }
 
@@ -3005,7 +3009,7 @@ class ApiService {
       return response.data.intimacy_requests?.map((item: unknown) => this.transformIntimacyRequest(item)) || [];
     } catch (error: unknown) {
       console.error('Failed to fetch intimacy requests:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法獲取親密邀請記錄');
+      throw new Error((error as ApiErrorResponse)?.message || tr('無法獲取親密邀請記錄', 'Couldn\'t load intimacy invitation history'));
     }
   }
 
@@ -3028,7 +3032,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to fetch intimacy stats:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法獲取親密邀請統計');
+      throw new Error((error as ApiErrorResponse)?.message || tr('無法獲取親密邀請統計', 'Couldn\'t load intimacy invitation stats'));
     }
   }
 
@@ -3037,17 +3041,17 @@ class ApiService {
       const response = await apiClient.post('/intimacy-requests/stats/send-nudge');
 
       if (!response.data?.success) {
-        const message = response.data?.message || '無法寄出貼心提醒';
+        const message = response.data?.message || tr('無法寄出貼心提醒', 'Couldn\'t send the caring reminder');
         throw new Error(message);
       }
 
-      return response.data.message || '貼心提醒已寄出';
+      return response.data.message || tr('貼心提醒已寄出', 'Caring reminder sent');
     } catch (error: unknown) {
       console.error('Failed to send intimacy nudge email:', error);
       if (error instanceof Error && error.message) {
         throw error;
       }
-      throw new Error((error as ApiErrorResponse)?.message || '無法寄出貼心提醒');
+      throw new Error((error as ApiErrorResponse)?.message || tr('無法寄出貼心提醒', 'Couldn\'t send the caring reminder'));
     }
   }
 
@@ -3066,7 +3070,7 @@ class ApiService {
       return this.transformIntimacyRequest(result.data);
     } catch (error: unknown) {
       console.error('Failed to respond to intimacy request:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法回應親密邀請');
+      throw new Error((error as ApiErrorResponse)?.message || tr('無法回應親密邀請', 'Couldn\'t respond to the intimacy invitation'));
     }
   }
 
@@ -3076,7 +3080,7 @@ class ApiService {
       return response.data.templates?.map((item: unknown) => this.transformIntimacyTemplate(item)) || [];
     } catch (error: unknown) {
       console.error('Failed to fetch intimacy templates:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法獲取親密邀請模板');
+      throw new Error((error as ApiErrorResponse)?.message || tr('無法獲取親密邀請模板', 'Couldn\'t load intimacy invitation templates'));
     }
   }
 
@@ -3245,13 +3249,13 @@ class ApiService {
         days: days ?? undefined,
       });
       if (!response.data?.success) {
-        throw new Error(response.data?.message || '無法送出提醒');
+        throw new Error(response.data?.message || tr('無法送出提醒', 'Couldn\'t send the reminder'));
       }
-      return response.data.message || '已把溫柔提醒送給TA了 💗';
+      return response.data.message || tr('已把溫柔提醒送給TA了 💗', 'Your gentle reminder was sent to them 💗');
     } catch (error: unknown) {
       console.error('Failed to send intimacy nudge message:', error);
       if (error instanceof Error && error.message) throw error;
-      throw new Error((error as ApiErrorResponse)?.message || '無法送出提醒');
+      throw new Error((error as ApiErrorResponse)?.message || tr('無法送出提醒', 'Couldn\'t send the reminder'));
     }
   }
 
@@ -3266,7 +3270,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to fetch alternative intimacy options:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法獲取替代親密選項');
+      throw new Error((error as ApiErrorResponse)?.message || tr('無法獲取替代親密選項', 'Couldn\'t load alternative intimacy options'));
     }
   }
 
@@ -3281,7 +3285,7 @@ class ApiService {
       return response.data.notifications?.map((item: unknown) => this.transformNotification(item)) || [];
     } catch (error: unknown) {
       console.error('Failed to fetch notifications:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法獲取通知');
+      throw new Error((error as ApiErrorResponse)?.message || tr('無法獲取通知', 'Couldn\'t load notifications'));
     }
   }
 
@@ -3292,7 +3296,7 @@ class ApiService {
       });
     } catch (error: unknown) {
       console.error('Failed to mark notifications as read:', error);
-      throw new Error((error as ApiErrorResponse)?.message || '無法標記通知為已讀');
+      throw new Error((error as ApiErrorResponse)?.message || tr('無法標記通知為已讀', 'Couldn\'t mark notifications as read'));
     }
   }
 
@@ -3393,7 +3397,7 @@ class ApiService {
       return response.data.assessment;
     } catch (error: unknown) {
       console.error('Failed to save assessment:', error);
-      this.throwApiError(error, '儲存測驗結果失敗，請稍後再試');
+      this.throwApiError(error, tr('儲存測驗結果失敗，請稍後再試', 'Couldn\'t save the quiz result. Please try again in a moment'));
     }
   }
 
@@ -3414,7 +3418,7 @@ class ApiService {
       return response.data.wish;
     } catch (error: unknown) {
       console.error('Failed to add love wish:', error);
-      this.throwApiError(error, '新增失敗，請稍後再試');
+      this.throwApiError(error, tr('新增失敗，請稍後再試', 'Couldn\'t add. Please try again in a moment'));
     }
   }
 
@@ -3423,7 +3427,7 @@ class ApiService {
       await apiClient.delete(`/assessments/love-wishes/${id}`);
     } catch (error: unknown) {
       console.error('Failed to delete love wish:', error);
-      this.throwApiError(error, '刪除失敗，請稍後再試');
+      this.throwApiError(error, tr('刪除失敗，請稍後再試', 'Couldn\'t delete. Please try again in a moment'));
     }
   }
 
@@ -3443,7 +3447,7 @@ class ApiService {
       await apiClient.post('/relationship/checkin', input);
     } catch (error: unknown) {
       console.error('Failed to submit check-in:', error);
-      this.throwApiError(error, '儲存關係檢視失敗，請稍後再試');
+      this.throwApiError(error, tr('儲存關係檢視失敗，請稍後再試', 'Couldn\'t save the relationship check. Please try again in a moment'));
     }
   }
 
@@ -3514,7 +3518,7 @@ class ApiService {
       return response.data.roles || [];
     } catch (error) {
       console.error('Failed to AI-parse script roles:', error);
-      throw this.extractScriptError(error, 'AI 角色辨識暫時無法使用，請稍後再試');
+      throw this.extractScriptError(error, tr('AI 角色辨識暫時無法使用，請稍後再試', 'AI character detection isn\'t available right now. Please try again in a moment'));
     }
   }
 
@@ -3527,7 +3531,7 @@ class ApiService {
       return { content: response.data.content, suggestedTitle: response.data.suggestedTitle };
     } catch (error) {
       console.error('Failed to import Google Doc:', error);
-      throw this.extractScriptError(error, '無法匯入 Google 文件，請稍後再試');
+      throw this.extractScriptError(error, tr('無法匯入 Google 文件，請稍後再試', 'Couldn\'t import the Google Doc. Please try again in a moment'));
     }
   }
 
@@ -3551,7 +3555,7 @@ class ApiService {
         fd.append('scenario', script.scenario);
         if (script.location !== undefined) fd.append('location', script.location);
         fd.append('content', script.content);
-        fd.append('duration', script.duration ?? '15-30分鐘');
+        fd.append('duration', script.duration ?? tr('15-30分鐘', '15–30 min'));
         fd.append('tags', JSON.stringify(script.tags ?? []));
         for (const p of script.photos) fd.append('photos', p);
         if (script.isPublic !== undefined) fd.append('isPublic', String(script.isPublic));
@@ -3567,7 +3571,7 @@ class ApiService {
       return response.data.custom_script;
     } catch (error) {
       console.error('Failed to create custom script:', error);
-      throw this.extractScriptError(error, '無法建立劇本');
+      throw this.extractScriptError(error, tr('無法建立劇本', 'Couldn\'t create the script'));
     }
   }
 
@@ -3616,7 +3620,7 @@ class ApiService {
       return response.data.custom_script;
     } catch (error) {
       console.error('Failed to update custom script:', error);
-      throw this.extractScriptError(error, '無法更新劇本');
+      throw this.extractScriptError(error, tr('無法更新劇本', 'Couldn\'t update the script'));
     }
   }
 
@@ -3710,7 +3714,7 @@ class ApiService {
       await apiClient.post(`/marketplace/scripts/${id}/rate`, { stars, reviewText });
     } catch (error) {
       console.error('Failed to submit rating:', error);
-      throw this.extractScriptError(error, '無法送出評分');
+      throw this.extractScriptError(error, tr('無法送出評分', 'Couldn\'t submit the rating'));
     }
   }
 
@@ -3728,7 +3732,7 @@ class ApiService {
       await apiClient.post(`/marketplace/scripts/${id}/report`, { reason, detail });
     } catch (error) {
       console.error('Failed to submit report:', error);
-      throw this.extractScriptError(error, '無法送出檢舉');
+      throw this.extractScriptError(error, tr('無法送出檢舉', 'Couldn\'t send the report'));
     }
   }
 
@@ -4177,7 +4181,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to preview icebreaker:', error);
-      this.throwApiError(error, '無法解析輸入內容');
+      this.throwApiError(error, tr('無法解析輸入內容', 'Couldn\'t process what you wrote'));
     }
   }
 
@@ -4201,7 +4205,7 @@ class ApiService {
       return this.transformEvent(response.data.event);
     } catch (error: unknown) {
       console.error('Failed to create event:', error);
-      this.throwApiError(error, '無法建立對話');
+      this.throwApiError(error, tr('無法建立對話', 'Couldn\'t create the conversation'));
     }
   }
 
@@ -4217,7 +4221,7 @@ class ApiService {
       return { events, total: response.data.total || 0 };
     } catch (error: unknown) {
       console.error('Failed to list events:', error);
-      this.throwApiError(error, '無法取得對話列表');
+      this.throwApiError(error, tr('無法取得對話列表', 'Couldn\'t load conversations'));
     }
   }
 
@@ -4227,7 +4231,7 @@ class ApiService {
       return this.transformEvent(response.data.event);
     } catch (error: unknown) {
       console.error('Failed to fetch event:', error);
-      this.throwApiError(error, '無法取得對話詳情');
+      this.throwApiError(error, tr('無法取得對話詳情', 'Couldn\'t load the conversation details'));
     }
   }
 
@@ -4237,7 +4241,7 @@ class ApiService {
       return this.transformEvent(response.data.event);
     } catch (error: unknown) {
       console.error('Failed to update event:', error);
-      this.throwApiError(error, '無法更新對話內容');
+      this.throwApiError(error, tr('無法更新對話內容', 'Couldn\'t update the conversation'));
     }
   }
 
@@ -4247,7 +4251,7 @@ class ApiService {
       return this.transformEventMessage(response.data.message);
     } catch (error: unknown) {
       console.error('Failed to update event message:', error);
-      this.throwApiError(error, '無法更新訊息');
+      this.throwApiError(error, tr('無法更新訊息', 'Couldn\'t update the message'));
     }
   }
 
@@ -4257,7 +4261,7 @@ class ApiService {
       return this.transformEventMessage(response.data.message);
     } catch (error: unknown) {
       console.error('Failed to reply to event:', error);
-      this.throwApiError(error, '無法送出訊息');
+      this.throwApiError(error, tr('無法送出訊息', 'Couldn\'t send the message'));
     }
   }
 
@@ -4275,7 +4279,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to preview reply rewrite:', error);
-      this.throwApiError(error, '無法改寫回覆，請稍後再試');
+      this.throwApiError(error, tr('無法改寫回覆，請稍後再試', 'Couldn\'t rewrite the reply. Please try again in a moment'));
     }
   }
 
@@ -4297,7 +4301,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to analyze draft:', error);
-      this.throwApiError(error, '情緒檢測暫時無法產生，請稍後再試');
+      this.throwApiError(error, tr('情緒檢測暫時無法產生，請稍後再試', 'The emotion check can\'t be generated right now. Please try again in a moment'));
     }
   }
 
@@ -4318,7 +4322,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to preview emotion acceptance:', error);
-      this.throwApiError(error, 'AI 接住情緒建議暫時無法產生，請稍後再試');
+      this.throwApiError(error, tr('AI 接住情緒建議暫時無法產生，請稍後再試', 'AI suggestions for holding their feelings can\'t be generated right now. Please try again in a moment'));
     }
   }
 
@@ -4329,7 +4333,7 @@ class ApiService {
       return response.data.comment || '';
     } catch (error: unknown) {
       console.error('Failed to preview event AI comment:', error);
-      this.throwApiError(error, 'AI 諮商師暫時無法回應，請稍後再試');
+      this.throwApiError(error, tr('AI 諮商師暫時無法回應，請稍後再試', 'The AI counselor can\'t respond right now. Please try again in a moment'));
     }
   }
 
@@ -4340,7 +4344,7 @@ class ApiService {
       return this.transformEventMessage(response.data.message);
     } catch (error: unknown) {
       console.error('Failed to post event AI comment:', error);
-      this.throwApiError(error, '無法新增 AI 留言，請稍後再試');
+      this.throwApiError(error, tr('無法新增 AI 留言，請稍後再試', 'Couldn\'t add the AI comment. Please try again in a moment'));
     }
   }
 
@@ -4351,7 +4355,7 @@ class ApiService {
       return response.data.translation_enabled === true;
     } catch (error: unknown) {
       console.error('Failed to toggle event translation:', error);
-      this.throwApiError(error, '無法更新情緒翻譯設定，請稍後再試');
+      this.throwApiError(error, tr('無法更新情緒翻譯設定，請稍後再試', 'Couldn\'t update the emotion translation setting. Please try again in a moment'));
     }
   }
 
@@ -4366,7 +4370,7 @@ class ApiService {
       return toTranslationResult(response.data);
     } catch (error: unknown) {
       console.error('Failed to fetch event translations:', error);
-      this.throwApiError(error, '情緒翻譯暫時無法產生，請稍後再試');
+      this.throwApiError(error, tr('情緒翻譯暫時無法產生，請稍後再試', 'Emotion translation can\'t be generated right now. Please try again in a moment'));
     }
   }
 
@@ -4378,7 +4382,7 @@ class ApiService {
       return response.data.therapyNote as TherapyNote;
     } catch (error: unknown) {
       console.error('Failed to fetch therapy note:', error);
-      this.throwApiError(error, '治療摘要暫時無法產生，請稍後再試');
+      this.throwApiError(error, tr('治療摘要暫時無法產生，請稍後再試', 'Session notes can\'t be generated right now. Please try again in a moment'));
     }
   }
 
@@ -4395,7 +4399,7 @@ class ApiService {
       return response.data.journey as DeepDiveJourney;
     } catch (error: unknown) {
       console.error('Failed to start deep dive:', error);
-      this.throwApiError(error, '暫時沒辦法開始情緒深潛，請稍後再試');
+      this.throwApiError(error, tr('暫時沒辦法開始情緒深潛，請稍後再試', 'Couldn\'t start the emotion deep dive right now. Please try again in a moment'));
     }
   }
 
@@ -4406,7 +4410,7 @@ class ApiService {
       return (response.data.journey ?? null) as DeepDiveJourney | null;
     } catch (error: unknown) {
       console.error('Failed to fetch active deep dive:', error);
-      this.throwApiError(error, '暫時讀不到你的情緒深潛進度');
+      this.throwApiError(error, tr('暫時讀不到你的情緒深潛進度', 'Couldn\'t load your emotion deep dive progress right now'));
     }
   }
 
@@ -4416,7 +4420,7 @@ class ApiService {
       return response.data.journey as DeepDiveJourney;
     } catch (error: unknown) {
       console.error('Failed to fetch deep dive:', error);
-      this.throwApiError(error, '暫時讀不到這段情緒深潛');
+      this.throwApiError(error, tr('暫時讀不到這段情緒深潛', 'Couldn\'t load this emotion deep dive right now'));
     }
   }
 
@@ -4427,7 +4431,7 @@ class ApiService {
       return (response.data.journeys ?? []) as DeepDiveInboxItem[];
     } catch (error: unknown) {
       console.error('Failed to fetch deep dive inbox:', error);
-      this.throwApiError(error, '暫時讀不到伴侶分享的內容');
+      this.throwApiError(error, tr('暫時讀不到伴侶分享的內容', 'Couldn\'t load what your partner shared right now'));
     }
   }
 
@@ -4439,7 +4443,7 @@ class ApiService {
       return response.data.journey as DeepDiveJourney;
     } catch (error: unknown) {
       console.error('Failed to save deep dive step:', error);
-      this.throwApiError(error, '這一步暫時存不起來，你寫的內容還在，請再試一次');
+      this.throwApiError(error, tr('這一步暫時存不起來，你寫的內容還在，請再試一次', 'This step couldn\'t be saved right now. What you wrote is still here; please try again'));
     }
   }
 
@@ -4448,7 +4452,7 @@ class ApiService {
       await apiClient.put(`/deep-dive/${id}/letter`, { kind, content });
     } catch (error: unknown) {
       console.error('Failed to save deep dive letter:', error);
-      this.throwApiError(error, '這封信暫時存不起來，你寫的內容還在，請再試一次');
+      this.throwApiError(error, tr('這封信暫時存不起來，你寫的內容還在，請再試一次', 'This letter couldn\'t be saved right now. What you wrote is still here; please try again'));
     }
   }
 
@@ -4458,7 +4462,7 @@ class ApiService {
       return response.data as DeepDiveReflection;
     } catch (error: unknown) {
       console.error('Failed to get deep dive reflection:', error);
-      this.throwApiError(error, 'AI 暫時想不出來，你還是可以自己寫');
+      this.throwApiError(error, tr('AI 暫時想不出來，你還是可以自己寫', 'The AI can\'t think of anything right now. You can still write it yourself'));
     }
   }
 
@@ -4468,7 +4472,7 @@ class ApiService {
       return response.data as DeepDiveLetterAi;
     } catch (error: unknown) {
       console.error('Failed to get deep dive letter draft:', error);
-      this.throwApiError(error, 'AI 暫時想不出來，你還是可以自己寫');
+      this.throwApiError(error, tr('AI 暫時想不出來，你還是可以自己寫', 'The AI can\'t think of anything right now. You can still write it yourself'));
     }
   }
 
@@ -4478,7 +4482,7 @@ class ApiService {
       return response.data.journey as DeepDiveJourney;
     } catch (error: unknown) {
       console.error('Failed to share deep dive:', error);
-      this.throwApiError(error, '暫時沒辦法分享，你的信已經存好了，請稍後再試一次');
+      this.throwApiError(error, tr('暫時沒辦法分享，你的信已經存好了，請稍後再試一次', 'Can\'t share right now. Your letter is saved; please try again in a moment'));
     }
   }
 
@@ -4487,7 +4491,7 @@ class ApiService {
       await apiClient.post(`/deep-dive/${id}/partner/read`);
     } catch (error: unknown) {
       console.error('Failed to mark deep dive read:', error);
-      this.throwApiError(error, '暫時存不起來，請再試一次');
+      this.throwApiError(error, tr('暫時存不起來，請再試一次', 'Couldn\'t save right now. Please try again'));
     }
   }
 
@@ -4496,7 +4500,7 @@ class ApiService {
       await apiClient.put(`/deep-dive/${id}/partner/mirror`, { mirror });
     } catch (error: unknown) {
       console.error('Failed to save mirror:', error);
-      this.throwApiError(error, '暫時存不起來，你寫的內容還在，請再試一次');
+      this.throwApiError(error, tr('暫時存不起來，你寫的內容還在，請再試一次', 'Couldn\'t save right now. What you wrote is still here; please try again'));
     }
   }
 
@@ -4505,7 +4509,7 @@ class ApiService {
       await apiClient.put(`/deep-dive/${id}/partner/validation`, validation);
     } catch (error: unknown) {
       console.error('Failed to save validation:', error);
-      this.throwApiError(error, '暫時存不起來，你寫的內容還在，請再試一次');
+      this.throwApiError(error, tr('暫時存不起來，你寫的內容還在，請再試一次', 'Couldn\'t save right now. What you wrote is still here; please try again'));
     }
   }
 
@@ -4514,7 +4518,7 @@ class ApiService {
       await apiClient.put(`/deep-dive/${id}/partner/response`, { response });
     } catch (error: unknown) {
       console.error('Failed to save response:', error);
-      this.throwApiError(error, '暫時存不起來，你寫的內容還在，請再試一次');
+      this.throwApiError(error, tr('暫時存不起來，你寫的內容還在，請再試一次', 'Couldn\'t save right now. What you wrote is still here; please try again'));
     }
   }
 
@@ -4524,7 +4528,7 @@ class ApiService {
       return response.data.journey as DeepDiveJourney;
     } catch (error: unknown) {
       console.error('Failed to finish deep dive:', error);
-      this.throwApiError(error, '暫時存不起來，請再試一次');
+      this.throwApiError(error, tr('暫時存不起來，請再試一次', 'Couldn\'t save right now. Please try again'));
     }
   }
 
@@ -4533,7 +4537,7 @@ class ApiService {
       await apiClient.post(`/deep-dive/${id}/abandon`);
     } catch (error: unknown) {
       console.error('Failed to abandon deep dive:', error);
-      this.throwApiError(error, '暫時沒辦法結束，請再試一次');
+      this.throwApiError(error, tr('暫時沒辦法結束，請再試一次', 'Couldn\'t finish right now. Please try again'));
     }
   }
 
@@ -4546,7 +4550,7 @@ class ApiService {
       return (response.data.session ?? null) as FacilitationSession | null;
     } catch (error: unknown) {
       console.error('Failed to fetch facilitation:', error);
-      this.throwApiError(error, '無法載入引導進度，請稍後再試');
+      this.throwApiError(error, tr('無法載入引導進度，請稍後再試', 'Couldn\'t load the guided practice progress. Please try again in a moment'));
     }
   }
 
@@ -4560,7 +4564,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to start facilitation:', error);
-      this.throwApiError(error, '無法開始引導，請稍後再試');
+      this.throwApiError(error, tr('無法開始引導，請稍後再試', 'Couldn\'t start the guided practice. Please try again in a moment'));
     }
   }
 
@@ -4574,7 +4578,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to advance facilitation:', error);
-      this.throwApiError(error, '引導暫時無法繼續，請稍後再試');
+      this.throwApiError(error, tr('引導暫時無法繼續，請稍後再試', 'The guided practice can\'t continue right now. Please try again in a moment'));
     }
   }
 
@@ -4584,7 +4588,7 @@ class ApiService {
       return (response.data.session ?? null) as FacilitationSession | null;
     } catch (error: unknown) {
       console.error('Failed to end facilitation:', error);
-      this.throwApiError(error, '無法結束引導，請稍後再試');
+      this.throwApiError(error, tr('無法結束引導，請稍後再試', 'Couldn\'t end the guided practice. Please try again in a moment'));
     }
   }
 
@@ -4620,7 +4624,7 @@ class ApiService {
       return { created, closure: response.data.closure };
     } catch (error: unknown) {
       console.error('[closure] start failed', error);
-      this.throwApiError(error, '無法開始一起收尾，請稍後再試');
+      this.throwApiError(error, tr('無法開始一起收尾，請稍後再試', 'Couldn\'t start wrapping up together. Please try again in a moment'));
     }
   }
 
@@ -4630,7 +4634,7 @@ class ApiService {
       return response.data.closure;
     } catch (error: unknown) {
       console.error('[closure] fetch failed', error);
-      this.throwApiError(error, '無法取得收尾狀態');
+      this.throwApiError(error, tr('無法取得收尾狀態', 'Couldn\'t load the wrap-up status'));
     }
   }
 
@@ -4649,7 +4653,7 @@ class ApiService {
       return { options: Array.isArray(response.data?.options) ? response.data.options : [] };
     } catch (error: unknown) {
       console.error('[closure] assist failed', error);
-      this.throwApiError(error, '幫我想一個暫時無法使用');
+      this.throwApiError(error, tr('幫我想一個暫時無法使用', '"Suggest one" is unavailable right now'));
     }
   }
 
@@ -4665,7 +4669,7 @@ class ApiService {
       return response.data.closure;
     } catch (error: unknown) {
       console.error('[closure] submit failed', error);
-      this.throwApiError(error, '無法送出你的約定');
+      this.throwApiError(error, tr('無法送出你的約定', 'Couldn\'t send your commitment'));
     }
   }
 
@@ -4683,7 +4687,7 @@ class ApiService {
       return response.data.closure;
     } catch (error: unknown) {
       console.error('[closure] review failed', error);
-      this.throwApiError(error, '無法送出你的回應');
+      this.throwApiError(error, tr('無法送出你的回應', 'Couldn\'t send your response'));
     }
   }
 
@@ -4696,7 +4700,7 @@ class ApiService {
       return response.data.closure;
     } catch (error: unknown) {
       console.error('[closure] skip failed', error);
-      this.throwApiError(error, '無法跳過');
+      this.throwApiError(error, tr('無法跳過', 'Couldn\'t skip'));
     }
   }
 
@@ -4709,7 +4713,7 @@ class ApiService {
       console.log('[closure] cancel', { eventId: id });
     } catch (error: unknown) {
       console.error('[closure] cancel failed', error);
-      this.throwApiError(error, '無法取消一起收尾');
+      this.throwApiError(error, tr('無法取消一起收尾', 'Couldn\'t cancel the wrap-up'));
     }
   }
 
@@ -4723,7 +4727,7 @@ class ApiService {
       console.log('[closure] abandon', { eventId: id });
     } catch (error: unknown) {
       console.error('[closure] abandon failed', error);
-      this.throwApiError(error, '無法回到討論，請稍後再試');
+      this.throwApiError(error, tr('無法回到討論，請稍後再試', 'Couldn\'t return to the discussion. Please try again in a moment'));
     }
   }
 
@@ -4734,7 +4738,7 @@ class ApiService {
       return response.data.closure;
     } catch (error: unknown) {
       console.error('[closure] finalize failed', error);
-      this.throwApiError(error, '無法先這樣完成');
+      this.throwApiError(error, tr('無法先這樣完成', 'Couldn\'t finish as-is'));
     }
   }
 
@@ -4745,7 +4749,7 @@ class ApiService {
       return response.data.closure;
     } catch (error: unknown) {
       console.error('[closure] insight retry failed', error);
-      this.throwApiError(error, '無法重新產生見解');
+      this.throwApiError(error, tr('無法重新產生見解', 'Couldn\'t regenerate the insight'));
     }
   }
 
@@ -4756,7 +4760,7 @@ class ApiService {
       return this.transformEvent(response.data.event);
     } catch (error: unknown) {
       console.error('Failed to reopen event:', error);
-      this.throwApiError(error, '無法重新開啟對話');
+      this.throwApiError(error, tr('無法重新開啟對話', 'Couldn\'t reopen the conversation'));
     }
   }
 
@@ -4778,7 +4782,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to fetch event analytics:', error);
-      this.throwApiError(error, '無法取得分析資料');
+      this.throwApiError(error, tr('無法取得分析資料', 'Couldn\'t load insights'));
     }
   }
 
@@ -4795,7 +4799,7 @@ class ApiService {
         return {
           ok: false,
           errorCode: (d.error_code as 'NOT_PAIRED' | 'NO_EVENTS') ?? 'NO_EVENTS',
-          message: d.message ?? '目前還沒有可整理的事件。',
+          message: d.message ?? tr('目前還沒有可整理的事件。', 'There are no events to summarize yet.'),
         };
       }
       return {
@@ -4808,7 +4812,7 @@ class ApiService {
       console.error('Failed to fetch therapy summary:', error);
       // Quota exhaustion (429) and true failures still throw with error_code
       // preserved, so the view can surface the specific quota message.
-      this.throwApiError(error, '諮商摘要暫時無法產生，請稍後再試');
+      this.throwApiError(error, tr('諮商摘要暫時無法產生，請稍後再試', 'The counseling summary can\'t be generated right now. Please try again in a moment'));
     }
   }
 
@@ -4822,7 +4826,7 @@ class ApiService {
         return {
           ok: false,
           errorCode: (d.error_code as 'NOT_PAIRED' | 'NOT_ENOUGH_EVENTS') ?? 'NOT_ENOUGH_EVENTS',
-          message: d.message ?? '再多說開幾件事，就能看見你們的溝通模式了。',
+          message: d.message ?? tr('再多說開幾件事，就能看見你們的溝通模式了。', 'Talk through a few more issues and you\'ll start to see your communication patterns.'),
           progress: d.progress as { have: number; need: number } | undefined,
         };
       }
@@ -4836,7 +4840,7 @@ class ApiService {
       console.error('Failed to fetch communication pattern:', error);
       // Quota exhaustion (429) and true failures still throw with error_code
       // preserved, so the view can surface the specific quota message.
-      this.throwApiError(error, '溝通模式暫時無法產生，請稍後再試');
+      this.throwApiError(error, tr('溝通模式暫時無法產生，請稍後再試', 'Communication patterns can\'t be generated right now. Please try again in a moment'));
     }
   }
 
@@ -4869,7 +4873,7 @@ class ApiService {
         return {
           ok: false,
           errorCode: (d.error_code as 'NOT_PAIRED') ?? 'NOT_PAIRED',
-          message: d.message ?? '先和另一半配對，就能開始收到話題建議。',
+          message: d.message ?? tr('先和另一半配對，就能開始收到話題建議。', 'Pair with your partner to start getting topic suggestions.'),
         };
       }
       return {
@@ -4882,7 +4886,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to fetch therapy topics:', error);
-      this.throwApiError(error, '話題建議暫時無法產生，請稍後再試');
+      this.throwApiError(error, tr('話題建議暫時無法產生，請稍後再試', 'Topic suggestions can\'t be generated right now. Please try again in a moment'));
     }
   }
 
@@ -4909,7 +4913,7 @@ class ApiService {
       return response.data?.selection as TherapyTopicSelection & { topicIndex: number };
     } catch (error: unknown) {
       console.error('Failed to update therapy topic selection:', error);
-      this.throwApiError(error, '更新失敗，請稍後再試');
+      this.throwApiError(error, tr('更新失敗，請稍後再試', 'Couldn\'t update. Please try again in a moment'));
     }
   }
 
@@ -4937,7 +4941,7 @@ class ApiService {
       return response.data?.selection as TherapyTopicSelection & { topicId: string };
     } catch (error: unknown) {
       console.error('Failed to update therapy topic library selection:', error);
-      this.throwApiError(error, '更新失敗，請稍後再試');
+      this.throwApiError(error, tr('更新失敗，請稍後再試', 'Couldn\'t update. Please try again in a moment'));
     }
   }
 
@@ -4949,7 +4953,7 @@ class ApiService {
       return (response.data.checkup as MarriageCheckup) ?? null;
     } catch (error: unknown) {
       console.error('Failed to load marriage checkup:', error);
-      this.throwApiError(error, '無法載入婚姻檢查，請稍後再試');
+      this.throwApiError(error, tr('無法載入婚姻檢查，請稍後再試', 'Couldn\'t load the relationship check-in. Please try again in a moment'));
     }
   }
 
@@ -4959,7 +4963,7 @@ class ApiService {
       return response.data.checkup as MarriageCheckup;
     } catch (error: unknown) {
       console.error('Failed to start marriage checkup:', error);
-      this.throwApiError(error, '無法開始婚姻檢查，請稍後再試');
+      this.throwApiError(error, tr('無法開始婚姻檢查，請稍後再試', 'Couldn\'t start the relationship check-in. Please try again in a moment'));
     }
   }
 
@@ -4972,7 +4976,7 @@ class ApiService {
       return response.data.checkup as MarriageCheckup;
     } catch (error: unknown) {
       console.error('Failed to submit marriage checkup response:', error);
-      this.throwApiError(error, '無法送出答案，請稍後再試');
+      this.throwApiError(error, tr('無法送出答案，請稍後再試', 'Couldn\'t send your answers. Please try again in a moment'));
     }
   }
 
@@ -4982,7 +4986,7 @@ class ApiService {
       return Array.isArray(response.data.checkups) ? response.data.checkups : [];
     } catch (error: unknown) {
       console.error('Failed to load marriage checkup history:', error);
-      this.throwApiError(error, '無法載入歷史紀錄，請稍後再試');
+      this.throwApiError(error, tr('無法載入歷史紀錄，請稍後再試', 'Couldn\'t load history. Please try again in a moment'));
     }
   }
 
@@ -4992,7 +4996,7 @@ class ApiService {
       return response.data.checkup as MarriageCheckup;
     } catch (error: unknown) {
       console.error('Failed to load marriage checkup:', error);
-      this.throwApiError(error, '無法載入婚姻檢查，請稍後再試');
+      this.throwApiError(error, tr('無法載入婚姻檢查，請稍後再試', 'Couldn\'t load the relationship check-in. Please try again in a moment'));
     }
   }
 
@@ -5109,7 +5113,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to fetch billing status:', error);
-      this.throwApiError(error, '無法取得訂閱狀態');
+      this.throwApiError(error, tr('無法取得訂閱狀態', 'Couldn\'t load your subscription status'));
     }
   }
 
@@ -5126,7 +5130,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to redeem coupon:', error);
-      this.throwApiError(error, '無法兌換優惠碼，請稍後再試');
+      this.throwApiError(error, tr('無法兌換優惠碼，請稍後再試', 'Couldn\'t redeem the promo code. Please try again in a moment'));
     }
   }
 
@@ -5138,12 +5142,12 @@ class ApiService {
       const response = await apiClient.post('/billing/checkout', { plan, provider });
       const { action_url, params } = response.data || {};
       if (!action_url || !params) {
-        throw new Error('付款資料異常，請稍後再試');
+        throw new Error(tr('付款資料異常，請稍後再試', 'The payment data looks wrong. Please try again in a moment'));
       }
       submitGatewayForm(action_url, params);
     } catch (error: unknown) {
       console.error('Failed to start checkout:', error);
-      this.throwApiError(error, '無法建立付款，請稍後再試');
+      this.throwApiError(error, tr('無法建立付款，請稍後再試', 'Couldn\'t create the payment. Please try again in a moment'));
     }
   }
 
@@ -5157,7 +5161,7 @@ class ApiService {
       return (response.data?.therapists || []) as Therapist[];
     } catch (error: unknown) {
       console.error('Failed to fetch therapists:', error);
-      this.throwApiError(error, '無法取得諮商師列表');
+      this.throwApiError(error, tr('無法取得諮商師列表', 'Couldn\'t load counselors'));
     }
   }
 
@@ -5167,7 +5171,7 @@ class ApiService {
       return response.data?.therapist as Therapist;
     } catch (error: unknown) {
       console.error('Failed to fetch therapist:', error);
-      this.throwApiError(error, '無法取得諮商師資料');
+      this.throwApiError(error, tr('無法取得諮商師資料', 'Couldn\'t load the counselor\'s details'));
     }
   }
 
@@ -5177,7 +5181,7 @@ class ApiService {
       return response.data?.application;
     } catch (error: unknown) {
       console.error('Failed to submit therapist application:', error);
-      this.throwApiError(error, '送出申請失敗，請稍後再試');
+      this.throwApiError(error, tr('送出申請失敗，請稍後再試', 'Couldn\'t submit the application. Please try again in a moment'));
     }
   }
 
@@ -5191,7 +5195,7 @@ class ApiService {
       const code = (error as { response?: { status?: number } })?.response?.status;
       if (code === 404) return null;
       console.error('Failed to fetch own therapist profile:', error);
-      this.throwApiError(error, '無法取得諮商師檔案');
+      this.throwApiError(error, tr('無法取得諮商師檔案', 'Couldn\'t load the counselor profile'));
     }
   }
 
@@ -5201,7 +5205,7 @@ class ApiService {
       return response.data?.therapist as OwnTherapistProfile;
     } catch (error: unknown) {
       console.error('Failed to update therapist profile:', error);
-      this.throwApiError(error, '更新檔案失敗，請稍後再試');
+      this.throwApiError(error, tr('更新檔案失敗，請稍後再試', 'Couldn\'t update the profile. Please try again in a moment'));
     }
   }
 
@@ -5211,7 +5215,7 @@ class ApiService {
       return response.data?.therapist as OwnTherapistProfile;
     } catch (error: unknown) {
       console.error('Failed to add therapist document:', error);
-      this.throwApiError(error, '上傳文件失敗，請稍後再試');
+      this.throwApiError(error, tr('上傳文件失敗，請稍後再試', 'Couldn\'t upload the document. Please try again in a moment'));
     }
   }
 
@@ -5228,7 +5232,7 @@ class ApiService {
       return response.data?.url as string;
     } catch (error: unknown) {
       console.error('Failed to upload therapist asset:', error);
-      this.throwApiError(error, '上傳失敗，請稍後再試');
+      this.throwApiError(error, tr('上傳失敗，請稍後再試', 'Upload failed. Please try again in a moment'));
     }
   }
 
@@ -5238,7 +5242,7 @@ class ApiService {
       return response.data?.consultation;
     } catch (error: unknown) {
       console.error('Failed to request consultation:', error);
-      this.throwApiError(error, '預約失敗，請稍後再試');
+      this.throwApiError(error, tr('預約失敗，請稍後再試', 'Couldn\'t book. Please try again in a moment'));
     }
   }
 
@@ -5248,7 +5252,7 @@ class ApiService {
       return (response.data?.consultations || []) as TherapistConsultation[];
     } catch (error: unknown) {
       console.error('Failed to fetch consultations:', error);
-      this.throwApiError(error, '無法取得預約紀錄');
+      this.throwApiError(error, tr('無法取得預約紀錄', 'Couldn\'t load bookings'));
     }
   }
 
@@ -5261,7 +5265,7 @@ class ApiService {
       return (response.data?.dedicated ?? null) as DedicatedTherapist | null;
     } catch (error: unknown) {
       console.error('Failed to fetch dedicated therapist:', error);
-      this.throwApiError(error, '無法取得專屬心理師資訊');
+      this.throwApiError(error, tr('無法取得專屬心理師資訊', 'Couldn\'t load dedicated therapist details'));
     }
   }
 
@@ -5274,7 +5278,7 @@ class ApiService {
       return response.data?.dedicated as DedicatedTherapist;
     } catch (error: unknown) {
       console.error('Failed to set dedicated therapist:', error);
-      this.throwApiError(error, '設定專屬心理師失敗，請稍後再試');
+      this.throwApiError(error, tr('設定專屬心理師失敗，請稍後再試', 'Couldn\'t set the dedicated therapist. Please try again in a moment'));
     }
   }
 
@@ -5285,7 +5289,7 @@ class ApiService {
       return response.data?.canComment === true;
     } catch (error: unknown) {
       console.error('Failed to update dedicated therapist permission:', error);
-      this.throwApiError(error, '更新權限失敗，請稍後再試');
+      this.throwApiError(error, tr('更新權限失敗，請稍後再試', 'Couldn\'t update permissions. Please try again in a moment'));
     }
   }
 
@@ -5294,7 +5298,7 @@ class ApiService {
       await apiClient.delete('/therapists/dedicated');
     } catch (error: unknown) {
       console.error('Failed to remove dedicated therapist:', error);
-      this.throwApiError(error, '解除失敗，請稍後再試');
+      this.throwApiError(error, tr('解除失敗，請稍後再試', 'Couldn\'t remove. Please try again in a moment'));
     }
   }
 
@@ -5306,7 +5310,7 @@ class ApiService {
       return (response.data?.clients || []) as TherapistClientCouple[];
     } catch (error: unknown) {
       console.error('Failed to fetch therapist clients:', error);
-      this.throwApiError(error, '無法取得個案列表');
+      this.throwApiError(error, tr('無法取得個案列表', 'Couldn\'t load the client list'));
     }
   }
 
@@ -5319,7 +5323,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to fetch client wall:', error);
-      this.throwApiError(error, '無法取得牆內容');
+      this.throwApiError(error, tr('無法取得牆內容', 'Couldn\'t load the wall'));
     }
   }
 
@@ -5336,7 +5340,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to fetch client wall replies:', error);
-      this.throwApiError(error, '無法取得回覆');
+      this.throwApiError(error, tr('無法取得回覆', 'Couldn\'t load replies'));
     }
   }
 
@@ -5346,7 +5350,7 @@ class ApiService {
       return response.data?.reply as WallReply;
     } catch (error: unknown) {
       console.error('Failed to add client wall reply:', error);
-      this.throwApiError(error, '留言失敗，請稍後再試');
+      this.throwApiError(error, tr('留言失敗，請稍後再試', 'Couldn\'t post your comment. Please try again in a moment'));
     }
   }
 
@@ -5360,7 +5364,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to fetch client events:', error);
-      this.throwApiError(error, '無法取得對話列表');
+      this.throwApiError(error, tr('無法取得對話列表', 'Couldn\'t load conversations'));
     }
   }
 
@@ -5373,7 +5377,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to fetch client event detail:', error);
-      this.throwApiError(error, '無法取得對話詳情');
+      this.throwApiError(error, tr('無法取得對話詳情', 'Couldn\'t load the conversation details'));
     }
   }
 
@@ -5394,7 +5398,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to fetch client therapy topics:', error);
-      this.throwApiError(error, '無法取得話題建議');
+      this.throwApiError(error, tr('無法取得話題建議', 'Couldn\'t load topic suggestions'));
     }
   }
 
@@ -5406,7 +5410,7 @@ class ApiService {
       return (response.data?.summaries ?? []) as TherapySummaryHistoryEntry[];
     } catch (error: unknown) {
       console.error('Failed to fetch client therapy summaries:', error);
-      this.throwApiError(error, '無法取得諮商摘要');
+      this.throwApiError(error, tr('無法取得諮商摘要', 'Couldn\'t load the counseling summary'));
     }
   }
 
@@ -5416,7 +5420,7 @@ class ApiService {
       return this.transformEventMessage(response.data?.message);
     } catch (error: unknown) {
       console.error('Failed to add client event message:', error);
-      this.throwApiError(error, '留言失敗，請稍後再試');
+      this.throwApiError(error, tr('留言失敗，請稍後再試', 'Couldn\'t post your comment. Please try again in a moment'));
     }
   }
 
@@ -5434,7 +5438,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to fetch consultation messages:', error);
-      this.throwApiError(error, '無法載入訊息');
+      this.throwApiError(error, tr('無法載入訊息', 'Couldn\'t load messages'));
     }
   }
 
@@ -5446,7 +5450,7 @@ class ApiService {
       });
     } catch (error: unknown) {
       console.error('Failed to post consultation message:', error);
-      this.throwApiError(error, '送出訊息失敗');
+      this.throwApiError(error, tr('送出訊息失敗', 'Couldn\'t send the message'));
     }
   }
 
@@ -5459,7 +5463,7 @@ class ApiService {
       return { publicStatus: response.data?.publicStatus, message: response.data?.message };
     } catch (error: unknown) {
       console.error('Failed to request publish:', error);
-      this.throwApiError(error, '提議公開失敗，請稍後再試');
+      this.throwApiError(error, tr('提議公開失敗，請稍後再試', 'Couldn\'t propose publishing. Please try again in a moment'));
     }
   }
 
@@ -5470,7 +5474,7 @@ class ApiService {
       return { publicStatus: response.data?.publicStatus, message: response.data?.message };
     } catch (error: unknown) {
       console.error('Failed to approve publish:', error);
-      this.throwApiError(error, '同意公開失敗，請稍後再試');
+      this.throwApiError(error, tr('同意公開失敗，請稍後再試', 'Couldn\'t agree to publish. Please try again in a moment'));
     }
   }
 
@@ -5481,7 +5485,7 @@ class ApiService {
       return { publicStatus: response.data?.publicStatus, message: response.data?.message };
     } catch (error: unknown) {
       console.error('Failed to withdraw publish:', error);
-      this.throwApiError(error, '取消公開失敗，請稍後再試');
+      this.throwApiError(error, tr('取消公開失敗，請稍後再試', 'Couldn\'t unpublish. Please try again in a moment'));
     }
   }
 
@@ -5495,7 +5499,7 @@ class ApiService {
       return { page: d.page || page, hasMore: Boolean(d.hasMore), threads: (d.threads || []) as PublicQaThreadSummary[] };
     } catch (error: unknown) {
       console.error('Failed to fetch public Q&A:', error);
-      this.throwApiError(error, '無法取得公開問答列表');
+      this.throwApiError(error, tr('無法取得公開問答列表', 'Couldn\'t load public Q&A'));
     }
   }
 
@@ -5507,7 +5511,7 @@ class ApiService {
       return response.data?.thread as PublicQaThread;
     } catch (error: unknown) {
       console.error('Failed to fetch public Q&A thread:', error);
-      this.throwApiError(error, '無法載入公開問答');
+      this.throwApiError(error, tr('無法載入公開問答', 'Couldn\'t load this public Q&A'));
     }
   }
 
@@ -5519,7 +5523,7 @@ class ApiService {
       return this.transformEvent(response.data.event);
     } catch (error: unknown) {
       console.error('Failed to share event with partner:', error);
-      this.throwApiError(error, '分享失敗，請稍後再試');
+      this.throwApiError(error, tr('分享失敗，請稍後再試', 'Couldn\'t share. Please try again in a moment'));
     }
   }
 
@@ -5530,7 +5534,7 @@ class ApiService {
       return this.transformEvent(response.data.event);
     } catch (error: unknown) {
       console.error('Failed to publish event:', error);
-      this.throwApiError(error, '公開失敗，請稍後再試');
+      this.throwApiError(error, tr('公開失敗，請稍後再試', 'Couldn\'t publish. Please try again in a moment'));
     }
   }
 
@@ -5540,7 +5544,7 @@ class ApiService {
       return this.transformEvent(response.data.event);
     } catch (error: unknown) {
       console.error('Failed to unpublish event:', error);
-      this.throwApiError(error, '取消公開失敗，請稍後再試');
+      this.throwApiError(error, tr('取消公開失敗，請稍後再試', 'Couldn\'t unpublish. Please try again in a moment'));
     }
   }
 
@@ -5550,7 +5554,7 @@ class ApiService {
       await apiClient.post(`/wall/${postId}/publish`, title ? { title } : {});
     } catch (error: unknown) {
       console.error('Failed to publish wall post:', error);
-      this.throwApiError(error, '公開失敗，請稍後再試');
+      this.throwApiError(error, tr('公開失敗，請稍後再試', 'Couldn\'t publish. Please try again in a moment'));
     }
   }
 
@@ -5559,7 +5563,7 @@ class ApiService {
       await apiClient.post(`/wall/${postId}/unpublish`);
     } catch (error: unknown) {
       console.error('Failed to unpublish wall post:', error);
-      this.throwApiError(error, '取消公開失敗，請稍後再試');
+      this.throwApiError(error, tr('取消公開失敗，請稍後再試', 'Couldn\'t unpublish. Please try again in a moment'));
     }
   }
 
@@ -5570,7 +5574,7 @@ class ApiService {
       return { voted: Boolean(response.data?.voted), helpfulCount: response.data?.helpfulCount ?? 0 };
     } catch (error: unknown) {
       console.error('Failed to vote public Q&A:', error);
-      this.throwApiError(error, '操作失敗，請稍後再試');
+      this.throwApiError(error, tr('操作失敗，請稍後再試', 'Something went wrong. Please try again in a moment'));
     }
   }
 
@@ -5588,7 +5592,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to fetch therapist reviews:', error);
-      this.throwApiError(error, '無法取得評價');
+      this.throwApiError(error, tr('無法取得評價', 'Couldn\'t load reviews'));
     }
   }
 
@@ -5598,10 +5602,10 @@ class ApiService {
   ): Promise<{ message: string }> {
     try {
       const response = await apiClient.post(`/therapists/${therapistId}/reviews`, input);
-      return { message: response.data?.message || '感謝你的評價！' };
+      return { message: response.data?.message || tr('感謝你的評價！', 'Thanks for your review!') };
     } catch (error: unknown) {
       console.error('Failed to submit therapist review:', error);
-      this.throwApiError(error, '送出評價失敗，請稍後再試');
+      this.throwApiError(error, tr('送出評價失敗，請稍後再試', 'Couldn\'t submit your review. Please try again in a moment'));
     }
   }
 
@@ -5618,7 +5622,7 @@ class ApiService {
       return { id: c.id, priceTwd: c.priceTwd };
     } catch (error: unknown) {
       console.error('Failed to book video session:', error);
-      this.throwApiError(error, '預約失敗，請稍後再試');
+      this.throwApiError(error, tr('預約失敗，請稍後再試', 'Couldn\'t book. Please try again in a moment'));
     }
   }
 
@@ -5627,11 +5631,11 @@ class ApiService {
     try {
       const response = await apiClient.post(`/therapists/consultations/${consultationId}/pay`, { provider });
       const { action_url, params } = response.data || {};
-      if (!action_url || !params) throw new Error('付款資料異常，請稍後再試');
+      if (!action_url || !params) throw new Error(tr('付款資料異常，請稍後再試', 'The payment data looks wrong. Please try again in a moment'));
       submitGatewayForm(action_url, params);
     } catch (error: unknown) {
       console.error('Failed to start session payment:', error);
-      this.throwApiError(error, '無法建立付款，請稍後再試');
+      this.throwApiError(error, tr('無法建立付款，請稍後再試', 'Couldn\'t create the payment. Please try again in a moment'));
     }
   }
 
@@ -5645,7 +5649,7 @@ class ApiService {
       await apiClient.post(`/therapists/consultations/${consultationId}/respond`, { action, note });
     } catch (error: unknown) {
       console.error('Failed to respond to consultation:', error);
-      this.throwApiError(error, '回覆預約失敗，請稍後再試');
+      this.throwApiError(error, tr('回覆預約失敗，請稍後再試', 'Couldn\'t respond to the booking. Please try again in a moment'));
     }
   }
 
@@ -5655,7 +5659,7 @@ class ApiService {
       await apiClient.post(`/therapists/consultations/${consultationId}/meeting-link`, { provider, url });
     } catch (error: unknown) {
       console.error('Failed to set meeting link:', error);
-      this.throwApiError(error, '設定會議連結失敗，請稍後再試');
+      this.throwApiError(error, tr('設定會議連結失敗，請稍後再試', 'Couldn\'t set the meeting link. Please try again in a moment'));
     }
   }
 
@@ -5665,7 +5669,7 @@ class ApiService {
       return response.data?.earnings as TherapistEarnings;
     } catch (error: unknown) {
       console.error('Failed to fetch earnings:', error);
-      this.throwApiError(error, '無法取得收入資料');
+      this.throwApiError(error, tr('無法取得收入資料', 'Couldn\'t load earnings data'));
     }
   }
 
@@ -5698,7 +5702,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to send conflict message:', error);
-      this.throwApiError(error, 'Sophie 暫時無法處理這則訊息，請稍後再試');
+      this.throwApiError(error, tr('Sophie 暫時無法處理這則訊息，請稍後再試', 'Sophie can\'t handle this message right now. Please try again in a moment'));
     }
   }
 
@@ -5720,7 +5724,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to load active intervention:', error);
-      this.throwApiError(error, '無法載入進行中的對話');
+      this.throwApiError(error, tr('無法載入進行中的對話', 'Couldn\'t load the conversation in progress'));
     }
   }
 
@@ -5757,7 +5761,7 @@ class ApiService {
       };
     } catch (error: unknown) {
       console.error('Failed to answer intervention:', error);
-      this.throwApiError(error, 'Sophie 暫時無法整理這段話，請稍後再試');
+      this.throwApiError(error, tr('Sophie 暫時無法整理這段話，請稍後再試', 'Sophie can\'t put this together right now. Please try again in a moment'));
     }
   }
 
@@ -5773,7 +5777,7 @@ class ApiService {
       return toConflictIntervention(response.data?.intervention);
     } catch (error: unknown) {
       console.error('Failed to record agency:', error);
-      this.throwApiError(error, 'Sophie 暫時無法處理，請稍後再試');
+      this.throwApiError(error, tr('Sophie 暫時無法處理，請稍後再試', 'Sophie can\'t handle this right now. Please try again in a moment'));
     }
   }
 
@@ -5791,7 +5795,7 @@ class ApiService {
       return toConflictIntervention(response.data?.intervention);
     } catch (error: unknown) {
       console.error('Failed to confirm translation:', error);
-      this.throwApiError(error, '無法儲存，請稍後再試');
+      this.throwApiError(error, tr('無法儲存，請稍後再試', 'Couldn\'t save. Please try again in a moment'));
     }
   }
 
@@ -5803,7 +5807,7 @@ class ApiService {
       return toConflictIntervention(response.data?.intervention);
     } catch (error: unknown) {
       console.error('Failed to release intervention:', error);
-      this.throwApiError(error, '無法送出，請稍後再試');
+      this.throwApiError(error, tr('無法送出，請稍後再試', 'Couldn\'t send. Please try again in a moment'));
     }
   }
 
@@ -5815,7 +5819,7 @@ class ApiService {
       return Array.isArray(items) ? items.map(toConflictIntervention) : [];
     } catch (error: unknown) {
       console.error('Failed to load conflict inbox:', error);
-      this.throwApiError(error, '無法載入收件匣');
+      this.throwApiError(error, tr('無法載入收件匣', 'Couldn\'t load the inbox'));
     }
   }
 
@@ -5825,7 +5829,7 @@ class ApiService {
       return toConflictIntervention(response.data?.intervention);
     } catch (error: unknown) {
       console.error('Failed to mark conflict read:', error);
-      this.throwApiError(error, '無法更新狀態');
+      this.throwApiError(error, tr('無法更新狀態', 'Couldn\'t update the status'));
     }
   }
 
@@ -5837,7 +5841,7 @@ class ApiService {
       return toConflictIntervention(response.data?.intervention);
     } catch (error: unknown) {
       console.error('Failed to respond understood:', error);
-      this.throwApiError(error, '無法送出回應');
+      this.throwApiError(error, tr('無法送出回應', 'Couldn\'t send the response'));
     }
   }
 }

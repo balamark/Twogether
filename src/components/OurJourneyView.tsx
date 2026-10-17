@@ -3,6 +3,7 @@ import { Heart, Sparkles, Plus, X, ImagePlus, Pencil, Trash2 } from 'lucide-reac
 import { useScrollLock } from '../hooks/useScrollLock';
 import { apiService } from '../services/api';
 import type { AuthState, IntimateRecord, JourneyMilestone, Notification } from '../App';
+import { tr } from '../i18n/tr';
 
 interface OurJourneyViewProps {
   journeyMilestones: JourneyMilestone[];
@@ -49,18 +50,18 @@ interface JourneyStore {
 // Emoji + a suggested title for the add/edit form. 「其他」 keeps the marker
 // generic so anything the presets don't cover still has a home.
 const MILESTONE_PRESETS: { emoji: string; label: string }[] = [
-  { emoji: '💕', label: '相遇' },
-  { emoji: '🌹', label: '開始交往' },
-  { emoji: '💋', label: '初吻' },
-  { emoji: '💍', label: '求婚' },
-  { emoji: '👰', label: '結婚' },
-  { emoji: '🏠', label: '搬到一起' },
-  { emoji: '👶', label: '孩子出生' },
-  { emoji: '✈️', label: '第一次旅行' },
-  { emoji: '🎂', label: '週年紀念' },
-  { emoji: '🐾', label: '養了寵物' },
-  { emoji: '🌧️', label: '一起走過的低潮' },
-  { emoji: '✦', label: '其他' },
+  { emoji: '💕', label: tr('相遇', 'The day we met') },
+  { emoji: '🌹', label: tr('開始交往', 'Started dating') },
+  { emoji: '💋', label: tr('初吻', 'First kiss') },
+  { emoji: '💍', label: tr('求婚', 'The proposal') },
+  { emoji: '👰', label: tr('結婚', 'Our wedding') },
+  { emoji: '🏠', label: tr('搬到一起', 'Moved in together') },
+  { emoji: '👶', label: tr('孩子出生', 'Our baby was born') },
+  { emoji: '✈️', label: tr('第一次旅行', 'First trip together') },
+  { emoji: '🎂', label: tr('週年紀念', 'Anniversary') },
+  { emoji: '🐾', label: tr('養了寵物', 'Got a pet') },
+  { emoji: '🌧️', label: tr('一起走過的低潮', 'A hard time we got through') },
+  { emoji: '✦', label: tr('其他', 'Other') },
 ];
 
 const baseEmoji = (type: JourneyMilestone['type']): string =>
@@ -160,9 +161,9 @@ const MilestoneEditor: React.FC<{
       >
         <div className="flex items-center justify-between gap-3 p-4 border-b border-petal-rule">
           <h3 className="font-display text-lg text-petal-ink">
-            {state.mode === 'add' ? '新增一段回憶' : state.mode === 'enrich' ? '加上照片與回憶' : '編輯這段回憶'}
+            {state.mode === 'add' ? tr('新增一段回憶', 'Add a memory') : state.mode === 'enrich' ? tr('加上照片與回憶', 'Add a photo and memories') : tr('編輯這段回憶', 'Edit this memory')}
           </h3>
-          <button onClick={onClose} className="p-1.5 text-petal-muted hover:text-petal-ink rounded-full hover:bg-petal-cream-2" aria-label="關閉">
+          <button onClick={onClose} className="p-1.5 text-petal-muted hover:text-petal-ink rounded-full hover:bg-petal-cream-2" aria-label={tr("關閉", 'Close')}>
             <X className="w-4 h-4" strokeWidth={1.5} />
           </button>
         </div>
@@ -171,7 +172,7 @@ const MilestoneEditor: React.FC<{
           {!ro && (
             <>
               <div>
-                <label className="block font-body text-[12px] text-petal-muted mb-1.5">這是什麼時刻？</label>
+                <label className="block font-body text-[12px] text-petal-muted mb-1.5">{tr('這是什麼時刻？', 'What moment is this?')}</label>
                 <div className="flex flex-wrap gap-1.5">
                   {MILESTONE_PRESETS.map((p) => (
                     <button
@@ -189,11 +190,11 @@ const MilestoneEditor: React.FC<{
               </div>
 
               <div>
-                <label className="block font-body text-[12px] text-petal-muted mb-1.5">標題</label>
+                <label className="block font-body text-[12px] text-petal-muted mb-1.5">{tr('標題', 'Title')}</label>
                 <input
                   value={draft.title}
                   onChange={(e) => set({ title: e.target.value })}
-                  placeholder="例如：山出生的那天"
+                  placeholder={tr("例如：山出生的那天", 'e.g. The day our son was born')}
                   data-testid="milestone-title"
                   className="w-full rounded-xl border border-petal-rule bg-white px-3 py-2 font-body text-sm text-petal-ink focus:border-petal-rose-deep focus:outline-none"
                 />
@@ -201,7 +202,7 @@ const MilestoneEditor: React.FC<{
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-body text-[12px] text-petal-muted mb-1.5">日期</label>
+                  <label className="block font-body text-[12px] text-petal-muted mb-1.5">{tr('日期', 'Date')}</label>
                   <input
                     type="date"
                     value={draft.date}
@@ -211,23 +212,23 @@ const MilestoneEditor: React.FC<{
                   />
                 </div>
                 <div>
-                  <label className="block font-body text-[12px] text-petal-muted mb-1.5">地點（可留白）</label>
+                  <label className="block font-body text-[12px] text-petal-muted mb-1.5">{tr('地點（可留白）', 'Place (optional)')}</label>
                   <input
                     value={draft.place ?? ''}
                     onChange={(e) => set({ place: e.target.value })}
-                    placeholder="例如：台北"
+                    placeholder={tr("例如：台北", 'e.g. Taipei')}
                     className="w-full rounded-xl border border-petal-rule bg-white px-3 py-2 font-body text-sm text-petal-ink focus:border-petal-rose-deep focus:outline-none"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-body text-[12px] text-petal-muted mb-1.5">當時發生了什麼？</label>
+                <label className="block font-body text-[12px] text-petal-muted mb-1.5">{tr('當時發生了什麼？', 'What happened then?')}</label>
                 <textarea
                   value={draft.description}
                   onChange={(e) => set({ description: e.target.value })}
                   rows={2}
-                  placeholder="用一兩句話記下那一天。"
+                  placeholder={tr("用一兩句話記下那一天。", 'Capture that day in a sentence or two.')}
                   className="w-full rounded-xl border border-petal-rule bg-white px-3 py-2 font-body text-sm text-petal-ink focus:border-petal-rose-deep focus:outline-none resize-none"
                 />
               </div>
@@ -243,7 +244,7 @@ const MilestoneEditor: React.FC<{
 
           {/* Photo */}
           <div>
-            <label className="block font-body text-[12px] text-petal-muted mb-1.5">一張照片（可留白）</label>
+            <label className="block font-body text-[12px] text-petal-muted mb-1.5">{tr('一張照片（可留白）', 'A photo (optional)')}</label>
             {draft.photo ? (
               <div className="relative">
                 {/* Full image, never cropped (project image rule): contained in a
@@ -255,7 +256,7 @@ const MilestoneEditor: React.FC<{
                   type="button"
                   onClick={() => set({ photo: undefined })}
                   className="absolute top-2 right-2 rounded-full bg-black/50 text-white p-1.5 hover:bg-black/70"
-                  aria-label="移除照片"
+                  aria-label={tr("移除照片", 'Remove photo')}
                 >
                   <X className="w-3.5 h-3.5" strokeWidth={2} />
                 </button>
@@ -268,7 +269,7 @@ const MilestoneEditor: React.FC<{
                 data-testid="milestone-photo-pick"
                 className="w-full flex items-center justify-center gap-2 rounded-xl border border-dashed border-petal-rose-soft bg-white px-3 py-4 font-body text-sm text-petal-muted hover:border-petal-rose-deep transition-colors disabled:opacity-50"
               >
-                <ImagePlus className="w-4 h-4" strokeWidth={1.5} /> {photoBusy ? '處理中…' : '加一張照片'}
+                <ImagePlus className="w-4 h-4" strokeWidth={1.5} /> {photoBusy ? tr('處理中…', 'Processing…') : tr('加一張照片', 'Add a photo')}
               </button>
             )}
             <input
@@ -283,27 +284,27 @@ const MilestoneEditor: React.FC<{
           {/* Reflections */}
           <div>
             <label className="flex items-center gap-1.5 font-body text-[12px] text-petal-rose-deep mb-1.5">
-              <Heart className="w-3.5 h-3.5" strokeWidth={1.5} /> 當時，我喜歡你的一個地方
+              <Heart className="w-3.5 h-3.5" strokeWidth={1.5} /> {tr('當時，我喜歡你的一個地方', 'One thing I loved about you then')}
             </label>
             <textarea
               value={draft.likedThen ?? ''}
               onChange={(e) => set({ likedThen: e.target.value })}
               rows={2}
               data-testid="milestone-liked-then"
-              placeholder="那時候的你，最讓我心動的是…"
+              placeholder={tr("那時候的你，最讓我心動的是…", 'What made my heart skip about you back then was…')}
               className="w-full rounded-xl border border-petal-rule bg-white px-3 py-2 font-body text-sm text-petal-ink focus:border-petal-rose-deep focus:outline-none resize-none"
             />
           </div>
           <div>
             <label className="flex items-center gap-1.5 font-body text-[12px] text-petal-sage-deeper mb-1.5">
-              <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} /> 現在回頭看，我才發現…
+              <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} /> {tr('現在回頭看，我才發現…', 'Looking back now, I realize…')}
             </label>
             <textarea
               value={draft.realizeNow ?? ''}
               onChange={(e) => set({ realizeNow: e.target.value })}
               rows={2}
               data-testid="milestone-realize-now"
-              placeholder="經過這些年，我對那一天有了不一樣的看法…"
+              placeholder={tr("經過這些年，我對那一天有了不一樣的看法…", 'After all these years, I see that day differently…')}
               className="w-full rounded-xl border border-petal-rule bg-white px-3 py-2 font-body text-sm text-petal-ink focus:border-petal-rose-deep focus:outline-none resize-none"
             />
           </div>
@@ -318,7 +319,7 @@ const MilestoneEditor: React.FC<{
               className="inline-flex items-center gap-1.5 font-body text-sm text-petal-muted hover:text-red-600 transition-colors disabled:opacity-40"
               data-testid="milestone-delete"
             >
-              <Trash2 className="w-4 h-4" strokeWidth={1.5} /> 刪除
+              <Trash2 className="w-4 h-4" strokeWidth={1.5} /> {tr('刪除', 'Delete')}
             </button>
           )}
           <button
@@ -328,7 +329,7 @@ const MilestoneEditor: React.FC<{
             data-testid="milestone-save"
             className="ml-auto rounded-full bg-petal-rose-deep px-6 py-2.5 font-body text-sm font-medium text-white hover:bg-petal-rose transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            {saving ? '儲存中…' : '儲存'}
+            {saving ? tr('儲存中…', 'Saving…') : tr('儲存', 'Save')}
           </button>
         </div>
       </div>
@@ -380,7 +381,7 @@ const OurJourneyView = ({ journeyMilestones, intimateRecords, setCurrentView, au
       .catch((err) => {
         if (cancelled) return;
         const e = err as { message?: string };
-        showNotification({ type: 'error', title: '讀不到你們的故事', message: e?.message || '請稍後再試一次。' });
+        showNotification({ type: 'error', title: tr('讀不到你們的故事', 'Couldn\'t load your story'), message: e?.message || tr('請稍後再試一次。', 'Please try again in a moment.') });
       });
     return () => { cancelled = true; };
   }, [userId, showNotification]);
@@ -444,7 +445,7 @@ const OurJourneyView = ({ journeyMilestones, intimateRecords, setCurrentView, au
 
   const onSaveError = (err: unknown) => {
     const e = err as { message?: string };
-    showNotification({ type: 'error', title: '沒有存起來', message: e?.message || '網路好像不太穩，你的內容還在，再按一次試試。' });
+    showNotification({ type: 'error', title: tr('沒有存起來', 'It didn\'t save'), message: e?.message || tr('網路好像不太穩，你的內容還在，再按一次試試。', 'The connection seems unstable. Your content is still here; tap again to retry.') });
   };
 
   const saveFromEditor = async (m: StoryMilestone) => {
@@ -528,13 +529,13 @@ const OurJourneyView = ({ journeyMilestones, intimateRecords, setCurrentView, au
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-              — 我們的故事
+              {tr('— 我們的故事', '— Our story')}
             </div>
             <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
-              我們的<em className="not-italic font-light italic text-pink-600">故事</em>
+              {tr('我們的', 'Our ')}<em className="not-italic font-light italic text-pink-600">{tr('故事', 'story')}</em>
             </h2>
             <p className="font-display italic font-light text-base text-petal-muted">
-              一起走過的每個重要時刻，加上照片和回憶，慢慢變成只屬於你們的記憶庫。
+              {tr('一起走過的每個重要時刻，加上照片和回憶，慢慢變成只屬於你們的記憶庫。', 'Every important moment you\'ve shared, with photos and memories, slowly becomes a memory book that\'s yours alone.')}
             </p>
           </div>
           <button
@@ -543,7 +544,7 @@ const OurJourneyView = ({ journeyMilestones, intimateRecords, setCurrentView, au
             data-testid="journey-add-milestone"
             className="inline-flex items-center gap-1.5 rounded-full bg-petal-ink px-4 py-2 font-body text-sm font-medium text-petal-cream hover:bg-petal-ink/85 transition-colors"
           >
-            <Plus className="w-4 h-4" strokeWidth={1.5} /> 新增一段回憶
+            <Plus className="w-4 h-4" strokeWidth={1.5} /> {tr('新增一段回憶', 'Add a memory')}
           </button>
         </div>
       </div>
@@ -570,13 +571,13 @@ const OurJourneyView = ({ journeyMilestones, intimateRecords, setCurrentView, au
                         {milestone.date ? milestone.date.slice(0, 10) : (milestone.place ? '—' : '')}
                       </p>
                       {milestone.place && (
-                        <p className="font-body text-xs text-petal-muted">地點：{milestone.place}</p>
+                        <p className="font-body text-xs text-petal-muted">{tr('地點：', 'Place: ')}{milestone.place}</p>
                       )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {milestone.count && (
                         <span className="font-display italic font-light text-xs text-petal-rose-deep border border-petal-rose-soft px-2.5 py-0.5 rounded-full whitespace-nowrap">
-                          第 {milestone.count} 次
+                          {tr('第', '#')} {milestone.count} {tr('次', '')}
                         </span>
                       )}
                       <button
@@ -584,7 +585,7 @@ const OurJourneyView = ({ journeyMilestones, intimateRecords, setCurrentView, au
                         onClick={() => openEditFor(milestone)}
                         data-testid={`journey-edit-${milestone.id}`}
                         className="p-1.5 text-petal-muted hover:text-petal-ink rounded-full hover:bg-petal-cream-2 transition-colors"
-                        aria-label={milestone.source === 'added' ? '編輯' : '加上照片與回憶'}
+                        aria-label={milestone.source === 'added' ? tr('編輯', 'Edit') : tr('加上照片與回憶', 'Add a photo and memories')}
                       >
                         <Pencil className="w-3.5 h-3.5" strokeWidth={1.5} />
                       </button>
@@ -606,7 +607,7 @@ const OurJourneyView = ({ journeyMilestones, intimateRecords, setCurrentView, au
                       {milestone.likedThen && (
                         <div className="rounded-xl bg-petal-rose-soft/20 border border-petal-rose-soft/60 px-3.5 py-2.5">
                           <div className="flex items-center gap-1.5 font-body text-[11px] text-petal-rose-deep mb-1">
-                            <Heart className="w-3 h-3" strokeWidth={1.5} /> 當時，我喜歡你的一個地方
+                            <Heart className="w-3 h-3" strokeWidth={1.5} /> {tr('當時，我喜歡你的一個地方', 'One thing I loved about you then')}
                           </div>
                           <p className="font-display italic font-light text-sm text-petal-ink leading-relaxed">{milestone.likedThen}</p>
                         </div>
@@ -614,7 +615,7 @@ const OurJourneyView = ({ journeyMilestones, intimateRecords, setCurrentView, au
                       {milestone.realizeNow && (
                         <div className="rounded-xl bg-petal-sage/10 border border-petal-sage/30 px-3.5 py-2.5">
                           <div className="flex items-center gap-1.5 font-body text-[11px] text-petal-sage-deeper mb-1">
-                            <Sparkles className="w-3 h-3" strokeWidth={1.5} /> 現在回頭看，我才發現…
+                            <Sparkles className="w-3 h-3" strokeWidth={1.5} /> {tr('現在回頭看，我才發現…', 'Looking back now, I realize…')}
                           </div>
                           <p className="font-display italic font-light text-sm text-petal-ink leading-relaxed">{milestone.realizeNow}</p>
                         </div>
@@ -628,7 +629,7 @@ const OurJourneyView = ({ journeyMilestones, intimateRecords, setCurrentView, au
                       className="inline-flex items-center font-body text-xs text-petal-ink-soft hover:text-petal-rose-deep transition-colors"
                     >
                       <Heart className="w-3 h-3 mr-1" strokeWidth={1.5} />
-                      查看詳細記錄 →
+                      {tr('查看詳細記錄 →', 'See details →')}
                     </button>
                   )}
                 </div>
@@ -640,14 +641,14 @@ const OurJourneyView = ({ journeyMilestones, intimateRecords, setCurrentView, au
                 <div className="w-12 h-12 rounded-full bg-petal-cream border border-dashed border-petal-rose-soft flex items-center justify-center relative z-10 text-base">✦</div>
                 <div className="flex-1 rounded-2xl border border-dashed border-petal-rose-soft bg-petal-cream-2/40 p-5">
                   <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-3">
-                    你們的故事從哪一天開始的？先放上一個重要時刻——相遇、第一次旅行、孩子出生……加上一張照片和一句「當時我喜歡你的地方」，慢慢累積成你們的記憶庫。
+                    {tr('你們的故事從哪一天開始的？先放上一個重要時刻——相遇、第一次旅行、孩子出生……加上一張照片和一句「當時我喜歡你的地方」，慢慢累積成你們的記憶庫。', 'When did your story begin? Start with one important moment (the day you met, your first trip, your baby\'s birth…), add a photo and a line about "what I loved about you then", and slowly build your memory book.')}
                   </p>
                   <button
                     type="button"
                     onClick={openAdd}
                     className="inline-flex items-center gap-1.5 rounded-full bg-petal-rose-deep px-4 py-2 font-body text-sm font-medium text-white hover:bg-petal-rose transition-colors"
                   >
-                    <Plus className="w-4 h-4" strokeWidth={1.5} /> 新增第一段回憶
+                    <Plus className="w-4 h-4" strokeWidth={1.5} /> {tr('新增第一段回憶', 'Add your first memory')}
                   </button>
                 </div>
               </div>
@@ -658,7 +659,7 @@ const OurJourneyView = ({ journeyMilestones, intimateRecords, setCurrentView, au
           <div className="mt-8 p-6 bg-petal-cream-2/40 rounded-md border border-dashed border-petal-rose-soft">
             <h3 className="font-display text-lg font-medium tracking-tight text-petal-ink mb-4 flex items-center">
               <Sparkles className="w-4 h-4 mr-2 text-petal-rose-deep" strokeWidth={1.5} />
-              即將到來的里程碑
+              {tr('即將到來的里程碑', 'Upcoming milestones')}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {[
@@ -673,12 +674,12 @@ const OurJourneyView = ({ journeyMilestones, intimateRecords, setCurrentView, au
                     : 'border-gray-200 bg-white'
                 }`}>
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-gray-800">第 {count} 次親密時光</span>
+                    <span className="font-medium text-gray-800">{tr('第', 'Intimate moment #')} {count} {tr('次親密時光', '')}</span>
                     {achieved ? (
-                      <span className="text-green-600 font-bold">✓ 已達成</span>
+                      <span className="text-green-600 font-bold">{tr('✓ 已達成', '✓ Reached')}</span>
                     ) : (
                       <span className="text-gray-500">
-                        還需 {count - intimateRecords.length} 次
+                        {tr('還需', '')} {count - intimateRecords.length} {tr('次', ' more to go')}
                       </span>
                     )}
                   </div>
@@ -699,8 +700,8 @@ const OurJourneyView = ({ journeyMilestones, intimateRecords, setCurrentView, au
           onPhotoError={() =>
             showNotification({
               type: 'error',
-              title: '這張照片讀不進來',
-              message: '可能是格式不支援。換一張 JPG 或 PNG 照片再試試看。',
+              title: tr('這張照片讀不進來', 'This photo couldn\'t be read'),
+              message: tr('可能是格式不支援。換一張 JPG 或 PNG 照片再試試看。', 'The format may not be supported. Try a JPG or PNG photo instead.'),
             })
           }
         />

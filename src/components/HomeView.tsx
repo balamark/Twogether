@@ -8,6 +8,7 @@ import { formatDateTime } from '../utils/datetime';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { trackAction } from '../utils/track';
 import type { AuthState, Notification } from '../App';
+import { tr } from '../i18n/tr';
 
 interface HomeViewProps {
   authState: AuthState;
@@ -30,10 +31,10 @@ interface HomeViewProps {
 // this at 11pm abroad should see 晚安). A hardcoded 早安 reads as broken at night.
 const greeting = (): string => {
   const h = new Date().getHours();
-  if (h < 5) return '晚安';
-  if (h < 11) return '早安';
-  if (h < 18) return '午安';
-  return '晚安';
+  if (h < 5) return tr('晚安', 'Good evening');
+  if (h < 11) return tr('早安', 'Good morning');
+  if (h < 18) return tr('午安', 'Good afternoon');
+  return tr('晚安', 'Good evening');
 };
 
 // "Twogether 發現" — a static, non-fetching teaser. The real AI pattern-detection
@@ -50,9 +51,9 @@ const PatternTeaserCard: React.FC<{ onGoToGrow: () => void }> = ({ onGoToGrow })
   >
     <Sparkles className="w-4 h-4 text-petal-rose-deep shrink-0" strokeWidth={1.5} />
     <span className="min-w-0 flex-1">
-      <span className="block font-display text-sm text-petal-ink">Twogether 發現</span>
+      <span className="block font-display text-sm text-petal-ink">{tr('Twogether 發現', 'Twogether noticed')}</span>
       <span className="block font-body text-[11px] text-petal-muted">
-        看看你們最近反覆卡住的溝通模式
+        {tr('看看你們最近反覆卡住的溝通模式', 'See the communication patterns you keep getting stuck in')}
       </span>
     </span>
     <ChevronRight className="w-4 h-4 text-petal-muted shrink-0" strokeWidth={1.5} />
@@ -78,19 +79,19 @@ const WeeklyStatsStrip: React.FC = () => {
   return (
     <div className="bg-white border border-petal-rule rounded-2xl px-4 py-3.5" data-testid="home-weekly-stats">
       <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
-        近兩週
+        {tr('近兩週', 'Last 2 weeks')}
       </div>
       <div className="flex flex-wrap gap-x-5 gap-y-1.5 font-body text-sm text-petal-ink">
-        <span>正向互動 <b className="font-display italic">{pos}</b> 次</span>
-        <span>衝突 <b className="font-display italic">{neg}</b> 次</span>
+        <span>{tr('正向互動', 'Positive interactions')} <b className="font-display italic">{pos}</b> {tr('次', '')}</span>
+        <span>{tr('衝突', 'Conflicts')} <b className="font-display italic">{neg}</b> {tr('次', '')}</span>
         {typeof summary.daysSinceIntimacy === 'number' && (
-          <span>{summary.daysSinceIntimacy} 天沒有親密</span>
+          <span>{summary.daysSinceIntimacy} {tr('天沒有親密', ' days without intimacy')}</span>
         )}
         {typeof summary.daysSinceAppreciation === 'number' && (
-          <span>{summary.daysSinceAppreciation} 天沒說欣賞的話</span>
+          <span>{summary.daysSinceAppreciation} {tr('天沒說欣賞的話', ' days without a word of appreciation')}</span>
         )}
         {summary.checkin?.overdue && (
-          <span className="text-petal-rose-deep">關係檢視待完成</span>
+          <span className="text-petal-rose-deep">{tr('關係檢視待完成', 'Relationship check-in due')}</span>
         )}
       </div>
     </div>
@@ -115,14 +116,14 @@ const ActivityTeaser: React.FC<{ onGoToActivity: () => void }> = ({ onGoToActivi
     <div className="bg-white border border-petal-rule rounded-2xl px-4 py-3.5" data-testid="home-activity-teaser">
       <div className="flex items-center justify-between mb-2">
         <span className="inline-flex items-center gap-1.5 font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted">
-          <Activity className="w-3.5 h-3.5" strokeWidth={1.5} /> 最近發生了什麼
+          <Activity className="w-3.5 h-3.5" strokeWidth={1.5} /> {tr('最近發生了什麼', 'What happened recently')}
         </span>
         <button
           type="button"
           onClick={() => { trackAction('onboarding.home.activity_all'); onGoToActivity(); }}
           className="font-body text-[11px] text-petal-muted hover:text-petal-ink underline underline-offset-2"
         >
-          查看全部
+          {tr('查看全部', 'See all')}
         </button>
       </div>
       <ul className="space-y-1.5">
@@ -150,8 +151,8 @@ const GrowthTeaserCard: React.FC<{ onGoToGrow: () => void }> = ({ onGoToGrow }) 
   >
     <TrendingUp className="w-4 h-4 text-petal-sage-deep shrink-0" strokeWidth={1.5} />
     <span className="min-w-0 flex-1">
-      <span className="block font-display text-sm text-petal-ink">🌱 我們正在成長</span>
-      <span className="block font-body text-[11px] text-petal-muted">看統計、里程碑與真實故事</span>
+      <span className="block font-display text-sm text-petal-ink">{tr('🌱 我們正在成長', '🌱 We are growing')}</span>
+      <span className="block font-body text-[11px] text-petal-muted">{tr('看統計、里程碑與真實故事', 'See stats, milestones and real stories')}</span>
     </span>
     <ChevronRight className="w-4 h-4 text-petal-muted shrink-0" strokeWidth={1.5} />
   </button>
@@ -177,27 +178,27 @@ const TodayActions: React.FC<{
   }[] = [
     {
       emoji: '❤️',
-      title: '今天存一點愛',
-      desc: '花 1 分鐘，回答一個小問題：今天你還喜歡他什麼？',
-      cta: '開始',
+      title: tr('今天存一點愛', 'Save a little love today'),
+      desc: tr('花 1 分鐘，回答一個小問題：今天你還喜歡他什麼？', 'Take 1 minute to answer one small question: what do you still love about them today?'),
+      cta: tr('開始', 'Start'),
       onClick: () => { trackAction('home.today.save_love'); onGoToDailyLove(); },
       testId: 'home-today-love',
       tone: 'bg-petal-rose-soft/25 border-petal-rose-soft',
     },
     {
       emoji: '💬',
-      title: '有件事情想說',
-      desc: '有些話，不一定要等到吵架才說。',
-      cta: '說開一件事',
+      title: tr('有件事情想說', 'Something you want to say'),
+      desc: tr('有些話，不一定要等到吵架才說。', 'Some things don\'t have to wait for a fight to be said.'),
+      cta: tr('說開一件事', 'Talk it through'),
       onClick: () => { trackAction('home.today.talk'); onGoToTalk(); },
       testId: 'home-today-talk',
       tone: 'bg-white border-petal-rule',
     },
     {
       emoji: '🌱',
-      title: '一起變好',
-      desc: '今天想一起探索一個關係主題嗎？',
-      cta: '開始探索',
+      title: tr('一起變好', 'Get better together'),
+      desc: tr('今天想一起探索一個關係主題嗎？', 'Want to explore a relationship topic together today?'),
+      cta: tr('開始探索', 'Start exploring'),
       onClick: () => { trackAction('home.today.grow'); onGoToGrow(); },
       testId: 'home-today-grow',
       tone: 'bg-petal-sage/10 border-petal-sage/40',
@@ -207,7 +208,7 @@ const TodayActions: React.FC<{
   return (
     <div className="space-y-2.5" data-testid="home-today-actions">
       <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted">
-        今天想做什麼
+        {tr('今天想做什麼', 'What would you like to do today?')}
       </div>
       {items.map((it) => (
         <div
@@ -260,12 +261,12 @@ const HomeView: React.FC<HomeViewProps> = ({
     <div className="space-y-4" data-testid="home-view">
       <div className="border-b border-petal-rule pb-5 mb-1">
         <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-2">
-          — 今天
+          {tr('— 今天', '— Today')}
         </div>
         <div className="flex items-center gap-2">
           <h2 className="font-display text-3xl md:text-4xl font-light tracking-tight text-petal-ink leading-[1.05]">
             {greeting()}
-            {names && <>，{names}</>}
+            {names && <>{tr('，', ', ')}{names}</>}
             <em className="not-italic font-light italic text-pink-600"> ❤️</em>
           </h2>
           <InfoHint viewId="home" />
