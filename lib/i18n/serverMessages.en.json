@@ -953,6 +953,14 @@
 "這串對話比較長，AI 這次沒能完成情緒翻譯（沒有扣用今日額度）。請按「重試」，通常再試一次就會成功。": "This thread is quite long, and the AI couldn't finish the emotion translation this time (today's credits weren't used). Tap \"Retry\"; it usually works the second time.",
 "周平均統計卡片": "Weekly average stats card",
 "在「記錄時光」顯示親密次數的周平均統計卡片。預設關閉，可在此開啟試用。": "Shows a weekly average intimacy stats card in \"Calendar\". Off by default; turn it on here to try it."
+,
+"無法取得購買紀錄，請稍後再試": "Couldn't load your purchase history. Please try again in a moment",
+"無法取得收據，請稍後再試": "Couldn't load the receipt. Please try again in a moment",
+"找不到這張收據，請確認收據編號，或從購買紀錄重新開啟": "We couldn't find this receipt. Check the receipt number, or reopen it from your purchase history",
+"收據抬頭請控制在 100 字以內": "Please keep the receipt name under 100 characters",
+"統一編號需為 8 位數字": "A tax ID must be 8 digits",
+"付款資料有誤，請確認後再試": "Some payment details are invalid. Please check them and try again",
+"視訊諮商預約": "Video session booking"
 },
 "patterns": [
 [

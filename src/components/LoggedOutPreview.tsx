@@ -47,6 +47,7 @@ import { trackAction } from '../utils/track';
 import { PairingInviteShare } from './PairingInviteShare';
 import PairingReminderBanner from './PairingReminderBanner';
 import { tr } from '../i18n/tr';
+import { ReceiptDocument } from './PurchaseReceipts';
 
 interface PreviewScript {
   id: string;
@@ -866,6 +867,27 @@ const PRICING_PLANS: { days: number; amount: number; perDay: string; featured?: 
   { days: 365, amount: 790, perDay: tr('約每天 NT$2.2', 'About NT$2.2 a day') },
 ];
 
+// Every payment issues a numbered electronic receipt (lib/receipts.js). The
+// showroom previews the actual document so visitors can see what they'd get for
+// expense claims before signing up. Static sample — no auth'd fetch.
+const SAMPLE_RECEIPT = {
+  receiptNo: 'TG-20260801-A1B2C3',
+  itemLabel: tr('Twogether Premium 90 天', 'Twogether Premium 90 days'),
+  amount: 240,
+  currency: 'TWD',
+  provider: 'newebpay' as const,
+  tradeNo: '26080110134567',
+  invoiceNo: null,
+  buyerEmail: 'sample@twogether.fun',
+  buyerName: tr('範例使用者', 'Sample user'),
+  buyerTitle: null,
+  buyerTaxId: null,
+  issuedAt: '2026-08-01T10:13:00+08:00',
+  sellerName: tr('Twogether（個人賣家）', 'Twogether (individual seller)'),
+  sellerTaxId: null,
+  sellerContact: 'support@twogether.fun',
+};
+
 const PRICING_PERKS = [
   tr('每日 AI 整理／改寫次數大幅提升', 'Many more AI rewrites and summaries per day'),
   tr('無限建立自訂角色扮演劇本', 'Unlimited custom role-play scripts'),
@@ -1568,6 +1590,25 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scr
               </li>
             ))}
           </ul>
+        </div>
+
+        {/* Receipt sample: what every paid transaction produces. */}
+        <div className="mb-8" data-testid="pricing-receipt-sample">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-body text-xs text-petal-muted">
+              {tr('每筆付款都會開立電子收據', 'Every payment issues an electronic receipt')}
+            </span>
+            <SampleTag />
+          </div>
+          <div className="rounded-md border border-petal-rule bg-petal-cream overflow-hidden">
+            <ReceiptDocument receipt={SAMPLE_RECEIPT} />
+          </div>
+          <p className="mt-2 font-body text-xs text-petal-muted text-center">
+            {tr(
+              '收據會寄到你的信箱，也能在 App 內「購買紀錄與收據」隨時查看、列印報帳。',
+              'The receipt is emailed to you, and stays in "Purchases & receipts" inside the app to view or print for expenses.'
+            )}
+          </p>
         </div>
 
         <SignUpCta onSignUp={onSignUp} />
