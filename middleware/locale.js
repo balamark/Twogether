@@ -22,6 +22,10 @@ const TRANSLATABLE_KEYS = new Set([
   'message', 'error', 'msg', 'title', 'content', 'description', 'reason', 'hint',
   'label', 'tagline', 'styles', 'sample', 'goal', 'prompts', 'why', 'name',
   'fallback', 'body', 'detail',
+  // Receipt/order line item ("Twogether Premium 90 天" / "視訊諮商 — 某諮商師").
+  // Only billing responses carry this key, and the values come from our own
+  // catalog, never from user input (lib/receipts.js).
+  'item_label',
 ]);
 const CJK = /[一-鿿]/;
 const PH = /\{(\d+|[a-z_]+)\}/g;
