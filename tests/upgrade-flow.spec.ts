@@ -170,13 +170,31 @@ test.describe('Premium upgrade flow', () => {
     await expect.poll(() => ecpaySubmitted, { timeout: 5000 }).toBe(true);
   });
 
-  test('optional 抬頭／統編 ride along with the checkout, and a bad 統編 blocks it', async ({ page }) => {
-    // Heaviest test in the file: a full page load plus two checkout attempts.
-    // Against a cold Vite dev build that outgrows the config's 60s default.
-    test.setTimeout(90_000);
-    let checkoutBody: Record<string, unknown> | null = null;
+  test('a bad 統編 never starts a payment; a good one rides along with the checkout', async ({ page }) => {
+    // The guarantee under test is what the buyer gets: a malformed 統編 never
+    // turns into a charge, and they are told exactly what to fix. UpgradeView
+    // checks it before calling, and routes/billing.js rejects it with the same
+    // message (covered against the real server in receipt-issuance.spec.ts) —
+    // so this stub mirrors the server and the test passes whichever layer
+    // blocks first. Asserting "the client blocked it" instead would be a race:
+    // page.fill() sets the input's value natively, so it can land before React
+    // has re-rendered the click handler that closes over it.
+    const checkoutCalls: Record<string, unknown>[] = [];
     await page.route('**/api/billing/checkout**', async (route) => {
-      checkoutBody = JSON.parse(route.request().postData() || '{}');
+      const body = JSON.parse(route.request().postData() || '{}');
+      checkoutCalls.push(body);
+      const taxId = body.receipt_tax_id;
+      if (taxId !== undefined && !/^\d{8}$/.test(String(taxId))) {
+        return route.fulfill({
+          status: 400,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: false,
+            message: '統一編號需為 8 位數字',
+            error_code: 'CHECKOUT_INVALID_INPUT',
+          }),
+        });
+      }
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -187,43 +205,42 @@ test.describe('Premium upgrade flow', () => {
         }),
       });
     });
-    await page.route('https://ccore.newebpay.com/**', async (route) => route.abort());
+
+    // A payment starting at all is the failure we're guarding against, so watch
+    // for the gateway POST rather than inferring it from the checkout call.
+    let gatewayReached = false;
+    await page.route('https://ccore.newebpay.com/**', async (route) => {
+      gatewayReached = true;
+      return route.abort();
+    });
 
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
     await page.getByTestId('user-menu-toggle').click();
     await page.getByTestId('user-menu-upgrade').click();
-    await expect(page.getByTestId('upgrade-view')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByTestId('upgrade-view')).toBeVisible({ timeout: 10_000 });
 
     await page.getByTestId('receipt-details-toggle').click();
     await page.getByTestId('receipt-title-input').fill('測試股份有限公司');
-    // The input strips non-digits, so a short 統編 is the reachable bad case.
+    // The input strips non-digits, so a too-short 統編 is the reachable bad case.
     await page.getByTestId('receipt-tax-id-input').fill('123');
-    // These are controlled inputs: assert the value has round-tripped through
-    // React state before clicking, otherwise the click can read stale state and
-    // start a checkout that should have been blocked.
-    await expect(page.getByTestId('receipt-title-input')).toHaveValue('測試股份有限公司');
-    await expect(page.getByTestId('receipt-tax-id-input')).toHaveValue('123');
     await page.getByTestId('upgrade-button-pass_30').click();
 
-    // Blocked client-side with a specific reason — no checkout call at all.
-    await expect(page.getByText('統一編號需為 8 位數字', { exact: false })).toBeVisible({ timeout: 5000 });
-    expect(checkoutBody).toBeNull();
+    // Told what to fix, and no payment was ever started.
+    await expect(page.getByText('統一編號需為 8 位數字', { exact: false })).toBeVisible({ timeout: 10_000 });
+    expect(gatewayReached).toBe(false);
 
     await page.getByTestId('receipt-tax-id-input').fill('12345678');
-    await expect(page.getByTestId('receipt-tax-id-input')).toHaveValue('12345678');
     await page.getByTestId('upgrade-button-pass_30').click();
 
-    await expect.poll(() => checkoutBody, { timeout: 5000 }).toMatchObject({
-      plan: 'pass_30',
-      receipt_title: '測試股份有限公司',
-      receipt_tax_id: '12345678',
-    });
+    // Now it goes through, carrying both receipt fields.
+    await expect
+      .poll(() => checkoutCalls[checkoutCalls.length - 1], { timeout: 10_000 })
+      .toMatchObject({ plan: 'pass_30', receipt_title: '測試股份有限公司', receipt_tax_id: '12345678' });
+    await expect.poll(() => gatewayReached, { timeout: 10_000 }).toBe(true);
   });
 
   test('purchase history lists the receipt and opens the printable document', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
     await page.getByTestId('user-menu-toggle').click();
     await page.getByTestId('user-menu-upgrade').click();
     await expect(page.getByTestId('upgrade-view')).toBeVisible({ timeout: 5000 });

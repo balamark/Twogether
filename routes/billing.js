@@ -394,7 +394,23 @@ async function grantPaidOrder(order, { gatewayTradeNo, paymentMethod, rawPayload
   // All values are bound parameters; the GREATEST/COALESCE handles the "no
   // active pass" case ($4 = NULL → starts now).
   let receipt = null;
+  let alreadyGranted = false;
   await db.transaction(async (client) => {
+    // Gateways deliver the notify more than once, and the browser ReturnURL can
+    // race the server-to-server NotifyURL. The caller's status check happens
+    // before this transaction opens, so two deliveries can both pass it and
+    // both land here — which used to grant the pass twice (one payment, N rows
+    // in couple_entitlements). Taking the order row's lock serializes them and
+    // the re-read inside the lock makes the whole grant idempotent.
+    const locked = await client.query(
+      `SELECT status FROM payment_orders WHERE id = $1 FOR UPDATE`,
+      [order.id]
+    );
+    if (locked.rows[0]?.status === 'paid') {
+      alreadyGranted = true;
+      return;
+    }
+
     const expiryRow = await client.query(
       `SELECT MAX(expires_at) AS max_exp FROM couple_entitlements
         WHERE couple_id = $1 AND expires_at > NOW()`,
@@ -433,6 +449,15 @@ async function grantPaidOrder(order, { gatewayTradeNo, paymentMethod, rawPayload
       tradeNo: gatewayTradeNo || null,
     });
   });
+
+  if (alreadyGranted) {
+    logInfo('billing.callback.already_granted', {
+      merchantTradeNo: order.merchant_trade_no,
+      coupleId: order.couple_id,
+      provider: order.provider,
+    });
+    return true;
+  }
 
   logInfo('billing.callback.granted', {
     merchantTradeNo: order.merchant_trade_no,
