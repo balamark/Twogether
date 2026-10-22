@@ -76,6 +76,9 @@ adds a fragment file in `changelog/`; CI compiles them into the block below —
 see `CLAUDE.md`.)
 
 <!-- changelog:begin (generated from changelog/*.md — edit those, not this) -->
+### 2026-10-20
+- **溫柔提醒更多風格＋英文版**: 「已經幾天沒有親密了」的溫柔提醒新增 20 種風格（詩意、居家溫馨、遊戲任務、撒嬌萌系、月光浪漫…），每次都有新鮮的句子可選；切換成 English 時，提醒句子也會完整顯示英文。
+
 ### 2026-10-15
 - **整個 App 都能切換英文 + 英文客服頁**: 右上角新增清楚的「繁中 / EN」切換，登入前後都看得到，選擇會記在這台裝置上。切到 EN 後，所有分頁內容、彈窗、提示訊息、伺服器回傳的錯誤訊息都會變成英文，AI 諮商師的回覆也會跟著用英文；「使用說明」在英文版叫 Help & Support。另外新增免登入的公開客服頁 twogether.fun/support（預設英文、可切繁中），整理了聯絡方式、帳號與配對、付款退費和隱私問答，海外朋友與 App 審核都能直接找到我們。
 
