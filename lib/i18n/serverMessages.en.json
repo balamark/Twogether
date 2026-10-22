@@ -853,6 +853,27 @@
 "成就感": "Sense of achievement",
 "AI 助理風": "AI assistant",
 "極簡版": "Minimal",
+"詩意": "Poetic",
+"居家溫馨": "Cozy at home",
+"美食約會": "Food date",
+"懷舊回憶": "Nostalgic",
+"小冒險": "Little adventure",
+"天氣日常": "Everyday weather",
+"感謝": "Gratitude",
+"先照顧自己": "Self-care first",
+"遊戲任務": "Game quest",
+"澆花比喻": "Watering the plant",
+"音樂時光": "Music moment",
+"睡前時光": "Bedtime",
+"週末計畫": "Weekend plan",
+"撒嬌萌系": "Cute and cuddly",
+"咖啡時光": "Coffee time",
+"月光浪漫": "Moonlit romance",
+"好奇提問": "Curious question",
+"小小一步": "One tiny step",
+"隊友風": "Teammates",
+"文青風": "Literary",
+"Twogether 溫柔提醒": "A gentle reminder from Twogether",
 "一段時間": "A while",
 "孩子之外，我們還是伴侶嗎？": "Beyond the kids, are we still partners?",
 "成為父母之後，很容易把所有時間都花在「一起帶小孩」，卻忘了單純當彼此的伴侶。": "After becoming parents, it's easy to spend all your time \"raising the kids together\" and forget to simply be each other's partner.",
@@ -1438,6 +1459,86 @@
 [
 "距離上次親密時光：{days} 天。找個時間，重新靠近彼此吧。",
 "Time since your last intimate moment: {days} days. Find a moment to get close again."
+],
+[
+"{days} 天，像一封還沒寄出的信。也許今晚，就是把它交給彼此的時候。",
+"{days} days, like a letter not yet sent. Maybe tonight is the time to hand it to each other."
+],
+[
+"已經 {days} 天沒有記錄親密時光了。窩在沙發上、蓋同一條毯子，也是一種很棒的靠近。",
+"It's been {days} days since you recorded an intimate moment. Curling up on the couch under the same blanket is a lovely way to get close, too."
+],
+[
+"距離上次親密時光已經 {days} 天。一起煮頓晚餐、分食一碗熱湯，有時候比什麼都暖。",
+"It's been {days} days since your last intimate moment. Cooking dinner together or sharing a bowl of hot soup can be warmer than anything."
+],
+[
+"已經 {days} 天沒有記錄親密時光了。翻翻以前的合照，聊聊當初怎麼開始的，回憶也會把你們拉近。",
+"It's been {days} days since you recorded an intimate moment. Look through old photos and talk about how it all began. Memories can pull you closer, too."
+],
+[
+"{days} 天沒有新的親密紀錄囉！試試一起做件沒做過的小事，新鮮感是關係最好的燃料。",
+"No new intimate moments in {days} days! Try something small you've never done together. Novelty is great fuel for a relationship."
+],
+[
+"距離上次親密時光已經 {days} 天。不管今天是晴天還是雨天，都適合在彼此身邊多待一會兒。",
+"It's been {days} days since your last intimate moment. Sunny or rainy, today is a good day to stay by each other a little longer."
+],
+[
+"已經 {days} 天沒有記錄親密時光了。今天不妨跟對方說一件你很感謝的小事，親密常常從這裡開始。",
+"It's been {days} days since you recorded an intimate moment. Try telling each other one small thing you're grateful for today. Closeness often starts there."
+],
+[
+"距離上次親密時光已經 {days} 天。先讓自己好好休息，放鬆的兩個人，更容易自然地靠近。",
+"It's been {days} days since your last intimate moment. Get some real rest first. Two relaxed people find their way to each other more naturally."
+],
+[
+"新任務解鎖：已經 {days} 天沒有親密紀錄！完成條件：一起度過 30 分鐘不看手機的時光。🏆",
+"New quest unlocked: {days} days without an intimate moment! Goal: spend 30 phone-free minutes together. 🏆"
+],
+[
+"關係像一盆植物，已經 {days} 天沒澆水囉。一點點陪伴，就能讓它重新長出新芽。",
+"A relationship is like a houseplant, and it's gone {days} days without water. A little time together helps it sprout again."
+],
+[
+"已經 {days} 天沒有記錄親密時光了。放一首你們都喜歡的歌，一起聽完，就是很好的開始。",
+"It's been {days} days since you recorded an intimate moment. Put on a song you both love and listen to it together. That's a great place to start."
+],
+[
+"距離上次親密時光已經 {days} 天。今晚睡前，留十分鐘給彼此，聊聊今天、抱一下再睡。",
+"It's been {days} days since your last intimate moment. Tonight before bed, save ten minutes for each other: talk about your day and hug before sleep."
+],
+[
+"已經 {days} 天沒有記錄親密時光了。這個週末，要不要先在行事曆上替彼此留一個位置？",
+"It's been {days} days since you recorded an intimate moment. How about saving a spot for each other on this weekend's calendar?"
+],
+[
+"叮咚～已經 {days} 天沒有親密紀錄了喵！快去找對方蹭一蹭、抱一抱吧～🐾",
+"Ding-dong~ It's been {days} days without an intimate moment, meow! Go snuggle up and share a hug~ 🐾"
+],
+[
+"距離上次親密時光已經 {days} 天。明天早上，一起慢慢喝杯咖啡，也是一種溫柔的靠近。",
+"It's been {days} days since your last intimate moment. Slowly sharing a cup of coffee tomorrow morning is a gentle way to get close, too."
+],
+[
+"已經 {days} 天沒有記錄親密時光了。今晚關掉燈、拉開窗簾，在月光下說說心裡話吧。",
+"It's been {days} days since you recorded an intimate moment. Tonight, turn off the lights, open the curtains, and share what's on your minds under the moonlight."
+],
+[
+"{days} 天沒有親密紀錄了。今天試著問對方一個問題：「最近有什麼事讓你很開心？」",
+"No intimate moments in {days} days. Try asking each other one question today: \"What's made you happy lately?\""
+],
+[
+"距離上次親密時光已經 {days} 天。不用大計畫，牽個手、多看一眼，小小一步就夠了。",
+"It's been {days} days since your last intimate moment. No big plans needed. Holding hands or one more look is a small step, and that's enough."
+],
+[
+"你們是最好的隊友，已經 {days} 天沒有一起「充電」了。找個時間，好好為彼此加油打氣吧！",
+"You two are the best teammates, and it's been {days} days since you last recharged together. Find some time to cheer each other on!"
+],
+[
+"已經 {days} 天沒有記錄親密時光了。日子再忙，也別忘了在彼此的故事裡，留一頁給今天。",
+"It's been {days} days since you recorded an intimate moment. However busy life gets, save a page in your shared story for today."
 ],
 [
 "{0} {1}新增了一則愛的記錄",

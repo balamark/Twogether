@@ -180,7 +180,7 @@ const SampleStats: React.FC = () => {
         <ul className="space-y-1.5">
           {[
             { label: tr('🫶 鼓勵連結', '🫶 Encourage connection'), text: tr('已經 16 天沒有記錄親密時光。一個擁抱、一場散步，或一段沒有打擾的聊天，都能讓彼此更靠近。', 'It\'s been 16 days since you recorded an intimate moment. A hug, a walk, or an uninterrupted chat can all bring you closer.'), recommended: true },
-            { label: tr('💛 溫柔關心', '💛 Gentle care'), text: tr('Twogether 注意到，你們已經 16 天沒有記錄親密時光了。如果最近生活比較忙，不妨找個舒服的時間，好好陪伴彼此。', 'Twogether noticed it\'s been 16 days since you recorded an intimate moment. If life\'s been busy lately, find a comfortable time to really be with each other.'), recommended: false },
+            { label: tr('🎮 遊戲任務', '🎮 Game quest'), text: tr('新任務解鎖：已經 16 天沒有親密紀錄！完成條件：一起度過 30 分鐘不看手機的時光。🏆', 'New quest unlocked: 16 days without an intimate moment! Goal: spend 30 phone-free minutes together. 🏆'), recommended: false },
             { label: tr('🌿 不只談性', '🌿 Not just about sex'), text: tr('已經有 16 天沒有記錄親密時光了。親密不一定只有性愛，也可以是一個擁抱、一句關心，或一起度過的一段時光。', 'It\'s been 16 days since you recorded an intimate moment. Intimacy isn\'t only sex; it can be a hug, a caring word, or time spent together.'), recommended: false },
           ].map((s, i) => (
             <li key={i} className={`bg-white rounded-md border p-2 ${s.recommended ? 'border-petal-rose-deep' : 'border-petal-rule'}`}>

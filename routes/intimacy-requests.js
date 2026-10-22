@@ -16,6 +16,7 @@ const {
   buildSuggestions: buildNudgeSuggestions,
   DEFAULT_COUNT: NUDGE_OPTION_COUNT,
 } = require('../lib/intimacyNudgeTones');
+const { translateString } = require('../middleware/locale');
 
 const router = express.Router();
 
@@ -23,6 +24,13 @@ const router = express.Router();
 router.use(authenticateToken);
 
 const NUDGE_THRESHOLD = 3;
+
+// The nudge copy lives in `text`, which the locale middleware deliberately
+// doesn't translate (it's the message that gets sent), so localize it here.
+// The cache keeps the 繁中 originals; English is applied on the way out.
+const localizeNudges = (suggestions, locale) => (locale === 'en'
+  ? suggestions.map((s) => ({ ...s, text: translateString(String(s.text || '')) }))
+  : suggestions);
 
 // AI usage gating — the roleplay invitation generator hits the paid LLM, so it
 // shares the tier-aware daily AI budget with every other paid-LLM feature. The
@@ -679,7 +687,7 @@ router.post('/nudge-suggestions', [
         );
         if (cached.rows.length > 0 && Array.isArray(cached.rows[0].suggestions) && cached.rows[0].suggestions.length > 0) {
           logInfo('intimacy.nudge.cache_hit', { userId, coupleId, days });
-          return res.json({ success: true, suggestions: cached.rows[0].suggestions, cached: true });
+          return res.json({ success: true, suggestions: localizeNudges(cached.rows[0].suggestions, req.locale), cached: true });
         }
       } catch (cacheErr) {
         logWarn('intimacy nudge cache lookup failed', { err: cacheErr.message });
@@ -708,7 +716,7 @@ router.post('/nudge-suggestions', [
       logWarn('intimacy nudge cache save failed', { err: saveErr.message });
     }
 
-    res.json({ success: true, suggestions, cached: false });
+    res.json({ success: true, suggestions: localizeNudges(suggestions, req.locale), cached: false });
   } catch (error) {
     logError('Build intimacy nudges failed', { err: error.message, stack: error.stack });
     res.status(500).json({
