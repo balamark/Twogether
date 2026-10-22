@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import dotenv from 'dotenv';
 import path from 'path';
+import { TEST_NEWEBPAY } from './tests/helpers/newebpay';
 
 // Load .env.test so `npx playwright test` works without manual env exports.
 // We intentionally do NOT load .env or .env.local here — tests must always
@@ -102,6 +103,15 @@ export default defineConfig({
         // that only lives in GitHub secrets → prod. Outbound push/reply no-op.
         LINE_CHANNEL_ID: 'test-line-channel',
         LINE_CHANNEL_SECRET: 'test-line-secret',
+        // Dummy 藍新金流 creds, same idea as the LINE ones: isConfigured()=true
+        // so /billing/checkout builds a real MPG payload, and receipt-issuance
+        // .spec.ts signs callbacks with this very key (tests/helpers/newebpay).
+        NEWEBPAY_MERCHANT_ID: TEST_NEWEBPAY.merchantId,
+        NEWEBPAY_HASH_KEY: TEST_NEWEBPAY.hashKey,
+        NEWEBPAY_HASH_IV: TEST_NEWEBPAY.hashIV,
+        // The gateway callbacks are built against this origin, and the spec
+        // asserts NotifyURL points back at our own server.
+        APP_BASE_URL: 'http://localhost:8080',
         PORT: '8080'
       }
     },

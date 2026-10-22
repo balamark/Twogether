@@ -43,8 +43,11 @@ export default defineConfig(({ mode }) => {
       "worker-src 'self' blob:",
       "frame-src 'none'",
       "object-src 'none'",
-      // Allow the checkout form to POST to ECPay's hosted payment page.
-      "form-action 'self' https://payment-stage.ecpay.com.tw https://payment.ecpay.com.tw"
+      // Allow the checkout form to POST to the hosted payment pages of BOTH
+      // gateways (stage + production hosts each). Miss one and the browser
+      // silently refuses the form submit, so that gateway's button does
+      // nothing — see lib/ecpay.js / lib/newebpay.js ENDPOINTS.
+      "form-action 'self' https://payment-stage.ecpay.com.tw https://payment.ecpay.com.tw https://ccore.newebpay.com https://core.newebpay.com"
     ];
 
     // Development-specific connect-src
