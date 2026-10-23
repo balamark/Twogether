@@ -96,13 +96,17 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
         onNavigate('deep-dive');
         break;
       // 專屬心理師關係變化。伴侶端：帶到「心理諮商」分頁（可管理專屬心理師）。
+      // 專屬諮商空間 new message / session saved → the couple's 心理諮商 page,
+      // where the panel shows the 新訊息 badge and opens the space.
       case 'dedicated_therapist_added':
+      case 'dedicated_message':
         onNavigate('therapists');
         break;
       // 諮商師端：有伴侶把你設為專屬諮商師 → 帶到諮商工作台的「我輔導的伴侶」，
       // 並自動開啟你所諮商的那對伴侶的頁面。payload 帶 coupleId 精準定位該對伴侶；
       // 舊通知沒有 coupleId 時，App 會退回開啟最新一筆 client。
       case 'dedicated_client_added':
+      case 'dedicated_client_message':
         onNavigate('counselor', notification.coupleId);
         break;
       // Partner-action notifications (services/notificationService.js): route each

@@ -25,6 +25,7 @@ const ecpay = require('../lib/ecpay');
 const newebpay = require('../lib/newebpay');
 const qaPool = require('../lib/qaPool');
 const { logInfo, logWarn, logError } = require('../lib/logger');
+const dedicatedSpaceRoutes = require('./dedicated-space');
 // Reusable read/write helpers for a dedicated therapist's view of a couple's
 // wall and 好好說話 (events) content. These modules don't require this one, so
 // there's no require cycle.
@@ -1361,7 +1362,27 @@ router.get('/dedicated', authenticateToken, async (req, res) => {
       [couple.id]
     );
     const row = result.rows[0];
-    res.json({ success: true, dedicated: row ? toDedicated(row) : null });
+    const dedicated = row ? toDedicated(row) : null;
+    // Space activity for the panel's entry buttons (new-message dot, 下次要談
+    // count). Best-effort: the space tables are lazily created on first use.
+    if (dedicated) {
+      try {
+        const act = await db.query(
+          `SELECT (SELECT MAX(created_at) FROM dedicated_messages WHERE link_id = $1 AND sender_id IS DISTINCT FROM $2) AS last_incoming_at,
+                  (SELECT COUNT(*)::int FROM dedicated_agenda_items WHERE link_id = $1 AND status = 'open') AS open_agenda,
+                  EXISTS (SELECT 1 FROM dedicated_sessions WHERE link_id = $1 AND ended_at IS NULL) AS session_open`,
+          [dedicated.id, req.user.id]
+        );
+        dedicated.lastIncomingAt = act.rows[0].last_incoming_at || null;
+        dedicated.openAgendaCount = act.rows[0].open_agenda || 0;
+        dedicated.sessionOpen = act.rows[0].session_open === true;
+      } catch {
+        dedicated.lastIncomingAt = null;
+        dedicated.openAgendaCount = 0;
+        dedicated.sessionOpen = false;
+      }
+    }
+    res.json({ success: true, dedicated });
   } catch (error) {
     logError('Failed to load dedicated therapist', { userId: req.user?.id, err: error.message });
     res.status(500).json({ success: false, message: '無法取得專屬心理師資訊' });
@@ -1736,6 +1757,12 @@ router.post('/clients/:coupleId/events/:eventId/messages', authenticateToken, [
     res.status(500).json({ success: false, message: '留言失敗，請稍後再試' });
   }
 });
+
+// 專屬諮商空間 — the shared message thread + session page between a couple and
+// their dedicated therapist (routes/dedicated-space.js). Mounted for both
+// sides; each mount resolves to the same couple_therapists link.
+router.use('/dedicated/space', authenticateToken, dedicatedSpaceRoutes);
+router.use('/clients/:coupleId/space', authenticateToken, dedicatedSpaceRoutes);
 
 // GET /api/therapists/:id — single approved therapist.
 router.get('/:id', optionalAuth, async (req, res) => {
