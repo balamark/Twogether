@@ -40,6 +40,12 @@ env_variables:
   # Admin dashboard (/admin) Basic-Auth password. Without it, adminAuth returns
   # 503 "Admin disabled". Shares the prod ADMIN_PASSWORD secret.
   ADMIN_PASSWORD: $_ADMIN_PASSWORD
+  # NewebPay 藍新 MPG — shares prod's merchant keys. MODE is pinned to "stage"
+  # in deploy.yml so staging never sends real charges.
+  NEWEBPAY_MERCHANT_ID: $_NEWEBPAY_MERCHANT_ID
+  NEWEBPAY_HASH_KEY: $_NEWEBPAY_HASH_KEY
+  NEWEBPAY_HASH_IV: $_NEWEBPAY_HASH_IV
+  NEWEBPAY_MODE: $_NEWEBPAY_MODE
 
 automatic_scaling:
   min_instances: 0

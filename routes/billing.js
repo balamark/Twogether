@@ -286,6 +286,7 @@ router.post(
 
     try {
       if (provider === 'newebpay' && !newebpay.isConfigured()) {
+        logWarn('billing.newebpay_unconfigured', { userId: req.user.id, plan: req.body.plan });
         return res.status(503).json({
           success: false,
           message: '藍新金流暫時無法使用，請改用綠界 ECPay 付款',

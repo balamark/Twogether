@@ -49,6 +49,12 @@ env_variables:
   LINE_CHANNEL_SECRET: $_LINE_CHANNEL_SECRET
   # The official account's "add friend" deep link, shown in Settings.
   LINE_OA_ADD_URL: $_LINE_OA_ADD_URL
+  # NewebPay 藍新 MPG. lib/newebpay.isConfigured() needs all three; missing →
+  # checkout returns 503 NEWEBPAY_UNAVAILABLE. MODE: stage|production.
+  NEWEBPAY_MERCHANT_ID: $_NEWEBPAY_MERCHANT_ID
+  NEWEBPAY_HASH_KEY: $_NEWEBPAY_HASH_KEY
+  NEWEBPAY_HASH_IV: $_NEWEBPAY_HASH_IV
+  NEWEBPAY_MODE: $_NEWEBPAY_MODE
 
 # Automatic scaling (free tier compatible)
 automatic_scaling:
