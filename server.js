@@ -147,8 +147,17 @@ app.use(helmet({
       // default-src 'self' and the browser blocks them.
       mediaSrc: ["'self'", "data:", "blob:", "https:"],
       connectSrc: ["'self'", "https:"],
-      // Allow the premium checkout form to POST to ECPay's hosted payment page.
-      formAction: ["'self'", "https://payment-stage.ecpay.com.tw", "https://payment.ecpay.com.tw"]
+      // Allow the checkout form to POST to the hosted payment pages of BOTH
+      // gateways (stage + production hosts each, mirroring lib/ecpay.js and
+      // lib/newebpay.js ENDPOINTS). A gateway missing here is silently broken:
+      // the browser refuses the form submit, the button sticks on 前往付款…
+      // and the buyer never reaches the payment page. Keep in sync with the
+      // dev-server CSP in vite.config.ts.
+      formAction: [
+        "'self'",
+        "https://payment-stage.ecpay.com.tw", "https://payment.ecpay.com.tw",
+        "https://ccore.newebpay.com", "https://core.newebpay.com",
+      ]
     }
   }
 }));

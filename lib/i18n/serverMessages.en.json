@@ -995,7 +995,14 @@
 "這次諮商的紀錄已整理好": "This session's notes are saved",
 "本次摘要與談過的項目已存進「過往紀錄」，沒談完的會留在下次要談": "The notes and covered items are saved under \"Past sessions\"; anything unfinished stays in \"Next time\"",
 "訊息 id 無效": "Invalid message id",
-"狀態無效": "Invalid status"
+"狀態無效": "Invalid status",
+"無法取得購買紀錄，請稍後再試": "Couldn't load your purchase history. Please try again in a moment",
+"無法取得收據，請稍後再試": "Couldn't load the receipt. Please try again in a moment",
+"找不到這張收據，請確認收據編號，或從購買紀錄重新開啟": "We couldn't find this receipt. Check the receipt number, or reopen it from your purchase history",
+"收據抬頭請控制在 100 字以內": "Please keep the receipt name under 100 characters",
+"統一編號需為 8 位數字": "A tax ID must be 8 digits",
+"付款資料有誤，請確認後再試": "Some payment details are invalid. Please check them and try again",
+"視訊諮商預約": "Video session booking"
 },
 "patterns": [
 [
