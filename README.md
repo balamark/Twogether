@@ -76,6 +76,9 @@ adds a fragment file in `changelog/`; CI compiles them into the block below —
 see `CLAUDE.md`.)
 
 <!-- changelog:begin (generated from changelog/*.md — edit those, not this) -->
+### 2026-10-23
+- **專屬諮商：訊息與諮商頁**: 你們兩個和專屬心理師現在有一個共同的訊息管道，諮商之間想到的事可以先傳過去，按 📌 就排進「下次要談」。諮商時打開「諮商頁」，要談的清單、三方共用的本次摘要、話題建議、AI 諮商摘要與過往紀錄都在同一頁；訊息可以一鍵加進摘要，結束後沒談完的會自動留到下次。
+
 ### 2026-10-20
 - **溫柔提醒更多風格＋英文版**: 「已經幾天沒有親密了」的溫柔提醒新增 20 種風格（詩意、居家溫馨、遊戲任務、撒嬌萌系、月光浪漫…），每次都有新鮮的句子可選；切換成 English 時，提醒句子也會完整顯示英文。
 
