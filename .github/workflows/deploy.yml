@@ -84,6 +84,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build frontend
+        # server.js serves dist/index.html at /, which is the URL Playwright's
+        # webServer polls for readiness — without a build it 404s forever.
+        run: npm run build
+
       - name: Cache Playwright browsers
         id: pw-cache
         uses: actions/cache@v4
