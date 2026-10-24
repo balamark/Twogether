@@ -973,7 +973,29 @@
 "上傳的檔案格式不支援。": "This file format isn't supported.",
 "這串對話比較長，AI 這次沒能完成情緒翻譯（沒有扣用今日額度）。請按「重試」，通常再試一次就會成功。": "This thread is quite long, and the AI couldn't finish the emotion translation this time (today's credits weren't used). Tap \"Retry\"; it usually works the second time.",
 "周平均統計卡片": "Weekly average stats card",
-"在「記錄時光」顯示親密次數的周平均統計卡片。預設關閉，可在此開啟試用。": "Shows a weekly average intimacy stats card in \"Calendar\". Off by default; turn it on here to try it."
+"在「記錄時光」顯示親密次數的周平均統計卡片。預設關閉，可在此開啟試用。": "Shows a weekly average intimacy stats card in \"Calendar\". Off by default; turn it on here to try it.",
+"你目前不是這對伴侶的專屬心理師，無法進入諮商空間。若對方重新指定你，就能再次使用。": "You're no longer this couple's dedicated therapist, so you can't open their counseling space. If they choose you again, you'll regain access.",
+"你們還沒有專屬心理師。從「心理諮商」名錄挑一位諮商師設為專屬，就能開始傳訊息與整理下次要談的事。": "You don't have a dedicated therapist yet. Pick a counselor from the Counseling directory to start messaging and lining up what to discuss next time.",
+"無法載入諮商空間，請重新整理頁面後再試": "Couldn't load the counseling space. Please refresh and try again",
+"專屬心理師傳了訊息給你們": "Your dedicated therapist sent you a message",
+"諮商空間有新訊息": "New message in your counseling space",
+"訊息沒有送出，請檢查網路後再傳一次": "Your message wasn't sent. Check your connection and try again",
+"找不到這則訊息，可能已被移除。請重新整理後再試": "Couldn't find that message; it may have been removed. Please refresh and try again",
+"這件事已經在「下次要談」裡了": "This is already in \"Next time\"",
+"沒能加入「下次要談」，請稍後再試一次": "Couldn't add it to \"Next time\". Please try again in a moment",
+"找不到這個項目，可能已被另一位刪除。請重新整理後再試": "Couldn't find that item; someone else may have deleted it. Please refresh and try again",
+"更新失敗，請稍後再試一次": "Couldn't update. Please try again in a moment",
+"刪除失敗，請稍後再試一次": "Couldn't delete. Please try again in a moment",
+"沒能開始這次諮商紀錄，請稍後再試一次": "Couldn't start this session's notes. Please try again in a moment",
+"這次諮商已經結束了，摘要沒有存到。請按「開始今天的諮商」開一份新紀錄，再把內容貼上": "This session has already ended, so your notes weren't saved. Tap \"Start today's session\" to open new notes, then paste your text in",
+"摘要沒有存到，請檢查網路後再試一次（內容還留在畫面上）": "Your notes weren't saved. Check your connection and try again (your text is still on screen)",
+"沒能加進摘要，請稍後再試一次": "Couldn't add it to the notes. Please try again in a moment",
+"目前沒有進行中的諮商紀錄，可能已被另一位結束。請重新整理看看": "There's no session in progress; someone else may have ended it. Try refreshing",
+"沒能結束這次諮商，請稍後再試一次": "Couldn't end this session. Please try again in a moment",
+"這次諮商的紀錄已整理好": "This session's notes are saved",
+"本次摘要與談過的項目已存進「過往紀錄」，沒談完的會留在下次要談": "The notes and covered items are saved under \"Past sessions\"; anything unfinished stays in \"Next time\"",
+"訊息 id 無效": "Invalid message id",
+"狀態無效": "Invalid status"
 },
 "patterns": [
 [
@@ -1739,6 +1761,22 @@
 [
 "情境：{0}",
 "Scenario: {0}"
+],
+[
+"訊息需在 1-{0} 字之間",
+"Messages must be 1-{0} characters"
+],
+[
+"要談的事需在 1-{0} 字之間",
+"Items must be 1-{0} characters"
+],
+[
+"摘要最多 {0} 字，請精簡後再存",
+"Notes can be at most {0} characters. Please shorten them and save again"
+],
+[
+"本次摘要已接近 {0} 字上限，請先精簡摘要再加入訊息",
+"These notes are near the {0}-character limit. Shorten them before adding a message"
 ]
 ]
 }

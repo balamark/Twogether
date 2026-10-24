@@ -1,14 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { X, Lock, Send, MessageCircle, ChevronLeft, Compass, Library, ClipboardList, Clock } from 'lucide-react';
+import { X, Lock, Send, MessageCircle, ChevronLeft } from 'lucide-react';
 import {
   apiService,
   type WallPost,
   type WallReply,
   type EventRecord,
   type TherapistClientCouple,
-  type TherapistClientTopics,
-  type TherapyTopicSelectionStatus,
-  type TherapySummaryHistoryEntry,
 } from '../services/api';
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -16,31 +13,35 @@ import { isVideoUrl } from '../utils/script';
 import { companionName } from '../utils/aiCompanions';
 import { ROLE_STYLE } from '../utils/threadRoles';
 import ParticipantAvatar from './ParticipantAvatar';
-import TherapySummaryDetail from './TherapySummaryDetail';
+import { DedicatedMessagesPane, DedicatedSessionPane } from './DedicatedSpace';
+import { useDedicatedSpace } from '../hooks/useDedicatedSpace';
 import { tr, dateLocale } from '../i18n/tr';
 
-// A dedicated therapist's read-only (or read+comment) view of ONE client
-// couple's 牆 and 好好說話. Private items are never returned by the API, so this
-// only ever shows shared content. When the couple granted can_comment, each
-// thread gets a reply/message composer whose posts are flagged 心理師.
+// A dedicated therapist's view of ONE client couple. 訊息 / 諮商頁 are the
+// shared 專屬諮商空間 (same data the couple sees — the 諮商頁 also carries their
+// 話題建議 and AI 諮商摘要). 牆 / 好好說話 are read-only (or read+comment)
+// views of their shared content; private items are never returned by the API.
+// When the couple granted can_comment, each thread gets a composer whose posts
+// are flagged 心理師.
 interface Props {
   client: TherapistClientCouple;
   onClose: () => void;
   showNotification: (n: Omit<Notification, 'id'>) => void;
 }
 
-type Tab = 'wall' | 'events' | 'topics' | 'summaries';
+type Tab = 'messages' | 'session' | 'wall' | 'events';
 
 const coupleTitle = (c: TherapistClientCouple): string =>
   c.coupleName || (c.partnerNames.length ? c.partnerNames.join(' & ') : tr('伴侶', 'Couple'));
 
 const TherapistClientView: React.FC<Props> = ({ client, onClose, showNotification }) => {
   useScrollLock(true);
-  const [tab, setTab] = useState<Tab>('wall');
+  const [tab, setTab] = useState<Tab>('messages');
+  const space = useDedicatedSpace(client.coupleId, showNotification);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4">
-      <div className="bg-petal-cream w-full sm:max-w-2xl h-[92vh] sm:h-[85vh] flex flex-col rounded-t-2xl sm:rounded-lg border border-petal-rule shadow-petal" data-testid="therapist-client-view">
+      <div className={`bg-petal-cream w-full ${tab === 'session' ? 'sm:max-w-5xl' : 'sm:max-w-2xl'} h-[92vh] sm:h-[85vh] flex flex-col rounded-t-2xl sm:rounded-lg border border-petal-rule shadow-petal`} data-testid="therapist-client-view">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-petal-rule">
           <div className="min-w-0">
@@ -57,7 +58,7 @@ const TherapistClientView: React.FC<Props> = ({ client, onClose, showNotificatio
 
         {/* Tabs */}
         <div className="flex border-b border-petal-rule">
-          {(['wall', 'events', 'topics', 'summaries'] as Tab[]).map((key) => (
+          {(['messages', 'session', 'wall', 'events'] as Tab[]).map((key) => (
             <button
               key={key}
               onClick={() => setTab(key)}
@@ -66,21 +67,21 @@ const TherapistClientView: React.FC<Props> = ({ client, onClose, showNotificatio
                 tab === key ? 'text-pink-600 border-b-2 border-pink-500' : 'text-petal-muted hover:text-petal-ink'
               }`}
             >
-              {key === 'wall' ? tr('牆', 'Wall') : key === 'events' ? tr('好好說話', 'Talk it through') : key === 'topics' ? tr('話題建議', 'Topic suggestions') : tr('諮商摘要', 'Counseling summary')}
+              {key === 'messages' ? tr('訊息', 'Messages') : key === 'session' ? tr('諮商頁', 'Session page') : key === 'wall' ? tr('牆', 'Wall') : tr('好好說話', 'Talk it through')}
             </button>
           ))}
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto">
-          {tab === 'wall' ? (
+        <div className={`flex-1 min-h-0 ${tab === 'messages' || tab === 'session' ? '' : 'overflow-y-auto'}`}>
+          {tab === 'messages' ? (
+            <DedicatedMessagesPane state={space} onOpenSession={() => setTab('session')} />
+          ) : tab === 'session' ? (
+            <DedicatedSessionPane state={space} />
+          ) : tab === 'wall' ? (
             <ClientWall coupleId={client.coupleId} canComment={client.canComment} showNotification={showNotification} />
-          ) : tab === 'events' ? (
-            <ClientEvents coupleId={client.coupleId} canComment={client.canComment} showNotification={showNotification} />
-          ) : tab === 'topics' ? (
-            <ClientTherapyTopics coupleId={client.coupleId} showNotification={showNotification} />
           ) : (
-            <ClientTherapySummaries coupleId={client.coupleId} showNotification={showNotification} />
+            <ClientEvents coupleId={client.coupleId} canComment={client.canComment} showNotification={showNotification} />
           )}
         </div>
       </div>
@@ -434,230 +435,6 @@ const ClientEventDetail: React.FC<{
           )}
         </>
       )}
-    </div>
-  );
-};
-
-// --- 話題建議 tab -----------------------------------------------------------
-
-const STATUS_LABEL: Record<TherapyTopicSelectionStatus | 'none', string> = {
-  selected: tr('已加入諮商', 'Added to session'),
-  saved: tr('先收藏', 'Saved for later'),
-  dismissed: tr('不相關', 'Not relevant'),
-  none: tr('尚未決定', 'Undecided'),
-};
-const STATUS_CLS: Record<TherapyTopicSelectionStatus | 'none', string> = {
-  selected: 'bg-petal-rose-deep text-white',
-  saved: 'bg-petal-cream-2 text-petal-ink-soft',
-  dismissed: 'bg-petal-cream-2 text-petal-muted',
-  none: 'bg-petal-cream-2 text-petal-muted',
-};
-
-const StatusChip: React.FC<{ status: TherapyTopicSelectionStatus | null }> = ({ status }) => {
-  const key = status ?? 'none';
-  return (
-    <span className={`inline-flex items-center rounded-full font-body text-[11px] px-2.5 py-0.5 ${STATUS_CLS[key]}`}>
-      {STATUS_LABEL[key]}
-    </span>
-  );
-};
-
-// Read-only therapist rendering of one topic — pick + notes, no controls.
-const TopicReadOnly: React.FC<{
-  title: string;
-  subtitleLabel: string;
-  subtitle: string;
-  status: TherapyTopicSelectionStatus | null;
-  notes: string | null;
-}> = ({ title, subtitleLabel, subtitle, status, notes }) => (
-  <div className="rounded-lg border border-petal-rule bg-petal-cream p-4">
-    <div className="flex items-center justify-between gap-2 mb-1.5">
-      <span className="font-display text-base text-petal-ink">{title}</span>
-      <StatusChip status={status} />
-    </div>
-    <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-0.5">{subtitleLabel}</div>
-    <p className="font-body text-sm text-petal-ink-soft leading-relaxed">{subtitle}</p>
-    {notes && (
-      <div className="mt-2 rounded-md bg-pink-50 border border-pink-200 px-3 py-2">
-        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-pink-700 mb-0.5">{tr('伴侶想延伸聊的點', 'Things the couple wants to explore further')}</div>
-        <p className="font-body text-sm text-petal-ink whitespace-pre-wrap">{notes}</p>
-      </div>
-    )}
-  </div>
-);
-
-const ClientTherapyTopics: React.FC<{
-  coupleId: string;
-  showNotification: (n: Omit<Notification, 'id'>) => void;
-}> = ({ coupleId, showNotification }) => {
-  const [data, setData] = useState<TherapistClientTopics | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      setData(await apiService.getClientTherapyTopics(coupleId));
-    } catch (err) {
-      showNotification({ type: 'error', title: tr('無法載入', 'Couldn\'t load'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'), duration: 3500 });
-    } finally {
-      setLoading(false);
-    }
-  }, [coupleId, showNotification]);
-
-  useEffect(() => { load(); }, [load]);
-
-  if (loading) return <p className="text-center font-body text-sm text-petal-muted py-10">{tr('載入中…', 'Loading…')}</p>;
-  if (!data) return null;
-
-  const hasAiTopics = !!data.topics && data.topics.topics.length > 0;
-  const hasLibrary = data.library.length > 0;
-
-  return (
-    <div className="p-4 space-y-5" data-testid="client-therapy-topics">
-      <div>
-        <div className="flex items-center gap-1.5 text-petal-sage-deep mb-2">
-          <Compass className="w-4 h-4" strokeWidth={1.5} />
-          <h4 className="font-display text-base text-petal-ink">{tr('話題建議', 'Topic suggestions')}</h4>
-          {hasAiTopics && data.period?.quiet && (
-            <span className="font-body text-[11px] text-petal-muted">{tr('・平靜模式', '・Calm mode')}</span>
-          )}
-        </div>
-        {/* library is always non-empty, so the "no topics yet" state has to be
-            scoped to the AI section — otherwise a couple who never generated
-            shows the therapist a bare 話題庫 with no explanation. */}
-        {hasAiTopics && data.topics ? (
-          <>
-            {data.topics.intro && (
-              <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-2">{data.topics.intro}</p>
-            )}
-            <div className="space-y-2">
-              {data.topics.topics.map((t, idx) => (
-                <TopicReadOnly
-                  key={idx}
-                  title={t.title}
-                  subtitleLabel={tr("為什麼會建議這個", 'Why this is suggested')}
-                  subtitle={t.whySuggested}
-                  status={data.selections[idx]?.status ?? null}
-                  notes={data.selections[idx]?.notes ?? null}
-                />
-              ))}
-            </div>
-          </>
-        ) : (
-          <p className="font-body text-sm text-petal-muted leading-relaxed">
-            {tr('這對伴侶還沒有產生 AI 話題建議。等他們下次整理事件後，這裡會顯示下次諮商可以聊的方向。以下是他們可以直接挑選的話題庫。', 'This couple hasn\'t generated AI topic suggestions yet. Once they next summarize their events, directions for your next session will show here. Below is the topic library they can pick from directly.')}
-          </p>
-        )}
-      </div>
-
-      {hasLibrary && (
-        <div>
-          <div className="flex items-center gap-1.5 text-petal-sage-deep mb-2">
-            <Library className="w-4 h-4" strokeWidth={1.5} />
-            <h4 className="font-display text-base text-petal-ink">{tr('話題庫', 'Topic library')}</h4>
-          </div>
-          <div className="space-y-2">
-            {data.library.map((t) => (
-              <TopicReadOnly
-                key={t.id}
-                title={t.title}
-                subtitleLabel={tr("為什麼值得聊聊", 'Why it\'s worth talking about')}
-                subtitle={t.description}
-                status={data.librarySelections[t.id]?.status ?? null}
-                notes={data.librarySelections[t.id]?.notes ?? null}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// --- 諮商摘要 tab ----------------------------------------------------------
-
-const summaryDate = (iso: string): string => {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
-};
-
-// The couple's generated 諮商摘要 snapshots, read-only for the dedicated
-// therapist. Newest first; each expands to the full digest. This is what the
-// couple compiled to bring into the session — the therapist reads it here.
-const ClientTherapySummaries: React.FC<{
-  coupleId: string;
-  showNotification: (n: Omit<Notification, 'id'>) => void;
-}> = ({ coupleId, showNotification }) => {
-  const [summaries, setSummaries] = useState<TherapySummaryHistoryEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [openId, setOpenId] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      const rows = await apiService.getClientTherapySummaries(coupleId);
-      setSummaries(rows);
-      // Open the most recent one by default — it's the one they'd bring in.
-      setOpenId(rows[0]?.id ?? null);
-    } catch (err) {
-      showNotification({ type: 'error', title: tr('無法載入', 'Couldn\'t load'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'), duration: 3500 });
-    } finally {
-      setLoading(false);
-    }
-  }, [coupleId, showNotification]);
-
-  useEffect(() => { load(); }, [load]);
-
-  if (loading) return <p className="text-center font-body text-sm text-petal-muted py-10">{tr('載入中…', 'Loading…')}</p>;
-  if (summaries.length === 0) {
-    return (
-      <div className="p-4" data-testid="client-therapy-summaries">
-        <div className="rounded-lg border border-petal-rule bg-petal-cream-2/50 p-5 flex items-start gap-3">
-          <ClipboardList className="w-5 h-5 text-petal-sage-deep shrink-0 mt-0.5" strokeWidth={1.5} />
-          <div>
-            <h4 className="font-display text-base text-petal-ink">{tr('還沒有諮商摘要', 'No counseling summary yet')}</h4>
-            <p className="mt-1 font-body text-sm text-petal-ink-soft leading-relaxed">
-              {tr('當這對伴侶把最近的事件整理成一份「諮商摘要」後，就會出現在這裡——最常出現的主題、雙方的情緒、已修復與未解決的事，以及他們想和你討論的問題。你可以在諮商前先讀過，直接切入重點。', 'Once this couple puts their recent events into a "counseling summary", it\'ll appear here: the most common topics, how they both felt, what\'s repaired and what isn\'t, and questions they want to discuss with you. You can read it before the session and get straight to the point.')}
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-4 space-y-2" data-testid="client-therapy-summaries">
-      {summaries.map((s) => {
-        const open = openId === s.id;
-        return (
-          <div key={s.id} className="rounded-lg border border-petal-rule bg-petal-cream overflow-hidden">
-            <button
-              onClick={() => setOpenId(open ? null : s.id)}
-              data-testid="client-summary-row"
-              aria-expanded={open}
-              className="w-full flex items-center justify-between gap-2 px-4 py-3 text-left hover:bg-petal-cream-2/50 transition-colors"
-            >
-              <span className="flex items-center gap-2 min-w-0">
-                <ClipboardList className="w-4 h-4 text-petal-sage-deep shrink-0" strokeWidth={1.5} />
-                <span className="font-body text-sm text-petal-ink truncate">
-                  {s.periodLabel}
-                  {typeof s.eventCount === 'number' ? tr(` · 共 ${s.eventCount} 件`, ` · ${s.eventCount} events`) : ''}
-                </span>
-              </span>
-              <span className="inline-flex items-center gap-1 font-body text-[11px] text-petal-muted shrink-0">
-                <Clock className="w-3.5 h-3.5" strokeWidth={1.5} />
-                {summaryDate(s.createdAt)}
-              </span>
-            </button>
-            {open && (
-              <div className="px-4 pb-4 pt-1 border-t border-petal-rule" data-testid="client-summary-detail">
-                <TherapySummaryDetail summary={s.summary} />
-              </div>
-            )}
-          </div>
-        );
-      })}
     </div>
   );
 };

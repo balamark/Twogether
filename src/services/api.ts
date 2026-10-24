@@ -1065,6 +1065,63 @@ export interface TherapistClientTopics {
   librarySelections: Record<string, TherapyTopicSelection>;
 }
 
+// 專屬諮商空間 (Dedicated counseling space) — the shared thread + session page
+// between a couple and their dedicated therapist. The couple reaches it via
+// /therapists/dedicated/space, the therapist via /therapists/clients/:id/space;
+// both see the exact same data.
+export interface DedicatedMessage {
+  id: string;
+  senderId: string | null;
+  senderName: string | null;
+  isTherapist: boolean;
+  isMine: boolean;
+  content: string;
+  createdAt: string;
+}
+export type DedicatedAgendaSource = 'manual' | 'message' | 'topic';
+export interface DedicatedAgendaItem {
+  id: string;
+  content: string;
+  source: DedicatedAgendaSource;
+  sourceMessageId: string | null;
+  sourceRef: string | null;
+  status: 'open' | 'discussed';
+  sessionId: string | null;
+  createdBy: string | null;
+  createdByName: string | null;
+  createdAt: string;
+}
+export interface DedicatedSession {
+  id: string;
+  notes: string;
+  startedAt: string;
+  updatedAt: string;
+  updatedByName: string | null;
+  endedAt: string | null;
+}
+export interface DedicatedPastSession extends DedicatedSession {
+  discussed: string[];
+}
+export interface DedicatedSpaceTopic {
+  ref: string;
+  kind: 'ai' | 'library';
+  title: string;
+  why: string;
+  status: TherapyTopicSelectionStatus | null;
+  notes: string | null;
+}
+export interface DedicatedSpace {
+  role: 'couple' | 'therapist';
+  therapist: { displayName: string; title: string | null; photoUrl: string | null };
+  messages: DedicatedMessage[];
+  agenda: DedicatedAgendaItem[];
+  session: DedicatedSession | null;
+  pastSessions: DedicatedPastSession[];
+  sessionCount: number;
+  topics: DedicatedSpaceTopic[];
+  summaries: TherapySummaryHistoryEntry[];
+}
+
 export interface CreateEventInput {
   title: string;
   summary: string;
@@ -1752,6 +1809,11 @@ export interface DedicatedTherapist {
   canComment: boolean;
   addedBy: string | null;
   createdAt: string;
+  // 專屬諮商空間 activity (GET only): newest message not sent by the caller,
+  // open 下次要談 items, and whether a session is in progress.
+  lastIncomingAt?: string | null;
+  openAgendaCount?: number;
+  sessionOpen?: boolean;
 }
 
 // The therapist's view of one couple who added them as dedicated therapist.
@@ -5421,6 +5483,124 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to add client event message:', error);
       this.throwApiError(error, tr('留言失敗，請稍後再試', 'Couldn\'t post your comment. Please try again in a moment'));
+    }
+  }
+
+  // --- 專屬諮商空間 (shared by couple + therapist) --------------------------
+  // coupleId given → the therapist's path for that client couple; omitted →
+  // the caller's own couple. Every method throws with error_code preserved
+  // (NO_DEDICATED_THERAPIST / NOT_DEDICATED_THERAPIST / NO_OPEN_SESSION …).
+
+  private dedicatedSpaceBase(coupleId?: string): string {
+    return coupleId ? `/therapists/clients/${coupleId}/space` : '/therapists/dedicated/space';
+  }
+
+  async getDedicatedSpace(coupleId?: string): Promise<DedicatedSpace> {
+    try {
+      const response = await apiClient.get(this.dedicatedSpaceBase(coupleId));
+      const d = response.data ?? {};
+      return {
+        role: d.role === 'therapist' ? 'therapist' : 'couple',
+        therapist: d.therapist ?? { displayName: '', title: null, photoUrl: null },
+        messages: (d.messages ?? []) as DedicatedMessage[],
+        agenda: (d.agenda ?? []) as DedicatedAgendaItem[],
+        session: (d.session ?? null) as DedicatedSession | null,
+        pastSessions: (d.pastSessions ?? []) as DedicatedPastSession[],
+        sessionCount: Number(d.sessionCount) || 0,
+        topics: (d.topics ?? []) as DedicatedSpaceTopic[],
+        summaries: (d.summaries ?? []) as TherapySummaryHistoryEntry[],
+      };
+    } catch (error: unknown) {
+      console.error('Failed to load dedicated space:', error);
+      this.throwApiError(error, tr('無法載入諮商空間，請重新整理頁面後再試', 'Couldn\'t load the counseling space. Please refresh and try again'));
+    }
+  }
+
+  async sendDedicatedMessage(content: string, coupleId?: string): Promise<DedicatedMessage> {
+    try {
+      const response = await apiClient.post(`${this.dedicatedSpaceBase(coupleId)}/messages`, { content });
+      return response.data?.message as DedicatedMessage;
+    } catch (error: unknown) {
+      console.error('Failed to send dedicated message:', error);
+      this.throwApiError(error, tr('訊息沒有送出，請檢查網路後再傳一次', 'Your message wasn\'t sent. Check your connection and try again'));
+    }
+  }
+
+  async addDedicatedAgendaItem(
+    input: { content: string; source?: DedicatedAgendaSource; sourceMessageId?: string; sourceRef?: string },
+    coupleId?: string
+  ): Promise<{ item: DedicatedAgendaItem; duplicate: boolean }> {
+    try {
+      const response = await apiClient.post(`${this.dedicatedSpaceBase(coupleId)}/agenda`, input);
+      return { item: response.data?.item as DedicatedAgendaItem, duplicate: response.data?.duplicate === true };
+    } catch (error: unknown) {
+      console.error('Failed to add agenda item:', error);
+      this.throwApiError(error, tr('沒能加入「下次要談」，請稍後再試一次', 'Couldn\'t add it to "Next time". Please try again in a moment'));
+    }
+  }
+
+  async updateDedicatedAgendaItem(
+    itemId: string,
+    update: { status?: 'open' | 'discussed'; content?: string },
+    coupleId?: string
+  ): Promise<DedicatedAgendaItem> {
+    try {
+      const response = await apiClient.patch(`${this.dedicatedSpaceBase(coupleId)}/agenda/${itemId}`, update);
+      return response.data?.item as DedicatedAgendaItem;
+    } catch (error: unknown) {
+      console.error('Failed to update agenda item:', error);
+      this.throwApiError(error, tr('更新失敗，請稍後再試一次', 'Couldn\'t update. Please try again in a moment'));
+    }
+  }
+
+  async deleteDedicatedAgendaItem(itemId: string, coupleId?: string): Promise<void> {
+    try {
+      await apiClient.delete(`${this.dedicatedSpaceBase(coupleId)}/agenda/${itemId}`);
+    } catch (error: unknown) {
+      console.error('Failed to delete agenda item:', error);
+      this.throwApiError(error, tr('刪除失敗，請稍後再試一次', 'Couldn\'t delete. Please try again in a moment'));
+    }
+  }
+
+  async startDedicatedSession(coupleId?: string): Promise<DedicatedSession> {
+    try {
+      const response = await apiClient.post(`${this.dedicatedSpaceBase(coupleId)}/session`);
+      return response.data?.session as DedicatedSession;
+    } catch (error: unknown) {
+      console.error('Failed to start dedicated session:', error);
+      this.throwApiError(error, tr('沒能開始這次諮商紀錄，請稍後再試一次', 'Couldn\'t start this session\'s notes. Please try again in a moment'));
+    }
+  }
+
+  async saveDedicatedSessionNotes(notes: string, coupleId?: string): Promise<DedicatedSession> {
+    try {
+      const response = await apiClient.patch(`${this.dedicatedSpaceBase(coupleId)}/session`, { notes });
+      return response.data?.session as DedicatedSession;
+    } catch (error: unknown) {
+      console.error('Failed to save session notes:', error);
+      this.throwApiError(error, tr('摘要沒有存到，請檢查網路後再試一次（內容還留在畫面上）', 'Your notes weren\'t saved. Check your connection and try again (your text is still on screen)'));
+    }
+  }
+
+  async appendMessageToDedicatedSession(
+    messageId: string,
+    coupleId?: string
+  ): Promise<{ session: DedicatedSession; startedSession: boolean }> {
+    try {
+      const response = await apiClient.post(`${this.dedicatedSpaceBase(coupleId)}/session/append`, { messageId });
+      return { session: response.data?.session as DedicatedSession, startedSession: response.data?.startedSession === true };
+    } catch (error: unknown) {
+      console.error('Failed to append message to session:', error);
+      this.throwApiError(error, tr('沒能加進摘要，請稍後再試一次', 'Couldn\'t add it to the notes. Please try again in a moment'));
+    }
+  }
+
+  async endDedicatedSession(coupleId?: string): Promise<void> {
+    try {
+      await apiClient.post(`${this.dedicatedSpaceBase(coupleId)}/session/end`);
+    } catch (error: unknown) {
+      console.error('Failed to end dedicated session:', error);
+      this.throwApiError(error, tr('沒能結束這次諮商，請稍後再試一次', 'Couldn\'t end this session. Please try again in a moment'));
     }
   }
 
