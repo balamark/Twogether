@@ -94,6 +94,48 @@ const SampleCard: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   </div>
 );
 
+// Read-only 專屬諮商空間 sample: the shared couple + therapist thread, a
+// message pinned into 下次要談, and the session page's checklist + notes.
+// Static 範例 data only.
+const DedicatedSpaceSample: React.FC = () => (
+  <SampleCard>
+    <div className="flex items-center justify-between mb-2">
+      <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
+        <MessageCircle className="w-3.5 h-3.5 text-pink-500" />
+        {tr('專屬諮商：訊息 + 諮商頁', 'Dedicated counseling: messages + session page')}
+      </span>
+      <SampleTag />
+    </div>
+    <div className="space-y-1.5">
+      <div className="flex justify-end">
+        <div className="max-w-[85%] rounded-lg bg-petal-cream-2 border border-petal-rule-soft px-3 py-1.5">
+          <p className="font-body text-xs text-petal-ink">{tr('這週又為了家事分工吵架，想下次談談怎麼分配。', 'We argued about chores again. I\'d like to talk about splitting them next time.')}</p>
+          <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-petal-sage/15 px-1.5 font-body text-[10px] text-petal-sage-deep">📌 {tr('已排進下次要談', 'In "Next time"')}</span>
+        </div>
+      </div>
+      <div className="flex justify-center">
+        <div className="w-full rounded-lg bg-petal-cream-2 border border-petal-rule px-3 py-1.5">
+          <span className="font-body text-[10px] text-petal-muted">🩺 {tr('林心理師（心理師）', 'Dr. Lin (therapist)')}</span>
+          <p className="font-body text-xs text-petal-ink">{tr('謝謝分享，我們下次就從這裡開始。這週可以先各自記下一次「覺得不公平」的時刻。', 'Thanks for sharing; we\'ll start there next time. This week, each of you note one moment that felt unfair.')}</p>
+        </div>
+      </div>
+    </div>
+    <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div className="rounded-md border border-petal-rule bg-white px-3 py-2">
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-pink-600 mb-1">{tr('這次要談', 'To talk about')}</div>
+        <ul className="space-y-1 font-body text-xs">
+          <li className="flex items-center gap-1.5 text-petal-muted line-through"><Check className="w-3 h-3 text-petal-sage-deep" /> {tr('家事分工', 'Splitting chores')}</li>
+          <li className="flex items-center gap-1.5 text-petal-ink"><span className="w-3 h-3 rounded-sm border border-petal-rule" /> {tr('週末要不要回老家', 'Visiting family on weekends')}</li>
+        </ul>
+      </div>
+      <div className="rounded-md border border-petal-rule bg-white px-3 py-2">
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-1">{tr('本次摘要', 'Session notes')}</div>
+        <p className="font-body text-xs text-petal-ink-soft leading-relaxed whitespace-pre-line">{tr('• 家事不是誰做得多，而是「有沒有被看見」\n• 回家練習：每天說一次謝謝', '• Chores aren\'t about who does more, but feeling seen\n• Homework: say thank you once a day')}</p>
+      </div>
+    </div>
+  </SampleCard>
+);
+
 // Read-only「通知中心」sample: every action your partner takes shows up here, so
 // you always know what TA just did (愛的記錄、劇本、禮物、婚姻健檢…). Static 範例 data.
 const NotificationCenterSample: React.FC = () => {
@@ -181,7 +223,7 @@ const SampleStats: React.FC = () => {
         <ul className="space-y-1.5">
           {[
             { label: tr('🫶 鼓勵連結', '🫶 Encourage connection'), text: tr('已經 16 天沒有記錄親密時光。一個擁抱、一場散步，或一段沒有打擾的聊天，都能讓彼此更靠近。', 'It\'s been 16 days since you recorded an intimate moment. A hug, a walk, or an uninterrupted chat can all bring you closer.'), recommended: true },
-            { label: tr('💛 溫柔關心', '💛 Gentle care'), text: tr('Twogether 注意到，你們已經 16 天沒有記錄親密時光了。如果最近生活比較忙，不妨找個舒服的時間，好好陪伴彼此。', 'Twogether noticed it\'s been 16 days since you recorded an intimate moment. If life\'s been busy lately, find a comfortable time to really be with each other.'), recommended: false },
+            { label: tr('🎮 遊戲任務', '🎮 Game quest'), text: tr('新任務解鎖：已經 16 天沒有親密紀錄！完成條件：一起度過 30 分鐘不看手機的時光。🏆', 'New quest unlocked: 16 days without an intimate moment! Goal: spend 30 phone-free minutes together. 🏆'), recommended: false },
             { label: tr('🌿 不只談性', '🌿 Not just about sex'), text: tr('已經有 16 天沒有記錄親密時光了。親密不一定只有性愛，也可以是一個擁抱、一句關心，或一起度過的一段時光。', 'It\'s been 16 days since you recorded an intimate moment. Intimacy isn\'t only sex; it can be a hug, a caring word, or time spent together.'), recommended: false },
           ].map((s, i) => (
             <li key={i} className={`bg-white rounded-md border p-2 ${s.recommended ? 'border-petal-rose-deep' : 'border-petal-rule'}`}>
@@ -1263,6 +1305,8 @@ const PREVIEWS: Record<string, PreviewConfig> = {
             <li className="flex items-center gap-1.5"><HeartHandshake className="w-3 h-3 text-pink-500" /> {tr('隨時可以解除', 'Remove them any time')}</li>
           </ul>
         </SampleCard>
+
+        <DedicatedSpaceSample />
 
         <p className="font-body text-xs text-petal-muted leading-relaxed text-center px-2">
           {NOT_A_SUBSTITUTE}

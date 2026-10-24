@@ -72,5 +72,5 @@ MS1839358868、網址 https://twogether.fun）之經營者，茲聲明如下：
 2. 本專案的技術文件，可佐證系統為自建而非套版：
    - `docs/PAYMENT_MODEL.zh-TW.md`（交易模式與憑證流程）
    - `lib/newebpay.js`（藍新 MPG 加解密與驗章實作）
-   - `lib/receipts.js`、`database/migrations/098_payment_receipts.sql`（電子收據系統）
+   - `lib/receipts.js`、`database/migrations/099_payment_receipts.sql`（電子收據系統）
 3. 雲端主機（App Engine）的部署紀錄，顯示部署者為本人帳號。

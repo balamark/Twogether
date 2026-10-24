@@ -1,8 +1,19 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ShieldCheck, Heart, MessageSquare } from 'lucide-react';
+import { ShieldCheck, Heart, MessageSquare, MessageCircle, ClipboardList } from 'lucide-react';
 import { apiService, type DedicatedTherapist } from '../services/api';
 import type { Notification } from './ErrorNotification';
+import DedicatedSpaceModal, { type DedicatedSpaceTab } from './DedicatedSpaceModal';
 import { tr } from '../i18n/tr';
+
+// Per-link "last opened the thread" marker for the new-message dot. Browser
+// storage is a convenience only — when it's unavailable the dot just shows.
+const seenKey = (linkId: string) => `dedicatedSpaceSeen:${linkId}`;
+const readSeen = (linkId: string): string | null => {
+  try { return localStorage.getItem(seenKey(linkId)); } catch { return null; }
+};
+const markSeen = (linkId: string) => {
+  try { localStorage.setItem(seenKey(linkId), new Date().toISOString()); } catch { /* ignore */ }
+};
 
 // 你們的專屬心理師 — the couple-facing card at the top of the 心理諮商 tab. Shows
 // either a mini-onboarding empty state (pick one from the directory below) or the
@@ -20,16 +31,18 @@ const DedicatedTherapistPanel: React.FC<Props> = ({ reloadKey, isAuthenticated, 
   const [dedicated, setDedicated] = useState<DedicatedTherapist | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [spaceTab, setSpaceTab] = useState<DedicatedSpaceTab | null>(null);
 
-  const load = useCallback(async () => {
+  // silent: refresh counts after closing the space without blanking the panel.
+  const load = useCallback(async (silent = false) => {
     if (!isAuthenticated) { setDedicated(null); setLoading(false); return; }
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setDedicated(await apiService.getDedicatedTherapist());
     } catch {
-      setDedicated(null);
+      if (!silent) setDedicated(null);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [isAuthenticated]);
 
@@ -87,6 +100,9 @@ const DedicatedTherapistPanel: React.FC<Props> = ({ reloadKey, isAuthenticated, 
               <strong className="text-petal-ink">{tr('「牆」', 'wall')}</strong>{tr('與', ' and in ')}
               <strong className="text-petal-ink">{tr('「好好說話」', 'Talk it through')}</strong>{tr('累積的內容， 更了解你們的關係脈絡。私密內容不會被看到，你們也可以隨時解除。', ', so they understand your relationship\'s context. Private content is never visible, and you can remove them any time.')}
             </p>
+            <p className="mt-2 font-body text-sm text-petal-ink-soft leading-relaxed">
+              {tr('之後你們和心理師會有一個共同的訊息管道：諮商之間想到的事先傳過去、排進「下次要談」，諮商時打開「諮商頁」一起整理摘要。', 'You\'ll also share a message thread with them: send what comes up between sessions, queue it for "Next time", and open the session page together to take notes.')}
+            </p>
             <p className="mt-2 font-body text-xs text-petal-muted">
               {tr('從下方名錄挑一位諮商師，點「完整檔案」即可設為專屬。', 'Pick a counselor from the directory below and tap "Full profile" to make them your dedicated therapist.')}
             </p>
@@ -95,6 +111,15 @@ const DedicatedTherapistPanel: React.FC<Props> = ({ reloadKey, isAuthenticated, 
       </div>
     );
   }
+
+  const openSpace = (tab: DedicatedSpaceTab) => {
+    if (!dedicated) return;
+    markSeen(dedicated.id);
+    setSpaceTab(tab);
+  };
+  const seenAt = readSeen(dedicated.id);
+  const hasNew = !!dedicated.lastIncomingAt && (!seenAt || dedicated.lastIncomingAt > seenAt);
+  const agendaCount = dedicated.openAgendaCount ?? 0;
 
   // --- Active state ---------------------------------------------------------
   return (
@@ -118,7 +143,46 @@ const DedicatedTherapistPanel: React.FC<Props> = ({ reloadKey, isAuthenticated, 
             <h3 className="font-display text-xl text-petal-ink">{dedicated.displayName}</h3>
             {dedicated.title && <span className="font-body text-xs text-petal-muted">{dedicated.title}</span>}
           </div>
-          <p className="mt-1.5 font-body text-xs text-petal-ink-soft leading-relaxed">
+          {/* 專屬諮商空間 entry — 訊息 between sessions, 諮商頁 during one. */}
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => openSpace('messages')}
+              data-testid="dedicated-open-messages"
+              className="relative flex items-start gap-2 rounded-md border border-pink-200 bg-petal-cream px-3 py-2.5 text-left hover:border-pink-400 transition-colors"
+            >
+              <MessageCircle className="w-4 h-4 text-pink-500 shrink-0 mt-0.5" strokeWidth={1.5} />
+              <span className="min-w-0">
+                <span className="block font-body text-sm font-medium text-petal-ink">{tr('傳訊息給心理師', 'Message your therapist')}</span>
+                <span className="block font-body text-[11px] text-petal-muted">{tr('你們兩個和心理師都看得到，想下次談的可以直接排進去', 'You both and your therapist see it; queue what you want to discuss next time')}</span>
+              </span>
+              {hasNew && (
+                <span className="absolute top-2 right-2 inline-flex items-center rounded-full bg-pink-500 px-1.5 font-body text-[10px] text-white" data-testid="dedicated-new-badge">
+                  {tr('新訊息', 'New')}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => openSpace('session')}
+              data-testid="dedicated-open-session"
+              className="flex items-start gap-2 rounded-md border border-pink-200 bg-petal-cream px-3 py-2.5 text-left hover:border-pink-400 transition-colors"
+            >
+              <ClipboardList className="w-4 h-4 text-pink-500 shrink-0 mt-0.5" strokeWidth={1.5} />
+              <span className="min-w-0">
+                <span className="block font-body text-sm font-medium text-petal-ink">
+                  {dedicated.sessionOpen ? tr('回到諮商頁（進行中）', 'Back to session (in progress)') : tr('打開諮商頁', 'Open session page')}
+                </span>
+                <span className="block font-body text-[11px] text-petal-muted">
+                  {agendaCount > 0
+                    ? tr(`下次要談 ${agendaCount} 件・摘要・話題建議都在這`, `${agendaCount} to discuss · notes · topics, all in one place`)
+                    : tr('諮商時打開：要談的事、摘要、話題建議都在這', 'Open it during a session: agenda, notes and topics in one place')}
+                </span>
+              </span>
+            </button>
+          </div>
+
+          <p className="mt-3 font-body text-xs text-petal-ink-soft leading-relaxed">
             {tr('可檢視：你們的', 'Can view: your ')}<strong>{tr('牆', 'wall')}</strong>{tr('與', ' and ')}<strong>{tr('好好說話', 'Talk it through')}</strong>{tr('（不含私密內容）', ' (excluding private content)')}
             {dedicated.canComment ? tr('，並可在其中留言', ', and can comment there') : ''}{tr('。', '.')}
           </p>
@@ -165,6 +229,14 @@ const DedicatedTherapistPanel: React.FC<Props> = ({ reloadKey, isAuthenticated, 
           </div>
         </div>
       </div>
+      {spaceTab && (
+        <DedicatedSpaceModal
+          dedicated={dedicated}
+          initialTab={spaceTab}
+          onClose={() => { markSeen(dedicated.id); setSpaceTab(null); load(true); }}
+          showNotification={showNotification}
+        />
+      )}
     </div>
   );
 };

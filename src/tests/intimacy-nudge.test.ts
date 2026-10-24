@@ -15,10 +15,12 @@ const {
   buildSuggestions,
   renderTone,
 } = require('../../lib/intimacyNudgeTones.js');
+const { translateString } = require('../../middleware/locale.js');
 
 describe('intimacy nudge tone catalog', () => {
-  it('exposes the 12 curated tones with a recommended default', () => {
-    expect(TONES).toHaveLength(12);
+  it('exposes the 32 curated tones with a recommended default', () => {
+    expect(TONES).toHaveLength(32);
+    expect(new Set(TONES.map((t: { id: string }) => t.id)).size).toBe(TONES.length);
     expect(TONES.filter((t: { recommended?: boolean }) => t.recommended)).toHaveLength(1);
     expect(RECOMMENDED_TONE_ID).toBe('encourage');
   });
@@ -54,5 +56,14 @@ describe('intimacy nudge tone catalog', () => {
     const text = renderTone(TONES.find((t: { id: string }) => t.id === 'minimal'), null);
     expect(text).not.toContain('{days}');
     expect(text).toContain('一段時間');
+  });
+
+  it('ships an English version of every tone label and reminder', () => {
+    for (const t of TONES) {
+      const en = translateString(renderTone(t, 12));
+      expect(en).not.toMatch(/[一-鿿]/);
+      expect(en).toContain('12');
+      expect(translateString(t.label)).not.toMatch(/[一-鿿]/);
+    }
   });
 });
