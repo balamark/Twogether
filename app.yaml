@@ -10,6 +10,10 @@ env_variables:
   # "Deceptive site ahead" warning. Plain literal (public, not a secret), so
   # envsubst leaves it untouched.
   FRONTEND_URL: "https://twogether.fun"
+  # Public origin for payment gateway callbacks (ECPay/NewebPay NotifyURL,
+  # ReturnURL, ClientBackURL — routes/billing.js, routes/therapists.js).
+  # Unset → falls back to http://localhost:8080 and 藍新 rejects 網址設定錯誤.
+  APP_BASE_URL: "https://twogether.fun"
   # Database connection
   DATABASE_URL: $_DATABASE_URL
   # JWT Secret
