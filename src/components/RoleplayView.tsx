@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Heart, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow, LayoutGrid, List, Gamepad2, ChevronDown, ArrowUp, ChevronLeft, ChevronRight, Share2, Search } from 'lucide-react';
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
+import { useHistoryState } from '../hooks/useHistoryState';
 import { apiService } from '../services/api';
 import type { MarketplaceScript } from '../services/api';
 import StarRating from './StarRating';
@@ -175,11 +176,21 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
 }) => {
   const tz = useTimezone();
   const [selectedScript, setSelectedScript] = useState<RoleplayScript | null>(null);
-  const [showScriptModal, setShowScriptModal] = useState(false);
+  // Modal open-state lives in browser history so 上一頁 closes the script
+  // instead of leaving the page; the list keeps its scroll position under it.
+  const [showScriptModal, setShowScriptModal] = useHistoryState('roleplay:script', false, { scrollTop: false });
+
   // Id of the script currently being shared to the partner's email (disables
   // that card's share button while the request is in flight).
   const [sharingId, setSharingId] = useState<string | null>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
+  // A forward/back into an entry whose script object is gone (remount) has
+  // nothing to show — drop the flag so the next open pushes a fresh entry.
+  useEffect(() => {
+    if (showScriptModal && !selectedScript) setShowScriptModal(false, { replace: true });
+    // Closed by 上一頁 (not closeModal): don't leave the photo lightbox floating.
+    if (!showScriptModal) setLightboxOpen(false);
+  }, [showScriptModal, selectedScript, setShowScriptModal]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
   // In-modal photo paging for the preview image (arrows / swipe) so users can
   // browse the photo series without opening the fullscreen lightbox.
@@ -233,7 +244,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     const t = setTimeout(() => setDebouncedMarketplaceQuery(marketplaceQuery.trim()), 350);
     return () => clearTimeout(t);
   }, [marketplaceQuery]);
-  const [marketplaceDetailId, setMarketplaceDetailId] = useState<string | null>(null);
+  const [marketplaceDetailId, setMarketplaceDetailId] = useHistoryState<string | null>('roleplay:market', null, { scrollTop: false });
   const [favoritedMarketplace, setFavoritedMarketplace] = useState<MarketplaceScript[]>([]);
 
   const loadMarketplace = useCallback(async () => {
@@ -330,7 +341,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     setSelectedScript({ ...script, script: parsedScript });
     setHasBegun(false);
     setShowScriptModal(true);
-  }, [parseScriptContent]);
+  }, [parseScriptContent, setShowScriptModal]);
 
   useEffect(() => {
     if (!initialScriptTitle) return;
@@ -396,7 +407,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     setShowScriptModal(false);
     setHasBegun(false);
     setLightboxOpen(false);
-  }, []);
+  }, [setShowScriptModal]);
 
   // Email the script to the partner to spark their interest. The backend
   // returns a clear message for every outcome (shared / unpaired / opted out),
@@ -489,7 +500,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     const rp = marketplaceToRoleplay(m);
     setMarketplaceDetailId(null);
     handleQuickPlay(rp);
-  }, [handleQuickPlay]);
+  }, [handleQuickPlay, setMarketplaceDetailId]);
 
   const FavoriteButton: React.FC<{ scriptId: string; className?: string }> = ({ scriptId, className = '' }) => {
     const isFav = favoriteScriptIds.has(scriptId);

@@ -6,6 +6,7 @@ import IntimacyRequestDetailModal from './IntimacyRequestDetailModal';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
 import { tr } from '../i18n/tr';
+import { useHistoryState } from '../hooks/useHistoryState';
 
 interface User {
   id: string;
@@ -43,7 +44,8 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
   const [emailFeedback, setEmailFeedback] = useState<FeedbackState | null>(null);
   const [tab, setTab] = useState<Tab>('received');
   const [tabInitialized, setTabInitialized] = useState(false);
-  const [detailOpenId, setDetailOpenId] = useState<string | null>(null);
+  // History-backed so 上一頁 closes the detail modal instead of leaving.
+  const [detailOpenId, setDetailOpenId] = useHistoryState<string | null>('intimacy:detail', null, { scrollTop: false });
   const me = authState.user?.nickname || '';
   const meId = authState.user?.id || '';
   const tz = useTimezone();

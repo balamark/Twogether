@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { ArrowLeft, ArrowRight, BookOpen, FileText, Globe, User as UserIcon, Vote } from 'lucide-react';
 import StoryList from './StoryList';
 import StoryDetail from './StoryDetail';
@@ -9,6 +8,7 @@ import PublicQaView from './PublicQaView';
 import PollsView from './PollsView';
 import InfoHint from './InfoHint';
 import { tr } from '../i18n/tr';
+import { useHistoryState } from '../hooks/useHistoryState';
 
 // 真實故事 main tab: the public-facing community surface. Sub-tabs:
 // 智慧故事 (guided-template story archive, new) / 公開問答 (moved here from
@@ -48,8 +48,10 @@ export default function StoriesView({
   setShowAuthModal,
   onFindTherapist,
 }: StoriesViewProps) {
-  const [tab, setTab] = useState<SubTab>('wisdom');
-  const [wisdomView, setWisdomView] = useState<WisdomView>({ kind: 'list' });
+  // History-backed: 上一頁 steps back through sub-tabs / story detail /
+  // compose and lands on the list where the user was scrolled.
+  const [tab, setTab] = useHistoryState<SubTab>('stories:tab', 'wisdom');
+  const [wisdomView, setWisdomView] = useHistoryState<WisdomView>('stories:wisdom', { kind: 'list' });
 
   const requireLoginForCompose = () => {
     showNotification({
@@ -128,11 +130,15 @@ export default function StoriesView({
         </div>
       </div>
 
-      {tab === 'wisdom' && wisdomView.kind === 'list' && (
-        <StoryList
-          onOpenStory={(id) => setWisdomView({ kind: 'detail', id })}
-          onCompose={openCompose}
-        />
+      {/* Kept mounted (hidden) under an open story so going back keeps the
+          loaded pages and the scroll spot. */}
+      {tab === 'wisdom' && (wisdomView.kind === 'list' || wisdomView.kind === 'detail') && (
+        <div hidden={wisdomView.kind !== 'list'}>
+          <StoryList
+            onOpenStory={(id) => setWisdomView({ kind: 'detail', id })}
+            onCompose={openCompose}
+          />
+        </div>
       )}
 
       {tab === 'wisdom' && wisdomView.kind === 'detail' && (
@@ -191,7 +197,7 @@ export default function StoriesView({
       {tab === 'wisdom' && wisdomView.kind === 'compose' && (
         <StoryComposeFlow
           showNickname={authState.user?.public_share_show_nickname !== false}
-          onDone={(storyId) => setWisdomView({ kind: 'detail', id: storyId })}
+          onDone={(storyId) => setWisdomView({ kind: 'detail', id: storyId }, { replace: true })}
           onCancel={() => setWisdomView({ kind: 'compose-choose' })}
           showNotification={showNotification}
         />
@@ -200,7 +206,7 @@ export default function StoriesView({
       {tab === 'wisdom' && wisdomView.kind === 'compose-article' && (
         <ArticleComposeFlow
           showNickname={authState.user?.public_share_show_nickname !== false}
-          onDone={(storyId) => setWisdomView({ kind: 'detail', id: storyId })}
+          onDone={(storyId) => setWisdomView({ kind: 'detail', id: storyId }, { replace: true })}
           onCancel={() => setWisdomView({ kind: 'compose-choose' })}
           showNotification={showNotification}
         />
