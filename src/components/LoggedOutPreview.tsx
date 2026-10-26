@@ -1386,7 +1386,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
 
 // Small "explore more" links shown under some previews, letting a logged-out
 // visitor reach a dedicated real/bespoke preview that's no longer its own
-// bottom-nav tab (roleplay/wall/therapists nest inside 對話's hub, stories
+// bottom-nav tab (roleplay/therapists nest inside 對話, wall inside 我們, stories
 // inside 成長).
 // The testids intentionally match the authenticated entry points (the
 // TalkSwitcher chips / GrowView), so "the way into 真實故事 from 成長" is one
@@ -1396,8 +1396,11 @@ const ExploreLinks: React.FC<{ view: string; onNavigate?: (view: string) => void
   const links: { label: string; target: string; testId: string }[] =
     view === 'talk' || view === 'communicate' ? [
       { label: tr('看看角色扮演', 'See role play'), target: 'roleplay', testId: 'talk-roleplay-entry' },
-      { label: tr('看看我們的牆', 'See our wall'), target: 'wall', testId: 'talk-wall-entry' },
       { label: tr('看看專業諮商師', 'See professional counselors'), target: 'therapists', testId: 'talk-therapists-entry' },
+    ] :
+    // 我們的牆 now lives as a card on 我們, so its preview link does too.
+    view === 'us' ? [
+      { label: tr('看看我們的牆', 'See our wall'), target: 'wall', testId: 'us-wall-card' },
     ] :
     view === 'grow' ? [
       { label: tr('看看真實故事', 'See real stories'), target: 'stories', testId: 'grow-stories-entry' },
