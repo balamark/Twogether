@@ -205,6 +205,10 @@ async function listEventsForCouple(
   return { events, total };
 }
 
+// A repeat POST /events with the same title inside this window is treated as a
+// retry of the first (see the double-submit guard in the create route).
+const DUPLICATE_EVENT_WINDOW_MINUTES = 5;
+
 // One event (with full message log) scoped to a couple, applying the privacy
 // rule. Returns a serialized event or null when it isn't visible to the viewer.
 async function getEventDetailForCouple(eventId, coupleId, { privateVisibleTo = null } = {}) {
@@ -337,6 +341,30 @@ router.post(
         is_private = false,
         detail = null,
       } = req.body;
+
+      // Double-submit guard. A slow network can make the client give up on a
+      // request the server already saved; the user taps 送出 again and gets a
+      // second, identical card (and the partner a second notification). If the
+      // same person made a conversation with the same title and privacy in the
+      // last few minutes, hand back that one instead of inserting another.
+      const recentDup = await db.query(
+        `SELECT id FROM events
+          WHERE couple_id = $1 AND created_by = $2 AND title = $3
+            AND is_private = $4
+            AND created_at > NOW() - ($5 || ' minutes')::interval
+          ORDER BY created_at DESC
+          LIMIT 1`,
+        [couple.couple_id, userId, title, Boolean(is_private), String(DUPLICATE_EVENT_WINDOW_MINUTES)]
+      );
+      if (recentDup.rows[0]) {
+        const existing = await getEventDetailForCouple(recentDup.rows[0].id, couple.couple_id, {
+          privateVisibleTo: userId,
+        });
+        if (existing) {
+          logInfo('events.create.deduplicated', { userId, eventId: existing.id });
+          return res.status(200).json({ success: true, deduplicated: true, event: existing });
+        }
+      }
 
       const eventId = uuidv4();
 

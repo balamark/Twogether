@@ -34,6 +34,9 @@ test.describe('language switch', () => {
   test('logged-in: Help & Support renders in English with the support email', async ({ page }) => {
     await seedAuth(page);
     await page.goto('/');
+    // Signed in, the switch lives in the profile menu rather than the header.
+    await expect(page.getByTestId('language-switch')).toHaveCount(0);
+    await page.getByTestId('user-menu-toggle').click();
     await page.getByTestId('language-switch-en').click();
 
     await page.getByTestId('user-menu-toggle').click();

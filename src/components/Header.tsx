@@ -249,6 +249,12 @@ const Header: React.FC<HeaderProps> = ({
                           <span className="font-body text-xs text-petal-rose-deep">{t('header.partnerWaiting')}</span>
                         </div>
                       )}
+                      {/* Signed-in users switch language here, not in the
+                          header row, which was crowded on phones. */}
+                      <div className="mt-3 flex items-center justify-between gap-2">
+                        <span className="font-body text-xs text-petal-muted">{t('lang.switchLabel')}</span>
+                        <LanguageSwitch />
+                      </div>
                     </div>
                     <div className="p-2">
                       <button
@@ -456,8 +462,9 @@ const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* 語言切換：永遠在最右上角，登入前後都看得到。 */}
-            <LanguageSwitch />
+            {/* 語言切換：登入前放在最右上角；登入後收進個人選單（見上方），
+                讓 390px 寬的手機 header 不會擠成一排按鈕。 */}
+            {!authState.isAuthenticated && <LanguageSwitch />}
           </div>
         </div>
       </div>

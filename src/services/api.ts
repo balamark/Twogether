@@ -4306,7 +4306,20 @@ class ApiService {
         opening_message: input.openingMessage ?? null,
         is_private: input.isPrivate,
       };
-      const response = await apiClient.post('/events', payload);
+      // Creating an event also seeds the opener and notifies the partner, which
+      // can outlast the 15s default on a slow phone connection. A timed-out
+      // request has usually been saved already, so retry once instead of
+      // surfacing an error that invites a second tap: the server treats a
+      // same-title POST within a few minutes as the same conversation and hands
+      // back the first one, so the retry can't create a duplicate card.
+      const post = () => apiClient.post('/events', payload, { timeout: 30000 });
+      let response;
+      try {
+        response = await post();
+      } catch (first: unknown) {
+        if ((first as { error_code?: string })?.error_code !== 'TIMEOUT') throw first;
+        response = await post();
+      }
       return this.transformEvent(response.data.event);
     } catch (error: unknown) {
       console.error('Failed to create event:', error);

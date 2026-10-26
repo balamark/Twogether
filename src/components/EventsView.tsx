@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Sparkles, BarChart3, ChevronLeft, Plus } from 'lucide-react';
 import EventHistoryList from './EventHistoryList';
 import ComposeEventFlow from './ComposeEventFlow';
@@ -8,6 +8,9 @@ import SoloModeGate from './SoloModeGate';
 import InfoHint from './InfoHint';
 import { tr } from '../i18n/tr';
 import { useHistoryState } from '../hooks/useHistoryState';
+
+// Cached "this user has at least one conversation" flag for the hero size.
+const EVENTS_HAS_HISTORY_KEY = 'eventsHasHistory';
 
 type EventsSubView = 'list' | 'compose' | 'detail' | 'analytics';
 
@@ -59,6 +62,17 @@ export default function EventsView({
   const [view, setViewState] = useHistoryState<EventsSubView>('events:view', 'list');
   const [selectedEventId, setSelectedEventId] = useHistoryState<string | null>('events:id', null);
   const [refreshKey, setRefreshKey] = useState(0);
+  // First-timers get the full hero (what this is, why it's safe); anyone with
+  // history gets a one-line title so the list starts higher on a phone. The
+  // last answer is cached so returning users don't see the big hero flash.
+  const [compactHero, setCompactHero] = useState<boolean>(() => {
+    try { return localStorage.getItem(EVENTS_HAS_HISTORY_KEY) === '1'; } catch { return false; }
+  });
+  const onHistoryLoaded = useCallback((total: number) => {
+    const has = total > 0;
+    setCompactHero(has);
+    try { localStorage.setItem(EVENTS_HAS_HISTORY_KEY, has ? '1' : '0'); } catch { /* storage unavailable */ }
+  }, []);
 
   // Leaving detail also clears the id in the same history entry, so the
   // in-app 返回 matches the entry below and acts as a browser back.
@@ -142,18 +156,29 @@ export default function EventsView({
       {/* Same editorial header pattern as ConflictView (eyebrow + font-display +
           italic sub-line) so the two halves of 好好說話 read as one feature
           rather than two apps. Title matches the sub-tab chip you tapped. */}
-      <header className="border-b border-petal-rule pb-7 mb-7">
-        <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-          {tr('— 說開', '— Talk')}
-        </div>
-        <h1 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
-          {tr('說開', 'Talk it')}<em className="not-italic font-light italic text-pink-600">{tr('一件事', ' through')}</em>
-          <span className="align-middle ml-2"><InfoHint viewId="events" /></span>
-        </h1>
-        <p className="font-display italic font-light text-base text-petal-muted">
-          {tr('當下情緒不會直接送出 — AI 幫你整理成對方聽得進去的版本，由你決定要不要送。', 'Raw emotions are never sent directly. AI helps shape them into a version your partner can hear, and you decide whether to send it.')}
-        </p>
-      </header>
+      {compactHero ? (
+        // Once there's history, the list is what matters: the hero shrinks to a
+        // single line and the explanation stays one tap away behind (?).
+        <header className="border-b border-petal-rule pb-3 mb-5" data-testid="events-hero" data-compact="true">
+          <h1 className="font-display text-2xl font-light tracking-tight text-petal-ink leading-tight flex items-center gap-2">
+            <span>{tr('說開', 'Talk it')}<span className="text-pink-600">{tr('一件事', ' through')}</span></span>
+            <InfoHint viewId="events" />
+          </h1>
+        </header>
+      ) : (
+        <header className="border-b border-petal-rule pb-7 mb-7" data-testid="events-hero" data-compact="false">
+          <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
+            {tr('— 說開', '— Talk')}
+          </div>
+          <h1 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
+            {tr('說開', 'Talk it')}<em className="not-italic font-light italic text-pink-600">{tr('一件事', ' through')}</em>
+            <span className="align-middle ml-2"><InfoHint viewId="events" /></span>
+          </h1>
+          <p className="font-display italic font-light text-base text-petal-muted">
+            {tr('當下情緒不會直接送出 — AI 幫你整理成對方聽得進去的版本，由你決定要不要送。', 'Raw emotions are never sent directly. AI helps shape them into a version your partner can hear, and you decide whether to send it.')}
+          </p>
+        </header>
+      )}
 
       <div>
         {/* Kept mounted (hidden) under an open event so going back returns
@@ -192,6 +217,7 @@ export default function EventsView({
               onOpenEvent={openDetail}
               currentUserId={authState.user?.id || ''}
               onCompose={() => setView('compose')}
+              onLoaded={onHistoryLoaded}
             />
           </div>
         )}
