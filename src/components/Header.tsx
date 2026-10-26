@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown, MessageSquarePlus, Activity, LifeBuoy, Compass, BookOpen, Play, StickyNote, HeartHandshake } from 'lucide-react';
+import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown, MessageSquarePlus, Activity, LifeBuoy, Compass, BookOpen, Play, StickyNote, HeartHandshake, HeartPulse } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { BillingStatus } from '../services/api';
 import LanguageSwitch from './LanguageSwitch';
@@ -34,6 +34,7 @@ interface HeaderProps {
   onShowStories: () => void;
   onShowRoleplay: () => void;
   onShowWall: () => void;
+  onShowEmotionCheck: () => void;
   onShowTherapists: () => void;
   onShowIntimacyHistory: () => void;
   onShowUpgrade: () => void;
@@ -75,6 +76,7 @@ const Header: React.FC<HeaderProps> = ({
   onShowStories,
   onShowRoleplay,
   onShowWall,
+  onShowEmotionCheck,
   onShowTherapists,
   onShowIntimacyHistory,
   onShowUpgrade,
@@ -247,6 +249,12 @@ const Header: React.FC<HeaderProps> = ({
                           <span className="font-body text-xs text-petal-rose-deep">{t('header.partnerWaiting')}</span>
                         </div>
                       )}
+                      {/* Signed-in users switch language here, not in the
+                          header row, which was crowded on phones. */}
+                      <div className="mt-3 flex items-center justify-between gap-2">
+                        <span className="font-body text-xs text-petal-muted">{t('lang.switchLabel')}</span>
+                        <LanguageSwitch />
+                      </div>
                     </div>
                     <div className="p-2">
                       <button
@@ -353,6 +361,17 @@ const Header: React.FC<HeaderProps> = ({
                       </button>
                       <button
                         onClick={() => {
+                          onShowEmotionCheck();
+                          setShowUserMenu(false);
+                        }}
+                        data-testid="user-menu-emotion-check"
+                        className="w-full flex items-center space-x-2 px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
+                      >
+                        <HeartPulse className="w-3.5 h-3.5" strokeWidth={1.5} />
+                        <span>{t('menu.emotionCheck')}</span>
+                      </button>
+                      <button
+                        onClick={() => {
                           onShowDeepDive();
                           setShowUserMenu(false);
                         }}
@@ -443,8 +462,9 @@ const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            {/* 語言切換：永遠在最右上角，登入前後都看得到。 */}
-            <LanguageSwitch />
+            {/* 語言切換：登入前放在最右上角；登入後收進個人選單（見上方），
+                讓 390px 寬的手機 header 不會擠成一排按鈕。 */}
+            {!authState.isAuthenticated && <LanguageSwitch />}
           </div>
         </div>
       </div>

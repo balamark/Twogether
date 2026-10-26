@@ -6,7 +6,9 @@ import { tr } from '../i18n/tr';
 // other destinations without going back. It replaced a card-hub landing page
 // (a whole screen of "我們要談什麼" you had to click past) and, before that, a
 // two-item sub-tab row: one compact, horizontally-scrolling strip now carries
-// all five and is the only chrome the section adds.
+// the destinations and is the only chrome the section adds. 情緒檢查 moved to
+// the profile menu and 我們的牆 to a card on 我們, so the strip stays at three
+// chips that fit a 390px screen without scrolling.
 //
 // Sticky at top-0; ConflictView's own section nav sits at top-[52px] and stacks
 // *below* this row (see the comment there). The active chip is auto-centred so
@@ -14,9 +16,7 @@ import { tr } from '../i18n/tr';
 
 const DESTINATIONS: { key: string; label: string; testId: string }[] = [
   { key: 'events', label: tr('說開一件事', 'Talk it through'), testId: 'talk-events-entry' },
-  { key: 'conflict', label: tr('情緒檢查', 'Emotion check'), testId: 'talk-conflict-entry' },
   { key: 'roleplay', label: tr('角色扮演', 'Role play'), testId: 'talk-roleplay-entry' },
-  { key: 'wall', label: tr('我們的牆', 'Our wall'), testId: 'talk-wall-entry' },
   { key: 'therapists', label: tr('專業諮商師', 'Counselors'), testId: 'talk-therapists-entry' },
 ];
 

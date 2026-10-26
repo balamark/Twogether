@@ -2610,10 +2610,11 @@ const LoveTimeApp = () => {
             />
           </div>
         );
+      // 情緒檢查 lives in the profile menu now (and 我們 → 成長 card), not the
+      // TalkSwitcher, so it renders without the 對話 strip.
       case 'conflict':
         return (
           <div>
-            <TalkSwitcher current="conflict" onNavigate={setCurrentView} />
             <ConflictView
               showNotification={showNotification}
               partnerConnected={partnerConnected}
@@ -2669,9 +2670,10 @@ const LoveTimeApp = () => {
           showNotification={showNotification}
         />
       );
+      // 我們的牆 is reached from the card on 我們 (and the profile menu), so it
+      // belongs to the 我們 family and carries no 對話 switcher.
       case 'wall': return (
         <div>
-          <TalkSwitcher current="wall" onNavigate={setCurrentView} />
           <WallView
             authState={authState}
             nicknames={nicknames}
@@ -2819,6 +2821,7 @@ const LoveTimeApp = () => {
         onShowStories={() => setCurrentView('stories')}
         onShowRoleplay={() => setCurrentView('roleplay')}
         onShowWall={() => setCurrentView('wall')}
+        onShowEmotionCheck={() => setCurrentView('conflict')}
         onShowTherapists={() => setCurrentView('therapists')}
         onShowIntimacyHistory={() => setCurrentView('intimacy-history')}
         onShowFeedback={() => setCurrentView('feedback')}
@@ -3037,8 +3040,8 @@ const LoveTimeApp = () => {
             const Icon = item.icon;
             const isActive =
               currentView === item.id ||
-              (item.id === 'talk' && ['communicate', 'conflict', 'events', 'roleplay', 'therapists', 'wall'].includes(currentView)) ||
-              (item.id === 'us' && ['record', 'calendar', 'rediscover', 'see-you', 'secret', 'daily-love', 'journey'].includes(currentView)) ||
+              (item.id === 'talk' && ['communicate', 'events', 'roleplay', 'therapists'].includes(currentView)) ||
+              (item.id === 'us' && ['record', 'calendar', 'rediscover', 'see-you', 'secret', 'daily-love', 'journey', 'wall'].includes(currentView)) ||
               // 'achievements' is a legacy deep-link id that now renders GrowView,
               // so it must light up 成長 — not 我們.
               (item.id === 'grow' && ['achievements', 'stories'].includes(currentView));

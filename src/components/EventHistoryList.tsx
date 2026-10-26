@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Tag, CheckCircle2, Sprout, Lock, MessageSquareHeart } from 'lucide-react';
 import apiService, { type EventRecord, type EventStatus } from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -11,6 +11,9 @@ interface EventHistoryListProps {
   hideFilters?: boolean;
   // Empty-state CTA: jump straight into the compose flow.
   onCompose?: () => void;
+  // Reports how many conversations exist under 全部 once loaded, so the page
+  // can tell a first-timer from someone with history.
+  onLoaded?: (total: number) => void;
 }
 
 // 'resolve_pending' is deliberately absent: nothing produces it any more, and a
@@ -61,12 +64,16 @@ export default function EventHistoryList({
   currentUserId,
   hideFilters,
   onCompose,
+  onLoaded,
 }: EventHistoryListProps) {
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<EventStatus | 'all'>('all');
   const tz = useTimezone();
+  // Held in a ref so a new callback each parent render doesn't refetch.
+  const onLoadedRef = useRef(onLoaded);
+  onLoadedRef.current = onLoaded;
 
   useEffect(() => {
     let cancelled = false;
@@ -75,7 +82,9 @@ export default function EventHistoryList({
     apiService
       .listEvents({ status })
       .then((res) => {
-        if (!cancelled) setEvents(res.events);
+        if (cancelled) return;
+        setEvents(res.events);
+        if (status === 'all') onLoadedRef.current?.(res.total ?? res.events.length);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : tr('無法取得對話列表', 'Couldn\'t load conversations. Please try again in a moment.'));

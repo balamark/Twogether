@@ -236,6 +236,24 @@ const UsView: React.FC<UsViewProps> = ({ onNavigate }) => {
         </span>
         <ChevronRight className="w-4 h-4 text-petal-muted shrink-0" strokeWidth={1.5} />
       </button>
+
+      {/* 我們的牆 — the shared wall of posts and photos. It used to be a chip in
+          the 對話 switcher, but it's about keeping good moments, not talking
+          something through, so it lives here as a small card under the calendar
+          instead of a tab of its own. */}
+      <button
+        type="button"
+        onClick={() => { trackAction('us.wall'); onNavigate('wall'); }}
+        data-testid="us-wall-card"
+        className="w-full flex items-center gap-3 rounded-2xl border border-petal-rule bg-white px-4 py-3.5 text-left hover:border-petal-ink transition-colors"
+      >
+        <span className="text-base" aria-hidden>📌</span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-display text-sm text-petal-ink">{tr('我們的牆', 'Our wall')}</span>
+          <span className="block font-body text-[11px] text-petal-muted">{tr('一起貼上照片和想說的話，留住彼此的日常', 'Pin photos and notes together to keep your everyday moments')}</span>
+        </span>
+        <ChevronRight className="w-4 h-4 text-petal-muted shrink-0" strokeWidth={1.5} />
+      </button>
     </div>
   );
 };

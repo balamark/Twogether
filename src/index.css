@@ -390,3 +390,18 @@ video {
   }
   body.printing-receipt .receipt-no-print { display: none !important; }
 }
+
+/* Chinese has no true italic: browsers fake it by slanting the glyphs, which
+   makes 繁中 subtitles harder to read. In Chinese mode, render every italic as
+   upright text. The light-weight subtitles also step up to regular weight so
+   the thin strokes stay legible; their muted color already sets them apart.
+   English mode keeps its italics. Accent words in titles (<em>) stay at the
+   title's weight so a heading doesn't turn half-bold. */
+html:lang(zh-Hant) .italic,
+html:lang(zh-Hant) em,
+html:lang(zh-Hant) i {
+  font-style: normal;
+}
+html:lang(zh-Hant) .italic.font-light:not(em) {
+  font-weight: 400;
+}

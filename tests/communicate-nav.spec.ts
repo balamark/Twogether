@@ -28,17 +28,18 @@ test.describe('對話 — a persistent switcher over 說開一件事', () => {
     await expect(page.getByRole('heading', { name: /說開一件事/ })).toBeVisible();
     await expect(page.locator(`text=${EVENT_TITLE}`).first()).toBeVisible();
 
-    // The switcher carries all five, with 說開一件事 active.
+    // The switcher carries three chips, with 說開一件事 active. 情緒檢查 moved
+    // to the profile menu and 我們的牆 to a card on 我們.
     await expect(page.getByTestId('talk-switcher')).toBeVisible();
     for (const id of [
       'talk-events-entry',
-      'talk-conflict-entry',
       'talk-roleplay-entry',
-      'talk-wall-entry',
       'talk-therapists-entry',
     ]) {
       await expect(page.getByTestId(id)).toBeVisible();
     }
+    await expect(page.getByTestId('talk-conflict-entry')).toHaveCount(0);
+    await expect(page.getByTestId('talk-wall-entry')).toHaveCount(0);
     await expect(page.getByTestId('talk-events-entry')).toHaveAttribute('aria-selected', 'true');
 
     // The old sub-tab row is gone; so is the events 歷史／開始對話／分析 pill row.
@@ -53,15 +54,30 @@ test.describe('對話 — a persistent switcher over 說開一件事', () => {
   }) => {
     test.setTimeout(60000);
 
-    await page.getByTestId('talk-conflict-entry').click();
-    await expect(page.getByRole('heading', { name: /接住情緒/ })).toBeVisible();
+    await page.getByTestId('talk-roleplay-entry').click();
     // Still switchable from here — no going back to find the others.
     await expect(page.getByTestId('talk-switcher')).toBeVisible();
-    await expect(page.getByTestId('talk-conflict-entry')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('talk-roleplay-entry')).toHaveAttribute('aria-selected', 'true');
 
     // Hop back to 說開一件事 from the destination itself.
     await page.getByTestId('talk-events-entry').click();
     await expect(page.getByRole('heading', { name: /說開一件事/ })).toBeVisible();
+  });
+
+  test('情緒檢查 opens from the profile menu, and 我們的牆 from a card on 我們', async ({
+    page,
+  }) => {
+    test.setTimeout(60000);
+
+    await page.getByTestId('user-menu-toggle').click();
+    await page.getByTestId('user-menu-emotion-check').click();
+    await expect(page.getByRole('heading', { name: /接住情緒/ })).toBeVisible();
+    await expect(page.getByTestId('talk-switcher')).toHaveCount(0);
+
+    await page.getByTestId('nav-tab-us').click();
+    await page.getByTestId('us-wall-card').click();
+    await expect(page.getByTestId('nav-tab-us')).toBeVisible();
+    await expect(page.getByTestId('talk-switcher')).toHaveCount(0);
   });
 
   test('寫下我的情緒，讓對方接住 lands on the composer, not the history list', async ({
@@ -69,15 +85,17 @@ test.describe('對話 — a persistent switcher over 說開一件事', () => {
   }) => {
     test.setTimeout(60000);
 
-    await page.getByTestId('talk-conflict-entry').click();
+    await page.getByTestId('user-menu-toggle').click();
+    await page.getByTestId('user-menu-emotion-check').click();
     await page.getByTestId('conflict-compose-event').click();
 
     await expect(page.getByTestId('compose-raw-input')).toBeVisible();
 
     // Consume-once: leaving and coming back must NOT drop you in the composer
     // again.
-    await page.getByTestId('talk-conflict-entry').click();
-    await page.getByTestId('talk-events-entry').click();
+    await page.getByTestId('user-menu-toggle').click();
+    await page.getByTestId('user-menu-emotion-check').click();
+    await page.getByTestId('nav-tab-talk').click();
     await expect(page.getByTestId('events-compose-button')).toBeVisible();
     await expect(page.getByTestId('compose-raw-input')).toHaveCount(0);
   });
