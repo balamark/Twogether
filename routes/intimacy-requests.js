@@ -17,6 +17,7 @@ const {
   DEFAULT_COUNT: NUDGE_OPTION_COUNT,
 } = require('../lib/intimacyNudgeTones');
 const { translateString } = require('../middleware/locale');
+const { notifyPartnerAction } = require('../services/notificationService');
 
 const router = express.Router();
 
@@ -189,6 +190,9 @@ const computeIntimacyStatsForReceiver = async (userId) => {
       SUM(CASE WHEN status = 'pending' AND created_at >= $3 THEN 1 ELSE 0 END) AS month_unanswered
     FROM intimacy_requests
     WHERE receiver_id = $1
+      -- 替代方案協商 invites a conversation; a "not now" there is a boundary,
+      -- never something the nudge should push back on (PRD acceptance rule).
+      AND request_type IS DISTINCT FROM 'negotiation'
       AND (created_at >= $3 OR (responded_at IS NOT NULL AND responded_at >= $3))
   `, [userId, weekCutoff.toISOString(), monthCutoff.toISOString()]);
 
@@ -219,7 +223,7 @@ router.post('/', [
     .isLength({ max: 1000 })
     .withMessage('訊息不能超過1000個字符'),
   body('request_type')
-    .isIn(['general', 'romantic', 'playful', 'surprise', 'compliment', 'intimate', 'reconciliation', 'guidance'])
+    .isIn(['general', 'romantic', 'playful', 'surprise', 'compliment', 'intimate', 'reconciliation', 'guidance', 'negotiation'])
     .withMessage('請求類型無效'),
   body('scheduled_time')
     .optional({ nullable: true })
@@ -322,6 +326,7 @@ router.post('/', [
       intimate: '親密時光',
       reconciliation: '和好邀請',
       guidance: '情緒指引',
+      negotiation: '替代方案協商',
     };
     const lineInvitePush = [
       `💌 Twogether｜${req.user.nickname || '你的伴侶'} 傳來親密邀請`,
@@ -1024,11 +1029,82 @@ router.get('/', async (req, res) => {
   }
 });
 
+// 替代方案協商 response. Three answers: 願意一起討論 (accepted) / 稍後再討論
+// (later — stays answerable) / 暫時不想討論 (rejected). Accepting means "let's
+// talk", never consent to any specific act, so there are no coins and the
+// copy to the sender stays non-judgmental whatever the answer.
+async function respondToNegotiation(req, res, request) {
+  const userId = req.user.id;
+  const requestId = request.id;
+  const { response, response_message } = req.body;
+  try {
+    if (request.status !== 'pending' && request.status !== 'later') {
+      return res.status(400).json({
+        success: false,
+        message: '你已經回覆過這個討論邀請了；想再聊的話，可以直接到「共同方案」提出方案',
+        error_code: 'ALREADY_RESPONDED'
+      });
+    }
+
+    const status = response === 'accepted' ? 'accepted' : response === 'later' ? 'later' : 'rejected';
+    await db.query(
+      `UPDATE intimacy_requests
+          SET status = $1, response_message = $2, responded_at = NOW()
+        WHERE id = $3`,
+      [status, response_message || null, requestId]
+    );
+
+    logInfo('intimacy_negotiation.responded', { requestId, userId, status });
+
+    notifyPartnerAction({
+      actorId: userId,
+      type: status === 'accepted' ? 'negotiation_accepted' : status === 'later' ? 'negotiation_later' : 'negotiation_declined',
+      content: response_message || null,
+    });
+
+    const updated = await db.query(`
+      SELECT
+        ir.id, ir.message_content, ir.request_type, ir.status, ir.created_at, ir.responded_at,
+        ir.response_message, sender.nickname as sender_nickname, receiver.nickname as receiver_nickname
+      FROM intimacy_requests ir
+      JOIN users sender ON ir.sender_id = sender.id
+      JOIN users receiver ON ir.receiver_id = receiver.id
+      WHERE ir.id = $1
+    `, [requestId]);
+    const row = updated.rows[0] || {};
+
+    res.json({
+      success: true,
+      message: status === 'accepted'
+        ? '已告訴對方你願意一起討論，現在就可以到「共同方案」提出想法'
+        : status === 'later'
+        ? '已告訴對方你想晚一點再聊，準備好時回到這裡回覆就好'
+        : '已告訴對方你目前還不想討論，這完全沒關係',
+      id: row.id,
+      message_content: row.message_content,
+      request_type: row.request_type,
+      status: row.status,
+      created_at: row.created_at,
+      responded_at: row.responded_at,
+      response_message: row.response_message,
+      sender_nickname: row.sender_nickname,
+      receiver_nickname: row.receiver_nickname,
+      direction: 'received'
+    });
+  } catch (error) {
+    logError('intimacy_negotiation.respond_failed', { requestId, userId, err: error.message, stack: error.stack });
+    res.status(500).json({
+      success: false,
+      message: '回覆沒有送出，請稍後再試'
+    });
+  }
+}
+
 // Respond to intimacy request
 router.put('/:id/respond', [
   body('response')
-    .isIn(['accepted', 'declined', 'rejected'])
-    .withMessage('回應必須是 accepted、declined 或 rejected'),
+    .isIn(['accepted', 'declined', 'rejected', 'later'])
+    .withMessage('回應必須是 accepted、declined、rejected 或 later'),
   body('response_message')
     .optional({ nullable: true })
     .isLength({ max: 500 })
@@ -1066,7 +1142,7 @@ router.put('/:id/respond', [
 
     // Check if user is the recipient of this request
     const requestResult = await db.query(
-      'SELECT id, status, sender_id FROM intimacy_requests WHERE id = $1 AND receiver_id = $2',
+      'SELECT id, status, sender_id, request_type FROM intimacy_requests WHERE id = $1 AND receiver_id = $2',
       [requestId, userId]
     );
 
@@ -1078,6 +1154,18 @@ router.put('/:id/respond', [
     }
 
     const request = requestResult.rows[0];
+
+    if (request.request_type === 'negotiation') {
+      return respondToNegotiation(req, res, request);
+    }
+
+    if (response === 'later') {
+      return res.status(400).json({
+        success: false,
+        message: '「稍後再討論」只適用於替代方案協商邀請，這個邀請請選擇接受或提出其他方式',
+        error_code: 'LATER_NOT_SUPPORTED'
+      });
+    }
 
     if (request.status !== 'pending') {
       return res.status(400).json({

@@ -199,7 +199,8 @@ class EmailService {
       compliment: '甜蜜讚美',
       intimate: '親密時光',
       reconciliation: '真心和解',
-      guidance: '情緒指引'
+      guidance: '情緒指引',
+      negotiation: '替代方案協商'
     };
     const typeLabel = typeTranslations[requestType] || '';
 

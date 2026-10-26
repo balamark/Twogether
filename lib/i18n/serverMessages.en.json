@@ -1002,7 +1002,59 @@
 "收據抬頭請控制在 100 字以內": "Please keep the receipt name under 100 characters",
 "統一編號需為 8 位數字": "A tax ID must be 8 digits",
 "付款資料有誤，請確認後再試": "Some payment details are invalid. Please check them and try again",
-"視訊諮商預約": "Video session booking"
+"視訊諮商預約": "Video session booking",
+"替代方案協商": "Talk about alternatives",
+"替代方案需要和另一半一起建立，請先完成配對；配對前可以先看看示範方案": "Plans are made together with your partner, so pair up first. Until then, have a look at the example plans",
+"方案名稱需為 1–100 字，例如「週末劇本之夜」": "Plan names need 1–100 characters, e.g. \"Weekend script night\"",
+"請描述具體的互動方式（最多 2000 字），讓對方知道你想像的是什麼": "Describe what you'd do together (up to 2000 characters) so your partner knows what you have in mind",
+"偏好與界線最多 2000 字，可以精簡後再送出": "Preferences & boundaries can be up to 2000 characters. Shorten it and try again",
+"時間與準備最多 1000 字，可以精簡後再送出": "Time & preparation can be up to 1000 characters. Shorten it and try again",
+"需要先確認的條件最多 1000 字，可以精簡後再送出": "Things to check first can be up to 1000 characters. Shorten it and try again",
+"方案內容不完整，請檢查後再送出": "The plan is incomplete. Check it and try again",
+"找不到這個方案，可能已被移除，請重新整理後再試": "Couldn't find this plan; it may have been removed. Refresh and try again",
+"無法載入替代方案，請稍後重新整理再試": "Couldn't load your plans. Please refresh in a moment",
+"方案已提出，等另一半看過並認可後就會加入共同清單": "Plan proposed. Once your partner reviews and approves it, it joins your shared list",
+"方案沒有送出，請稍後再試；你寫的內容仍保留在畫面上": "The plan wasn't sent. Please try again; your text is still on screen",
+"這個方案已停用，請先重新啟用再修改": "This plan is paused. Reactivate it before editing",
+"內容沒有變動": "Nothing changed",
+"方案已更新，需要另一半重新認可": "Plan updated. Your partner needs to approve it again",
+"方案沒有更新，請稍後再試；你修改的內容仍保留在畫面上": "The plan wasn't updated. Please try again; your edits are still on screen",
+"請重新整理後再認可方案": "Please refresh before approving the plan",
+"這個方案已停用，請先重新啟用再認可": "This plan is paused. Reactivate it before approving",
+"另一半剛修改了這個方案，請先看過新內容再決定是否認可": "Your partner just changed this plan. Read the new version before deciding",
+"雙方都認可了，方案已加入共同清單。每次實際互動前，仍會再確認彼此當下的意願": "You both approved it, so it's on your shared list. You'll still check with each other every time before doing it",
+"已記下你的認可，等另一半也認可後就會加入共同清單": "Your approval is saved. It joins the shared list once your partner approves too",
+"認可沒有送出，請稍後再試": "Your approval wasn't sent. Please try again in a moment",
+"方案已經是停用狀態": "This plan is already paused",
+"方案已停用，不再出現在共同清單；之後想再討論可以重新啟用": "Plan paused and off the shared list. Reactivate it whenever you want to talk again",
+"停用沒有成功，請稍後再試": "Couldn't pause the plan. Please try again in a moment",
+"方案目前已是啟用狀態": "This plan is already active",
+"方案已重新啟用，等另一半再次認可後會回到共同清單": "Plan reactivated. It returns to the shared list once your partner approves again",
+"重新啟用沒有成功，請稍後再試": "Couldn't reactivate the plan. Please try again in a moment",
+"這個方案雙方都認可了，已加入共同方案清單": "You both approved this plan; it's on your shared list now",
+"回應必須是 accepted、declined、rejected 或 later": "Response must be accepted, declined, rejected or later",
+"「稍後再討論」只適用於替代方案協商邀請，這個邀請請選擇接受或提出其他方式": "\"Let's talk later\" only applies to invitations to talk about alternatives. For this one, accept it or suggest another way",
+"你已經回覆過這個討論邀請了；想再聊的話，可以直接到「共同方案」提出方案": "You already replied to this invitation. To keep talking, propose a plan under \"Shared plans\"",
+"已告訴對方你願意一起討論，現在就可以到「共同方案」提出想法": "We let them know you're happy to talk. You can share ideas under \"Shared plans\" now",
+"已告訴對方你想晚一點再聊，準備好時回到這裡回覆就好": "We let them know you'd like to talk later. Come back and reply whenever you're ready",
+"已告訴對方你目前還不想討論，這完全沒關係": "We let them know you'd rather not talk right now, and that's completely okay",
+"回覆沒有送出，請稍後再試": "Your reply wasn't sent. Please try again in a moment",
+"打開 App，一起提出彼此都喜歡的方式": "Open the app and propose ways you'd both enjoy",
+"對方記得這件事，等彼此都方便時再聊就好": "They haven't forgotten. Talk whenever it suits you both",
+"謝謝你願意開口。這是對方此刻的步調，你們的共同方案清單會一直保留著": "Thank you for speaking up. That's their pace right now, and your shared plan list stays here",
+"打開 App 看看，認可、修改或先放著都可以": "Open the app to take a look. Approve, edit or leave it for now, all fine",
+"內容有變動，請看過新內容再決定是否認可": "The wording changed. Read the new version before deciding",
+"打開 App 查看你們的共同方案清單": "Open the app to see your shared plan list",
+"方案已移出共同清單，隨時可以再一起討論": "The plan is off your shared list. You can talk about it again anytime",
+"需要你們再次確認，才會回到共同清單": "You'll both need to approve it again before it returns to the shared list",
+"願意和你一起討論替代方案": "is happy to talk about alternatives with you",
+"想晚一點再討論替代方案": "would like to talk about alternatives a bit later",
+"目前還不想討論替代方案": "would rather not talk about alternatives right now",
+"提出了一個替代方案": "proposed an alternative plan",
+"修改了一個替代方案": "edited an alternative plan",
+"認可了一個替代方案": "approved an alternative plan",
+"停用了一個替代方案": "paused an alternative plan",
+"重新啟用了一個替代方案": "reactivated an alternative plan"
 },
 "patterns": [
 [
@@ -1784,6 +1836,78 @@
 [
 "本次摘要已接近 {0} 字上限，請先精簡摘要再加入訊息",
 "These notes are near the {0}-character limit. Shorten them before adding a message"
+],
+[
+"{0} {1}願意和你一起討論替代方案",
+"{0} {1} is happy to talk about alternatives with you"
+],
+[
+"{0}願意和你一起討論替代方案",
+"{0} is happy to talk about alternatives with you"
+],
+[
+"{0} {1}想晚一點再討論替代方案",
+"{0} {1} would like to talk about alternatives a bit later"
+],
+[
+"{0}想晚一點再討論替代方案",
+"{0} would like to talk about alternatives a bit later"
+],
+[
+"{0} {1}目前還不想討論替代方案",
+"{0} {1} would rather not talk about alternatives right now"
+],
+[
+"{0}目前還不想討論替代方案",
+"{0} would rather not talk about alternatives right now"
+],
+[
+"{0} {1}提出了一個替代方案",
+"{0} {1} proposed an alternative plan"
+],
+[
+"{0}提出了一個替代方案",
+"{0} proposed an alternative plan"
+],
+[
+"{0} {1}修改了一個替代方案",
+"{0} {1} edited an alternative plan"
+],
+[
+"{0}修改了一個替代方案",
+"{0} edited an alternative plan"
+],
+[
+"{0} {1}認可了一個替代方案",
+"{0} {1} approved an alternative plan"
+],
+[
+"{0}認可了一個替代方案",
+"{0} approved an alternative plan"
+],
+[
+"{0} {1}停用了一個替代方案",
+"{0} {1} paused an alternative plan"
+],
+[
+"{0}停用了一個替代方案",
+"{0} paused an alternative plan"
+],
+[
+"{0} {1}重新啟用了一個替代方案",
+"{0} {1} reactivated an alternative plan"
+],
+[
+"{0}重新啟用了一個替代方案",
+"{0} reactivated an alternative plan"
+],
+[
+"每對伴侶最多保存 {0} 個替代方案，可以先修改或重用已停用的方案",
+"Each couple can keep up to {0} plans. Edit or reuse a paused plan instead"
+],
+[
+"{0}雙方都認可了，已加入共同方案清單",
+"{0}: you both approved it, and it's on your shared list now"
 ]
 ]
 }

@@ -36,6 +36,16 @@ const CATALOG = {
   custom_script_created: { emoji: '🎭', verb: '建立了一個自訂劇本', fallback: '打開 App 看看新的劇本' },
   custom_script_updated: { emoji: '🎭', verb: '更新了一個自訂劇本', fallback: '打開 App 看看更新後的劇本' },
   custom_script_deleted: { emoji: '🎭', verb: '刪除了一個自訂劇本', fallback: '一個自訂劇本已被移除' },
+  // 親密邀請 — 替代方案協商 (negotiation responses + co-authored plans). Tone:
+  // never frame a no / not-now as something to fix (PRD acceptance criterion).
+  negotiation_accepted: { emoji: '💬', verb: '願意和你一起討論替代方案', fallback: '打開 App，一起提出彼此都喜歡的方式', priority: 2 },
+  negotiation_later: { emoji: '🕊️', verb: '想晚一點再討論替代方案', fallback: '對方記得這件事，等彼此都方便時再聊就好' },
+  negotiation_declined: { emoji: '🕊️', verb: '目前還不想討論替代方案', fallback: '謝謝你願意開口。這是對方此刻的步調，你們的共同方案清單會一直保留著' },
+  alt_plan_proposed: { emoji: '🤝', verb: '提出了一個替代方案', fallback: '打開 App 看看，認可、修改或先放著都可以' },
+  alt_plan_updated: { emoji: '🤝', verb: '修改了一個替代方案', fallback: '內容有變動，請看過新內容再決定是否認可' },
+  alt_plan_approved: { emoji: '✅', verb: '認可了一個替代方案', fallback: '打開 App 查看你們的共同方案清單' },
+  alt_plan_disabled: { emoji: '⏸️', verb: '停用了一個替代方案', fallback: '方案已移出共同清單，隨時可以再一起討論' },
+  alt_plan_reactivated: { emoji: '🤝', verb: '重新啟用了一個替代方案', fallback: '需要你們再次確認，才會回到共同清單' },
   // 商店 — custom gifts
   custom_gift_created: { emoji: '🎁', verb: '新增了一個客製禮物', fallback: '打開 App 看看新的禮物' },
   custom_gift_updated: { emoji: '🎁', verb: '更新了一個客製禮物', fallback: '打開 App 看看更新後的禮物' },

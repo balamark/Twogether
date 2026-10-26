@@ -250,6 +250,40 @@ interface RespondToIntimacyRequestRequest {
   alternativeScheduledTime?: string;
 }
 
+// 替代方案協商 — co-authored plans (routes/intimacy-plans.js).
+type AlternativePlanStatus = 'pending' | 'approved' | 'disabled';
+
+interface AlternativePlan {
+  id: string;
+  requestId?: string | null;
+  title: string;
+  interaction: string;
+  boundaries?: string | null;
+  timePrep?: string | null;
+  conditions?: string | null;
+  status: AlternativePlanStatus;
+  revision: number;
+  approvedByMe: boolean;
+  approvedByPartner: boolean;
+  createdByMe: boolean;
+  updatedByMe: boolean;
+  disabledByMe: boolean;
+  disabledAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface AlternativePlanInput {
+  title: string;
+  interaction: string;
+  boundaries?: string;
+  timePrep?: string;
+  conditions?: string;
+  requestId?: string;
+}
+
+type NegotiationResponse = 'accepted' | 'later' | 'rejected';
+
 interface IntimacyTemplate {
   id: string;
   category: string;
@@ -2951,7 +2985,7 @@ class ApiService {
       // distinct meaning end-to-end (compliment / reconciliation / guidance);
       // everything else (incl. scheduled) is stored as a generic intimate request.
       let requestType = request.requestType;
-      if (!['compliment', 'reconciliation', 'guidance'].includes(requestType)) {
+      if (!['compliment', 'reconciliation', 'guidance', 'negotiation'].includes(requestType)) {
         requestType = 'intimate';
       }
 
@@ -3176,6 +3210,89 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to respond to intimacy request:', error);
       throw new Error((error as ApiErrorResponse)?.message || tr('無法回應親密邀請', 'Couldn\'t respond to the intimacy invitation'));
+    }
+  }
+
+  // 替代方案協商: 願意一起討論 / 稍後再討論 / 暫時不想討論.
+  async respondToNegotiation(
+    requestId: string,
+    response: NegotiationResponse,
+    responseMessage?: string
+  ): Promise<IntimacyRequest> {
+    try {
+      const result = await apiClient.put(`/intimacy-requests/${requestId}/respond`, {
+        response,
+        response_message: responseMessage,
+      });
+      return this.transformIntimacyRequest(result.data);
+    } catch (error: unknown) {
+      console.error('Failed to respond to negotiation invite:', error);
+      this.throwApiError(error, tr('回覆沒有送出，請稍後再試', 'Your reply wasn\'t sent. Please try again in a moment'));
+    }
+  }
+
+  async getAlternativePlans(): Promise<AlternativePlan[]> {
+    try {
+      const response = await apiClient.get('/intimacy-plans');
+      return (response.data.plans || []).map((p: unknown) => this.transformAlternativePlan(p));
+    } catch (error: unknown) {
+      console.error('Failed to fetch alternative plans:', error);
+      this.throwApiError(error, tr('無法載入替代方案，請稍後重新整理再試', 'Couldn\'t load your plans. Please refresh in a moment'));
+    }
+  }
+
+  async createAlternativePlan(input: AlternativePlanInput): Promise<AlternativePlan> {
+    try {
+      const response = await apiClient.post('/intimacy-plans', {
+        title: input.title,
+        interaction: input.interaction,
+        boundaries: input.boundaries,
+        time_prep: input.timePrep,
+        conditions: input.conditions,
+        request_id: input.requestId,
+      });
+      return this.transformAlternativePlan(response.data.plan);
+    } catch (error: unknown) {
+      console.error('Failed to create alternative plan:', error);
+      this.throwApiError(error, tr('方案沒有送出，請稍後再試', 'The plan wasn\'t sent. Please try again in a moment'));
+    }
+  }
+
+  async updateAlternativePlan(id: string, input: Partial<AlternativePlanInput>): Promise<AlternativePlan> {
+    try {
+      const response = await apiClient.put(`/intimacy-plans/${id}`, {
+        title: input.title,
+        interaction: input.interaction,
+        boundaries: input.boundaries,
+        time_prep: input.timePrep,
+        conditions: input.conditions,
+      });
+      return this.transformAlternativePlan(response.data.plan);
+    } catch (error: unknown) {
+      console.error('Failed to update alternative plan:', error);
+      this.throwApiError(error, tr('方案沒有更新，請稍後再試', 'The plan wasn\'t updated. Please try again in a moment'));
+    }
+  }
+
+  async approveAlternativePlan(id: string, revision: number): Promise<AlternativePlan> {
+    try {
+      const response = await apiClient.post(`/intimacy-plans/${id}/approve`, { revision });
+      return this.transformAlternativePlan(response.data.plan);
+    } catch (error: unknown) {
+      console.error('Failed to approve alternative plan:', error);
+      this.throwApiError(error, tr('認可沒有送出，請稍後再試', 'Your approval wasn\'t sent. Please try again in a moment'));
+    }
+  }
+
+  async setAlternativePlanActive(id: string, active: boolean): Promise<AlternativePlan> {
+    try {
+      const response = await apiClient.post(`/intimacy-plans/${id}/${active ? 'reactivate' : 'disable'}`);
+      return this.transformAlternativePlan(response.data.plan);
+    } catch (error: unknown) {
+      console.error('Failed to change alternative plan state:', error);
+      this.throwApiError(error, active
+        ? tr('重新啟用沒有成功，請稍後再試', 'Couldn\'t reactivate the plan. Please try again in a moment')
+        : tr('停用沒有成功，請稍後再試', 'Couldn\'t pause the plan. Please try again in a moment'));
     }
   }
 
@@ -4131,6 +4248,30 @@ class ApiService {
   }
 
   // Transform methods for intimacy features
+  private transformAlternativePlan(data: unknown): AlternativePlan {
+    const d = (data || {}) as Record<string, unknown>;
+    const str = (v: unknown) => (typeof v === 'string' ? v : null);
+    return {
+      id: String(d.id || ''),
+      requestId: str(d.request_id),
+      title: String(d.title || ''),
+      interaction: String(d.interaction || ''),
+      boundaries: str(d.boundaries),
+      timePrep: str(d.time_prep),
+      conditions: str(d.conditions),
+      status: (['pending', 'approved', 'disabled'].includes(String(d.status)) ? d.status : 'pending') as AlternativePlanStatus,
+      revision: Number(d.revision) || 1,
+      approvedByMe: !!d.approved_by_me,
+      approvedByPartner: !!d.approved_by_partner,
+      createdByMe: !!d.created_by_me,
+      updatedByMe: !!d.updated_by_me,
+      disabledByMe: !!d.disabled_by_me,
+      disabledAt: str(d.disabled_at),
+      createdAt: String(d.created_at || ''),
+      updatedAt: String(d.updated_at || ''),
+    };
+  }
+
   private transformIntimacyRequest(data: unknown): IntimacyRequest {
     const typedData = data as {
       id?: string;
@@ -6156,6 +6297,10 @@ export type {
   IntimacyRequest,
   CreateIntimacyRequestRequest,
   RespondToIntimacyRequestRequest,
+  AlternativePlan,
+  AlternativePlanInput,
+  AlternativePlanStatus,
+  NegotiationResponse,
   IntimacyTemplate,
   RoleplayMessageLevel,
   RoleplayMessageSuggestion,

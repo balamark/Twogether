@@ -70,6 +70,17 @@ const LEVEL_STYLE: Record<string, { dot: string; chip: string }> = {
   intense: { dot: 'bg-rose-600', chip: 'bg-rose-50 text-rose-700 border-rose-200' },
 };
 
+// 替代方案協商 — invites a conversation, not a specific act.
+const NEGOTIATION_DESCRIPTION = tr(
+  '想和伴侶討論，當原本期待的親密互動暫時無法實現時，有沒有其他雙方都喜歡、也都願意參與的方式？',
+  'Talk with your partner: when the intimacy you hoped for can\'t happen right now, what else would you both enjoy and want to do?',
+);
+
+const NEGOTIATION_STARTER = tr(
+  '我想跟你聊聊我們的親密時光。當我們原本期待的方式暫時沒辦法的時候，有沒有其他我們都喜歡、也都願意的方式？我想先說說我的需要：',
+  'I\'d like to talk about our intimacy. When what we hoped for can\'t happen right now, is there another way we\'d both enjoy and want? Here\'s what I need:',
+);
+
 const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
   isOpen,
   onClose,
@@ -117,6 +128,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
     { id: 'compliment', name: tr('甜蜜讚美', 'Sweet compliment'), emoji: '💕', description: tr('發送溫馨的讚美和愛意給伴侶', 'Send your partner warm compliments and love') },
     { id: 'reconciliation', name: tr('真心和解', 'Make up for real'), emoji: '🤝', description: tr('冷戰／吵架後，AI 幫你想一句中性、給台階的破冰開場白', 'After a cold war or a fight, AI helps you find a neutral opener that offers a way back') },
     { id: 'guidance', name: tr('情緒指引', 'Emotion guide'), emoji: '🧭', description: tr('把「當我情緒上來時，你可以這樣接住我」的指引挑幾句傳給對方', 'Pick a few lines from "when my feelings rise, here\'s how you can hold me" and send them') },
+    { id: 'negotiation', name: tr('替代方案協商', 'Talk about alternatives'), emoji: '💬', description: NEGOTIATION_DESCRIPTION },
     { id: 'roleplay', name: tr('角色扮演', 'Role play'), emoji: '🎭', description: tr('選擇你們的劇本，AI 幫你想 5 句入戲開場邀請', 'Pick your script, and AI suggests 5 in-character opening invitations') },
     { id: 'custom', name: tr('自訂訊息', 'Custom message'), emoji: '✨', description: tr('完全客製化你的親密邀請', 'Fully customize your intimacy invitation') },
   ];
@@ -127,13 +139,15 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
 
   const isGuidance = selectedCategory === 'guidance';
 
+  const isNegotiation = selectedCategory === 'negotiation';
+
   const flowSteps: Step[] = isRoleplay
     ? ['category', 'script', 'aimsg', 'customize', 'confirm']
     : isReconciliation
     ? ['category', 'reconcile', 'customize', 'confirm']
     : isGuidance
     ? ['category', 'guidance', 'customize', 'confirm']
-    : selectedCategory === 'custom'
+    : selectedCategory === 'custom' || isNegotiation
     ? ['category', 'customize', 'confirm']
     : ['category', 'template', 'customize', 'confirm'];
 
@@ -181,7 +195,8 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
       selectedCategory &&
       selectedCategory !== 'custom' &&
       selectedCategory !== 'roleplay' &&
-      selectedCategory !== 'reconciliation'
+      selectedCategory !== 'reconciliation' &&
+      selectedCategory !== 'negotiation'
     ) {
       fetchTemplatesByCategory();
     }
@@ -244,6 +259,10 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
     setSelectedTemplate(null);
     setCustomMessage('');
     if (categoryId === 'custom') {
+      setCurrentStep('customize');
+    } else if (categoryId === 'negotiation') {
+      setRequestType('intimate');
+      setCustomMessage(NEGOTIATION_STARTER);
       setCurrentStep('customize');
     } else if (categoryId === 'roleplay') {
       setCurrentStep('script');
@@ -417,6 +436,8 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
             ? 'reconciliation'
             : selectedCategory === 'guidance'
             ? 'guidance'
+            : isNegotiation
+            ? 'negotiation'
             : requestType,
         roleplayCategory: isRoleplay ? selectedScript?.category : undefined,
         // Name the script + its 簡介 so the recipient (who may never have seen
@@ -424,7 +445,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
         scriptTitle: isRoleplay ? selectedScript?.title : undefined,
         scriptScenario: isRoleplay ? selectedScript?.scenario : undefined,
         scheduledTime:
-          requestType === 'scheduled' && scheduledTime ? localInputToIsoInTz(scheduledTime, tz) : undefined,
+          !isNegotiation && requestType === 'scheduled' && scheduledTime ? localInputToIsoInTz(scheduledTime, tz) : undefined,
       });
 
       onSuccess();
@@ -477,7 +498,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
     ? 'reconcile'
     : isGuidance
     ? 'guidance'
-    : selectedCategory === 'custom'
+    : selectedCategory === 'custom' || isNegotiation
     ? 'category'
     : 'template';
 
@@ -1130,6 +1151,8 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                     ? tr('自訂讚美內容', 'Custom compliment')
                     : selectedCategory === 'reconciliation'
                     ? tr('自訂和解內容', 'Custom make-up message')
+                    : isNegotiation
+                    ? tr('說說你的需要', 'Share what you need')
                     : tr('自訂邀請內容', 'Custom invitation')}
                 </h4>
                 <button onClick={() => setCurrentStep(customizeBackStep)} className="text-sm text-pink-600 hover:text-pink-700">
@@ -1148,7 +1171,17 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                 </p>
               )}
 
+              {isNegotiation && (
+                <div className="rounded-lg border border-pink-200 bg-pink-50 p-3 space-y-1.5" data-testid="negotiation-explainer">
+                  <p className="text-sm text-gray-800">{NEGOTIATION_DESCRIPTION}</p>
+                  <p className="text-xs text-gray-600">
+                    {tr('對方可以選擇「願意一起討論」「稍後再討論」或「暫時不想討論」。接受討論不代表同意任何特定的親密行為；之後你們可以各自提出方案，雙方都認可的才會加入共同方案清單。', 'They can choose "Happy to talk", "Later" or "Not right now". Agreeing to talk never means agreeing to any specific act. Afterwards you can each propose plans, and only ones you both approve join your shared list.')}
+                  </p>
+                </div>
+              )}
+
               <div className="space-y-4">
+                {!isNegotiation && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">{tr('邀請類型', 'Invitation type')}</label>
                   <div className="flex space-x-4">
@@ -1174,8 +1207,9 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                     </label>
                   </div>
                 </div>
+                )}
 
-                {requestType === 'scheduled' && (
+                {!isNegotiation && requestType === 'scheduled' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       {tr('預約時間（以', 'Scheduled time (shown in ')} {getTimezoneShortLabel(tz)} {tr('顯示）', ')')}
@@ -1194,7 +1228,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {selectedCategory === 'compliment' ? tr('讚美內容 *', 'Compliment *') : selectedCategory === 'reconciliation' ? tr('和解內容 *', 'Make-up message *') : tr('邀請內容 *', 'Invitation *')}
+                    {selectedCategory === 'compliment' ? tr('讚美內容 *', 'Compliment *') : selectedCategory === 'reconciliation' ? tr('和解內容 *', 'Make-up message *') : isNegotiation ? tr('想討論的內容 *', 'What you\'d like to talk about *') : tr('邀請內容 *', 'Invitation *')}
                   </label>
                   <textarea
                     data-testid="intimacy-message-input"
@@ -1205,6 +1239,8 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                         ? tr('輸入你想對伴侶說的甜蜜讚美...', 'Write a sweet compliment for your partner...')
                         : selectedCategory === 'reconciliation'
                         ? tr('輸入你的真誠道歉和和解訊息...', 'Write your sincere apology and make-up message...')
+                        : isNegotiation
+                        ? tr('描述你的需要，以及想一起討論的方向…', 'Describe what you need and what you\'d like to explore together…')
                         : tr('輸入你的親密邀請內容...', 'Write your intimacy invitation...')
                     }
                     rows={4}
@@ -1232,7 +1268,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="text-lg font-medium text-gray-900">
-                  {selectedCategory === 'compliment' ? tr('確認讚美內容', 'Confirm your compliment') : selectedCategory === 'reconciliation' ? tr('確認和解內容', 'Confirm your make-up message') : tr('確認邀請內容', 'Confirm your invitation')}
+                  {selectedCategory === 'compliment' ? tr('確認讚美內容', 'Confirm your compliment') : selectedCategory === 'reconciliation' ? tr('確認和解內容', 'Confirm your make-up message') : isNegotiation ? tr('確認討論邀請', 'Confirm your invitation to talk') : tr('確認邀請內容', 'Confirm your invitation')}
                 </h4>
                 <button onClick={() => setCurrentStep('customize')} className="text-sm text-pink-600 hover:text-pink-700">
                   {tr('編輯內容', 'Edit')}
@@ -1244,13 +1280,13 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                   <Heart className="w-6 h-6 text-pink-500 mt-1" />
                   <div className="flex-1">
                     <h5 className="font-medium text-gray-900 mb-2">
-                      {selectedCategory === 'compliment' ? tr('你的甜蜜讚美', 'Your sweet compliment') : selectedCategory === 'reconciliation' ? tr('你的真心和解', 'Your heartfelt make-up message') : tr('你的親密邀請', 'Your intimacy invitation')}
+                      {selectedCategory === 'compliment' ? tr('你的甜蜜讚美', 'Your sweet compliment') : selectedCategory === 'reconciliation' ? tr('你的真心和解', 'Your heartfelt make-up message') : isNegotiation ? tr('💬 替代方案協商', '💬 Talk about alternatives') : tr('你的親密邀請', 'Your intimacy invitation')}
                     </h5>
                     {isRoleplay && selectedScript && (
                       <p className="text-xs text-pink-600 mb-2">{tr('劇本：', 'Script: ')}{selectedScript.title}</p>
                     )}
                     <p className="text-gray-700 whitespace-pre-wrap">{customMessage}</p>
-                    {requestType === 'scheduled' && scheduledTime && (
+                    {!isNegotiation && requestType === 'scheduled' && scheduledTime && (
                       <div className="mt-3 flex items-center space-x-2 text-sm text-gray-600">
                         <Clock className="w-4 h-4" />
                         <span>{tr('預約時間：', 'Scheduled time: ')}{formatDateTime(localInputToIsoInTz(scheduledTime, tz), tz, { alwaysShowTz: true })}</span>
@@ -1278,7 +1314,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                   ) : (
                     <Send className="w-4 h-4" />
                   )}
-                  <span>{loading ? tr('發送中...', 'Sending...') : selectedCategory === 'compliment' ? tr('發送讚美', 'Send compliment') : selectedCategory === 'reconciliation' ? tr('發送和解', 'Send make-up message') : tr('發送邀請', 'Send invitation')}</span>
+                  <span>{loading ? tr('發送中...', 'Sending...') : selectedCategory === 'compliment' ? tr('發送讚美', 'Send compliment') : selectedCategory === 'reconciliation' ? tr('發送和解', 'Send make-up message') : isNegotiation ? tr('邀請對方一起討論', 'Invite them to talk') : tr('發送邀請', 'Send invitation')}</span>
                 </button>
               </div>
             </div>

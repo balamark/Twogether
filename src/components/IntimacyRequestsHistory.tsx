@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Calendar, Inbox, Send } from 'lucide-react';
+import { Calendar, Inbox, Send, ListChecks } from 'lucide-react';
 import apiService from '../services/api';
 import type { IntimacyRequest, IntimacyRequestStats, IntimacyRequestNudge } from '../services/api';
 import IntimacyRequestDetailModal from './IntimacyRequestDetailModal';
+import AlternativePlansPanel from './AlternativePlansPanel';
+import { intimacyStatusLabel, intimacyStatusBadgeClass, intimacyStatusAccent, isAwaitingResponse } from './intimacyStatus';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
 import { tr } from '../i18n/tr';
@@ -32,9 +34,9 @@ interface IntimacyRequestsHistoryProps {
 }
 
 type FeedbackState = { type: 'success' | 'error'; message: string };
-type Tab = 'received' | 'sent';
+type Tab = 'received' | 'sent' | 'plans';
 
-export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = ({ authState, onViewScript, onSendInvite }) => {
+export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = ({ authState, partnerNickname, onViewScript, onSendInvite }) => {
   const [items, setItems] = useState<IntimacyRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +107,7 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
   // Smart default: open on 我收到的 when there's something actionable; otherwise 我發送的.
   useEffect(() => {
     if (tabInitialized || loading || items.length === 0) return;
-    const hasPendingReceived = received.some((r) => r.status === 'pending');
+    const hasPendingReceived = received.some((r) => isAwaitingResponse(r.status, r.requestType));
     setTab(hasPendingReceived ? 'received' : sent.length > 0 ? 'sent' : 'received');
     setTabInitialized(true);
   }, [tabInitialized, loading, items.length, received, sent]);
@@ -137,7 +139,7 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
     );
   }
 
-  const activeItems = tab === 'received' ? received : sent;
+  const activeItems = tab === 'received' ? received : tab === 'sent' ? sent : [];
   const activeEmptyText = tab === 'received' ? tr('尚無收到紀錄', 'Nothing received yet') : tr('尚無發送紀錄', 'Nothing sent yet');
   const detailRequest = detailOpenId
     ? items.find((it) => it.id === detailOpenId) ?? null
@@ -191,8 +193,17 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
                 label={tr("我發送的", 'Sent')}
                 count={sent.length}
               />
+              <TabButton
+                active={tab === 'plans'}
+                onClick={() => setTab('plans')}
+                icon={ListChecks}
+                label={tr("共同方案", 'Shared plans')}
+              />
             </nav>
 
+            {tab === 'plans' ? (
+              <AlternativePlansPanel partnerNickname={partnerNickname} onSendInvite={onSendInvite} />
+            ) : (
             <RequestList
               items={activeItems}
               emptyText={activeEmptyText}
@@ -216,13 +227,15 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
               tz={tz}
               onOpenDetail={(id) => setDetailOpenId(id)}
             />
+            )}
           </div>
         </>
       )}
 
       <IntimacyRequestDetailModal
         request={detailRequest}
-        direction={tab}
+        direction={detailRequest?.direction ?? (tab === 'sent' ? 'sent' : 'received')}
+        onOpenPlans={() => setTab('plans')}
         onClose={() => setDetailOpenId(null)}
         onResponded={() => {
           setDetailOpenId(null);
@@ -239,7 +252,7 @@ interface TabButtonProps {
   onClick: () => void;
   icon: typeof Inbox;
   label: string;
-  count: number;
+  count?: number;
 }
 
 function TabButton({ active, onClick, icon: Icon, label, count }: TabButtonProps) {
@@ -251,9 +264,11 @@ function TabButton({ active, onClick, icon: Icon, label, count }: TabButtonProps
     <button type="button" role="tab" aria-selected={active} onClick={onClick} className={`${base} ${cls}`}>
       <Icon className="w-4 h-4" />
       <span>{label}</span>
-      <span className={`text-xs px-1.5 rounded-full ${active ? 'bg-petal-cream/20 text-petal-cream' : 'bg-petal-cream-2 text-petal-muted'}`}>
-        {count}
-      </span>
+      {count !== undefined && (
+        <span className={`text-xs px-1.5 rounded-full ${active ? 'bg-petal-cream/20 text-petal-cream' : 'bg-petal-cream-2 text-petal-muted'}`}>
+          {count}
+        </span>
+      )}
     </button>
   );
 }
@@ -430,33 +445,6 @@ function buildInvitationInsights(stats: IntimacyRequestStats): string[] {
   return insights.slice(0, 4);
 }
 
-function statusAccent(status: string): string {
-  switch (status) {
-    case 'accepted': return 'bg-petal-sage-deep';
-    case 'pending': return 'bg-amber-400';
-    case 'rejected':
-    case 'declined': return 'bg-petal-rose-deep';
-    default: return 'bg-gray-300'; // expired or unknown
-  }
-}
-
-function statusBadgeClass(status: string): string {
-  switch (status) {
-    case 'accepted': return 'bg-green-100 text-green-700';
-    case 'pending': return 'bg-yellow-100 text-yellow-700';
-    case 'rejected':
-    case 'declined': return 'bg-red-100 text-red-700';
-    default: return 'bg-gray-100 text-gray-600';
-  }
-}
-
-function translateStatus(status: string): string {
-  if (status === 'accepted') return tr('已接受', 'Accepted');
-  if (status === 'rejected' || status === 'declined') return tr('已拒絕', 'Declined');
-  if (status === 'expired') return tr('已過期', 'Expired');
-  return tr('待回應', 'Awaiting reply');
-}
-
 function RequestList({
   items,
   emptyText,
@@ -491,7 +479,7 @@ function RequestList({
               data-testid="intimacy-card"
               className="w-full text-left flex rounded-xl border border-petal-rule-soft bg-petal-cream-2/30 overflow-hidden hover:bg-petal-cream-2/60 transition-colors focus:outline-none focus:ring-2 focus:ring-petal-rose-deep/40"
             >
-              <div className={`w-1 flex-shrink-0 ${statusAccent(it.status)}`} aria-hidden="true" />
+              <div className={`w-1 flex-shrink-0 ${intimacyStatusAccent(it.status, it.requestType)}`} aria-hidden="true" />
               <div className="flex-1 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -500,6 +488,9 @@ function RequestList({
                         <Calendar className="w-4 h-4" />
                         <span>{tr('預約', 'Scheduled')} {formatDateTime(it.scheduledTime, tz, { alwaysShowTz: true })}</span>
                       </div>
+                    )}
+                    {it.requestType === 'negotiation' && (
+                      <div className="text-xs text-petal-rose-deep mb-1">{tr('💬 替代方案協商', '💬 Talk about alternatives')}</div>
                     )}
                     <div className="text-petal-ink text-sm leading-relaxed break-words">{it.messageContent}</div>
                     {it.scriptTitle && (
@@ -520,9 +511,9 @@ function RequestList({
                     </div>
                   </div>
                   <span
-                    className={`text-xs whitespace-nowrap flex-shrink-0 min-w-[4.5rem] inline-flex items-center justify-center text-center px-2 py-1 rounded-full ${statusBadgeClass(it.status)}`}
+                    className={`text-xs whitespace-nowrap flex-shrink-0 min-w-[4.5rem] inline-flex items-center justify-center text-center px-2 py-1 rounded-full ${intimacyStatusBadgeClass(it.status, it.requestType)}`}
                   >
-                    {translateStatus(it.status)}
+                    {intimacyStatusLabel(it.status, it.requestType)}
                   </span>
                 </div>
               </div>

@@ -1,11 +1,12 @@
 import React from 'react';
-import { Calendar, X, MessageSquareHeart, Sparkles, Play } from 'lucide-react';
+import { Calendar, X, MessageSquareHeart, Sparkles, Play, ListChecks } from 'lucide-react';
 import type { IntimacyRequest } from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
 import { useScrollLock } from '../hooks/useScrollLock';
 import IntimacyRequestActionPanel from './IntimacyRequestActionPanel';
 import { tr } from '../i18n/tr';
+import { intimacyStatusLabel, intimacyStatusBadgeClass, isAwaitingResponse, isNegotiation } from './intimacyStatus';
 
 interface IntimacyRequestDetailModalProps {
   request: IntimacyRequest | null;
@@ -14,6 +15,8 @@ interface IntimacyRequestDetailModalProps {
   onResponded: () => void;
   /** Navigate to the roleplay view and open the named script. */
   onViewScript?: (title: string) => void;
+  /** 替代方案協商: open the shared plan list. */
+  onOpenPlans?: () => void;
 }
 
 const ALTERNATIVE_CATEGORY_LABEL: Record<string, string> = {
@@ -24,33 +27,22 @@ const ALTERNATIVE_CATEGORY_LABEL: Record<string, string> = {
   custom: tr('自訂', 'Custom'),
 };
 
-function statusLabel(status: string): string {
-  if (status === 'accepted') return tr('已接受', 'Accepted');
-  if (status === 'rejected' || status === 'declined') return tr('已拒絕', 'Declined');
-  if (status === 'expired') return tr('已過期', 'Expired');
-  return tr('待回應', 'Awaiting reply');
-}
-
-function statusBadgeClass(status: string): string {
-  if (status === 'accepted') return 'bg-green-100 text-green-700';
-  if (status === 'pending') return 'bg-yellow-100 text-yellow-700';
-  if (status === 'rejected' || status === 'declined') return 'bg-red-100 text-red-700';
-  return 'bg-gray-100 text-gray-600';
-}
-
 const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
   request,
   direction,
   onClose,
   onResponded,
   onViewScript,
+  onOpenPlans,
 }) => {
   const tz = useTimezone();
   useScrollLock(!!request);
 
   if (!request) return null;
 
+  const negotiation = isNegotiation(request.requestType);
   const isPending = request.status === 'pending';
+  const canRespond = isAwaitingResponse(request.status, request.requestType);
   const isRejected = request.status === 'rejected' || request.status === 'declined';
   const responseTitle = direction === 'sent' ? tr('對方的回應', 'Their response') : tr('你的回應', 'Your response');
 
@@ -70,9 +62,9 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
               {direction === 'sent' ? tr('我發送的邀請', 'Invitation I sent') : tr('我收到的邀請', 'Invitation I received')}
             </h3>
             <span
-              className={`text-xs whitespace-nowrap inline-flex items-center justify-center text-center px-2 py-0.5 rounded-full ${statusBadgeClass(request.status)}`}
+              className={`text-xs whitespace-nowrap inline-flex items-center justify-center text-center px-2 py-0.5 rounded-full ${intimacyStatusBadgeClass(request.status, request.requestType)}`}
             >
-              {statusLabel(request.status)}
+              {intimacyStatusLabel(request.status, request.requestType)}
             </span>
           </div>
           <button
@@ -89,7 +81,9 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
         <div className="overflow-y-auto px-5 py-4 space-y-5">
           {/* Original invitation */}
           <section>
-            <div className="text-xs uppercase tracking-[0.12em] text-petal-muted mb-1.5">{tr('原邀請', 'Original invitation')}</div>
+            <div className="text-xs uppercase tracking-[0.12em] text-petal-muted mb-1.5">
+              {negotiation ? tr('💬 替代方案協商', '💬 Talk about alternatives') : tr('原邀請', 'Original invitation')}
+            </div>
             {request.scheduledTime && (
               <div className="inline-flex items-center gap-1.5 text-sm text-petal-ink-soft mb-2">
                 <Calendar className="w-4 h-4" />
@@ -185,16 +179,44 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
             </section>
           )}
 
+          {/* 替代方案協商: point both partners at the shared plan list. */}
+          {negotiation && onOpenPlans && (request.status === 'accepted' || direction === 'sent') && (
+            <section className="rounded-xl border border-petal-rule-soft bg-petal-cream-2/40 p-4 space-y-2" data-testid="negotiation-plans-cta">
+              <p className="text-sm text-petal-ink">
+                {request.status === 'accepted'
+                  ? tr('你們可以各自提出方案，雙方都認可的才會加入共同清單。', 'You can each propose plans; only ones you both approve join the shared list.')
+                  : request.status === 'pending' || request.status === 'later'
+                  ? tr('等待回覆的同時，你也可以先把想法寫成方案草稿，對方看過再決定。', 'While you wait, you can draft a plan; they\'ll see it and decide.')
+                  : tr('謝謝你願意開口。這是對方此刻的步調，你們的共同方案清單會一直保留著。', 'Thank you for speaking up. That\'s their pace right now; your shared plan list stays here for whenever you\'re both ready.')}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenPlans();
+                }}
+                className="inline-flex items-center gap-1.5 text-sm text-petal-rose-deep hover:text-pink-700 underline underline-offset-2"
+              >
+                <ListChecks className="w-4 h-4" />
+                {tr('前往共同方案', 'Open shared plans')}
+              </button>
+            </section>
+          )}
+
           {/* Empty rejected state (responded with no message) */}
-          {isRejected && !request.responseMessage && !request.alternativeContent && !request.alternativeScheduledTime && (
+          {!negotiation && isRejected && !request.responseMessage && !request.alternativeContent && !request.alternativeScheduledTime && (
             <p className="text-sm text-petal-muted italic">{tr('對方沒有附上額外訊息。', 'They didn\'t add a message.')}</p>
           )}
 
           {/* Action panel — only for received pending */}
-          {direction === 'received' && isPending && (
+          {direction === 'received' && canRespond && (
             <section>
               <div className="text-xs uppercase tracking-[0.12em] text-petal-muted mb-2">{tr('如何回應', 'How they responded')}</div>
-              <IntimacyRequestActionPanel request={request} onResponded={onResponded} />
+              <IntimacyRequestActionPanel
+                request={request}
+                onResponded={onResponded}
+                onOpenPlans={onOpenPlans ? () => { onResponded(); onOpenPlans(); } : undefined}
+              />
             </section>
           )}
         </div>
