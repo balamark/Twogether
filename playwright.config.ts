@@ -13,8 +13,10 @@ dotenv.config({ path: path.resolve(__dirname, '.env.test'), override: true });
  */
 export default defineConfig({
   testDir: './tests',
-  /* Run tests in files in parallel */
-  fullyParallel: true,
+  /* Off so CI's `--shard=N/4` splits by whole FILE, never by test: every file
+     keeps its in-file order and runs its beforeAll once, as in a single run.
+     With `workers: 1` (below) this changes nothing else. */
+  fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
@@ -33,7 +35,7 @@ export default defineConfig({
   /* One worker everywhere, not just on CI. The DB-backed specs (custom-script,
      marketplace-flow, roleplay-favorites, user-journey, …) all drive the single
      shared account global-setup seeds, and several mutate the same script /
-     favorite rows. `fullyParallel` runs different FILES concurrently, so with
+     favorite rows. Multiple workers run different FILES concurrently, so with
      more than one worker those files corrupt each other's state — which is
      exactly why marketplace-flow already deletes its scripts in afterEach "to
      keep the parallel roleplay-favorites suite from flaking".
