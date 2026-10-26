@@ -14,6 +14,7 @@ import ParticipantAvatar from './ParticipantAvatar';
 import MarkdownContent from './MarkdownContent';
 import { ROLE_STYLE } from '../utils/threadRoles';
 import { tr } from '../i18n/tr';
+import { useHistoryState } from '../hooks/useHistoryState';
 
 // 公開問答 (Public Q&A): a read-only, anonymised browse of consultation chats
 // that both the client and therapist agreed to publish. Helps people with
@@ -69,7 +70,7 @@ const PublicQaView: React.FC<PublicQaViewProps> = ({ isAuthenticated, showNotifi
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [open, setOpen] = useState<{ id: string; source: PublicQaSource } | null>(null);
+  const [open, setOpen] = useHistoryState<{ id: string; source: PublicQaSource } | null>('qa:open', null);
 
   const load = useCallback(async (nextPage: number, replace: boolean) => {
     try {
@@ -88,8 +89,11 @@ const PublicQaView: React.FC<PublicQaViewProps> = ({ isAuthenticated, showNotifi
 
   useEffect(() => { load(1, true); }, [load]);
 
-  if (open) {
-    return (
+  // The list stays mounted (just hidden) under an open thread, so going back
+  // keeps every "載入更多" page and the scroll spot instead of reloading page 1.
+  return (
+    <>
+    {open && (
       <PublicQaDetail
         id={open.id}
         source={open.source}
@@ -98,11 +102,8 @@ const PublicQaView: React.FC<PublicQaViewProps> = ({ isAuthenticated, showNotifi
         onBack={() => setOpen(null)}
         onFindTherapist={onFindTherapist}
       />
-    );
-  }
-
-  return (
-    <div className="space-y-6" data-testid="public-qa-view">
+    )}
+    <div className="space-y-6" data-testid="public-qa-view" hidden={!!open}>
       <div className="text-center max-w-2xl mx-auto">
         <p className="font-body text-sm text-petal-ink-soft">
           {tr('這些是經諮商師與個案雙方同意、', 'These conversations were shared with the consent of both the counselor and the clients, ')}<span className="text-petal-ink">{tr('匿名公開', 'anonymously')}</span>{tr('的對話。 也許別人的經驗，正好能幫上你。', '. Someone else\'s experience might be just what helps you.')}
@@ -170,6 +171,7 @@ const PublicQaView: React.FC<PublicQaViewProps> = ({ isAuthenticated, showNotifi
         </>
       )}
     </div>
+    </>
   );
 };
 

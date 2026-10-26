@@ -7,6 +7,7 @@ import EventAnalytics from './EventAnalytics';
 import SoloModeGate from './SoloModeGate';
 import InfoHint from './InfoHint';
 import { tr } from '../i18n/tr';
+import { useHistoryState } from '../hooks/useHistoryState';
 
 type EventsSubView = 'list' | 'compose' | 'detail' | 'analytics';
 
@@ -53,13 +54,18 @@ export default function EventsView({
   onInvitePartner,
   onNavigate,
 }: EventsViewProps) {
-  const [view, setView] = useState<EventsSubView>('list');
-  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
+  // History-backed so the browser's 上一頁 returns from a detail/compose to
+  // the list (at the same scroll spot) instead of leaving the app.
+  const [view, setViewState] = useHistoryState<EventsSubView>('events:view', 'list');
+  const [selectedEventId, setSelectedEventId] = useHistoryState<string | null>('events:id', null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  useEffect(() => {
-    if (view !== 'detail') setSelectedEventId(null);
-  }, [view]);
+  // Leaving detail also clears the id in the same history entry, so the
+  // in-app 返回 matches the entry below and acts as a browser back.
+  const setView = (next: EventsSubView, opts?: { replace?: boolean }) => {
+    setViewState(next, opts);
+    if (next !== 'detail') setSelectedEventId(null, opts);
+  };
 
   // When the parent passes an initialEventId (e.g. from a notification tap),
   // jump straight to detail. Clear the parent's pending id so re-mounting the
@@ -67,28 +73,30 @@ export default function EventsView({
   useEffect(() => {
     if (initialEventId) {
       setSelectedEventId(initialEventId);
-      setView('detail');
+      setViewState('detail');
       onInitialEventConsumed?.();
     }
-  }, [initialEventId, onInitialEventConsumed]);
+  }, [initialEventId, onInitialEventConsumed, setSelectedEventId, setViewState]);
 
   // Same consume-once pattern as initialEventId, so coming back to 說開一件事
   // later doesn't drop you into the composer again.
   useEffect(() => {
     if (initialSubView) {
-      setView(initialSubView);
+      setViewState(initialSubView);
       onInitialSubViewConsumed?.();
     }
-  }, [initialSubView, onInitialSubViewConsumed]);
+  }, [initialSubView, onInitialSubViewConsumed, setViewState]);
 
-  const openDetail = (id: string) => {
-    setSelectedEventId(id);
-    setView('detail');
+  const openDetail = (id: string, opts?: { replace?: boolean }) => {
+    setSelectedEventId(id, opts);
+    setViewState('detail', opts);
   };
 
+  // The finished composer is replaced by its result, so 上一頁 from the new
+  // event goes to the list rather than back into a spent compose flow.
   const onEventCreated = (id: string | null) => {
     setRefreshKey((k) => k + 1);
-    if (id) openDetail(id);
+    if (id) openDetail(id, { replace: true });
     else setView('list');
   };
 
@@ -148,8 +156,10 @@ export default function EventsView({
       </header>
 
       <div>
-        {view === 'list' && (
-          <>
+        {/* Kept mounted (hidden) under an open event so going back returns
+            to the same scroll spot without refetching the list. */}
+        {(view === 'list' || view === 'detail') && (
+          <div hidden={view !== 'list'}>
             {/* The 歷史／開始對話／分析 row was a third row of pills before any
                 content on a 390px screen. 開始對話 is the primary action, so it
                 belongs in the list header; 分析 is rare enough to be an icon. */}
@@ -183,7 +193,7 @@ export default function EventsView({
               currentUserId={authState.user?.id || ''}
               onCompose={() => setView('compose')}
             />
-          </>
+          </div>
         )}
         {view === 'compose' && (
           <ComposeEventFlow

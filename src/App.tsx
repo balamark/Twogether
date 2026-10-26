@@ -60,6 +60,7 @@ import { EngineerModeProvider } from './contexts/EngineerModeProvider';
 import EngineerTextEngine from './components/EngineerTextEngine';
 import { useScrollLock } from './hooks/useScrollLock';
 import { usePageTracking } from './hooks/usePageTracking';
+import { useHistoryState } from './hooks/useHistoryState';
 import { tr, dateLocale } from './i18n/tr';
 
 // The accept link for a just-sent pairing invite, surfaced so the inviter can
@@ -546,7 +547,9 @@ const LoveTimeApp = () => {
   // Persist the active tab across page refreshes so a reload keeps the user on
   // the same page (e.g. 角色扮演) instead of bouncing back to 記錄時光. Only
   // restore known navigable views; transient/result flows handle their own view.
-  const [currentView, setCurrentView] = useState(() => {
+  // Backed by browser history so 上一頁/下一頁 move between tabs (and restore
+  // the scroll position) instead of leaving the site.
+  const [currentView, setCurrentView] = useHistoryState('view', () => {
     if (typeof window === 'undefined') return 'home';
     const p = window.location.pathname;
     if (p.startsWith('/billing/result') || p.startsWith('/booking/result')) return 'home';
@@ -555,7 +558,7 @@ const LoveTimeApp = () => {
       if (saved && PERSISTED_VIEWS.has(saved)) return saved;
     } catch { /* storage disabled — fall back to default */ }
     return 'home';
-  });
+  }, { root: true });
 
   // Remember the active tab (best-effort) so a refresh restores it.
   useEffect(() => {
@@ -820,7 +823,7 @@ const LoveTimeApp = () => {
 
       // Clean up URL to remove token after processing
       const newUrl = window.location.pathname;
-      window.history.replaceState({}, document.title, newUrl);
+      window.history.replaceState(window.history.state, document.title, newUrl);
     }
   }, []);
 
@@ -831,7 +834,7 @@ const LoveTimeApp = () => {
     const scriptParam = urlParams.get('script');
     if (scriptParam) {
       sessionStorage.setItem('pendingScriptDeepLink', scriptParam);
-      window.history.replaceState({}, document.title, window.location.pathname);
+      window.history.replaceState(window.history.state, document.title, window.location.pathname);
     }
   }, []);
   useEffect(() => {
@@ -842,7 +845,7 @@ const LoveTimeApp = () => {
       setPendingScriptTitle(stored);
       setCurrentView('roleplay');
     }
-  }, [authState.isAuthenticated]);
+  }, [authState.isAuthenticated, setCurrentView]);
 
   // Load Premium status on auth (and clear it on logout) so the header badge and
   // the proactive expiry banner have the couple's tier + expiry. Best-effort:
@@ -887,8 +890,8 @@ const LoveTimeApp = () => {
   // (a non-therapist restored a stale 'counselor' view, or the therapist probe
   // resolved false / they switched back), bounce to home.
   useEffect(() => {
-    if (currentView === 'counselor' && !counselorActive) setCurrentView('home');
-  }, [currentView, counselorActive]);
+    if (currentView === 'counselor' && !counselorActive) setCurrentView('home', { replace: true });
+  }, [currentView, counselorActive, setCurrentView]);
 
   useEffect(() => {
     if (!pairingInvitationToken) {
@@ -1395,7 +1398,7 @@ const LoveTimeApp = () => {
     };
     window.addEventListener('auth:session-expired', handleSessionExpired);
     return () => window.removeEventListener('auth:session-expired', handleSessionExpired);
-  }, [showNotification]);
+  }, [showNotification, setCurrentView]);
 
   // src/services/api.ts dispatches `billing:limit-reached` on a 429 with one of
   // our freemium cap error_codes. Send the user to the Upgrade view with the
@@ -1408,7 +1411,7 @@ const LoveTimeApp = () => {
     };
     window.addEventListener('billing:limit-reached', handleLimitReached);
     return () => window.removeEventListener('billing:limit-reached', handleLimitReached);
-  }, []);
+  }, [setCurrentView]);
 
   // Proactive expiration: schedule a logout when the JWT is due to expire,
   // and re-check on visibilitychange so users who put their machine to sleep
@@ -2772,7 +2775,7 @@ const LoveTimeApp = () => {
     return (
       <BillingResultView
         onDone={() => {
-          window.history.replaceState(null, '', '/');
+          window.history.replaceState(window.history.state, '', '/');
           setIsBillingResult(false);
           setCurrentView('home');
         }}
@@ -2786,7 +2789,7 @@ const LoveTimeApp = () => {
     return (
       <BookingResultView
         onDone={() => {
-          window.history.replaceState(null, '', '/');
+          window.history.replaceState(window.history.state, '', '/');
           setIsBookingResult(false);
           setCurrentView('therapists');
         }}
