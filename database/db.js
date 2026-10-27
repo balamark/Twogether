@@ -27,7 +27,13 @@ const pool = new Pool({
   // Add additional SSL options for Supabase
   ...(isSupabase && {
     sslmode: 'require'
-  })
+  }),
+  // pg's default closes an idle connection after 10s, so the first tap after
+  // a short pause paid a fresh TCP + TLS handshake to the remote database
+  // (often 300ms+) before any query ran. Keep connections warm for 5 minutes
+  // and TCP keep-alive them so NATs/poolers don't silently drop them.
+  idleTimeoutMillis: 5 * 60 * 1000,
+  keepAlive: true,
 });
 
 // Test the connection

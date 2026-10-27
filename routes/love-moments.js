@@ -660,7 +660,9 @@ router.delete('/:id', async (req, res) => {
 // and even that appends to the same shared, persisted pool.
 const APPRECIATION_POOL_CAP = 60;
 
+let appreciationQuestionCacheTableReady = false; // DDL is idempotent; run it once per process, not per request
 async function ensureAppreciationQuestionCacheTable() {
+  if (appreciationQuestionCacheTableReady) return;
   try {
     await db.query(`
       CREATE TABLE IF NOT EXISTS appreciation_question_cache (
@@ -673,6 +675,7 @@ async function ensureAppreciationQuestionCacheTable() {
         updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
       );
     `);
+    appreciationQuestionCacheTableReady = true;
   } catch (err) {
     logWarn('ensureAppreciationQuestionCacheTable failed', { err: err.message });
   }

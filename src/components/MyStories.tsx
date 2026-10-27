@@ -39,13 +39,19 @@ export default function MyStories({
   useEffect(load, []);
 
   const remove = async (id: string) => {
+    // Optimistic (playbook §R7): the inline confirm was the decision, so drop
+    // the story right away; restore the list if the server rejects it.
+    const snapshot = data;
+    setData((d) => (d ? { ...d, stories: d.stories.filter((s) => s.id !== id) } : d));
+    setConfirmDeleteId(null);
     setDeleting(true);
     try {
       await apiService.deleteStory(id);
       showNotification({ type: 'success', title: tr('已刪除', 'Deleted'), message: tr('已從「好文 · 故事」移除', 'Removed from "Reads & stories"') });
-      setConfirmDeleteId(null);
-      load();
+      // Refresh the totals quietly — load() would blank the list behind a spinner.
+      apiService.getMyStories().then(setData).catch(() => {});
     } catch (err) {
+      setData(snapshot);
       showNotification({ type: 'error', title: tr('刪除失敗', 'Couldn\'t delete'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment') });
     } finally {
       setDeleting(false);

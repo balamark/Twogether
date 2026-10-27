@@ -558,7 +558,9 @@ router.get('/analytics', async (req, res) => {
 // therapist a ready summary so the session starts on the real issue.
 // ---------------------------------------------------------------------------
 
+let therapySummariesTableReady = false; // DDL is idempotent; run it once per process, not per request
 async function ensureTherapySummariesTable() {
+  if (therapySummariesTableReady) return;
   try {
     await db.query(`
       CREATE TABLE IF NOT EXISTS therapy_summaries (
@@ -576,6 +578,7 @@ async function ensureTherapySummariesTable() {
     await db.query(
       `ALTER TABLE therapy_summaries ADD COLUMN IF NOT EXISTS event_count INTEGER`
     );
+    therapySummariesTableReady = true;
   } catch (err) {
     logWarn('ensureTherapySummariesTable failed', { err: err.message });
   }
@@ -745,7 +748,9 @@ router.get(
 // just one fight. Below this, the empty state guides them to keep going.
 const COMMUNICATION_PATTERN_MIN_EVENTS = 2;
 
+let communicationPatternsTableReady = false; // DDL is idempotent; run it once per process, not per request
 async function ensureCommunicationPatternsTable() {
+  if (communicationPatternsTableReady) return;
   try {
     await db.query(`
       CREATE TABLE IF NOT EXISTS communication_pattern_summaries (
@@ -758,6 +763,7 @@ async function ensureCommunicationPatternsTable() {
         UNIQUE (couple_id, input_hash)
       );
     `);
+    communicationPatternsTableReady = true;
   } catch (err) {
     logWarn('ensureCommunicationPatternsTable failed', { err: err.message });
   }
@@ -963,7 +969,9 @@ router.get('/therapy-summary/history', async (req, res) => {
 const QUIET_EVENT_THRESHOLD = 3;
 const QUIET_WIDEN_DAYS = 60;
 
+let therapyTopicSuggestionsTableReady = false; // DDL is idempotent; run it once per process, not per request
 async function ensureTherapyTopicSuggestionsTable() {
+  if (therapyTopicSuggestionsTableReady) return;
   try {
     await db.query(`
       CREATE TABLE IF NOT EXISTS therapy_topic_suggestions (
@@ -979,12 +987,15 @@ async function ensureTherapyTopicSuggestionsTable() {
         UNIQUE (couple_id, input_hash)
       );
     `);
+    therapyTopicSuggestionsTableReady = true;
   } catch (err) {
     logWarn('ensureTherapyTopicSuggestionsTable failed', { err: err.message });
   }
 }
 
+let therapyTopicSelectionsTableReady = false; // DDL is idempotent; run it once per process, not per request
 async function ensureTherapyTopicSelectionsTable() {
+  if (therapyTopicSelectionsTableReady) return;
   try {
     await db.query(`
       CREATE TABLE IF NOT EXISTS therapy_topic_selections (
@@ -1001,12 +1012,15 @@ async function ensureTherapyTopicSelectionsTable() {
           REFERENCES therapy_topic_suggestions (couple_id, input_hash) ON DELETE CASCADE
       );
     `);
+    therapyTopicSelectionsTableReady = true;
   } catch (err) {
     logWarn('ensureTherapyTopicSelectionsTable failed', { err: err.message });
   }
 }
 
+let therapyTopicLibrarySelectionsTableReady = false; // DDL is idempotent; run it once per process, not per request
 async function ensureTherapyTopicLibrarySelectionsTable() {
+  if (therapyTopicLibrarySelectionsTableReady) return;
   try {
     await db.query(`
       CREATE TABLE IF NOT EXISTS therapy_topic_library_selections (
@@ -1020,6 +1034,7 @@ async function ensureTherapyTopicLibrarySelectionsTable() {
         UNIQUE (couple_id, topic_id)
       );
     `);
+    therapyTopicLibrarySelectionsTableReady = true;
   } catch (err) {
     logWarn('ensureTherapyTopicLibrarySelectionsTable failed', { err: err.message });
   }

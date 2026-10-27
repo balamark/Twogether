@@ -434,12 +434,16 @@ const CalendarView = ({
     // IS the confirmation step (it shows the record and asks 「標記錯了嗎？」),
     // and a native dialog stacked on a fixed overlay would be a second blocking
     // modal. The button sits apart from the card's other actions instead.
+    // Optimistic (playbook §R7): drop the mark at once (the open day card
+    // re-derives from cycleRecords); put the record back if the delete fails.
+    const removed = periodDayRecord;
+    setCycleRecords(prev => prev.filter(r => r.id !== removed.id));
     setDeletingPeriod(true);
     try {
-      await apiService.deleteCycleRecord(periodDayRecord.id);
-      setCycleRecords(prev => prev.filter(r => r.id !== periodDayRecord.id));
+      await apiService.deleteCycleRecord(removed.id);
       showNotification({ type: 'success', title: tr('已取消', 'Removed'), message: tr('月經紀錄已移除', 'The period record was removed'), duration: 3000 });
     } catch (error: unknown) {
+      setCycleRecords(prev => (prev.some(r => r.id === removed.id) ? prev : [...prev, removed]));
       showNotification({ type: 'error', title: tr('移除失敗', 'Couldn\'t remove'), message: (error as Error)?.message || tr('無法移除月經紀錄，請稍後再試', 'Couldn\'t remove the period record. Please try again in a moment'), duration: 5000 });
     } finally {
       setDeletingPeriod(false);

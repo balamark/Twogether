@@ -195,8 +195,10 @@ async function notifyPartner(partnerId, type, title, content, relatedUserId, opt
     `💌 Twogether｜${title}\n「${lineService.excerpt(content)}」\n👉 https://twogether.fun`
   );
 
-  // Fire-and-forget email to the partner. Honors per-user opt-out.
-  try {
+  // Fire-and-forget email to the partner. Honors per-user opt-out. Not
+  // awaited: callers await notifyPartner before responding, and an SMTP send
+  // would hold the post/reply button for 1–3s (playbook §R7).
+  (async () => {
     const partner = await emailService.getUserEmailIfOptedIn(db, partnerId);
     if (!partner) return;
     let senderName = opts.senderName;
@@ -212,9 +214,9 @@ async function notifyPartner(partnerId, type, title, content, relatedUserId, opt
       isReply: type === 'wall_reply',
       content,
     });
-  } catch (err) {
+  })().catch((err) => {
     logWarn('Failed to send notification email', { type, err: err.message });
-  }
+  });
 }
 
 // Tell the author their partner tapped a 心意回應. Deliberately NOT routed
