@@ -1308,21 +1308,6 @@ const toDedicated = (row) => ({
   createdAt: row.created_at,
 });
 
-// Defensive: make sure the couple_id column exists (migration 092) so
-// insertNotification can wire a notification to a specific couple even on an
-// environment where migrations haven't caught up. Mirrors the event_id ensure
-// pattern in routes/intimacy-requests.js. Runs its ALTER once per process.
-let notificationsCoupleIdEnsured = false;
-async function ensureNotificationsCoupleIdColumn() {
-  if (notificationsCoupleIdEnsured) return;
-  try {
-    await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS couple_id UUID`);
-    notificationsCoupleIdEnsured = true;
-  } catch (err) {
-    logWarn('ensureNotificationsCoupleIdColumn failed', { err: err.message });
-  }
-}
-
 // In-app only notification (avoids the wall/event email templates for
 // relationship-status changes like adding/removing a dedicated therapist).
 // coupleId (optional) lets the notification deep-link to a specific couple's
@@ -1330,7 +1315,6 @@ async function ensureNotificationsCoupleIdColumn() {
 async function insertNotification(userId, type, title, content, relatedUserId, priority = 1, coupleId = null) {
   if (!userId) return;
   try {
-    await ensureNotificationsCoupleIdColumn();
     await db.query(
       `INSERT INTO notifications (user_id, notification_type, title, content, related_user_id, priority, couple_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,

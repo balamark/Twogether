@@ -13,9 +13,6 @@ const db = require('../database/db');
 const { logInfo, logError, logWarn } = require('../lib/logger');
 const { optionalAuth } = require('../middleware/auth');
 const featureFlags = require('../lib/featureFlags');
-// For ensureAiFeedbackTable() — guarantees the curation columns exist before the
-// AI down-vote endpoints read/update them (no cycle: ai-feedback never requires admin).
-const aiFeedbackRoutes = require('./ai-feedback');
 
 const publicRouter = express.Router();
 const adminApiRouter = express.Router();
@@ -763,7 +760,6 @@ adminApiRouter.get('/ai-downvotes', async (req, res) => {
     : null;
   const limit = Math.min(Math.max(1, parseInt(req.query.limit, 10) || 100), 200);
   try {
-    await aiFeedbackRoutes.ensureAiFeedbackTable();
     const params = [];
     let where = "f.rating = 'down'";
     if (surface) {
@@ -806,7 +802,6 @@ adminApiRouter.post('/ai-downvotes/:id/curate', express.json(), async (req, res)
   const note =
     curated && typeof req.body.note === 'string' ? req.body.note.trim().slice(0, 200) : null;
   try {
-    await aiFeedbackRoutes.ensureAiFeedbackTable();
     const result = await db.query(
       `UPDATE ai_response_feedback
           SET curated_negative = $1,

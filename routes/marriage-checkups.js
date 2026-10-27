@@ -42,46 +42,6 @@ async function getCoupleForUser(userId) {
   return result.rows[0] || null;
 }
 
-// Lazy table creation — mirrors the pattern used by lib/aiUsage.js and
-// routes/intimacy-requests.js so the feature works even where the migration
-// runner hasn't been applied (e.g. some test DBs). Idempotent.
-let tablesReady = false;
-async function ensureTables() {
-  if (tablesReady) return;
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS marriage_checkups (
-      id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      couple_id     UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
-      created_by    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      status        VARCHAR(20) NOT NULL DEFAULT 'collecting',
-      ai_summary    TEXT,
-      ai_points     JSONB,
-      created_at    TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-      revealed_at   TIMESTAMP WITH TIME ZONE
-    );
-  `);
-  await db.query(
-    `CREATE INDEX IF NOT EXISTS idx_marriage_checkups_couple ON marriage_checkups(couple_id, created_at DESC)`
-  );
-  await db.query(
-    `CREATE UNIQUE INDEX IF NOT EXISTS uq_marriage_checkups_open ON marriage_checkups(couple_id) WHERE status = 'collecting'`
-  );
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS marriage_checkup_responses (
-      id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      checkup_id    UUID NOT NULL REFERENCES marriage_checkups(id) ON DELETE CASCADE,
-      user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      answers       JSONB NOT NULL,
-      submitted_at  TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-      UNIQUE (checkup_id, user_id)
-    );
-  `);
-  await db.query(
-    `CREATE INDEX IF NOT EXISTS idx_marriage_checkup_responses_checkup ON marriage_checkup_responses(checkup_id)`
-  );
-  tablesReady = true;
-}
-
 // Load a checkup row + its responses, scoped to the user's couple. Hides the
 // partner's answers until the checkup is revealed (both submitted).
 async function loadCheckup(checkupId, userId, coupleId) {
@@ -128,7 +88,6 @@ function serialize(checkup, responses, userId, partnerId) {
 // GET / — the couple's current (collecting) checkup, or the most recent one.
 router.get('/', async (req, res) => {
   try {
-    await ensureTables();
     const userId = req.user.id;
     const couple = await getCoupleForUser(userId);
     if (!couple) {
@@ -162,7 +121,6 @@ router.get('/', async (req, res) => {
 // GET /history — past revealed checkups (lightweight list).
 router.get('/history', async (req, res) => {
   try {
-    await ensureTables();
     const userId = req.user.id;
     const couple = await getCoupleForUser(userId);
     if (!couple) return res.json({ success: true, checkups: [] });
@@ -194,7 +152,6 @@ router.get('/history', async (req, res) => {
 router.get('/:id', [param('id').isUUID()], async (req, res) => {
   if (sendValidationError(req, res)) return;
   try {
-    await ensureTables();
     const userId = req.user.id;
     const couple = await getCoupleForUser(userId);
     if (!couple) return res.status(404).json({ success: false, message: '找不到這份婚姻檢查。' });
@@ -214,7 +171,6 @@ router.get('/:id', [param('id').isUUID()], async (req, res) => {
 // (so both partners converge on the same review).
 router.post('/', async (req, res) => {
   try {
-    await ensureTables();
     const userId = req.user.id;
     const couple = await getCoupleForUser(userId);
     if (!couple) {
@@ -262,7 +218,6 @@ router.post(
   async (req, res) => {
     if (sendValidationError(req, res)) return;
     try {
-      await ensureTables();
       const userId = req.user.id;
       const couple = await getCoupleForUser(userId);
       if (!couple) {

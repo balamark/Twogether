@@ -660,24 +660,6 @@ router.delete('/:id', async (req, res) => {
 // and even that appends to the same shared, persisted pool.
 const APPRECIATION_POOL_CAP = 60;
 
-async function ensureAppreciationQuestionCacheTable() {
-  try {
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS appreciation_question_cache (
-        scope_id VARCHAR(64) PRIMARY KEY,
-        questions JSONB NOT NULL,
-        provider VARCHAR(32),
-        model VARCHAR(64),
-        gen_count INTEGER NOT NULL DEFAULT 1,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-      );
-    `);
-  } catch (err) {
-    logWarn('ensureAppreciationQuestionCacheTable failed', { err: err.message });
-  }
-}
-
 async function loadAppreciationCache(scopeId) {
   try {
     const r = await db.query(
@@ -740,7 +722,6 @@ router.post('/appreciation-questions', [
     : [];
 
   try {
-    await ensureAppreciationQuestionCacheTable();
     const scopeId = await resolveAppreciationScope(userId);
     const cached = await loadAppreciationCache(scopeId);
 
