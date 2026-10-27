@@ -175,9 +175,13 @@ async function notifyPartner(partnerId, type, title, content, relatedUserId, opt
   try {
     await db.query(
       `INSERT INTO notifications (
-         user_id, notification_type, title, content, related_user_id, priority
-       ) VALUES ($1, $2, $3, $4, $5, $6)`,
-      [partnerId, type, title, content.slice(0, 200), relatedUserId, 1]
+         user_id, notification_type, title, content, related_user_id, priority,
+         target_id, target_reply_id
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        partnerId, type, title, content.slice(0, 200), relatedUserId, 1,
+        opts.postId || null, opts.replyId || null,
+      ]
     );
   } catch (err) {
     logWarn('Failed to create notification', { type, err: err.message });
@@ -216,7 +220,7 @@ async function notifyPartner(partnerId, type, title, content, relatedUserId, opt
 // Tell the author their partner tapped a 心意回應. Deliberately NOT routed
 // through notifyPartner: that helper always fans out to email, and emailing
 // every one-tap chip is how a kind gesture turns into spam. In-app + LINE only.
-async function notifyReaction(authorId, reactorId, reactionKey) {
+async function notifyReaction(authorId, reactorId, reactionKey, postId) {
   if (!authorId || authorId === reactorId) return;
   const meta = WALL_REACTIONS[reactionKey];
   if (!meta) return;
@@ -227,9 +231,9 @@ async function notifyReaction(authorId, reactorId, reactionKey) {
   try {
     await db.query(
       `INSERT INTO notifications (
-         user_id, notification_type, title, content, related_user_id, priority
-       ) VALUES ($1, $2, $3, $4, $5, $6)`,
-      [authorId, 'wall_reaction', title, content, reactorId, 1]
+         user_id, notification_type, title, content, related_user_id, priority, target_id
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [authorId, 'wall_reaction', title, content, reactorId, 1, postId || null]
     );
   } catch (err) {
     logWarn('Failed to create reaction notification', { err: err.message });
@@ -555,7 +559,7 @@ router.put('/:id/reaction', async (req, res) => {
 
     // Only a newly given reaction is worth a ping — taking one back isn't, and
     // re-tapping the same chip never reaches here (it clears instead).
-    if (next !== null) await notifyReaction(post.author_id, userId, next);
+    if (next !== null) await notifyReaction(post.author_id, userId, next, post.id);
 
     const refreshed = await fetchReactionsForPosts([postId]);
     const rows = refreshed[postId] || [];
@@ -694,6 +698,7 @@ router.post(
         await notifyPartner(partnerId, 'wall_post', title, notifyBody, userId, {
           isImportant: category === 'important',
           senderName: enriched.rows[0]?.author_nickname || null,
+          postId: post.id,
         });
       }
 
@@ -1004,7 +1009,7 @@ router.post(
           '對方回覆了你的貼文',
           content,
           userId,
-          { senderName: reply.author_nickname || null }
+          { senderName: reply.author_nickname || null, postId, replyId: reply.id }
         );
       }
 
@@ -1180,7 +1185,7 @@ router.post(
           `AI 諮商師 ${companion.name} 在你們的牆上留言`,
           content,
           userId,
-          { senderName: `AI 諮商師 ${companion.name}` }
+          { senderName: `AI 諮商師 ${companion.name}`, postId, replyId: reply.id }
         );
       }
 

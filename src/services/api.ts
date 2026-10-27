@@ -419,6 +419,10 @@ interface Notification {
   intimacyRequestId?: string;
   eventId?: string;
   coupleId?: string;
+  // The exact wall post / love moment the notification is about, and (for wall
+  // replies) the reply inside its thread — lets a tap land on it, not just its tab.
+  targetId?: string;
+  targetReplyId?: string;
   relatedUserNickname?: string;
   isRead: boolean;
   readAt?: string;
@@ -4402,6 +4406,8 @@ class ApiService {
       intimacy_request_id?: string;
       event_id?: string;
       couple_id?: string;
+      target_id?: string;
+      target_reply_id?: string;
       related_user_nickname?: string;
       is_read?: boolean;
       read_at?: string;
@@ -4417,6 +4423,8 @@ class ApiService {
       intimacyRequestId: typedData?.intimacy_request_id,
       eventId: typedData?.event_id,
       coupleId: typedData?.couple_id,
+      targetId: typedData?.target_id || undefined,
+      targetReplyId: typedData?.target_reply_id || undefined,
       relatedUserNickname: typedData?.related_user_nickname,
       isRead: typedData?.is_read || false,
       readAt: typedData?.read_at,

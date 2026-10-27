@@ -12,7 +12,9 @@ interface NotificationInboxProps {
   onClose: () => void;
   unreadCount: number;
   onUnreadCountChange: (count: number) => void;
-  onNavigate?: (view: string, payload?: string) => void;
+  // payload: the event / couple / wall post / love moment id to land on;
+  // subPayload: the wall reply inside that post's thread.
+  onNavigate?: (view: string, payload?: string, subPayload?: string) => void;
 }
 
 const NotificationInbox: React.FC<NotificationInboxProps> = ({
@@ -58,12 +60,14 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       return;
     }
     switch (notification.notificationType) {
-      // Wall activity (incl. AI 諮商師 comments) → the wall thread.
+      // Wall activity (incl. AI 諮商師 comments) → the exact post, and for a
+      // reply the exact reply inside its thread. Older rows without a target
+      // just open the wall.
       case 'wall_post':
       case 'wall_reply':
       case 'wall_reaction':
       case 'wall_ai_comment':
-        onNavigate('wall');
+        onNavigate('wall', notification.targetId, notification.targetReplyId);
         break;
       // The three 一起收尾 types land here too: the closure panel (or the summary
       // card, once it's finished) is on the event itself.
@@ -120,10 +124,13 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
         break;
       // Partner-action notifications (services/notificationService.js): route each
       // to the tab where the action lives so the tap lands somewhere useful.
+      // A record that still exists → its row on the 時間軸 (timeline).
       case 'love_moment_created':
       case 'love_moment_updated':
-      case 'love_moment_deleted':
       case 'love_moment_response':
+        onNavigate('record', notification.targetId);
+        break;
+      case 'love_moment_deleted':
       case 'cycle_record_created':
       case 'cycle_record_updated':
       case 'cycle_record_deleted':

@@ -1643,7 +1643,10 @@ router.post('/clients/:coupleId/wall/:postId/replies', authenticateToken, [
     (async () => {
       const ids = await coupleMemberIds(req.params.coupleId);
       for (const uid of ids) {
-        await wallRoutes.notifyPartner(uid, 'wall_reply', '你們的專屬心理師在牆上留言', req.body.content, req.user.id);
+        await wallRoutes.notifyPartner(uid, 'wall_reply', '你們的專屬心理師在牆上留言', req.body.content, req.user.id, {
+          postId: req.params.postId,
+          replyId: reply?.id,
+        });
       }
     })().catch((err) => logWarn('notify therapist wall reply failed', { err: err.message }));
 

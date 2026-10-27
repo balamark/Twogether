@@ -126,7 +126,14 @@ interface CalendarViewProps {
    * the modal only exists inside this mounted component. */
   autoOpenAddRecord?: boolean;
   onAutoOpenAddRecordConsumed?: () => void;
+  /** Consume-once: a 通知中心 tap's love moment (by API id) — switch to 時間軸,
+   * scroll to that record and flash it. */
+  focusRecordApiId?: string | null;
+  onFocusRecordConsumed?: () => void;
 }
+
+// How long a deep-linked record stays highlighted after we scroll to it.
+const FOCUS_FLASH_MS = 2500;
 
 // Calendar / record-keeping view. Defined at module scope (not inside App) so
 // its identity is stable across App re-renders — a nested definition would
@@ -164,6 +171,8 @@ const CalendarView = ({
   onNudgePartner,
   autoOpenAddRecord,
   onAutoOpenAddRecordConsumed,
+  focusRecordApiId,
+  onFocusRecordConsumed,
 }: CalendarViewProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [viewMode, setViewMode] = useState<'calendar' | 'timeline'>('calendar');
@@ -240,6 +249,68 @@ const CalendarView = ({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpenAddRecord]);
+
+  // Deep link from 通知中心 (回應／新增／更新了記錄): land on that record in the
+  // 時間軸. Records are loaded once at login, so one the partner just made may
+  // not be here yet — refetch once before saying it's gone.
+  const [highlightRecordApiId, setHighlightRecordApiId] = useState<string | null>(null);
+  const [scrollToRecordApiId, setScrollToRecordApiId] = useState<string | null>(null);
+  const focusRefetchedRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!focusRecordApiId) return;
+    if (!intimateRecords.some((r) => r.apiId === focusRecordApiId)) {
+      if (focusRefetchedRef.current !== focusRecordApiId) {
+        focusRefetchedRef.current = focusRecordApiId;
+        apiService.getIntimateRecords()
+          .then((records) => setIntimateRecords(records))
+          .catch((err) => {
+            focusRefetchedRef.current = null;
+            showNotification({
+              type: 'error',
+              title: tr('無法載入記錄', 'Couldn\'t load your records'),
+              message: err instanceof Error
+                ? err.message
+                : tr('請檢查網路後重新整理頁面再試一次。', 'Check your connection, then refresh the page and try again.'),
+            });
+            onFocusRecordConsumed?.();
+          });
+        return;
+      }
+      focusRefetchedRef.current = null;
+      showNotification({
+        type: 'info',
+        title: tr('找不到這筆記錄', 'Couldn\'t find that record'),
+        message: tr(
+          '它可能已經被刪除了。其他記錄都在下方的時間軸裡。',
+          'It may have been deleted. Your other records are in the timeline below.'
+        ),
+      });
+      setViewMode('timeline');
+      onFocusRecordConsumed?.();
+      return;
+    }
+    focusRefetchedRef.current = null;
+    setViewMode('timeline');
+    setHighlightRecordApiId(focusRecordApiId);
+    setScrollToRecordApiId(focusRecordApiId);
+    onFocusRecordConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusRecordApiId, intimateRecords]);
+
+  // Runs after the commit that switched to 時間軸, so the row exists to scroll to.
+  useEffect(() => {
+    if (!scrollToRecordApiId || viewMode !== 'timeline') return;
+    document
+      .querySelector<HTMLElement>(`[data-record-api-id="${CSS.escape(scrollToRecordApiId)}"]`)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setScrollToRecordApiId(null);
+  }, [scrollToRecordApiId, viewMode]);
+
+  useEffect(() => {
+    if (!highlightRecordApiId) return;
+    const t = window.setTimeout(() => setHighlightRecordApiId(null), FOCUS_FLASH_MS);
+    return () => window.clearTimeout(t);
+  }, [highlightRecordApiId]);
 
   const recordsByDate = React.useMemo(() => {
     const map = new Map<string, IntimateRecord[]>();
@@ -582,10 +653,12 @@ const CalendarView = ({
                 return (
                 <article
                   key={record.id}
+                  data-record-api-id={record.apiId}
+                  data-testid={`timeline-record-${record.apiId ?? record.id}`}
                   onClick={() => showRecordDetails(record.id)}
                   className={`group grid grid-cols-[40px_1fr_auto] gap-5 py-5 cursor-pointer hover:bg-petal-cream-2/40 -mx-2 px-2 transition-colors ${
                     idx === 0 ? '' : 'border-t border-petal-rule-soft'
-                  }`}
+                  } ${highlightRecordApiId && record.apiId === highlightRecordApiId ? 'bg-petal-cream-2 ring-2 ring-petal-rose/60 rounded-md' : ''}`}
                 >
                   <div className="text-base opacity-70 saturate-75 mt-1 text-center leading-none">
                     {record.mood}

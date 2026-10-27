@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { Send, Trash2, Sparkles, X, HeartHandshake } from 'lucide-react';
 import { apiService, type WallReply, type MessageTranslationMap } from '../services/api';
@@ -29,7 +29,11 @@ interface WallPostThreadProps {
   onReplyCountChange?: (newCount: number) => void;
   onError?: (message: string) => void;
   onNotify?: (n: { type: 'success' | 'error' | 'warning' | 'info'; title: string; message: string }) => void;
+  /** A reply to scroll to and flash once the thread has loaded (通知中心 tap). */
+  focusReplyId?: string;
 }
+
+const FOCUS_FLASH_MS = 2500;
 
 const formatTime = (iso: string, tz: string) =>
   formatRelativeOrDate(iso, tz, { month: 'short', day: 'numeric' });
@@ -55,6 +59,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
   onReplyCountChange,
   onError,
   onNotify,
+  focusReplyId,
 }) => {
   const myCompanion = resolveCompanion(companionId);
   const { quota, refresh: refreshQuota } = useAiQuota();
@@ -115,6 +120,28 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
       setTranslationLoading(false);
     }
   };
+
+  // Deep link from 通知中心: once the replies are in, scroll the target reply
+  // into view and flash it — once per mount (a new focus remounts us).
+  const [highlightReplyId, setHighlightReplyId] = useState<string | null>(null);
+  const focusDoneRef = useRef(false);
+  useEffect(() => {
+    if (!focusReplyId || loading || focusDoneRef.current) return;
+    focusDoneRef.current = true;
+    // A deleted reply just leaves the post itself in view — nothing to flash.
+    if (!replies.some((r) => r.id === focusReplyId)) return;
+    setHighlightReplyId(focusReplyId);
+    requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLElement>(`[data-testid="wall-reply-${CSS.escape(focusReplyId)}"]`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }, [focusReplyId, loading, replies]);
+  useEffect(() => {
+    if (!highlightReplyId) return;
+    const t = window.setTimeout(() => setHighlightReplyId(null), FOCUS_FLASH_MS);
+    return () => window.clearTimeout(t);
+  }, [highlightReplyId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -316,7 +343,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
         return (
           <div
             key={reply.id}
-            className={
+            className={`${
               // 牆是討論串不是時間軸，沒有左右座位可用 —— 所以人一律中性列，
               // 只有 Luma 拿品牌淡色卡片，跟「好好說話」的中間座位對應。
               isAi
@@ -324,7 +351,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
                 : isTherapist
                   ? `${ROLE_STYLE.therapist.surface} rounded-xl py-2.5 px-3`
                   : 'pl-4 border-l-2 border-petal-rule'
-            }
+            } transition-shadow ${highlightReplyId === reply.id ? 'ring-2 ring-petal-rose/60 rounded-md' : ''}`}
             data-testid={`wall-reply-${reply.id}`}
           >
             <div className="flex items-start justify-between gap-2">

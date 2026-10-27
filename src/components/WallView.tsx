@@ -45,7 +45,13 @@ interface WallViewProps {
   defaultWallExamples: WallExample[];
   moodTags: readonly string[];
   showNotification: (notification: Omit<Notification, 'id'>) => void;
+  /** Consume-once: a 通知中心 tap's post (and reply) to scroll to and flash. */
+  focusTarget?: { postId: string; replyId?: string } | null;
+  onFocusTargetConsumed?: () => void;
 }
+
+// How long a deep-linked post / reply stays highlighted after we scroll to it.
+const FOCUS_FLASH_MS = 2500;
 
 type WallFilter = 'all' | 'important' | 'general' | 'mood';
 
@@ -141,6 +147,8 @@ const WallView: React.FC<WallViewProps> = ({
   defaultWallExamples,
   moodTags,
   showNotification,
+  focusTarget,
+  onFocusTargetConsumed,
 }) => {
   const userId = authState.user?.id;
   const tutorialKey = `wall_tutorial_seen_${userId || 'anon'}`;
@@ -324,6 +332,69 @@ const WallView: React.FC<WallViewProps> = ({
   useEffect(() => {
     loadPosts();
   }, [loadPosts]);
+
+  // --- Notification deep link ----------------------------------------------
+  // A tap in 通知中心 hands us the post (and, for a reply, the reply) it's
+  // about: show it under 全部, open its thread when a reply is the target, then
+  // scroll to it and flash it. A post we don't have yet (the partner just wrote
+  // it while we sat on the wall) gets one reload before we give up.
+  const [highlightPostId, setHighlightPostId] = useState<string | null>(null);
+  const [scrollToPostId, setScrollToPostId] = useState<string | null>(null);
+  const [threadFocus, setThreadFocus] =
+    useState<{ postId: string; replyId: string; nonce: number } | null>(null);
+  const focusReloadedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!focusTarget || loading) return;
+    const { postId, replyId } = focusTarget;
+    if (!posts.some((p) => p.id === postId)) {
+      if (focusReloadedRef.current !== postId) {
+        focusReloadedRef.current = postId;
+        loadPosts();
+        return;
+      }
+      focusReloadedRef.current = null;
+      showNotification({
+        type: 'info',
+        title: tr('找不到這則貼文', 'Couldn\'t find that post'),
+        message: tr(
+          '它可能已被刪除或改成私密。牆上其他的話都還在，往下看看吧。',
+          'It may have been deleted or made private. The rest of your wall is still here.'
+        ),
+      });
+      onFocusTargetConsumed?.();
+      return;
+    }
+    focusReloadedRef.current = null;
+    setFilter('all');
+    if (replyId) {
+      // New nonce → the thread remounts and refetches, so a reply that arrived
+      // while this thread was already open is there to scroll to.
+      setExpandedPostId(postId);
+      setThreadFocus({ postId, replyId, nonce: Date.now() });
+    }
+    setHighlightPostId(postId);
+    setScrollToPostId(postId);
+    onFocusTargetConsumed?.();
+  }, [focusTarget, loading, posts, loadPosts, showNotification, onFocusTargetConsumed]);
+
+  // Scroll in its own effect so it runs after the commit that switched the
+  // filter back to 全部 — only then is the card guaranteed to be in the DOM.
+  useEffect(() => {
+    if (!scrollToPostId) return;
+    const el = document.querySelector<HTMLElement>(
+      `[data-testid="wall-post-${CSS.escape(scrollToPostId)}"]`
+    );
+    // A reply target scrolls itself into view once its thread has loaded.
+    el?.scrollIntoView({ behavior: 'smooth', block: threadFocus?.postId === scrollToPostId ? 'start' : 'center' });
+    setScrollToPostId(null);
+  }, [scrollToPostId, threadFocus]);
+
+  useEffect(() => {
+    if (!highlightPostId) return;
+    const t = window.setTimeout(() => setHighlightPostId(null), FOCUS_FLASH_MS);
+    return () => window.clearTimeout(t);
+  }, [highlightPostId]);
 
   const filteredPosts = useMemo(() => {
     switch (filter) {
@@ -528,14 +599,18 @@ const WallView: React.FC<WallViewProps> = ({
     // with someone on the other side to read it.
     const showsReadState = isOwn && !post.is_private && authState.partnerConnected;
     const partnerReaction = reactionMeta(post.partner_reaction?.reaction);
+    const isFocused = highlightPostId === post.id;
+    const focusedThread = threadFocus?.postId === post.id ? threadFocus : null;
 
     return (
       <div
         key={post.id}
         ref={tracksRead ? readObserverRef : undefined}
         data-post-id={post.id}
-        className={`bg-white rounded-md p-5 border transition-colors ${
-          isImportant
+        className={`bg-white rounded-md p-5 border transition-colors scroll-mt-20 ${
+          isFocused
+            ? 'border-petal-rose-deep ring-2 ring-petal-rose/60'
+            : isImportant
             ? 'border-petal-rose-deep/40 ring-1 ring-petal-rose-deep/20'
             : 'border-petal-rule hover:border-petal-rose'
         }`}
@@ -800,7 +875,9 @@ const WallView: React.FC<WallViewProps> = ({
 
         {isExpanded && (
           <WallPostThread
+            key={focusedThread ? `${post.id}-${focusedThread.nonce}` : post.id}
             postId={post.id}
+            focusReplyId={focusedThread?.replyId}
             currentUserId={userId}
             companionId={authState.user?.selected_therapist ?? null}
             onReplyCountChange={(newCount) => updateReplyCount(post.id, newCount)}

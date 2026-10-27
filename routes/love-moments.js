@@ -74,7 +74,7 @@ function digestResponses(rows, viewerId) {
 // through notifyPartnerAction: that helper always fans out to email, and
 // emailing every one-tap chip is how a kind gesture turns into spam.
 // In-app + LINE only.
-async function notifyResponse(actorId, actorNickname, next) {
+async function notifyResponse(actorId, actorNickname, next, momentId) {
   try {
     const partnerId = await getPartnerId(actorId);
     if (!partnerId) return;
@@ -87,9 +87,9 @@ async function notifyResponse(actorId, actorNickname, next) {
 
     await db.query(
       `INSERT INTO notifications (
-         user_id, notification_type, title, content, related_user_id, priority
-       ) VALUES ($1, $2, $3, $4, $5, $6)`,
-      [partnerId, 'love_moment_response', title, content, actorId, 1]
+         user_id, notification_type, title, content, related_user_id, priority, target_id
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [partnerId, 'love_moment_response', title, content, actorId, 1, momentId ? String(momentId) : null]
     );
 
     lineService.pushToUserIfLinked(
@@ -192,6 +192,7 @@ router.post('/', [
       actorId: userId,
       type: 'love_moment_created',
       content: moment.description || moment.notes || moment.location || null,
+      targetId: momentId,
     });
 
     res.status(201).json({
@@ -486,7 +487,7 @@ router.put('/:id/response', async (req, res) => {
     // and neither is re-saving what was already there.
     const changed = nextReaction !== current.reaction || nextNote !== current.note;
     if (!cleared && changed) {
-      await notifyResponse(userId, req.user.nickname, { reaction: nextReaction, note: nextNote });
+      await notifyResponse(userId, req.user.nickname, { reaction: nextReaction, note: nextNote }, momentId);
     }
 
     const refreshed = await fetchResponsesForMoments([momentId]);
@@ -592,6 +593,7 @@ router.put('/:id', [
       actorId: userId,
       type: 'love_moment_updated',
       content: req.body.description || req.body.notes || req.body.location || null,
+      targetId: momentId,
     });
 
     res.json({

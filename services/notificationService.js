@@ -87,6 +87,11 @@ async function ensureNotificationsTable() {
         priority INTEGER NOT NULL DEFAULT 1
       );
     `);
+    await db.query(`
+      ALTER TABLE notifications
+        ADD COLUMN IF NOT EXISTS target_id TEXT,
+        ADD COLUMN IF NOT EXISTS target_reply_id TEXT;
+    `);
     tableEnsured = true;
   } catch (err) {
     logWarn('ensureNotificationsTable failed', { err: err.message });
@@ -127,8 +132,10 @@ async function getNickname(userId) {
 //   content  – optional specific detail (the moment's note, the gift name…);
 //              falls back to the catalog's generic line when omitted
 //   priority – overrides the catalog/default priority when provided
+//   targetId – optional id of the exact item (e.g. the love moment) so tapping
+//              the notification can land on it, not just on its tab
 // Fire-and-forget: safe to call without await at an action site.
-async function notifyPartnerAction({ actorId, type, content = null, priority } = {}) {
+async function notifyPartnerAction({ actorId, type, content = null, priority, targetId = null } = {}) {
   const entry = CATALOG[type];
   if (!entry) {
     logWarn('notifyPartnerAction unknown type', { type });
@@ -147,9 +154,9 @@ async function notifyPartnerAction({ actorId, type, content = null, priority } =
     await ensureNotificationsTable();
     try {
       await db.query(
-        `INSERT INTO notifications (user_id, notification_type, title, content, related_user_id, priority)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [partnerId, type, title.slice(0, 200), body.slice(0, 2000), actorId, prio]
+        `INSERT INTO notifications (user_id, notification_type, title, content, related_user_id, priority, target_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [partnerId, type, title.slice(0, 200), body.slice(0, 2000), actorId, prio, targetId ? String(targetId) : null]
       );
     } catch (err) {
       logWarn('partner_notification.insert_failed', { type, err: err.message });

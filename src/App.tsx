@@ -576,6 +576,10 @@ const LoveTimeApp = () => {
     typeof window !== 'undefined' && window.location.pathname.startsWith('/booking/result')
   );
   const [pendingEventId, setPendingEventId] = useState<string | null>(null);
+  // Notification tap → the exact wall post (and reply) / 時間軸 record to land on.
+  // Consume-once, like pendingEventId.
+  const [pendingWallFocus, setPendingWallFocus] = useState<{ postId: string; replyId?: string } | null>(null);
+  const [pendingRecordFocus, setPendingRecordFocus] = useState<string | null>(null);
   // Set when another view means "write one now" (接住情緒's CTA) so 說開一件事
   // opens on the composer instead of the history list. Consumed once.
   const [pendingEventsCompose, setPendingEventsCompose] = useState(false);
@@ -2560,6 +2564,8 @@ const LoveTimeApp = () => {
             partnerNickname={nicknames.partner2 || tr('對方', 'Partner')}
             autoOpenAddRecord={pendingAddRecord}
             onAutoOpenAddRecordConsumed={() => setPendingAddRecord(false)}
+            focusRecordApiId={pendingRecordFocus}
+            onFocusRecordConsumed={() => setPendingRecordFocus(null)}
           />
           </div>
         );
@@ -2682,6 +2688,8 @@ const LoveTimeApp = () => {
             defaultWallExamples={defaultWallExamples}
             moodTags={WALL_MOOD_TAGS}
             showNotification={showNotification}
+            focusTarget={pendingWallFocus}
+            onFocusTargetConsumed={() => setPendingWallFocus(null)}
           />
         </div>
       );
@@ -3251,9 +3259,15 @@ const LoveTimeApp = () => {
         onClose={() => setShowNotificationInbox(false)}
         unreadCount={unreadNotificationCount}
         onUnreadCountChange={setUnreadNotificationCount}
-        onNavigate={(view, payload) => {
+        onNavigate={(view, payload, subPayload) => {
           if (view === 'events' && payload) {
             setPendingEventId(payload);
+          }
+          if (view === 'wall' && payload) {
+            setPendingWallFocus({ postId: payload, replyId: subPayload });
+          }
+          if (view === 'record' && payload) {
+            setPendingRecordFocus(payload);
           }
           // 情緒深潛 notification → open the deep-dive layer over the current view
           // rather than routing to a plain page. Resume the caller's active /
