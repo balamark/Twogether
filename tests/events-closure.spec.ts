@@ -16,7 +16,7 @@ import {
 // given payload, and the promise the whole ceremony rests on: you never see
 // your partner's commitment before you've written your own.
 //
-// Screens: ② composer → ④ waiting → ⑤ review → ⑥ summary.
+// Screens: ② composer → ④ waiting → ⑥ summary (no review round).
 
 test.describe('一起收尾 — the ceremony across its screens', () => {
   test.beforeEach(async ({ page }) => {
@@ -24,7 +24,7 @@ test.describe('一起收尾 — the ceremony across its screens', () => {
     await seedQuota(page, 2, 10);
   });
 
-  test('composer → waiting → review → summary, and the partner’s commitment stays hidden until I submit', async ({
+  test('composer → summary, and the partner’s commitment stays hidden until I submit', async ({
     page,
   }) => {
     test.setTimeout(60000);
@@ -64,10 +64,15 @@ test.describe('一起收尾 — the ceremony across its screens', () => {
     await page.getByTestId('closure-commitment-input').fill('要動孩子之前，我會先問你一聲');
     await page.getByTestId('closure-decision-input').fill('孩子睡著後若沒有立即危險，就不移動');
 
-    // Submitting reveals the partner's commitment in the SAME response — that
-    // simultaneity is the product promise.
+    // I'm the second to write, so submitting finishes the ceremony on the
+    // spot — no review round — and lands on Screen ⑥ with both commitments.
     fx.on('submit', (body, f) => {
+      f.setEvent({ status: 'resolved', resolved_at: new Date().toISOString() });
       f.setClosure({
+        status: 'finalized',
+        eventStatus: 'resolved',
+        finalizedAt: new Date().toISOString(),
+        insight: '你們都在講「先講一聲」，只是講法不同。',
         me: {
           userId: (f.closure().me as { userId: string }).userId,
           status: 'submitted',
@@ -94,43 +99,13 @@ test.describe('一起收尾 — the ceremony across its screens', () => {
 
     await page.getByTestId('closure-submit-button').click();
 
-    // Screen ⑤ — both submitted and I still owe a review, so review wins over
-    // waiting.
-    await expect(page.getByTestId('closure-review-screen')).toBeVisible();
-    await expect(page.getByTestId('closure-partner-commitment')).toContainText(
-      '晚上十點前我會把明天的東西準備好',
-    );
-    // My own shared decision is in the same card for me to stand behind.
-    await expect(page.getByTestId('closure-partner-decision')).toBeVisible();
-
     const submitted = fx.calls.find((c) => c.url.endsWith('/closure/submit'));
     expect(submitted?.body).toContain('要動孩子之前');
     expect(submitted?.body).toContain('孩子睡著後');
 
-    // 我想調整一下 opens a note box rather than firing straight away — 1.4.
-    await page.getByTestId('closure-review-change').click();
-    await expect(page.getByTestId('closure-review-note-commitment')).toBeVisible();
-    await page
-      .getByTestId('closure-review-note-commitment')
-      .fill('可以再早一點嗎？九點半我比較有精神。');
-
-    // Agreeing on both parts finalizes and lands on Screen ⑥.
-    fx.on('review', (_b, f) => {
-      f.setEvent({ status: 'resolved', resolved_at: new Date().toISOString() });
-      f.setClosure({
-        status: 'finalized',
-        eventStatus: 'resolved',
-        finalizedAt: new Date().toISOString(),
-        insight: '你們都在講「先講一聲」，只是講法不同。',
-        me: {
-          ...(f.closure().me as Record<string, unknown>),
-          reviewedAt: new Date().toISOString(),
-        },
-      });
-    });
-    await page.getByTestId('closure-review-note-submit-commitment').click();
-
     await expect(page.getByTestId('event-closure-summary')).toBeVisible();
+    await expect(page.getByTestId('closure-review-screen')).toHaveCount(0);
+    expect(fx.actions()).not.toContain('closure/review');
     await expect(page.getByTestId('closure-insight')).toContainText('先講一聲');
     // Both commitments survive into the summary.
     await expect(page.getByTestId('event-closure-summary')).toContainText('要動孩子之前');
@@ -161,8 +136,8 @@ test.describe('一起收尾 — the ceremony across its screens', () => {
     await expect(page.getByTestId('closure-review-screen')).toHaveCount(0);
     await expect(page.getByTestId('closure-composer-screen')).toHaveCount(0);
     await expect(page.getByTestId('closure-waiting-card')).toContainText(PARTNER_NICKNAME);
-    // Inside the 24h grace there is nothing to finalize yet.
-    await expect(page.getByTestId('closure-finalize-button')).toHaveCount(0);
+    // No grace window: whoever has written can finish right away.
+    await expect(page.getByTestId('closure-finalize-button')).toBeVisible();
 
     // 改一下我的約定 re-opens the composer over the waiting card, pre-filled —
     // before 2.2 there was no way to change your own wording at all.

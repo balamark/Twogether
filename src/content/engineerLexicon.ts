@@ -59,7 +59,7 @@ export const ENGINEER_LEXICON: Record<string, string> = {
 
   // ── 記錄時光 / Calendar ─────────────────────────────────────
   '你們的節奏': '系統吞吐量 (throughput)',
-  '點月曆任一天新增或查看紀錄': '點任一日期查看或新增 commit',
+  '點任一天看節奏、記錄心情或新增紀錄': '點任一日期查看 metrics 或新增 commit',
   '事件類型': 'commit type',
   '親密時光': '部署到 Production 🚀',
   '月經': '排程維護 (maintenance window)',

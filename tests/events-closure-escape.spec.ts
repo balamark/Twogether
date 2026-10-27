@@ -6,7 +6,6 @@ import {
   openEventDetail,
   makeClosure,
   makeCommitment,
-  hoursFromNow,
   FAKE_USER,
 } from './helpers/closure';
 
@@ -97,13 +96,12 @@ test.describe('一起收尾 — the ways out', () => {
     expect(fx.calls.some((c) => c.url.endsWith('/reopen'))).toBe(false);
   });
 
-  test('先這樣完成 appears only past the 24h grace, and finishes the ceremony', async ({
+  test('先這樣完成 is available right after I submit, and finishes the ceremony', async ({
     page,
   }) => {
     test.setTimeout(60000);
     const fx = await seedClosure(page, {
       closure: makeClosure({
-        canFinalizeAt: hoursFromNow(-1), // grace has passed
         me: {
           userId: FAKE_USER.id,
           status: 'submitted',
@@ -115,7 +113,9 @@ test.describe('一起收尾 — the ways out', () => {
     });
     await openEventDetail(page);
 
-    await expect(page.getByTestId('closure-waiting-card')).toContainText('還沒動作');
+    // No dates or countdowns — just the option to stop waiting.
+    await expect(page.getByTestId('closure-waiting-card')).toContainText('先這樣完成');
+    await expect(page.getByTestId('closure-waiting-card')).not.toContainText('前都沒回應');
     await page.getByTestId('closure-finalize-button').click();
 
     await expect(page.getByTestId('event-closure-summary')).toBeVisible();

@@ -135,11 +135,19 @@ export const FEATURE_INTROS_EN: Record<string, IntroCopy> = {
     faqs: [
       {
         q: 'Can my partner see my records?',
-        a: 'Yes. Once paired, the calendar, intimacy records and achievements are shared. It is a diary for two, not a private notebook.',
+        a: 'Yes. Once paired, the calendar, intimacy records and achievements are shared. It is a diary for two, not a private notebook. The one exception is your daily mood and intimacy status: private by default, shown to your partner only when you choose to share it.',
       },
       {
         q: 'What is cycle tracking for?',
         a: 'Turn it on in Settings and the calendar marks periods and predictions, so your partner can be a little more considerate at the right time.',
+      },
+      {
+        q: 'What is the light-to-dark shading around the predicted ovulation day?',
+        a: 'With cycle tracking on, the calendar estimates the ovulation day from your own cycle lengths (all cycles blended with the latest 3) and shades the 5 days on either side, light to dark. After 3 complete cycles it also estimates a "possible window" from how much your cycles vary. It is a calendar-method estimate, not confirmed ovulation, and says nothing about anyone\'s mood or wishes that day.',
+      },
+      {
+        q: 'Who can see my daily mood and intimacy status?',
+        a: 'Tap any calendar day to log your mood and how you feel about intimacy in one tap. Only you can see it by default; your partner sees a day only if you turn on sharing for it, and you can turn that off or clear it any time. Your partner can never fill it in for you, and not recording never means "no".',
       },
       {
         q: 'What are coins?',

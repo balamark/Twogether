@@ -1056,7 +1056,20 @@
 "修改了一個替代方案": "edited an alternative plan",
 "認可了一個替代方案": "approved an alternative plan",
 "停用了一個替代方案": "paused an alternative plan",
-"重新啟用了一個替代方案": "reactivated an alternative plan"
+"重新啟用了一個替代方案": "reactivated an alternative plan",
+"日期區間格式錯誤，請重新整理頁面後再試": "The date range is invalid. Please refresh the page and try again",
+"一次最多查詢 400 天的每日狀態，請縮小日期範圍": "You can load up to 400 days of daily status at once. Please narrow the date range",
+"無法載入每日狀態，請稍後再試": "Couldn't load daily status. Please try again in a moment",
+"日期格式錯誤，請重新選擇日期": "The date is invalid. Please pick the date again",
+"這一天還沒到，等當天再記錄你的狀態吧": "This day hasn't come yet. Record how you feel when it arrives",
+"心情選項無效，請重新選擇": "That mood option isn't valid. Please choose again",
+"親密意願選項無效，請重新選擇": "That intimacy option isn't valid. Please choose again",
+"分享設定格式錯誤，請重新切換一次": "The sharing setting is invalid. Please toggle it again",
+"沒有要更新的內容，請選擇心情或親密意願": "Nothing to update. Choose a mood or an intimacy option",
+"已清除這天的狀態": "Cleared this day's status",
+"已記錄這天的狀態": "Saved this day's status",
+"無法儲存每日狀態，請稍後再試": "Couldn't save your daily status. Please try again in a moment",
+"無法清除每日狀態，請稍後再試": "Couldn't clear your daily status. Please try again in a moment"
 },
 "patterns": [
 [
@@ -1294,10 +1307,6 @@
 [
 "{0} 寫好了下次願意做的事",
 "{0} wrote what they're willing to do next time"
-],
-[
-"再給對方一點時間。{0} 之後你就可以自己先完成這次收尾。",
-"Give them a little more time. After {0} you can finish this wrap-up on your own."
 ],
 [
 "{0} 這次沒能整理出想法，晚點再試一次就好。你們的約定已經留下來了。",
