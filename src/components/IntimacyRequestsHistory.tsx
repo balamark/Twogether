@@ -4,6 +4,7 @@ import apiService from '../services/api';
 import type { IntimacyRequest, IntimacyRequestStats, IntimacyRequestNudge } from '../services/api';
 import IntimacyRequestDetailModal from './IntimacyRequestDetailModal';
 import AlternativePlansPanel from './AlternativePlansPanel';
+import type { PlanScript } from './AlternativePlansPanel';
 import { intimacyStatusLabel, intimacyStatusBadgeClass, intimacyStatusAccent, isAwaitingResponse } from './intimacyStatus';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
@@ -31,12 +32,14 @@ interface IntimacyRequestsHistoryProps {
   onViewScript?: (title: string) => void;
   /** Empty-state CTA: open the send-invite form. */
   onSendInvite?: () => void;
+  /** The couple's roleplay scripts, offered when building a 共同方案. */
+  scripts?: PlanScript[];
 }
 
 type FeedbackState = { type: 'success' | 'error'; message: string };
 type Tab = 'received' | 'sent' | 'plans';
 
-export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = ({ authState, partnerNickname, onViewScript, onSendInvite }) => {
+export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = ({ authState, partnerNickname, onViewScript, onSendInvite, scripts }) => {
   const [items, setItems] = useState<IntimacyRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -202,7 +205,12 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
             </nav>
 
             {tab === 'plans' ? (
-              <AlternativePlansPanel partnerNickname={partnerNickname} onSendInvite={onSendInvite} />
+              <AlternativePlansPanel
+                partnerNickname={partnerNickname}
+                onSendInvite={onSendInvite}
+                scripts={scripts}
+                onViewScript={onViewScript}
+              />
             ) : (
             <RequestList
               items={activeItems}

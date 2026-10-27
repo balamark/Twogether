@@ -75,12 +75,17 @@ test.describe.serial('替代方案協商 UI', () => {
     // Lands on 共同方案 with the empty-state samples.
     await expect(page.getByTestId('alt-plans-empty')).toBeVisible({ timeout: 10000 });
     await expect(page.getByTestId('alt-plan-samples')).toContainText('範例');
-    await page.getByTestId('alt-plan-use-sample-cafe-roleplay').click();
-    await expect(page.getByTestId('alt-plan-title')).toHaveValue(/咖啡店/);
+    await expect(page.getByTestId('alt-plan-samples')).toContainText('精油按摩');
+    // Sample 2 is built on the built-in script「初次相遇」.
+    await page.getByTestId('alt-plan-use-1').click();
+    await expect(page.getByTestId('alt-plan-title')).toHaveValue(/初次相遇/);
+    await expect(page.getByTestId('alt-plan-script-select')).toHaveValue('初次相遇');
+    await expect(page.getByTestId('alt-plan-editor')).not.toContainText('界線');
     await page.getByTestId('alt-plan-save').click();
 
     const card = page.getByTestId('alt-plan-card').first();
-    await expect(card).toContainText('咖啡店');
+    await expect(card).toContainText('初次相遇');
+    await expect(card.getByTestId('alt-plan-script')).toContainText('在咖啡廳偶然相遇的陌生人');
     await expect(page.getByTestId('alt-plans-pending')).toBeVisible();
     await expect(card).toContainText('待認可', { timeout: 10000 });
   });
@@ -92,11 +97,30 @@ test.describe.serial('替代方案協商 UI', () => {
     await page.getByTestId('alt-plan-approve').first().click();
     const approved = page.getByTestId('alt-plans-approved');
     await expect(approved).toBeVisible();
-    await expect(approved).toContainText('咖啡店');
+    await expect(approved).toContainText('初次相遇');
     await expect(page.getByRole('status')).toContainText('雙方都認可了', { timeout: 10000 });
 
     await approved.getByTestId('alt-plan-disable').click();
     await expect(page.getByTestId('alt-plans-approved')).toHaveCount(0);
     await expect(page.getByText(/已停用（1）/)).toBeVisible();
+  });
+
+  test('a plan can be built on one of the couple\'s scripts and links to it', async ({ page }) => {
+    await signInOnIntimacyHistory(page, USER_A);
+    await page.getByRole('tab', { name: /共同方案/ }).click();
+    await page.getByTestId('alt-plan-new').click();
+    await page.getByTestId('alt-plan-title').fill('辦公室之夜');
+    // A script alone is a valid plan.
+    await page.getByTestId('alt-plan-script-select').selectOption('辦公室秘密');
+    await expect(page.getByTestId('alt-plan-editor')).toContainText('下班後的辦公室');
+    await page.getByTestId('alt-plan-save').click();
+
+    const card = page.getByTestId('alt-plan-card').filter({ hasText: '辦公室之夜' });
+    await expect(card).toContainText('待認可', { timeout: 10000 });
+    await card.getByTestId('alt-plan-view-script').click();
+    // Lands in 角色扮演 with that script open.
+    await expect(page.locator('text=辦公室秘密 >> visible=true').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/開始扮演/)).toBeVisible();
+    await expect(page.getByRole('tab', { name: /共同方案/ })).toHaveCount(0);
   });
 });

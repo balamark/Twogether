@@ -5,6 +5,9 @@
 // wording. Any edit resets approval to just the editor. Either partner can
 // disable a plan at any time. Schema: migration 101.
 //
+// A plan's interaction can be free text, a linked roleplay script, or both.
+//
+//   GET    /api/intimacy-plans/samples         示範方案 (public, admin-managed)
 //   GET    /api/intimacy-plans                 list the couple's plans
 //   POST   /api/intimacy-plans                 propose a plan (counts as the author's approval)
 //   PUT    /api/intimacy-plans/:id             edit (resets approval to the editor)
@@ -20,6 +23,38 @@ const { notifyPartnerAction } = require('../services/notificationService');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 
 const router = express.Router();
+
+// 示範方案 — public (also shown on the logged-out showroom), so it's mounted
+// before the auth gate. English columns fall back to 繁中 when blank.
+router.get('/samples', async (req, res) => {
+  const en = String(req.get('X-Locale') || '').toLowerCase().startsWith('en');
+  try {
+    const r = await db.query(
+      `SELECT id, title, title_en, interaction, interaction_en, time_prep, time_prep_en,
+              script_id, script_title
+         FROM alternative_plan_samples
+        WHERE active = TRUE
+        ORDER BY sort_order, created_at`
+    );
+    const pick = (zh, enText) => (en && enText ? enText : zh);
+    res.json({
+      success: true,
+      samples: r.rows.map((row) => ({
+        id: row.id,
+        sample_title: pick(row.title, row.title_en),
+        interaction: pick(row.interaction, row.interaction_en),
+        time_prep: pick(row.time_prep, row.time_prep_en),
+        script_id: row.script_id,
+        script_title: row.script_title,
+      })),
+    });
+  } catch (error) {
+    // Missing table on an unmigrated env → the client falls back to its copy.
+    logWarn('intimacy_plans.samples_failed', { err: error.message });
+    res.json({ success: true, samples: [] });
+  }
+});
+
 router.use(authenticateToken);
 
 // Generous cap — it exists to stop runaway inserts, not to ration the feature.
@@ -36,10 +71,11 @@ async function ensurePlansTable() {
         couple_id UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
         request_id UUID REFERENCES intimacy_requests(id) ON DELETE SET NULL,
         title VARCHAR(100) NOT NULL,
-        interaction TEXT NOT NULL,
-        boundaries TEXT,
+        interaction TEXT,
         time_prep TEXT,
-        conditions TEXT,
+        script_id VARCHAR(128),
+        script_title VARCHAR(200),
+        script_scenario TEXT,
         created_by UUID REFERENCES users(id) ON DELETE SET NULL,
         updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
         approved_by UUID[] NOT NULL DEFAULT '{}',
@@ -107,9 +143,10 @@ function serializePlan(row, userId, partnerId) {
     request_id: row.request_id,
     title: row.title,
     interaction: row.interaction,
-    boundaries: row.boundaries,
     time_prep: row.time_prep,
-    conditions: row.conditions,
+    script_id: row.script_id,
+    script_title: row.script_title,
+    script_scenario: row.script_scenario,
     status: planStatus(row, userId, partnerId),
     revision: row.revision,
     approved_by_me: approved.includes(userId),
@@ -123,7 +160,7 @@ function serializePlan(row, userId, partnerId) {
   };
 }
 
-const PLAN_COLUMNS = `id, request_id, title, interaction, boundaries, time_prep, conditions,
+const PLAN_COLUMNS = `id, request_id, title, interaction, time_prep, script_id, script_title, script_scenario,
   created_by, updated_by, approved_by, revision, disabled_at, disabled_by, created_at, updated_at`;
 
 const planFieldValidators = (optional) => {
@@ -133,18 +170,35 @@ const planFieldValidators = (optional) => {
       .isString().trim()
       .isLength({ min: 1, max: 100 })
       .withMessage('方案名稱需為 1–100 字，例如「週末劇本之夜」'),
-    req(body('interaction'))
-      .isString().trim()
-      .isLength({ min: 1, max: 2000 })
-      .withMessage('請描述具體的互動方式（最多 2000 字），讓對方知道你想像的是什麼'),
-    body('boundaries').optional({ nullable: true }).isString().isLength({ max: 2000 })
-      .withMessage('偏好與界線最多 2000 字，可以精簡後再送出'),
+    body('interaction').optional({ nullable: true }).isString().isLength({ max: 2000 })
+      .withMessage('互動方式最多 2000 字，可以精簡後再送出'),
     body('time_prep').optional({ nullable: true }).isString().isLength({ max: 1000 })
       .withMessage('時間與準備最多 1000 字，可以精簡後再送出'),
-    body('conditions').optional({ nullable: true }).isString().isLength({ max: 1000 })
-      .withMessage('需要先確認的條件最多 1000 字，可以精簡後再送出'),
+    body('script_id').optional({ nullable: true }).isString().isLength({ max: 128 }),
+    body('script_title').optional({ nullable: true }).isString().isLength({ max: 200 })
+      .withMessage('劇本名稱過長，請重新選擇劇本'),
+    body('script_scenario').optional({ nullable: true }).isString().isLength({ max: 2000 }),
   ];
 };
+
+// A plan needs something to do: a description, a linked script, or both.
+function missingContent(res) {
+  return res.status(400).json({
+    success: false,
+    message: '請描述互動方式，或選一個角色扮演劇本，讓對方知道你想像的是什麼',
+    error_code: 'PLAN_EMPTY',
+  });
+}
+
+// The script snapshot from the body; script_title is the switch (null clears).
+function scriptFields(body) {
+  const title = nullableText(body.script_title) ?? null;
+  return {
+    script_id: title ? nullableText(body.script_id) ?? null : null,
+    script_title: title,
+    script_scenario: title ? nullableText(body.script_scenario) ?? null : null,
+  };
+}
 
 function validationFailed(req, res) {
   const errors = validationResult(req);
@@ -220,7 +274,12 @@ router.post('/', [
     await ensurePlansTable();
     const couple = await getCouple(userId);
     if (!couple) return noCouple(res);
-    logInfo('intimacy_plans.create.attempt', { userId, coupleId: couple.id, fromRequest: !!req.body.request_id });
+    const interaction = nullableText(req.body.interaction) ?? null;
+    const script = scriptFields(req.body);
+    if (!interaction && !script.script_title) return missingContent(res);
+    logInfo('intimacy_plans.create.attempt', {
+      userId, coupleId: couple.id, fromRequest: !!req.body.request_id, withScript: !!script.script_title,
+    });
 
     const count = await db.query(
       'SELECT COUNT(*)::int AS n FROM intimacy_alternative_plans WHERE couple_id = $1',
@@ -247,23 +306,24 @@ router.post('/', [
 
     const r = await db.query(
       `INSERT INTO intimacy_alternative_plans
-         (couple_id, request_id, title, interaction, boundaries, time_prep, conditions,
+         (couple_id, request_id, title, interaction, time_prep, script_id, script_title, script_scenario,
           created_by, updated_by, approved_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, ARRAY[$8]::uuid[])
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $9, ARRAY[$9]::uuid[])
        RETURNING ${PLAN_COLUMNS}`,
       [
         couple.id,
         requestId,
         req.body.title.trim(),
-        req.body.interaction.trim(),
-        nullableText(req.body.boundaries) ?? null,
+        interaction,
         nullableText(req.body.time_prep) ?? null,
-        nullableText(req.body.conditions) ?? null,
+        script.script_id,
+        script.script_title,
+        script.script_scenario,
         userId,
       ]
     );
     const plan = r.rows[0];
-    logInfo('intimacy_plans.create.success', { userId, coupleId: couple.id, planId: plan.id });
+    logInfo('intimacy_plans.create.success', { userId, coupleId: couple.id, planId: plan.id, withScript: !!plan.script_title });
     notifyPartnerAction({ actorId: userId, type: 'alt_plan_proposed', content: quoted(plan.title) });
     res.status(201).json({
       success: true,
@@ -296,11 +356,13 @@ router.put('/:id', planFieldValidators(true), async (req, res) => {
 
     const next = {
       title: req.body.title !== undefined ? req.body.title.trim() : existing.title,
-      interaction: req.body.interaction !== undefined ? req.body.interaction.trim() : existing.interaction,
-      boundaries: req.body.boundaries !== undefined ? nullableText(req.body.boundaries) : existing.boundaries,
+      interaction: req.body.interaction !== undefined ? nullableText(req.body.interaction) : existing.interaction,
       time_prep: req.body.time_prep !== undefined ? nullableText(req.body.time_prep) : existing.time_prep,
-      conditions: req.body.conditions !== undefined ? nullableText(req.body.conditions) : existing.conditions,
+      ...(req.body.script_title !== undefined
+        ? scriptFields(req.body)
+        : { script_id: existing.script_id, script_title: existing.script_title, script_scenario: existing.script_scenario }),
     };
+    if (!next.interaction && !next.script_title) return missingContent(res);
     const changed = Object.keys(next).some((k) => (next[k] ?? null) !== (existing[k] ?? null));
     if (!changed) {
       return res.json({
@@ -313,12 +375,13 @@ router.put('/:id', planFieldValidators(true), async (req, res) => {
     // New wording → only the editor has approved it; the partner must re-confirm.
     const r = await db.query(
       `UPDATE intimacy_alternative_plans
-          SET title = $1, interaction = $2, boundaries = $3, time_prep = $4, conditions = $5,
-              updated_by = $6, approved_by = ARRAY[$6]::uuid[], revision = revision + 1,
+          SET title = $1, interaction = $2, time_prep = $3,
+              script_id = $4, script_title = $5, script_scenario = $6,
+              updated_by = $7, approved_by = ARRAY[$7]::uuid[], revision = revision + 1,
               updated_at = NOW()
-        WHERE id = $7 AND couple_id = $8
+        WHERE id = $8 AND couple_id = $9
         RETURNING ${PLAN_COLUMNS}`,
-      [next.title, next.interaction, next.boundaries, next.time_prep, next.conditions, userId, planId, couple.id]
+      [next.title, next.interaction, next.time_prep, next.script_id, next.script_title, next.script_scenario, userId, planId, couple.id]
     );
     const plan = r.rows[0];
     logInfo('intimacy_plans.update', {

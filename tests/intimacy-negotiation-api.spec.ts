@@ -100,15 +100,19 @@ test('plans need both approvals; edits reset approval; either partner can pause'
   const created = await a.post(`${API}/intimacy-plans`, {
     data: {
       title: '週末劇本之夜',
-      interaction: '依劇本演出咖啡店的陌生人',
-      boundaries: '安全詞「打烊了」',
+      interaction: '客廳佈置成咖啡廳',
       time_prep: '約 90 分鐘',
-      conditions: '當天再確認一次',
+      script_id: 'first-meeting',
+      script_title: '初次相遇',
+      script_scenario: '在咖啡廳偶然相遇的陌生人',
     },
   });
   expect(created.status(), await created.text()).toBe(201);
   const plan = (await created.json()).plan;
   expect(plan.status).toBe('pending');
+  expect(plan.script_title).toBe('初次相遇');
+  expect(plan.script_scenario).toBe('在咖啡廳偶然相遇的陌生人');
+  expect(plan).not.toHaveProperty('boundaries');
   expect(plan.approved_by_me).toBe(true);
   expect(plan.approved_by_partner).toBe(false);
 
@@ -134,9 +138,11 @@ test('plans need both approvals; edits reset approval; either partner can pause'
   expect((await ok.json()).plan.status).toBe('approved');
 
   // B edits an approved plan → back to pending, only B approved.
-  const reword = await b.put(`${API}/intimacy-plans/${plan.id}`, { data: { boundaries: '任一方說暫停就停' } });
+  // Swapping the script is a content change too.
+  const reword = await b.put(`${API}/intimacy-plans/${plan.id}`, { data: { script_title: null } });
   const reworded = (await reword.json()).plan;
   expect(reworded.status).toBe('pending');
+  expect(reworded.script_title).toBeNull();
   expect(reworded.approved_by_me).toBe(true);
   expect(reworded.approved_by_partner).toBe(false);
   await a.post(`${API}/intimacy-plans/${plan.id}/approve`, { data: { revision: reworded.revision } });
@@ -161,6 +167,18 @@ test('plan validation and not-found return specific, actionable errors', async (
   expect(body.error_code).toBe('VALIDATION_FAILED');
   expect(body.message).toContain('方案名稱');
 
+  // A plan needs a description or a script.
+  const empty = await a.post(`${API}/intimacy-plans`, { data: { title: '空方案' } });
+  expect(empty.status()).toBe(400);
+  expect((await empty.json()).error_code).toBe('PLAN_EMPTY');
+
+  // A script alone is enough.
+  const scriptOnly = await a.post(`${API}/intimacy-plans`, {
+    data: { title: '只選劇本', script_id: 'office-romance', script_title: '辦公室秘密' },
+  });
+  expect(scriptOnly.status(), await scriptOnly.text()).toBe(201);
+  expect((await scriptOnly.json()).plan.interaction).toBeNull();
+
   const nf = await a.post(`${API}/intimacy-plans/not-a-uuid/disable`);
   expect(nf.status()).toBe(404);
   expect((await nf.json()).error_code).toBe('PLAN_NOT_FOUND');
@@ -181,4 +199,56 @@ test('unpaired users get a three-part gate, not a generic failure', async () => 
   const en = await ctx.get(`${API}/intimacy-plans`, { headers: { 'X-Locale': 'en' } });
   expect((await en.json()).message).toContain('pair up first');
   await ctx.dispose();
+});
+
+test('示範方案 are public, localized, and seeded with the 精油按摩 + script samples', async () => {
+  const ctx = await request.newContext();
+  const zh = (await (await ctx.get(`${API}/intimacy-plans/samples`)).json()).samples;
+  expect(zh.length).toBeGreaterThanOrEqual(2);
+  expect(zh.some((s: { interaction?: string }) => (s.interaction || '').includes('精油按摩'))).toBe(true);
+  expect(zh.some((s: { script_title?: string }) => s.script_title === '初次相遇')).toBe(true);
+
+  const en = (await (await ctx.get(`${API}/intimacy-plans/samples`, { headers: { 'X-Locale': 'en' } })).json()).samples;
+  expect(en.some((s: { interaction?: string }) => (s.interaction || '').includes('oil massage'))).toBe(true);
+  await ctx.dispose();
+});
+
+test('admin can create, edit, hide and delete 示範方案', async () => {
+  const ADMIN_PW = process.env.ADMIN_PASSWORD || 'test-admin-pw';
+  const admin = await request.newContext({ httpCredentials: { username: 'admin', password: ADMIN_PW } });
+  const pub = await request.newContext();
+  const publicTitles = async () =>
+    ((await (await pub.get(`${API}/intimacy-plans/samples`)).json()).samples as { sample_title: string }[])
+      .map((s) => s.sample_title);
+  let id = '';
+  try {
+    const bad = await admin.post(`${API}/admin/alt-plan-samples`, { data: { title: '空的' } });
+    expect(bad.status()).toBe(400);
+
+    const created = await admin.post(`${API}/admin/alt-plan-samples`, {
+      data: { title: 'E2E 範例', interaction: '一起泡澡', time_prep: '30 分鐘', sort_order: 99 },
+    });
+    expect(created.status(), await created.text()).toBe(200);
+    id = (await created.json()).sample.id;
+    expect(await publicTitles()).toContain('E2E 範例');
+
+    const edited = await admin.patch(`${API}/admin/alt-plan-samples/${id}`, {
+      data: { title: 'E2E 範例改', interaction: '', script_id: 'first-meeting', script_title: '初次相遇', sort_order: 99 },
+    });
+    expect(edited.status(), await edited.text()).toBe(200);
+    expect((await edited.json()).sample.script_title).toBe('初次相遇');
+
+    await admin.patch(`${API}/admin/alt-plan-samples/${id}`, { data: { active: false } });
+    expect(await publicTitles()).not.toContain('E2E 範例改');
+
+    const list = (await (await admin.get(`${API}/admin/alt-plan-samples`)).json()).samples;
+    expect(list.find((s: { id: string }) => s.id === id)?.active).toBe(false);
+  } finally {
+    if (id) {
+      const del = await admin.delete(`${API}/admin/alt-plan-samples/${id}`);
+      expect(del.status()).toBe(200);
+    }
+    await admin.dispose();
+    await pub.dispose();
+  }
 });

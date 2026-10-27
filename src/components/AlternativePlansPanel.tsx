@@ -1,15 +1,23 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Check, Pencil, PauseCircle, PlayCircle, Plus, X, Users } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Check, Pencil, PauseCircle, PlayCircle, Plus, X, Users, Play } from 'lucide-react';
 import apiService from '../services/api';
 import type { AlternativePlan, AlternativePlanInput } from '../services/api';
-import { ALTERNATIVE_PLAN_SAMPLES } from '../data/alternativePlanSamples';
+import { useAlternativePlanSamples } from '../data/alternativePlanSamples';
 import type { AlternativePlanSample } from '../data/alternativePlanSamples';
 import { SampleTag } from './LoggedOutPreview';
 import { tr } from '../i18n/tr';
 
 // 替代方案協商 — the couple's co-authored plans. Only plans BOTH partners
 // approved (current wording) sit on the shared list; any edit sends a plan back
-// to 待確認; either partner can pause one at any time.
+// to 待確認; either partner can pause one at any time. A plan's interaction can
+// be one of the couple's roleplay scripts, deep-linked via「查看劇本」.
+
+/** Minimal script shape — satisfied by built-in, custom and marketplace scripts. */
+export interface PlanScript {
+  id: string;
+  title: string;
+  scenario?: string;
+}
 
 interface AlternativePlansPanelProps {
   partnerNickname?: string;
@@ -17,12 +25,16 @@ interface AlternativePlansPanelProps {
   requestId?: string;
   /** Open the invite form on the 替代方案協商 type (empty-state CTA). */
   onSendInvite?: () => void;
+  /** The couple's scripts (built-in + custom); favorites load lazily. */
+  scripts?: PlanScript[];
+  /** Open the named script in 角色扮演. */
+  onViewScript?: (title: string) => void;
 }
 
 type Feedback = { type: 'info' | 'error'; message: string };
-type Draft = { title: string; interaction: string; boundaries: string; timePrep: string; conditions: string };
+type Draft = { title: string; interaction: string; timePrep: string; scriptId: string; scriptTitle: string; scriptScenario: string };
 
-const EMPTY_DRAFT: Draft = { title: '', interaction: '', boundaries: '', timePrep: '', conditions: '' };
+const EMPTY_DRAFT: Draft = { title: '', interaction: '', timePrep: '', scriptId: '', scriptTitle: '', scriptScenario: '' };
 
 const errCode = (err: unknown) => (err as { error_code?: string })?.error_code;
 const errMessage = (err: unknown, fallback: string) =>
@@ -33,31 +45,31 @@ const CONSENT_NOTE = tr(
   'Approving a plan never means you have to do it. Every time, check that you both still want to.',
 );
 
-const FIELDS: { key: keyof Draft; label: string; placeholder: string; rows: number; required?: boolean }[] = [
-  { key: 'interaction', label: tr('具體的互動方式 *', 'What you\'d do together *'), placeholder: tr('例如：從按摩和擁抱開始，只做我們都說好的方式', 'e.g. Start with a massage and cuddling, only what we both agreed on'), rows: 3, required: true },
-  { key: 'boundaries', label: tr('各自的偏好與界線', 'Preferences & boundaries'), placeholder: tr('例如：任何一方說「暫停」就停下來', 'e.g. Either of us says "pause" and we stop'), rows: 2 },
-  { key: 'timePrep', label: tr('預期時間與準備', 'Time & preparation'), placeholder: tr('例如：約 1 小時；準備服裝、音樂', 'e.g. About an hour; costumes, music'), rows: 2 },
-  { key: 'conditions', label: tr('需要先確認的條件', 'Check first'), placeholder: tr('例如：兩個人都不累、開始前再問一次', 'e.g. Neither of us is tired; ask once more before starting'), rows: 2 },
-];
-
-const toDraft = (p: Pick<AlternativePlan, 'title' | 'interaction' | 'boundaries' | 'timePrep' | 'conditions'> | AlternativePlanSample): Draft => ({
+const toDraft = (
+  p: Pick<AlternativePlan, 'title' | 'interaction' | 'timePrep' | 'scriptId' | 'scriptTitle' | 'scriptScenario'> | AlternativePlanSample,
+  scriptScenario?: string | null,
+): Draft => ({
   title: p.title || '',
   interaction: p.interaction || '',
-  boundaries: p.boundaries || '',
   timePrep: p.timePrep || '',
-  conditions: p.conditions || '',
+  scriptId: p.scriptId || '',
+  scriptTitle: p.scriptTitle || '',
+  scriptScenario: ('scriptScenario' in p ? p.scriptScenario : scriptScenario) || '',
 });
 
 const toInput = (d: Draft): AlternativePlanInput => ({
   title: d.title.trim(),
   interaction: d.interaction.trim(),
-  boundaries: d.boundaries.trim(),
   timePrep: d.timePrep.trim(),
-  conditions: d.conditions.trim(),
+  scriptId: d.scriptTitle ? d.scriptId || null : null,
+  scriptTitle: d.scriptTitle || null,
+  scriptScenario: d.scriptTitle ? d.scriptScenario || null : null,
 });
 
-const AlternativePlansPanel: React.FC<AlternativePlansPanelProps> = ({ partnerNickname, requestId, onSendInvite }) => {
+const AlternativePlansPanel: React.FC<AlternativePlansPanelProps> = ({ partnerNickname, requestId, onSendInvite, scripts = [], onViewScript }) => {
   const partner = partnerNickname || tr('另一半', 'your partner');
+  const samples = useAlternativePlanSamples();
+  const [favoriteScripts, setFavoriteScripts] = useState<PlanScript[]>([]);
   const [plans, setPlans] = useState<AlternativePlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [gate, setGate] = useState<string | null>(null);
@@ -94,7 +106,29 @@ const AlternativePlansPanel: React.FC<AlternativePlansPanelProps> = ({ partnerNi
     setFeedback(null);
   };
 
-  const canSave = draft.title.trim().length > 0 && draft.interaction.trim().length > 0;
+  // Lazily add marketplace favorites to the picker the first time it opens.
+  const favoritesRequested = useRef(false);
+  useEffect(() => {
+    if (!editing || favoritesRequested.current) return;
+    favoritesRequested.current = true;
+    apiService.getFavoritedMarketplaceScripts()
+      .then((favs) => setFavoriteScripts(favs.map((f) => ({ id: f.id, title: f.title, scenario: f.scenario }))))
+      .catch(() => { /* non-fatal — built-in + custom scripts still listed */ });
+  }, [editing]);
+
+  const scriptOptions = useMemo(() => {
+    const map = new Map<string, PlanScript>();
+    for (const sc of [...scripts, ...favoriteScripts]) {
+      if (sc?.title && !map.has(sc.title)) map.set(sc.title, sc);
+    }
+    return Array.from(map.values());
+  }, [scripts, favoriteScripts]);
+
+  const scenarioFor = (title?: string | null) =>
+    (title && scriptOptions.find((sc) => sc.title === title)?.scenario) || null;
+
+  // A plan needs something to do: a description, a script, or both.
+  const canSave = draft.title.trim().length > 0 && (draft.interaction.trim().length > 0 || !!draft.scriptTitle);
 
   // Submit returns instantly (playbook §R7): close the editor, show the plan
   // right away, reconcile in the background. On failure reopen the draft; a
@@ -110,8 +144,8 @@ const AlternativePlansPanel: React.FC<AlternativePlansPanelProps> = ({ partnerNi
       const tempId = `temp-${++tempSeq.current}`;
       const now = new Date().toISOString();
       setPlans((prev) => [{
-        id: tempId, title: input.title, interaction: input.interaction,
-        boundaries: input.boundaries || null, timePrep: input.timePrep || null, conditions: input.conditions || null,
+        id: tempId, title: input.title, interaction: input.interaction || null, timePrep: input.timePrep || null,
+        scriptId: input.scriptId, scriptTitle: input.scriptTitle, scriptScenario: input.scriptScenario,
         status: 'pending', revision: 1, approvedByMe: true, approvedByPartner: false,
         createdByMe: true, updatedByMe: true, disabledByMe: false, createdAt: now, updatedAt: now,
       }, ...prev]);
@@ -138,7 +172,7 @@ const AlternativePlansPanel: React.FC<AlternativePlansPanelProps> = ({ partnerNi
     // An edit is new wording: only the editor has approved it now.
     replacePlan(target, {
       ...before, ...input,
-      boundaries: input.boundaries || null, timePrep: input.timePrep || null, conditions: input.conditions || null,
+      interaction: input.interaction || null, timePrep: input.timePrep || null,
       status: 'pending', approvedByMe: true, approvedByPartner: false, updatedByMe: true,
     });
     apiService.updateAlternativePlan(target, input)
@@ -215,20 +249,20 @@ const AlternativePlansPanel: React.FC<AlternativePlansPanelProps> = ({ partnerNi
   const pending = plans.filter((p) => p.status === 'pending');
   const disabled = plans.filter((p) => p.status === 'disabled');
 
-  const samples = (
+  const samplesBlock = (
     <div className="space-y-3" data-testid="alt-plan-samples">
-      {ALTERNATIVE_PLAN_SAMPLES.map((s) => (
+      {samples.map((s, i) => (
         <div key={s.id} className="rounded-xl border border-petal-rule-soft bg-petal-cream-2/30 p-4">
           <div className="flex items-start justify-between gap-2 mb-2">
             <div className="font-medium text-sm text-petal-ink">{s.title}</div>
             <SampleTag />
           </div>
-          <PlanFields plan={s} />
+          <PlanFields plan={s} onViewScript={onViewScript} />
           {!gate && (
             <button
               type="button"
-              data-testid={`alt-plan-use-${s.id}`}
-              onClick={() => openEditor('new', toDraft(s))}
+              data-testid={`alt-plan-use-${i}`}
+              onClick={() => openEditor('new', toDraft(s, scenarioFor(s.scriptTitle)))}
               className="mt-3 text-sm text-petal-rose-deep hover:text-pink-700 underline underline-offset-2"
             >
               {tr('用這個範例開始', 'Start from this example')}
@@ -251,7 +285,7 @@ const AlternativePlansPanel: React.FC<AlternativePlansPanelProps> = ({ partnerNi
             </button>
           )}
         </div>
-        {samples}
+        {samplesBlock}
       </div>
     );
   }
@@ -265,6 +299,22 @@ const AlternativePlansPanel: React.FC<AlternativePlansPanelProps> = ({ partnerNi
       onApprove={() => approve(plan)}
       onEdit={() => openEditor(plan.id, toDraft(plan))}
       onToggleActive={() => setActive(plan, plan.status === 'disabled')}
+      onViewScript={onViewScript}
+    />
+  );
+
+  const editor = (opts: { key?: string; isNew?: boolean; willResetApproval?: boolean }) => (
+    <PlanEditor
+      key={opts.key}
+      draft={draft}
+      onChange={setDraft}
+      onCancel={() => setEditing(null)}
+      onSave={save}
+      canSave={canSave}
+      isNew={opts.isNew}
+      willResetApproval={opts.willResetApproval}
+      scripts={scriptOptions}
+      onViewScript={onViewScript}
     />
   );
 
@@ -307,7 +357,7 @@ const AlternativePlansPanel: React.FC<AlternativePlansPanelProps> = ({ partnerNi
       )}
 
       {editing === 'new' && (
-        <PlanEditor draft={draft} onChange={setDraft} onCancel={() => setEditing(null)} onSave={save} canSave={canSave} isNew />
+        editor({ isNew: true })
       )}
 
       {plans.length === 0 && editing !== 'new' && (
@@ -333,21 +383,21 @@ const AlternativePlansPanel: React.FC<AlternativePlansPanelProps> = ({ partnerNi
             </div>
           </div>
           <div className="text-xs uppercase tracking-[0.12em] text-petal-muted">{tr('示範方案', 'Example plans')}</div>
-          {samples}
+          {samplesBlock}
         </div>
       )}
 
       {approved.length > 0 && (
         <section className="space-y-3" data-testid="alt-plans-approved">
           <h4 className="text-sm font-medium text-petal-sage-deep">{tr('✅ 共同方案清單', '✅ Shared list')}</h4>
-          {approved.map((p) => (editing === p.id ? <PlanEditor key={p.id} draft={draft} onChange={setDraft} onCancel={() => setEditing(null)} onSave={save} canSave={canSave} willResetApproval /> : renderPlan(p)))}
+          {approved.map((p) => (editing === p.id ? editor({ key: p.id, willResetApproval: true }) : renderPlan(p)))}
         </section>
       )}
 
       {pending.length > 0 && (
         <section className="space-y-3" data-testid="alt-plans-pending">
           <h4 className="text-sm font-medium text-amber-700">{tr('⏳ 待確認', '⏳ Awaiting approval')}</h4>
-          {pending.map((p) => (editing === p.id ? <PlanEditor key={p.id} draft={draft} onChange={setDraft} onCancel={() => setEditing(null)} onSave={save} canSave={canSave} /> : renderPlan(p)))}
+          {pending.map((p) => (editing === p.id ? editor({ key: p.id }) : renderPlan(p)))}
         </section>
       )}
 
@@ -363,22 +413,47 @@ const AlternativePlansPanel: React.FC<AlternativePlansPanelProps> = ({ partnerNi
   );
 };
 
-const PlanFields: React.FC<{ plan: Pick<AlternativePlan, 'interaction' | 'boundaries' | 'timePrep' | 'conditions'> }> = ({ plan }) => {
+// The script a plan is built on, with a jump into 角色扮演 to read it.
+const ScriptLink: React.FC<{ title: string; scenario?: string | null; onViewScript?: (title: string) => void }> = ({ title, scenario, onViewScript }) => (
+  <div className="rounded-lg border border-petal-rule-soft bg-petal-rose-soft/30 px-3 py-2 space-y-1" data-testid="alt-plan-script">
+    <div className="text-sm text-petal-ink">
+      {tr('🎭 劇本', '🎭 Script')} <span className="font-medium">{tr('《', '“')}{title}{tr('》', '”')}</span>
+    </div>
+    {scenario && <p className="text-xs text-petal-muted leading-relaxed">{scenario}</p>}
+    {onViewScript && (
+      <button
+        type="button"
+        data-testid="alt-plan-view-script"
+        onClick={() => onViewScript(title)}
+        className="inline-flex items-center gap-1 text-sm text-petal-rose-deep hover:text-pink-700 underline underline-offset-2"
+      >
+        <Play className="w-3.5 h-3.5" />
+        {tr('查看劇本', 'View script')}
+      </button>
+    )}
+  </div>
+);
+
+const PlanFields: React.FC<{
+  plan: { interaction?: string | null; timePrep?: string | null; scriptTitle?: string | null; scriptScenario?: string | null };
+  onViewScript?: (title: string) => void;
+}> = ({ plan, onViewScript }) => {
   const rows: [string, string | null | undefined][] = [
     [tr('互動方式', 'What'), plan.interaction],
-    [tr('偏好與界線', 'Boundaries'), plan.boundaries],
     [tr('時間與準備', 'Time & prep'), plan.timePrep],
-    [tr('先確認', 'Check first'), plan.conditions],
   ];
   return (
-    <dl className="space-y-1.5 text-sm">
-      {rows.filter(([, v]) => v).map(([label, value]) => (
-        <div key={label}>
-          <dt className="text-[11px] uppercase tracking-[0.1em] text-petal-muted">{label}</dt>
-          <dd className="text-petal-ink whitespace-pre-wrap break-words leading-relaxed">{value}</dd>
-        </div>
-      ))}
-    </dl>
+    <div className="space-y-2">
+      {plan.scriptTitle && <ScriptLink title={plan.scriptTitle} scenario={plan.scriptScenario} onViewScript={onViewScript} />}
+      <dl className="space-y-1.5 text-sm">
+        {rows.filter(([, v]) => v).map(([label, value]) => (
+          <div key={label}>
+            <dt className="text-[11px] uppercase tracking-[0.1em] text-petal-muted">{label}</dt>
+            <dd className="text-petal-ink whitespace-pre-wrap break-words leading-relaxed">{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 };
 
@@ -389,7 +464,8 @@ const PlanCard: React.FC<{
   onApprove: () => void;
   onEdit: () => void;
   onToggleActive: () => void;
-}> = ({ plan, partner, busy, onApprove, onEdit, onToggleActive }) => {
+  onViewScript?: (title: string) => void;
+}> = ({ plan, partner, busy, onApprove, onEdit, onToggleActive, onViewScript }) => {
   const isDisabled = plan.status === 'disabled';
   const chip = (ok: boolean, who: string) => (
     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${ok ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
@@ -406,7 +482,7 @@ const PlanCard: React.FC<{
         <div className="font-medium text-petal-ink break-words">{plan.title}</div>
         {busy && <span className="text-xs text-petal-muted">{tr('送出中…', 'Sending…')}</span>}
       </div>
-      <PlanFields plan={plan} />
+      <PlanFields plan={plan} onViewScript={onViewScript} />
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         {isDisabled ? (
           <span className="text-xs text-petal-muted">
@@ -467,7 +543,19 @@ const PlanEditor: React.FC<{
   canSave: boolean;
   isNew?: boolean;
   willResetApproval?: boolean;
-}> = ({ draft, onChange, onCancel, onSave, canSave, isNew, willResetApproval }) => (
+  scripts: PlanScript[];
+  onViewScript?: (title: string) => void;
+}> = ({ draft, onChange, onCancel, onSave, canSave, isNew, willResetApproval, scripts, onViewScript }) => {
+  // Keep a linked script selectable even if it's no longer in the list
+  // (deleted / renamed / a sample's script the couple doesn't own).
+  const options = draft.scriptTitle && !scripts.some((sc) => sc.title === draft.scriptTitle)
+    ? [{ id: draft.scriptId, title: draft.scriptTitle, scenario: draft.scriptScenario }, ...scripts]
+    : scripts;
+  const pickScript = (title: string) => {
+    const sc = options.find((o) => o.title === title);
+    onChange({ ...draft, scriptTitle: sc?.title || '', scriptId: sc?.id || '', scriptScenario: sc?.scenario || '' });
+  };
+  return (
   <div className="rounded-xl border border-pink-200 bg-pink-50/60 p-4 space-y-3" data-testid="alt-plan-editor">
     <div>
       <label className="block text-sm text-gray-700 mb-1">{tr('方案名稱 *', 'Plan name *')}</label>
@@ -480,20 +568,56 @@ const PlanEditor: React.FC<{
         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-200"
       />
     </div>
-    {FIELDS.map((f) => (
-      <div key={f.key}>
-        <label className="block text-sm text-gray-700 mb-1">{f.label}</label>
-        <textarea
-          data-testid={`alt-plan-${f.key}`}
-          value={draft[f.key]}
-          rows={f.rows}
-          maxLength={f.key === 'interaction' || f.key === 'boundaries' ? 2000 : 1000}
-          onChange={(e) => onChange({ ...draft, [f.key]: e.target.value })}
-          placeholder={f.placeholder}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-pink-200"
-        />
-      </div>
-    ))}
+    <div>
+      <label className="block text-sm text-gray-700 mb-1">{tr('角色扮演劇本（選填）', 'Roleplay script (optional)')}</label>
+      <select
+        data-testid="alt-plan-script-select"
+        value={draft.scriptTitle}
+        onChange={(e) => pickScript(e.target.value)}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-200"
+      >
+        <option value="">{tr('不使用劇本', 'No script')}</option>
+        {options.map((sc) => (
+          <option key={sc.title} value={sc.title}>{sc.title}</option>
+        ))}
+      </select>
+      {draft.scriptTitle && (
+        <div className="mt-2">
+          <ScriptLink title={draft.scriptTitle} scenario={draft.scriptScenario} onViewScript={onViewScript} />
+        </div>
+      )}
+    </div>
+    <div>
+      <label className="block text-sm text-gray-700 mb-1">
+        {draft.scriptTitle ? tr('互動方式（選填）', 'What you\'d do (optional)') : tr('互動方式 *', 'What you\'d do together *')}
+      </label>
+      <textarea
+        data-testid="alt-plan-interaction"
+        value={draft.interaction}
+        rows={3}
+        maxLength={2000}
+        onChange={(e) => onChange({ ...draft, interaction: e.target.value })}
+        placeholder={draft.scriptTitle
+          ? tr('想補充的玩法，例如：客廳佈置成咖啡廳', 'Anything to add, e.g. turn the living room into a café')
+          : tr('例如：先來一段精油按摩，再依偎擁抱', 'e.g. Start with an oil massage, then cuddle')}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-pink-200"
+      />
+      {!draft.scriptTitle && (
+        <p className="text-xs text-gray-500 mt-1">{tr('也可以直接選一個劇本當作互動方式。', 'Or just pick a script as the plan.')}</p>
+      )}
+    </div>
+    <div>
+      <label className="block text-sm text-gray-700 mb-1">{tr('預期時間與準備', 'Time & preparation')}</label>
+      <textarea
+        data-testid="alt-plan-timePrep"
+        value={draft.timePrep}
+        rows={2}
+        maxLength={1000}
+        onChange={(e) => onChange({ ...draft, timePrep: e.target.value })}
+        placeholder={tr('例如：約 1 小時；準備按摩精油、音樂', 'e.g. About an hour; massage oil, music')}
+        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-pink-200"
+      />
+    </div>
     <p className="text-xs text-gray-600">
       {isNew
         ? tr('送出即代表你認可這個方案；對方也認可後才會加入共同清單。', 'Sending counts as your approval; it joins the shared list once they approve too.')
@@ -516,6 +640,7 @@ const PlanEditor: React.FC<{
       </button>
     </div>
   </div>
-);
+  );
+};
 
 export default AlternativePlansPanel;

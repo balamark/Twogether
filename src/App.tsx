@@ -2718,6 +2718,7 @@ const LoveTimeApp = () => {
             setCurrentView('roleplay');
           }}
           onSendInvite={() => setShowIntimacyRequestForm(true)}
+          scripts={[...defaultRoleplayScripts, ...customScripts]}
         />
       );
       // 'pricing' is the logged-out Premium tab; once signed in it becomes the

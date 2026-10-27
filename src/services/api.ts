@@ -257,10 +257,12 @@ interface AlternativePlan {
   id: string;
   requestId?: string | null;
   title: string;
-  interaction: string;
-  boundaries?: string | null;
+  interaction?: string | null;
   timePrep?: string | null;
-  conditions?: string | null;
+  // Linked roleplay script (snapshot of its id/title/簡介), or null.
+  scriptId?: string | null;
+  scriptTitle?: string | null;
+  scriptScenario?: string | null;
   status: AlternativePlanStatus;
   revision: number;
   approvedByMe: boolean;
@@ -275,11 +277,23 @@ interface AlternativePlan {
 
 interface AlternativePlanInput {
   title: string;
-  interaction: string;
-  boundaries?: string;
+  interaction?: string;
   timePrep?: string;
-  conditions?: string;
+  // null clears the linked script on update.
+  scriptId?: string | null;
+  scriptTitle?: string | null;
+  scriptScenario?: string | null;
   requestId?: string;
+}
+
+// Admin-managed 示範方案 (GET /intimacy-plans/samples, public).
+interface AlternativePlanSampleData {
+  id: string;
+  title: string;
+  interaction?: string | null;
+  timePrep?: string | null;
+  scriptId?: string | null;
+  scriptTitle?: string | null;
 }
 
 type NegotiationResponse = 'accepted' | 'later' | 'rejected';
@@ -3246,9 +3260,10 @@ class ApiService {
       const response = await apiClient.post('/intimacy-plans', {
         title: input.title,
         interaction: input.interaction,
-        boundaries: input.boundaries,
         time_prep: input.timePrep,
-        conditions: input.conditions,
+        script_id: input.scriptId,
+        script_title: input.scriptTitle,
+        script_scenario: input.scriptScenario,
         request_id: input.requestId,
       });
       return this.transformAlternativePlan(response.data.plan);
@@ -3263,15 +3278,28 @@ class ApiService {
       const response = await apiClient.put(`/intimacy-plans/${id}`, {
         title: input.title,
         interaction: input.interaction,
-        boundaries: input.boundaries,
         time_prep: input.timePrep,
-        conditions: input.conditions,
+        script_id: input.scriptId,
+        script_title: input.scriptTitle,
+        script_scenario: input.scriptScenario,
       });
       return this.transformAlternativePlan(response.data.plan);
     } catch (error: unknown) {
       console.error('Failed to update alternative plan:', error);
       this.throwApiError(error, tr('方案沒有更新，請稍後再試', 'The plan wasn\'t updated. Please try again in a moment'));
     }
+  }
+
+  async getAlternativePlanSamples(): Promise<AlternativePlanSampleData[]> {
+    const response = await apiClient.get('/intimacy-plans/samples');
+    return (response.data.samples || []).map((d: Record<string, unknown>) => ({
+      id: String(d.id || ''),
+      title: String(d.sample_title || ''),
+      interaction: typeof d.interaction === 'string' ? d.interaction : null,
+      timePrep: typeof d.time_prep === 'string' ? d.time_prep : null,
+      scriptId: typeof d.script_id === 'string' ? d.script_id : null,
+      scriptTitle: typeof d.script_title === 'string' ? d.script_title : null,
+    }));
   }
 
   async approveAlternativePlan(id: string, revision: number): Promise<AlternativePlan> {
@@ -4255,10 +4283,11 @@ class ApiService {
       id: String(d.id || ''),
       requestId: str(d.request_id),
       title: String(d.title || ''),
-      interaction: String(d.interaction || ''),
-      boundaries: str(d.boundaries),
+      interaction: str(d.interaction),
       timePrep: str(d.time_prep),
-      conditions: str(d.conditions),
+      scriptId: str(d.script_id),
+      scriptTitle: str(d.script_title),
+      scriptScenario: str(d.script_scenario),
       status: (['pending', 'approved', 'disabled'].includes(String(d.status)) ? d.status : 'pending') as AlternativePlanStatus,
       revision: Number(d.revision) || 1,
       approvedByMe: !!d.approved_by_me,
@@ -6299,6 +6328,7 @@ export type {
   RespondToIntimacyRequestRequest,
   AlternativePlan,
   AlternativePlanInput,
+  AlternativePlanSampleData,
   AlternativePlanStatus,
   NegotiationResponse,
   IntimacyTemplate,
