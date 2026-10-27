@@ -159,25 +159,16 @@ test.describe.serial('一起收尾 — the closure state machine over HTTP', () 
     const bBeforeSubmit = await (await ctxB.get(`${API}/events/${eventId}/closure`)).json();
     expect(bBeforeSubmit.closure.partner.commitment).toBeNull();
 
-    // B submits. Both are now 'submitted' but neither has reviewed, so the
-    // event must NOT be resolved yet.
+    // B submits. Both are now 'submitted', and that alone finishes the
+    // closure — there is no review round to wait on.
     const submitB = await ctxB.post(`${API}/events/${eventId}/closure/submit`, {
       data: { commitment: '我會先跟你說一聲再抱孩子' },
     });
     expect(submitB.ok()).toBeTruthy();
 
-    // Now B can see A's commitment.
+    // B can see A's commitment in the summary.
     const bAfterSubmit = await (await ctxB.get(`${API}/events/${eventId}/closure`)).json();
     expect(bAfterSubmit.closure.partner.commitment?.text).toBe('即使很生氣，也不在孩子面前說你');
-
-    // Each reviews the other. The last review finalizes.
-    await ctxB.post(`${API}/events/${eventId}/closure/review`, {
-      data: { target: 'commitment', verdict: 'agree' },
-    });
-    const lastReview = await ctxA.post(`${API}/events/${eventId}/closure/review`, {
-      data: { target: 'commitment', verdict: 'agree' },
-    });
-    expect(lastReview.ok()).toBeTruthy();
 
     const done = await withDb((c) =>
       c.query(`SELECT status, resolved_at FROM events WHERE id = $1`, [eventId])
@@ -270,7 +261,7 @@ test.describe.serial('一起收尾 — the closure state machine over HTTP', () 
     expect((await refused.json()).error_code).toBe('CLOSURE_ALREADY_STARTED');
   });
 
-  test('unilateral finalize is refused inside the 24h grace window', async () => {
+  test('unilateral finalize works as soon as my own part is in', async () => {
     const eventId = await createEvent(ctxA, '訊息已讀不回');
 
     await ctxA.post(`${API}/events/${eventId}/closure/start`);
@@ -283,14 +274,7 @@ test.describe.serial('一起收尾 — the closure state machine over HTTP', () 
     await ctxA.post(`${API}/events/${eventId}/closure/submit`, {
       data: { commitment: '看到訊息我會先回一個貼圖' },
     });
-    const stillEarly = await ctxA.post(`${API}/events/${eventId}/closure/finalize`);
-    expect(stillEarly.status()).toBe(400);
-    expect((await stillEarly.json()).error_code).toBe('CLOSURE_FINALIZE_TOO_EARLY');
-
-    // Backdate the start so the valve unlocks, then it works.
-    await withDb((c) =>
-      c.query(`UPDATE event_closures SET started_at = NOW() - INTERVAL '25 hours' WHERE event_id = $1`, [eventId])
-    );
+    // No waiting window — the one who has written can finish right away.
     const forced = await ctxA.post(`${API}/events/${eventId}/closure/finalize`);
     expect(forced.ok()).toBeTruthy();
 
@@ -355,9 +339,18 @@ test.describe.serial('一起收尾 — the closure state machine over HTTP', () 
     await withDb((c) =>
       c.query(`UPDATE commitments SET status = 'active', activated_at = NOW() WHERE event_id = $1`, [eventId])
     );
-    await ctxB.post(`${API}/events/${eventId}/closure/submit`, {
-      data: { commitment: '我也會先跟你說一聲再下單' },
-    });
+    // A half-written draft from B. Submitting it would finish the closure on
+    // the spot (no review round), so plant it directly.
+    await withDb((c) =>
+      c.query(
+        `INSERT INTO commitments (couple_id, event_id, owner_id, text)
+         SELECT c.couple_id, c.event_id, p.user_id, '我也會先跟你說一聲再下單'
+           FROM commitments c
+           JOIN event_closure_participants p ON p.event_id = c.event_id AND p.user_id <> c.owner_id
+          WHERE c.event_id = $1`,
+        [eventId]
+      )
+    );
 
     const reopen = await ctxB.post(`${API}/events/${eventId}/reopen`);
     expect(reopen.ok()).toBeTruthy();
@@ -468,50 +461,6 @@ test.describe.serial('一起收尾 — the closure state machine over HTTP', () 
       c.query(`SELECT status FROM commitments WHERE event_id = $1`, [eventId])
     );
     expect(commitments.rows.length).toBe(0);
-  });
-
-  test('the sweep rescues a closure where both submitted but neither reviewed', async () => {
-    const eventId = await createEvent(ctxA, '誰去接小孩');
-
-    await ctxA.post(`${API}/events/${eventId}/closure/start`);
-    await ctxA.post(`${API}/events/${eventId}/closure/submit`, {
-      data: { commitment: '接送安排我會前一天就確認' },
-    });
-    await ctxB.post(`${API}/events/${eventId}/closure/submit`, {
-      data: { commitment: '臨時有事我會早點跟你說' },
-    });
-
-    // Neither reviews. The sweep's auto-skip only touches 'pending' rows, so it
-    // flips nothing here — without force the finalize claim kept failing
-    // NOT_TERMINAL_EXISTS and the event sat in 'closing' past its deadline
-    // forever, re-occupying the LIMIT 20 window on every sweep.
-    const stillClosing = await withDb((c) =>
-      c.query(`SELECT status FROM events WHERE id = $1`, [eventId])
-    );
-    expect(stillClosing.rows[0].status).toBe('closing');
-
-    await withDb((c) =>
-      c.query(`UPDATE event_closures SET deadline_at = NOW() - INTERVAL '1 hour' WHERE event_id = $1`, [eventId])
-    );
-    await ctxA.get(`${API}/events`);
-
-    await expect
-      .poll(
-        async () => {
-          const r = await withDb((c) => c.query(`SELECT status FROM events WHERE id = $1`, [eventId]));
-          return r.rows[0].status;
-        },
-        { timeout: 10000 }
-      )
-      .toBe('resolved');
-
-    // Past the deadline the clock is the authority, but both promises still
-    // count — forcing the finish must not throw away what they wrote.
-    const commitments = await withDb((c) =>
-      c.query(`SELECT status FROM commitments WHERE event_id = $1`, [eventId])
-    );
-    expect(commitments.rows.length).toBe(2);
-    for (const row of commitments.rows) expect(row.status).toBe('active');
   });
 
   test('a private (solo) event has no closure flow', async () => {

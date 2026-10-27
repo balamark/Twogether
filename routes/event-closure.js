@@ -46,8 +46,6 @@ const MAX_COMMITMENT_CHARS = 200;
 // that a busy partner isn't cut out, short enough that events don't strand in
 // 'closing' and quietly corrupt every resolved count.
 const CLOSURE_DEADLINE_HOURS = 72;
-// An impatient partner can force the finish, but not within a day of asking.
-const UNILATERAL_FINALIZE_AFTER_HOURS = 24;
 // When the event resolves, each active commitment gets a follow-up date (Batch 3).
 const FOLLOW_UP_AFTER_HOURS = 72;
 
@@ -138,7 +136,8 @@ async function getCommitments(eventId) {
 }
 
 // A participant is terminal when nothing more is expected of them: they wrote
-// their part AND looked at their partner's, or they opted out.
+// their part or they opted out. Reviewing the partner's is not required — an
+// unhappy partner can 取消收尾 and rewrite instead.
 function isTerminal(row) {
   return row && row.status !== 'pending';
 }
@@ -169,11 +168,6 @@ function serializeClosure({ closure, participants, commitments, event, userId, p
     dueAt: row.due_at,
   } : null);
 
-  const startedAt = closure.started_at ? new Date(closure.started_at) : null;
-  const canFinalizeAt = startedAt
-    ? new Date(startedAt.getTime() + UNILATERAL_FINALIZE_AFTER_HOURS * 3600 * 1000).toISOString()
-    : null;
-
   // The shared decision is written by one partner but belongs to both, so
   // unlike a commitment it is only hidden while I still owe my own answer.
   const decisionVisible = iSubmitted || closure.shared_decision_by === userId || closure.status === 'finalized';
@@ -185,7 +179,6 @@ function serializeClosure({ closure, participants, commitments, event, userId, p
     startedBy: closure.started_by,
     startedAt: closure.started_at,
     deadlineAt: closure.deadline_at,
-    canFinalizeAt,
     finalizedAt: closure.finalized_at,
     // The recap block renders from this — no new AI call to open the panel.
     therapyNote: event.therapy_note || null,
@@ -302,20 +295,12 @@ async function enterClosing(access, userId) {
 // insight and fires the notification, so there are no duplicate pushes and no
 // duplicate LLM spend. Same shape as the facilitation step_count claim.
 //
-// Terminal means: skipped/auto_skipped, or submitted AND reviewed the partner's
-// commitment. The review clause is conditional on the partner having actually
-// submitted something — if they skipped there is nothing to review, and a
-// blanket "reviewed_at IS NOT NULL" would strand the closure forever.
+// Terminal means submitted, skipped or auto_skipped. Once both have written,
+// the closure finishes right away — there is no separate review round to wait
+// on. Someone unhappy with the result can reopen and rewrite.
 const NOT_TERMINAL_EXISTS = `EXISTS (
         SELECT 1 FROM event_closure_participants p
-         WHERE p.event_id = e.id
-           AND (
-             p.status = 'pending'
-             OR (p.status = 'submitted' AND p.reviewed_at IS NULL AND EXISTS (
-                   SELECT 1 FROM event_closure_participants q
-                    WHERE q.event_id = e.id AND q.user_id <> p.user_id
-                      AND q.status = 'submitted'))
-           ))`;
+         WHERE p.event_id = e.id AND p.status = 'pending')`;
 
 async function maybeFinalizeClosure(eventId, { force = false } = {}) {
   const claim = await db.query(
@@ -478,9 +463,8 @@ async function sweepOverdueClosures({ force = false } = {}) {
         [eventId]
       );
       // force: past the deadline the clock is the authority, not the state
-      // machine. Without it a closure where both submitted but neither reviewed
-      // flips zero rows above, still trips NOT_TERMINAL_EXISTS, and sits in
-      // 'closing' forever — re-occupying the LIMIT 20 window on every sweep.
+      // machine, so nothing can leave a closure sitting in 'closing' and
+      // re-occupying the LIMIT 20 window on every sweep.
       const result = await maybeFinalizeClosure(eventId, { force: true });
       if (result) {
         logInfo('events.closure.auto_finalize', {
@@ -686,15 +670,6 @@ router.post(
       const text = String(req.body.commitment).trim();
       const decision = req.body.sharedDecision ? String(req.body.sharedDecision).trim() : null;
 
-      // Read the prior wording before the upsert overwrites it — a re-submit
-      // that actually changes the text has to send the partner back to Screen 5
-      // (see below), and afterwards there is no way to tell what it used to say.
-      const priorText = (await db.query(
-        `SELECT text FROM commitments
-          WHERE event_id = $1 AND owner_id = $2 AND status IN ('draft','active')`,
-        [eventId, userId]
-      )).rows[0]?.text ?? null;
-
       // The partial unique index (event_id, owner_id) WHERE status IN
       // ('draft','active') makes this a clean upsert — a double-tap updates one
       // row instead of creating a second promise.
@@ -734,21 +709,6 @@ router.post(
         [eventId, userId]
       )).rows[0];
 
-      // The upsert above already reset MY commitment's review_status, but the
-      // partner's own reviewed_at lives on a different table. Without clearing
-      // it too, they stay terminal and the closure can finalize with them never
-      // having seen the revised wording. Only on a real edit — re-sending the
-      // same text must not drag them back to Screen 5.
-      const textChanged = priorText !== null && priorText !== text;
-      if (textChanged && access.partnerId) {
-        await db.query(
-          `UPDATE event_closure_participants
-              SET reviewed_at = NULL, updated_at = NOW()
-            WHERE event_id = $1 AND user_id = $2 AND reviewed_at IS NOT NULL`,
-          [eventId, access.partnerId]
-        );
-      }
-
       logInfo('events.closure.submit', {
         userId, eventId, hasDecision: !!decision, resubmit: !!participant?.reviewed_at,
       });
@@ -781,9 +741,9 @@ router.post(
   }
 );
 
-// REVIEW — 對方檢視. 可以，就這樣 or 我想調整一下（附建議）. A change request is
-// recorded and shown to the owner, who may 採納 or 維持原案. It never blocks
-// finalize: you cannot veto someone else's promise, you can only be heard.
+// REVIEW — legacy 對方檢視. The current client no longer shows a review round
+// (both submitted → finalized on the spot), so review never gates finalize.
+// Kept so an older cached client still gets a valid answer instead of a 404.
 router.post(
   '/:id/closure/review',
   [
@@ -980,9 +940,9 @@ router.post('/:id/closure/abandon', [param('id').isUUID()], async (req, res) => 
   }
 });
 
-// FINALIZE — Screen 4's 「先這樣完成」 valve. Allowed only when my own part is
-// done AND ≥24h have passed, so an impatient partner can't stampede the other
-// within a day of asking, but also isn't held for three days.
+// FINALIZE — Screen 4's 「先這樣完成」 valve. Allowed as soon as my own part is
+// done: whoever has written shouldn't be held waiting on a clock. The partner
+// isn't locked out — if they're unhappy they can reopen and rewrite.
 router.post('/:id/closure/finalize', [param('id').isUUID()], async (req, res) => {
   if (sendValidationError(req, res)) return;
   try {
@@ -1006,16 +966,6 @@ router.post('/:id/closure/finalize', [param('id').isUUID()], async (req, res) =>
         success: false,
         message: '先寫下你自己的約定，才能完成這次收尾。',
         error_code: 'CLOSURE_NEEDS_YOUR_PART',
-      });
-    }
-
-    const unlockAt = new Date(new Date(closure.started_at).getTime() + UNILATERAL_FINALIZE_AFTER_HOURS * 3600 * 1000);
-    if (Date.now() < unlockAt.getTime()) {
-      return res.status(400).json({
-        success: false,
-        message: `再給對方一點時間。${unlockAt.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })} 之後你就可以自己先完成這次收尾。`,
-        error_code: 'CLOSURE_FINALIZE_TOO_EARLY',
-        unlockAt: unlockAt.toISOString(),
       });
     }
 

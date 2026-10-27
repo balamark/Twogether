@@ -1,40 +1,20 @@
-import { useEffect, useState } from 'react';
 import { Clock, Loader2, Pencil } from 'lucide-react';
-import { formatDateTime } from '../../utils/datetime';
-import { useTimezone } from '../../contexts/TimezoneContext';
 import { tr } from '../../i18n/tr';
 
-// Screen 4 — after I submit but before my partner does. Naming the auto-finish
-// time («大約⋯») is what turns limbo into a wait. The 先這樣完成 button appears
-// only past canFinalizeAt (the 24h grace) to protect the co-writing intent.
+// Screen 4 — after I submit but before my partner does. Whoever has written can
+// 先這樣完成 right away; no dates or countdowns to parse. If the partner isn't
+// happy with how it ended, they can reopen and rewrite.
 export default function ClosureWaitingCard({
   partnerNickname,
-  canFinalizeAt,
-  deadlineAt,
   finalizing,
   onFinalize,
   onRevise,
 }: {
   partnerNickname?: string;
-  canFinalizeAt: string | null;
-  deadlineAt: string;
   finalizing: boolean;
   onFinalize: () => void;
   onRevise: () => void;
 }) {
-  const tz = useTimezone();
-  // The panel only refreshes on focus/visibilitychange, so a card left open
-  // across the grace boundary would never grow its 先這樣完成 button. A minute
-  // is plenty of resolution for a 24h gate and costs nothing.
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(t);
-  }, []);
-  const canFinalizeNow = !!(canFinalizeAt && new Date(canFinalizeAt).getTime() <= now);
-  const deadlineLabel = safeFormat(deadlineAt, tz);
-  const graceLabel = canFinalizeAt ? safeFormat(canFinalizeAt, tz) : null;
-
   return (
     <div
       data-testid="closure-waiting-card"
@@ -44,13 +24,8 @@ export default function ClosureWaitingCard({
         <Clock className="w-4 h-4 text-petal-sage-deep" />
         {tr('你的約定已送出，等', 'Your commitment is in. Waiting for ')}{partnerNickname || tr('對方', 'your partner')}{tr('也寫好。', ' to finish theirs.')}
       </p>
-      {/* The old string read 「阿哲 8/9 14:00 前還沒動作，你就可以…」, which parses
-          as a broken sentence. Lead with 若 so the condition is signposted
-          before the clause it governs. */}
       <p className="text-xs text-petal-ink-soft leading-relaxed">
-        {canFinalizeNow
-          ? tr(`${partnerNickname || '對方'}還沒動作。你可以先這樣完成，或再等等。`, `${partnerNickname || 'Your partner'} hasn't responded yet. You can finish as-is now, or wait a little longer.`)
-          : tr(`若${partnerNickname || '對方'}${graceLabel ? `到 ${graceLabel}` : ''}都還沒動作，你就可以「先這樣完成」。${deadlineLabel} 前都沒回應的話，系統會安全地為你們結束。`, `If ${partnerNickname || 'your partner'} still hasn't responded${graceLabel ? ` by ${graceLabel}` : ''}, you can "finish as-is". If there's no response by ${deadlineLabel}, it will close safely for you both.`)}
+        {tr('不想等的話，可以直接「先這樣完成」。', 'Don\'t want to wait? You can "finish as-is" now.')}
       </p>
       <div className="flex justify-center gap-2 pt-1">
         {/* 我先跳過 read as "skip my own part" — but I already wrote it. The
@@ -65,28 +40,17 @@ export default function ClosureWaitingCard({
           <Pencil className="w-3 h-3" />
           {tr('改一下我的約定', 'Edit my commitment')}
         </button>
-        {canFinalizeNow && (
-          <button
-            type="button"
-            data-testid="closure-finalize-button"
-            disabled={finalizing}
-            onClick={onFinalize}
-            className="px-3 py-1.5 rounded-full bg-petal-sage-deeper text-white text-xs font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
-          >
-            {finalizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
-            {tr('先這樣完成', 'Finish as-is')}
-          </button>
-        )}
+        <button
+          type="button"
+          data-testid="closure-finalize-button"
+          disabled={finalizing}
+          onClick={onFinalize}
+          className="px-3 py-1.5 rounded-full bg-petal-sage-deeper text-white text-xs font-medium inline-flex items-center gap-1.5 disabled:opacity-50 hover:opacity-90 active:scale-[0.98] transition"
+        >
+          {finalizing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+          {tr('先這樣完成', 'Finish as-is')}
+        </button>
       </div>
     </div>
   );
-}
-
-function safeFormat(iso: string | null, tz: string): string {
-  if (!iso) return '';
-  try {
-    return formatDateTime(iso, tz);
-  } catch {
-    return '';
-  }
 }

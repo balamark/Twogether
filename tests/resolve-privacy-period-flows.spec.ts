@@ -128,7 +128,6 @@ function makeClosure(over: Record<string, unknown> = {}) {
     startedBy: FAKE_USER.id,
     startedAt: new Date().toISOString(),
     deadlineAt: new Date(Date.now() + 72 * 3600 * 1000).toISOString(),
-    canFinalizeAt: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
     finalizedAt: null,
     therapyNote: null,
     insight: null,
