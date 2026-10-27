@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Heart, Check, Smile, Coffee, HandHeart } from 'lucide-react';
+import { Heart, Check, Smile, Coffee, HandHeart, MessageCircle, Clock, PauseCircle } from 'lucide-react';
 import { apiService } from '../services/api';
 import type {
   IntimacyRequest,
   AlternativeIntimacyOptionsGrouped,
   AlternativeIntimacyOption,
   RespondToIntimacyRequestRequest,
+  NegotiationResponse,
 } from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { localInputToIsoInTz, formatDateTime } from '../utils/datetime';
@@ -15,7 +16,103 @@ import { tr } from '../i18n/tr';
 interface IntimacyRequestActionPanelProps {
   request: IntimacyRequest;
   onResponded: () => void;
+  /** 替代方案協商: after "願意一起討論", jump to the shared plan list. */
+  onOpenPlans?: (planId?: string) => void;
 }
+
+const NEGOTIATION_CHOICES: { value: NegotiationResponse; label: string; hint: string; icon: typeof Check; testId: string }[] = [
+  { value: 'accepted', label: tr('願意一起討論', 'Happy to talk'), hint: tr('一起提出彼此都喜歡的方式', 'Propose ways you\'d both enjoy'), icon: MessageCircle, testId: 'negotiation-accept' },
+  { value: 'later', label: tr('稍後再討論', 'Let\'s talk later'), hint: tr('現在不方便，之後回來回覆就好', 'Not now; come back and reply anytime'), icon: Clock, testId: 'negotiation-later' },
+  { value: 'rejected', label: tr('暫時不想討論', 'Not right now'), hint: tr('這是你此刻的步調，完全沒關係', 'That\'s your pace right now, and that\'s okay'), icon: PauseCircle, testId: 'negotiation-decline' },
+];
+
+// 替代方案協商 response. Accepting means "let's talk", never consent to any act.
+const NegotiationResponsePanel: React.FC<IntimacyRequestActionPanelProps> = ({ request, onResponded, onOpenPlans }) => {
+  const [choice, setChoice] = useState<NegotiationResponse | null>(null);
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const lockRef = useRef(false);
+
+  const send = async () => {
+    if (!choice || lockRef.current) return;
+    lockRef.current = true;
+    try {
+      setLoading(true);
+      setError(null);
+      await apiService.respondToNegotiation(request.id, choice, message.trim() || undefined);
+      // Land on the first plan the sender linked, if any.
+      if (choice === 'accepted' && onOpenPlans) onOpenPlans(request.altPlanIds?.[0]);
+      else onResponded();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : tr('回覆沒有送出，請稍後再試', 'Your reply wasn\'t sent. Please try again in a moment'));
+    } finally {
+      setLoading(false);
+      lockRef.current = false;
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-pink-200 bg-pink-50 p-4 space-y-3" data-testid="negotiation-response-panel">
+      {error && (
+        <div className="rounded-md bg-red-50 border border-red-200 p-2 text-sm text-red-600">{error}</div>
+      )}
+      <p className="text-xs text-pink-800 bg-white border border-pink-200 rounded-md px-3 py-2">
+        {tr('接受討論不代表同意任何特定的親密行為，只是願意一起聊聊。每個選擇都被尊重。', 'Agreeing to talk never means agreeing to any specific act. It just means you\'re open to a conversation. Every choice is respected.')}
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2" role="radiogroup" aria-label={tr('你的回覆', 'Your reply')}>
+        {NEGOTIATION_CHOICES.map(({ value, label, hint, icon: Icon, testId }) => (
+          <button
+            key={value}
+            type="button"
+            role="radio"
+            aria-checked={choice === value}
+            data-testid={testId}
+            onClick={() => setChoice(value)}
+            className={`p-3 text-left rounded-lg border transition-colors ${
+              choice === value ? 'border-pink-400 bg-white ring-1 ring-pink-300' : 'border-gray-200 bg-white hover:border-pink-200'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900">
+              <Icon className="w-4 h-4 text-pink-500" />
+              {label}
+            </div>
+            <div className="text-xs text-gray-600 mt-0.5">{hint}</div>
+          </button>
+        ))}
+      </div>
+      <div>
+        <label className="block text-sm text-gray-700 mb-1">{tr('想附上一句話嗎？（選填）', 'Add a note? (optional)')}</label>
+        <textarea
+          data-testid="negotiation-message"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          rows={2}
+          maxLength={500}
+          placeholder={
+            choice === 'rejected'
+              ? tr('例如：謝謝你願意說出來，我現在還沒準備好', 'e.g. Thank you for telling me. I\'m not ready yet')
+              : choice === 'later'
+              ? tr('例如：這週末找個時間好好聊', 'e.g. Let\'s find time this weekend to talk properly')
+              : tr('例如：謝謝你說出來，我也想聽聽你的想法', 'e.g. Thanks for telling me. I\'d love to hear what you think')
+          }
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-200 text-sm resize-none"
+        />
+      </div>
+      <div className="flex justify-end">
+        <button
+          type="button"
+          data-testid="negotiation-send"
+          onClick={send}
+          disabled={!choice || loading}
+          className="px-4 py-2 bg-pink-500 text-white rounded-lg hover:bg-pink-600 disabled:bg-pink-300 disabled:cursor-not-allowed transition-colors"
+        >
+          {loading ? tr('送出中…', 'Sending…') : choice ? tr('送出回覆', 'Send reply') : tr('先選一個回覆', 'Pick a reply first')}
+        </button>
+      </div>
+    </div>
+  );
+};
 
 const AFFIRMATION_SUGGESTIONS = [
   tr('謝謝你想到我 ❤️', 'Thanks for thinking of me ❤️'),
@@ -52,7 +149,12 @@ const getCategoryName = (category: string) => {
 
 type Mode = 'choice' | 'accept' | 'alternative';
 
-const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = ({
+const IntimacyRequestActionPanel: React.FC<IntimacyRequestActionPanelProps> = (props) =>
+  props.request.requestType === 'negotiation'
+    ? <NegotiationResponsePanel {...props} />
+    : <StandardResponsePanel {...props} />;
+
+const StandardResponsePanel: React.FC<IntimacyRequestActionPanelProps> = ({
   request,
   onResponded,
 }) => {

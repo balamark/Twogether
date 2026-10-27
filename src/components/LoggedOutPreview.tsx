@@ -47,6 +47,7 @@ import { trackAction } from '../utils/track';
 import { PairingInviteShare } from './PairingInviteShare';
 import PairingReminderBanner from './PairingReminderBanner';
 import { tr } from '../i18n/tr';
+import { useAlternativePlanSamples } from '../data/alternativePlanSamples';
 import { ReceiptDocument } from './PurchaseReceipts';
 
 interface PreviewScript {
@@ -82,7 +83,7 @@ interface PreviewConfig {
 
 // A small read-only "範例" chip used across samples so visitors clearly
 // understand these are illustrations, not their own data.
-const SampleTag: React.FC = () => (
+export const SampleTag: React.FC = () => (
   <span className="font-body text-[10px] font-medium uppercase tracking-[0.16em] text-petal-muted border border-petal-rule rounded-full px-2 py-0.5">
     {tr('範例', 'Example')}
   </span>
@@ -1004,6 +1005,39 @@ const DeepDiveSample: React.FC = () => (
   </div>
 );
 
+// Read-only 替代方案協商 sample: the invite type plus the two 示範方案 with
+// both-partner approval chips. 範例 data only: the admin-managed samples
+// (public endpoint, no auth) with the built-in copy as fallback.
+const AlternativePlansSample: React.FC = () => {
+  const samples = useAlternativePlanSamples();
+  return (
+  <div className="bg-petal-cream border border-petal-rule rounded-md p-4 text-left space-y-3" data-testid="preview-alt-plans">
+    <div className="flex items-center justify-between">
+      <span className="font-body text-xs font-medium text-petal-rose-deep">{tr('💬 替代方案協商', '💬 Talk about alternatives')}</span>
+      <SampleTag />
+    </div>
+    <p className="font-body text-xs text-petal-ink-soft leading-relaxed">
+      {tr('原本期待的親密暫時無法實現時，一起討論其他雙方都喜歡的方式。接受討論不代表同意任何特定行為；雙方都認可的方案才會加入共同清單。', 'When the intimacy you hoped for can\'t happen right now, talk about other ways you\'d both enjoy. Agreeing to talk never means agreeing to any act; only plans you both approve join your shared list.')}
+    </p>
+    {samples.map((p, i) => (
+      <div key={p.id} className="bg-white rounded-md border border-petal-rule p-3">
+        <div className="font-body text-sm font-medium text-petal-ink">{p.title}</div>
+        {p.scriptTitle && (
+          <div className="font-body text-xs text-petal-rose-deep mt-1">{tr('🎭 劇本《', '🎭 Script “')}{p.scriptTitle}{tr('》', '”')}</div>
+        )}
+        {p.interaction && <p className="font-body text-xs text-petal-ink-soft leading-snug mt-1">{p.interaction}</p>}
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          <span className="font-body text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700">{tr('✓ 你已認可', '✓ You approved')}</span>
+          <span className={`font-body text-[10px] px-2 py-0.5 rounded-full ${i === 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+            {i === 0 ? tr('✓ 另一半已認可', '✓ Partner approved') : tr('另一半待認可', 'Partner to approve')}
+          </span>
+        </div>
+      </div>
+    ))}
+  </div>
+);
+};
+
 const PREVIEWS: Record<string, PreviewConfig> = {
   us: {
     icon: Heart,
@@ -1072,6 +1106,9 @@ const PREVIEWS: Record<string, PreviewConfig> = {
           <SampleStats />
         </div>
         <SampleRecordList />
+        <div className="mt-4">
+          <AlternativePlansSample />
+        </div>
         <div className="mt-4">
           <NotificationCenterSample />
         </div>

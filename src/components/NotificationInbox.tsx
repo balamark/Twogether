@@ -82,8 +82,17 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
           onNavigate('events');
         }
         break;
+      // 替代方案協商 answers + co-authored plan changes live on the same page.
       case 'intimacy_request':
       case 'request_response':
+      case 'negotiation_accepted':
+      case 'negotiation_later':
+      case 'negotiation_declined':
+      case 'alt_plan_proposed':
+      case 'alt_plan_updated':
+      case 'alt_plan_approved':
+      case 'alt_plan_disabled':
+      case 'alt_plan_reactivated':
         onNavigate('intimacy-history');
         break;
       case 'consultation_message':

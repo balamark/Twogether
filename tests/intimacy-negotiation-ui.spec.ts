@@ -1,0 +1,217 @@
+import { test, expect, request, Page, APIRequestContext } from '@playwright/test';
+
+// UI for 替代方案協商: the receiver answers a negotiation invite with one of the
+// three choices, lands on 共同方案, starts a plan from a 示範方案, and the
+// sender approves it onto the shared list. Own paired couple (see the API spec).
+const USER_A = { email: 'negotiate-ui-a-e2e@twogether.app', nickname: 'NegoUI A', password: 'test123456' };
+const USER_B = { email: 'negotiate-ui-b-e2e@twogether.app', nickname: 'NegoUI B', password: 'test123456' };
+
+const BACKEND_BASE = process.env.PLAYWRIGHT_BACKEND_BASE || 'http://localhost:8080';
+const API = `${BACKEND_BASE}/api`;
+
+async function loginOrRegister(ctx: APIRequestContext, user: typeof USER_A): Promise<string> {
+  let res = await ctx.post(`${API}/auth/login`, { data: { email: user.email, password: user.password } });
+  if (!res.ok()) {
+    await ctx.post(`${API}/auth/register`, { data: user });
+    res = await ctx.post(`${API}/auth/login`, { data: { email: user.email, password: user.password } });
+  }
+  if (!res.ok()) throw new Error(`login failed for ${user.email}: ${res.status()}`);
+  return (await res.json()).token;
+}
+
+async function signInOnIntimacyHistory(page: Page, user: typeof USER_A) {
+  await page.addInitScript(() => {
+    localStorage.setItem('pairingPromptDismissed', 'true');
+    localStorage.setItem('tw:lastView', 'intimacy-history');
+  });
+  await page.goto('/');
+  await page.getByTestId('header-auth-button').click();
+  await page.getByTestId('auth-email-input').fill(user.email);
+  await page.getByTestId('auth-password-input').fill(user.password);
+  await page.getByTestId('auth-submit-button').click();
+  await expect(page.getByTestId('user-menu-toggle')).toBeVisible({ timeout: 15000 });
+  const close = page.getByTestId('auth-modal-close-button');
+  if (await close.isVisible({ timeout: 1000 }).catch(() => false)) await close.click().catch(() => {});
+  await expect(page.getByRole('tab', { name: /共同方案|Shared plans/ })).toBeVisible({ timeout: 15000 });
+}
+
+let requestId = '';
+
+test.beforeAll(async () => {
+  const base = await request.newContext();
+  const tokenA = await loginOrRegister(base, USER_A);
+  const tokenB = await loginOrRegister(base, USER_B);
+  await base.dispose();
+  const a = await request.newContext({ extraHTTPHeaders: { Authorization: `Bearer ${tokenA}` } });
+  const b = await request.newContext({ extraHTTPHeaders: { Authorization: `Bearer ${tokenB}` } });
+  const complete = !!(await (await a.get(`${API}/couples`)).json())?.couple?.is_complete;
+  if (!complete) {
+    const code = (await (await a.post(`${API}/couples/pairing-code`, { data: {} })).json())?.code;
+    await b.post(`${API}/couples`, { data: { pairing_code: code } });
+  }
+  const created = await a.post(`${API}/intimacy-requests`, {
+    data: { message: '想跟你聊聊，有沒有其他我們都喜歡的方式？', request_type: 'negotiation' },
+  });
+  requestId = (await created.json()).intimacy_request.id;
+  await a.dispose();
+  await b.dispose();
+});
+
+test.describe.serial('替代方案協商 UI', () => {
+  test('receiver answers "願意一起討論" and proposes a plan from a sample', async ({ page }) => {
+    expect(requestId).toBeTruthy();
+    await signInOnIntimacyHistory(page, USER_B);
+
+    await page.getByTestId('intimacy-card').filter({ hasText: '替代方案協商' }).first().click();
+    const panel = page.getByTestId('negotiation-response-panel');
+    await expect(panel).toBeVisible();
+    await expect(panel).toContainText('不代表同意任何特定的親密行為');
+    await expect(page.getByTestId('negotiation-later')).toBeVisible();
+    await expect(page.getByTestId('negotiation-decline')).toBeVisible();
+
+    await page.getByTestId('negotiation-accept').click();
+    await page.getByTestId('negotiation-send').click();
+
+    // Lands on 共同方案 with the empty-state samples.
+    await expect(page.getByTestId('alt-plans-empty')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('alt-plan-samples')).toContainText('範例');
+    await expect(page.getByTestId('alt-plan-samples')).toContainText('精油按摩');
+    // Sample 2 is built on the built-in script「初次相遇」.
+    await page.getByTestId('alt-plan-use-1').click();
+    await expect(page.getByTestId('alt-plan-title')).toHaveValue(/初次相遇/);
+    await expect(page.getByTestId('alt-plan-script-select')).toHaveValue('初次相遇');
+    await expect(page.getByTestId('alt-plan-editor')).not.toContainText('界線');
+    await page.getByTestId('alt-plan-save').click();
+
+    const card = page.getByTestId('alt-plan-card').first();
+    await expect(card).toContainText('初次相遇');
+    await expect(card.getByTestId('alt-plan-script')).toContainText('在咖啡廳偶然相遇的陌生人');
+    await expect(page.getByTestId('alt-plans-pending')).toBeVisible();
+    await expect(card).toContainText('待認可', { timeout: 10000 });
+  });
+
+  test('sender approves → plan joins the shared list; pausing removes it', async ({ page }) => {
+    await signInOnIntimacyHistory(page, USER_A);
+    await page.getByRole('tab', { name: /共同方案/ }).click();
+
+    await page.getByTestId('alt-plan-approve').first().click();
+    const approved = page.getByTestId('alt-plans-approved');
+    await expect(approved).toBeVisible();
+    await expect(approved).toContainText('初次相遇');
+    await expect(page.getByRole('status')).toContainText('雙方都認可了', { timeout: 10000 });
+
+    await approved.getByTestId('alt-plan-disable').click();
+    await expect(page.getByTestId('alt-plans-approved')).toHaveCount(0);
+    await expect(page.getByText(/已停用（1）/)).toBeVisible();
+  });
+
+  test('a plan can be built on one of the couple\'s scripts and links to it', async ({ page }) => {
+    await signInOnIntimacyHistory(page, USER_A);
+    await page.getByRole('tab', { name: /共同方案/ }).click();
+    await page.getByTestId('alt-plan-new').click();
+    await page.getByTestId('alt-plan-title').fill('辦公室之夜');
+    // A script alone is a valid plan.
+    await page.getByTestId('alt-plan-script-select').selectOption('辦公室秘密');
+    await expect(page.getByTestId('alt-plan-editor')).toContainText('下班後的辦公室');
+    await page.getByTestId('alt-plan-save').click();
+
+    const card = page.getByTestId('alt-plan-card').filter({ hasText: '辦公室之夜' });
+    await expect(card).toContainText('待認可', { timeout: 10000 });
+    await card.getByTestId('alt-plan-view-script').click();
+    // Lands in 角色扮演 with that script open.
+    await expect(page.locator('text=辦公室秘密 >> visible=true').first()).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(/開始扮演/)).toBeVisible();
+    await expect(page.getByRole('tab', { name: /共同方案/ })).toHaveCount(0);
+  });
+
+  test('sender links a shared plan to a negotiation invite; receiver jumps to it', async ({ browser }) => {
+    // Sender: build the invite in the form and pick the plan to discuss.
+    const ctxA = await browser.newContext();
+    const pageA = await ctxA.newPage();
+    await signInOnIntimacyHistory(pageA, USER_A);
+    await pageA.getByTestId('header-intimacy-button').click();
+    await pageA.getByTestId('intimacy-category-negotiation').click();
+    const picker = pageA.getByTestId('negotiation-plan-picker');
+    await expect(picker).toContainText('辦公室之夜', { timeout: 10000 });
+    await picker.getByTestId('negotiation-plan-option').filter({ hasText: '辦公室之夜' }).first().click();
+    await pageA.getByTestId('intimacy-preview-btn').click();
+    await expect(pageA.getByTestId('negotiation-linked-preview')).toContainText('辦公室之夜');
+    await pageA.getByTestId('intimacy-send-btn').click();
+    await expect(pageA.getByTestId('intimacy-send-btn')).toHaveCount(0, { timeout: 10000 });
+    await ctxA.close();
+
+    // Receiver: sees the linked plan on the invite and opens it in 共同方案.
+    const ctxB = await browser.newContext();
+    const pageB = await ctxB.newPage();
+    await signInOnIntimacyHistory(pageB, USER_B);
+    await pageB.getByTestId('intimacy-card').filter({ hasText: '替代方案協商' }).first().click();
+    const linked = pageB.getByTestId('negotiation-linked-plan').first();
+    await expect(linked).toContainText('辦公室之夜', { timeout: 10000 });
+    await linked.click();
+    await expect(pageB.locator('[data-testid="alt-plan-card"][data-highlighted="true"]')).toContainText('辦公室之夜', { timeout: 10000 });
+    await ctxB.close();
+  });
+
+  test('the invite modal offers 示範方案 too; a ticked one becomes a linked plan', async ({ browser }) => {
+    const ctxA = await browser.newContext();
+    const pageA = await ctxA.newPage();
+    await signInOnIntimacyHistory(pageA, USER_A);
+    await pageA.getByTestId('header-intimacy-button').click();
+    await pageA.getByTestId('intimacy-category-negotiation').click();
+
+    const picker = pageA.getByTestId('negotiation-plan-picker');
+    const slowNight = picker.getByTestId('negotiation-sample-option').filter({ hasText: '慢慢來的親密夜' });
+    await expect(slowNight).toContainText('精油按摩');
+    // The script sample links straight to its script.
+    await expect(picker.getByTestId('negotiation-sample-option').filter({ hasText: '初次相遇' }).getByTestId('negotiation-view-script')).toBeVisible();
+
+    await slowNight.getByRole('checkbox').check();
+    await pageA.getByTestId('intimacy-preview-btn').click();
+    await expect(pageA.getByTestId('negotiation-linked-preview')).toContainText('慢慢來的親密夜');
+    await pageA.getByTestId('intimacy-send-btn').click();
+    await expect(pageA.getByTestId('intimacy-send-btn')).toHaveCount(0, { timeout: 10000 });
+
+    // It's now a shared plan the sender proposed, waiting on the partner.
+    await pageA.getByRole('tab', { name: /共同方案/ }).click();
+    await expect(pageA.getByTestId('alt-plan-card').filter({ hasText: '慢慢來的親密夜' })).toContainText('待認可', { timeout: 10000 });
+
+    // 管理共同方案 from the modal lands on the 共同方案 tab.
+    await pageA.getByRole('tab', { name: /我發送的/ }).click();
+    await pageA.getByTestId('header-intimacy-button').click();
+    await pageA.getByTestId('intimacy-category-negotiation').click();
+    await pageA.getByTestId('negotiation-manage-plans').click();
+    await expect(pageA.getByTestId('alt-plans-panel')).toBeVisible({ timeout: 10000 });
+    await ctxA.close();
+
+    const ctxB = await browser.newContext();
+    const pageB = await ctxB.newPage();
+    await signInOnIntimacyHistory(pageB, USER_B);
+    await pageB.getByTestId('intimacy-card').filter({ hasText: '替代方案協商' }).first().click();
+    await expect(pageB.getByTestId('negotiation-linked-plan').first()).toContainText('慢慢來的親密夜', { timeout: 10000 });
+    await ctxB.close();
+  });
+
+  test('提出方案 still offers examples once plans exist; a picked example is editable', async ({ page }) => {
+    await signInOnIntimacyHistory(page, USER_A);
+    await page.getByRole('tab', { name: /共同方案/ }).click();
+    // Earlier tests left plans on the list, so this is the non-empty case.
+    await expect(page.getByTestId('alt-plan-card').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('alt-plans-empty')).toHaveCount(0);
+
+    await page.getByTestId('alt-plan-new').click();
+    const picker = page.getByTestId('alt-plan-sample-picker');
+    await expect(picker).toContainText('範例');
+    await picker.getByTestId('alt-plan-sample-pick').filter({ hasText: '初次相遇' }).click();
+    await expect(page.getByTestId('alt-plan-sample-applied')).toBeVisible();
+    await expect(page.getByTestId('alt-plan-title')).toHaveValue(/初次相遇/);
+    await expect(page.getByTestId('alt-plan-script-select')).toHaveValue('初次相遇');
+
+    // Make it their own before proposing.
+    await page.getByTestId('alt-plan-title').fill('我們版的初次相遇');
+    await page.getByTestId('alt-plan-timePrep').fill('週六晚上，約 2 小時');
+    await page.getByTestId('alt-plan-save').click();
+    const card = page.getByTestId('alt-plan-card').filter({ hasText: '我們版的初次相遇' });
+    await expect(card).toContainText('週六晚上，約 2 小時', { timeout: 10000 });
+    await expect(card.getByTestId('alt-plan-script')).toContainText('初次相遇');
+  });
+});

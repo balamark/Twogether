@@ -1036,6 +1036,121 @@ adminApiRouter.delete('/coupons/:id', async (req, res) => {
   }
 });
 
+// ── 替代方案範例 (alternative plan samples) ─────────────────────────────────
+// The 示範方案 shown in the empty plan list and on the logged-out showroom
+// (GET /api/intimacy-plans/samples serves the active ones). Schema: migration 101.
+const ALT_SAMPLE_FIELDS = `id, title, title_en, interaction, interaction_en, time_prep, time_prep_en,
+  script_id, script_title, sort_order, active, created_at, updated_at`;
+
+function altSampleInput(body) {
+  const text = (v, max) => {
+    if (typeof v !== 'string') return null;
+    const t = v.trim();
+    return t ? t.slice(0, max) : null;
+  };
+  const sort = parseInt(body.sort_order, 10);
+  return {
+    title: text(body.title, 100),
+    title_en: text(body.title_en, 100),
+    interaction: text(body.interaction, 2000),
+    interaction_en: text(body.interaction_en, 2000),
+    time_prep: text(body.time_prep, 1000),
+    time_prep_en: text(body.time_prep_en, 1000),
+    script_id: text(body.script_id, 128),
+    script_title: text(body.script_title, 200),
+    sort_order: Number.isFinite(sort) ? sort : 0,
+    active: body.active === undefined ? true : !!body.active,
+  };
+}
+
+function altSampleInvalid(v) {
+  if (!v.title) return '請輸入範例名稱';
+  if (!v.interaction && !v.script_title) return '請填寫互動方式，或指定一個劇本名稱';
+  return null;
+}
+
+adminApiRouter.get('/alt-plan-samples', async (req, res) => {
+  try {
+    const r = await db.query(
+      `SELECT ${ALT_SAMPLE_FIELDS} FROM alternative_plan_samples ORDER BY sort_order, created_at`
+    );
+    res.json({ samples: r.rows });
+  } catch (err) {
+    logWarn('Admin alt plan samples list failed', { err: err.message });
+    res.json({ samples: [] });
+  }
+});
+
+adminApiRouter.post('/alt-plan-samples', express.json(), async (req, res) => {
+  const v = altSampleInput(req.body || {});
+  const invalid = altSampleInvalid(v);
+  if (invalid) return res.status(400).json({ error: invalid });
+  try {
+    const r = await db.query(
+      `INSERT INTO alternative_plan_samples
+         (title, title_en, interaction, interaction_en, time_prep, time_prep_en, script_id, script_title, sort_order, active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+       RETURNING ${ALT_SAMPLE_FIELDS}`,
+      [v.title, v.title_en, v.interaction, v.interaction_en, v.time_prep, v.time_prep_en, v.script_id, v.script_title, v.sort_order, v.active]
+    );
+    logInfo('admin.alt_plan_sample.created', { id: r.rows[0].id });
+    res.json({ sample: r.rows[0] });
+  } catch (err) {
+    logError('Admin alt plan sample create failed', { err: err.message });
+    res.status(500).json({ error: '建立失敗：' + err.message });
+  }
+});
+
+adminApiRouter.patch('/alt-plan-samples/:id', express.json(), async (req, res) => {
+  const id = req.params.id;
+  if (!COUPON_ID_RE.test(id)) return res.status(400).json({ error: 'invalid sample id' });
+  const body = req.body || {};
+  try {
+    // Toggle-only PATCH ({ active }) keeps every other field as-is.
+    if (Object.keys(body).length === 1 && body.active !== undefined) {
+      const r = await db.query(
+        `UPDATE alternative_plan_samples SET active = $1, updated_at = NOW() WHERE id = $2 RETURNING ${ALT_SAMPLE_FIELDS}`,
+        [!!body.active, id]
+      );
+      if (r.rows.length === 0) return res.status(404).json({ error: 'sample not found' });
+      logInfo('admin.alt_plan_sample.toggled', { id, active: !!body.active });
+      return res.json({ sample: r.rows[0] });
+    }
+    const v = altSampleInput(body);
+    const invalid = altSampleInvalid(v);
+    if (invalid) return res.status(400).json({ error: invalid });
+    const r = await db.query(
+      `UPDATE alternative_plan_samples
+          SET title = $1, title_en = $2, interaction = $3, interaction_en = $4, time_prep = $5,
+              time_prep_en = $6, script_id = $7, script_title = $8, sort_order = $9, active = $10,
+              updated_at = NOW()
+        WHERE id = $11
+        RETURNING ${ALT_SAMPLE_FIELDS}`,
+      [v.title, v.title_en, v.interaction, v.interaction_en, v.time_prep, v.time_prep_en, v.script_id, v.script_title, v.sort_order, v.active, id]
+    );
+    if (r.rows.length === 0) return res.status(404).json({ error: 'sample not found' });
+    logInfo('admin.alt_plan_sample.updated', { id });
+    res.json({ sample: r.rows[0] });
+  } catch (err) {
+    logError('Admin alt plan sample update failed', { err: err.message, id });
+    res.status(500).json({ error: '更新失敗：' + err.message });
+  }
+});
+
+adminApiRouter.delete('/alt-plan-samples/:id', async (req, res) => {
+  const id = req.params.id;
+  if (!COUPON_ID_RE.test(id)) return res.status(400).json({ error: 'invalid sample id' });
+  try {
+    const r = await db.query('DELETE FROM alternative_plan_samples WHERE id = $1 RETURNING title', [id]);
+    if (r.rows.length === 0) return res.status(404).json({ error: 'sample not found' });
+    logInfo('admin.alt_plan_sample.deleted', { id, title: r.rows[0].title });
+    res.json({ success: true });
+  } catch (err) {
+    logError('Admin alt plan sample delete failed', { err: err.message, id });
+    res.status(500).json({ error: 'delete failed' });
+  }
+});
+
 // GET /api/admin/coupons/:id/redemptions — who redeemed this coupon, when,
 // and the Premium window it granted (join couple_entitlements for the exact
 // start/expiry actually applied — stacking can push starts_at into the
@@ -1181,6 +1296,7 @@ const ADMIN_HTML = `<!doctype html>
       <button class="tab" data-panel="polls">投票心聲</button>
       <button class="tab" data-panel="pool">分潤</button>
       <button class="tab" data-panel="coupons">優惠碼</button>
+      <button class="tab" data-panel="alt-samples">替代方案範例</button>
       <button class="tab" data-panel="roleplay">邀請劇本</button>
       <button class="tab" data-panel="ai-usage">AI 用量</button>
       <button class="tab" data-panel="ai-downvotes">AI 負評</button>
@@ -1479,6 +1595,41 @@ const ADMIN_HTML = `<!doctype html>
             <tbody></tbody>
           </table>
         </div>
+      </div>
+    </div>
+
+    <!-- Panel: 替代方案範例 -->
+    <div class="panel" id="panel-alt-samples">
+      <p class="sub">「替代方案協商」的示範方案，會出現在空的共同方案清單和未登入的展示頁。互動方式與劇本至少填一個；劇本名稱需與角色扮演裡的劇本標題完全相同，才能連到「查看劇本」。英文欄位留空時，英文介面會顯示中文。</p>
+      <div class="controls" style="align-items:flex-end;flex-wrap:wrap">
+        <label>名稱<br><input type="text" id="altTitle" maxlength="100" style="width:200px"></label>
+        <label>名稱（英）<br><input type="text" id="altTitleEn" maxlength="100" style="width:200px"></label>
+        <label>互動方式<br><textarea id="altInteraction" rows="3" maxlength="2000" style="width:280px"></textarea></label>
+        <label>互動方式（英）<br><textarea id="altInteractionEn" rows="3" maxlength="2000" style="width:280px"></textarea></label>
+        <label>時間與準備<br><input type="text" id="altTimePrep" maxlength="1000" style="width:240px"></label>
+        <label>時間與準備（英）<br><input type="text" id="altTimePrepEn" maxlength="1000" style="width:240px"></label>
+        <label>劇本 ID<br><input type="text" id="altScriptId" maxlength="128" placeholder="first-meeting" style="width:140px"></label>
+        <label>劇本名稱<br><input type="text" id="altScriptTitle" maxlength="200" placeholder="初次相遇" style="width:160px"></label>
+        <label>排序<br><input type="number" id="altSort" step="1" value="0" style="width:70px"></label>
+        <button id="altSubmit">建立</button>
+        <button id="altCancelEdit" hidden>取消編輯</button>
+        <span class="muted" id="altStatusMsg"></span>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="altSamplesTable">
+          <thead>
+            <tr>
+              <th class="num">排序</th>
+              <th>名稱</th>
+              <th>互動方式</th>
+              <th>時間與準備</th>
+              <th>劇本</th>
+              <th>狀態</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
       </div>
     </div>
 
@@ -2560,6 +2711,122 @@ const ADMIN_HTML = `<!doctype html>
       }
     }
 
+    // ── 替代方案範例 (alternative plan samples) ───────────────────────────
+    var altEditingId = null;
+    var altRows = [];
+    var ALT_FIELDS = [
+      ['altTitle', 'title'], ['altTitleEn', 'title_en'],
+      ['altInteraction', 'interaction'], ['altInteractionEn', 'interaction_en'],
+      ['altTimePrep', 'time_prep'], ['altTimePrepEn', 'time_prep_en'],
+      ['altScriptId', 'script_id'], ['altScriptTitle', 'script_title']
+    ];
+    async function loadAltSamples() {
+      $('altStatusMsg').textContent = '載入中…';
+      try {
+        var res = await fetch('/api/admin/alt-plan-samples');
+        if (!res.ok) throw new Error('samples ' + res.status);
+        var body = await res.json();
+        altRows = body.samples || [];
+        renderAltSamples();
+        $('altStatusMsg').textContent = '更新於 ' + new Date().toLocaleTimeString('zh-TW');
+      } catch (e) {
+        $('altStatusMsg').textContent = '載入失敗: ' + e.message;
+      }
+    }
+    function renderAltSamples() {
+      var tbody = document.querySelector('#altSamplesTable tbody');
+      if (altRows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="muted">尚無範例（前台會顯示內建的兩個範例）</td></tr>';
+        return;
+      }
+      tbody.innerHTML = altRows.map(function (r) {
+        return '<tr>' +
+          '<td class="num">' + r.sort_order + '</td>' +
+          '<td>' + esc(r.title) + (r.title_en ? '<div class="muted" style="font-size:12px">' + esc(r.title_en) + '</div>' : '') + '</td>' +
+          '<td style="font-size:12px;max-width:280px">' + esc(r.interaction || '') + '</td>' +
+          '<td style="font-size:12px;max-width:200px">' + esc(r.time_prep || '') + '</td>' +
+          '<td>' + (r.script_title ? '🎭 ' + esc(r.script_title) : '<span class="muted">—</span>') + '</td>' +
+          '<td>' + (r.active ? '<span class="badge yes">顯示中</span>' : '<span class="badge no">已隱藏</span>') + '</td>' +
+          '<td>' +
+            '<button data-alt-edit="' + r.id + '">編輯</button> ' +
+            '<button data-alt-toggle="' + r.id + '" data-next="' + (!r.active) + '">' + (r.active ? '隱藏' : '顯示') + '</button> ' +
+            '<button class="danger" data-alt-del="' + r.id + '">刪除</button>' +
+          '</td>' +
+          '</tr>';
+      }).join('');
+      tbody.querySelectorAll('button[data-alt-edit]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.getAttribute('data-alt-edit');
+          startEditAlt(altRows.find(function (r) { return r.id === id; }));
+        });
+      });
+      tbody.querySelectorAll('button[data-alt-toggle]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          altRequest('/api/admin/alt-plan-samples/' + btn.getAttribute('data-alt-toggle'), 'PATCH',
+            { active: btn.getAttribute('data-next') === 'true' }, btn);
+        });
+      });
+      tbody.querySelectorAll('button[data-alt-del]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          if (!confirm('永久刪除這個範例？無法復原。')) return;
+          var id = btn.getAttribute('data-alt-del');
+          if (altEditingId === id) resetAltForm();
+          altRequest('/api/admin/alt-plan-samples/' + id, 'DELETE', null, btn);
+        });
+      });
+    }
+    function startEditAlt(r) {
+      if (!r) return;
+      altEditingId = r.id;
+      ALT_FIELDS.forEach(function (f) { $(f[0]).value = r[f[1]] || ''; });
+      $('altSort').value = r.sort_order;
+      $('altSubmit').textContent = '更新';
+      $('altCancelEdit').hidden = false;
+    }
+    function resetAltForm() {
+      altEditingId = null;
+      ALT_FIELDS.forEach(function (f) { $(f[0]).value = ''; });
+      $('altSort').value = '0';
+      $('altSubmit').textContent = '建立';
+      $('altCancelEdit').hidden = true;
+    }
+    async function altRequest(url, method, payload, btn) {
+      if (btn) btn.disabled = true;
+      try {
+        var res = await fetch(url, {
+          method: method,
+          headers: payload ? { 'Content-Type': 'application/json' } : {},
+          body: payload ? JSON.stringify(payload) : undefined,
+        });
+        var body = await res.json().catch(function () { return {}; });
+        if (!res.ok) throw new Error(body.error || (method + ' ' + res.status));
+        await loadAltSamples();
+        return true;
+      } catch (e) {
+        $('altStatusMsg').textContent = '操作失敗: ' + e.message;
+        return false;
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+    $('altCancelEdit').addEventListener('click', resetAltForm);
+    $('altSubmit').addEventListener('click', async function () {
+      var payload = { sort_order: parseInt($('altSort').value, 10) || 0 };
+      ALT_FIELDS.forEach(function (f) { payload[f[1]] = $(f[0]).value; });
+      if (altEditingId) {
+        var editing = altRows.find(function (r) { return r.id === altEditingId; });
+        payload.active = editing ? editing.active : true;
+      }
+      if (!payload.title.trim()) { $('altStatusMsg').textContent = '請輸入範例名稱'; return; }
+      if (!payload.interaction.trim() && !payload.script_title.trim()) {
+        $('altStatusMsg').textContent = '互動方式與劇本名稱至少填一個'; return;
+      }
+      var ok = await altRequest(
+        altEditingId ? '/api/admin/alt-plan-samples/' + altEditingId : '/api/admin/alt-plan-samples',
+        altEditingId ? 'PATCH' : 'POST', payload, $('altSubmit'));
+      if (ok) resetAltForm();
+    });
+
     // ── Roleplay invitations ────────────────────────────────────────────────
     var ROLEPLAY_LEVEL_LABEL = {
       normal: '普通', mild: '輕微', moderate: '中等', explicit: '露骨', intense: '最強烈'
@@ -2756,7 +3023,7 @@ const ADMIN_HTML = `<!doctype html>
 
     // Lazy-load the reviews + pool + roleplay + ai-usage + flags tabs the first
     // time they're opened.
-    var reviewsLoaded = false, feedbackLoaded = false, poolLoaded = false, couponsLoaded = false, roleplayLoaded = false, aiUsageLoaded = false, flagsLoaded = false, storiesLoaded = false, pollsLoaded = false, aiDownvotesLoaded = false;
+    var reviewsLoaded = false, feedbackLoaded = false, poolLoaded = false, couponsLoaded = false, altSamplesLoaded = false, roleplayLoaded = false, aiUsageLoaded = false, flagsLoaded = false, storiesLoaded = false, pollsLoaded = false, aiDownvotesLoaded = false;
     document.querySelectorAll('.tab').forEach(function (btn) {
       var panel = btn.getAttribute('data-panel');
       if (panel === 'reviews') btn.addEventListener('click', function () { if (!reviewsLoaded) { reviewsLoaded = true; loadReviews(); } });
@@ -2765,6 +3032,7 @@ const ADMIN_HTML = `<!doctype html>
       if (panel === 'polls') btn.addEventListener('click', function () { if (!pollsLoaded) { pollsLoaded = true; loadPollVoices(); } });
       if (panel === 'pool') btn.addEventListener('click', function () { if (!poolLoaded) { poolLoaded = true; loadPools(); } });
       if (panel === 'coupons') btn.addEventListener('click', function () { if (!couponsLoaded) { couponsLoaded = true; loadCoupons(); } });
+      if (panel === 'alt-samples') btn.addEventListener('click', function () { if (!altSamplesLoaded) { altSamplesLoaded = true; loadAltSamples(); } });
       if (panel === 'roleplay') btn.addEventListener('click', function () { if (!roleplayLoaded) { roleplayLoaded = true; loadRoleplay(); } });
       if (panel === 'ai-usage') btn.addEventListener('click', function () { if (!aiUsageLoaded) { aiUsageLoaded = true; loadAiUsage(); } });
       if (panel === 'ai-downvotes') btn.addEventListener('click', function () { if (!aiDownvotesLoaded) { aiDownvotesLoaded = true; loadDownvotes(); } });
