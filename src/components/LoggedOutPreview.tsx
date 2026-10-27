@@ -157,7 +157,9 @@ const NotificationCenterSample: React.FC = () => {
       <ul className="divide-y divide-petal-rule">
         {rows.map((r, i) => (
           <li key={i} className={`flex items-start gap-2.5 px-3 py-2.5 ${r.unread ? 'bg-petal-rose-soft/10' : ''}`}>
-            <span className={`mt-1.5 h-2 w-2 rounded-full ${r.dot}`} />
+            {/* 「新」 dot only on unread rows — tapping a notification opens its
+                page and clears the dot, same as the real inbox. */}
+            <span className={`shrink-0 mt-1.5 h-2 w-2 rounded-full ${r.unread ? r.dot : ''}`} />
             <div className="min-w-0">
               <p className="font-body text-sm text-petal-ink">{r.emoji} {r.title}</p>
               <p className="font-body text-xs text-petal-muted mt-0.5 truncate">{r.body}</p>
@@ -165,6 +167,9 @@ const NotificationCenterSample: React.FC = () => {
           </li>
         ))}
       </ul>
+      <p className="px-3 py-2 border-t border-petal-rule font-body text-[11px] text-petal-muted">
+        {tr('點一下通知就直接帶你到那一頁，看過的圓點會自動消失。', 'Tap a notification to jump straight to it — the dot clears once you\'ve seen it.')}
+      </p>
     </div>
   );
 };

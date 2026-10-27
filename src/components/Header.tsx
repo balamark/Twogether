@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown, MessageSquarePlus, Activity, LifeBuoy, Compass, BookOpen, Play, StickyNote, HeartHandshake, HeartPulse } from 'lucide-react';
-import { apiService } from '../services/api';
 import type { BillingStatus } from '../services/api';
 import LanguageSwitch from './LanguageSwitch';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -27,6 +26,7 @@ interface HeaderProps {
   onLogout: () => void;
   onShowIntimacyRequest: () => void;
   onShowNotifications: () => void;
+  unreadNotificationCount: number;
   onShowCoinShop: () => void;
   onShowSettings: () => void;
   onShowActivity: () => void;
@@ -69,6 +69,7 @@ const Header: React.FC<HeaderProps> = ({
   onLogout,
   onShowIntimacyRequest,
   onShowNotifications,
+  unreadNotificationCount,
   onShowCoinShop,
   onShowSettings,
   onShowActivity,
@@ -91,36 +92,11 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const { t, locale } = useLanguage();
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
-
-  // Fetch unread notification count only on login/refresh
-  useEffect(() => {
-    if (authState.isAuthenticated) {
-      fetchUnreadCount();
-      // No periodic refresh - only fetch on login/refresh to reduce server load
-    }
-  }, [authState.isAuthenticated]);
-
-  const fetchUnreadCount = async function() {
-    try {
-      const count = await apiService.getUnreadNotificationCount();
-      setUnreadNotificationCount(count);
-    } catch (error) {
-      console.error('Failed to fetch unread notification count:', error);
-    }
-  };
-
   const handleLogout = () => {
     onLogout();
     setShowUserMenu(false);
   };
 
-  const handleNotificationClick = () => {
-    onShowNotifications();
-    setUnreadNotificationCount(0); // Reset count when opening notifications
-    // Refresh count after opening notifications
-    setTimeout(() => fetchUnreadCount(), 1000);
-  };
 
   return (
     <div className="bg-petal-cream border-b border-petal-rule safe-pt safe-px">
@@ -200,7 +176,7 @@ const Header: React.FC<HeaderProps> = ({
             {/* Notifications */}
             {authState.isAuthenticated && (
               <button
-                onClick={handleNotificationClick}
+                onClick={onShowNotifications}
                 className="relative p-2 text-petal-ink-soft hover:text-petal-ink hover:bg-petal-cream-2 rounded-full transition-colors"
                 title={t('header.notifications')}
                 aria-label={t('header.notifications')}
