@@ -329,6 +329,8 @@ const AlternativePlansPanel: React.FC<AlternativePlansPanelProps> = ({ partnerNi
 
   const editor = (opts: { key?: string; isNew?: boolean; willResetApproval?: boolean }) => (
     <PlanEditor
+      samples={opts.isNew ? samples : undefined}
+      onPickSample={(sample) => setDraft(toDraft(sample, scenarioFor(sample.scriptTitle)))}
       key={opts.key}
       draft={draft}
       onChange={setDraft}
@@ -562,6 +564,72 @@ const PlanCard: React.FC<{
   );
 };
 
+// 「從範例開始」in the new-plan editor: tap an example to fill the form, then
+// rewrite it as your own. Scrolls (and gets a search box) as admins add more.
+const SAMPLE_SEARCH_THRESHOLD = 6;
+
+const SamplePicker: React.FC<{
+  samples: AlternativePlanSample[];
+  onPick: (sample: AlternativePlanSample) => void;
+}> = ({ samples, onPick }) => {
+  const [query, setQuery] = useState('');
+  const [appliedId, setAppliedId] = useState<string | null>(null);
+  const q = query.trim().toLowerCase();
+  const shown = q
+    ? samples.filter((sm) => [sm.title, sm.interaction, sm.scriptTitle].some((t) => (t || '').toLowerCase().includes(q)))
+    : samples;
+  const applied = samples.find((sm) => sm.id === appliedId);
+  return (
+    <div className="space-y-2" data-testid="alt-plan-sample-picker">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-sm text-gray-700">{tr('從範例開始（選填）', 'Start from an example (optional)')}</div>
+        <SampleTag />
+      </div>
+      {samples.length > SAMPLE_SEARCH_THRESHOLD && (
+        <input
+          type="search"
+          data-testid="alt-plan-sample-search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={tr('搜尋範例，例如：按摩、劇本', 'Search examples, e.g. massage, script')}
+          className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-pink-200"
+        />
+      )}
+      <ul className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+        {shown.map((sm) => (
+          <li key={sm.id}>
+            <button
+              type="button"
+              data-testid="alt-plan-sample-pick"
+              onClick={() => {
+                onPick(sm);
+                setAppliedId(sm.id);
+              }}
+              className={`w-full text-left rounded-lg border px-3 py-2 transition-colors ${
+                appliedId === sm.id ? 'border-pink-400 bg-white ring-1 ring-pink-300' : 'border-gray-200 bg-white hover:border-pink-200'
+              }`}
+            >
+              <span className="block text-sm font-medium text-gray-900">{sm.title}</span>
+              {sm.scriptTitle && (
+                <span className="block text-xs text-pink-600">{tr('🎭 劇本《', '🎭 Script “')}{sm.scriptTitle}{tr('》', '”')}</span>
+              )}
+              {sm.interaction && <span className="block text-xs text-gray-600 line-clamp-1">{sm.interaction}</span>}
+            </button>
+          </li>
+        ))}
+        {shown.length === 0 && (
+          <li className="text-xs text-gray-500 px-1">{tr('沒有符合的範例，換個關鍵字試試，或直接自己寫。', 'No matching examples. Try another word, or write your own.')}</li>
+        )}
+      </ul>
+      {applied && (
+        <p className="text-xs text-pink-700" data-testid="alt-plan-sample-applied">
+          {tr(`已套用「${applied.title}」，下面的內容都可以改成你們想要的樣子。`, `Applied "${applied.title}". Change anything below to make it yours.`)}
+        </p>
+      )}
+    </div>
+  );
+};
+
 const PlanEditor: React.FC<{
   draft: Draft;
   onChange: (d: Draft) => void;
@@ -572,7 +640,10 @@ const PlanEditor: React.FC<{
   willResetApproval?: boolean;
   scripts: PlanScript[];
   onViewScript?: (title: string) => void;
-}> = ({ draft, onChange, onCancel, onSave, canSave, isNew, willResetApproval, scripts, onViewScript }) => {
+  /** New plans only: examples to start from (always offered, not just when empty). */
+  samples?: AlternativePlanSample[];
+  onPickSample?: (sample: AlternativePlanSample) => void;
+}> = ({ draft, onChange, onCancel, onSave, canSave, isNew, willResetApproval, scripts, onViewScript, samples, onPickSample }) => {
   // Keep a linked script selectable even if it's no longer in the list
   // (deleted / renamed / a sample's script the couple doesn't own).
   const options = draft.scriptTitle && !scripts.some((sc) => sc.title === draft.scriptTitle)
@@ -584,6 +655,9 @@ const PlanEditor: React.FC<{
   };
   return (
   <div className="rounded-xl border border-pink-200 bg-pink-50/60 p-4 space-y-3" data-testid="alt-plan-editor">
+    {samples && samples.length > 0 && onPickSample && (
+      <SamplePicker samples={samples} onPick={onPickSample} />
+    )}
     <div>
       <label className="block text-sm text-gray-700 mb-1">{tr('方案名稱 *', 'Plan name *')}</label>
       <input

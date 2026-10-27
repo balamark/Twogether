@@ -1414,7 +1414,8 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
 
                     <div className="space-y-2">
                       <div className="text-xs font-medium text-gray-600">{tr('可以參考的方案', 'Ideas to start from')}</div>
-                      <ul className="space-y-2">
+                      {/* Scrolls as admins add more examples. */}
+                      <ul className="space-y-2 max-h-72 overflow-y-auto pr-1">
                         {planSamples.map((sample) => (
                           <li key={sample.id}>
                             <PlanOption

@@ -190,4 +190,28 @@ test.describe.serial('替代方案協商 UI', () => {
     await expect(pageB.getByTestId('negotiation-linked-plan').first()).toContainText('慢慢來的親密夜', { timeout: 10000 });
     await ctxB.close();
   });
+
+  test('提出方案 still offers examples once plans exist; a picked example is editable', async ({ page }) => {
+    await signInOnIntimacyHistory(page, USER_A);
+    await page.getByRole('tab', { name: /共同方案/ }).click();
+    // Earlier tests left plans on the list, so this is the non-empty case.
+    await expect(page.getByTestId('alt-plan-card').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('alt-plans-empty')).toHaveCount(0);
+
+    await page.getByTestId('alt-plan-new').click();
+    const picker = page.getByTestId('alt-plan-sample-picker');
+    await expect(picker).toContainText('範例');
+    await picker.getByTestId('alt-plan-sample-pick').filter({ hasText: '初次相遇' }).click();
+    await expect(page.getByTestId('alt-plan-sample-applied')).toBeVisible();
+    await expect(page.getByTestId('alt-plan-title')).toHaveValue(/初次相遇/);
+    await expect(page.getByTestId('alt-plan-script-select')).toHaveValue('初次相遇');
+
+    // Make it their own before proposing.
+    await page.getByTestId('alt-plan-title').fill('我們版的初次相遇');
+    await page.getByTestId('alt-plan-timePrep').fill('週六晚上，約 2 小時');
+    await page.getByTestId('alt-plan-save').click();
+    const card = page.getByTestId('alt-plan-card').filter({ hasText: '我們版的初次相遇' });
+    await expect(card).toContainText('週六晚上，約 2 小時', { timeout: 10000 });
+    await expect(card.getByTestId('alt-plan-script')).toContainText('初次相遇');
+  });
 });
