@@ -361,14 +361,18 @@ const CalendarView = ({
     // a native dialog stacked on a fixed overlay would be a second blocking
     // modal. The off-target-tap risk is handled by sizing instead — see the
     // button row below.
+    // Optimistic (playbook §R7): drop the mark and close the modal at once;
+    // put the record back if the server rejects the delete.
+    const removed = periodDayRecord;
+    setCycleRecords(prev => prev.filter(r => r.id !== removed.id));
+    setPeriodDayRecord(null);
+    setPeriodDayDate(null);
     setDeletingPeriod(true);
     try {
-      await apiService.deleteCycleRecord(periodDayRecord.id);
-      setCycleRecords(prev => prev.filter(r => r.id !== periodDayRecord.id));
+      await apiService.deleteCycleRecord(removed.id);
       showNotification({ type: 'success', title: tr('已取消', 'Removed'), message: tr('月經紀錄已移除', 'The period record was removed'), duration: 3000 });
-      setPeriodDayRecord(null);
-      setPeriodDayDate(null);
     } catch (error: unknown) {
+      setCycleRecords(prev => (prev.some(r => r.id === removed.id) ? prev : [...prev, removed]));
       showNotification({ type: 'error', title: tr('移除失敗', 'Couldn\'t remove'), message: (error as Error)?.message || tr('無法移除月經紀錄，請稍後再試', 'Couldn\'t remove the period record. Please try again in a moment'), duration: 5000 });
     } finally {
       setDeletingPeriod(false);

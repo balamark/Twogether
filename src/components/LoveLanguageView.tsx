@@ -350,8 +350,9 @@ const LoveActions: React.FC<{
     setMine((p) => p.filter((w) => w.id !== id));
     try {
       await apiService.deleteLoveWish(id);
-    } catch {
+    } catch (err) {
       load();
+      showNotification({ type: 'error', title: tr('刪除失敗', 'Couldn\'t delete'), message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment') });
     }
   };
 

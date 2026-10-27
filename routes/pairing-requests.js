@@ -129,13 +129,12 @@ router.post('/accept/:token', optionalAuth, async (req, res) => {
       });
     }
 
-    // Send notification email to original sender
-    try {
-      if (emailService.isConfigured() && result.senderEmail) {
-        await emailService.sendPairingAccepted(result.senderEmail, req.user.nickname);
-      }
-    } catch (emailError) {
-      logError('Failed to send pairing accepted email', { kind: 'pairing_accepted', err: emailError.message, code: emailError.code });
+    // Send notification email to original sender. Not awaited: pairing is
+    // already committed, so the accepter shouldn't wait on SMTP.
+    if (emailService.isConfigured() && result.senderEmail) {
+      emailService.sendPairingAccepted(result.senderEmail, req.user.nickname).catch((emailError) => {
+        logError('Failed to send pairing accepted email', { kind: 'pairing_accepted', err: emailError.message, code: emailError.code });
+      });
     }
 
     return res.json({

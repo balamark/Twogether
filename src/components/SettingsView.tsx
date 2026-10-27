@@ -542,36 +542,36 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const handleSaveSettings = async () => {
     try {
       setIsSavingSettings(true);
-      // Update user gender if specified
-      if (userGender) {
-        await apiService.updateUserGender(userGender);
-      }
       // Persist birth date (only if it changed from the auth-state value)
       const previousBirthDate = authState.user?.birth_date
         ? formatDateForInput(authState.user.birth_date)
         : '';
       const nextBirthDate = userBirthDate || null;
-      if ((previousBirthDate || '') !== (userBirthDate || '')) {
-        await apiService.updateUserBirthDate(nextBirthDate);
-      }
-      // Only update current user's nickname
-      await apiService.updateNicknames({
-        partner1: nicknames.partner1,
-        partner2: nicknames.partner2
-      });
-      // Persist couple journey to backend
       const meeting = journeyMilestones.find(m => m.type === 'meeting');
       const firstDate = journeyMilestones.find(m => m.type === 'first_date');
       const firstKiss = journeyMilestones.find(m => m.type === 'first_kiss');
       const firstSex = journeyMilestones.find(m => m.type === 'first_sex');
-      await apiService.updateCoupleJourney({
-        first_meet_date: meeting?.date || undefined,
-        anniversary_date: firstDate?.date || undefined,
-        first_kiss_date: firstKiss?.date || undefined,
-        first_kiss_place: firstKiss?.place || undefined,
-        first_intimacy_date: firstSex?.date || undefined,
-        first_intimacy_place: firstSex?.place || undefined,
-      });
+      // The four writes touch independent fields, so send them together: run
+      // one after another they made 保存設定 wait four round trips (~1–2s).
+      await Promise.all([
+        // Update user gender if specified
+        userGender ? apiService.updateUserGender(userGender) : null,
+        (previousBirthDate || '') !== (userBirthDate || '') ? apiService.updateUserBirthDate(nextBirthDate) : null,
+        // Only update current user's nickname
+        apiService.updateNicknames({
+          partner1: nicknames.partner1,
+          partner2: nicknames.partner2
+        }),
+        // Persist couple journey to backend
+        apiService.updateCoupleJourney({
+          first_meet_date: meeting?.date || undefined,
+          anniversary_date: firstDate?.date || undefined,
+          first_kiss_date: firstKiss?.date || undefined,
+          first_kiss_place: firstKiss?.place || undefined,
+          first_intimacy_date: firstSex?.date || undefined,
+          first_intimacy_place: firstSex?.place || undefined,
+        }),
+      ]);
       // Update auth state and local storage so Header/profile and couple status reflect immediately
       if (authState.user && onAuthStateUpdate) {
         const updatedAuthState = {

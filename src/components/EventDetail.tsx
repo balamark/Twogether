@@ -585,11 +585,40 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
         setReply('');
         setDraftAnalysis(null);
       } else {
-        // Delivered immediately — already posted to the thread.
+        // Delivered immediately — already posted to the thread. Show it right
+        // away from what we sent and release the button; the refetch (real id,
+        // read state) and any therapist-turn advance run in the background
+        // instead of holding the spinner (playbook §R7).
         setReply('');
         setDraftAnalysis(null);
-        await refresh();
-        await afterReplyLanded();
+        const now = new Date().toISOString();
+        setEvent((prev) =>
+          prev
+            ? {
+                ...prev,
+                messages: [
+                  ...prev.messages,
+                  {
+                    id: `local-${Date.now()}`,
+                    eventId,
+                    senderId: currentUserId,
+                    content,
+                    isAi: false,
+                    isTherapist: false,
+                    aiTherapist: null,
+                    facilitation: null,
+                    createdAt: now,
+                    readAt: null,
+                    editedAt: null,
+                    sophieTranslation: null,
+                    sophieNeed: null,
+                    sophieCompanion: null,
+                  },
+                ],
+              }
+            : prev
+        );
+        void refresh().then(afterReplyLanded);
       }
     } catch (err) {
       showNotification({

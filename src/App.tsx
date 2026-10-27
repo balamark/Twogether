@@ -2003,14 +2003,18 @@ const LoveTimeApp = () => {
   }, []);
 
   const handleDeleteRecord = async (record: IntimateRecord) => {
+    // Optimistic (playbook §R7): close the confirm and drop the record at once
+    // — the confirm dialog was the decision point; the server round trip
+    // shouldn't leave the tap looking dead. Restore it if the delete fails.
+    const snapshot = intimateRecords;
     try {
       if (!record.apiId) {
         throw new Error(tr('記錄ID缺失', 'Missing record ID'));
       }
-      await apiService.deleteIntimateRecord(record.apiId);
       setIntimateRecords(prev => prev.filter(r => r.id !== record.id));
       setShowDeleteConfirm(false);
       setDeletingRecord(null);
+      await apiService.deleteIntimateRecord(record.apiId);
       showNotification({
         type: 'success',
         title: tr('已刪除', 'Deleted'),
@@ -2019,6 +2023,7 @@ const LoveTimeApp = () => {
       });
     } catch (error: unknown) {
       console.error('Error deleting record:', error);
+      setIntimateRecords(snapshot);
       showNotification({
         type: 'error',
         title: tr('刪除失敗', 'Couldn\'t delete'),
@@ -2236,11 +2241,14 @@ const LoveTimeApp = () => {
   // local state, then closes the modal.
   const deleteCustomScript = async (id: string) => {
     const removed = customScripts.find(s => s.id === id);
+    // Optimistic (playbook §R7): the in-modal 確認刪除 is the decision point, so
+    // close the modal and drop the script immediately; restore it on failure.
+    const snapshot = customScripts;
+    setCustomScripts(prev => prev.filter(s => s.id !== id));
+    setShowScriptUploadModal(false);
+    setEditingScript(null);
     try {
       await apiService.deleteCustomScript(id);
-      setCustomScripts(prev => prev.filter(s => s.id !== id));
-      setShowScriptUploadModal(false);
-      setEditingScript(null);
       showNotification({
         type: 'success',
         title: tr('劇本已刪除', 'Script deleted'),
@@ -2249,6 +2257,7 @@ const LoveTimeApp = () => {
       });
     } catch (error) {
       console.error('Failed to delete custom script:', error);
+      setCustomScripts(snapshot);
       showNotification({
         type: 'error',
         title: tr('刪除失敗', 'Couldn\'t delete'),

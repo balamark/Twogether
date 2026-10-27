@@ -46,7 +46,9 @@ const localizeNudges = (suggestions, locale) => (locale === 'en'
 // event_ai_usage pattern above).
 // ---------------------------------------------------------------------------
 
+let roleplaySuggestionTablesReady = false; // DDL is idempotent; run it once per process, not per request
 async function ensureRoleplaySuggestionTables() {
+  if (roleplaySuggestionTablesReady) return;
   try {
     await db.query(`
       CREATE TABLE IF NOT EXISTS roleplay_message_cache (
@@ -86,6 +88,7 @@ async function ensureRoleplaySuggestionTables() {
       CREATE INDEX IF NOT EXISTS idx_roleplay_feedback_script
         ON roleplay_message_feedback(script_id, created_at DESC)
     `);
+    roleplaySuggestionTablesReady = true;
   } catch (err) {
     logWarn('ensureRoleplaySuggestionTables failed', { err: err.message });
   }
@@ -95,7 +98,9 @@ async function ensureRoleplaySuggestionTables() {
 // re-opening the same gap (or the partner opening it) reuses the same randomly
 // selected set, keeping the options stable. Runtime-created belt-and-suspenders
 // alongside migration 072.
+let intimacyNudgeCacheTableReady = false; // DDL is idempotent; run it once per process, not per request
 async function ensureIntimacyNudgeCacheTable() {
+  if (intimacyNudgeCacheTableReady) return;
   try {
     await db.query(`
       CREATE TABLE IF NOT EXISTS intimacy_nudge_cache (
@@ -110,6 +115,7 @@ async function ensureIntimacyNudgeCacheTable() {
         PRIMARY KEY (couple_id, days)
       );
     `);
+    intimacyNudgeCacheTableReady = true;
   } catch (err) {
     logWarn('ensureIntimacyNudgeCacheTable failed', { err: err.message });
   }
@@ -386,8 +392,9 @@ router.post('/', [
     lineService.pushToUserIfLinked(db, partnerId, lineInvitePush);
 
     // Send email notification to partner — honors the partner's "Email 通知"
-    // switch (the in-app notification above is sent regardless).
-    try {
+    // switch (the in-app notification above is sent regardless). Not awaited:
+    // the SMTP send is 1–3s and the sender shouldn't wait on it (playbook §R7).
+    (async () => {
       const partner = await emailService.getUserEmailIfOptedIn(db, partnerId);
       if (partner) {
         const senderNickname = req.user.nickname || '你的伴侶';
@@ -402,10 +409,10 @@ router.post('/', [
       } else {
         logInfo('Partner opted out of email or unreachable; skipping intimacy request email', { partnerId });
       }
-    } catch (emailError) {
+    })().catch((emailError) => {
       logWarn('Failed to send intimacy request email', { kind: 'intimacy_request', err: emailError.message, code: emailError.code });
       // Don't fail the request if email sending fails
-    }
+    });
 
     logInfo('Intimacy request created', { requestId, fromUserId: userId, toUserId: partnerId });
 
@@ -1322,7 +1329,8 @@ router.put('/:id/respond', [
     lineService.pushToUserIfLinked(db, request.sender_id, lineResponsePush);
 
     // Fire-and-forget email to the original sender. Honors per-user opt-out.
-    try {
+    // Not awaited so the 接受/婉拒 tap doesn't wait on SMTP (playbook §R7).
+    (async () => {
       const sender = await emailService.getUserEmailIfOptedIn(db, request.sender_id);
       if (sender) {
         const receiverRow = await db.query(`SELECT nickname FROM users WHERE id = $1`, [userId]);
@@ -1334,9 +1342,9 @@ router.put('/:id/respond', [
           responseMessage: response_message || '',
         });
       }
-    } catch (emailError) {
+    })().catch((emailError) => {
       logWarn('Failed to send intimacy response email', { kind: 'intimacy_response', err: emailError.message, code: emailError.code });
-    }
+    });
 
     logInfo('Intimacy request responded', { requestId, response, userId });
 

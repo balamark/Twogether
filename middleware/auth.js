@@ -21,6 +21,39 @@ const parseDurationMs = (value) => {
 
 const JWT_EXPIRES_IN_MS = parseDurationMs(JWT_EXPIRES_IN) || 7 * 86_400_000;
 
+// Short-lived cache of the authenticated user's row. Every API call runs this
+// middleware, so without it each tap paid an extra database round trip before
+// the route even started. Entries expire after USER_CACHE_TTL_MS; routes that
+// change a cached field (nickname/email) or delete a user call
+// invalidateUserCache so the change is visible immediately. Disabled under
+// NODE_ENV=test, where suites delete users directly in the database.
+const USER_CACHE_TTL_MS = 60_000;
+const USER_CACHE_MAX = 5000;
+const userCache = new Map(); // userId → { user, expires }
+const userCacheEnabled = process.env.NODE_ENV !== 'test';
+
+const loadUser = async (userId) => {
+  if (userCacheEnabled) {
+    const hit = userCache.get(userId);
+    // A copy, so a route that mutates req.user can't poison the cache.
+    if (hit && hit.expires > Date.now()) return { ...hit.user };
+  }
+  const userResult = await db.query(
+    'SELECT id, nickname, email, created_at FROM users WHERE id = $1',
+    [userId]
+  );
+  const user = userResult.rows[0] || null;
+  if (userCacheEnabled && user) {
+    if (userCache.size >= USER_CACHE_MAX) userCache.clear();
+    userCache.set(userId, { user: { ...user }, expires: Date.now() + USER_CACHE_TTL_MS });
+  }
+  return user;
+};
+
+const invalidateUserCache = (userId) => {
+  userCache.delete(userId);
+};
+
 // JWT middleware to verify tokens
 const authenticateToken = async (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -37,13 +70,10 @@ const authenticateToken = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Fetch user details from database
-    const userResult = await db.query(
-      'SELECT id, nickname, email, created_at FROM users WHERE id = $1',
-      [decoded.userId]
-    );
+    // Fetch user details (cached briefly — see loadUser)
+    const user = await loadUser(decoded.userId);
 
-    if (userResult.rows.length === 0) {
+    if (!user) {
       return res.status(401).json({
         success: false,
         message: 'Invalid token - user not found',
@@ -51,7 +81,7 @@ const authenticateToken = async (req, res, next) => {
       });
     }
 
-    req.user = userResult.rows[0];
+    req.user = user;
     next();
   } catch (error) {
     logWarn('Token verification failed', { name: error.name, err: error.message });
@@ -77,12 +107,7 @@ const optionalAuth = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const userResult = await db.query(
-      'SELECT id, nickname, email, created_at FROM users WHERE id = $1',
-      [decoded.userId]
-    );
-
-    req.user = userResult.rows.length > 0 ? userResult.rows[0] : null;
+    req.user = await loadUser(decoded.userId);
   } catch (error) {
     req.user = null;
   }
@@ -104,6 +129,7 @@ const generateToken = (userId) => {
 
 module.exports = {
   authenticateToken,
+  invalidateUserCache,
   optionalAuth,
   generateToken,
   JWT_EXPIRES_IN,
