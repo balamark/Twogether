@@ -1,11 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Bell, X } from 'lucide-react';
+import { Bell, CheckCheck, X } from 'lucide-react';
 import { apiService } from '../services/api';
 import type { Notification } from '../services/api';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatRelativeOrDate } from '../utils/datetime';
 import { tr } from '../i18n/tr';
+
+interface ToastInput {
+  type: 'success' | 'error' | 'info' | 'warning';
+  title: string;
+  message: string;
+  duration?: number;
+}
 
 interface NotificationInboxProps {
   isOpen: boolean;
@@ -15,6 +22,7 @@ interface NotificationInboxProps {
   // payload: the event / couple / wall post / love moment id to land on;
   // subPayload: the wall reply inside that post's thread.
   onNavigate?: (view: string, payload?: string, subPayload?: string) => void;
+  showNotification?: (n: ToastInput) => void;
 }
 
 const NotificationInbox: React.FC<NotificationInboxProps> = ({
@@ -23,6 +31,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
   unreadCount,
   onUnreadCountChange,
   onNavigate,
+  showNotification,
 }) => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
@@ -33,13 +42,11 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
     try {
       setLoading(true);
       const data = await apiService.getNotifications();
+      setError(null);
       setNotifications(data);
-
-      const unreadIds = data.filter(n => !n.isRead).map(n => n.id);
-      if (unreadIds.length > 0) {
-        await apiService.markNotificationsRead(unreadIds);
-        onUnreadCountChange(0);
-      }
+      // Opening the inbox no longer marks everything read: each item keeps its
+      // 「新」 dot until the user actually taps it (or uses 全部標為已讀).
+      onUnreadCountChange(data.filter(n => !n.isRead).length);
     } catch (err) {
       console.error('Failed to fetch notifications:', err);
       setError(err instanceof Error ? err.message : tr('無法載入通知', 'Couldn\'t load notifications. Please try again.'));
@@ -54,7 +61,30 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
     }
   }, [isOpen, fetchNotifications]);
 
+  // Optimistic mark-read (playbook §R7): clear the dot + badge immediately,
+  // sync in the background, roll back and tell the user if the server refuses.
+  const markRead = (ids: string[]) => {
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    const readAt = new Date().toISOString();
+    setNotifications(prev => prev.map(n => (idSet.has(n.id) ? { ...n, isRead: true, readAt } : n)));
+    onUnreadCountChange(Math.max(0, unreadCount - ids.length));
+    apiService.markNotificationsRead(ids).catch((err) => {
+      console.error('Failed to mark notifications as read:', err);
+      setNotifications(prev => prev.map(n => (idSet.has(n.id) ? { ...n, isRead: false, readAt: undefined } : n)));
+      apiService.getUnreadNotificationCount().then(onUnreadCountChange);
+      showNotification?.({
+        type: 'warning',
+        title: tr('已讀狀態沒有儲存', 'Read status wasn\'t saved'),
+        message: tr('網路不穩，這則通知仍會顯示為未讀。請稍後再打開通知中心點一次。', 'Connection hiccup — the notification still shows as unread. Open the inbox and tap it again later.'),
+      });
+    });
+  };
+
+  const unreadIds = notifications.filter(n => !n.isRead).map(n => n.id);
+
   const handleNotificationClick = (notification: Notification) => {
+    if (!notification.isRead) markRead([notification.id]);
     if (!onNavigate) {
       onClose();
       return;
@@ -163,7 +193,19 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       case 'profile_updated':
         onNavigate('settings');
         break;
+      // 有人在你的故事留言 → 故事頁。
+      case 'story_comment':
+        onNavigate('stories');
+        break;
+      // 關係之屋提醒（每週檢視 / 好久沒親密 / 存好感）→ 首頁的關係儀表板。
+      case 'relationship_checkin_due':
+      case 'relationship_intimacy_gap':
+      case 'relationship_appreciation_gap':
+        onNavigate('home');
+        break;
+      // Unknown / future types still land somewhere instead of a dead tap.
       default:
+        onNavigate('home');
         break;
     }
     onClose();
@@ -183,18 +225,32 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
           <div className="flex items-center space-x-3">
             <Bell className="w-6 h-6 text-pink-500" />
             <h3 className="text-xl font-semibold text-gray-900">{tr('通知中心', 'Notifications')}</h3>
-            {unreadCount > 0 && (
+            {unreadIds.length > 0 && (
               <span className="bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                {unreadCount}
+                {unreadIds.length}
               </span>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-2">
+            {unreadIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => markRead(unreadIds)}
+                data-testid="notification-mark-all-read"
+                className="flex items-center gap-1 text-xs sm:text-sm text-pink-600 hover:text-pink-700 px-2 py-1 rounded-md hover:bg-pink-50 transition-colors"
+              >
+                <CheckCheck className="w-4 h-4" />
+                {tr('全部標為已讀', 'Mark all read')}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 transition-colors"
+              aria-label={tr('關閉', 'Close')}
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -219,26 +275,45 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
             ) : (
               notifications.map((notification) => (
                 <div
+                  role="button"
+                  tabIndex={0}
                   key={notification.id}
                   data-testid={`notification-item-${notification.notificationType}`}
-                  className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer ${
+                  data-unread={!notification.isRead ? 'true' : 'false'}
+                  className={`block w-full text-left p-4 hover:bg-gray-50 transition-colors cursor-pointer ${
                     !notification.isRead ? 'bg-blue-50' : ''
                   }`}
                   onClick={() => handleNotificationClick(notification)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleNotificationClick(notification);
+                    }
+                  }}
                 >
                   <div className="flex items-start space-x-3">
-                    <div className={`w-2 h-2 rounded-full mt-2 ${
-                      notification.priority === 3 ? 'bg-red-500' :
-                      notification.priority === 2 ? 'bg-yellow-500' :
-                      'bg-blue-500'
-                    }`}></div>
+                    {/* 「新」 dot: only on unread items; disappears once tapped.
+                        The empty slot keeps read items' text aligned. */}
+                    {!notification.isRead ? (
+                      <span
+                        data-testid="notification-unread-dot"
+                        aria-label={tr('新通知', 'New')}
+                        className={`shrink-0 w-2 h-2 rounded-full mt-2 ${
+                          notification.priority === 3 ? 'bg-red-500' :
+                          notification.priority === 2 ? 'bg-yellow-500' :
+                          'bg-blue-500'
+                        }`}
+                      ></span>
+                    ) : (
+                      <span className="shrink-0 w-2 h-2 mt-2" aria-hidden="true"></span>
+                    )}
 
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <h5 className="font-medium text-gray-900">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <h5 className={`text-gray-900 ${!notification.isRead ? 'font-semibold' : 'font-medium'}`}>
                           {notification.title}
                         </h5>
-                        <span className="text-xs text-gray-500">
+                        <span className="shrink-0 text-xs text-gray-500">
                           {formatTimeAgo(notification.createdAt)}
                         </span>
                       </div>

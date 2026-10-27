@@ -755,6 +755,15 @@ const LoveTimeApp = () => {
   const [showIntimacyRequestForm, setShowIntimacyRequestForm] = useState(false);
   const [showNotificationInbox, setShowNotificationInbox] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  // The header bell badge and the inbox share this count: it's fetched on login
+  // and drops by one each time a notification is opened (marked read).
+  useEffect(() => {
+    if (!authState.isAuthenticated) {
+      setUnreadNotificationCount(0);
+      return;
+    }
+    apiService.getUnreadNotificationCount().then(setUnreadNotificationCount);
+  }, [authState.isAuthenticated]);
   // Couple's Premium status (tier + expiry). Fetched once on auth so the header
   // and the proactive expiry banner can render without each re-fetching.
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
@@ -2827,6 +2836,7 @@ const LoveTimeApp = () => {
         onLogout={handleLogout}
         onShowIntimacyRequest={() => setShowIntimacyRequestForm(true)}
         onShowNotifications={() => setShowNotificationInbox(true)}
+        unreadNotificationCount={unreadNotificationCount}
         onShowCoinShop={() => setCurrentView('shop')}
         onShowSettings={() => setCurrentView('settings')}
         onShowActivity={() => setCurrentView('activity')}
@@ -3259,6 +3269,7 @@ const LoveTimeApp = () => {
         onClose={() => setShowNotificationInbox(false)}
         unreadCount={unreadNotificationCount}
         onUnreadCountChange={setUnreadNotificationCount}
+        showNotification={showNotification}
         onNavigate={(view, payload, subPayload) => {
           if (view === 'events' && payload) {
             setPendingEventId(payload);
