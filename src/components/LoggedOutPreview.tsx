@@ -573,7 +573,7 @@ const TherapyTopicsSample: React.FC = () => (
 );
 
 // Batch 1 一起收尾 read-only sample. Shows the closure summary card as it
-// appears after both partners have written and reviewed — commitments in the
+// appears after both partners have written — commitments in the
 // couple's own words, the shared decision, and the AI's short 見解. Static, no
 // fetches, mirrors ClosureSummaryCard layout.
 const CloseTogetherSample: React.FC = () => (

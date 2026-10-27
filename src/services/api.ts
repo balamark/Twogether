@@ -894,8 +894,6 @@ export type SharedDecisionStatus = 'none' | 'proposed' | 'change_requested' | 'a
 // Mirrors commitments_status_valid in migration 083.
 export type CommitmentStatus = 'draft' | 'active' | 'completed' | 'skipped' | 'replaced';
 export type ClosureAssistField = 'commitment' | 'decision';
-export type ClosureReviewTarget = 'commitment' | 'decision';
-export type ClosureReviewVerdict = 'agree' | 'request_change';
 
 export interface ClosureCommitment {
   id: string;
@@ -924,7 +922,6 @@ export interface EventClosure {
   startedBy: string;
   startedAt: string;
   deadlineAt: string;
-  canFinalizeAt: string | null;
   finalizedAt: string | null;
   therapyNote: TherapyNote | null;
   insight: string | null;
@@ -4972,24 +4969,6 @@ class ApiService {
     } catch (error: unknown) {
       console.error('[closure] submit failed', error);
       this.throwApiError(error, tr('無法送出你的約定', 'Couldn\'t send your commitment'));
-    }
-  }
-
-  async reviewClosure(
-    id: string,
-    payload: { target: ClosureReviewTarget; verdict: ClosureReviewVerdict; note?: string | null }
-  ): Promise<EventClosure> {
-    try {
-      const body: Record<string, unknown> = { target: payload.target, verdict: payload.verdict };
-      if (payload.note !== undefined && payload.note !== null && payload.note !== '') {
-        body.note = payload.note;
-      }
-      const response = await apiClient.post(`/events/${id}/closure/review`, body);
-      console.log('[closure] review', { eventId: id, target: payload.target, verdict: payload.verdict });
-      return response.data.closure;
-    } catch (error: unknown) {
-      console.error('[closure] review failed', error);
-      this.throwApiError(error, tr('無法送出你的回應', 'Couldn\'t send your response'));
     }
   }
 

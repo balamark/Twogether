@@ -3,13 +3,10 @@ import { Loader2, RotateCcw } from 'lucide-react';
 import apiService, {
   type EventClosure,
   type ClosureAssistField,
-  type ClosureReviewTarget,
-  type ClosureReviewVerdict,
   type AiUsageToday,
 } from '../../services/api';
 import CommitmentComposer from './CommitmentComposer';
 import ClosureWaitingCard from './ClosureWaitingCard';
-import PartnerReviewCard from './PartnerReviewCard';
 import ClosureSkipModal from './ClosureSkipModal';
 import { tr } from '../../i18n/tr';
 
@@ -168,27 +165,6 @@ export default function ClosurePanel({
     }
   };
 
-  const handleReview = async (
-    target: ClosureReviewTarget,
-    verdict: ClosureReviewVerdict,
-    note: string | null
-  ) => {
-    setBusy(true);
-    try {
-      const next = await apiService.reviewClosure(eventId, { target, verdict, note });
-      setClosure(next);
-      if (next.eventStatus === 'resolved') await onResolved();
-    } catch (err) {
-      showNotification({
-        type: 'error',
-        title: tr('無法送出你的回應', 'Couldn\'t send your response'),
-        message: err instanceof Error ? err.message : tr('請稍後再試', 'Please try again in a moment'),
-      });
-    } finally {
-      setBusy(false);
-    }
-  };
-
   // An explicit tap always opens. Playbook R4 is about modals that AUTO-fire —
   // suppressing this one after a 再想一下 turned 先不寫，跳過這次 into a dead
   // button for the rest of the session.
@@ -225,10 +201,9 @@ export default function ClosurePanel({
       if (next.eventStatus === 'resolved') await onResolved();
     } catch (err) {
       const code = (err as { error_code?: string })?.error_code;
-      // "暫時還不能結束" is only true for the expected too-early/not-ready gates.
-      // A 500 is a failure, and titling it as a gate sends the user off waiting
-      // for a clock that was never the problem.
-      const expected = code === 'CLOSURE_FINALIZE_TOO_EARLY' || code === 'CLOSURE_NEEDS_YOUR_PART';
+      // "暫時還不能結束" is only true for the expected not-ready gate. A 500 is
+      // a failure, and titling it as a gate hides what actually went wrong.
+      const expected = code === 'CLOSURE_NEEDS_YOUR_PART';
       showNotification({
         type: expected ? 'info' : 'error',
         title: expected ? tr('暫時還不能結束', 'It can\'t be closed yet') : tr('無法完成收尾', 'Couldn\'t finish the wrap-up'),
@@ -279,26 +254,13 @@ export default function ClosurePanel({
   if (!closure) return null;
 
   const iSubmitted = closure.me.status === 'submitted';
-  const partnerSubmitted = closure.partner.status === 'submitted';
-  const iReviewed = !!closure.me.reviewedAt;
-  // The shared decision's un-reviewed state is 'proposed' (submit writes it);
-  // 'pending_review' is the commitment vocabulary and the server never sends it
-  // here, so this clause used to be permanently false and Screen 5 never opened
-  // for a decision on its own.
-  const partnerHasSomethingToReview =
-    (closure.partner.commitment && closure.partner.commitment.reviewStatus === 'pending_review') ||
-    (closure.sharedDecision && closure.sharedDecisionStatus === 'proposed');
-
-  // Screen 5 wins as soon as partner has submitted AND I still owe a review;
-  // otherwise Screen 4 (waiting) shows post-submit and Screen 2 (composer)
-  // shows pre-submit. Revising re-opens the composer over whichever it'd be.
-  const showReview =
-    iSubmitted && partnerSubmitted && !iReviewed && !!partnerHasSomethingToReview && !revising;
-  const showWaiting = iSubmitted && !showReview && !revising;
+  // No review round: once both have written the server finalizes on the spot,
+  // so post-submit is always Screen 4 (waiting) unless I'm revising.
+  const showWaiting = iSubmitted && !revising;
 
   return (
     // The panel wrapper is the ONLY carrier of this id — the composer and the
-    // review card used to repeat it, so a locator for it matched 2–3 nodes and
+    // old review card used to repeat it, so a locator for it matched 2–3 nodes and
     // strict-mode assertions became ambiguous. Each screen has its own id.
     <div className="space-y-3" data-testid="event-closure-panel">
       {/* 收尾中 recap header — mirrors the therapy note above the composer so the
@@ -322,20 +284,9 @@ export default function ClosurePanel({
         </details>
       )}
 
-      {showReview && (
-        <PartnerReviewCard
-          closure={closure}
-          partnerNickname={partnerNickname}
-          busy={busy}
-          onReview={handleReview}
-          onRevise={() => setRevising(true)}
-        />
-      )}
       {showWaiting && (
         <ClosureWaitingCard
           partnerNickname={partnerNickname}
-          canFinalizeAt={closure.canFinalizeAt}
-          deadlineAt={closure.deadlineAt}
           finalizing={busy}
           onFinalize={handleFinalize}
           onRevise={() => setRevising(true)}

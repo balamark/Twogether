@@ -129,7 +129,6 @@ export function makeClosure(over: Record<string, unknown> = {}) {
     startedBy: FAKE_USER.id,
     startedAt: new Date().toISOString(),
     deadlineAt: hoursFromNow(72),
-    canFinalizeAt: hoursFromNow(24),
     finalizedAt: null,
     therapyNote: null,
     insight: null,

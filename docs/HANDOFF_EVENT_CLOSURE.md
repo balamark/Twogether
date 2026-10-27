@@ -61,17 +61,16 @@ compilable and the panel is the only one with real logic:
 |---|---|---|
 | `CloseTogetherBar.tsx` | 0 | always-present bar on `open`/`resolve_pending` |
 | `CloseTogetherModal.tsx` | 1 | confirm sheet |
-| `ClosurePanel.tsx` | orchestrator | fetches `GET /closure`, owns all state, picks screen 2/4/5. Polls on focus/visibilitychange only — **no interval, no websocket** |
+| `ClosurePanel.tsx` | orchestrator | fetches `GET /closure`, owns all state, picks screen 2/4. Polls on focus/visibilitychange only — **no interval, no websocket** |
 | `CommitmentComposer.tsx` | 2 ① ② | textarea + ✓/✗ examples + 幫我想一個 + `AiQuotaHint` |
 | `AssistOptions.tsx` | 2a | |
 | `ClosureSkipModal.tsx` | 3 | |
-| `ClosureWaitingCard.tsx` | 4 | shows `canFinalizeAt` — naming the auto-finalize time is what turns limbo into a wait |
-| `PartnerReviewCard.tsx` | 5 | |
+| `ClosureWaitingCard.tsx` | 4 | 先這樣完成 is available right away — no dates, no review round (both submitted → finalized on the spot) |
 | `ClosureSummaryCard.tsx` | 6 | sibling of `TherapyNoteCard`, same shell styling |
 | `CommitmentCard.tsx` | shared row | reused by Batches 2–3 — keep it dumb |
 
 `GET /closure` already returns everything the panel needs (`me`, `partner`,
-`canFinalizeAt`, `deadlineAt`, `therapyNote` for the recap, `insight`), so the
+`deadlineAt`, `therapyNote` for the recap, `insight`), so the
 panel should need exactly one fetch to render any screen.
 
 ### 2. `src/services/api.ts`
@@ -80,7 +79,7 @@ Only the `EventStatus` union is done. Still needed: the `EventClosure` /
 `Commitment` types mirroring `serializeClosure()` in
 `routes/event-closure.js:153`, plus the nine `apiService` methods. Keep
 `error_code` intact through the interceptor (CLAUDE.md) — the UI branches on
-`AI_DAILY_LIMIT_REACHED`, `CLOSURE_NEEDS_YOUR_PART`, `CLOSURE_FINALIZE_TOO_EARLY`,
+`AI_DAILY_LIMIT_REACHED`, `CLOSURE_NEEDS_YOUR_PART`,
 `CLOSURE_ALREADY_STARTED`, `COMMITMENT_TOO_SHORT`.
 
 ### 3. `EventDetail.tsx` diff (~40 lines, no new `useState` beyond one boolean)
@@ -103,7 +102,7 @@ Exactly as plan §1.7:
   is server-side, but a regression that leaks it into props should fail loudly).
 - `tests/events-closure-escape.spec.ts` — skip/cancel/finalize. `closure-skip-later`
   must not re-open the modal in the same session (UX playbook R4); cancel hidden
-  once the partner has submitted; `canFinalizeAt` in the past → finalize works.
+  once the partner has submitted; finalize works as soon as my part is in.
 - `tests/events-closure-quota.spec.ts` — `closure/assist` stubbed 429
   `AI_DAILY_LIMIT_REACHED` renders as a `warning`, not a red error; textarea
   still editable; submit still works; and `closure/start` still succeeds with an
