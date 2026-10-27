@@ -151,4 +151,43 @@ test.describe.serial('替代方案協商 UI', () => {
     await expect(pageB.locator('[data-testid="alt-plan-card"][data-highlighted="true"]')).toContainText('辦公室之夜', { timeout: 10000 });
     await ctxB.close();
   });
+
+  test('the invite modal offers 示範方案 too; a ticked one becomes a linked plan', async ({ browser }) => {
+    const ctxA = await browser.newContext();
+    const pageA = await ctxA.newPage();
+    await signInOnIntimacyHistory(pageA, USER_A);
+    await pageA.getByTestId('header-intimacy-button').click();
+    await pageA.getByTestId('intimacy-category-negotiation').click();
+
+    const picker = pageA.getByTestId('negotiation-plan-picker');
+    const slowNight = picker.getByTestId('negotiation-sample-option').filter({ hasText: '慢慢來的親密夜' });
+    await expect(slowNight).toContainText('精油按摩');
+    // The script sample links straight to its script.
+    await expect(picker.getByTestId('negotiation-sample-option').filter({ hasText: '初次相遇' }).getByTestId('negotiation-view-script')).toBeVisible();
+
+    await slowNight.getByRole('checkbox').check();
+    await pageA.getByTestId('intimacy-preview-btn').click();
+    await expect(pageA.getByTestId('negotiation-linked-preview')).toContainText('慢慢來的親密夜');
+    await pageA.getByTestId('intimacy-send-btn').click();
+    await expect(pageA.getByTestId('intimacy-send-btn')).toHaveCount(0, { timeout: 10000 });
+
+    // It's now a shared plan the sender proposed, waiting on the partner.
+    await pageA.getByRole('tab', { name: /共同方案/ }).click();
+    await expect(pageA.getByTestId('alt-plan-card').filter({ hasText: '慢慢來的親密夜' })).toContainText('待認可', { timeout: 10000 });
+
+    // 管理共同方案 from the modal lands on the 共同方案 tab.
+    await pageA.getByRole('tab', { name: /我發送的/ }).click();
+    await pageA.getByTestId('header-intimacy-button').click();
+    await pageA.getByTestId('intimacy-category-negotiation').click();
+    await pageA.getByTestId('negotiation-manage-plans').click();
+    await expect(pageA.getByTestId('alt-plans-panel')).toBeVisible({ timeout: 10000 });
+    await ctxA.close();
+
+    const ctxB = await browser.newContext();
+    const pageB = await ctxB.newPage();
+    await signInOnIntimacyHistory(pageB, USER_B);
+    await pageB.getByTestId('intimacy-card').filter({ hasText: '替代方案協商' }).first().click();
+    await expect(pageB.getByTestId('negotiation-linked-plan').first()).toContainText('慢慢來的親密夜', { timeout: 10000 });
+    await ctxB.close();
+  });
 });

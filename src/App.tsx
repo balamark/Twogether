@@ -583,6 +583,8 @@ const LoveTimeApp = () => {
   // mounts (the modal only exists inside CalendarView). Consumed once.
   const [pendingAddRecord, setPendingAddRecord] = useState(false);
   const [pendingScriptTitle, setPendingScriptTitle] = useState<string | null>(null);
+  // Open 親密邀請紀錄 straight on its 共同方案 tab (from the invite modal).
+  const [pendingIntimacyTab, setPendingIntimacyTab] = useState<'plans' | null>(null);
   const [intimateRecords, setIntimateRecords] = useState<IntimateRecord[]>([]);
   const [cycleRecords, setCycleRecords] = useState<CycleRecord[]>([]);
   const [nicknames, setNicknames] = useState<Nicknames>({ partner1: tr('親愛的', 'Dear'), partner2: tr('寶貝', 'Babe') });
@@ -2719,6 +2721,8 @@ const LoveTimeApp = () => {
           }}
           onSendInvite={() => setShowIntimacyRequestForm(true)}
           scripts={[...defaultRoleplayScripts, ...customScripts]}
+          requestedTab={pendingIntimacyTab}
+          onRequestedTabConsumed={() => setPendingIntimacyTab(null)}
         />
       );
       // 'pricing' is the logged-out Premium tab; once signed in it becomes the
@@ -3221,6 +3225,16 @@ const LoveTimeApp = () => {
         isOpen={showIntimacyRequestForm}
         onClose={() => setShowIntimacyRequestForm(false)}
         scripts={[...defaultRoleplayScripts, ...customScripts]}
+        onViewScript={(title) => {
+          setShowIntimacyRequestForm(false);
+          setPendingScriptTitle(title);
+          setCurrentView('roleplay');
+        }}
+        onOpenPlans={() => {
+          setShowIntimacyRequestForm(false);
+          setPendingIntimacyTab('plans');
+          setCurrentView('intimacy-history');
+        }}
         onSuccess={() => {
           showNotification({
             type: 'success',

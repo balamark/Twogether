@@ -34,12 +34,15 @@ interface IntimacyRequestsHistoryProps {
   onSendInvite?: () => void;
   /** The couple's roleplay scripts, offered when building a 共同方案. */
   scripts?: PlanScript[];
+  /** Open on this tab (e.g. 共同方案 from the invite modal), then consumed. */
+  requestedTab?: 'plans' | null;
+  onRequestedTabConsumed?: () => void;
 }
 
 type FeedbackState = { type: 'success' | 'error'; message: string };
 type Tab = 'received' | 'sent' | 'plans';
 
-export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = ({ authState, partnerNickname, onViewScript, onSendInvite, scripts }) => {
+export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = ({ authState, partnerNickname, onViewScript, onSendInvite, scripts, requestedTab, onRequestedTabConsumed }) => {
   const [items, setItems] = useState<IntimacyRequest[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,6 +111,13 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
     });
     return { sent: s, received: r };
   }, [items, me, meId]);
+
+  useEffect(() => {
+    if (!requestedTab) return;
+    setTab(requestedTab);
+    setTabInitialized(true); // don't let the smart default override it
+    onRequestedTabConsumed?.();
+  }, [requestedTab, onRequestedTabConsumed]);
 
   // Smart default: open on 我收到的 when there's something actionable; otherwise 我發送的.
   useEffect(() => {

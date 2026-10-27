@@ -15,6 +15,7 @@ import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime, localInputToIsoInTz } from '../utils/datetime';
 import { getTimezoneShortLabel } from '../utils/timezone-options';
 import { tr } from '../i18n/tr';
+import { useAlternativePlanSamples } from '../data/alternativePlanSamples';
 
 // Minimal shape we need from a roleplay script — structurally satisfied by both
 // the built-in defaults and custom/marketplace scripts passed in from App.
@@ -36,6 +37,10 @@ interface IntimacyRequestFormProps {
   // Scripts the couple owns (built-in defaults + custom). Marketplace favorites
   // are loaded lazily inside the form when the roleplay branch is opened.
   scripts?: FormScript[];
+  /** 替代方案協商: open a script in 角色扮演 (closes the modal). */
+  onViewScript?: (title: string) => void;
+  /** 替代方案協商: open the 共同方案 tab (closes the modal). */
+  onOpenPlans?: () => void;
 }
 
 type Step = 'category' | 'script' | 'aimsg' | 'reconcile' | 'guidance' | 'template' | 'customize' | 'confirm';
@@ -82,11 +87,58 @@ const NEGOTIATION_STARTER = tr(
   'I\'d like to talk about our intimacy. When what we hoped for can\'t happen right now, is there another way we\'d both enjoy and want? Here\'s what I need:',
 );
 
+// One plan in the 替代方案協商 picker: tick to attach, peek at its script.
+const PlanOption: React.FC<{
+  testId: string;
+  checked: boolean;
+  onToggle: () => void;
+  title: string;
+  scriptTitle?: string | null;
+  interaction?: string | null;
+  badge: string;
+  onViewScript?: (title: string) => void;
+}> = ({ testId, checked, onToggle, title, scriptTitle, interaction, badge, onViewScript }) => (
+  // A <label> so the whole card toggles; the 查看劇本 button inside doesn't.
+  <label
+    data-testid={testId}
+    className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+      checked ? 'border-pink-400 bg-pink-50' : 'border-gray-200 hover:border-pink-200'
+    }`}
+  >
+    <input type="checkbox" checked={checked} onChange={onToggle} className="mt-1" />
+    <div className="min-w-0 flex-1">
+      <span className="block text-sm font-medium text-gray-900 break-words">{title}</span>
+      {scriptTitle && (
+        <div className="text-xs text-pink-600 flex flex-wrap items-center gap-x-2">
+          <span>{tr('🎭 劇本《', '🎭 Script “')}{scriptTitle}{tr('》', '”')}</span>
+          {onViewScript && (
+            <button
+              type="button"
+              data-testid="negotiation-view-script"
+              onClick={(e) => {
+                e.preventDefault(); // stay a link, not a toggle
+                onViewScript(scriptTitle);
+              }}
+              className="underline underline-offset-2 hover:text-pink-700"
+            >
+              {tr('查看劇本', 'View script')}
+            </button>
+          )}
+        </div>
+      )}
+      {interaction && <p className="text-xs text-gray-600 line-clamp-2">{interaction}</p>}
+      <p className="text-[11px] text-gray-500 mt-0.5">{badge}</p>
+    </div>
+  </label>
+);
+
 const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
   isOpen,
   onClose,
   onSuccess,
   scripts = [],
+  onViewScript,
+  onOpenPlans,
 }) => {
   const [currentStep, setCurrentStep] = useState<Step>('category');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -127,6 +179,9 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
   const [negotiationPlans, setNegotiationPlans] = useState<AlternativePlan[] | null>(null);
   const [negotiationPlansError, setNegotiationPlansError] = useState<string | null>(null);
   const [linkedPlanIds, setLinkedPlanIds] = useState<string[]>([]);
+  // 示範方案 picked in the modal; each becomes a plan the sender proposes on send.
+  const planSamples = useAlternativePlanSamples();
+  const [linkedSampleIds, setLinkedSampleIds] = useState<string[]>([]);
 
   const tz = useTimezone();
 
@@ -256,7 +311,38 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
     setLinkedPlanIds((prev) => (prev.includes(planId) ? prev.filter((id) => id !== planId) : [...prev, planId].slice(0, 10)));
   };
 
+  const toggleLinkedSample = function (sampleId: string) {
+    setLinkedSampleIds((prev) => (prev.includes(sampleId) ? prev.filter((id) => id !== sampleId) : [...prev, sampleId]));
+  };
+
   const linkedPlans = (negotiationPlans || []).filter((p) => linkedPlanIds.includes(p.id));
+  const linkedSamples = planSamples.filter((s) => linkedSampleIds.includes(s.id));
+  // Everything that will be attached, for the confirm step.
+  const linkedTitles = [...linkedPlans.map((p) => p.title), ...linkedSamples.map((s) => s.title)];
+
+  // Turn picked samples into shared plans (reusing a live plan with the same
+  // name instead of duplicating it), then return every id to link.
+  const resolveLinkedPlanIds = async function (): Promise<string[]> {
+    const ids = [...linkedPlanIds];
+    for (const sample of linkedSamples) {
+      const existing = (negotiationPlans || []).find((p) => p.title === sample.title);
+      if (existing) {
+        if (!ids.includes(existing.id)) ids.push(existing.id);
+        continue;
+      }
+      const scenario = sample.scriptTitle ? ownedScripts.find((sc) => sc.title === sample.scriptTitle)?.scenario : undefined;
+      const plan = await apiService.createAlternativePlan({
+        title: sample.title,
+        interaction: sample.interaction || undefined,
+        timePrep: sample.timePrep || undefined,
+        scriptId: sample.scriptTitle ? sample.scriptId || null : null,
+        scriptTitle: sample.scriptTitle || null,
+        scriptScenario: scenario || null,
+      });
+      ids.push(plan.id);
+    }
+    return ids.slice(0, 10);
+  };
 
   // Lazily load marketplace favorites the first time the roleplay branch opens.
   useEffect(() => {
@@ -460,6 +546,8 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
         return;
       }
 
+      const altPlanIds = isNegotiation ? await resolveLinkedPlanIds() : undefined;
+
       await apiService.createIntimacyRequest({
         messageContent,
         requestType:
@@ -479,7 +567,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
         scriptScenario: isRoleplay ? selectedScript?.scenario : undefined,
         scheduledTime:
           !isNegotiation && requestType === 'scheduled' && scheduledTime ? localInputToIsoInTz(scheduledTime, tz) : undefined,
-        altPlanIds: isNegotiation ? linkedPlanIds : undefined,
+        altPlanIds,
       });
 
       onSuccess();
@@ -521,6 +609,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
     setNegotiationPlans(null);
     setNegotiationPlansError(null);
     setLinkedPlanIds([]);
+    setLinkedSampleIds([]);
   };
 
   const handleClose = function () {
@@ -1217,58 +1306,6 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                 </div>
               )}
 
-              {isNegotiation && (
-                <div className="space-y-2" data-testid="negotiation-plan-picker">
-                  <div className="text-sm font-medium text-gray-700">
-                    {tr('想討論的共同方案（選填）', 'Shared plans to talk about (optional)')}
-                  </div>
-                  {negotiationPlans === null ? (
-                    <p className="text-xs text-gray-500">{tr('載入共同方案中…', 'Loading your shared plans…')}</p>
-                  ) : negotiationPlansError ? (
-                    <p className="text-xs text-amber-700">{negotiationPlansError}</p>
-                  ) : negotiationPlans.length === 0 ? (
-                    <p className="text-xs text-gray-500">
-                      {tr('你們還沒有共同方案。先送出邀請，對方願意討論後就能一起建立。', 'You don\'t have any shared plans yet. Send the invitation first; once they\'re open to talk you can build some together.')}
-                    </p>
-                  ) : (
-                    <ul className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                      {negotiationPlans.map((plan) => {
-                        const checked = linkedPlanIds.includes(plan.id);
-                        return (
-                          <li key={plan.id}>
-                            <label
-                              data-testid="negotiation-plan-option"
-                              className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
-                                checked ? 'border-pink-400 bg-pink-50' : 'border-gray-200 hover:border-pink-200'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => toggleLinkedPlan(plan.id)}
-                                className="mt-1"
-                              />
-                              <span className="min-w-0">
-                                <span className="block text-sm font-medium text-gray-900 break-words">{plan.title}</span>
-                                {plan.scriptTitle && (
-                                  <span className="block text-xs text-pink-600">{tr('🎭 劇本《', '🎭 Script “')}{plan.scriptTitle}{tr('》', '”')}</span>
-                                )}
-                                {plan.interaction && (
-                                  <span className="block text-xs text-gray-600 line-clamp-2">{plan.interaction}</span>
-                                )}
-                                <span className="block text-[11px] text-gray-500 mt-0.5">
-                                  {plan.status === 'approved' ? tr('✅ 雙方已認可', '✅ Both approved') : tr('⏳ 待確認', '⏳ Awaiting approval')}
-                                </span>
-                              </span>
-                            </label>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              )}
-
               <div className="space-y-4">
                 {!isNegotiation && (
                 <div>
@@ -1338,6 +1375,76 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                   <p className="mt-1 text-xs text-gray-500">{customMessage.length}{tr('/1000 字符', '/1000 characters')}</p>
                 </div>
 
+                {isNegotiation && (
+                  <div className="rounded-lg border border-gray-200 p-3 space-y-3" data-testid="negotiation-plan-picker">
+                    <div>
+                      <div className="text-sm font-medium text-gray-700">{tr('想一起討論的方案（選填）', 'Plans to talk about (optional)')}</div>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {tr('勾選的方案會附在邀請裡，對方點一下就能看到內容。', 'Ticked plans are attached to the invitation; your partner can open each one with a tap.')}
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-gray-600">{tr('你們的共同方案', 'Your shared plans')}</div>
+                      {negotiationPlans === null ? (
+                        <p className="text-xs text-gray-500">{tr('載入共同方案中…', 'Loading your shared plans…')}</p>
+                      ) : negotiationPlansError ? (
+                        <p className="text-xs text-amber-700">{negotiationPlansError}</p>
+                      ) : negotiationPlans.length === 0 ? (
+                        <p className="text-xs text-gray-500">{tr('還沒有共同方案，可以從下面的方案挑一個開始。', 'No shared plans yet. Start from one of the plans below.')}</p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {negotiationPlans.map((plan) => (
+                            <li key={plan.id}>
+                              <PlanOption
+                                testId="negotiation-plan-option"
+                                checked={linkedPlanIds.includes(plan.id)}
+                                onToggle={() => toggleLinkedPlan(plan.id)}
+                                title={plan.title}
+                                scriptTitle={plan.scriptTitle}
+                                interaction={plan.interaction}
+                                badge={plan.status === 'approved' ? tr('✅ 雙方已認可', '✅ Both approved') : tr('⏳ 待確認', '⏳ Awaiting approval')}
+                                onViewScript={onViewScript}
+                              />
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-gray-600">{tr('可以參考的方案', 'Ideas to start from')}</div>
+                      <ul className="space-y-2">
+                        {planSamples.map((sample) => (
+                          <li key={sample.id}>
+                            <PlanOption
+                              testId="negotiation-sample-option"
+                              checked={linkedSampleIds.includes(sample.id)}
+                              onToggle={() => toggleLinkedSample(sample.id)}
+                              title={sample.title}
+                              scriptTitle={sample.scriptTitle}
+                              interaction={sample.interaction}
+                              badge={tr('💡 送出時會成為你提出的共同方案', '💡 Becomes a plan you propose when you send')}
+                              onViewScript={onViewScript}
+                            />
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {onOpenPlans && (
+                      <button
+                        type="button"
+                        data-testid="negotiation-manage-plans"
+                        onClick={() => { handleClose(); onOpenPlans(); }}
+                        className="text-sm text-pink-600 hover:text-pink-700 underline underline-offset-2"
+                      >
+                        {tr('管理共同方案 →', 'Manage shared plans →')}
+                      </button>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex justify-end space-x-3">
                   <button
                     data-testid="intimacy-preview-btn"
@@ -1375,11 +1482,11 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                       <p className="text-xs text-pink-600 mb-2">{tr('劇本：', 'Script: ')}{selectedScript.title}</p>
                     )}
                     <p className="text-gray-700 whitespace-pre-wrap">{customMessage}</p>
-                    {isNegotiation && linkedPlans.length > 0 && (
+                    {isNegotiation && linkedTitles.length > 0 && (
                       <div className="mt-3 text-sm text-gray-700" data-testid="negotiation-linked-preview">
-                        <div className="text-xs text-gray-500 mb-1">{tr('想討論的共同方案', 'Shared plans to talk about')}</div>
+                        <div className="text-xs text-gray-500 mb-1">{tr('想一起討論的方案', 'Plans to talk about')}</div>
                         <ul className="list-disc list-inside space-y-0.5">
-                          {linkedPlans.map((p) => <li key={p.id}>{p.title}</li>)}
+                          {linkedTitles.map((t) => <li key={t}>{t}</li>)}
                         </ul>
                       </div>
                     )}
