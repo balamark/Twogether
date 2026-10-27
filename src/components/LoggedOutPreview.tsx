@@ -47,6 +47,7 @@ import { trackAction } from '../utils/track';
 import { PairingInviteShare } from './PairingInviteShare';
 import PairingReminderBanner from './PairingReminderBanner';
 import { tr } from '../i18n/tr';
+import { RHYTHM_STRIP_BG, RHYTHM_STRIP_HEIGHT, MOOD_OPTIONS, INTENTION_OPTIONS } from './rhythmDisplay';
 import { useAlternativePlanSamples } from '../data/alternativePlanSamples';
 import { ReceiptDocument } from './PurchaseReceipts';
 
@@ -188,6 +189,12 @@ const MARKED: Record<number, string> = {
 const DOT_CLS: Record<string, string> = {
   rose: 'bg-petal-rose-deep',
 };
+// 親密節奏 sample: predicted ovulation on the 23rd, shaded ±5 days.
+const SAMPLE_OVULATION_DAY = 23;
+const sampleRhythmLevel = (day: number): number | null => {
+  const d = Math.abs(day - SAMPLE_OVULATION_DAY);
+  return d <= 5 ? 6 - d : null;
+};
 
 // Sample of the real intimacy-stats cards, leading with the「已經幾天沒有親密了」
 // hook (16 days, escalated) — reuses the same tier styling as the live view.
@@ -328,7 +335,7 @@ const CalendarMock: React.FC = () => {
       <div className="flex items-start justify-between mb-3">
         <div>
           <span className="font-display italic text-base text-petal-ink">{tr('你們的節奏', 'Your rhythm')}</span>
-          <p className="font-body text-[11px] text-petal-muted mt-0.5">{tr('點月曆任一天新增或查看紀錄', 'Tap any day on the calendar to add or view a record')}</p>
+          <p className="font-body text-[11px] text-petal-muted mt-0.5">{tr('點任一天看節奏、記錄心情或新增紀錄', 'Tap any day to see the rhythm, log how you feel, or add a record')}</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-petal-ink text-petal-cream rounded-md font-display italic text-xs">
@@ -344,10 +351,16 @@ const CalendarMock: React.FC = () => {
           </div>
         ))}
         {cells.map((day, i) => (
-          <div key={i} className="flex flex-col items-center justify-start h-8">
+          <div key={i} className="relative flex flex-col items-center justify-start h-8">
             {day !== null && (
               <>
                 <span className="font-body text-xs text-petal-ink leading-none">{day}</span>
+                {sampleRhythmLevel(day) !== null && (
+                  <span
+                    aria-hidden="true"
+                    className={`absolute inset-x-1 bottom-0 rounded-full ${RHYTHM_STRIP_BG[sampleRhythmLevel(day)!]} ${RHYTHM_STRIP_HEIGHT[sampleRhythmLevel(day)!]}`}
+                  />
+                )}
                 {MARKED[day] === 'pink' ? (
                   <span className="mt-0.5 text-[10px] leading-none text-pink-500">♥</span>
                 ) : MARKED[day] ? (
@@ -365,10 +378,50 @@ const CalendarMock: React.FC = () => {
         <span className="flex items-center gap-1 font-body text-[11px] text-petal-muted">
           <span className="w-1.5 h-1.5 rounded-full bg-petal-rose-deep" /> {tr('生理期', 'Period')}
         </span>
+        <span className="flex items-center gap-1 font-body text-[11px] text-petal-muted">
+          <span className={`w-3 rounded-full ${RHYTHM_STRIP_BG[5]} ${RHYTHM_STRIP_HEIGHT[5]}`} /> {tr('親密節奏', 'Rhythm')}
+        </span>
       </div>
     </div>
   );
 };
+
+// Read-only sample of the 親密節奏 day card a tap on any calendar day opens:
+// the cycle estimate (as an estimate) and a one-tap private 每日狀態.
+const RhythmDayCardSample: React.FC = () => (
+  <SampleCard>
+    <div className="flex items-center justify-between mb-2">
+      <span className="font-body text-xs text-petal-muted">{tr('點一天 → 這一天的節奏', 'Tap a day → this day\'s rhythm')}</span>
+      <SampleTag />
+    </div>
+    <div className="flex items-center gap-2 mb-1.5">
+      <span className={`inline-block w-6 rounded-full ${RHYTHM_STRIP_BG[5]} ${RHYTHM_STRIP_HEIGHT[5]}`} aria-hidden="true" />
+      <span className="font-display text-base text-petal-ink">{tr('接近預測排卵日', 'Close to the predicted ovulation day')}</span>
+    </div>
+    <dl className="space-y-1 font-body text-xs text-petal-ink mb-2">
+      <div className="flex justify-between gap-3">
+        <dt className="text-petal-muted">{tr('預測排卵日', 'Predicted ovulation')}</dt>
+        <dd>{tr('6/23（排卵前 1 天）', 'Jun 23 (1 day before)')}</dd>
+      </div>
+      <div className="flex justify-between gap-3">
+        <dt className="text-petal-muted">{tr('可能排卵區間', 'Possible window')}</dt>
+        <dd>{tr('6/21 ～ 6/25（依你的週期）', 'Jun 21–25 (from your cycles)')}</dd>
+      </div>
+    </dl>
+    <div className="font-body text-[11px] text-petal-muted mb-1.5">{tr('今日狀態（只有你看得到，可選擇分享）', 'Today\'s status (only you see it unless you share)')}</div>
+    <div className="flex flex-wrap gap-1.5">
+      <span className="px-2.5 py-1 rounded-full border border-petal-rose-deep bg-petal-rose-soft font-body text-[11px] text-petal-ink">
+        {MOOD_OPTIONS[1].emoji} {MOOD_OPTIONS[1].label}
+      </span>
+      <span className="px-2.5 py-1 rounded-full border border-petal-rose-deep bg-petal-rose-soft font-body text-[11px] text-petal-ink">
+        {INTENTION_OPTIONS[1].label}
+      </span>
+    </div>
+    <p className="font-display italic font-light text-[11px] text-petal-muted mt-2 leading-relaxed">
+      {tr('依週期推算的參考，不代表任何人的意願；點一下就記好心情，伴侶溝通更自然。', 'An estimate from the cycle, never anyone\'s wishes. One tap logs how you feel, so talking about it comes easier.')}
+    </p>
+  </SampleCard>
+);
 
 // The 衝突事件 "repair flywheel" — the heart of the product. Four connected
 // steps, escalating to an AI / human counselor when the couple gets stuck.
@@ -1085,6 +1138,9 @@ const PREVIEWS: Record<string, PreviewConfig> = {
             </p>
           </div>
         </SampleCard>
+        {/* 親密節奏 lives one tap down (記錄時光 calendar); preview it here too
+            so the logged-out 我們 tab shows it. */}
+        <RhythmDayCardSample />
         <SampleCard>
           <div className="font-body text-[11px] text-petal-muted mb-1">{tr('💌 我們曾經這樣愛過', '💌 How we once loved')}</div>
           <p className="font-display italic font-light text-sm text-petal-ink leading-relaxed">
@@ -1103,10 +1159,13 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       </>
     ),
     description:
-      tr('看見你們的節奏：親密時光與生理期都在一張月曆上。記下的每段時光都能互相回應——點一下表情，或留一句短短的話。太久沒親密時，App 會溫柔提醒另一半多關心你。另一半的每個操作也會出現在通知中心，讓你隨時知道 TA 做了什麼。', 'See your rhythm: intimate moments and your cycle on one calendar. You can respond to each other\'s moments with a tap of an emoji or a short note. If it\'s been a while, the app gently reminds your partner to check in on you. Your partner\'s actions also appear in your notifications, so you always know what they\'ve done.'),
+      tr('看見你們的節奏：親密時光與生理期都在一張月曆上，預測排卵日前後會以深淺顏色標出；點任一天就能記下今天的心情與親密意願（預設只有自己看得到）。記下的每段時光都能互相回應——點一下表情，或留一句短短的話。太久沒親密時，App 會溫柔提醒另一半多關心你。另一半的每個操作也會出現在通知中心，讓你隨時知道 TA 做了什麼。', 'See your rhythm: intimate moments and your cycle on one calendar, with the days around the predicted ovulation shaded light to dark. Tap any day to log your mood and how you feel about intimacy (private unless you share it). You can respond to each other\'s moments with a tap of an emoji or a short note. If it\'s been a while, the app gently reminds your partner to check in on you. Your partner\'s actions also appear in your notifications, so you always know what they\'ve done.'),
     sample: (
       <>
         <CalendarMock />
+        <div className="mt-4">
+          <RhythmDayCardSample />
+        </div>
         <div className="mt-4">
           <SampleStats />
         </div>

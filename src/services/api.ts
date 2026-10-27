@@ -82,6 +82,32 @@ export interface CycleRecord {
   createdAt: string;
 }
 
+// 每日狀態 — keys only; labels live in src/components/DayRhythmCard.tsx.
+export type DayMood = 'great' | 'good' | 'okay' | 'low' | 'stressed';
+export type IntimacyIntention =
+  | 'want_intimacy' | 'start_with_cuddles' | 'prefer_rest' | 'not_sure' | 'prefer_not_say';
+
+export interface DayStatus {
+  date: string;                       // YYYY-MM-DD
+  mood: DayMood | null;
+  intimacyIntention: IntimacyIntention | null;
+  sharingEnabled: boolean;
+}
+
+interface ApiDayStatus {
+  date: string;
+  mood: DayMood | null;
+  intimacy_intention: IntimacyIntention | null;
+  sharing_enabled: boolean;
+}
+
+const toDayStatus = (row: ApiDayStatus): DayStatus => ({
+  date: String(row.date).slice(0, 10),
+  mood: row.mood ?? null,
+  intimacyIntention: row.intimacy_intention ?? null,
+  sharingEnabled: row.sharing_enabled === true,
+});
+
 export type ActivityType =
   | 'love_moment' | 'custom_script' | 'wall_post' | 'event'
   | 'achievement' | 'coins' | 'checkin';
@@ -2300,6 +2326,49 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to delete cycle record:', error);
       this.throwApiError(error, tr('無法刪除週期紀錄', 'Couldn\'t delete the cycle record'));
+    }
+  }
+
+  // 每日狀態 — mine + the partner's SHARED rows for a date range.
+  async getDayStatuses(from: string, to: string): Promise<{ mine: DayStatus[]; partner: DayStatus[] }> {
+    try {
+      const response = await apiClient.get('/day-status', { params: { from, to } });
+      return {
+        mine: ((response.data?.mine || []) as ApiDayStatus[]).map(toDayStatus),
+        partner: ((response.data?.partner || []) as ApiDayStatus[]).map(toDayStatus),
+      };
+    } catch (error: unknown) {
+      console.error('Failed to fetch day statuses:', error);
+      this.throwApiError(error, tr('無法載入每日狀態，請稍後再試', 'Couldn\'t load daily status. Please try again in a moment'));
+    }
+  }
+
+  // Upsert the caller's own status. Present fields overwrite (null clears);
+  // returns null when both mood and intention end up empty (row deleted).
+  async saveDayStatus(
+    date: string,
+    patch: Partial<{ mood: DayMood | null; intimacyIntention: IntimacyIntention | null; sharingEnabled: boolean }>
+  ): Promise<DayStatus | null> {
+    try {
+      const payload: Record<string, unknown> = {};
+      if (patch.mood !== undefined) payload.mood = patch.mood;
+      if (patch.intimacyIntention !== undefined) payload.intimacy_intention = patch.intimacyIntention;
+      if (patch.sharingEnabled !== undefined) payload.sharing_enabled = patch.sharingEnabled;
+      const response = await apiClient.put(`/day-status/${date}`, payload);
+      const row = response.data?.day_status as ApiDayStatus | null | undefined;
+      return row ? toDayStatus(row) : null;
+    } catch (error: unknown) {
+      console.error('Failed to save day status:', error);
+      this.throwApiError(error, tr('無法儲存每日狀態，請稍後再試', 'Couldn\'t save your daily status. Please try again in a moment'));
+    }
+  }
+
+  async clearDayStatus(date: string): Promise<void> {
+    try {
+      await apiClient.delete(`/day-status/${date}`);
+    } catch (error: unknown) {
+      console.error('Failed to clear day status:', error);
+      this.throwApiError(error, tr('無法清除每日狀態，請稍後再試', 'Couldn\'t clear your daily status. Please try again in a moment'));
     }
   }
 

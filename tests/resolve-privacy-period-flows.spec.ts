@@ -366,7 +366,7 @@ test.describe('Wall card privacy toggle', () => {
 // ───────────────────────────── period delete ─────────────────────────────
 
 test.describe('Deleting a logged period', () => {
-  // The period-day modal is itself the confirmation step, so this flow
+  // The day card is itself the confirmation step, so this flow
   // deliberately has no native confirm() — assert both that it deletes and that
   // it does NOT stack a second dialog on top of the modal.
   test('the modal deletes the record without a second dialog', async ({ page }) => {
@@ -416,14 +416,14 @@ test.describe('Deleting a logged period', () => {
     await page.getByTestId('nav-tab-us').click();
     await page.getByTestId('us-calendar-entry').click();
 
-    // Today is inside the seeded period, so today's heatmap cell opens the
-    // period-management modal.
+    // Today is inside the seeded period, so today's day card carries the
+    // period's review & undo section.
     const todayCell = page.getByTestId('calendar-today-cell');
     await todayCell.waitFor({ state: 'visible', timeout: 15000 });
     await todayCell.click();
 
-    const modal = page.getByTestId('period-day-modal');
-    await expect(modal).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('day-rhythm-card')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByTestId('period-day-section')).toBeVisible();
     await page.getByTestId('period-day-delete-button').click();
 
     await expect

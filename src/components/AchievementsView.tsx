@@ -7,6 +7,8 @@ import { useTimezone } from '../contexts/TimezoneContext';
 import { useFeatureFlag } from '../contexts/FeatureFlagsContext';
 import { formatDate, formatYmdInTz } from '../utils/datetime';
 import { tr, dateLocale } from '../i18n/tr';
+import { RHYTHM_STRIP_BG, RHYTHM_STRIP_HEIGHT, rhythmOffsetLabel } from './rhythmDisplay';
+import type { RhythmDay } from '../utils/cycle';
 
 interface IntimateRecord {
   id: number;
@@ -410,9 +412,11 @@ interface CalendarHeatmapProps {
   periodDates?: Set<string>;
   predictedPeriodDates?: Set<string>;
   fertileDates?: Set<string>;
+  /** 親密節奏: days within ±5 of the predicted ovulation → offset + shade level. */
+  rhythmDates?: Map<string, RhythmDay>;
 }
 
-export function CalendarHeatmap({ data, year, month, title, showMonthLabels = true, onNavigate, onDaySelect, selectedDay, periodDates, predictedPeriodDates, fertileDates }: CalendarHeatmapProps) {
+export function CalendarHeatmap({ data, year, month, title, showMonthLabels = true, onNavigate, onDaySelect, selectedDay, periodDates, predictedPeriodDates, fertileDates, rhythmDates }: CalendarHeatmapProps) {
   const tz = useTimezone();
   // Use the viewer's tz for "now" so the default month/year reflects local
   // wall-clock (a Taipei viewer sees the Taipei month, not UTC's).
@@ -549,12 +553,23 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
           const isPeriod = !!periodDates && periodDates.has(day.dateStr!);
           const isPredictedPeriod = !!predictedPeriodDates && predictedPeriodDates.has(day.dateStr!);
           const isFertile = !!fertileDates && fertileDates.has(day.dateStr!);
+          const rhythm = rhythmDates?.get(day.dateStr!);
+          const rhythmText = rhythm ? rhythmOffsetLabel(rhythm.offset) : '';
           return (
             <button
               key={index}
               type="button"
               onClick={() => onDaySelect?.(day.dateStr!)}
               data-testid={isToday ? 'calendar-today-cell' : undefined}
+              data-date={day.dateStr}
+              data-rhythm-level={rhythm?.level}
+              aria-label={[
+                day.date.toLocaleDateString(dateLocale(), { month: 'long', day: 'numeric' }),
+                day.count > 0 ? tr(`${day.count} 次記錄`, `${day.count} ${day.count === 1 ? 'record' : 'records'}`) : '',
+                isPeriod ? tr('月經', 'Period') : isPredictedPeriod ? tr('預測月經', 'Predicted period') : '',
+                isFertile ? tr('適合備孕', 'Fertile window') : '',
+                rhythmText,
+              ].filter(Boolean).join('，')}
               className={`
                 aspect-square rounded-sm border transition-all duration-200 hover:scale-110 hover:z-10 relative group cursor-pointer
                 ${getIntensityClass(day.count)}
@@ -574,8 +589,15 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
               {!isPeriod && isPredictedPeriod && (
                 <span data-testid="cycle-predicted-dot" className="absolute top-0.5 left-0.5 w-2 h-2 rounded-full border border-red-400" title={tr("預測月經", 'Predicted period')} />
               )}
+              {rhythm && (
+                <span
+                  data-testid={rhythm.offset === 0 ? 'rhythm-ovulation-strip' : 'rhythm-strip'}
+                  aria-hidden="true"
+                  className={`absolute inset-x-0.5 bottom-0 rounded-full ${RHYTHM_STRIP_BG[rhythm.level]} ${RHYTHM_STRIP_HEIGHT[rhythm.level]}`}
+                />
+              )}
               {isFertile && (
-                <span data-testid="cycle-fertile-dot" className="absolute bottom-0.5 right-0.5 w-2 h-2 rounded-full bg-emerald-500" title={tr("適合備孕", 'Fertile window')} />
+                <span data-testid="cycle-fertile-dot" className="absolute bottom-2 right-0.5 w-2 h-2 rounded-full bg-emerald-500" title={tr("適合備孕", 'Fertile window')} />
               )}
               {day.count > 0 && (
                 <span
@@ -594,6 +616,7 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
                 {isPeriod && <><br />{tr('🔴 月經', '🔴 Period')}</>}
                 {!isPeriod && isPredictedPeriod && <><br />{tr('⭕ 預測月經', '⭕ Predicted period')}</>}
                 {isFertile && <><br />{tr('🟢 適合備孕', '🟢 Fertile window')}</>}
+                {rhythm && <><br />{rhythmText}</>}
               </div>
             </button>
           );
@@ -613,8 +636,8 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
           </div>
           <span>{tr('較多', 'More')}</span>
         </div>
-        {(periodDates || fertileDates || predictedPeriodDates) && (
-          <div className="flex items-center gap-3">
+        {(periodDates || fertileDates || predictedPeriodDates || (rhythmDates && rhythmDates.size > 0)) && (
+          <div className="flex flex-wrap items-center gap-3">
             {periodDates && periodDates.size > 0 && (
               <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-500" /> {tr('月經', 'Period')}</span>
             )}
@@ -623,6 +646,16 @@ export function CalendarHeatmap({ data, year, month, title, showMonthLabels = tr
             )}
             {fertileDates && fertileDates.size > 0 && (
               <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> {tr('適合備孕', 'Fertile window')}</span>
+            )}
+            {rhythmDates && rhythmDates.size > 0 && (
+              <span className="flex items-center gap-1" data-testid="rhythm-legend" title={tr('預測排卵日前後 5 天，越接近顏色越深；是推算參考，不代表意願', '5 days either side of the predicted ovulation day, darker when closer; an estimate, not anyone\'s wishes')}>
+                <span className="flex items-end gap-px" aria-hidden="true">
+                  {[1, 3, 5, 6, 5, 3, 1].map((lv, i) => (
+                    <span key={i} className={`w-1.5 rounded-full ${RHYTHM_STRIP_BG[lv]} ${RHYTHM_STRIP_HEIGHT[lv]}`} />
+                  ))}
+                </span>
+                {tr('親密節奏（預測排卵日前後）', 'Rhythm (around predicted ovulation)')}
+              </span>
             )}
           </div>
         )}
