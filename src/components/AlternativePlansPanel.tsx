@@ -29,6 +29,8 @@ interface AlternativePlansPanelProps {
   scripts?: PlanScript[];
   /** Open the named script in 角色扮演. */
   onViewScript?: (title: string) => void;
+  /** Scroll to + highlight this plan once loaded (from a linked invitation). */
+  focusPlanId?: string | null;
 }
 
 type Feedback = { type: 'info' | 'error'; message: string };
@@ -66,7 +68,7 @@ const toInput = (d: Draft): AlternativePlanInput => ({
   scriptScenario: d.scriptTitle ? d.scriptScenario || null : null,
 });
 
-const AlternativePlansPanel: React.FC<AlternativePlansPanelProps> = ({ partnerNickname, requestId, onSendInvite, scripts = [], onViewScript }) => {
+const AlternativePlansPanel: React.FC<AlternativePlansPanelProps> = ({ partnerNickname, requestId, onSendInvite, scripts = [], onViewScript, focusPlanId }) => {
   const partner = partnerNickname || tr('另一半', 'your partner');
   const samples = useAlternativePlanSamples();
   const [favoriteScripts, setFavoriteScripts] = useState<PlanScript[]>([]);
@@ -123,6 +125,27 @@ const AlternativePlansPanel: React.FC<AlternativePlansPanelProps> = ({ partnerNi
     }
     return Array.from(map.values());
   }, [scripts, favoriteScripts]);
+
+  // Jumped in from an invitation: reveal the plan (even if paused), scroll to
+  // it and highlight it briefly.
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  useEffect(() => {
+    if (loading || !focusPlanId) return;
+    const target = plans.find((p) => p.id === focusPlanId);
+    if (!target) return;
+    if (target.status === 'disabled') setShowDisabled(true);
+    setHighlightId(focusPlanId);
+    const raf = requestAnimationFrame(() => {
+      document.getElementById(`alt-plan-${focusPlanId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    const t = setTimeout(() => setHighlightId(null), 2500);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(t);
+    };
+    // Only on arrival / once plans load — not on every plan update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, focusPlanId]);
 
   const scenarioFor = (title?: string | null) =>
     (title && scriptOptions.find((sc) => sc.title === title)?.scenario) || null;
@@ -296,6 +319,7 @@ const AlternativePlansPanel: React.FC<AlternativePlansPanelProps> = ({ partnerNi
       plan={plan}
       partner={partner}
       busy={plan.id.startsWith('temp-')}
+      highlight={plan.id === highlightId}
       onApprove={() => approve(plan)}
       onEdit={() => openEditor(plan.id, toDraft(plan))}
       onToggleActive={() => setActive(plan, plan.status === 'disabled')}
@@ -465,7 +489,8 @@ const PlanCard: React.FC<{
   onEdit: () => void;
   onToggleActive: () => void;
   onViewScript?: (title: string) => void;
-}> = ({ plan, partner, busy, onApprove, onEdit, onToggleActive, onViewScript }) => {
+  highlight?: boolean;
+}> = ({ plan, partner, busy, onApprove, onEdit, onToggleActive, onViewScript, highlight }) => {
   const isDisabled = plan.status === 'disabled';
   const chip = (ok: boolean, who: string) => (
     <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${ok ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
@@ -475,8 +500,10 @@ const PlanCard: React.FC<{
   );
   return (
     <div
+      id={`alt-plan-${plan.id}`}
       data-testid="alt-plan-card"
-      className={`rounded-xl border p-4 ${isDisabled ? 'border-petal-rule-soft bg-gray-50 opacity-80' : plan.status === 'approved' ? 'border-petal-sage/50 bg-petal-sage/10' : 'border-amber-200 bg-white'}`}
+      data-highlighted={highlight ? 'true' : undefined}
+      className={`rounded-xl border p-4 transition-shadow ${highlight ? 'ring-2 ring-petal-rose-deep ' : ''}${isDisabled ? 'border-petal-rule-soft bg-gray-50 opacity-80' : plan.status === 'approved' ? 'border-petal-sage/50 bg-petal-sage/10' : 'border-amber-200 bg-white'}`}
     >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="font-medium text-petal-ink break-words">{plan.title}</div>

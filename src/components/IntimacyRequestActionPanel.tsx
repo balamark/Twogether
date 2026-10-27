@@ -17,7 +17,7 @@ interface IntimacyRequestActionPanelProps {
   request: IntimacyRequest;
   onResponded: () => void;
   /** 替代方案協商: after "願意一起討論", jump to the shared plan list. */
-  onOpenPlans?: () => void;
+  onOpenPlans?: (planId?: string) => void;
 }
 
 const NEGOTIATION_CHOICES: { value: NegotiationResponse; label: string; hint: string; icon: typeof Check; testId: string }[] = [
@@ -41,7 +41,8 @@ const NegotiationResponsePanel: React.FC<IntimacyRequestActionPanelProps> = ({ r
       setLoading(true);
       setError(null);
       await apiService.respondToNegotiation(request.id, choice, message.trim() || undefined);
-      if (choice === 'accepted' && onOpenPlans) onOpenPlans();
+      // Land on the first plan the sender linked, if any.
+      if (choice === 'accepted' && onOpenPlans) onOpenPlans(request.altPlanIds?.[0]);
       else onResponded();
     } catch (err) {
       setError(err instanceof Error ? err.message : tr('回覆沒有送出，請稍後再試', 'Your reply wasn\'t sent. Please try again in a moment'));

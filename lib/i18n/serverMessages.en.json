@@ -1004,6 +1004,8 @@
 "付款資料有誤，請確認後再試": "Some payment details are invalid. Please check them and try again",
 "視訊諮商預約": "Video session booking",
 "替代方案協商": "Talk about alternatives",
+"連結的方案已不存在，請重新選擇": "A linked plan no longer exists. Please choose again",
+"一次最多連結 10 個共同方案，請先取消幾個再送出": "You can link up to 10 shared plans at once. Unselect a few and try again",
 "請描述互動方式，或選一個角色扮演劇本，讓對方知道你想像的是什麼": "Describe what you'd do, or pick a roleplay script, so your partner knows what you have in mind",
 "劇本名稱過長，請重新選擇劇本": "That script name is too long. Pick the script again",
 "互動方式最多 2000 字，可以精簡後再送出": "What you'd do can be up to 2000 characters. Shorten it and try again",

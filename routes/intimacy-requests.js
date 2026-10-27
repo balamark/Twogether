@@ -216,6 +216,36 @@ const computeIntimacyStatsForReceiver = async (userId) => {
   return { stats, nudge };
 };
 
+// 替代方案協商 invites can point at shared plans (migration 102). Ensured once
+// per process so an env that skipped the migration doesn't 500 on the column.
+let altPlanIdsEnsured = false;
+async function ensureAltPlanIdsColumn() {
+  if (altPlanIdsEnsured) return;
+  try {
+    await db.query('ALTER TABLE intimacy_requests ADD COLUMN IF NOT EXISTS alt_plan_ids UUID[]');
+    altPlanIdsEnsured = true;
+  } catch (err) {
+    logWarn('ensureAltPlanIdsColumn failed', { err: err.message });
+  }
+}
+
+// Keep only this couple's live (not paused) plans, in the order picked.
+async function resolveLinkedPlans(coupleId, ids) {
+  if (!Array.isArray(ids) || ids.length === 0) return [];
+  try {
+    const r = await db.query(
+      `SELECT id, title FROM intimacy_alternative_plans
+        WHERE couple_id = $1 AND id = ANY($2::uuid[]) AND disabled_at IS NULL`,
+      [coupleId, ids]
+    );
+    const byId = new Map(r.rows.map((row) => [row.id, row]));
+    return ids.map((id) => byId.get(id)).filter(Boolean);
+  } catch (err) {
+    logWarn('resolveLinkedPlans failed', { err: err.message });
+    return [];
+  }
+}
+
 // Create intimacy request
 router.post('/', [
   body('message')
@@ -240,7 +270,14 @@ router.post('/', [
   body('script_scenario')
     .optional({ nullable: true })
     .isLength({ max: 500 })
-    .withMessage('script_scenario 過長')
+    .withMessage('script_scenario 過長'),
+  body('alt_plan_ids')
+    .optional({ nullable: true })
+    .isArray({ max: 10 })
+    .withMessage('一次最多連結 10 個共同方案，請先取消幾個再送出'),
+  body('alt_plan_ids.*')
+    .isUUID()
+    .withMessage('連結的方案已不存在，請重新選擇')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -254,9 +291,12 @@ router.post('/', [
     }
 
     const userId = req.user.id;
-    const { message, request_type, scheduled_time, roleplay_category, script_title, script_scenario } = req.body;
+    const { message, request_type, scheduled_time, roleplay_category, script_title, script_scenario, alt_plan_ids } = req.body;
 
-    logInfo('Creating intimacy request', { userId, request_type, hasMessage: !!message, hasSchedule: !!scheduled_time });
+    logInfo('Creating intimacy request', {
+      userId, request_type, hasMessage: !!message, hasSchedule: !!scheduled_time,
+      linkedPlans: Array.isArray(alt_plan_ids) ? alt_plan_ids.length : 0,
+    });
 
     // Find user's couple and partner
     const coupleResult = await db.query(`
@@ -278,6 +318,10 @@ router.post('/', [
 
     const { couple_id: coupleId, partner_id: partnerId } = coupleResult.rows[0];
 
+    await ensureAltPlanIdsColumn();
+    // Only 替代方案協商 invites carry linked plans.
+    const linkedPlans = request_type === 'negotiation' ? await resolveLinkedPlans(coupleId, alt_plan_ids) : [];
+
     // Create intimacy request
     const requestId = uuidv4();
     const now = new Date().toISOString();
@@ -285,11 +329,15 @@ router.post('/', [
     const result = await db.query(`
       INSERT INTO intimacy_requests (
         id, couple_id, sender_id, receiver_id, message_content, request_type,
-        roleplay_category, script_title, script_scenario, scheduled_time, status, created_at
+        roleplay_category, script_title, script_scenario, scheduled_time, status, created_at, alt_plan_ids
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11)
-      RETURNING id, message_content, request_type, roleplay_category, script_title, script_scenario, scheduled_time, status, created_at
-    `, [requestId, coupleId, userId, partnerId, message || null, request_type, roleplay_category || null, script_title || null, script_scenario || null, scheduled_time || null, now]);
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending', $11, $12::uuid[])
+      RETURNING id, message_content, request_type, roleplay_category, script_title, script_scenario, scheduled_time, status, created_at, alt_plan_ids
+    `, [requestId, coupleId, userId, partnerId, message || null, request_type, roleplay_category || null, script_title || null, script_scenario || null, scheduled_time || null, now, linkedPlans.length ? linkedPlans.map((p) => p.id) : null]);
+
+    if (linkedPlans.length) {
+      logInfo('intimacy_negotiation.linked_plans', { requestId, count: linkedPlans.length });
+    }
 
     const request = result.rows[0];
 
@@ -332,6 +380,7 @@ router.post('/', [
       `💌 Twogether｜${req.user.nickname || '你的伴侶'} 傳來親密邀請`,
       `類型：${INTIMACY_TYPE_LABELS[request_type] || request_type}${script_title ? `・劇本《${script_title}》` : ''}`,
       message ? `「${lineService.excerpt(message)}」` : null,
+      linkedPlans.length ? `想討論的方案：${linkedPlans.map((p) => `《${p.title}》`).join('')}` : null,
       '👉 https://twogether.fun',
     ].filter(Boolean).join('\n');
     lineService.pushToUserIfLinked(db, partnerId, lineInvitePush);
@@ -931,6 +980,7 @@ router.get('/', async (req, res) => {
     const { type = 'all', status = 'all', page = 1, limit = 20 } = req.query;
     
     logInfo('Fetching intimacy requests', { userId, type, status, page });
+    await ensureAltPlanIdsColumn();
     
     const offset = (page - 1) * limit;
 
@@ -971,7 +1021,7 @@ router.get('/', async (req, res) => {
         ir.script_title, ir.script_scenario,
         ir.scheduled_time, ir.status, ir.created_at, ir.responded_at, ir.expires_at,
         ir.response_message, ir.alternative_type, ir.alternative_content,
-        ir.alternative_scheduled_time,
+        ir.alternative_scheduled_time, ir.alt_plan_ids,
         sender.id as sender_id, sender.nickname as sender_nickname,
         receiver.id as receiver_id, receiver.nickname as receiver_nickname,
         CASE WHEN ir.sender_id = $1 THEN 'sent' ELSE 'received' END as direction
@@ -1000,6 +1050,7 @@ router.get('/', async (req, res) => {
       alternative_type: row.alternative_type,
       alternative_content: row.alternative_content,
       alternative_scheduled_time: row.alternative_scheduled_time,
+      alt_plan_ids: row.alt_plan_ids || [],
       sender_nickname: row.sender_nickname,
       receiver_nickname: row.receiver_nickname,
       requester: {

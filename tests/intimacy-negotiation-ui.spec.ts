@@ -123,4 +123,32 @@ test.describe.serial('替代方案協商 UI', () => {
     await expect(page.getByText(/開始扮演/)).toBeVisible();
     await expect(page.getByRole('tab', { name: /共同方案/ })).toHaveCount(0);
   });
+
+  test('sender links a shared plan to a negotiation invite; receiver jumps to it', async ({ browser }) => {
+    // Sender: build the invite in the form and pick the plan to discuss.
+    const ctxA = await browser.newContext();
+    const pageA = await ctxA.newPage();
+    await signInOnIntimacyHistory(pageA, USER_A);
+    await pageA.getByTestId('header-intimacy-button').click();
+    await pageA.getByTestId('intimacy-category-negotiation').click();
+    const picker = pageA.getByTestId('negotiation-plan-picker');
+    await expect(picker).toContainText('辦公室之夜', { timeout: 10000 });
+    await picker.getByTestId('negotiation-plan-option').filter({ hasText: '辦公室之夜' }).first().click();
+    await pageA.getByTestId('intimacy-preview-btn').click();
+    await expect(pageA.getByTestId('negotiation-linked-preview')).toContainText('辦公室之夜');
+    await pageA.getByTestId('intimacy-send-btn').click();
+    await expect(pageA.getByTestId('intimacy-send-btn')).toHaveCount(0, { timeout: 10000 });
+    await ctxA.close();
+
+    // Receiver: sees the linked plan on the invite and opens it in 共同方案.
+    const ctxB = await browser.newContext();
+    const pageB = await ctxB.newPage();
+    await signInOnIntimacyHistory(pageB, USER_B);
+    await pageB.getByTestId('intimacy-card').filter({ hasText: '替代方案協商' }).first().click();
+    const linked = pageB.getByTestId('negotiation-linked-plan').first();
+    await expect(linked).toContainText('辦公室之夜', { timeout: 10000 });
+    await linked.click();
+    await expect(pageB.locator('[data-testid="alt-plan-card"][data-highlighted="true"]')).toContainText('辦公室之夜', { timeout: 10000 });
+    await ctxB.close();
+  });
 });

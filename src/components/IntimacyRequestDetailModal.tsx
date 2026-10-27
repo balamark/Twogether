@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Calendar, X, MessageSquareHeart, Sparkles, Play, ListChecks } from 'lucide-react';
-import type { IntimacyRequest } from '../services/api';
+import apiService from '../services/api';
+import type { IntimacyRequest, AlternativePlan } from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -15,9 +16,72 @@ interface IntimacyRequestDetailModalProps {
   onResponded: () => void;
   /** Navigate to the roleplay view and open the named script. */
   onViewScript?: (title: string) => void;
-  /** 替代方案協商: open the shared plan list. */
-  onOpenPlans?: () => void;
+  /** 替代方案協商: open the shared plan list (optionally on one plan). */
+  onOpenPlans?: (planId?: string) => void;
 }
+
+// The shared plans a 替代方案協商 invite points at, read live from 共同方案 so
+// both partners see the current wording and approval state.
+const LinkedPlans: React.FC<{ ids: string[]; onOpenPlan?: (planId: string) => void }> = ({ ids, onOpenPlan }) => {
+  const [plans, setPlans] = useState<AlternativePlan[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const key = ids.join(',');
+  useEffect(() => {
+    let cancelled = false;
+    apiService.getAlternativePlans()
+      .then((all) => { if (!cancelled) setPlans(all.filter((p) => ids.includes(p.id))); })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error && err.message ? err.message : tr('方案暫時載入不了，請稍後再試', 'Couldn\'t load the plans. Please try again shortly'));
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  const ordered = plans ? ids.map((id) => plans.find((p) => p.id === id)).filter((p): p is AlternativePlan => !!p) : [];
+  const missing = plans ? ids.length - ordered.length : 0;
+
+  return (
+    <section className="rounded-xl border border-petal-rule-soft bg-petal-cream-2/40 p-4 space-y-2" data-testid="negotiation-linked-plans">
+      <div className="text-xs uppercase tracking-[0.12em] text-petal-muted">{tr('想討論的共同方案', 'Shared plans to talk about')}</div>
+      {error && <p className="text-sm text-amber-700">{error}</p>}
+      {!plans && !error && <p className="text-sm text-petal-muted">{tr('載入中…', 'Loading…')}</p>}
+      {ordered.map((p) => (
+        <button
+          key={p.id}
+          type="button"
+          data-testid="negotiation-linked-plan"
+          onClick={() => onOpenPlan?.(p.id)}
+          disabled={!onOpenPlan}
+          className="w-full text-left rounded-lg border border-petal-rule-soft bg-white p-3 hover:border-petal-rose-deep/40 transition-colors"
+        >
+          <div className="flex items-start justify-between gap-2">
+            <span className="text-sm font-medium text-petal-ink break-words">{p.title}</span>
+            <span className={`shrink-0 text-[11px] px-2 py-0.5 rounded-full ${
+              p.status === 'approved' ? 'bg-green-100 text-green-700' : p.status === 'disabled' ? 'bg-gray-100 text-gray-600' : 'bg-yellow-100 text-yellow-700'
+            }`}>
+              {p.status === 'approved' ? tr('雙方已認可', 'Both approved') : p.status === 'disabled' ? tr('已停用', 'Paused') : tr('待確認', 'Awaiting approval')}
+            </span>
+          </div>
+          {p.scriptTitle && (
+            <div className="text-xs text-petal-rose-deep mt-1">{tr('🎭 劇本《', '🎭 Script “')}{p.scriptTitle}{tr('》', '”')}</div>
+          )}
+          {p.interaction && <p className="text-xs text-petal-ink-soft mt-1 line-clamp-2">{p.interaction}</p>}
+          {onOpenPlan && (
+            <span className="inline-flex items-center gap-1 text-xs text-petal-rose-deep mt-1.5 underline underline-offset-2">
+              <ListChecks className="w-3.5 h-3.5" />
+              {tr('查看方案', 'Open plan')}
+            </span>
+          )}
+        </button>
+      ))}
+      {missing > 0 && (
+        <p className="text-xs text-petal-muted">
+          {tr(`有 ${missing} 個方案已被移除。`, `${missing} plan(s) were removed.`)}
+        </p>
+      )}
+    </section>
+  );
+};
 
 const ALTERNATIVE_CATEGORY_LABEL: Record<string, string> = {
   physical: tr('肢體親密', 'Physical intimacy'),
@@ -132,6 +196,13 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
             </div>
           </section>
 
+          {negotiation && request.altPlanIds && request.altPlanIds.length > 0 && (
+            <LinkedPlans
+              ids={request.altPlanIds}
+              onOpenPlan={onOpenPlans ? (planId) => { onClose(); onOpenPlans(planId); } : undefined}
+            />
+          )}
+
           {/* Response (if responded) */}
           {!isPending && (request.responseMessage || request.alternativeType || request.alternativeContent || request.alternativeScheduledTime) && (
             <section className="rounded-xl border border-petal-rule-soft bg-petal-cream-2/40 p-4 space-y-3">
@@ -215,7 +286,7 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
               <IntimacyRequestActionPanel
                 request={request}
                 onResponded={onResponded}
-                onOpenPlans={onOpenPlans ? () => { onResponded(); onOpenPlans(); } : undefined}
+                onOpenPlans={onOpenPlans ? (planId?: string) => { onResponded(); onOpenPlans(planId); } : undefined}
               />
             </section>
           )}

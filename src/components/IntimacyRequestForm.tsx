@@ -7,6 +7,7 @@ import type {
   EventRecord,
   ReconciliationIntensity,
   ReconciliationOpener,
+  AlternativePlan,
 } from '../services/api';
 import { conflictPhraseTiers } from '../data/conflictSteps';
 import { useScrollLock } from '../hooks/useScrollLock';
@@ -122,6 +123,11 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
   // from the 8-step "當我情緒上來時，你可以這樣接住我" guide.
   const [guidanceSelected, setGuidanceSelected] = useState<Set<string>>(new Set());
 
+  // 替代方案協商: the couple's live shared plans, and the ones picked to discuss.
+  const [negotiationPlans, setNegotiationPlans] = useState<AlternativePlan[] | null>(null);
+  const [negotiationPlansError, setNegotiationPlansError] = useState<string | null>(null);
+  const [linkedPlanIds, setLinkedPlanIds] = useState<string[]>([]);
+
   const tz = useTimezone();
 
   const categories = [
@@ -224,6 +230,33 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
       cancelled = true;
     };
   }, [currentStep, reconcileEvents.length]);
+
+  // Load the shared plans the first time the 替代方案協商 branch opens. Non-
+  // fatal: the invite still works without linking any plan.
+  useEffect(() => {
+    if (selectedCategory !== 'negotiation' || negotiationPlans !== null) return;
+    let cancelled = false;
+    apiService.getAlternativePlans()
+      .then((plans) => {
+        if (!cancelled) setNegotiationPlans(plans.filter((p) => p.status !== 'disabled'));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setNegotiationPlans([]);
+        setNegotiationPlansError(err instanceof Error && err.message
+          ? err.message
+          : tr('共同方案暫時載入不了，你仍可以先送出邀請', 'Couldn\'t load your shared plans. You can still send the invitation'));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCategory, negotiationPlans]);
+
+  const toggleLinkedPlan = function (planId: string) {
+    setLinkedPlanIds((prev) => (prev.includes(planId) ? prev.filter((id) => id !== planId) : [...prev, planId].slice(0, 10)));
+  };
+
+  const linkedPlans = (negotiationPlans || []).filter((p) => linkedPlanIds.includes(p.id));
 
   // Lazily load marketplace favorites the first time the roleplay branch opens.
   useEffect(() => {
@@ -446,6 +479,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
         scriptScenario: isRoleplay ? selectedScript?.scenario : undefined,
         scheduledTime:
           !isNegotiation && requestType === 'scheduled' && scheduledTime ? localInputToIsoInTz(scheduledTime, tz) : undefined,
+        altPlanIds: isNegotiation ? linkedPlanIds : undefined,
       });
 
       onSuccess();
@@ -484,6 +518,9 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
     setReconcileOpeners([]);
     setReconcileLoading(false);
     setGuidanceSelected(new Set());
+    setNegotiationPlans(null);
+    setNegotiationPlansError(null);
+    setLinkedPlanIds([]);
   };
 
   const handleClose = function () {
@@ -1180,6 +1217,58 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                 </div>
               )}
 
+              {isNegotiation && (
+                <div className="space-y-2" data-testid="negotiation-plan-picker">
+                  <div className="text-sm font-medium text-gray-700">
+                    {tr('想討論的共同方案（選填）', 'Shared plans to talk about (optional)')}
+                  </div>
+                  {negotiationPlans === null ? (
+                    <p className="text-xs text-gray-500">{tr('載入共同方案中…', 'Loading your shared plans…')}</p>
+                  ) : negotiationPlansError ? (
+                    <p className="text-xs text-amber-700">{negotiationPlansError}</p>
+                  ) : negotiationPlans.length === 0 ? (
+                    <p className="text-xs text-gray-500">
+                      {tr('你們還沒有共同方案。先送出邀請，對方願意討論後就能一起建立。', 'You don\'t have any shared plans yet. Send the invitation first; once they\'re open to talk you can build some together.')}
+                    </p>
+                  ) : (
+                    <ul className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {negotiationPlans.map((plan) => {
+                        const checked = linkedPlanIds.includes(plan.id);
+                        return (
+                          <li key={plan.id}>
+                            <label
+                              data-testid="negotiation-plan-option"
+                              className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
+                                checked ? 'border-pink-400 bg-pink-50' : 'border-gray-200 hover:border-pink-200'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleLinkedPlan(plan.id)}
+                                className="mt-1"
+                              />
+                              <span className="min-w-0">
+                                <span className="block text-sm font-medium text-gray-900 break-words">{plan.title}</span>
+                                {plan.scriptTitle && (
+                                  <span className="block text-xs text-pink-600">{tr('🎭 劇本《', '🎭 Script “')}{plan.scriptTitle}{tr('》', '”')}</span>
+                                )}
+                                {plan.interaction && (
+                                  <span className="block text-xs text-gray-600 line-clamp-2">{plan.interaction}</span>
+                                )}
+                                <span className="block text-[11px] text-gray-500 mt-0.5">
+                                  {plan.status === 'approved' ? tr('✅ 雙方已認可', '✅ Both approved') : tr('⏳ 待確認', '⏳ Awaiting approval')}
+                                </span>
+                              </span>
+                            </label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-4">
                 {!isNegotiation && (
                 <div>
@@ -1286,6 +1375,14 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                       <p className="text-xs text-pink-600 mb-2">{tr('劇本：', 'Script: ')}{selectedScript.title}</p>
                     )}
                     <p className="text-gray-700 whitespace-pre-wrap">{customMessage}</p>
+                    {isNegotiation && linkedPlans.length > 0 && (
+                      <div className="mt-3 text-sm text-gray-700" data-testid="negotiation-linked-preview">
+                        <div className="text-xs text-gray-500 mb-1">{tr('想討論的共同方案', 'Shared plans to talk about')}</div>
+                        <ul className="list-disc list-inside space-y-0.5">
+                          {linkedPlans.map((p) => <li key={p.id}>{p.title}</li>)}
+                        </ul>
+                      </div>
+                    )}
                     {!isNegotiation && requestType === 'scheduled' && scheduledTime && (
                       <div className="mt-3 flex items-center space-x-2 text-sm text-gray-600">
                         <Clock className="w-4 h-4" />

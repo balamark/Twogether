@@ -49,6 +49,8 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
   const [emailFeedback, setEmailFeedback] = useState<FeedbackState | null>(null);
   const [tab, setTab] = useState<Tab>('received');
   const [tabInitialized, setTabInitialized] = useState(false);
+  // Plan to scroll to / highlight when jumping in from an invitation.
+  const [focusPlanId, setFocusPlanId] = useState<string | null>(null);
   // History-backed so 上一頁 closes the detail modal instead of leaving.
   const [detailOpenId, setDetailOpenId] = useHistoryState<string | null>('intimacy:detail', null, { scrollTop: false });
   const me = authState.user?.nickname || '';
@@ -210,6 +212,7 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
                 onSendInvite={onSendInvite}
                 scripts={scripts}
                 onViewScript={onViewScript}
+                focusPlanId={focusPlanId}
               />
             ) : (
             <RequestList
@@ -243,7 +246,10 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
       <IntimacyRequestDetailModal
         request={detailRequest}
         direction={detailRequest?.direction ?? (tab === 'sent' ? 'sent' : 'received')}
-        onOpenPlans={() => setTab('plans')}
+        onOpenPlans={(planId) => {
+          setFocusPlanId(planId ?? null);
+          setTab('plans');
+        }}
         onClose={() => setDetailOpenId(null)}
         onResponded={() => {
           setDetailOpenId(null);

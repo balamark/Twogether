@@ -60,7 +60,7 @@ router.use(authenticateToken);
 // Generous cap — it exists to stop runaway inserts, not to ration the feature.
 const MAX_PLANS_PER_COUPLE = 50;
 
-// Belt-and-suspenders alongside migration 101, for envs that haven't migrated.
+// Belt-and-suspenders alongside migrations 101/102, for envs that haven't migrated.
 let tableEnsured = false;
 async function ensurePlansTable() {
   if (tableEnsured) return;
@@ -89,6 +89,14 @@ async function ensurePlansTable() {
     await db.query(`
       CREATE INDEX IF NOT EXISTS idx_intimacy_alt_plans_couple
         ON intimacy_alternative_plans(couple_id, updated_at DESC)
+    `);
+    // An env that only ran the first 101 lacks the script columns (migration
+    // 102) and still requires interaction — exactly what 500'd staging.
+    await db.query(`
+      ALTER TABLE intimacy_alternative_plans ADD COLUMN IF NOT EXISTS script_id VARCHAR(128);
+      ALTER TABLE intimacy_alternative_plans ADD COLUMN IF NOT EXISTS script_title VARCHAR(200);
+      ALTER TABLE intimacy_alternative_plans ADD COLUMN IF NOT EXISTS script_scenario TEXT;
+      ALTER TABLE intimacy_alternative_plans ALTER COLUMN interaction DROP NOT NULL;
     `);
     tableEnsured = true;
   } catch (err) {

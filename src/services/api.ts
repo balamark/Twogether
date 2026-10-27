@@ -228,6 +228,8 @@ interface IntimacyRequest {
   alternativeType?: string;
   alternativeContent?: string;
   alternativeScheduledTime?: string;
+  // 替代方案協商: shared plans the sender wants to talk about.
+  altPlanIds?: string[];
   createdAt: string;
   expiresAt: string;
   direction?: 'sent' | 'received';  // Added to track if user sent or received this request
@@ -240,6 +242,7 @@ interface CreateIntimacyRequestRequest {
   scriptTitle?: string;
   scriptScenario?: string;
   scheduledTime?: string;
+  altPlanIds?: string[];
 }
 
 interface RespondToIntimacyRequestRequest {
@@ -3010,6 +3013,7 @@ class ApiService {
         script_title: request.scriptTitle,
         script_scenario: request.scriptScenario,
         scheduled_time: request.scheduledTime,
+        alt_plan_ids: request.altPlanIds?.length ? request.altPlanIds : undefined,
       });
       return this.transformIntimacyRequest(response.data.intimacy_request || response.data);
     } catch (error: unknown) {
@@ -4320,6 +4324,7 @@ class ApiService {
       alternative_type?: string;
       alternative_content?: string;
       alternative_scheduled_time?: string;
+      alt_plan_ids?: string[] | null;
       created_at?: string;
       expires_at?: string;
       direction?: 'sent' | 'received';
@@ -4345,6 +4350,7 @@ class ApiService {
       alternativeType: typedData?.alternative_type,
       alternativeContent: typedData?.alternative_content,
       alternativeScheduledTime: typedData?.alternative_scheduled_time,
+      altPlanIds: Array.isArray(typedData?.alt_plan_ids) ? typedData.alt_plan_ids : [],
       createdAt: typedData?.created_at || '',
       expiresAt: typedData?.expires_at || '',
       direction: typedData?.direction,

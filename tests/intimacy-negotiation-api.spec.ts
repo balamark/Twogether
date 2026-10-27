@@ -252,3 +252,34 @@ test('admin can create, edit, hide and delete 示範方案', async () => {
     await pub.dispose();
   }
 });
+
+test('a negotiation invite links only this couple\'s live plans; other types ignore them', async () => {
+  const p1 = (await (await a.post(`${API}/intimacy-plans`, { data: { title: '連結方案一', interaction: '精油按摩' } })).json()).plan;
+  const p2 = (await (await a.post(`${API}/intimacy-plans`, { data: { title: '連結方案二', script_title: '初次相遇' } })).json()).plan;
+  const paused = (await (await a.post(`${API}/intimacy-plans`, { data: { title: '停用方案', interaction: 'x' } })).json()).plan;
+  await a.post(`${API}/intimacy-plans/${paused.id}/disable`);
+  const stranger = '00000000-0000-4000-8000-000000000000';
+
+  const created = await a.post(`${API}/intimacy-requests`, {
+    data: { message: '想聊聊這兩個', request_type: 'negotiation', alt_plan_ids: [p2.id, stranger, paused.id, p1.id] },
+  });
+  expect(created.status(), await created.text()).toBe(201);
+  const req = (await created.json()).intimacy_request;
+  // Order kept, foreign + paused plans dropped.
+  expect(req.alt_plan_ids).toEqual([p2.id, p1.id]);
+
+  // The receiver sees the links on the invitation list.
+  const list = (await (await b.get(`${API}/intimacy-requests`)).json()).intimacy_requests;
+  expect(list.find((r: { id: string }) => r.id === req.id).alt_plan_ids).toEqual([p2.id, p1.id]);
+
+  // Non-negotiation invites never carry plan links.
+  const plain = await a.post(`${API}/intimacy-requests`, {
+    data: { message: '今晚？', request_type: 'intimate', alt_plan_ids: [p1.id] },
+  });
+  expect((await plain.json()).intimacy_request.alt_plan_ids).toBeNull();
+
+  const tooMany = await a.post(`${API}/intimacy-requests`, {
+    data: { message: 'x', request_type: 'negotiation', alt_plan_ids: Array(11).fill(p1.id) },
+  });
+  expect(tooMany.status()).toBe(400);
+});
