@@ -22,47 +22,6 @@ const router = express.Router();
 
 const SURFACES = ['emotion_translation', 'counselor'];
 
-// The migration (088) is the source of truth; this runtime-ensure keeps the
-// endpoint working on environments where migrations haven't run yet, matching
-// how event_ai_usage / roleplay_message_feedback bootstrap themselves.
-let ensured = false;
-async function ensureAiFeedbackTable() {
-  if (ensured) return;
-  await db.query(`
-    CREATE TABLE IF NOT EXISTS ai_response_feedback (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-      user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      surface VARCHAR(32) NOT NULL,
-      reference_id UUID,
-      message_text TEXT,
-      context_snapshot JSONB,
-      rating VARCHAR(8) NOT NULL,
-      feedback_text TEXT,
-      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-    )
-  `);
-  await db.query(`
-    CREATE UNIQUE INDEX IF NOT EXISTS uq_ai_response_feedback_user_ref
-      ON ai_response_feedback (user_id, surface, reference_id)
-  `);
-  // Phase 2 curation columns (migration 089) — admins promote a down-vote into a
-  // negative example for the judge. Kept here too so the admin flow works before
-  // migrations run.
-  await db.query(`
-    ALTER TABLE ai_response_feedback
-      ADD COLUMN IF NOT EXISTS curated_negative BOOLEAN NOT NULL DEFAULT false,
-      ADD COLUMN IF NOT EXISTS curated_note TEXT,
-      ADD COLUMN IF NOT EXISTS curated_at TIMESTAMP WITH TIME ZONE
-  `);
-  await db.query(`
-    CREATE INDEX IF NOT EXISTS idx_ai_response_feedback_curated
-      ON ai_response_feedback (surface, curated_at DESC)
-      WHERE curated_negative
-  `);
-  ensured = true;
-}
-
 router.post(
   '/',
   authenticateToken,
@@ -94,7 +53,6 @@ router.post(
       req.body.contextSnapshot != null ? JSON.stringify(req.body.contextSnapshot) : null;
 
     try {
-      await ensureAiFeedbackTable();
       await db.query(
         `INSERT INTO ai_response_feedback
            (user_id, surface, reference_id, message_text, context_snapshot, rating, feedback_text)
@@ -121,7 +79,4 @@ router.post(
   }
 );
 
-// Exported so the admin curation endpoints (routes/admin.js) can guarantee the
-// table + curation columns exist before reading/updating them.
-router.ensureAiFeedbackTable = ensureAiFeedbackTable;
 module.exports = router;

@@ -41,85 +41,8 @@ const localizeNudges = (suggestions, locale) => (locale === 'en'
 // the actual deduction disagreed depending on which endpoint you hit.
 
 // ---------------------------------------------------------------------------
-// Roleplay message cache + feedback. Schema lives in migration 050; this lazy
-// ensure is a safety net for envs that haven't migrated (mirrors the
-// event_ai_usage pattern above).
+// Roleplay message cache + feedback. Schema lives in migration 050.
 // ---------------------------------------------------------------------------
-
-let roleplaySuggestionTablesReady = false; // DDL is idempotent; run it once per process, not per request
-async function ensureRoleplaySuggestionTables() {
-  if (roleplaySuggestionTablesReady) return;
-  try {
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS roleplay_message_cache (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        script_id VARCHAR(128) NOT NULL,
-        content_hash VARCHAR(64) NOT NULL,
-        script_title VARCHAR(200),
-        category VARCHAR(50),
-        summary TEXT,
-        messages JSONB NOT NULL,
-        provider VARCHAR(32),
-        model VARCHAR(64),
-        gen_count INTEGER NOT NULL DEFAULT 1,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        UNIQUE (script_id, content_hash)
-      );
-    `);
-    await db.query(`
-      CREATE INDEX IF NOT EXISTS idx_roleplay_cache_script
-        ON roleplay_message_cache(script_id, updated_at DESC)
-    `);
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS roleplay_message_feedback (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        script_id VARCHAR(128),
-        script_title VARCHAR(200),
-        level VARCHAR(16),
-        message_text TEXT,
-        rating VARCHAR(8) NOT NULL,
-        feedback_text TEXT,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-      );
-    `);
-    await db.query(`
-      CREATE INDEX IF NOT EXISTS idx_roleplay_feedback_script
-        ON roleplay_message_feedback(script_id, created_at DESC)
-    `);
-    roleplaySuggestionTablesReady = true;
-  } catch (err) {
-    logWarn('ensureRoleplaySuggestionTables failed', { err: err.message });
-  }
-}
-
-// Cache for the platform-voiced「溫柔提醒」options. Keyed by (couple_id, days) so
-// re-opening the same gap (or the partner opening it) reuses the same randomly
-// selected set, keeping the options stable. Runtime-created belt-and-suspenders
-// alongside migration 072.
-let intimacyNudgeCacheTableReady = false; // DDL is idempotent; run it once per process, not per request
-async function ensureIntimacyNudgeCacheTable() {
-  if (intimacyNudgeCacheTableReady) return;
-  try {
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS intimacy_nudge_cache (
-        couple_id UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
-        days INTEGER NOT NULL,
-        suggestions JSONB NOT NULL,
-        provider VARCHAR(32),
-        model VARCHAR(64),
-        gen_count INTEGER NOT NULL DEFAULT 1,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        PRIMARY KEY (couple_id, days)
-      );
-    `);
-    intimacyNudgeCacheTableReady = true;
-  } catch (err) {
-    logWarn('ensureIntimacyNudgeCacheTable failed', { err: err.message });
-  }
-}
 
 // Bump whenever the roleplay prompt's voice/perspective behavior changes: the
 // message cache is shared across couples and keyed by this hash, so without a
@@ -222,19 +145,6 @@ const computeIntimacyStatsForReceiver = async (userId) => {
   return { stats, nudge };
 };
 
-// 替代方案協商 invites can point at shared plans (migration 102). Ensured once
-// per process so an env that skipped the migration doesn't 500 on the column.
-let altPlanIdsEnsured = false;
-async function ensureAltPlanIdsColumn() {
-  if (altPlanIdsEnsured) return;
-  try {
-    await db.query('ALTER TABLE intimacy_requests ADD COLUMN IF NOT EXISTS alt_plan_ids UUID[]');
-    altPlanIdsEnsured = true;
-  } catch (err) {
-    logWarn('ensureAltPlanIdsColumn failed', { err: err.message });
-  }
-}
-
 // Keep only this couple's live (not paused) plans, in the order picked.
 async function resolveLinkedPlans(coupleId, ids) {
   if (!Array.isArray(ids) || ids.length === 0) return [];
@@ -324,7 +234,6 @@ router.post('/', [
 
     const { couple_id: coupleId, partner_id: partnerId } = coupleResult.rows[0];
 
-    await ensureAltPlanIdsColumn();
     // Only 替代方案協商 invites carry linked plans.
     const linkedPlans = request_type === 'negotiation' ? await resolveLinkedPlans(coupleId, alt_plan_ids) : [];
 
@@ -464,7 +373,6 @@ router.post('/script-messages', [
   const { scriptId, scriptTitle, scriptScenario, scriptBody, category, regenerate } = req.body;
 
   try {
-    await ensureRoleplaySuggestionTables();
 
     // The sender's gender selects which role in the script the messages speak
     // from; it's part of the cache key so different-gender senders don't share.
@@ -592,7 +500,6 @@ router.post('/script-messages/feedback', [
   const userId = req.user.id;
   const { scriptId, scriptTitle, level, messageText, rating, feedbackText } = req.body;
   try {
-    await ensureRoleplaySuggestionTables();
     await db.query(
       `INSERT INTO roleplay_message_feedback
          (user_id, script_id, script_title, level, message_text, rating, feedback_text)
@@ -727,7 +634,6 @@ router.post('/nudge-suggestions', [
   const regenerate = !!req.body.regenerate;
 
   try {
-    await ensureIntimacyNudgeCacheTable();
 
     const coupleId = await getCoupleIdForUser(userId);
     if (!coupleId) {
@@ -987,7 +893,6 @@ router.get('/', async (req, res) => {
     const { type = 'all', status = 'all', page = 1, limit = 20 } = req.query;
     
     logInfo('Fetching intimacy requests', { userId, type, status, page });
-    await ensureAltPlanIdsColumn();
     
     const offset = (page - 1) * limit;
 
@@ -1597,63 +1502,11 @@ router.get('/alternative-intimacy-options', async (req, res) => {
     const userId = req.user.id;
     logInfo('Getting alternative intimacy options', { userId });
 
-    // Check if alternative_intimacy_options table exists, if not create it
     const result = await db.query(`
       SELECT id, category, title, description, estimated_duration, sort_order
       FROM alternative_intimacy_options 
       ORDER BY category, sort_order, title
-    `).catch(async (error) => {
-      if (error.message.includes('relation "alternative_intimacy_options" does not exist')) {
-        logInfo('Creating alternative_intimacy_options table');
-        
-        // Create the table
-        await db.query(`
-          CREATE TABLE IF NOT EXISTS alternative_intimacy_options (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            category VARCHAR(50) NOT NULL,
-            title VARCHAR(100) NOT NULL,
-            description TEXT NOT NULL,
-            estimated_duration VARCHAR(50),
-            is_default BOOLEAN NOT NULL DEFAULT FALSE,
-            sort_order INTEGER NOT NULL DEFAULT 0,
-            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-          );
-          
-          CREATE INDEX IF NOT EXISTS idx_alternative_options_category ON alternative_intimacy_options(category);
-        `);
-
-        // Insert default alternative options
-        await db.query(`
-          INSERT INTO alternative_intimacy_options (category, title, description, estimated_duration, is_default, sort_order) VALUES
-          ('physical', '5分鐘擁抱', '緊緊擁抱對方，感受彼此的溫暖', '5分鐘', true, 1),
-          ('physical', '牽手散步', '手牽手到陽台或附近走走', '10分鐘', true, 2),
-          ('physical', '頭靠肩膀', '依偎在一起，頭靠在對方肩膀上', '5分鐘', true, 3),
-          ('physical', '互相按摩', '輕柔地為對方按摩肩膀或手臂', '15分鐘', true, 4),
-          ('emotional', '分享今天心情', '聊聊今天發生的事和感受', '10分鐘', true, 1),
-          ('emotional', '說一句感謝', '表達對伴侶的感謝和讚美', '3分鐘', true, 2),
-          ('emotional', '分享小回憶', '回憶一件美好的共同經歷', '5分鐘', true, 3),
-          ('emotional', '互相讚美', '說說對方今天最棒的地方', '5分鐘', true, 4),
-          ('playful', '搞怪自拍挑戰', '一起拍3分鐘的有趣照片', '3分鐘', true, 1),
-          ('playful', '看短影片', '一起看一小段有趣的影片', '10分鐘', true, 2),
-          ('playful', '小遊戲時光', '玩一局簡單的手機遊戲', '15分鐘', true, 3),
-          ('playful', '唱歌給對方聽', '為對方哼唱一首喜歡的歌', '5分鐘', true, 4),
-          ('companionship', '一起泡茶', '準備一壺茶，安靜地享受', '15分鐘', true, 1),
-          ('companionship', '準備小點心', '為對方準備喜歡的小零食', '10分鐘', true, 2),
-          ('companionship', '看夜景', '一起到窗邊或陽台看風景', '10分鐘', true, 3),
-          ('companionship', '規劃小旅行', '討論下次想一起去的地方', '20分鐘', true, 4)
-        `);
-
-        logInfo('Created alternative_intimacy_options table with default data');
-        
-        // Now fetch the data
-        return await db.query(`
-          SELECT id, category, title, description, estimated_duration, sort_order
-          FROM alternative_intimacy_options 
-          ORDER BY category, sort_order, title
-        `);
-      }
-      throw error;
-    });
+    `);
 
     // Group options by category
     const grouped = {
@@ -1698,29 +1551,6 @@ router.get('/alternative-intimacy-options', async (req, res) => {
   }
 });
 
-// Ensure-on-first-call: the `event_id` column was added later for the events
-// × 破冰 deep-link. Older deployments may not have it yet, and the events
-// route only adds it when an event is actually created. Run an idempotent
-// ALTER once per process so the SELECT below doesn't 500.
-let notificationsEventIdEnsured = false;
-async function ensureNotificationsEventIdColumn() {
-  if (notificationsEventIdEnsured) return;
-  try {
-    await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS event_id UUID`);
-    // couple_id (migration 092) lets a notification deep-link to a specific
-    // couple — ensured here alongside event_id so the GET query can always
-    // select it, even on a DB that hasn't run the migration yet.
-    await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS couple_id UUID`);
-    // target_id / target_reply_id (migration 103) point at the exact wall post,
-    // reply or 記錄 so a tap in 通知中心 lands on it.
-    await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS target_id TEXT`);
-    await db.query(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS target_reply_id TEXT`);
-    notificationsEventIdEnsured = true;
-  } catch (err) {
-    logWarn('ensureNotificationsEventIdColumn failed', { err: err.message });
-  }
-}
-
 // Get notifications for user
 router.get('/notifications', async (req, res) => {
   try {
@@ -1729,9 +1559,7 @@ router.get('/notifications', async (req, res) => {
 
     logInfo('Getting notifications', { userId, type: notification_type || 'all', is_read, limit });
 
-    await ensureNotificationsEventIdColumn();
 
-    // Check if notifications table exists, if not create it
     const result = await db.query(`
       SELECT
         n.id, n.notification_type, n.title, n.content,
@@ -1746,43 +1574,7 @@ router.get('/notifications', async (req, res) => {
         AND ($3::boolean IS NULL OR n.is_read = $3)
       ORDER BY n.created_at DESC
       LIMIT $4 OFFSET $5
-    `, [userId, notification_type || null, is_read === 'true' ? true : is_read === 'false' ? false : null, parseInt(limit), parseInt(offset)]).catch(async (error) => {
-      if (error.message.includes('relation "notifications" does not exist')) {
-        logInfo('Creating notifications table');
-        
-        // Create the notifications table
-        await db.query(`
-          CREATE TABLE IF NOT EXISTS notifications (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-            notification_type VARCHAR(50) NOT NULL,
-            title VARCHAR(200) NOT NULL,
-            content TEXT NOT NULL,
-            intimacy_request_id UUID REFERENCES intimacy_requests(id) ON DELETE CASCADE,
-            event_id UUID,
-            couple_id UUID,
-            target_id TEXT,
-            target_reply_id TEXT,
-            related_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-            is_read BOOLEAN NOT NULL DEFAULT FALSE,
-            read_at TIMESTAMP WITH TIME ZONE,
-            created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-            priority INTEGER NOT NULL DEFAULT 1
-          );
-          
-          CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
-          CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(notification_type);
-          CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, is_read);
-          CREATE INDEX IF NOT EXISTS idx_notifications_created ON notifications(created_at);
-        `);
-
-        logInfo('Notifications table created');
-        
-        // Return empty result since table was just created
-        return { rows: [] };
-      }
-      throw error;
-    });
+    `, [userId, notification_type || null, is_read === 'true' ? true : is_read === 'false' ? false : null, parseInt(limit), parseInt(offset)]);
 
     const notifications = result.rows.map(row => ({
       id: row.id,

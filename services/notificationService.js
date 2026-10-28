@@ -65,39 +65,6 @@ const CATALOG = {
   profile_updated: { emoji: '👤', verb: '更新了個人資料', fallback: '打開 App 看看 TA 的更新' },
 };
 
-// Lazy-ensure the notifications table exists. Mirrors the defensive creation in
-// routes/events.js / routes/intimacy-requests.js so this service works even on
-// an environment where migration 009 hasn't run. Runs its DDL once per process.
-let tableEnsured = false;
-async function ensureNotificationsTable() {
-  if (tableEnsured) return;
-  try {
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS notifications (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        notification_type VARCHAR(50) NOT NULL,
-        title VARCHAR(200) NOT NULL,
-        content TEXT NOT NULL,
-        intimacy_request_id UUID,
-        related_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
-        is_read BOOLEAN NOT NULL DEFAULT FALSE,
-        read_at TIMESTAMP WITH TIME ZONE,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        priority INTEGER NOT NULL DEFAULT 1
-      );
-    `);
-    await db.query(`
-      ALTER TABLE notifications
-        ADD COLUMN IF NOT EXISTS target_id TEXT,
-        ADD COLUMN IF NOT EXISTS target_reply_id TEXT;
-    `);
-    tableEnsured = true;
-  } catch (err) {
-    logWarn('ensureNotificationsTable failed', { err: err.message });
-  }
-}
-
 // Resolve the acting user's partner id via the standard couples CASE idiom.
 // Returns null for solo / unpaired couples (user2_id IS NULL) → callers no-op.
 async function getPartnerId(userId) {
@@ -151,7 +118,6 @@ async function notifyPartnerAction({ actorId, type, content = null, priority, ta
     const prio = priority || entry.priority || 1;
 
     // 1) In-app notification row (always written, best-effort).
-    await ensureNotificationsTable();
     try {
       await db.query(
         `INSERT INTO notifications (user_id, notification_type, title, content, related_user_id, priority, target_id)
@@ -195,6 +161,5 @@ async function notifyPartnerAction({ actorId, type, content = null, priority, ta
 module.exports = {
   notifyPartnerAction,
   getPartnerId,
-  ensureNotificationsTable,
   CATALOG,
 };

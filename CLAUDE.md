@@ -95,6 +95,15 @@ a method that calls the LLM, grep the endpoint for `AI_TIMEOUT` and make sure it
 there. (This was the 產生話題建議 timeout bug: `getTherapyTopics` was a GET AI
 call with no timeout override.)
 
+## Schema changes go in migrations only
+
+Every table, column and index is created by a numbered file in
+`database/migrations/` (CI and deploy run `npm run migrate` first). Never add
+runtime DDL (`CREATE TABLE IF NOT EXISTS`, `ALTER TABLE`, an `ensure…Table()`
+helper) to routes or services: it costs DB round trips on request paths, takes
+table locks, and hides schema that the migrations never got — migration 105 had
+to backfill four objects that only existed that way.
+
 ## UX conventions (every UI change)
 
 Read `docs/UX_PLAYBOOK.md` before UI work — it holds the binding UX rules and

@@ -558,32 +558,6 @@ router.get('/analytics', async (req, res) => {
 // therapist a ready summary so the session starts on the real issue.
 // ---------------------------------------------------------------------------
 
-let therapySummariesTableReady = false; // DDL is idempotent; run it once per process, not per request
-async function ensureTherapySummariesTable() {
-  if (therapySummariesTableReady) return;
-  try {
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS therapy_summaries (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        couple_id UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
-        period_days INTEGER NOT NULL,
-        input_hash VARCHAR(64) NOT NULL,
-        summary JSONB NOT NULL,
-        event_count INTEGER,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        UNIQUE (couple_id, input_hash)
-      );
-    `);
-    // event_count added later so past summaries can list "共 N 件事件" in history.
-    await db.query(
-      `ALTER TABLE therapy_summaries ADD COLUMN IF NOT EXISTS event_count INTEGER`
-    );
-    therapySummariesTableReady = true;
-  } catch (err) {
-    logWarn('ensureTherapySummariesTable failed', { err: err.message });
-  }
-}
-
 function periodLabelFor(days) {
   return Number(days) === 14 ? '最近兩週' : `最近 ${days} 天`;
 }
@@ -664,7 +638,6 @@ router.get(
       ]);
       const inputHash = aiCacheHash(['therapy_summary_v1', days, fingerprint]);
 
-      await ensureTherapySummariesTable();
       const cached = await db.query(
         `SELECT summary FROM therapy_summaries WHERE couple_id = $1 AND input_hash = $2`,
         [coupleId, inputHash]
@@ -748,27 +721,6 @@ router.get(
 // just one fight. Below this, the empty state guides them to keep going.
 const COMMUNICATION_PATTERN_MIN_EVENTS = 2;
 
-let communicationPatternsTableReady = false; // DDL is idempotent; run it once per process, not per request
-async function ensureCommunicationPatternsTable() {
-  if (communicationPatternsTableReady) return;
-  try {
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS communication_pattern_summaries (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        couple_id UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
-        input_hash VARCHAR(64) NOT NULL,
-        summary JSONB NOT NULL,
-        event_count INTEGER,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        UNIQUE (couple_id, input_hash)
-      );
-    `);
-    communicationPatternsTableReady = true;
-  } catch (err) {
-    logWarn('ensureCommunicationPatternsTable failed', { err: err.message });
-  }
-}
-
 // GET /api/events/communication-pattern — the couple's recurring 溝通模式 across
 // their recent resolved conflicts. Shared + cached; regenerates when the set of
 // resolved events (or their therapy notes) changes.
@@ -843,7 +795,6 @@ router.get('/communication-pattern', async (req, res) => {
     ]);
     const inputHash = aiCacheHash(['communication_pattern_v1', fingerprint]);
 
-    await ensureCommunicationPatternsTable();
     const cached = await db.query(
       `SELECT summary FROM communication_pattern_summaries WHERE couple_id = $1 AND input_hash = $2`,
       [coupleId, inputHash]
@@ -913,7 +864,6 @@ router.get('/communication-pattern', async (req, res) => {
 // Shared by the couple's own /therapy-summary/history endpoint and the dedicated
 // therapist's read-only view (routes/therapists.js) so both see the same list.
 async function listTherapySummariesForCouple(coupleId) {
-  await ensureTherapySummariesTable();
   const result = await db.query(
     `SELECT id, period_days, event_count, summary, created_at
        FROM therapy_summaries
@@ -968,77 +918,6 @@ router.get('/therapy-summary/history', async (req, res) => {
 // widen the lookback and switch to quiet framing instead of thin results.
 const QUIET_EVENT_THRESHOLD = 3;
 const QUIET_WIDEN_DAYS = 60;
-
-let therapyTopicSuggestionsTableReady = false; // DDL is idempotent; run it once per process, not per request
-async function ensureTherapyTopicSuggestionsTable() {
-  if (therapyTopicSuggestionsTableReady) return;
-  try {
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS therapy_topic_suggestions (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        couple_id UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
-        period_days INTEGER NOT NULL,
-        applied_days INTEGER NOT NULL,
-        quiet BOOLEAN NOT NULL DEFAULT FALSE,
-        input_hash VARCHAR(64) NOT NULL,
-        topics JSONB NOT NULL,
-        event_count INTEGER,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        UNIQUE (couple_id, input_hash)
-      );
-    `);
-    therapyTopicSuggestionsTableReady = true;
-  } catch (err) {
-    logWarn('ensureTherapyTopicSuggestionsTable failed', { err: err.message });
-  }
-}
-
-let therapyTopicSelectionsTableReady = false; // DDL is idempotent; run it once per process, not per request
-async function ensureTherapyTopicSelectionsTable() {
-  if (therapyTopicSelectionsTableReady) return;
-  try {
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS therapy_topic_selections (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        couple_id UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
-        input_hash VARCHAR(64) NOT NULL,
-        topic_index INTEGER NOT NULL,
-        status VARCHAR(16) CHECK (status IS NULL OR status IN ('selected', 'saved', 'dismissed')),
-        notes TEXT,
-        updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        UNIQUE (couple_id, input_hash, topic_index),
-        FOREIGN KEY (couple_id, input_hash)
-          REFERENCES therapy_topic_suggestions (couple_id, input_hash) ON DELETE CASCADE
-      );
-    `);
-    therapyTopicSelectionsTableReady = true;
-  } catch (err) {
-    logWarn('ensureTherapyTopicSelectionsTable failed', { err: err.message });
-  }
-}
-
-let therapyTopicLibrarySelectionsTableReady = false; // DDL is idempotent; run it once per process, not per request
-async function ensureTherapyTopicLibrarySelectionsTable() {
-  if (therapyTopicLibrarySelectionsTableReady) return;
-  try {
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS therapy_topic_library_selections (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        couple_id UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
-        topic_id VARCHAR(64) NOT NULL,
-        status VARCHAR(16) CHECK (status IS NULL OR status IN ('selected', 'saved', 'dismissed')),
-        notes TEXT,
-        updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        UNIQUE (couple_id, topic_id)
-      );
-    `);
-    therapyTopicLibrarySelectionsTableReady = true;
-  } catch (err) {
-    logWarn('ensureTherapyTopicLibrarySelectionsTable failed', { err: err.message });
-  }
-}
 
 // selections rows -> { [topicIndex]: {status, notes, updatedAt} } (or keyed by topic_id for the library)
 function selectionsByKey(rows, keyField) {
@@ -1148,8 +1027,6 @@ router.get(
       ]);
       const inputHash = aiCacheHash(['therapy_topics_v1', appliedDays, quiet, fingerprint]);
 
-      await ensureTherapyTopicSuggestionsTable();
-      await ensureTherapyTopicSelectionsTable();
       const cached = await db.query(
         `SELECT topics FROM therapy_topic_suggestions WHERE couple_id = $1 AND input_hash = $2`,
         [coupleId, inputHash]
@@ -1260,7 +1137,6 @@ router.put(
       }
       const coupleId = couple.couple_id;
 
-      await ensureTherapyTopicSuggestionsTable();
       const suggestion = await db.query(
         `SELECT topics FROM therapy_topic_suggestions WHERE couple_id = $1 AND input_hash = $2`,
         [coupleId, inputHash]
@@ -1273,7 +1149,6 @@ router.put(
         return res.status(400).json({ success: false, message: '找不到這個話題' });
       }
 
-      await ensureTherapyTopicSelectionsTable();
       const statusParam = hasStatus ? (req.body.status ?? null) : null;
       const notesParam = hasNotes ? req.body.notes.toString().trim() : null;
       const result = await db.query(
@@ -1308,7 +1183,6 @@ router.get('/therapy-topics/library', async (req, res) => {
     const couple = await getCoupleForUser(userId);
     let selections = {};
     if (couple) {
-      await ensureTherapyTopicLibrarySelectionsTable();
       const sel = await db.query(
         `SELECT topic_id, status, notes, updated_at FROM therapy_topic_library_selections WHERE couple_id = $1`,
         [couple.couple_id]
@@ -1349,7 +1223,6 @@ router.put(
         return res.status(400).json({ success: false, error_code: 'NOT_PAIRED', message: '請先和另一半配對，才能標記話題庫的話題' });
       }
 
-      await ensureTherapyTopicLibrarySelectionsTable();
       const statusParam = hasStatus ? (req.body.status ?? null) : null;
       const notesParam = hasNotes ? req.body.notes.toString().trim() : null;
       const result = await db.query(
@@ -1387,7 +1260,6 @@ router.get('/therapy-topics/history', async (req, res) => {
       return res.json({ success: true, history: [] });
     }
 
-    await ensureTherapyTopicSuggestionsTable();
     const result = await db.query(
       `SELECT id, input_hash, period_days, applied_days, quiet, event_count, topics, created_at
          FROM therapy_topic_suggestions
@@ -1399,7 +1271,6 @@ router.get('/therapy-topics/history', async (req, res) => {
 
     let selectionsByHash = {};
     if (result.rows.length) {
-      await ensureTherapyTopicSelectionsTable();
       const hashes = result.rows.map((r) => r.input_hash);
       const sel = await db.query(
         `SELECT input_hash, topic_index, status, notes, updated_at
@@ -1444,8 +1315,6 @@ router.get('/therapy-topics/history', async (req, res) => {
 // recent generation the couple actually ENGAGED with (has ≥1 selection),
 // falling back to the newest generation when none is annotated yet.
 async function getLatestTherapyTopicsForCouple(coupleId) {
-  await ensureTherapyTopicSuggestionsTable();
-  await ensureTherapyTopicSelectionsTable();
   const latest = await db.query(
     `SELECT s.input_hash, s.period_days, s.applied_days, s.quiet, s.event_count, s.topics, s.created_at
        FROM therapy_topic_suggestions s
@@ -1471,7 +1340,6 @@ async function getLatestTherapyTopicsForCouple(coupleId) {
     selections = selectionsByKey(sel.rows, 'topic_index');
   }
 
-  await ensureTherapyTopicLibrarySelectionsTable();
   const librarySel = await db.query(
     `SELECT topic_id, status, notes, updated_at FROM therapy_topic_library_selections WHERE couple_id = $1`,
     [coupleId]

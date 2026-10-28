@@ -60,50 +60,6 @@ router.use(authenticateToken);
 // Generous cap — it exists to stop runaway inserts, not to ration the feature.
 const MAX_PLANS_PER_COUPLE = 50;
 
-// Belt-and-suspenders alongside migrations 101/102, for envs that haven't migrated.
-let tableEnsured = false;
-async function ensurePlansTable() {
-  if (tableEnsured) return;
-  try {
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS intimacy_alternative_plans (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        couple_id UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
-        request_id UUID REFERENCES intimacy_requests(id) ON DELETE SET NULL,
-        title VARCHAR(100) NOT NULL,
-        interaction TEXT,
-        time_prep TEXT,
-        script_id VARCHAR(128),
-        script_title VARCHAR(200),
-        script_scenario TEXT,
-        created_by UUID REFERENCES users(id) ON DELETE SET NULL,
-        updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
-        approved_by UUID[] NOT NULL DEFAULT '{}',
-        revision INTEGER NOT NULL DEFAULT 1,
-        disabled_at TIMESTAMP WITH TIME ZONE,
-        disabled_by UUID REFERENCES users(id) ON DELETE SET NULL,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-      )
-    `);
-    await db.query(`
-      CREATE INDEX IF NOT EXISTS idx_intimacy_alt_plans_couple
-        ON intimacy_alternative_plans(couple_id, updated_at DESC)
-    `);
-    // An env that only ran the first 101 lacks the script columns (migration
-    // 102) and still requires interaction — exactly what 500'd staging.
-    await db.query(`
-      ALTER TABLE intimacy_alternative_plans ADD COLUMN IF NOT EXISTS script_id VARCHAR(128);
-      ALTER TABLE intimacy_alternative_plans ADD COLUMN IF NOT EXISTS script_title VARCHAR(200);
-      ALTER TABLE intimacy_alternative_plans ADD COLUMN IF NOT EXISTS script_scenario TEXT;
-      ALTER TABLE intimacy_alternative_plans ALTER COLUMN interaction DROP NOT NULL;
-    `);
-    tableEnsured = true;
-  } catch (err) {
-    logWarn('intimacy_plans.ensure_table_failed', { err: err.message });
-  }
-}
-
 // The caller's complete couple, or null when unpaired / waiting for a partner.
 async function getCouple(userId) {
   const r = await db.query(
@@ -250,7 +206,6 @@ const quoted = (title) => (title ? `《${title}》` : null);
 router.get('/', async (req, res) => {
   const userId = req.user.id;
   try {
-    await ensurePlansTable();
     const couple = await getCouple(userId);
     if (!couple) return noCouple(res);
     const r = await db.query(
@@ -279,7 +234,6 @@ router.post('/', [
   if (validationFailed(req, res)) return;
   const userId = req.user.id;
   try {
-    await ensurePlansTable();
     const couple = await getCouple(userId);
     if (!couple) return noCouple(res);
     const interaction = nullableText(req.body.interaction) ?? null;
@@ -349,7 +303,6 @@ router.put('/:id', planFieldValidators(true), async (req, res) => {
   const userId = req.user.id;
   const planId = req.params.id;
   try {
-    await ensurePlansTable();
     const couple = await getCouple(userId);
     if (!couple) return noCouple(res);
     const existing = await loadPlan(planId, couple.id);
@@ -417,7 +370,6 @@ router.post('/:id/approve', [
   const userId = req.user.id;
   const planId = req.params.id;
   try {
-    await ensurePlansTable();
     const couple = await getCouple(userId);
     if (!couple) return noCouple(res);
     const existing = await loadPlan(planId, couple.id);
@@ -477,7 +429,6 @@ router.post('/:id/disable', async (req, res) => {
   const userId = req.user.id;
   const planId = req.params.id;
   try {
-    await ensurePlansTable();
     const couple = await getCouple(userId);
     if (!couple) return noCouple(res);
     const existing = await loadPlan(planId, couple.id);
@@ -515,7 +466,6 @@ router.post('/:id/reactivate', async (req, res) => {
   const userId = req.user.id;
   const planId = req.params.id;
   try {
-    await ensurePlansTable();
     const couple = await getCouple(userId);
     if (!couple) return noCouple(res);
     const existing = await loadPlan(planId, couple.id);

@@ -22,62 +22,6 @@ const MESSAGE_MAX = 2000;
 const AGENDA_MAX = 300;
 const NOTES_MAX = 20000;
 
-// Defensive table creation (mirrors database/migrations/098_dedicated_space.sql)
-// for environments where migrations haven't caught up. Runs once per process.
-let tablesEnsured = false;
-async function ensureTables() {
-  if (tablesEnsured) return;
-  try {
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS dedicated_messages (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        link_id UUID NOT NULL REFERENCES couple_therapists(id) ON DELETE CASCADE,
-        couple_id UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
-        sender_id UUID REFERENCES users(id) ON DELETE SET NULL,
-        is_therapist BOOLEAN NOT NULL DEFAULT FALSE,
-        content TEXT NOT NULL,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-      );
-      CREATE INDEX IF NOT EXISTS idx_dedicated_messages_link_created
-        ON dedicated_messages (link_id, created_at DESC);
-      CREATE TABLE IF NOT EXISTS dedicated_sessions (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        link_id UUID NOT NULL REFERENCES couple_therapists(id) ON DELETE CASCADE,
-        couple_id UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
-        notes TEXT NOT NULL DEFAULT '',
-        started_by UUID REFERENCES users(id) ON DELETE SET NULL,
-        updated_by UUID REFERENCES users(id) ON DELETE SET NULL,
-        started_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        ended_at TIMESTAMP WITH TIME ZONE
-      );
-      CREATE UNIQUE INDEX IF NOT EXISTS uniq_dedicated_sessions_open
-        ON dedicated_sessions (link_id) WHERE ended_at IS NULL;
-      CREATE INDEX IF NOT EXISTS idx_dedicated_sessions_link_started
-        ON dedicated_sessions (link_id, started_at DESC);
-      CREATE TABLE IF NOT EXISTS dedicated_agenda_items (
-        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-        link_id UUID NOT NULL REFERENCES couple_therapists(id) ON DELETE CASCADE,
-        couple_id UUID NOT NULL REFERENCES couples(id) ON DELETE CASCADE,
-        content TEXT NOT NULL,
-        source VARCHAR(16) NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'message', 'topic')),
-        source_message_id UUID REFERENCES dedicated_messages(id) ON DELETE SET NULL,
-        source_ref VARCHAR(200),
-        status VARCHAR(16) NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'discussed')),
-        session_id UUID REFERENCES dedicated_sessions(id) ON DELETE SET NULL,
-        created_by UUID REFERENCES users(id) ON DELETE SET NULL,
-        created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-      );
-      CREATE INDEX IF NOT EXISTS idx_dedicated_agenda_link
-        ON dedicated_agenda_items (link_id, status, created_at);
-    `);
-    tablesEnsured = true;
-  } catch (err) {
-    logWarn('dedicatedSpace.ensureTables failed', { err: err.message });
-  }
-}
-
 // Validation → 400 with the FIRST field's specific message (not a vague 驗證失敗).
 function sendValidationError(req, res) {
   const errors = validationResult(req);
@@ -90,7 +34,6 @@ function sendValidationError(req, res) {
 // Therapist path (req.params.coupleId): the caller must be that couple's active,
 // approved dedicated therapist. Couple path: the caller's couple must have one.
 async function resolveSpace(req, res) {
-  await ensureTables();
   const userId = req.user.id;
   if (req.params.coupleId) {
     const r = await db.query(
