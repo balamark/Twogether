@@ -1,5 +1,5 @@
 const express = require('express');
-const { logInfo, logError } = require('../lib/logger');
+const { logInfo, logWarn, logError } = require('../lib/logger');
 
 const QUIET = process.env.NODE_ENV === 'test' && process.env.LOG_VERBOSE !== '1';
 
@@ -7,6 +7,10 @@ const QUIET = process.env.NODE_ENV === 'test' && process.env.LOG_VERBOSE !== '1'
 // e.g. a custom roleplay script. Always summarized regardless of length.
 const ALWAYS_SUMMARIZE = new Set(['content', 'scenario', 'script']);
 const MAX_STRING = 200;
+
+// A request slower than this is logged as `slow_request` (warning) so Cloud
+// Logging can list the slow routes directly (docs/PERFORMANCE.md).
+const SLOW_REQUEST_MS = 1000;
 
 // Replace large/free-text string fields in a request body with a size
 // placeholder before logging, so Cloud Logging keeps the useful metadata
@@ -91,6 +95,20 @@ const requestLogger = (req, res, next) => {
       }
     } catch (error) {
       logError('Logging middleware (send) failed', { err: error.message, stack: error.stack });
+    }
+
+    // Server-Timing lets the client (src/utils/perf.ts) split a slow call into
+    // time spent in this process vs. network / cold start / queueing.
+    if (!res.headersSent) res.setHeader('Server-Timing', `app;dur=${duration}`);
+    if (duration > SLOW_REQUEST_MS) {
+      logWarn('slow_request', {
+        method: req.method,
+        path: req.path,
+        route: req.baseUrl + (req.route?.path || ''),
+        durationMs: duration,
+        status: res.statusCode,
+        userId: req.user?.id,
+      });
     }
 
     return originalSend.call(this, body);

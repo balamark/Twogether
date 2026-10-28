@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Send, Sparkles, RefreshCw, X, HelpCircle } from 'lucide-react';
 import apiService from '../services/api';
 import type { NudgeSuggestion } from '../services/api';
+import { useCachedQuery, userKey } from '../services/queryCache';
 import type { Notification } from '../App';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { useFeatureFlag } from '../contexts/FeatureFlagsContext';
@@ -67,48 +68,33 @@ interface IntimacyStats {
   average_duration_minutes?: number;
 }
 
+const EMPTY_RECORDS: IntimateRecord[] = [];
+
 export function AchievementsView() {
-  const [achievements, setAchievements] = useState<AchievementStats | null>(null);
-  const [stats, setStats] = useState<IntimacyStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  // Fetch all records for badge logic
-  const [records, setRecords] = useState<IntimateRecord[]>([]);
-  const tz = useTimezone();
-  useEffect(() => {
-    (async () => {
-      try {
-        const recs = await apiService.getIntimateRecords();
-        setRecords(recs);
-      } catch (error) {
-        console.error('Failed to load intimate records:', error);
-        // Keep empty array if API fails
-      }
-    })();
-  }, []);
-
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  // Cached across visits (src/services/queryCache.ts): revisiting 成長 paints
+  // the last numbers instantly and refreshes them in the background.
+  const overview = useCachedQuery<{ achievements: AchievementStats | null; stats: IntimacyStats }>(
+    userKey('/achievements', 'overview'),
+    async () => {
       const [achievementsData, statsData] = await Promise.all([
         apiService.getAchievements(),
         apiService.getStats(),
       ]);
-      const achievementsPayload = achievementsData as { stats?: AchievementStats };
-      setAchievements(achievementsPayload.stats ?? null);
-      setStats(statsData as IntimacyStats);
-    } catch (err: unknown) {
-      console.error('Failed to load achievements and stats:', err);
-      setError((err as Error)?.message || tr('載入數據失敗', 'Couldn\'t load the data'));
-    } finally {
-      setLoading(false);
-    }
-  };
+      return {
+        achievements: (achievementsData as { stats?: AchievementStats }).stats ?? null,
+        stats: statsData as IntimacyStats,
+      };
+    },
+  );
+  const achievements = overview.data?.achievements ?? null;
+  const stats = overview.data?.stats ?? null;
+  const loading = overview.loading;
+  const error = overview.error ? (overview.error.message || tr('載入數據失敗', 'Couldn\'t load the data')) : null;
+  const loadData = overview.refetch;
+  // All records for badge logic. Best-effort: empty if the API fails.
+  const recordsQuery = useCachedQuery<IntimateRecord[]>(userKey('/love-moments', 'all'), () => apiService.getIntimateRecords());
+  const records = recordsQuery.data ?? EMPTY_RECORDS;
+  const tz = useTimezone();
 
 
   // Calculate current week/month statistics

@@ -127,3 +127,12 @@ FAQ+(?) help system, visible AI quota). Non-negotiables from it:
   raise a notification; only interrupt for money, destructive, or auth decisions.
 - **One blocking modal at a time**; priority order lives in the playbook §R4.
   Every modal needs a "稍後再說" that doesn't re-fire the same session.
+
+## Page speed (every view / data-loading change)
+
+Tab switches and 上一頁 must feel instant. Load view data through
+`useCachedQuery` / `useCachedState` (`src/services/queryCache.ts`) so a revisit
+paints from memory, show list images via `thumbSrc()` thumbnails, and check
+`node scripts/perf/measure-pages.mjs --mobile` before/after. Budgets, logs
+(`client.perf_*`, `slow_request`, `slow_query`) and queries live in
+`docs/PERFORMANCE.md`.

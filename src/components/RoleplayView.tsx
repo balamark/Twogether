@@ -10,7 +10,8 @@ import MarketplaceScriptDetail from './MarketplaceScriptDetail';
 import PetalSelect from './PetalSelect';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatYmdInTz, formatDate } from '../utils/datetime';
-import { scriptHasUnresolvedGenderTokens, isVideoUrl } from '../utils/script';
+import { scriptHasUnresolvedGenderTokens, isVideoUrl, thumbSrc } from '../utils/script';
+import { useCachedQuery, userKey } from '../services/queryCache';
 import { tr, dateLocale } from '../i18n/tr';
 
 interface RoleplayScript {
@@ -157,6 +158,8 @@ const ViewToggle: React.FC<{
   </div>
 );
 
+const EMPTY_MARKET: MarketplaceScript[] = [];
+
 const RoleplayView: React.FC<RoleplayViewProps> = ({
   defaultRoleplayScripts,
   customScripts,
@@ -232,8 +235,6 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
 
   // Marketplace state — discoverable public scripts shared by other users.
   const [mainTab, setMainTab] = useState<'mine' | 'marketplace' | 'games'>('mine');
-  const [marketplaceScripts, setMarketplaceScripts] = useState<MarketplaceScript[]>([]);
-  const [marketplaceLoading, setMarketplaceLoading] = useState(false);
   const [marketplaceSort, setMarketplaceSort] = useState<'rating' | 'recent' | 'popular'>('rating');
   const [marketplaceCategory, setMarketplaceCategory] = useState<'all' | RoleplayScript['category']>('all');
   // Server-side text search (title / scenario / location) — debounced so we
@@ -245,45 +246,40 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     return () => clearTimeout(t);
   }, [marketplaceQuery]);
   const [marketplaceDetailId, setMarketplaceDetailId] = useHistoryState<string | null>('roleplay:market', null, { scrollTop: false });
-  const [favoritedMarketplace, setFavoritedMarketplace] = useState<MarketplaceScript[]>([]);
-
-  const loadMarketplace = useCallback(async () => {
-    setMarketplaceLoading(true);
-    try {
-      const list = await apiService.getMarketplaceScripts({
-        sort: marketplaceSort,
-        category: marketplaceCategory === 'all' ? undefined : marketplaceCategory,
-        q: debouncedMarketplaceQuery || undefined,
-        limit: 60,
-      });
-      setMarketplaceScripts(list);
-    } catch (err) {
-      showNotification({
-        type: 'error',
-        title: tr('無法載入創作市集', 'Couldn\'t load the creator marketplace'),
-        message: (err as Error)?.message || tr('請稍後再試', 'Please try again in a moment'),
-        duration: 4000,
-      });
-    } finally {
-      setMarketplaceLoading(false);
-    }
-  }, [marketplaceSort, marketplaceCategory, debouncedMarketplaceQuery, showNotification]);
-
-  const loadFavoritedMarketplace = useCallback(async () => {
-    try {
-      const list = await apiService.getFavoritedMarketplaceScripts();
-      setFavoritedMarketplace(list);
-    } catch {
-      // Quiet fail — the section just stays empty.
-    }
-  }, []);
-
+  // Both lists are cached (src/services/queryCache.ts): returning to 劇本 or
+  // switching back to 市集 paints the last list instantly, refreshed quietly.
+  const marketplace = useCachedQuery<MarketplaceScript[]>(
+    mainTab === 'marketplace' ? userKey('/marketplace', 'list', marketplaceSort, marketplaceCategory, debouncedMarketplaceQuery) : null,
+    () => apiService.getMarketplaceScripts({
+      sort: marketplaceSort,
+      category: marketplaceCategory === 'all' ? undefined : marketplaceCategory,
+      q: debouncedMarketplaceQuery || undefined,
+      limit: 60,
+    }),
+  );
+  const marketplaceScripts = marketplace.data ?? EMPTY_MARKET;
+  const marketplaceLoading = marketplace.loading && mainTab === 'marketplace';
+  const loadMarketplace = marketplace.refetch;
   useEffect(() => {
-    if (mainTab === 'marketplace') loadMarketplace();
-  }, [mainTab, loadMarketplace]);
+    if (!marketplace.error) return;
+    showNotification({
+      type: 'error',
+      title: tr('無法載入創作市集', 'Couldn\'t load the creator marketplace'),
+      message: marketplace.error.message || tr('請稍後再試', 'Please try again in a moment'),
+      duration: 4000,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [marketplace.error]);
 
+  // Quiet on failure — the section just stays empty.
+  const favorited = useCachedQuery<MarketplaceScript[]>(userKey('/marketplace', 'favorites'), () => apiService.getFavoritedMarketplaceScripts());
+  const favoritedMarketplace = favorited.data ?? EMPTY_MARKET;
+  const loadFavoritedMarketplace = favorited.refetch;
+  // Re-check when the favorites set changes (not on mount — the hook loads).
+  const favIdsMounted = useRef(false);
   useEffect(() => {
-    loadFavoritedMarketplace();
+    if (!favIdsMounted.current) { favIdsMounted.current = true; return; }
+    void loadFavoritedMarketplace();
   }, [loadFavoritedMarketplace, favoriteScriptIds]);
 
   useScrollLock(showScriptModal && !!selectedScript);
@@ -529,7 +525,10 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   // to 'contain' so the full image is always visible — never crop images (see
   // CLAUDE.md). The slot background (bg-petal-cream-2) shows behind contained
   // images that don't match the slot's aspect ratio.
-  const renderThumb = (script: RoleplayScript, className: string, fit: 'cover' | 'contain' = 'contain') => {
+  // `variant: 'card'` (default) loads the small thumbnail when one exists; the
+  // detail modal passes 'full'. Card images are lazy so an off-screen grid
+  // doesn't compete with what the user is looking at.
+  const renderThumb = (script: RoleplayScript, className: string, fit: 'cover' | 'contain' = 'contain', variant: 'card' | 'full' = 'card') => {
     if (!script.image) {
       return <ScriptThumbPlaceholder category={script.category} title={script.title} className={className} />;
     }
@@ -558,13 +557,23 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
         </>
       );
     }
+    const full = script.image;
+    const thumb = variant === 'card' ? thumbSrc(full) : null;
     return (
       <>
         <img
-          src={script.image}
+          src={thumb ?? full}
           alt={script.title}
+          loading={variant === 'card' ? 'lazy' : undefined}
+          decoding="async"
           className={`${className} ${fitClass}`}
           onError={(e) => {
+            // No thumbnail for this cover (uploaded before thumbnails existed)
+            // → fall back to the full image before giving up.
+            if (thumb && e.currentTarget.getAttribute('src') !== full) {
+              e.currentTarget.setAttribute('src', full);
+              return;
+            }
             e.currentTarget.style.display = 'none';
             (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'flex';
           }}
@@ -1284,7 +1293,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                   />
                 )
               ) : (
-                renderThumb(selectedScript, 'w-full h-full', 'contain')
+                renderThumb(selectedScript, 'w-full h-full', 'contain', 'full')
               )}
               {lightboxPhotos.length > 1 && (
                 <>

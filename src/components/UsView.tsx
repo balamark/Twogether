@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Heart, Sprout, Sparkles, BookOpen, PlusCircle, ChevronRight, Eye, Gift, MessageCircleHeart, Wrench, Users } from 'lucide-react';
 import InfoHint from './InfoHint';
-import { apiService, type RelationshipSummary } from '../services/api';
+import { useRelationshipSummary } from '../hooks/usePageData';
 import { trackAction } from '../utils/track';
 import { POSITIVE_INTERACTION_ACTIONS } from '../content/positiveInteractions';
 import { tr } from '../i18n/tr';
@@ -18,14 +18,7 @@ interface UsViewProps {
 // exactly which interactions earned each +1. Hidden for solo users, who have
 // nothing shared to total up yet.
 const LoveSavings: React.FC<{ onNavigate: (view: string) => void }> = ({ onNavigate }) => {
-  const [summary, setSummary] = useState<RelationshipSummary | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    apiService.getRelationshipSummary()
-      .then((s) => { if (!cancelled) setSummary(s); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
+  const { data: summary } = useRelationshipSummary();
 
   if (!summary?.paired) return null;
   const pos = summary.positive14 ?? 0;

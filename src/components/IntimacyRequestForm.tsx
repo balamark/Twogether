@@ -15,6 +15,7 @@ import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime, localInputToIsoInTz } from '../utils/datetime';
 import { getTimezoneShortLabel } from '../utils/timezone-options';
 import { tr } from '../i18n/tr';
+import { thumbSrc } from '../utils/script';
 import { useAlternativePlanSamples } from '../data/alternativePlanSamples';
 
 // Minimal shape we need from a roleplay script — structurally satisfied by both
@@ -773,7 +774,17 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                     >
                       <div className="w-16 h-16 flex-shrink-0 rounded-md bg-petal-cream-2 overflow-hidden flex items-center justify-center">
                         {script.image ? (
-                          <img src={script.image} alt={script.title} className="w-full h-full object-contain" />
+                          <img
+                            src={thumbSrc(script.image) ?? script.image}
+                            alt={script.title}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-contain"
+                            onError={(e) => {
+                              // Older uploads have no thumbnail — use the full cover.
+                              if (e.currentTarget.getAttribute('src') !== script.image) e.currentTarget.setAttribute('src', script.image!);
+                            }}
+                          />
                         ) : (
                           <span className="text-2xl">🎭</span>
                         )}

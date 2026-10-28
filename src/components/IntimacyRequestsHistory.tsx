@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Calendar, Inbox, Send, ListChecks } from 'lucide-react';
+import { Calendar, Inbox, Send, ListChecks, RefreshCw } from 'lucide-react';
 import apiService from '../services/api';
 import type { IntimacyRequest, IntimacyRequestStats, IntimacyRequestNudge } from '../services/api';
 import IntimacyRequestDetailModal from './IntimacyRequestDetailModal';
@@ -10,6 +10,7 @@ import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
 import { tr } from '../i18n/tr';
 import { useHistoryState } from '../hooks/useHistoryState';
+import { useCachedQuery } from '../services/queryCache';
 
 interface User {
   id: string;
@@ -42,12 +43,11 @@ interface IntimacyRequestsHistoryProps {
 type FeedbackState = { type: 'success' | 'error'; message: string };
 type Tab = 'received' | 'sent' | 'plans';
 
+type HistoryData = { items: IntimacyRequest[]; stats: IntimacyRequestStats; nudge: IntimacyRequestNudge };
+
+const EMPTY_ITEMS: IntimacyRequest[] = [];
+
 export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = ({ authState, partnerNickname, onViewScript, onSendInvite, scripts, requestedTab, onRequestedTabConsumed }) => {
-  const [items, setItems] = useState<IntimacyRequest[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<IntimacyRequestStats | null>(null);
-  const [nudge, setNudge] = useState<IntimacyRequestNudge | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailFeedback, setEmailFeedback] = useState<FeedbackState | null>(null);
   const [tab, setTab] = useState<Tab>('received');
@@ -60,36 +60,30 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
   const meId = authState.user?.id || '';
   const tz = useTimezone();
 
-  const fetchAll = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const [all, statsResponse] = await Promise.all([
+  // Cached (src/services/queryCache.ts): coming back to this page paints the
+  // last list instantly and refreshes in the background, instead of a spinner
+  // — and a slow server can no longer blank a page you've already seen.
+  const history = useCachedQuery<HistoryData>(
+    authState.isAuthenticated && meId ? `/intimacy-requests|history|${meId}` : null,
+    async () => {
+      const [items, statsResponse] = await Promise.all([
         apiService.getIntimacyRequests(),
         apiService.getIntimacyRequestStats(),
       ]);
-      setItems(all);
-      setStats(statsResponse.statistics);
-      setNudge(statsResponse.nudge);
-    } catch (e) {
-      setError((e as Error)?.message || tr('載入失敗', 'Couldn\'t load'));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      return { items, stats: statsResponse.statistics, nudge: statsResponse.nudge };
+    },
+  );
+  const items = history.data?.items ?? EMPTY_ITEMS;
+  const stats = history.data?.stats ?? null;
+  const nudge = history.data?.nudge ?? null;
+  const loading = history.loading;
+  const error = history.error ? (history.error.message || tr('載入失敗', 'Couldn\'t load')) : null;
+  const refetch = history.refetch;
 
   useEffect(() => {
-    if (!authState.isAuthenticated) {
-      setItems([]);
-      setStats(null);
-      setNudge(null);
-      setEmailFeedback(null);
-      setSendingEmail(false);
-      return;
-    }
     setEmailFeedback(null);
-    fetchAll();
-  }, [authState.isAuthenticated, fetchAll]);
+    setSendingEmail(false);
+  }, [authState.isAuthenticated]);
 
   const { sent, received } = useMemo(() => {
     const s: IntimacyRequest[] = [];
@@ -180,7 +174,17 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
         </div>
       )}
       {error && (
-        <div className="text-center font-display italic text-petal-rose-deep">{error}</div>
+        <div className="text-center space-y-3" role="alert">
+          <p className="font-display italic text-petal-rose-deep">{error}</p>
+          <button
+            type="button"
+            onClick={() => void refetch()}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-petal-rule font-body text-sm text-petal-ink hover:bg-petal-cream-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            {tr('重新載入', 'Try again')}
+          </button>
+        </div>
       )}
 
       {!loading && !error && (
@@ -263,7 +267,7 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
         onClose={() => setDetailOpenId(null)}
         onResponded={() => {
           setDetailOpenId(null);
-          fetchAll();
+          void refetch();
         }}
         onViewScript={onViewScript}
       />

@@ -1,6 +1,9 @@
 import axios from 'axios';
 import { formatYmdInTz, browserTz } from '../utils/datetime';
 import { setLastRequestId } from '../utils/telemetry';
+import { startApiTimer, recordApiTiming } from '../utils/perf';
+import { clearQueryCache, invalidateQueries } from './queryCache';
+import { cachingAdapter, clearResponseCache } from './responseCache';
 import { tr, getLocale } from '../i18n/tr';
 
 // Opt a single request OUT of the global `billing:limit-reached` → paywall
@@ -12,6 +15,8 @@ import { tr, getLocale } from '../i18n/tr';
 declare module 'axios' {
   export interface AxiosRequestConfig {
     skipBillingRedirect?: boolean;
+    /** Set on the one automatic retry of a failed GET (see the interceptor). */
+    _retried?: boolean;
   }
 }
 
@@ -1387,6 +1392,9 @@ const AUTH_STORAGE_KEYS = ['authToken', 'authUser', 'authState', 'authTokenExpir
 
 export const clearAuthStorage = (): void => {
   AUTH_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+  // Signed out → drop every cached page so the next account starts clean.
+  clearQueryCache();
+  clearResponseCache();
 };
 
 export type SessionExpiredReason = 'expired' | 'invalid' | 'manual';
@@ -1533,6 +1541,9 @@ const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
+// Repeat GETs of page data answer from memory for a few seconds and share
+// in-flight requests (src/services/responseCache.ts).
+apiClient.defaults.adapter = cachingAdapter(axios.getAdapter(apiClient.defaults.adapter));
 
 // An LLM generation regularly runs past the 15s client default. The 諮商師
 // comment is the worst case: it can chain three sequential Claude calls
@@ -1585,25 +1596,62 @@ apiClient.interceptors.request.use(
     // Interface language → the server translates user-facing `message` fields
     // (middleware/locale.js) and lets AI replies follow the same language.
     config.headers['X-Locale'] = getLocale();
-    console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`, config.data);
-    return config;
+    // Dev only: logging every payload in production retained whole responses
+    // (photos lists, threads) in memory and cost main-thread time per call.
+    if (import.meta.env.DEV) console.log(`API Request: ${config.method?.toUpperCase()} ${config.url}`, config.data);
+    return startApiTimer(config);
   },
   (error) => {
     console.error('Request interceptor error:', error);
     return Promise.reject(error);
-  }
+  },
+  // Synchronous: runs inside the apiClient.get() call, so perf's
+  // runInBackground() mark is still set when startApiTimer reads it.
+  { synchronous: true }
 );
 
 // Response interceptor for unified error handling
 apiClient.interceptors.response.use(
   (response) => {
     setLastRequestId(response.headers?.['x-request-id']);
-    console.log(`API Response: ${response.status} ${response.config.url}`, response.data);
+    recordApiTiming(response.config, response.status, response.headers?.['server-timing']);
+    // A successful write can change more than its own resource (an AI call
+    // spends quota, a wall post moves the activity feed and summary), so it
+    // marks every cached page stale — still painted instantly, but refreshed
+    // on the next visit — and drops the short-lived GET responses.
+    if ((response.config.method || 'get').toLowerCase() !== 'get') {
+      invalidateQueries('');
+      clearResponseCache();
+    }
+    if (import.meta.env.DEV) console.log(`API Response: ${response.status} ${response.config.url}`, response.data);
     return response;
   },
   (error) => {
     setLastRequestId(error.response?.headers?.['x-request-id']);
     console.error('API Error:', error);
+
+    // A GET that got no response (timeout / dropped connection) is safe to
+    // repeat, and the usual cause is a cold or momentarily busy server
+    // instance that is warm by the time we ask again. Retry it once, quietly,
+    // before telling the user anything. Writes are never retried here — a
+    // repeated POST could duplicate the action.
+    const config = error.config;
+    const canceled = axios.isCancel(error) || error.code === 'ERR_CANCELED';
+    if (error.response) {
+      recordApiTiming(config, error.response.status, error.response.headers?.['server-timing']);
+    } else if (canceled) {
+      recordApiTiming(config, 'CANCELED');
+    } else if (config) {
+      const isTimeoutErr = error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT' || /timeout/i.test(error.message || '');
+      recordApiTiming(config, isTimeoutErr ? 'TIMEOUT' : 'NETWORK_ERROR');
+      // Only plain reads: a GET with a raised timeout (AI_TIMEOUT etc.) is an
+      // expensive generation, and repeating it would spend a second LLM call.
+      const plainRead = (config.method || 'get').toLowerCase() === 'get' && (config.timeout ?? 0) <= 15000;
+      if (plainRead && !config._retried) {
+        config._retried = true;
+        return apiClient(config);
+      }
+    }
 
     // The user hit "取消上傳" (AbortController.abort()) — not a failure, just
     // an intentional stop. Give it its own error_code so callers can treat it
@@ -1746,8 +1794,15 @@ apiClient.interceptors.response.use(
         error.code === 'ETIMEDOUT' ||
         /timeout/i.test(error.message || '');
       if (isTimeout) {
+        // A read can't have "gone through" — telling someone who only opened
+        // a page that their action may have been sent is confusing. Reads get
+        // their own message (already retried once above); writes keep the
+        // "maybe succeeded, don't resend" warning.
+        const isRead = (error.config?.method || 'get').toLowerCase() === 'get';
         const timeoutError = new Error(
-          tr('連線逾時。你的操作可能已經送出——請重新整理確認，先不要重複送出以免重複。', 'The connection timed out. Your action may already have gone through. Please refresh to check, and don\'t resend yet to avoid duplicates.')
+          isRead
+            ? tr('載入逾時：伺服器回應太慢，可能正在啟動。請稍候幾秒再試一次。', 'Loading timed out: the server is responding slowly and may be starting up. Please wait a few seconds and try again.')
+            : tr('連線逾時。你的操作可能已經送出——請重新整理確認，先不要重複送出以免重複。', 'The connection timed out. Your action may already have gone through. Please refresh to check, and don\'t resend yet to avoid duplicates.')
         ) as Error & { error_code?: string };
         timeoutError.error_code = 'TIMEOUT';
         throw timeoutError;

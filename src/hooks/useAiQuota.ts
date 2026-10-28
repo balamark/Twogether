@@ -1,24 +1,14 @@
-import { useCallback, useEffect, useState } from 'react';
-import { apiService, type AiUsageToday } from '../services/api';
+import { useCallback } from 'react';
+import { useAiUsageToday } from './usePageData';
 
-// Today's shared AI budget (docs/UX_PLAYBOOK.md P1-2): fetched once on mount;
-// call refresh() after any AI action so the「剩 N 次」hint stays honest.
+// Today's shared AI budget (docs/UX_PLAYBOOK.md P1-2). Cached across pages
+// (src/hooks/usePageData.ts) so the hint paints instantly; call refresh()
+// after any AI action so the「剩 N 次」hint stays honest.
 export function useAiQuota() {
-  const [quota, setQuota] = useState<AiUsageToday | null>(null);
-
+  const { data, error, refetch } = useAiUsageToday();
   const refresh = useCallback(() => {
-    apiService
-      .getAiUsageToday()
-      .then(setQuota)
-      .catch(() => {
-        // Hint is best-effort: a failed lookup just hides it.
-        setQuota(null);
-      });
-  }, []);
-
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  return { quota, refresh };
+    void refetch();
+  }, [refetch]);
+  // Hint is best-effort: a failed lookup with nothing cached just hides it.
+  return { quota: error && !data ? null : data ?? null, refresh };
 }

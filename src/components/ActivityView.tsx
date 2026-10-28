@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Activity } from 'lucide-react';
-import { apiService, type ActivityItem } from '../services/api';
+import type { ActivityItem } from '../services/api';
+import { useActivityFeed } from '../hooks/usePageData';
 import { formatDateTime } from '../utils/datetime';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { clientLog } from '../utils/telemetry';
@@ -37,37 +38,27 @@ function dotClass(type: ActivityItem['type']): string {
 // the profile dropdown.
 const ActivityView: React.FC<ActivityViewProps> = ({ showNotification }) => {
   const tz = useTimezone();
-  const [activities, setActivities] = useState<ActivityItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  // Shared cached feed with the 首頁 teaser (src/hooks/usePageData.ts).
+  const feed = useActivityFeed();
+  const activities = feed.data ?? [];
+  const loading = feed.loading;
+  const error = !!feed.error;
 
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(false);
-    apiService.getActivityFeed()
-      .then((items) => {
-        if (cancelled) return;
-        setActivities(items);
-        clientLog('activity.loaded', { count: items.length });
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        setError(true);
-        clientLog('activity.load_error', {
-          message: err instanceof Error ? err.message : String(err),
-        }, 'error');
-        showNotification({
-          type: 'warning',
-          title: tr('最近動態載入失敗', 'Couldn\'t load recent activity'),
-          message: tr('無法載入最近動態，請稍後再試。', 'Couldn\'t load recent activity. Please try again in a moment.'),
-          duration: 5000,
-        });
-      })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+    if (feed.data) clientLog('activity.loaded', { count: feed.data.length });
+  }, [feed.data]);
+
+  useEffect(() => {
+    if (!feed.error) return;
+    clientLog('activity.load_error', { message: feed.error.message }, 'error');
+    showNotification({
+      type: 'warning',
+      title: tr('最近動態載入失敗', 'Couldn\'t load recent activity'),
+      message: tr('無法載入最近動態，請稍後再試。', 'Couldn\'t load recent activity. Please try again in a moment.'),
+      duration: 5000,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [feed.error]);
 
   return (
     <div className="space-y-6 sm:space-y-10" data-testid="activity-view">
