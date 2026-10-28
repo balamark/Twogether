@@ -10,7 +10,7 @@ import MarketplaceScriptDetail from './MarketplaceScriptDetail';
 import PetalSelect from './PetalSelect';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatYmdInTz, formatDate } from '../utils/datetime';
-import { scriptHasUnresolvedGenderTokens, isVideoUrl } from '../utils/script';
+import { scriptHasUnresolvedGenderTokens, isVideoUrl, thumbSrc } from '../utils/script';
 import { tr, dateLocale } from '../i18n/tr';
 
 interface RoleplayScript {
@@ -529,7 +529,10 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   // to 'contain' so the full image is always visible — never crop images (see
   // CLAUDE.md). The slot background (bg-petal-cream-2) shows behind contained
   // images that don't match the slot's aspect ratio.
-  const renderThumb = (script: RoleplayScript, className: string, fit: 'cover' | 'contain' = 'contain') => {
+  // `variant: 'card'` (default) loads the small thumbnail when one exists; the
+  // detail modal passes 'full'. Card images are lazy so an off-screen grid
+  // doesn't compete with what the user is looking at.
+  const renderThumb = (script: RoleplayScript, className: string, fit: 'cover' | 'contain' = 'contain', variant: 'card' | 'full' = 'card') => {
     if (!script.image) {
       return <ScriptThumbPlaceholder category={script.category} title={script.title} className={className} />;
     }
@@ -558,13 +561,23 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
         </>
       );
     }
+    const full = script.image;
+    const thumb = variant === 'card' ? thumbSrc(full) : null;
     return (
       <>
         <img
-          src={script.image}
+          src={thumb ?? full}
           alt={script.title}
+          loading={variant === 'card' ? 'lazy' : undefined}
+          decoding="async"
           className={`${className} ${fitClass}`}
           onError={(e) => {
+            // No thumbnail for this cover (uploaded before thumbnails existed)
+            // → fall back to the full image before giving up.
+            if (thumb && e.currentTarget.getAttribute('src') !== full) {
+              e.currentTarget.setAttribute('src', full);
+              return;
+            }
             e.currentTarget.style.display = 'none';
             (e.currentTarget.nextElementSibling as HTMLElement)!.style.display = 'flex';
           }}
@@ -1284,7 +1297,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                   />
                 )
               ) : (
-                renderThumb(selectedScript, 'w-full h-full', 'contain')
+                renderThumb(selectedScript, 'w-full h-full', 'contain', 'full')
               )}
               {lightboxPhotos.length > 1 && (
                 <>

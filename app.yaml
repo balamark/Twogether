@@ -76,14 +76,17 @@ handlers:
     static_files: dist/assets/\1
     upload: dist/assets/(.*)
     secure: always
-    expiration: "1d"
+    # Vite content-hashes every file under /assets, so a changed file gets a
+    # new name — safe to cache for a year.
+    expiration: "365d"
     
   # Images with cache headers
   - url: /images/(.*)
     static_files: dist/images/\1
     upload: dist/images/(.*)
     secure: always
-    expiration: "1h"
+    # Roleplay covers etc. rarely change; 1h made every visit re-download them.
+    expiration: "7d"
     
   # Favicon and other root assets
   - url: /(.*\.(ico|png|svg))$

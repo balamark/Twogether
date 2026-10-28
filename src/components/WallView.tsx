@@ -34,6 +34,7 @@ import { isVideoUrl } from '../utils/script';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { tr } from '../i18n/tr';
 import { moodTagLabel } from '../content/moodTags';
+import { useCachedState } from '../services/queryCache';
 
 interface WallViewProps {
   authState: {
@@ -157,8 +158,10 @@ const WallView: React.FC<WallViewProps> = ({
   const templatesSeenKey = `wall_templates_seen_${userId || 'anon'}`;
   const tz = useTimezone();
 
-  const [posts, setPosts] = useState<WallPost[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Cached across visits (src/services/queryCache.ts): coming back to the wall
+  // paints the last posts instantly and refreshes them in the background.
+  const [posts, setPosts, postsCached] = useCachedState<WallPost[]>(userId ? `/wall|posts|${userId}` : null, [], 'wall');
+  const [loading, setLoading] = useState(!postsCached);
   const [filter, setFilter] = useState<WallFilter>('all');
   const [composerOpen, setComposerOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<WallPost | null>(null);
@@ -212,7 +215,7 @@ const WallView: React.FC<WallViewProps> = ({
         prev.map((p) => (ids.includes(p.id) && !p.partner_read_at ? { ...p, partner_read_at: now } : p))
       );
     }
-  }, []);
+  }, [setPosts]);
 
   const scheduleFlush = useCallback(() => {
     if (flushTimerRef.current !== null) window.clearTimeout(flushTimerRef.current);
@@ -314,7 +317,8 @@ const WallView: React.FC<WallViewProps> = ({
   };
 
   const loadPosts = useCallback(async () => {
-    setLoading(true);
+    // With cached posts on screen, refresh quietly instead of a spinner.
+    if (!postsCached) setLoading(true);
     try {
       const data = await apiService.getWallPosts();
       setPosts(data);
@@ -327,7 +331,7 @@ const WallView: React.FC<WallViewProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [showNotification]);
+  }, [showNotification, postsCached, setPosts]);
 
   useEffect(() => {
     loadPosts();

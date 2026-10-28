@@ -917,17 +917,17 @@ router.get('/', async (req, res) => {
 
     const whereClause = whereConditions.join(' AND ');
 
-    // Get total count
-    const countResult = await db.query(
+    // Count + page are independent — run them in parallel (migration 106
+    // indexes both sides of the sender/receiver OR).
+    const countPromise = db.query(
       `SELECT COUNT(*) as total FROM intimacy_requests ir WHERE ${whereClause}`,
-      params
+      [...params]
     );
-    const total = parseInt(countResult.rows[0].total);
 
     // Get requests with user info
     params.push(parseInt(limit), offset);
-    
-    const result = await db.query(`
+
+    const resultPromise = db.query(`
       SELECT
         ir.id, ir.message_content, ir.request_type, ir.roleplay_category,
         ir.script_title, ir.script_scenario,
@@ -944,6 +944,8 @@ router.get('/', async (req, res) => {
       ORDER BY ir.created_at DESC
       LIMIT $${paramIndex++} OFFSET $${paramIndex++}
     `, params);
+    const [countResult, result] = await Promise.all([countPromise, resultPromise]);
+    const total = parseInt(countResult.rows[0].total);
 
     const requests = result.rows.map(row => ({
       id: row.id,

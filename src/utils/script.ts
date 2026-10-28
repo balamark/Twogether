@@ -81,6 +81,22 @@ export function isVideoUrl(url: string | null | undefined): boolean {
   return /\.(mp4|webm|mov|m4v|quicktime)(?:[?#].*)?$/i.test(url);
 }
 
+// Small card-sized variant of a script cover. List cards used to load the full
+// cover (built-ins were 1–2MB PNGs, uploads 2048px JPEGs) just to paint a small
+// slot. Built-in covers have a pre-generated images/roleplay/thumb/*.webp
+// (scripts/generate-roleplay-thumbs.mjs); uploaded image covers get a
+// `<name>.thumb.webp` written next to them at upload (lib/media-upload.js).
+// Returns null when there's no thumbnail to try (videos, other URLs). Covers
+// uploaded before thumbnails existed 404 on the thumb — callers fall back to
+// the full URL on error.
+export function thumbSrc(url: string | null | undefined): string | null {
+  if (!url || isVideoUrl(url)) return null;
+  const builtIn = url.match(/^(\/?images\/roleplay\/)([^/]+)\.webp$/);
+  if (builtIn) return `${builtIn[1]}thumb/${builtIn[2]}.webp`;
+  if (/\/custom-script-thumbnails\/[^/?#]+\.jpg$/i.test(url)) return url.replace(/\.jpg$/i, '.thumb.webp');
+  return null;
+}
+
 // Distinct speaker names found in dialogue lines, in order of first
 // appearance. Placeholder tokens never match (the regex excludes brackets).
 export function detectScriptSpeakers(content: string): string[] {

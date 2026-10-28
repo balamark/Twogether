@@ -1328,7 +1328,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
           {/* Photo shown at its own aspect ratio (no forced crop / heavy border). */}
           <div className="mt-2 rounded-md border border-petal-rule bg-petal-cream-2 overflow-hidden">
             <img
-              src="/images/roleplay/reunion-love.png"
+              src="/images/roleplay/reunion-love.webp"
               alt={tr("範例貼文照片", 'Example post photo')}
               loading="lazy"
               className="w-full h-auto max-h-56 object-contain"

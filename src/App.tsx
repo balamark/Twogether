@@ -61,6 +61,7 @@ import EngineerTextEngine from './components/EngineerTextEngine';
 import { useScrollLock } from './hooks/useScrollLock';
 import { usePageTracking } from './hooks/usePageTracking';
 import { useHistoryState } from './hooks/useHistoryState';
+import { markNavigation } from './utils/perf';
 import { tr, dateLocale } from './i18n/tr';
 
 // The accept link for a just-sent pairing invite, surfaced so the inviter can
@@ -240,7 +241,7 @@ const defaultRoleplayScripts = [
     title: '粉絲與偶像：後台限定應援會',
     category: 'adventurous' as const,
     scenario: '演唱會結束後的後台更衣室，粉絲闖入的禁忌應援',
-    image: 'images/roleplay/fan.png',
+    image: 'images/roleplay/fan.webp',
     script: `[partner2]（滿臉興奮）：「天啊！是真的你……我居然能進來！」\n[partner1]（輕笑，擦汗）：「你怎麼拿到 backstage pass 的？這裡不是一般人可以來的地方。」\n[partner2]（低頭輕聲）：「我排了一整晚的隊，還偷偷賄賂了工作人員……因為我想告訴你一件事。」\n[partner1]（挑眉）：「你想告白？我每天收幾百封信，什麼都看過。」\n[partner2]（靠近一步）：「可你沒看過，我願意為你做的事。哪怕只是幫你擦汗，幫你按摩腳。」（此時可幫對方擦臉，脫掉外套）\n[partner1]（嘴角上揚）：「你是來當助理的？還是……想當更特別的粉絲？」\n（進入試探與誘惑階段，可選「說出你的幻想」「模仿偶像舞步」等）\n\n後續互動建議：\n- 偶像提出「粉絲任務」：念出應援口號＋親吻手背\n- 以身應援：跪下綁鞋帶，唱出最愛歌詞並用身體表現\n- 播放演唱會音效創造臨場感`,
     duration: '20-30分鐘'
   },
@@ -249,7 +250,7 @@ const defaultRoleplayScripts = [
     title: '人妻與老同學：重逢的夜晚',
     category: 'romantic' as const,
     scenario: '咖啡廳續攤到飯店房間，氣氛曖昧的重逢',
-    image: 'images/roleplay/coffee shop.png',
+    image: 'images/roleplay/coffee shop.webp',
     script: `[partner1]（輕鬆）：「沒想到妳變這麼漂亮。當年還是那個綁馬尾的書呆子。」\n[partner2]（微笑）：「你變得更……自信了。我還記得你以前坐我後面，總是借筆。」\n[partner1]（湊近些）：「我記得的不是筆，是妳背後的香味。」\n[partner2]（低頭）：「別鬧了……我現在可是人妻。」\n[partner1]（低語）：「但我不是你的丈夫。我是那個你當年錯過的人。」（可加入對視與肢體觸碰）\n\n後續引導：\n- 回憶遊戲：輪流說出大學時代對彼此的回憶\n- 「如果當年我有勇氣⋯⋯」接龍句，引導壓抑情感\n- 最終選擇：「今晚，就當回大學生，好嗎？」`,
     duration: '25-35分鐘'
   },
@@ -258,7 +259,7 @@ const defaultRoleplayScripts = [
     title: '攝影師與模特兒：寫真誘惑',
     category: 'adventurous' as const,
     scenario: '柔光攝影棚裡的寫真指導與凝視',
-    image: 'images/roleplay/model_cameramen.png',
+    image: 'images/roleplay/model_cameramen.webp',
     script: `[partner1]（專業）：「今天的主題是『慾望中的自己』，妳準備好了嗎？」\n[partner2]（緊張）：「這是我第一次拍這種風格……但我想試試看。」\n[partner1]（輕笑）：「放心，我會引導妳。先站到鏡子前，看著妳自己。」（慢慢脫去外衣，觀察肢體）\n[partner1]（低語）：「妳現在看到的，不是誰的老婆、誰的媽媽，只是妳自己——一個渴望被凝視的女人。」\n[partner2]（喘息）：「我從沒這樣看過我自己……好像，我突然開始喜歡這樣的我了。」\n\n後續互動建議：\n- 指導語：「轉身、抬頭、手放這裡……」\n- 「我看見了妳眼裡的慾望，現在妳也看看我。」\n- 最後拍下一張象徵性的照片（自拍或合影）作為紀念`,
     duration: '20-30分鐘'
   },
@@ -267,7 +268,7 @@ const defaultRoleplayScripts = [
     title: '初次相遇',
     category: 'romantic' as const,
     scenario: '在咖啡廳偶然相遇的陌生人',
-    image: 'images/roleplay/coffee shop.png',
+    image: 'images/roleplay/coffee shop.webp',
     script: `[partner1]: 不好意思，這個位子有人坐嗎？
 [partner2]: 沒有，請坐。你看起來很面熟，我們是不是在哪裡見過？
 [partner1]: 我也有這種感覺，也許是命運的安排。我叫[partner1]，你呢？
@@ -281,7 +282,7 @@ const defaultRoleplayScripts = [
     title: '辦公室秘密',
     category: 'adventurous' as const,
     scenario: '下班後的辦公室，只剩下你們兩個',
-    image: 'images/roleplay/office.png',
+    image: 'images/roleplay/office.webp',
     script: `[partner1]: 終於只剩我們兩個了，今天加班真累。
 [partner2]: 是啊，不過和你一起加班感覺還不錯。
 [partner1]: 我一直想找機會和你單獨聊聊...關於我們。
@@ -296,7 +297,7 @@ const defaultRoleplayScripts = [
     title: '禁忌誘惑',
     category: 'adventurous' as const,
     scenario: '朋友的聚會上，兩個不該在一起的人',
-    image: 'images/roleplay/party.png',
+    image: 'images/roleplay/party.webp',
     script: `[partner1]: 我們不應該在這裡...
 [partner2]: 我知道，但我忍不住。每次看到你，我就...
 [partner1]: 別人會看到的。我們是朋友的...
@@ -310,7 +311,7 @@ const defaultRoleplayScripts = [
     title: '舊情復燃',
     category: 'romantic' as const,
     scenario: '多年後的同學會，重遇初戀',
-    image: 'images/roleplay/reunion-love.png',
+    image: 'images/roleplay/reunion-love.webp',
     script: `[partner1]: [partner2]？真的是你嗎？這麼多年了...
 [partner2]: [partner1]！我沒想到會在這裡見到你。你一點都沒變。
 [partner1]: 你還是那麼美。這些年過得怎麼樣？
@@ -325,7 +326,7 @@ const defaultRoleplayScripts = [
     title: '度假誘惑',
     category: 'romantic' as const,
     scenario: '海邊度假村的浪漫邂逅',
-    image: 'images/roleplay/vacation-romance.png',
+    image: 'images/roleplay/vacation-romance.webp',
     script: `[partner1]: 這個海灘真美，尤其是夕陽西下的時候。
 [partner2]: 是啊，但最美的風景是你。
 [partner1]: 你真會說話。這次度假真是來對了。
@@ -341,7 +342,7 @@ const defaultRoleplayScripts = [
     title: '校園群體幻想：明星校花的秘密懲罰',
     category: 'school' as const,
     scenario: '學校地下社辦的臨時懲戒會議',
-    image: 'images/roleplay/discipline.png',
+    image: 'images/roleplay/discipline.webp',
     script: `（可多人參與或一對一扮演多角）
 [partner2]（校花，冷哼）：「你有證據嗎？還是你只是想抓我來羞辱我？」
 [partner1]（風紀會長，嚴肅）：「學生會長室今晚只處理一件事——妳在教官室的『不當行為』。」
@@ -367,7 +368,7 @@ const defaultRoleplayScripts = [
     title: '手搖飲辣妹店員的私房特調',
     category: 'bold' as const,
     scenario: '街角手搖飲店，快打烊的挑逗時刻',
-    image: 'images/roleplay/bubble-tea-girl.png',
+    image: 'images/roleplay/bubble-tea-girl.webp',
     script: `⏰ 第1分鐘：挑逗開場
 [partner2]（挑眉，輕聲）：「欸～這麼晚才來，專門等我下班嗎？你這樣很像跟蹤狂耶。」
 [partner1]（微笑）：「我只是想喝點特別的……聽說你這邊有‘不公開菜單’？」
@@ -396,7 +397,7 @@ const defaultRoleplayScripts = [
     title: '一對一私人導師：指導到最深處',
     category: 'bold' as const,
     scenario: '晚上九點的家教時間，嚴格導師與狡黠學生',
-    image: 'images/roleplay/private-tutor.png',
+    image: 'images/roleplay/private-tutor.webp',
     script: `⏰ 第 1–2 分鐘：冷調引入
 [partner2]（嬌嗔）：「老師～為什麼今天又排我這麼晚？你是不是……比較喜歡我一對一的樣子？」
 [partner1]（冷淡）：「你這個成績，全班倒數，還好意思跟我撒嬌？快把作業拿出來。」
@@ -559,6 +560,15 @@ const LoveTimeApp = () => {
     } catch { /* storage disabled — fall back to default */ }
     return 'home';
   }, { root: true });
+
+  // Start the page_ready clock (src/utils/perf.ts) as soon as the view changes
+  // — during render, so the new view's own render time is part of what we
+  // measure, and before its data hooks can report ready.
+  const perfViewRef = useRef<string | null>(null);
+  if (perfViewRef.current !== currentView) {
+    perfViewRef.current = currentView;
+    markNavigation(currentView);
+  }
 
   // Remember the active tab (best-effort) so a refresh restores it.
   useEffect(() => {

@@ -2,6 +2,7 @@ const { Pool } = require('pg');
 const path = require('path');
 
 const QUIET = process.env.NODE_ENV === 'test' && process.env.LOG_VERBOSE !== '1';
+const { logWarn } = require('../lib/logger');
 
 // Load environment variables based on NODE_ENV
 if (process.env.NODE_ENV === 'test') {
@@ -45,6 +46,8 @@ pool.on('error', (err) => {
   console.error('PostgreSQL connection error:', err);
 });
 
+const SLOW_QUERY_MS = 500;
+
 // Database query helper
 const query = async (text, params) => {
   const start = Date.now();
@@ -53,6 +56,11 @@ const query = async (text, params) => {
     if (!QUIET) {
       const duration = Date.now() - start;
       console.log('Query executed', { text: text.substring(0, 50) + '...', duration, rows: res.rowCount });
+      // Includes time waiting for a free pool connection, so a burst of
+      // parallel requests queueing on the pool shows up here too.
+      if (duration > SLOW_QUERY_MS) {
+        logWarn('slow_query', { text: text.replace(/\s+/g, ' ').trim().substring(0, 200), durationMs: duration, rows: res.rowCount, poolWaiting: pool.waitingCount, poolTotal: pool.totalCount });
+      }
     }
     return res;
   } catch (error) {

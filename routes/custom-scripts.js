@@ -49,6 +49,7 @@ function uploadScriptPhoto(file) {
   return uploadMedia(file, {
     imagePrefix: 'custom-script-thumbnails/',
     videoPrefix: 'custom-script-videos/',
+    thumbnail: true,
   });
 }
 
