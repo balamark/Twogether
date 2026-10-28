@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   LineChart,
   Line,
@@ -24,8 +24,9 @@ import {
 import apiService, {
   type EventAnalyticsData,
   type CommunicationPattern,
-  type AiUsageToday,
 } from '../services/api';
+import { useCachedQuery, userKey } from '../services/queryCache';
+import { useAiUsageToday } from '../hooks/usePageData';
 import { getEmotionAcceptance } from '../data/emotionAcceptance';
 import { useScrollLock } from '../hooks/useScrollLock';
 import AiQuotaHint from './AiQuotaHint';
@@ -37,30 +38,16 @@ const PETAL_BAR = '#7a8d6f';
 const GRID = '#e2dad2';
 
 export default function EventAnalytics() {
-  const [data, setData] = useState<EventAnalyticsData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // Cached across visits (src/services/queryCache.ts): revisiting 成長 paints
+  // the last charts instantly and refreshes them in the background.
+  const analytics = useCachedQuery<EventAnalyticsData>(userKey('/events', 'analytics'), () => apiService.getEventAnalytics());
+  const data = analytics.data ?? null;
+  const loading = analytics.loading;
+  const error = analytics.error
+    ? (analytics.error.message || tr('無法取得分析資料', 'Couldn\'t load insights. Please try again in a moment.'))
+    : null;
   // Which emotion's "如何接住" hint panel is open (null = closed).
   const [openEmotion, setOpenEmotion] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    apiService
-      .getEventAnalytics()
-      .then((res) => {
-        if (!cancelled) setData(res);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : tr('無法取得分析資料', 'Couldn\'t load insights. Please try again in a moment.'));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   if (loading) return <div className="p-8 text-center text-petal-ink-soft">{tr('載入中…', 'Loading…')}</div>;
   if (error) return <div className="p-6 text-center text-red-500">{error}</div>;
@@ -241,22 +228,8 @@ function CommunicationPatternCard() {
   const [notReady, setNotReady] = useState<{ message: string; progress?: { have: number; need: number } } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [quota, setQuota] = useState<AiUsageToday | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    apiService
-      .getAiUsageToday()
-      .then((q) => {
-        if (!cancelled) setQuota(q);
-      })
-      .catch(() => {
-        /* quota hint is best-effort; ignore fetch errors */
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { data: quotaData, refetch: refreshQuota } = useAiUsageToday();
+  const quota = quotaData ?? null;
 
   const generate = async () => {
     setLoading(true);
@@ -272,7 +245,7 @@ function CommunicationPatternCard() {
         setNotReady({ message: res.message, progress: res.progress });
       }
       // Refresh remaining quota after spending (or not) a credit.
-      apiService.getAiUsageToday().then(setQuota).catch(() => {});
+      void refreshQuota();
     } catch (err) {
       setError(err instanceof Error ? err.message : tr('溝通模式暫時無法產生，請稍後再試', 'Communication patterns couldn\'t be generated right now. Please try again in a moment.'));
     } finally {

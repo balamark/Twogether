@@ -35,14 +35,16 @@ const now = (): number => (typeof performance !== 'undefined' ? performance.now(
 // ── Page timing ───────────────────────────────────────────────────────────
 //
 // Generic for every view: after a navigation, the view is "ready" once the
-// API requests it started have all finished (nothing in flight for
-// SETTLE_MS). A view using useCachedQuery reports earlier and more precisely
-// via markViewReady — `source: 'cache'` when it painted from memory.
+// foreground API requests it started have all finished (nothing in flight for
+// SETTLE_MS). `source` is 'network' when it waited on any, 'cache' when it
+// painted from the cache (src/services/queryCache.ts) without waiting, 'idle'
+// when it needed no data. A cached view's background refresh runs inside
+// runInBackground(), so it doesn't count as the user waiting.
 
 const SETTLE_MS = 120;
 const GIVE_UP_MS = 30_000;
 
-type Nav = { view: string; start: number; lastEnd: number; requests: number; reported: boolean };
+type Nav = { view: string; start: number; lastEnd: number; requests: number; cacheHits: number; reported: boolean };
 let nav: Nav | null = null;
 let inflight = 0;
 let settleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -66,25 +68,45 @@ function scheduleSettle(): void {
     if (!n || n.reported) return;
     if (inflight > 0 && now() - n.start < GIVE_UP_MS) return; // next completion reschedules
     n.reported = true;
-    report(n.view, Math.round(n.lastEnd - n.start), n.requests > 0 ? 'network' : 'idle');
+    report(n.view, Math.round(n.lastEnd - n.start), n.requests > 0 ? 'network' : n.cacheHits > 0 ? 'cache' : 'idle');
   }, SETTLE_MS);
 }
 
 /** Call when the visible view changes (App.tsx does this for currentView). */
 export function markNavigation(view: string): void {
   const start = now();
-  nav = { view, start, lastEnd: start, requests: 0, reported: false };
+  const n: Nav = { view, start, lastEnd: start, requests: 0, cacheHits: 0, reported: false };
+  nav = n;
+  // The view is at least as slow as its first frame: rAF runs after React has
+  // committed the new view (render cost counts, even with no requests).
+  if (typeof requestAnimationFrame !== 'undefined') {
+    requestAnimationFrame(() => { if (!n.reported) n.lastEnd = Math.max(n.lastEnd, now()); });
+  }
   scheduleSettle();
 }
 
+/** A component painted from the cache during the current navigation. */
+export function noteCacheHit(): void {
+  if (!nav || nav.reported) return;
+  nav.cacheHits++;
+  nav.lastEnd = Math.max(nav.lastEnd, now()); // runs in an effect, after the cached paint committed
+}
+
+let backgroundDepth = 0;
+
 /**
- * Call when a view has painted its data. Only the first report after a
- * navigation to that view counts, so background revalidations don't skew it.
+ * Run `fn` with the requests it starts marked as background: they're still
+ * timed, but don't delay page_ready. Relies on the axios request interceptor
+ * being synchronous (src/services/api.ts), so the mark is read while `fn` is
+ * still on the stack.
  */
-export function markViewReady(view: string, source: 'cache' | 'network'): void {
-  if (!nav || nav.reported || nav.view !== view) return;
-  nav.reported = true;
-  report(view, Math.round(now() - nav.start), source);
+export function runInBackground<T>(fn: () => T): T {
+  backgroundDepth++;
+  try {
+    return fn();
+  } finally {
+    backgroundDepth--;
+  }
 }
 
 // ── API timing ────────────────────────────────────────────────────────────
@@ -103,14 +125,17 @@ function parseServerTiming(header: unknown): number | undefined {
   return m ? Math.round(Number(m[1])) : undefined;
 }
 
-type TimedConfig = { method?: string; url?: string; metadata?: { perfStart?: number } };
+type TimedConfig = { method?: string; url?: string; metadata?: { perfStart?: number; background?: boolean } };
 
 /** Request interceptor: stamp the start time on the config. */
 export function startApiTimer<T extends object>(config: T): T {
   const c = config as T & TimedConfig;
-  c.metadata = { ...(c.metadata || {}), perfStart: now() };
-  inflight++;
-  if (nav && !nav.reported) nav.requests++;
+  const background = backgroundDepth > 0 || c.metadata?.background === true; // a retry keeps its mark
+  c.metadata = { ...(c.metadata || {}), perfStart: now(), background };
+  if (!background) {
+    inflight++;
+    if (nav && !nav.reported) nav.requests++;
+  }
   return config;
 }
 
@@ -123,11 +148,13 @@ export function recordApiTiming(config: unknown, outcome: number | 'TIMEOUT' | '
   const start = c?.metadata?.perfStart;
   if (!c || typeof start !== 'number') return;
   delete c.metadata!.perfStart; // count each attempt once
-  inflight = Math.max(0, inflight - 1);
   const end = now();
-  if (nav && !nav.reported) {
-    nav.lastEnd = end;
-    if (inflight === 0) scheduleSettle();
+  if (!c.metadata!.background) {
+    inflight = Math.max(0, inflight - 1);
+    if (nav && !nav.reported) {
+      nav.lastEnd = end;
+      if (inflight === 0) scheduleSettle();
+    }
   }
   if (outcome === 'CANCELED') return;
   const ms = Math.round(end - start);

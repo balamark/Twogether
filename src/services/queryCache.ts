@@ -12,7 +12,7 @@
 // account can never see another's cache. Keys should still include the user id.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { markViewReady } from '../utils/perf';
+import { noteCacheHit, runInBackground } from '../utils/perf';
 
 type Entry = { data: unknown; at: number };
 
@@ -40,22 +40,15 @@ export function setCached<T>(key: string, data: T): void {
 }
 
 /**
- * Mark every entry whose key starts with `prefix` stale: it still paints
- * instantly on the next visit, but always refetches. Keys start with the API
- * resource they read (e.g. `/intimacy-requests|<userId>`), so the axios
- * interceptor calls this after any successful write to that resource — a
+ * Mark every entry whose key starts with `prefix` stale ('' = all): it still
+ * paints instantly on the next visit, but always refetches. The axios
+ * interceptor calls invalidateQueries('') after any successful write, so a
  * page never shows data from before your own change.
  */
 export function invalidateQueries(prefix: string): void {
   for (const [key, entry] of store) {
     if (key.startsWith(prefix)) entry.at = 0;
   }
-}
-
-/** `/intimacy-requests/abc/respond` → `/intimacy-requests` */
-export function resourceOf(url: string | undefined): string | null {
-  const m = (url || '').match(/^\/?([^/?#]+)/);
-  return m ? `/${m[1]}` : null;
 }
 
 export function clearQueryCache(): void {
@@ -77,9 +70,22 @@ export function fetchQuery<T>(key: string, fetcher: () => Promise<T>): Promise<T
   return p;
 }
 
+/**
+ * Cache key for the signed-in account: `userKey('/events', 'list')` →
+ * `/events|list|<userId>`. Null when signed out (disables the hooks below).
+ */
+export function userKey(resource: string, ...parts: Array<string | number | null | undefined>): string | null {
+  let userId: string | undefined;
+  try {
+    userId = (JSON.parse(localStorage.getItem('authUser') || 'null') as { id?: string } | null)?.id;
+  } catch {
+    userId = undefined;
+  }
+  if (!userId) return null;
+  return [resource, ...parts.map((p) => String(p ?? '')), userId].join('|');
+}
+
 export interface CachedQueryOptions {
-  /** View name for page_ready timing (src/utils/perf.ts). */
-  view?: string;
   /** Cached data younger than this is shown without refetching. Default 15s. */
   staleMs?: number;
 }
@@ -105,7 +111,7 @@ export interface CachedQuery<T> {
 export function useCachedQuery<T>(
   key: string | null,
   fetcher: () => Promise<T>,
-  { view, staleMs = 15_000 }: CachedQueryOptions = {},
+  { staleMs = 15_000 }: CachedQueryOptions = {},
 ): CachedQuery<T> {
   const initial = key ? getCached<T>(key) : undefined;
   const [data, setData] = useState<T | undefined>(initial?.data);
@@ -120,10 +126,11 @@ export function useCachedQuery<T>(
     setRefreshing(hasData);
     if (!hasData) setError(null); // a retry shows the spinner again
     try {
-      const fresh = await fetchQuery(key, () => fetcherRef.current());
+      // Refreshing data that's already on screen isn't the user waiting.
+      const run = () => fetchQuery(key, () => fetcherRef.current());
+      const fresh = await (hasData ? runInBackground(run) : run());
       setData(fresh);
       setError(null);
-      if (view && !hasData) markViewReady(view, 'network');
     } catch (e) {
       // With data on screen, a failed background refresh keeps the old data
       // rather than replacing the page with an error.
@@ -131,7 +138,7 @@ export function useCachedQuery<T>(
     } finally {
       setRefreshing(false);
     }
-  }, [key, view]);
+  }, [key]);
 
   useEffect(() => {
     if (!key) {
@@ -142,7 +149,7 @@ export function useCachedQuery<T>(
     const cached = getCached<T>(key);
     setData(cached?.data);
     setError(null);
-    if (cached && view) markViewReady(view, 'cache');
+    if (cached) noteCacheHit();
     if (!cached || Date.now() - cached.at > staleMs) void load();
 
     // Stay in sync when another component writes the same key.
@@ -156,7 +163,7 @@ export function useCachedQuery<T>(
     return () => {
       set.delete(onChange);
     };
-  }, [key, load, staleMs, view]);
+  }, [key, load, staleMs]);
 
   const mutate = useCallback((updater: (prev: T | undefined) => T) => {
     if (!key) return;
@@ -178,12 +185,13 @@ export function useCachedQuery<T>(
  * manage their own fetching and optimistic updates (e.g. the wall). The state
  * starts from the cache and every change is written back, so a revisit paints
  * the last state instantly. `wasCached` tells the view to skip its spinner and
- * refresh quietly instead. Pass a null key to behave like plain useState.
+ * refresh quietly instead — wrap that refresh in `refreshQuietly` so it
+ * doesn't count as the user waiting. Pass a null key to behave like plain
+ * useState.
  */
 export function useCachedState<T>(
   key: string | null,
   initial: T,
-  view?: string,
 ): [T, (next: T | ((prev: T) => T)) => void, boolean] {
   const [wasCached] = useState(() => !!key && store.has(key));
   const [state, setState] = useState<T>(() => (key && store.has(key) ? (store.get(key)!.data as T) : initial));
@@ -191,7 +199,7 @@ export function useCachedState<T>(
   keyRef.current = key;
 
   useEffect(() => {
-    if (wasCached && view) markViewReady(view, 'cache');
+    if (wasCached) noteCacheHit();
     // Only on mount: later visits remount the view.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -208,3 +216,6 @@ export function useCachedState<T>(
 
   return [state, set, wasCached];
 }
+
+/** Run a view's own refresh of already-shown data as background work. */
+export const refreshQuietly = runInBackground;

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiService } from '../services/api';
+import { useCachedQuery, userKey } from '../services/queryCache';
 import { tr } from '../i18n/tr';
 
 // 設定 → LINE 通知. Binding-code flow: request a code, add the official account
@@ -18,28 +19,24 @@ export default function LineNotificationSettings({
 }: {
   showNotification: (n: NotificationInput) => void;
 }) {
-  const [loading, setLoading] = useState(true);
-  const [configured, setConfigured] = useState(false);
-  const [linked, setLinked] = useState(false);
-  const [enabled, setEnabled] = useState(true);
+  // Cached across visits (src/services/queryCache.ts) so 設定 paints the LINE
+  // card instantly; `refresh` re-checks after the user links in the LINE app.
+  type LineStatus = { configured: boolean; linked: boolean; notificationsEnabled: boolean };
+  const status = useCachedQuery<LineStatus>(userKey('/line', 'status'), () => apiService.getLineStatus());
+  useEffect(() => {
+    if (status.error) console.error('[LINE] status load failed', status.error);
+  }, [status.error]);
+  const loading = status.loading;
+  const configured = status.data?.configured ?? false;
+  const linked = status.data?.linked ?? false;
+  const enabled = status.data?.notificationsEnabled ?? true;
+  const patch = (next: Partial<LineStatus>) => status.mutate((prev) => ({ ...(prev as LineStatus), ...next }));
+  const setEnabled = (notificationsEnabled: boolean) => patch({ notificationsEnabled });
+  const setLinked = (isLinked: boolean) => patch({ linked: isLinked });
+  const refresh = () => { void status.refetch(); };
   const [code, setCode] = useState<string | null>(null);
   const [addUrl, setAddUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const refresh = () => {
-    setLoading(true);
-    apiService
-      .getLineStatus()
-      .then((s) => {
-        setConfigured(s.configured);
-        setLinked(s.linked);
-        setEnabled(s.notificationsEnabled);
-      })
-      .catch((err) => console.error('[LINE] status load failed', err))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(refresh, []);
 
   const getCode = async () => {
     setBusy(true);

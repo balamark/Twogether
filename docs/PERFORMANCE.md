@@ -71,20 +71,32 @@ PERF_EMAIL=… PERF_PASSWORD=… node scripts/perf/measure-pages.mjs \
   --base=https://staging-dot-<project>.appspot.com --mobile --rounds=3
 ```
 
-`--mobile` adds a 4× CPU slowdown and ~4G latency, which is closer to how
+`--idle=35` waits between rounds so revisits fall outside the 30 s GET
+response cache and test the page cache itself. `--mobile` adds a 4× CPU slowdown and ~4G latency, which is closer to how
 most people use the app. Run it before and after a change that touches page
 loading, and paste both summaries in the PR.
 
 ## Making a page instant
 
-- **New view data**: load it with
-  `useCachedQuery(key, fetcher, { view })` from `src/services/queryCache.ts`.
-  Start the key with the API resource and include the user id, e.g.
-  `` `/intimacy-requests|history|${userId}` ``. Writes to that resource mark
-  the key stale automatically.
+Every main page (首頁, 對話, 我們, 成長, 劇本, 設定, 留言牆, 親密邀請紀錄)
+loads its data this way.
+
+- **New view data**: load it with `useCachedQuery(userKey('/resource',
+  …parts), fetcher)` from `src/services/queryCache.ts`. Data read by more
+  than one component gets one shared hook in `src/hooks/usePageData.ts`, so
+  they share a cache entry and a request (the relationship summary is read by
+  首頁, 我們 and the dashboard).
 - **Existing view with its own fetch + optimistic updates**: swap its
-  `useState` for `useCachedState(key, initial, view)`. Skip the spinner when
-  `wasCached` is true (see `WallView`).
+  `useState` for `useCachedState(key, initial)`. When `wasCached` is true,
+  skip the spinner and run the refresh inside `refreshQuietly(...)` (see
+  `WallView`).
+- **Optimistic writes on cached data**: use the hook's `mutate(prev => …)`
+  (see `LineNotificationSettings`).
+- **Freshness**: any successful write marks every cached page stale. It
+  still paints instantly, but always refreshes on the next visit. Otherwise
+  data younger than 15 s isn't refetched.
+- **Timing**: a refresh of data already on screen counts as background
+  work, so `page_ready` reports `cache` instead of waiting on it.
 - **Read-mostly endpoints shared by many components**: add them to the
   allowlist in `src/services/responseCache.ts`. Never add realtime threads,
   money, auth, AI quota or pairing state.

@@ -72,7 +72,6 @@ export const IntimacyRequestsHistory: React.FC<IntimacyRequestsHistoryProps> = (
       ]);
       return { items, stats: statsResponse.statistics, nudge: statsResponse.nudge };
     },
-    { view: 'intimacy-history' },
   );
   const items = history.data?.items ?? EMPTY_ITEMS;
   const stats = history.data?.stats ?? null;

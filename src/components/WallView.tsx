@@ -34,7 +34,7 @@ import { isVideoUrl } from '../utils/script';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { tr } from '../i18n/tr';
 import { moodTagLabel } from '../content/moodTags';
-import { useCachedState } from '../services/queryCache';
+import { useCachedState, refreshQuietly } from '../services/queryCache';
 
 interface WallViewProps {
   authState: {
@@ -160,7 +160,7 @@ const WallView: React.FC<WallViewProps> = ({
 
   // Cached across visits (src/services/queryCache.ts): coming back to the wall
   // paints the last posts instantly and refreshes them in the background.
-  const [posts, setPosts, postsCached] = useCachedState<WallPost[]>(userId ? `/wall|posts|${userId}` : null, [], 'wall');
+  const [posts, setPosts, postsCached] = useCachedState<WallPost[]>(userId ? `/wall|posts|${userId}` : null, []);
   const [loading, setLoading] = useState(!postsCached);
   const [filter, setFilter] = useState<WallFilter>('all');
   const [composerOpen, setComposerOpen] = useState(false);
@@ -320,7 +320,7 @@ const WallView: React.FC<WallViewProps> = ({
     // With cached posts on screen, refresh quietly instead of a spinner.
     if (!postsCached) setLoading(true);
     try {
-      const data = await apiService.getWallPosts();
+      const data = await (postsCached ? refreshQuietly(() => apiService.getWallPosts()) : apiService.getWallPosts());
       setPosts(data);
     } catch (err) {
       showNotification({

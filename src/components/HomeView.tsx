@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Sparkles, Activity, TrendingUp, ChevronRight } from 'lucide-react';
 import GettingStartedCard from './GettingStartedCard';
 import RelationshipDashboard from './RelationshipDashboard';
 import InfoHint from './InfoHint';
-import { apiService, type RelationshipSummary, type ActivityItem } from '../services/api';
+import { useRelationshipSummary, useActivityFeed } from '../hooks/usePageData';
 import { formatDateTime } from '../utils/datetime';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { trackAction } from '../utils/track';
@@ -63,14 +63,7 @@ const PatternTeaserCard: React.FC<{ onGoToGrow: () => void }> = ({ onGoToGrow })
 // 本週 stats strip — only real, already-available fields. RelationshipSummary has
 // no week-over-week delta, so this deliberately does not show a fabricated trend.
 const WeeklyStatsStrip: React.FC = () => {
-  const [summary, setSummary] = useState<RelationshipSummary | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    apiService.getRelationshipSummary()
-      .then((s) => { if (!cancelled) setSummary(s); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, []);
+  const { data: summary } = useRelationshipSummary();
 
   if (!summary?.paired) return null;
   const pos = summary.positive14 ?? 0;
@@ -101,14 +94,8 @@ const WeeklyStatsStrip: React.FC = () => {
 // 最近發生了什麼 — top 3 items from the same feed ActivityView shows in full.
 const ActivityTeaser: React.FC<{ onGoToActivity: () => void }> = ({ onGoToActivity }) => {
   const tz = useTimezone();
-  const [items, setItems] = useState<ActivityItem[] | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    apiService.getActivityFeed()
-      .then((all) => { if (!cancelled) setItems(all.slice(0, 3)); })
-      .catch(() => { if (!cancelled) setItems([]); });
-    return () => { cancelled = true; };
-  }, []);
+  const { data: feed } = useActivityFeed();
+  const items = feed?.slice(0, 3);
 
   if (!items || items.length === 0) return null;
 

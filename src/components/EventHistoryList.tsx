@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Tag, CheckCircle2, Sprout, Lock, MessageSquareHeart } from 'lucide-react';
 import apiService, { type EventRecord, type EventStatus } from '../services/api';
+import { useCachedQuery, userKey } from '../services/queryCache';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatDateTime } from '../utils/datetime';
 import { tr } from '../i18n/tr';
@@ -59,6 +60,8 @@ function formatDate(iso: string, tz: string) {
   }
 }
 
+const EMPTY_EVENTS: EventRecord[] = [];
+
 export default function EventHistoryList({
   onOpenEvent,
   currentUserId,
@@ -66,36 +69,24 @@ export default function EventHistoryList({
   onCompose,
   onLoaded,
 }: EventHistoryListProps) {
-  const [events, setEvents] = useState<EventRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<EventStatus | 'all'>('all');
   const tz = useTimezone();
   // Held in a ref so a new callback each parent render doesn't refetch.
   const onLoadedRef = useRef(onLoaded);
   onLoadedRef.current = onLoaded;
 
+  // Cached per filter (src/services/queryCache.ts): coming back to 對話 paints
+  // the last list instantly and refreshes it in the background.
+  const list = useCachedQuery(userKey('/events', 'list', status), () => apiService.listEvents({ status }));
+  const events = list.data?.events ?? EMPTY_EVENTS;
+  const loading = list.loading;
+  const error = list.error
+    ? (list.error.message || tr('無法取得對話列表', 'Couldn\'t load conversations. Please try again in a moment.'))
+    : null;
+
   useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setError(null);
-    apiService
-      .listEvents({ status })
-      .then((res) => {
-        if (cancelled) return;
-        setEvents(res.events);
-        if (status === 'all') onLoadedRef.current?.(res.total ?? res.events.length);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : tr('無法取得對話列表', 'Couldn\'t load conversations. Please try again in a moment.'));
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [status]);
+    if (status === 'all' && list.data) onLoadedRef.current?.(list.data.total ?? list.data.events.length);
+  }, [status, list.data]);
 
   if (loading) {
     return <div className="p-8 text-center text-petal-ink-soft">{tr('載入中…', 'Loading…')}</div>;

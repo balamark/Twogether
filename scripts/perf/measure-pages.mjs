@@ -15,6 +15,7 @@
 //   --views=a,b,c       view ids (default: main tabs + common sub-pages)
 //   --rounds=<n>        repeat the whole walk n times (default 2)
 //   --mobile            emulate a mid-range phone: 4× CPU slowdown + ~4G network
+//   --idle=<s>          wait this long between rounds (e.g. 35, past the 30s GET cache)
 //   --budget=<ms>       exit 1 if any revisit / back p95 exceeds this (default 300)
 //   --out=<file>        also write raw samples as JSON
 //
@@ -106,6 +107,10 @@ const record = (phase, view, sample) => {
 };
 
 for (let round = 1; round <= ROUNDS; round++) {
+  if (round > 1 && args.idle) {
+    console.log(`\n(idle ${args.idle}s)`);
+    await page.waitForTimeout(Number(args.idle) * 1000);
+  }
   console.log(`\n— round ${round} —`);
   for (const view of VIEWS) {
     try {

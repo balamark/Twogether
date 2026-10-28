@@ -11,6 +11,7 @@ import PetalSelect from './PetalSelect';
 import { useTimezone } from '../contexts/TimezoneContext';
 import { formatYmdInTz, formatDate } from '../utils/datetime';
 import { scriptHasUnresolvedGenderTokens, isVideoUrl, thumbSrc } from '../utils/script';
+import { useCachedQuery, userKey } from '../services/queryCache';
 import { tr, dateLocale } from '../i18n/tr';
 
 interface RoleplayScript {
@@ -157,6 +158,8 @@ const ViewToggle: React.FC<{
   </div>
 );
 
+const EMPTY_MARKET: MarketplaceScript[] = [];
+
 const RoleplayView: React.FC<RoleplayViewProps> = ({
   defaultRoleplayScripts,
   customScripts,
@@ -232,8 +235,6 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
 
   // Marketplace state — discoverable public scripts shared by other users.
   const [mainTab, setMainTab] = useState<'mine' | 'marketplace' | 'games'>('mine');
-  const [marketplaceScripts, setMarketplaceScripts] = useState<MarketplaceScript[]>([]);
-  const [marketplaceLoading, setMarketplaceLoading] = useState(false);
   const [marketplaceSort, setMarketplaceSort] = useState<'rating' | 'recent' | 'popular'>('rating');
   const [marketplaceCategory, setMarketplaceCategory] = useState<'all' | RoleplayScript['category']>('all');
   // Server-side text search (title / scenario / location) — debounced so we
@@ -245,45 +246,40 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     return () => clearTimeout(t);
   }, [marketplaceQuery]);
   const [marketplaceDetailId, setMarketplaceDetailId] = useHistoryState<string | null>('roleplay:market', null, { scrollTop: false });
-  const [favoritedMarketplace, setFavoritedMarketplace] = useState<MarketplaceScript[]>([]);
-
-  const loadMarketplace = useCallback(async () => {
-    setMarketplaceLoading(true);
-    try {
-      const list = await apiService.getMarketplaceScripts({
-        sort: marketplaceSort,
-        category: marketplaceCategory === 'all' ? undefined : marketplaceCategory,
-        q: debouncedMarketplaceQuery || undefined,
-        limit: 60,
-      });
-      setMarketplaceScripts(list);
-    } catch (err) {
-      showNotification({
-        type: 'error',
-        title: tr('無法載入創作市集', 'Couldn\'t load the creator marketplace'),
-        message: (err as Error)?.message || tr('請稍後再試', 'Please try again in a moment'),
-        duration: 4000,
-      });
-    } finally {
-      setMarketplaceLoading(false);
-    }
-  }, [marketplaceSort, marketplaceCategory, debouncedMarketplaceQuery, showNotification]);
-
-  const loadFavoritedMarketplace = useCallback(async () => {
-    try {
-      const list = await apiService.getFavoritedMarketplaceScripts();
-      setFavoritedMarketplace(list);
-    } catch {
-      // Quiet fail — the section just stays empty.
-    }
-  }, []);
-
+  // Both lists are cached (src/services/queryCache.ts): returning to 劇本 or
+  // switching back to 市集 paints the last list instantly, refreshed quietly.
+  const marketplace = useCachedQuery<MarketplaceScript[]>(
+    mainTab === 'marketplace' ? userKey('/marketplace', 'list', marketplaceSort, marketplaceCategory, debouncedMarketplaceQuery) : null,
+    () => apiService.getMarketplaceScripts({
+      sort: marketplaceSort,
+      category: marketplaceCategory === 'all' ? undefined : marketplaceCategory,
+      q: debouncedMarketplaceQuery || undefined,
+      limit: 60,
+    }),
+  );
+  const marketplaceScripts = marketplace.data ?? EMPTY_MARKET;
+  const marketplaceLoading = marketplace.loading && mainTab === 'marketplace';
+  const loadMarketplace = marketplace.refetch;
   useEffect(() => {
-    if (mainTab === 'marketplace') loadMarketplace();
-  }, [mainTab, loadMarketplace]);
+    if (!marketplace.error) return;
+    showNotification({
+      type: 'error',
+      title: tr('無法載入創作市集', 'Couldn\'t load the creator marketplace'),
+      message: marketplace.error.message || tr('請稍後再試', 'Please try again in a moment'),
+      duration: 4000,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [marketplace.error]);
 
+  // Quiet on failure — the section just stays empty.
+  const favorited = useCachedQuery<MarketplaceScript[]>(userKey('/marketplace', 'favorites'), () => apiService.getFavoritedMarketplaceScripts());
+  const favoritedMarketplace = favorited.data ?? EMPTY_MARKET;
+  const loadFavoritedMarketplace = favorited.refetch;
+  // Re-check when the favorites set changes (not on mount — the hook loads).
+  const favIdsMounted = useRef(false);
   useEffect(() => {
-    loadFavoritedMarketplace();
+    if (!favIdsMounted.current) { favIdsMounted.current = true; return; }
+    void loadFavoritedMarketplace();
   }, [loadFavoritedMarketplace, favoriteScriptIds]);
 
   useScrollLock(showScriptModal && !!selectedScript);

@@ -4,6 +4,7 @@ import { apiService, type RelationshipSummary, type GoodwillGroup, type Relation
 import { daysSinceLastNudge } from './AchievementsView';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { tr, dateLocale } from '../i18n/tr';
+import { useRelationshipSummary } from '../hooks/usePageData';
 
 interface NotificationInput {
   type: 'success' | 'error' | 'info' | 'warning';
@@ -99,7 +100,6 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
   onNudgePartner,
   onGoToWall,
 }) => {
-  const [summary, setSummary] = useState<RelationshipSummary | null>(null);
   const [checkinOpen, setCheckinOpen] = useState(false);
   const [goodwillOpen, setGoodwillOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -123,13 +123,9 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
     try { localStorage.setItem('record.lastSeen', String(Date.now())); } catch { /* ignore */ }
   }, []);
 
-  const loadSummary = React.useCallback(() => {
-    apiService.getRelationshipSummary().then(setSummary).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (partnerConnected) loadSummary();
-  }, [partnerConnected, loadSummary]);
+  // Shared cached entry with 首頁 / 我們 (src/hooks/usePageData.ts).
+  const { data: cachedSummary, refetch: loadSummary } = useRelationshipSummary(partnerConnected);
+  const summary = cachedSummary ?? null;
 
   const nudges = useMemo(() => {
     if (!summary?.paired) return [];

@@ -2,7 +2,7 @@ import axios from 'axios';
 import { formatYmdInTz, browserTz } from '../utils/datetime';
 import { setLastRequestId } from '../utils/telemetry';
 import { startApiTimer, recordApiTiming } from '../utils/perf';
-import { clearQueryCache, invalidateQueries, resourceOf } from './queryCache';
+import { clearQueryCache, invalidateQueries } from './queryCache';
 import { cachingAdapter, clearResponseCache } from './responseCache';
 import { tr, getLocale } from '../i18n/tr';
 
@@ -1604,7 +1604,10 @@ apiClient.interceptors.request.use(
   (error) => {
     console.error('Request interceptor error:', error);
     return Promise.reject(error);
-  }
+  },
+  // Synchronous: runs inside the apiClient.get() call, so perf's
+  // runInBackground() mark is still set when startApiTimer reads it.
+  { synchronous: true }
 );
 
 // Response interceptor for unified error handling
@@ -1612,12 +1615,12 @@ apiClient.interceptors.response.use(
   (response) => {
     setLastRequestId(response.headers?.['x-request-id']);
     recordApiTiming(response.config, response.status, response.headers?.['server-timing']);
-    // A successful write makes cached reads of the same resource stale, and
-    // drops every short-lived GET response (a write can change other
-    // resources too, e.g. coins).
+    // A successful write can change more than its own resource (an AI call
+    // spends quota, a wall post moves the activity feed and summary), so it
+    // marks every cached page stale — still painted instantly, but refreshed
+    // on the next visit — and drops the short-lived GET responses.
     if ((response.config.method || 'get').toLowerCase() !== 'get') {
-      const resource = resourceOf(response.config.url);
-      if (resource) invalidateQueries(resource);
+      invalidateQueries('');
       clearResponseCache();
     }
     if (import.meta.env.DEV) console.log(`API Response: ${response.status} ${response.config.url}`, response.data);
