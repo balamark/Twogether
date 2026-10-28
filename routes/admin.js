@@ -11,7 +11,7 @@
 const express = require('express');
 const db = require('../database/db');
 const { logInfo, logError, logWarn } = require('../lib/logger');
-const { optionalAuth } = require('../middleware/auth');
+const { optionalAuth, invalidateUserCache } = require('../middleware/auth');
 const featureFlags = require('../lib/featureFlags');
 
 const publicRouter = express.Router();
@@ -866,6 +866,7 @@ adminApiRouter.delete('/users/:id', async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'user not found' });
     }
+    invalidateUserCache(id);
     logInfo('admin.user.deleted', { id, email: result.rows[0].email });
     res.json({ success: true, email: result.rows[0].email });
   } catch (err) {

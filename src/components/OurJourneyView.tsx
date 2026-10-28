@@ -507,12 +507,16 @@ const OurJourneyView = ({ journeyMilestones, intimateRecords, setCurrentView, au
   const deleteFromEditor = async () => {
     if (!editor || saving) return;
     const id = editor.draft.id;
+    // Optimistic (playbook §R7): close the editor and drop the milestone now;
+    // put it back if the server rejects the delete.
+    const removed = store.added.find((a) => a.id === id);
+    setStore((prev) => ({ ...prev, added: prev.added.filter((a) => a.id !== id) }));
+    setEditor(null);
     setSaving(true);
     try {
       await apiService.deleteJourneyMilestone(id);
-      setStore((prev) => ({ ...prev, added: prev.added.filter((a) => a.id !== id) }));
-      setEditor(null);
     } catch (err) {
+      if (removed) setStore((prev) => ({ ...prev, added: [...prev.added, removed] }));
       onSaveError(err);
     } finally {
       setSaving(false);

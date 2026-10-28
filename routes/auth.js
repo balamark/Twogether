@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const { body, validationResult } = require('express-validator');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
-const { generateToken, authenticateToken } = require('../middleware/auth');
+const { generateToken, authenticateToken, invalidateUserCache } = require('../middleware/auth');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 const { notifyPartnerAction } = require('../services/notificationService');
 const { TIMEZONE_VALUES } = require('../lib/timezone-options');
@@ -365,6 +365,7 @@ router.get('/confirm-email-change', async (req, res) => {
         WHERE id = $1`,
       [row.id]
     );
+    invalidateUserCache(row.id);
     logInfo('Email change confirmed', { userId: row.id });
     return authPage(res, { ok: true, title: 'Email 已更新', message: '你的登入 Email 已成功變更。請使用新的 Email 重新登入。', body: '<a class="btn" href="/">回到 Twogether 登入</a>' });
   } catch (error) {

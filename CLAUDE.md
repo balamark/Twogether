@@ -101,7 +101,7 @@ Every table, column and index is created by a numbered file in
 `database/migrations/` (CI and deploy run `npm run migrate` first). Never add
 runtime DDL (`CREATE TABLE IF NOT EXISTS`, `ALTER TABLE`, an `ensure…Table()`
 helper) to routes or services: it costs DB round trips on request paths, takes
-table locks, and hides schema that the migrations never got — migration 104 had
+table locks, and hides schema that the migrations never got — migration 105 had
 to backfill four objects that only existed that way.
 
 ## UX conventions (every UI change)

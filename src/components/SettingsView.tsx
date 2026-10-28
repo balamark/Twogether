@@ -5,7 +5,7 @@ import { AiCompanionList } from './AiCompanionPicker';
 import LineNotificationSettings from './LineNotificationSettings';
 import { PairingInviteShare } from './PairingInviteShare';
 import { resolveCompanion } from '../utils/aiCompanions';
-import { averageCycleLength, predictNextPeriodStart, ovulationWindow, computeCycleLengths } from '../utils/cycle';
+import { averageCycleLength, predictCycle, computeCycleLengths } from '../utils/cycle';
 import { TIMEZONE_OPTIONS } from '../utils/timezone-options';
 import { formatYmdInTz, browserTz as getBrowserTz } from '../utils/datetime';
 import { useEngineerMode } from '../contexts/EngineerModeContext';
@@ -542,36 +542,36 @@ const SettingsView: React.FC<SettingsViewProps> = ({
   const handleSaveSettings = async () => {
     try {
       setIsSavingSettings(true);
-      // Update user gender if specified
-      if (userGender) {
-        await apiService.updateUserGender(userGender);
-      }
       // Persist birth date (only if it changed from the auth-state value)
       const previousBirthDate = authState.user?.birth_date
         ? formatDateForInput(authState.user.birth_date)
         : '';
       const nextBirthDate = userBirthDate || null;
-      if ((previousBirthDate || '') !== (userBirthDate || '')) {
-        await apiService.updateUserBirthDate(nextBirthDate);
-      }
-      // Only update current user's nickname
-      await apiService.updateNicknames({
-        partner1: nicknames.partner1,
-        partner2: nicknames.partner2
-      });
-      // Persist couple journey to backend
       const meeting = journeyMilestones.find(m => m.type === 'meeting');
       const firstDate = journeyMilestones.find(m => m.type === 'first_date');
       const firstKiss = journeyMilestones.find(m => m.type === 'first_kiss');
       const firstSex = journeyMilestones.find(m => m.type === 'first_sex');
-      await apiService.updateCoupleJourney({
-        first_meet_date: meeting?.date || undefined,
-        anniversary_date: firstDate?.date || undefined,
-        first_kiss_date: firstKiss?.date || undefined,
-        first_kiss_place: firstKiss?.place || undefined,
-        first_intimacy_date: firstSex?.date || undefined,
-        first_intimacy_place: firstSex?.place || undefined,
-      });
+      // The four writes touch independent fields, so send them together: run
+      // one after another they made 保存設定 wait four round trips (~1–2s).
+      await Promise.all([
+        // Update user gender if specified
+        userGender ? apiService.updateUserGender(userGender) : null,
+        (previousBirthDate || '') !== (userBirthDate || '') ? apiService.updateUserBirthDate(nextBirthDate) : null,
+        // Only update current user's nickname
+        apiService.updateNicknames({
+          partner1: nicknames.partner1,
+          partner2: nicknames.partner2
+        }),
+        // Persist couple journey to backend
+        apiService.updateCoupleJourney({
+          first_meet_date: meeting?.date || undefined,
+          anniversary_date: firstDate?.date || undefined,
+          first_kiss_date: firstKiss?.date || undefined,
+          first_kiss_place: firstKiss?.place || undefined,
+          first_intimacy_date: firstSex?.date || undefined,
+          first_intimacy_place: firstSex?.place || undefined,
+        }),
+      ]);
       // Update auth state and local storage so Header/profile and couple status reflect immediately
       if (authState.user && onAuthStateUpdate) {
         const updatedAuthState = {
@@ -1323,8 +1323,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           <div className="mt-6 space-y-5" data-testid="cycle-stats-section">
             {(() => {
               const avg = averageCycleLength(cycleRecords);
-              const nextStart = predictNextPeriodStart(cycleRecords);
-              const ov = ovulationWindow(cycleRecords);
+              const prediction = predictCycle(cycleRecords);
+              const nextStart = prediction?.nextPeriodStart ?? null;
               const lengths = computeCycleLengths(cycleRecords);
               return (
                 <>
@@ -1342,12 +1342,31 @@ const SettingsView: React.FC<SettingsViewProps> = ({
                       </div>
                     </div>
                     <div className="bg-emerald-50 rounded-md p-4 border border-emerald-200">
-                      <div className="text-[11px] uppercase tracking-[0.12em] text-emerald-700 mb-1">{tr('排卵日', 'Ovulation day')}</div>
+                      <div className="text-[11px] uppercase tracking-[0.12em] text-emerald-700 mb-1">{tr('預測排卵日', 'Predicted ovulation')}</div>
                       <div className="font-display italic font-light text-2xl text-emerald-700">
-                        {ov?.ovulation ?? '—'}
+                        {prediction?.ovulation ?? '—'}
                       </div>
+                      {prediction && (
+                        <div className="text-xs text-emerald-700 mt-1" data-testid="cycle-ovulation-window">
+                          {tr('可能排卵區間：', 'Possible window: ')}
+                          {prediction.windowStart && prediction.windowEnd
+                            ? `${prediction.windowStart.slice(5)} ${tr('～', '–')} ${prediction.windowEnd.slice(5)}`
+                            : tr('預測資料有限', 'limited data')}
+                        </div>
+                      )}
                     </div>
                   </div>
+
+                  {prediction && (
+                    <p className="text-xs text-petal-muted leading-relaxed" data-testid="cycle-prediction-note">
+                      {prediction.method === 'calendar_weighted'
+                        ? tr(`依你的週期紀錄推算（綜合全部週期與最近 3 次，預測週期 ${prediction.predictedCycleLength} 天）。`, `Estimated from your own records (all cycles blended with the latest 3; predicted cycle ${prediction.predictedCycleLength} days).`)
+                        : tr('目前只有一筆紀錄，先以 28 天週期估算。', 'Only one record so far, so a 28-day cycle is assumed.')}
+                      {prediction.confidence === 'limited' && tr(' 至少 3 次完整週期後，才會估出可能排卵區間。', ' A possible window appears after at least 3 complete cycles.')}
+                      {prediction.confidence === 'variable' && tr(' 你的週期變化較大，區間會比較寬。', ' Your cycles vary quite a bit, so the window is wider.')}
+                      {tr(' 這是日曆法推算，不是實際排卵的確認。', ' This is a calendar-method estimate, not a confirmation of ovulation.')}
+                    </p>
+                  )}
 
                   {lengths.length > 0 && (
                     <p className="text-xs text-petal-muted">

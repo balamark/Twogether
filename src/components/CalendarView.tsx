@@ -3,14 +3,15 @@ import { Camera, MapPin, Play, Clock, Trash2, LayoutGrid, ListTree } from 'lucid
 import CalendarDatePicker from './CalendarDatePicker';
 import InfoHint from './InfoHint';
 import { IntimacyStatsCards, CalendarHeatmap } from './AchievementsView';
-import { periodDateSet, fertileDateSet, predictedPeriodDateSet, addDays } from '../utils/cycle';
+import { periodDateSet, fertileDateSet, predictedPeriodDateSet, addDays, predictCycle, rhythmDateMap } from '../utils/cycle';
+import DayRhythmCard, { type DayStatusPatch } from './DayRhythmCard';
 import { formatYmdInTz } from '../utils/datetime';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { apiService } from '../services/api';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { Button } from './ui/Button';
 import MomentResponseBar from './MomentResponseBar';
-import type { CycleRecord, MomentReactionKey } from '../services/api';
+import type { CycleRecord, DayStatus, MomentReactionKey } from '../services/api';
 import type { IntimateRecord, AuthState, Notification } from '../App';
 import { tr, isEnglish } from '../i18n/tr';
 
@@ -154,8 +155,6 @@ const CalendarView = ({
   setShowRecordModal,
   setSelectedRecord,
   setShowRecordDetail,
-  setDayPickerDate,
-  setDayPickerRecords,
   setCurrentView,
   addIntimateRecord,
   showNotification,
@@ -328,19 +327,23 @@ const CalendarView = ({
   // empty and silently clamped every keystroke to a minimum of 1.
   const [periodLengthInput, setPeriodLengthInput] = useState<string>('5');
 
-  // Period-day management: tapping a calendar day that falls inside a logged
-  // period opens this lightweight modal so the entry can be reviewed and undone.
-  const [periodDayDate, setPeriodDayDate] = useState<string | null>(null);
-  const [periodDayRecord, setPeriodDayRecord] = useState<CycleRecord | null>(null);
+  // 親密節奏 day card: tapping ANY calendar day opens it. It shows the cycle
+  // estimate, the user's 每日狀態, the day's records, and — for a day inside a
+  // logged period — the review & undo for that period.
+  const [dayCardDate, setDayCardDate] = useState<string | null>(null);
   const [deletingPeriod, setDeletingPeriod] = useState(false);
   // Both modals are `fixed inset-0`; lock the page behind them so taps inside
   // aren't offset on iOS.
-  useScrollLock(showRecordModal || !!periodDayRecord);
+  useScrollLock(showRecordModal || !!dayCardDate);
 
   const cycleEnabled = !!authState.user?.cycle_tracking_enabled;
   const periodDates = React.useMemo(() => cycleEnabled ? periodDateSet(cycleRecords) : undefined, [cycleEnabled, cycleRecords]);
   const fertileDates = React.useMemo(() => cycleEnabled ? fertileDateSet(cycleRecords) : undefined, [cycleEnabled, cycleRecords]);
   const predictedPeriodDates = React.useMemo(() => cycleEnabled ? predictedPeriodDateSet(cycleRecords) : undefined, [cycleEnabled, cycleRecords]);
+  // Recomputed from the records themselves, so adding / editing / removing a
+  // period immediately moves the estimate and the rhythm shading.
+  const cyclePrediction = React.useMemo(() => cycleEnabled ? predictCycle(cycleRecords) : null, [cycleEnabled, cycleRecords]);
+  const rhythmDates = React.useMemo(() => cycleEnabled ? rhythmDateMap(cyclePrediction) : undefined, [cycleEnabled, cyclePrediction]);
 
   // Maps every YYYY-MM-DD covered by a logged period to its CycleRecord, so a
   // tap on the calendar can find (and offer to undo) the period that owns it.
@@ -353,22 +356,94 @@ const CalendarView = ({
     }
     return map;
   }, [cycleRecords]);
+  const dayCardPeriod = dayCardDate ? cycleRecordByDate.get(dayCardDate) ?? null : null;
+
+  // 每日狀態 for the visible month (+ the adjacent-month cells around it):
+  // mine, plus only the rows the partner chose to share.
+  const [myDayStatuses, setMyDayStatuses] = useState<Map<string, DayStatus>>(() => new Map());
+  const [partnerDayStatuses, setPartnerDayStatuses] = useState<Map<string, DayStatus>>(() => new Map());
+  const monthKey = `${calendarMonth.getFullYear()}-${calendarMonth.getMonth()}`;
+  useEffect(() => {
+    let cancelled = false;
+    const y = calendarMonth.getFullYear();
+    const m = calendarMonth.getMonth();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const first = `${y}-${pad(m + 1)}-01`;
+    const last = new Date(y, m + 1, 0).getDate();
+    const from = addDays(first, -7);
+    const to = addDays(`${y}-${pad(m + 1)}-${pad(last)}`, 7);
+    apiService.getDayStatuses(from, to)
+      .then(({ mine, partner }) => {
+        if (cancelled) return;
+        // Replace this window's entries (a row cleared elsewhere must vanish),
+        // keep other months already loaded.
+        setMyDayStatuses(prev => {
+          const next = new Map([...prev].filter(([d]) => d < from || d > to));
+          for (const r of mine) next.set(r.date, r);
+          return next;
+        });
+        setPartnerDayStatuses(new Map(partner.map(r => [r.date, r])));
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        // Not blocking: the calendar still works, only the status lines are
+        // missing. Say so and what to do, as a warning rather than a red error.
+        showNotification({ type: 'warning', title: tr('每日狀態暫時載入不了', 'Daily status didn\'t load'), message: (error as Error)?.message || tr('月曆仍可使用；稍後切換月份或重新整理即可再試', 'The calendar still works; switch months or refresh to try again'), duration: 5000 });
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthKey]);
+
+  // Optimistic: the chip lights up immediately; on failure we roll back and
+  // say why (playbook §R7).
+  const saveDayStatus = async (date: string, patch: DayStatusPatch) => {
+    const previous = myDayStatuses.get(date) ?? null;
+    const base: DayStatus = previous ?? { date, mood: null, intimacyIntention: null, sharingEnabled: false };
+    const optimistic: DayStatus = { ...base, ...patch };
+    const empty = optimistic.mood === null && optimistic.intimacyIntention === null;
+    const apply = (value: DayStatus | null) => setMyDayStatuses(prev => {
+      const next = new Map(prev);
+      if (value) next.set(date, value); else next.delete(date);
+      return next;
+    });
+    apply(empty ? null : optimistic);
+    try {
+      const saved = await apiService.saveDayStatus(date, patch);
+      apply(saved);
+    } catch (error: unknown) {
+      apply(previous);
+      showNotification({ type: 'error', title: tr('狀態沒有存到', 'Status not saved'), message: (error as Error)?.message || tr('無法儲存每日狀態，請稍後再試', 'Couldn\'t save your daily status. Please try again in a moment'), duration: 5000 });
+    }
+  };
+
+  const clearDayStatus = async (date: string) => {
+    const previous = myDayStatuses.get(date) ?? null;
+    setMyDayStatuses(prev => { const next = new Map(prev); next.delete(date); return next; });
+    try {
+      await apiService.clearDayStatus(date);
+    } catch (error: unknown) {
+      if (previous) setMyDayStatuses(prev => new Map(prev).set(date, previous));
+      showNotification({ type: 'error', title: tr('沒有清除成功', 'Couldn\'t clear'), message: (error as Error)?.message || tr('無法清除每日狀態，請稍後再試', 'Couldn\'t clear your daily status. Please try again in a moment'), duration: 5000 });
+    }
+  };
 
   const handleDeletePeriod = async () => {
+    const periodDayRecord = dayCardPeriod;
     if (!periodDayRecord) return;
-    // No confirm() here on purpose: the modal this button lives in already IS
-    // the confirmation step (it shows the record and asks 「標記錯了嗎？」), and
-    // a native dialog stacked on a fixed overlay would be a second blocking
-    // modal. The off-target-tap risk is handled by sizing instead — see the
-    // button row below.
+    // No confirm() here on purpose: the day card this button lives in already
+    // IS the confirmation step (it shows the record and asks 「標記錯了嗎？」),
+    // and a native dialog stacked on a fixed overlay would be a second blocking
+    // modal. The button sits apart from the card's other actions instead.
+    // Optimistic (playbook §R7): drop the mark at once (the open day card
+    // re-derives from cycleRecords); put the record back if the delete fails.
+    const removed = periodDayRecord;
+    setCycleRecords(prev => prev.filter(r => r.id !== removed.id));
     setDeletingPeriod(true);
     try {
-      await apiService.deleteCycleRecord(periodDayRecord.id);
-      setCycleRecords(prev => prev.filter(r => r.id !== periodDayRecord.id));
+      await apiService.deleteCycleRecord(removed.id);
       showNotification({ type: 'success', title: tr('已取消', 'Removed'), message: tr('月經紀錄已移除', 'The period record was removed'), duration: 3000 });
-      setPeriodDayRecord(null);
-      setPeriodDayDate(null);
     } catch (error: unknown) {
+      setCycleRecords(prev => (prev.some(r => r.id === removed.id) ? prev : [...prev, removed]));
       showNotification({ type: 'error', title: tr('移除失敗', 'Couldn\'t remove'), message: (error as Error)?.message || tr('無法移除月經紀錄，請稍後再試', 'Couldn\'t remove the period record. Please try again in a moment'), duration: 5000 });
     } finally {
       setDeletingPeriod(false);
@@ -553,7 +628,7 @@ const CalendarView = ({
             </h3>
             <p className="mt-1 font-body text-sm text-petal-muted">
               {viewMode === 'calendar'
-                ? tr('點月曆任一天新增或查看紀錄', 'Tap any day on the calendar to add or view a record')
+                ? tr('點任一天看節奏、記錄心情或新增紀錄', 'Tap any day to see the rhythm, log how you feel, or add a record')
                 : tr(`一起走過的每一天，共 ${intimateRecords.length} 次`, `Every day you've shared, ${intimateRecords.length} times in all`)}
             </p>
           </div>
@@ -605,31 +680,9 @@ const CalendarView = ({
             predictedPeriodDates={predictedPeriodDates}
             fertileDates={fertileDates}
             onNavigate={(y, m) => setCalendarMonth(new Date(y, m, 1))}
-            onDaySelect={(day) => {
-              // A day inside a logged period opens the period-management modal
-              // so it can be reviewed and undone if it was marked by mistake.
-              const periodRec = cycleRecordByDate.get(day);
-              if (periodRec) {
-                setPeriodDayDate(day);
-                setPeriodDayRecord(periodRec);
-                return;
-              }
-              const dayRecords = recordsByDate.get(day) || [];
-              if (dayRecords.length === 0) {
-                // Empty day → open the add modal pre-filled for that day.
-                openAddModalForDate(day);
-              } else if (dayRecords.length === 1) {
-                setSelectedRecord(dayRecords[0]);
-                setShowRecordDetail(true);
-              } else {
-                setDayPickerDate(day);
-                setDayPickerRecords(
-                  dayRecords.slice().sort((a, b) =>
-                    (b.date + 'T' + b.time).localeCompare(a.date + 'T' + a.time)
-                  )
-                );
-              }
-            }}
+            rhythmDates={rhythmDates}
+            selectedDay={dayCardDate}
+            onDaySelect={(day) => setDayCardDate(day)}
           />
         </div>
         )}
@@ -1010,75 +1063,33 @@ const CalendarView = ({
         </div>
       )}
 
-      {/* Period-day management modal — review & undo a logged period */}
-      {periodDayRecord && (
-        <div className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-petal-cream rounded-md shadow-petal max-w-md w-full border border-petal-rule" data-testid="period-day-modal">
-            <div className="p-5 sm:p-6">
-              <div className="flex justify-between items-end mb-5 pb-4 border-b border-petal-rule">
-                <div>
-                  <div className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted mb-2">
-                    {tr('— 月經紀錄', '— Period record')}
-                  </div>
-                  <h3 className="font-display text-3xl font-light tracking-tight text-petal-ink">
-                    {tr('這一天的', 'This day\'s ')}<em className="not-italic font-light italic text-red-500">{tr('月經', 'period')}</em>
-                  </h3>
-                </div>
-                <button
-                  onClick={() => { setPeriodDayRecord(null); setPeriodDayDate(null); }}
-                  data-testid="period-day-close-button"
-                  className="text-petal-muted hover:text-petal-ink text-2xl font-light transition-colors leading-none"
-                >
-                  ×
-                </button>
-              </div>
-
-              <dl className="space-y-2 font-body text-sm text-petal-ink">
-                <div className="flex justify-between gap-4">
-                  <dt className="text-petal-muted">{tr('所選日期', 'Selected date')}</dt>
-                  <dd>{periodDayDate}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-petal-muted">{tr('週期開始日', 'Cycle start')}</dt>
-                  <dd>{periodDayRecord.startDate}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-petal-muted">{tr('天數', 'Days')}</dt>
-                  <dd>{periodDayRecord.lengthDays} {tr('天', ' days')}</dd>
-                </div>
-                <div className="flex justify-between gap-4">
-                  <dt className="text-petal-muted">{tr('涵蓋區間', 'Range')}</dt>
-                  <dd>{periodDayRecord.startDate} {tr('～', '–')} {addDays(periodDayRecord.startDate, periodDayRecord.lengthDays - 1)}</dd>
-                </div>
-              </dl>
-
-              <p className="font-display italic font-light text-sm text-petal-muted mt-4">
-                {tr('標記錯了嗎？可以取消這次的月經紀錄。', 'Marked by mistake? You can remove this period record.')}
-              </p>
-
-              {/* 關閉 is the safe default and gets the wider share; the
-                  destructive one is separated so an off-target tap on a phone
-                  lands on nothing rather than on 取消這次月經. */}
-              <div className="flex gap-4 mt-6 pt-4 border-t border-petal-rule">
-                <button
-                  onClick={() => { setPeriodDayRecord(null); setPeriodDayDate(null); }}
-                  data-testid="period-day-dismiss-button"
-                  className="flex-[2] px-4 py-3 min-h-[44px] border border-petal-rule text-petal-ink rounded-md hover:bg-petal-cream-2 transition-colors font-body text-sm"
-                >
-                  {tr('關閉', 'Close')}
-                </button>
-                <button
-                  onClick={handleDeletePeriod}
-                  disabled={deletingPeriod}
-                  data-testid="period-day-delete-button"
-                  className="flex-1 px-4 py-3 min-h-[44px] bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors font-display italic text-base disabled:opacity-60"
-                >
-                  {deletingPeriod ? tr('移除中…', 'Removing…') : tr('取消這次月經', 'Remove this period')}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {dayCardDate && (
+        <DayRhythmCard
+          date={dayCardDate}
+          todayYmd={todayYmd()}
+          onClose={() => setDayCardDate(null)}
+          cycleEnabled={cycleEnabled}
+          prediction={cyclePrediction}
+          dayRecords={(recordsByDate.get(dayCardDate) || []).slice().sort((a, b) => b.time.localeCompare(a.time))}
+          onOpenRecord={(record) => {
+            setDayCardDate(null);
+            setSelectedRecord(record);
+            setShowRecordDetail(true);
+          }}
+          onAddRecord={(day) => {
+            setDayCardDate(null);
+            openAddModalForDate(day);
+          }}
+          periodRecord={dayCardPeriod}
+          onDeletePeriod={handleDeletePeriod}
+          deletingPeriod={deletingPeriod}
+          myStatus={myDayStatuses.get(dayCardDate) ?? null}
+          partnerStatus={partnerDayStatuses.get(dayCardDate) ?? null}
+          partnerConnected={authState.partnerConnected}
+          partnerNickname={partnerNickname}
+          onSaveStatus={saveDayStatus}
+          onClearStatus={clearDayStatus}
+        />
       )}
 
     </div>

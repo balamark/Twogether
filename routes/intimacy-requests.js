@@ -301,8 +301,9 @@ router.post('/', [
     lineService.pushToUserIfLinked(db, partnerId, lineInvitePush);
 
     // Send email notification to partner — honors the partner's "Email 通知"
-    // switch (the in-app notification above is sent regardless).
-    try {
+    // switch (the in-app notification above is sent regardless). Not awaited:
+    // the SMTP send is 1–3s and the sender shouldn't wait on it (playbook §R7).
+    (async () => {
       const partner = await emailService.getUserEmailIfOptedIn(db, partnerId);
       if (partner) {
         const senderNickname = req.user.nickname || '你的伴侶';
@@ -317,10 +318,10 @@ router.post('/', [
       } else {
         logInfo('Partner opted out of email or unreachable; skipping intimacy request email', { partnerId });
       }
-    } catch (emailError) {
+    })().catch((emailError) => {
       logWarn('Failed to send intimacy request email', { kind: 'intimacy_request', err: emailError.message, code: emailError.code });
       // Don't fail the request if email sending fails
-    }
+    });
 
     logInfo('Intimacy request created', { requestId, fromUserId: userId, toUserId: partnerId });
 
@@ -1233,7 +1234,8 @@ router.put('/:id/respond', [
     lineService.pushToUserIfLinked(db, request.sender_id, lineResponsePush);
 
     // Fire-and-forget email to the original sender. Honors per-user opt-out.
-    try {
+    // Not awaited so the 接受/婉拒 tap doesn't wait on SMTP (playbook §R7).
+    (async () => {
       const sender = await emailService.getUserEmailIfOptedIn(db, request.sender_id);
       if (sender) {
         const receiverRow = await db.query(`SELECT nickname FROM users WHERE id = $1`, [userId]);
@@ -1245,9 +1247,9 @@ router.put('/:id/respond', [
           responseMessage: response_message || '',
         });
       }
-    } catch (emailError) {
+    })().catch((emailError) => {
       logWarn('Failed to send intimacy response email', { kind: 'intimacy_response', err: emailError.message, code: emailError.code });
-    }
+    });
 
     logInfo('Intimacy request responded', { requestId, response, userId });
 

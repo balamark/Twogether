@@ -110,13 +110,19 @@ export default function MarketplaceScriptDetail({
 
   const handleDeleteRating = async () => {
     if (!window.confirm(tr('確定要刪除你的評分與評論嗎？刪除後無法復原。', 'Delete your rating and review? This can\'t be undone.'))) return;
+    // Optimistic (playbook §R7): clear the draft right after the confirm; the
+    // refetch of averages runs in the background instead of holding the button.
+    const prevStars = draftStars;
+    const prevReview = draftReview;
+    setDraftStars(0);
+    setDraftReview('');
     setSubmitting(true);
     try {
       await apiService.deleteScriptRating(scriptId);
-      setDraftStars(0);
-      setDraftReview('');
-      await loadDetail();
+      void loadDetail();
     } catch (err) {
+      setDraftStars(prevStars);
+      setDraftReview(prevReview);
       showNotification({
         type: 'error',
         title: tr('刪除失敗', 'Couldn\'t delete'),

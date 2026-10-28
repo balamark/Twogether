@@ -2,7 +2,7 @@ const express = require('express');
 const { body, validationResult } = require('express-validator');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken, invalidateUserCache } = require('../middleware/auth');
 const pairingService = require('../services/pairingService');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 const { notifyPartnerAction } = require('../services/notificationService');
@@ -488,6 +488,7 @@ router.put('/nicknames', [
       'UPDATE users SET nickname = $1 WHERE id = $2',
       [validNickname, userId]
     );
+    invalidateUserCache(userId);
     logInfo('User nickname updated', { userId, nickname: validNickname });
 
     notifyPartnerAction({ actorId: userId, type: 'profile_updated', content: `暱稱已更新為「${validNickname}」` });
