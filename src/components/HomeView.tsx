@@ -24,6 +24,7 @@ interface HomeViewProps {
   onGoToActivity: () => void;
   onGoToTalk: () => void;
   onGoToDailyLove: () => void;
+  onOpenLoveBank: () => void;
 }
 
 // Time-of-day greeting on the viewer's own device clock (deliberately NOT the
@@ -238,6 +239,7 @@ const HomeView: React.FC<HomeViewProps> = ({
   onGoToActivity,
   onGoToTalk,
   onGoToDailyLove,
+  onOpenLoveBank,
 }) => {
   // Greet the couple, not just the account holder — this is a shared space.
   const me = authState.user?.nickname;
@@ -274,6 +276,7 @@ const HomeView: React.FC<HomeViewProps> = ({
         showNotification={showNotification}
         onNudgePartner={onNudgePartner}
         onGoToWall={onGoToWall}
+        onOpenLoveBank={onOpenLoveBank}
       />
       {/* Pattern detection reads across BOTH partners' events, so it has nothing
           to offer a solo user — showing the teaser would promise an insight and

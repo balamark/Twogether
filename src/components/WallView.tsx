@@ -35,6 +35,7 @@ import { useScrollLock } from '../hooks/useScrollLock';
 import { tr } from '../i18n/tr';
 import { moodTagLabel } from '../content/moodTags';
 import { useCachedState, refreshQuietly } from '../services/queryCache';
+import { useFeatureFlag } from '../contexts/FeatureFlagsContext';
 
 interface WallViewProps {
   authState: {
@@ -180,6 +181,8 @@ const WallView: React.FC<WallViewProps> = ({
   // so we mark that moment visibly. null = nothing playing. Keyed by the counter
   // so posting twice in a row replays the animation rather than doing nothing.
   const [plusOneKey, setPlusOneKey] = useState<number | null>(null);
+  // Paused with the rest of the auto-counted 好感存款 (lib/featureFlags.js).
+  const showGoodwill = useFeatureFlag('goodwill_meter');
   const [showTutorial, setShowTutorial] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return !localStorage.getItem(tutorialKey);
@@ -953,7 +956,7 @@ const WallView: React.FC<WallViewProps> = ({
           would still count as a sibling for Tailwind's space-y rule and push the
           header down ~2rem for the 1.5s it's mounted — a visible jump on every
           post. As a fragment sibling it overlays cleanly with no layout shift. */}
-      {plusOneKey !== null && (
+      {showGoodwill && plusOneKey !== null && (
         <PlusOneCelebration key={plusOneKey} onDone={() => setPlusOneKey(null)} />
       )}
     <div className="space-y-8">

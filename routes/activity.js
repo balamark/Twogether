@@ -69,7 +69,7 @@ router.get('/', async (req, res) => {
                CASE ct.kind
                     WHEN 'thanks' THEN '為另一半存入感謝存款：' || ct.description
                     WHEN 'request' THEN '的存款申請已被確認：' || ct.description
-                    ELSE '用存款兌換了「' || ct.description || '」' END,
+                    ELSE '用感情存款兌換了「' || ct.description || '」' END,
                COALESCE(ct.responded_at, ct.transaction_date)
           FROM coin_transactions ct WHERE ct.couple_id = $1 AND ct.status = 'confirmed'
 

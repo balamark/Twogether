@@ -39,8 +39,8 @@ const ACHIEVEMENT_TYPES = {
     points: 20
   },
   'coin_collector': {
-    name: '存款收集家',
-    description: '累積100存款',
+    name: '感情存款收集家',
+    description: '累積100感情存款',
     icon: '🪙',
     category: 'coins',
     points: 30

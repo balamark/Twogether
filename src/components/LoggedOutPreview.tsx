@@ -1132,11 +1132,24 @@ const PREVIEWS: Record<string, PreviewConfig> = {
         </div>
         <SampleCard>
           <div className="text-center">
-            <div className="text-lg" aria-hidden>❤️</div>
-            <div className="font-body text-[10px] uppercase tracking-[0.16em] text-petal-muted">{tr('我們正在愛', 'We are loving')}</div>
-            <div className="font-display text-3xl font-light text-petal-rose-deep leading-none my-0.5">10</div>
-            <p className="font-body text-[11px] text-petal-ink-soft leading-relaxed">
-              {tr('每次留言、記錄美好、化解衝突都', 'Every note, good moment and resolved conflict adds ')} <span className="font-medium text-petal-rose-deep">+1</span>{tr('，美好存款越存越厚。', ', and your savings of good moments keep growing.')}
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-body text-[10px] uppercase tracking-[0.16em] text-petal-muted">{tr('💝 感情存款', '💝 Love Bank')}</span>
+              <SampleTag />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { label: tr('我的', 'Mine'), value: 1200 },
+                { label: tr('TA 的', 'Theirs'), value: 900 },
+                { label: tr('平均', 'Average'), value: 1050 },
+              ].map((d) => (
+                <div key={d.label}>
+                  <div className="font-display text-2xl font-light text-petal-rose-deep leading-none">{d.value}</div>
+                  <div className="font-body text-[11px] text-petal-muted">{d.label}</div>
+                </div>
+              ))}
+            </div>
+            <p className="mt-1.5 font-body text-[11px] text-petal-ink-soft leading-relaxed">
+              {tr('只有對方能為你存入：TA 幫你做了重要的事，就為 TA 存一筆。', 'Only the other can add to yours: when they do something that matters, make a deposit for them.')}
             </p>
           </div>
         </SampleCard>
@@ -1152,23 +1165,23 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       </div>
     ),
   },
-  // 存款：each partner's own deposit account, paid into only by the other
+  // 感情存款：each partner's own deposit account, paid into only by the other
   // (感謝存款 / 申請存款), spent on the other's gifts with their agreement.
   shop: {
     icon: Coins,
-    eyebrow: tr('存款', 'Deposits'),
+    eyebrow: tr('感情存款', 'Love Bank'),
     title: (
       <>
         {tr('讓「被在乎」', 'Make feeling cared for ')}<em className="not-italic font-light italic text-pink-600">{tr('看得見', 'visible')}</em>
       </>
     ),
     description:
-      tr('你們各有一個存款帳戶，只有另一半能為你存入：TA 幫你做了一件重要的事，你就為 TA 存一筆「感謝存款」；你為 TA 做了什麼，也能「申請存款」請 TA 確認。存款可以兌換對方的禮品，對方同意才會扣除；兩人存款的平均，讓彼此大概知道感情的狀態。', 'You each have a deposit account that only the other can add to: when they do something that matters to you, make a thank-you deposit for them; when you do something for them, ask for a deposit and they confirm it. Spend deposits on the other\'s gifts, deducted only once they agree. The average of both shows roughly how things are between you.'),
+      tr('你們各有一個感情存款帳戶，只有另一半能為你存入：TA 幫你做了一件重要的事，你就為 TA 存一筆「感謝存款」；你為 TA 做了什麼，也能「申請存款」請 TA 確認。感情存款可以兌換對方的禮品，對方同意才會扣除；兩人感情存款的平均，讓彼此大概知道感情的狀態。', 'You each have a Love Bank account that only the other can add to: when they do something that matters to you, make a thank-you deposit for them; when you do something for them, ask for a deposit and they confirm it. Spend deposits on the other\'s gifts, deducted only once they agree. The average of both shows roughly how things are between you.'),
     sample: (
       <div className="space-y-2.5">
         <SampleCard>
           <div className="flex items-center justify-between mb-2">
-            <span className="font-body text-xs text-petal-muted">{tr('你們的存款', 'Your deposits')}</span>
+            <span className="font-body text-xs text-petal-muted">{tr('你們的感情存款', 'Your Love Bank')}</span>
             <SampleTag />
           </div>
           <div className="grid grid-cols-3 gap-2 text-center">

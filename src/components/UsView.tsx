@@ -5,6 +5,8 @@ import { useRelationshipSummary } from '../hooks/usePageData';
 import { trackAction } from '../utils/track';
 import { POSITIVE_INTERACTION_ACTIONS } from '../content/positiveInteractions';
 import { tr } from '../i18n/tr';
+import { useFeatureFlag } from '../contexts/FeatureFlagsContext';
+import LoveBankCard from './LoveBankCard';
 
 interface UsViewProps {
   onNavigate: (view: string) => void;
@@ -87,6 +89,7 @@ const Scenario: React.FC<{
 // same size, same visual weight, side by side.
 const UsView: React.FC<UsViewProps> = ({ onNavigate }) => {
   useEffect(() => { trackAction('us.hub.view'); }, []);
+  const showGoodwill = useFeatureFlag('goodwill_meter');
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6" data-testid="us-view">
@@ -105,7 +108,9 @@ const UsView: React.FC<UsViewProps> = ({ onNavigate }) => {
         </p>
       </header>
 
-      <LoveSavings onNavigate={onNavigate} />
+      {/* The auto-counted 愛的存款 is paused (goodwill_meter); 感情存款 is the
+          app's single 存款 now. */}
+      {showGoodwill ? <LoveSavings onNavigate={onNavigate} /> : <LoveBankCard onOpen={() => onNavigate('shop')} />}
 
       <div className="grid gap-4 md:grid-cols-2">
         {/* ❤️ 我們正在愛 */}

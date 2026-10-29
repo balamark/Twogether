@@ -204,7 +204,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       case 'story_comment':
         onNavigate('stories');
         break;
-      // 關係之屋提醒（每週檢視 / 好久沒親密 / 存好感）→ 首頁的關係儀表板。
+      // 關係之屋提醒（每週檢視 / 好久沒親密 / 說句欣賞的話）→ 首頁的關係儀表板。
       case 'relationship_checkin_due':
       case 'relationship_intimacy_gap':
       case 'relationship_appreciation_gap':

@@ -2473,6 +2473,7 @@ const LoveTimeApp = () => {
             onGoToActivity={() => setCurrentView('activity')}
             onGoToTalk={() => setCurrentView('events')}
             onGoToDailyLove={() => setCurrentView('daily-love')}
+            onOpenLoveBank={() => setCurrentView('shop')}
           />
         );
       case 'grow':

@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Home, Heart, Sparkles, ShieldCheck, Send, StickyNote, TrendingUp, X, Loader2, HelpCircle, History } from 'lucide-react';
+import { Home, Heart, Sparkles, ShieldCheck, Send, StickyNote, TrendingUp, X, Loader2, HelpCircle, History, Coins } from 'lucide-react';
 import { apiService, type RelationshipSummary, type GoodwillGroup, type RelationshipCheckin } from '../services/api';
 import { daysSinceLastNudge } from './AchievementsView';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { tr, dateLocale } from '../i18n/tr';
 import { useRelationshipSummary } from '../hooks/usePageData';
+import { useFeatureFlag } from '../contexts/FeatureFlagsContext';
+import { useCachedQuery, userKey } from '../services/queryCache';
+import LoveBankCard from './LoveBankCard';
 
 interface NotificationInput {
   type: 'success' | 'error' | 'info' | 'warning';
@@ -20,9 +23,11 @@ interface RelationshipDashboardProps {
   onNudgePartner?: () => void;
   /** Navigate to 我們的牆 so the user can leave a praise note. */
   onGoToWall: () => void;
+  /** Open the 感情存款 page. */
+  onOpenLoveBank: () => void;
 }
 
-type NudgeKind = 'intimacy' | 'checkin' | 'goodwill' | 'appreciation';
+type NudgeKind = 'intimacy' | 'checkin' | 'goodwill' | 'appreciation' | 'deposit';
 
 interface Nudge {
   kind: NudgeKind;
@@ -37,9 +42,20 @@ interface Nudge {
 // the single most urgent one, so the couple is guided rather than spammed.
 function rankNudges(
   s: RelationshipSummary,
-  handlers: { intimacy?: () => void; checkin: () => void; praise: () => void }
+  handlers: { intimacy?: () => void; checkin: () => void; praise: () => void; loveBank: () => void },
+  opts: { goodwill: boolean; depositsWaiting: number }
 ): Nudge[] {
   const out: Nudge[] = [];
+
+  // A 申請存款 / 兌換申請 only the viewer can answer — the partner is waiting.
+  if (opts.depositsWaiting > 0) {
+    out.push({
+      kind: 'deposit', severity: 3, emoji: '💝',
+      title: tr('TA 在等你回應感情存款', 'Your partner is waiting on you in the Love Bank'),
+      body: tr(`有 ${opts.depositsWaiting} 筆申請存款或禮物兌換，等你確認或婉拒。`, `${opts.depositsWaiting} deposit request(s) or gift redemption(s) are waiting for you to confirm or decline.`),
+      cta: { label: tr('去回應', 'Respond'), action: handlers.loveBank },
+    });
+  }
 
   const di = s.daysSinceIntimacy ?? null;
   if (di !== null) {
@@ -68,15 +84,16 @@ function rankNudges(
   if (da !== null && da >= 7) {
     out.push({
       kind: 'appreciation', severity: da >= 14 ? 3 : 2, emoji: '🌱',
-      title: tr('存一筆好感吧', 'Make a goodwill deposit'),
-      body: tr('這陣子還沒對 TA 說一句欣賞的話。一句真誠的稱讚，就是替關係存好感。', 'You haven\'t said anything appreciative to them lately. One sincere compliment is a deposit in your relationship.'),
+      title: tr('說一句欣賞的話吧', 'Say something appreciative'),
+      body: tr('這陣子還沒對 TA 說一句欣賞的話。一句真誠的稱讚，就能讓 TA 感覺被看見。', 'You haven\'t said anything appreciative to them lately. One sincere compliment helps them feel seen.'),
       cta: { label: tr('寫一句稱讚', 'Write a compliment'), action: handlers.praise },
     });
   }
 
   const pos = s.positive14 ?? 0;
   const neg = s.negative14 ?? 0;
-  if (neg > 0 && pos < neg * 5) {
+  // The auto-counted 好感存款 nudge is paused with its meter (goodwill_meter).
+  if (opts.goodwill && neg > 0 && pos < neg * 5) {
     out.push({
       kind: 'goodwill', severity: pos <= neg ? 4 : 2, emoji: '⚖️',
       title: tr('好感存款偏低', 'Goodwill balance is low'),
@@ -99,7 +116,16 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
   showNotification,
   onNudgePartner,
   onGoToWall,
+  onOpenLoveBank,
 }) => {
+  // 好感存款 (auto-counted from positive14/negative14) is paused while
+  // 感情存款 is the app's single 存款; flip goodwill_meter in /admin to restore.
+  const showGoodwill = useFeatureFlag('goodwill_meter');
+  const { data: deposits } = useCachedQuery(
+    partnerConnected ? userKey('/coins/summary') : null,
+    () => apiService.getDepositSummary(),
+  );
+  const depositsWaiting = deposits?.awaitingMe.length ?? 0;
   const [checkinOpen, setCheckinOpen] = useState(false);
   const [goodwillOpen, setGoodwillOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -133,8 +159,9 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
       intimacy: onNudgePartner,
       checkin: () => setCheckinOpen(true),
       praise: onGoToWall,
-    });
-  }, [summary, onNudgePartner, onGoToWall]);
+      loveBank: onOpenLoveBank,
+    }, { goodwill: showGoodwill, depositsWaiting });
+  }, [summary, onNudgePartner, onGoToWall, onOpenLoveBank, showGoodwill, depositsWaiting]);
 
   if (!partnerConnected || !summary?.paired) return null;
 
@@ -209,7 +236,7 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
               data-testid="relationship-primary-cta"
               className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-pink-500 text-white hover:bg-pink-600 transition-colors font-body text-xs font-medium"
             >
-              {top.kind === 'intimacy' ? <Send className="w-3.5 h-3.5" /> : top.kind === 'checkin' ? <Home className="w-3.5 h-3.5" /> : <StickyNote className="w-3.5 h-3.5" />}
+              {top.kind === 'intimacy' ? <Send className="w-3.5 h-3.5" /> : top.kind === 'checkin' ? <Home className="w-3.5 h-3.5" /> : top.kind === 'deposit' ? <Coins className="w-3.5 h-3.5" /> : <StickyNote className="w-3.5 h-3.5" />}
               {top.cta.label}
             </button>
           )}
@@ -221,7 +248,13 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
         </div>
       )}
 
-      {/* Goodwill meter */}
+      {/* 感情存款: both balances + the read-only average */}
+      <div className="mb-3">
+        <LoveBankCard onOpen={onOpenLoveBank} compact />
+      </div>
+
+      {/* Goodwill meter (paused behind goodwill_meter) */}
+      {showGoodwill && (
       <div className="mb-3">
         <div className="flex items-center justify-between mb-1">
           <button
@@ -262,6 +295,7 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
           </p>
         )}
       </div>
+      )}
 
       {/* Quick actions */}
       <div className="flex flex-wrap gap-2">
@@ -311,7 +345,7 @@ const RelationshipDashboard: React.FC<RelationshipDashboardProps> = ({
         />
       )}
 
-      {goodwillOpen && <GoodwillModal onClose={() => setGoodwillOpen(false)} />}
+      {showGoodwill && goodwillOpen && <GoodwillModal onClose={() => setGoodwillOpen(false)} />}
       {historyOpen && <CheckinHistoryModal onClose={() => setHistoryOpen(false)} />}
     </div>
   );

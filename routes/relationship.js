@@ -173,7 +173,7 @@ router.get('/summary', async (req, res) => {
     const REMINDER_META = {
       checkin_due: { title: '本週的關係檢視', content: '花兩分鐘檢視你們的「信賴」與「奉獻」，照顧關係之屋。' },
       intimacy_gap: { title: '好久沒有親密了', content: `已經 ${daysSinceIntimacy} 天了，主動關心一下另一半吧。` },
-      appreciation_gap: { title: '存一筆好感吧', content: '對 TA 說一句欣賞的話，替你們的關係存好感。' },
+      appreciation_gap: { title: '說一句欣賞的話吧', content: '對 TA 說一句欣賞的話，讓 TA 感覺被看見。' },
     };
     const fireRemindersFor = async (targetUserId, checkinDueForTarget) => {
       if (!targetUserId) return;

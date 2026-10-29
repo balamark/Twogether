@@ -18,7 +18,7 @@ router.use(authenticateToken);
 
 const MAX_AMOUNT = 10000;
 
-const NOT_PAIRED_MESSAGE = '存款需要另一半才能運作：配對後，TA 就能為你存入感謝存款。先到「設定」邀請另一半加入吧';
+const NOT_PAIRED_MESSAGE = '感情存款需要另一半才能運作：配對後，TA 就能為你存入感謝存款。先到「設定」邀請另一半加入吧';
 
 // The caller's couple and partner. `partnerId` is null until both seats are
 // filled (a couple row can exist with only user1 while the invite is pending).
@@ -109,7 +109,7 @@ router.get('/balance', async (req, res) => {
     res.json({ success: true, paired: true, ...account });
   } catch (error) {
     logError('Get deposit balance failed', { err: error.message, stack: error.stack });
-    res.status(500).json({ success: false, message: '讀取存款失敗，請稍後再試' });
+    res.status(500).json({ success: false, message: '讀取感情存款失敗，請稍後再試' });
   }
 });
 
@@ -162,7 +162,7 @@ router.get('/summary', async (req, res) => {
     });
   } catch (error) {
     logError('Get deposit summary failed', { err: error.message, stack: error.stack });
-    res.status(500).json({ success: false, message: '讀取存款失敗，請稍後再試' });
+    res.status(500).json({ success: false, message: '讀取感情存款失敗，請稍後再試' });
   }
 });
 
@@ -235,7 +235,7 @@ router.post('/deposits', [
     });
   } catch (error) {
     logError('Create deposit failed', { err: error.message, stack: error.stack });
-    res.status(500).json({ success: false, message: '存款失敗，請稍後再試' });
+    res.status(500).json({ success: false, message: '存入失敗，請稍後再試' });
   }
 });
 
@@ -288,7 +288,7 @@ router.post('/redemptions', [
       logInfo('Redemption blocked: insufficient deposit', { user_id: userId, cost, available: outcome.account.available });
       return res.status(400).json({
         success: false,
-        message: `存款還差 ${shortBy}。可以向另一半申請存款，或先選一個價格較低的禮品`,
+        message: `感情存款還差 ${shortBy}。可以向另一半申請存款，或先選一個價格較低的禮品`,
         error_code: 'INSUFFICIENT_DEPOSIT',
         available: outcome.account.available,
         required: cost
@@ -388,7 +388,7 @@ router.post('/transactions/:id/respond', [
       }
       return res.status(409).json({
         success: false,
-        message: `對方目前的存款只有 ${outcome.account.balance}，不足以兌換這份禮品。可以先婉拒，等存款足夠再兌換`,
+        message: `對方目前的感情存款只有 ${outcome.account.balance}，不足以兌換這份禮品。可以先婉拒，等存款足夠再兌換`,
         error_code: 'INSUFFICIENT_DEPOSIT'
       });
     }
@@ -411,8 +411,8 @@ router.post('/transactions/:id/respond', [
     });
 
     const messages = {
-      redemption_approved: '已同意兌換，對方的存款已扣除',
-      redemption_declined: '已婉拒兌換，對方的存款不會被扣除',
+      redemption_approved: '已同意兌換，對方的感情存款已扣除',
+      redemption_declined: '已婉拒兌換，對方的感情存款不會被扣除',
       deposit_confirmed: '已確認，存款已存入對方帳戶',
       deposit_declined: '已婉拒這筆存款申請'
     };
@@ -486,7 +486,7 @@ router.get('/transactions', async (req, res) => {
     });
   } catch (error) {
     logError('Get deposit transactions failed', { err: error.message, stack: error.stack });
-    res.status(500).json({ success: false, message: '讀取存款紀錄失敗，請稍後再試' });
+    res.status(500).json({ success: false, message: '讀取感情存款紀錄失敗，請稍後再試' });
   }
 });
 

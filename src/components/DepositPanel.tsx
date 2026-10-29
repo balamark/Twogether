@@ -38,8 +38,8 @@ const formatDate = (iso: string | null) =>
 const describe = (t: DepositTransaction) => {
   if (t.kind === 'redeem') {
     return t.is_mine
-      ? tr(`你用存款兌換 ${t.gift_icon || '🎁'} ${t.note}`, `You redeem ${t.gift_icon || '🎁'} ${t.note}`)
-      : tr(`TA 想用存款兌換 ${t.gift_icon || '🎁'} ${t.note}`, `Your partner wants to redeem ${t.gift_icon || '🎁'} ${t.note}`);
+      ? tr(`你用感情存款兌換 ${t.gift_icon || '🎁'} ${t.note}`, `You redeem ${t.gift_icon || '🎁'} ${t.note}`)
+      : tr(`TA 想用感情存款兌換 ${t.gift_icon || '🎁'} ${t.note}`, `Your partner wants to redeem ${t.gift_icon || '🎁'} ${t.note}`);
   }
   if (t.kind === 'request') {
     return t.is_mine
@@ -100,7 +100,7 @@ const DepositPanel = ({ summary, loading, refresh, onInvitePartner, showNotifica
       setFormKind(null);
       await refresh();
     } catch (error) {
-      const { message, type } = describeError(error, tr('存款失敗，請稍後再試', 'Couldn\'t make the deposit. Please try again in a moment'));
+      const { message, type } = describeError(error, tr('存入失敗，請稍後再試', 'Couldn\'t make the deposit. Please try again in a moment'));
       showNotification({ type, title: tr('沒有存入', 'Not deposited'), message, duration: 6000 });
     }
   });
@@ -117,9 +117,9 @@ const DepositPanel = ({ summary, loading, refresh, onInvitePartner, showNotifica
       };
       const messages = {
         confirm: t.kind === 'redeem'
-          ? tr(`TA 的存款已扣除 ${t.amount}，記得一起兌現這份心意`, `${t.amount} was deducted from your partner's deposits. Enjoy the gift together`)
+          ? tr(`TA 的感情存款已扣除 ${t.amount}，記得一起兌現這份心意`, `${t.amount} was deducted from your partner's deposits. Enjoy the gift together`)
           : tr(`${t.amount} 已存入 TA 的帳戶`, `${t.amount} went into your partner's account`),
-        decline: tr('沒有任何存款變動，TA 會收到通知', 'No deposits changed; your partner will be notified'),
+        decline: tr('感情存款沒有任何變動，TA 會收到通知', 'No deposits changed; your partner will be notified'),
         cancel: tr('這筆申請已撤回', 'This request was withdrawn'),
       };
       showNotification({ type: 'success', title: titles[action], message: messages[action], duration: 3500 });
@@ -150,14 +150,14 @@ const DepositPanel = ({ summary, loading, refresh, onInvitePartner, showNotifica
     <div className="space-y-8">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {stat(
-          tr('我的存款', 'My deposits'),
+          tr('我的感情存款', 'My Love Bank'),
           summary?.me.balance ?? 0,
           'deposit-mine',
           summary && summary.me.available < summary.me.balance
             ? tr(`可用 ${summary.me.available}（兌換申請中的已先保留）`, `${summary.me.available} available (pending redemptions are held)`)
             : tr('只有 TA 能為你存入', 'Only your partner can add to it'),
         )}
-        {stat(tr('TA 的存款', 'Their deposits'), paired ? summary?.partner?.balance ?? 0 : '—', 'deposit-partner', tr('只有你能為 TA 存入', 'Only you can add to it'))}
+        {stat(tr('TA 的感情存款', 'Their Love Bank'), paired ? summary?.partner?.balance ?? 0 : '—', 'deposit-partner', tr('只有你能為 TA 存入', 'Only you can add to it'))}
         {stat(
           tr('兩人平均', 'Average of both'),
           paired ? summary?.average ?? 0 : '—',
@@ -168,9 +168,9 @@ const DepositPanel = ({ summary, loading, refresh, onInvitePartner, showNotifica
 
       {!paired ? (
         <div className="bg-petal-cream-2 border border-petal-rule rounded-md p-5" data-testid="deposit-unpaired-gate">
-          <p className="font-display text-lg text-petal-ink mb-1">{tr('存款只能由另一半存入', 'Only your partner can make deposits for you')}</p>
+          <p className="font-display text-lg text-petal-ink mb-1">{tr('感情存款只能由另一半存入', 'Only your partner can add to your Love Bank')}</p>
           <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-4">
-            {tr('配對後，TA 每次想謝謝你，都能為你存一筆；你也能用存款兌換 TA 的心意。現在可以先把你們想要的禮品放進下方商店。', 'Once you\'re paired, your partner can make a deposit whenever they want to thank you, and you can redeem gifts from them. For now, you can fill the shop below with gifts you\'d both like.')}
+            {tr('配對後，TA 每次想謝謝你，都能為你存一筆；你也能用感情存款兌換 TA 的心意。現在可以先把你們想要的禮品放進下方商店。', 'Once you\'re paired, your partner can make a deposit whenever they want to thank you, and you can redeem gifts from them. For now, you can fill the shop below with gifts you\'d both like.')}
           </p>
           <Button onClick={onInvitePartner}>{tr('邀請另一半', 'Invite your partner')}</Button>
         </div>
@@ -195,7 +195,7 @@ const DepositPanel = ({ summary, loading, refresh, onInvitePartner, showNotifica
                   <div className="font-body text-sm text-petal-ink break-words">{describe(t)}</div>
                   <div className="font-body text-xs text-petal-muted mt-0.5">
                     {t.kind === 'redeem'
-                      ? tr(`同意後會從 TA 的存款扣除 ${t.amount}`, `Agreeing deducts ${t.amount} from their deposits`)
+                      ? tr(`同意後會從 TA 的感情存款扣除 ${t.amount}`, `Agreeing deducts ${t.amount} from their deposits`)
                       : tr(`確認後會存入 TA 的帳戶 ${t.amount}`, `Confirming adds ${t.amount} to their account`)}
                     {' · '}{formatDate(t.created_at)}
                   </div>
@@ -242,7 +242,7 @@ const DepositPanel = ({ summary, loading, refresh, onInvitePartner, showNotifica
 
       {paired && summary && (
         <section>
-          <h3 className="font-display text-xl text-petal-ink mb-3">{tr('最近的存款', 'Recent deposits')}</h3>
+          <h3 className="font-display text-xl text-petal-ink mb-3">{tr('最近的感情存款', 'Recent Love Bank activity')}</h3>
           {summary.recent.length === 0 ? (
             <div className="bg-white rounded-md border border-dashed border-petal-rule p-5" data-testid="deposit-history-empty">
               <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-2">

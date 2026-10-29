@@ -66,6 +66,17 @@ test.describe('關係之屋 dashboard', () => {
         }),
       })
     );
+    await page.route('**/api/coins/summary', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true, paired: true,
+          me: { balance: 600, available: 600 }, partner: { balance: 400 }, average: 500,
+          awaiting_me: [], awaiting_partner: [], recent: [],
+        }),
+      })
+    );
     await page.route('**/api/relationship/goodwill', (route) =>
       route.fulfill({
         status: 200,
@@ -106,6 +117,25 @@ test.describe('關係之屋 dashboard', () => {
     await expect(page.getByTestId('relationship-checkin-modal')).toHaveCount(0, { timeout: 10000 });
     expect(posted.trust, 'a check-in was POSTed').toBe(4);
 
+    // 感情存款 shows in the house; the auto-counted 好感存款 meter is paused
+    // (goodwill_meter flag off by default).
+    await expect(page.getByTestId('love-bank-card')).toBeVisible();
+    await expect(page.getByTestId('love-bank-average')).toContainText('500');
+    await expect(page.getByTestId('goodwill-details-button')).toHaveCount(0);
+
+    // Past check-in results are viewable.
+    await page.getByTestId('relationship-history-button').click();
+    await expect(page.getByTestId('checkin-history-modal')).toBeVisible();
+    await expect(page.getByTestId('checkin-history-modal')).toContainText('還不錯');
+  });
+
+  test('with goodwill_meter on, the 好感存款 meter and breakdown come back', async ({ page }) => {
+    await page.route('**/api/feature-flags', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, flags: { goodwill_meter: true } }) })
+    );
+    await page.goto('/');
+    await expect(page.getByTestId('relationship-dashboard')).toBeVisible({ timeout: 15000 });
+
     // Goodwill breakdown modal explains the + / − items.
     await page.getByTestId('goodwill-details-button').click();
     await expect(page.getByTestId('goodwill-modal')).toBeVisible();
@@ -115,10 +145,36 @@ test.describe('關係之屋 dashboard', () => {
     // 5:1 ratio hint toggles open.
     await page.getByTestId('goodwill-ratio-hint-toggle').click();
     await expect(page.getByTestId('goodwill-ratio-hint')).toBeVisible();
+  });
 
-    // Past check-in results are viewable.
-    await page.getByTestId('relationship-history-button').click();
-    await expect(page.getByTestId('checkin-history-modal')).toBeVisible();
-    await expect(page.getByTestId('checkin-history-modal')).toContainText('還不錯');
+  test('a partner request waiting in 感情存款 becomes the top nudge', async ({ page }) => {
+    const now = new Date().toISOString();
+    await page.route('**/api/coins/summary', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          success: true, paired: true,
+          me: { balance: 0, available: 0 }, partner: { balance: 0 }, average: 0,
+          awaiting_me: [{ id: 'x', kind: 'request', status: 'pending', amount: 100, note: 'n', gift_icon: null, owner_id: 'p', created_by: 'p', is_mine: false, created_at: now, responded_at: null }],
+          awaiting_partner: [], recent: [],
+        }),
+      })
+    );
+    // No intimacy gap / overdue check-in, so the deposit nudge is the most urgent.
+    await page.route('**/api/relationship/summary', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          paired: true, partnerNickname: 'B', daysSinceIntimacy: 1, daysSinceAppreciation: 1,
+          positive14: 3, negative14: 0, openConflicts: 0,
+          checkin: { myLastDays: 1, coupleLastDays: 1, periodDays: 7, overdue: false },
+        }),
+      })
+    );
+    await page.goto('/');
+    await expect(page.getByTestId('relationship-primary-nudge')).toContainText('感情存款', { timeout: 15000 });
+    await expect(page.getByTestId('love-bank-card')).toContainText('1 筆在等你回應');
   });
 });

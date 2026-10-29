@@ -15,7 +15,7 @@ export const FEATURE_INTROS_EN: Record<string, IntroCopy> = {
     faqs: [
       {
         q: 'How is "the one thing most worth doing today" chosen?',
-        a: 'We look at signals like how often you are close, your relationship check-ins and your goodwill balance, and pick the single thing that needs attention most. One suggestion at a time, never a pile of reminders.',
+        a: 'We look at signals like how often you are close, your relationship check-ins and your Love Bank, and pick the single thing that needs attention most. One suggestion at a time, never a pile of reminders.',
       },
       {
         q: 'What is "Twogether noticed"?',
@@ -48,8 +48,8 @@ export const FEATURE_INTROS_EN: Record<string, IntroCopy> = {
         a: 'Love is not an add-on to problems, and growth is not a substitute for love. Both are part of a relationship. Whether you want to feel closer, feel lost, just had a fight or want to know each other better, your next step is here.',
       },
       {
-        q: 'What is the number on "we are loving"?',
-        a: 'Your positive interactions over the past two weeks: every note on the wall, every good moment recorded, every conflict resolved adds one. It is not a grade. Think of it as a savings account of good moments. Tap the card to see what added to it.',
+        q: 'What is the "Love Bank" at the top?',
+        a: 'Each of your Love Bank balances, plus the average of both. Only the other person can add to yours (a thank-you deposit, or confirming your deposit request), so it reflects how cared for they feel by you. Tap the card to make a deposit, confirm a request or redeem a gift.',
       },
       {
         q: 'Where did the old calendar go?',
@@ -150,8 +150,8 @@ export const FEATURE_INTROS_EN: Record<string, IntroCopy> = {
         a: 'Tap any calendar day to log your mood and how you feel about intimacy in one tap. Only you can see it by default; your partner sees a day only if you turn on sharing for it, and you can turn that off or clear it any time. Your partner can never fill it in for you, and not recording never means "no".',
       },
       {
-        q: 'What are deposits?',
-        a: 'You each have a deposit account that only your partner can add to: they make a thank-you deposit when they want to thank you, or you ask for a deposit and they confirm it. Spend your deposits in Deposits (profile menu, top right) on a gift from your partner; it\'s deducted only after they agree.',
+        q: 'What is the Love Bank?',
+        a: 'You each have a deposit account that only your partner can add to: they make a thank-you deposit when they want to thank you, or you ask for a deposit and they confirm it. Spend your deposits in Love Bank (profile menu, top right, or the relationship house on Today) on a gift from your partner; it\'s deducted only after they agree.',
       },
     ],
   },

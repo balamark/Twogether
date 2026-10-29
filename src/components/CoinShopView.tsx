@@ -29,7 +29,7 @@ interface CoinShopViewProps {
   updateGift: (gift: CoinGift, fields: GiftFields) => Promise<void>;
   removeGift: (gift: CoinGift) => Promise<void>;
   restoreDefaultGifts: () => Promise<void>;
-  /** Keeps the header's 存款 chip in sync with the latest summary. */
+  /** Keeps the header's 感情存款 chip in sync with the latest summary. */
   onBalanceChange: (balance: number) => void;
   onInvitePartner: () => void;
   showNotification: (notification: Omit<Notification, 'id'>) => void;
@@ -41,7 +41,7 @@ const EMPTY_GIFT: GiftFields = { title: '', description: '', cost: 1000, categor
 // can be redeemed but not edited/removed yet (there's no row to target).
 const isPending = (gift: CoinGift) => gift.id.startsWith('temp-');
 
-// 存款 page: both partners' deposit accounts (DepositPanel) plus the gift shop
+// 感情存款 page: both partners' deposit accounts (DepositPanel) plus the gift shop
 // where you spend your own deposit on a gift from your partner — the partner
 // has to agree before anything is deducted. Defined at module scope (not inside App) so its
 // identity is stable across App re-renders — a nested definition would remount
@@ -127,7 +127,7 @@ const CoinShopView = ({
       showNotification({
         type: 'info',
         title: tr('已送出兌換申請 🎁', 'Redemption request sent 🎁'),
-        message: tr(`等 TA 同意後，才會從你的存款扣除 ${gift.cost}`, `${gift.cost} is deducted from your deposits only after your partner agrees`),
+        message: tr(`等 TA 同意後，才會從你的感情存款扣除 ${gift.cost}`, `${gift.cost} is deducted from your Love Bank only after your partner agrees`),
         duration: 4000,
       });
     } catch (error) {
@@ -151,13 +151,13 @@ const CoinShopView = ({
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
           <div>
             <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-              {tr('— 存款', '— Deposits')}
+              {tr('— 感情存款', '— Love Bank')}
             </div>
             <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
-              {tr('我們的', 'Our ')}<em className="not-italic font-light italic text-pink-600">{tr('存款', 'deposits')}</em>
+              {tr('感情', 'Love ')}<em className="not-italic font-light italic text-pink-600">{tr('存款', 'Bank')}</em>
             </h2>
             <p className="font-display italic font-light text-base text-petal-muted">
-              {tr('只有另一半能為你存款；用自己的存款，兌換對方的心意。', 'Only your partner can add to your deposits; spend your own on a gift from them.')}
+              {tr('只有另一半能為你存入感情存款；用自己的感情存款，兌換對方的心意。', 'Only your partner can add to your Love Bank; spend your own on a gift from them.')}
             </p>
           </div>
         </div>
@@ -175,7 +175,7 @@ const CoinShopView = ({
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
             <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink">
-              {tr('用存款', 'Spend on a ')}<em className="not-italic font-light italic text-pink-600">{tr('兌換禮品', 'gift')}</em>
+              {tr('用感情存款', 'Spend on a ')}<em className="not-italic font-light italic text-pink-600">{tr('兌換禮品', 'gift')}</em>
             </h3>
             <p className="font-body text-sm text-petal-muted mt-1">
               {tr('一起設計你們想要的禮品；兌換要等對方同意後才會扣款。', 'Design the gifts you both want; a redemption is deducted only after the other agrees.')}
@@ -213,7 +213,7 @@ const CoinShopView = ({
             {tr('把你們真正想要的小幸福放進商店', 'Fill the shop with the little joys you two actually want')}
           </p>
           <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-5">
-            {tr('例如「💆 睡前肩頸按摩 · 800」——存款夠了，就兌換一份對方的心意。', 'For example "💆 A bedtime shoulder rub · 800": once your deposits add up, redeem a gesture from the other.')}
+            {tr('例如「💆 睡前肩頸按摩 · 800」——感情存款夠了，就兌換一份對方的心意。', 'For example "💆 A bedtime shoulder rub · 800": once your deposits add up, redeem a gesture from the other.')}
           </p>
           <div className="flex flex-wrap justify-center gap-2">
             <Button onClick={openAddModal}>{tr('新增第一個禮品', 'Add your first gift')}</Button>
@@ -304,7 +304,7 @@ const CoinShopView = ({
                   ? tr('送出中…', 'Sending…')
                   : canRedeem
                     ? tr('申請兌換 →', 'Ask to redeem →')
-                    : tr(`存款還差 ${gift.cost - available}`, `${gift.cost - available} short`);
+                    : tr(`感情存款還差 ${gift.cost - available}`, `${gift.cost - available} short`);
               return (
                 <button
                   onClick={() => buyGift(gift)}
@@ -386,7 +386,7 @@ const CoinShopView = ({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="gift-cost" className="block text-sm font-medium text-gray-700 mb-2">
-                    {tr('價格（存款）', 'Price (deposits)')}
+                    {tr('價格（感情存款）', 'Price (Love Bank)')}
                   </label>
                   <input
                     id="gift-cost"

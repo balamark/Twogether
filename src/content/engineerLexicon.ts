@@ -38,7 +38,7 @@ export const ENGINEER_LEXICON: Record<string, string> = {
   '接住情緒・檢查': 'Postmortem ● 根因分析',
 
   // ── 使用者選單（Header 下拉）────────────────────────────────
-  '存款': 'Credits 儲值',
+  '感情存款': 'Credits 儲值',
   '最近動態': 'Activity Log',
   '愛情旅程': 'Release Roadmap',
   '訊息紀錄': 'stdout Log Stream',
@@ -96,7 +96,7 @@ export const ENGINEER_LEXICON: Record<string, string> = {
   '想談的主題': 'incident 主題',
   '想聊聊的事（選填）': '事故描述（選填）',
 
-  // ── 存款 / Deposits ─────────────────────────────────────────
+  // ── 感情存款 / Love Bank ────────────────────────────────────
   '自訂禮品': '自訂 reward',
   '添加自訂禮品': '新增自訂 reward',
 
