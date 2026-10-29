@@ -4353,10 +4353,14 @@ class ApiService {
   }
 
   // Custom Gifts API
-  async getCustomGifts(): Promise<unknown[]> {
+  // Custom gifts plus the keys of built-in gifts this couple removed/replaced.
+  async getCustomGifts(): Promise<{ gifts: unknown[]; hiddenDefaults: string[] }> {
     try {
       const response = await apiClient.get('/custom-gifts');
-      return response.data.custom_gifts || [];
+      return {
+        gifts: response.data.custom_gifts || [],
+        hiddenDefaults: response.data.hidden_defaults || [],
+      };
     } catch (error) {
       console.error('Failed to fetch custom gifts:', error);
       throw error;
@@ -4369,6 +4373,8 @@ class ApiService {
     cost: number;
     category: 'service' | 'experience' | 'physical' | 'intimate';
     icon?: string;
+    /** Key of a built-in gift this one replaces (edit of a default gift). */
+    replaces_default?: string;
   }): Promise<unknown> {
     try {
       const response = await apiClient.post('/custom-gifts', gift);
@@ -4400,6 +4406,26 @@ class ApiService {
       await apiClient.delete(`/custom-gifts/${id}`);
     } catch (error) {
       console.error('Failed to delete custom gift:', error);
+      throw error;
+    }
+  }
+
+  // Remove a built-in gift from this couple's shop.
+  async hideDefaultGift(key: string): Promise<void> {
+    try {
+      await apiClient.delete(`/custom-gifts/defaults/${encodeURIComponent(key)}`);
+    } catch (error) {
+      console.error('Failed to hide default gift:', error);
+      throw error;
+    }
+  }
+
+  // Bring back every removed/replaced built-in gift.
+  async restoreDefaultGifts(): Promise<void> {
+    try {
+      await apiClient.delete('/custom-gifts/defaults/hidden');
+    } catch (error) {
+      console.error('Failed to restore default gifts:', error);
       throw error;
     }
   }

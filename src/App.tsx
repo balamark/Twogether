@@ -670,6 +670,8 @@ const LoveTimeApp = () => {
 
   const [totalCoins, setTotalCoins] = useState(0);
   const [customGifts, setCustomGifts] = useState<CoinGift[]>([]);
+  // Keys of built-in gifts this couple removed (or replaced with an edit).
+  const [hiddenDefaultGifts, setHiddenDefaultGifts] = useState<string[]>([]);
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
@@ -1666,8 +1668,9 @@ const LoveTimeApp = () => {
 
         // Load custom gifts from backend
         try {
-          const gifts = await apiService.getCustomGifts();
+          const { gifts, hiddenDefaults } = await apiService.getCustomGifts();
           setCustomGifts(gifts as ApiCustomGift[]);
+          setHiddenDefaultGifts(hiddenDefaults);
         } catch (giftError) {
           console.error('Failed to load custom gifts:', giftError);
         }
@@ -2288,7 +2291,15 @@ const LoveTimeApp = () => {
   };
 
   // Gift management functions
-  const addCustomGift = async (title: string, description: string, cost: number, category: CoinGift['category'], icon: string) => {
+  // The server's message already says what failed and what to do next (and is
+  // translated for English); fall back to a generic retry hint otherwise.
+  const giftErrorMessage = (error: unknown, fallback: string) => {
+    const message = (error as { message?: string })?.message;
+    return message && !/^Request failed/.test(message) ? message : fallback;
+  };
+
+  const addCustomGift = async (title: string, description: string, cost: number, category: CoinGift['category'], icon: string): Promise<boolean> => {
+    let added = false;
     try {
       // Create gift via backend API
       const newGift = await apiService.createCustomGift({
@@ -2301,6 +2312,7 @@ const LoveTimeApp = () => {
 
       // Update local state
       setCustomGifts(prev => [...prev, newGift]);
+      added = true;
 
       showNotification({
         type: 'success',
@@ -2314,7 +2326,91 @@ const LoveTimeApp = () => {
       showNotification({
         type: 'error',
         title: tr('禮品添加失敗', 'Couldn\'t add the gift'),
-        message: tr('無法保存禮品到服務器，請稍後再試', 'Couldn\'t save the gift to the server. Please try again in a moment'),
+        message: giftErrorMessage(error, tr('無法保存禮品到服務器，請稍後再試', 'Couldn\'t save the gift to the server. Please try again in a moment')),
+        duration: 5000
+      });
+    }
+    return added;
+  };
+
+  // Edit a gift. Optimistic (playbook §R7): the card updates immediately and
+  // rolls back with a notification if the save fails. A built-in gift can't be
+  // edited in place, so editing one saves a custom copy that replaces it.
+  const updateGift = async (gift: CoinGift, fields: Omit<CoinGift, 'id' | 'isCustom' | 'createdBy'>) => {
+    const failTitle = tr('禮品修改失敗', 'Couldn\'t update the gift');
+    const failFallback = tr('已恢復成修改前的內容，請稍後再試一次', 'We put back the previous version. Please try again in a moment');
+    if (gift.isCustom) {
+      const previous = customGifts;
+      setCustomGifts(prev => prev.map(g => (g.id === gift.id ? { ...g, ...fields } : g)));
+      try {
+        await apiService.updateCustomGift(gift.id, fields);
+      } catch (error) {
+        console.error('Failed to update custom gift:', error);
+        setCustomGifts(previous);
+        showNotification({ type: 'error', title: failTitle, message: giftErrorMessage(error, failFallback), duration: 5000 });
+      }
+      return;
+    }
+    const tempId = `temp-${gift.id}-${Date.now()}`;
+    setHiddenDefaultGifts(prev => (prev.includes(gift.id) ? prev : [...prev, gift.id]));
+    setCustomGifts(prev => [{ ...fields, id: tempId, isCustom: true }, ...prev]);
+    try {
+      const saved = await apiService.createCustomGift({ ...fields, replaces_default: gift.id }) as CoinGift;
+      setCustomGifts(prev => prev.map(g => (g.id === tempId ? saved : g)));
+    } catch (error) {
+      console.error('Failed to replace default gift:', error);
+      setCustomGifts(prev => prev.filter(g => g.id !== tempId));
+      setHiddenDefaultGifts(prev => prev.filter(k => k !== gift.id));
+      showNotification({ type: 'error', title: failTitle, message: giftErrorMessage(error, failFallback), duration: 5000 });
+    }
+  };
+
+  // Remove a gift (custom → deleted, built-in → hidden for this couple).
+  // Optimistic: gone immediately, put back with a notification on failure.
+  const removeGift = async (gift: CoinGift) => {
+    const failTitle = tr('禮品移除失敗', 'Couldn\'t remove the gift');
+    const failFallback = tr(`「${gift.title}」已放回商店，請稍後再試一次`, `"${gift.title}" is back in the shop. Please try again in a moment`);
+    if (gift.isCustom) {
+      const previous = customGifts;
+      setCustomGifts(prev => prev.filter(g => g.id !== gift.id));
+      try {
+        await apiService.deleteCustomGift(gift.id);
+      } catch (error) {
+        console.error('Failed to delete custom gift:', error);
+        setCustomGifts(previous);
+        showNotification({ type: 'error', title: failTitle, message: giftErrorMessage(error, failFallback), duration: 5000 });
+      }
+      return;
+    }
+    setHiddenDefaultGifts(prev => (prev.includes(gift.id) ? prev : [...prev, gift.id]));
+    try {
+      await apiService.hideDefaultGift(gift.id);
+    } catch (error) {
+      console.error('Failed to hide default gift:', error);
+      setHiddenDefaultGifts(prev => prev.filter(k => k !== gift.id));
+      showNotification({ type: 'error', title: failTitle, message: giftErrorMessage(error, failFallback), duration: 5000 });
+    }
+  };
+
+  // Bring back every removed built-in gift (edited copies stay as they are).
+  const restoreDefaultGifts = async () => {
+    const previous = hiddenDefaultGifts;
+    setHiddenDefaultGifts([]);
+    try {
+      await apiService.restoreDefaultGifts();
+      showNotification({
+        type: 'success',
+        title: tr('已恢復預設禮品', 'Default gifts restored'),
+        message: tr('內建禮品都回到商店了；你修改過的版本也會保留', 'The built-in gifts are back in the shop; your edited versions stay too'),
+        duration: 3000
+      });
+    } catch (error) {
+      console.error('Failed to restore default gifts:', error);
+      setHiddenDefaultGifts(previous);
+      showNotification({
+        type: 'error',
+        title: tr('恢復預設禮品失敗', 'Couldn\'t restore the default gifts'),
+        message: giftErrorMessage(error, tr('請稍後再試一次', 'Please try again in a moment')),
         duration: 5000
       });
     }
@@ -2600,9 +2696,13 @@ const LoveTimeApp = () => {
       case 'shop': return (
         <CoinShopView
           totalCoins={totalCoins}
-          defaultGifts={defaultGifts}
+          defaultGifts={defaultGifts.filter(g => !hiddenDefaultGifts.includes(g.id))}
+          hiddenDefaultCount={defaultGifts.filter(g => hiddenDefaultGifts.includes(g.id)).length}
           customGifts={customGifts}
           addCustomGift={addCustomGift}
+          updateGift={updateGift}
+          removeGift={removeGift}
+          restoreDefaultGifts={restoreDefaultGifts}
           purchaseGift={purchaseGift}
         />
       );

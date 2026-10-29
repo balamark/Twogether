@@ -30,6 +30,8 @@ import {
   ThumbsDown,
   Send,
   Globe,
+  Coins,
+  Trash2,
   type LucideIcon,
 } from 'lucide-react';
 import { daysSinceLastNudge } from './AchievementsView';
@@ -1147,6 +1149,41 @@ const PREVIEWS: Record<string, PreviewConfig> = {
             {tr('「還記得第一次注意到他的時候，是他笑起來眼睛會彎的樣子。」', '"I remember the first time I noticed him: the way his eyes curved when he smiled."')}
           </p>
         </SampleCard>
+      </div>
+    ),
+  },
+  // 金幣商店：the gift catalog is the couple's own — every gift (built-in ones
+  // included) can be added, edited or removed.
+  shop: {
+    icon: Coins,
+    eyebrow: tr('金幣商店', 'Coin shop'),
+    title: (
+      <>
+        {tr('用愛賺來的金幣，換', 'Trade the coins you earned with love for ')}<em className="not-italic font-light italic text-pink-600">{tr('你們想要的禮物', 'the gifts you want')}</em>
+      </>
+    ),
+    description:
+      tr('一起記錄親密、完成挑戰就能累積金幣，兌換對方的小心意。商店裡的每個禮品都由你們決定：新增自己的禮品，也能修改或移除內建的禮品，隨時一鍵恢復預設。', 'Log intimacy and finish challenges together to earn coins, then trade them for a little gesture from each other. Every gift in the shop is yours to decide: add your own, edit or remove the built-in ones, and restore the defaults with one tap.'),
+    sample: (
+      <div className="space-y-2.5">
+        {[
+          { icon: '💆‍♀️', title: tr('睡前肩頸按摩', 'Bedtime shoulder rub'), cost: 800 },
+          { icon: '🍳', title: tr('週末早午餐我來煮', 'I cook weekend brunch'), cost: 1200 },
+        ].map((g) => (
+          <SampleCard key={g.title}>
+            <div className="flex items-center justify-between">
+              <span className="font-body text-sm text-petal-ink">{g.icon} {g.title}</span>
+              <div className="flex items-center gap-2 text-petal-muted">
+                <span className="font-display italic text-sm text-petal-ink">
+                  <Coins className="inline w-3.5 h-3.5 mr-1 text-petal-rose-deep" strokeWidth={1.5} />{g.cost}
+                </span>
+                <Pencil className="w-3.5 h-3.5" aria-hidden />
+                <Trash2 className="w-3.5 h-3.5" aria-hidden />
+                <SampleTag />
+              </div>
+            </div>
+          </SampleCard>
+        ))}
       </div>
     ),
   },
