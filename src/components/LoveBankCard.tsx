@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronRight, HelpCircle } from 'lucide-react';
+import { ChevronRight, HelpCircle, PiggyBank } from 'lucide-react';
 import { apiService } from '../services/api';
 import { useCachedQuery, userKey } from '../services/queryCache';
 import { tr } from '../i18n/tr';
@@ -21,38 +21,17 @@ const LoveBankCard: React.FC<LoveBankCardProps> = ({ onOpen, compact = false }) 
 
   if (!summary?.paired) return null;
 
-  return (
-    <div
-      data-testid="love-bank-card"
-      className={`relative border transition-colors hover:border-petal-ink ${
-        compact ? 'rounded-xl bg-white border-petal-rule' : 'rounded-3xl bg-gradient-to-b from-white to-petal-cream border-petal-rose-soft shadow-petal'
-      }`}
-    >
-      <button
-        type="button"
-        onClick={onOpen}
-        className={`group w-full flex items-center gap-3 text-left ${compact ? 'px-4 py-3' : 'px-6 py-5'}`}
-      >
-        <span className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted">
-          {tr('感情存款', 'Love Bank')}
-        </span>
-        <span
-          data-testid="love-bank-average"
-          className={`ml-auto font-display font-light text-petal-rose-deep leading-none ${compact ? 'text-3xl' : 'text-4xl'}`}
-        >
-          {summary.average}
-        </span>
-        {/* Room for the (?) button, which sits on top of this row. */}
-        <span className="w-6" aria-hidden />
-        <ChevronRight className="w-4 h-4 text-petal-muted group-hover:text-petal-ink transition-colors shrink-0" strokeWidth={1.5} />
-      </button>
+  // The (?) and its tooltip; `align` keeps the tooltip on-screen (the compact
+  // row's (?) sits near the right edge).
+  const hint = (align: 'left' | 'right') => (
+    <>
       <button
         type="button"
         onClick={() => setHintOpen((v) => !v)}
         aria-label={tr('這個數字是什麼？', 'What is this number?')}
         aria-expanded={hintOpen}
         data-testid="love-bank-hint"
-        className={`absolute top-1/2 -translate-y-1/2 p-1.5 rounded-full text-petal-muted hover:text-petal-ink ${compact ? 'right-9' : 'right-11'}`}
+        className="p-1.5 rounded-full text-petal-muted hover:text-petal-ink"
       >
         <HelpCircle className="w-3.5 h-3.5" strokeWidth={1.5} />
       </button>
@@ -60,12 +39,48 @@ const LoveBankCard: React.FC<LoveBankCardProps> = ({ onOpen, compact = false }) 
         <p
           role="tooltip"
           data-testid="love-bank-hint-text"
-          className="absolute right-3 top-full mt-1 z-10 max-w-[240px] rounded-md bg-petal-ink px-3 py-2 font-body text-[11px] leading-relaxed text-petal-cream shadow-lg"
+          className={`absolute ${align === 'left' ? 'left-0' : 'right-0'} top-full mt-1 z-10 w-max max-w-[240px] rounded-md bg-petal-ink px-3 py-2 font-body text-[11px] leading-relaxed text-petal-cream shadow-lg`}
         >
           {tr('你們兩人感情存款的平均', 'The average of both your Love Bank balances')}
         </p>
       )}
-    </div>
+    </>
+  );
+
+  // 關係之屋: one quiet row inside the house.
+  if (compact) {
+    return (
+      <div data-testid="love-bank-card" className="relative flex items-center rounded-xl bg-white border border-petal-rule hover:border-petal-ink transition-colors">
+        <button type="button" onClick={onOpen} className="group flex-1 flex items-center gap-3 px-4 py-3 text-left">
+          <span className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted">{tr('感情存款', 'Love Bank')}</span>
+          <span data-testid="love-bank-average" className="ml-auto font-display text-3xl font-light text-petal-rose-deep leading-none">{summary.average}</span>
+        </button>
+        <div className="relative">{hint('right')}</div>
+        <button type="button" onClick={onOpen} aria-label={tr('打開感情存款', 'Open Love Bank')} className="pr-3 pl-1 py-3 text-petal-muted hover:text-petal-ink">
+          <ChevronRight className="w-4 h-4" strokeWidth={1.5} />
+        </button>
+      </div>
+    );
+  }
+
+  // 我們: a section in the same shape as 我們正在愛 / 我們正在成長 (title
+  // outside, inner white card), on a soft blue so it reads as its own thing.
+  return (
+    <section data-testid="love-bank-card" className="rounded-3xl border border-sky-200 bg-sky-50/60 p-5 md:p-6">
+      <div className="relative flex items-center gap-2 mb-4">
+        <PiggyBank className="w-5 h-5 text-sky-800" strokeWidth={1.5} />
+        <h2 className="font-display text-xl text-petal-ink">{tr('感情存款', 'Love Bank')}</h2>
+        <div className="relative">{hint('left')}</div>
+      </div>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="group w-full flex items-center gap-2 rounded-2xl bg-white/70 border border-petal-rule-soft px-4 py-4 hover:border-petal-ink transition-colors"
+      >
+        <span data-testid="love-bank-average" className="font-display text-4xl font-light text-petal-ink leading-none">{summary.average}</span>
+        <ChevronRight className="ml-auto w-4 h-4 text-petal-muted group-hover:text-petal-ink shrink-0 transition-colors" strokeWidth={1.5} />
+      </button>
+    </section>
   );
 };
 
