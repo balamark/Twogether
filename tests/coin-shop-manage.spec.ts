@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
-// 金幣商店 gift management: every gift (built-in ones included) can be edited
-// or removed, removed built-ins can be restored, and all of it is optimistic.
+// 存款 page: gift management (every gift, built-ins included, can be edited or
+// removed and restored — optimistically) and the deposit flows on top of it.
 
 const FAKE_USER = {
   id: '11111111-1111-1111-1111-111111111111',
@@ -11,7 +11,7 @@ const FAKE_USER = {
 };
 const CUSTOM_ID = '77777777-7777-7777-7777-777777777777';
 
-async function setup(page: Page) {
+async function setup(page: Page, summary: Record<string, unknown> = { success: true, paired: false }) {
   const calls: { method: string; url: string; body: string }[] = [];
 
   await page.addInitScript((user) => {
@@ -36,6 +36,15 @@ async function setup(page: Page) {
       });
     }
     return route.fallback();
+  });
+
+  await page.route('**/api/coins/**', async (route) => {
+    const req = route.request();
+    if (req.method() === 'GET') {
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(summary) });
+    }
+    calls.push({ method: req.method(), url: req.url(), body: req.postData() ?? '' });
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true }) });
   });
 
   await page.route('**/api/custom-gifts**', async (route) => {
@@ -136,5 +145,53 @@ test.describe('Coin shop gift management', () => {
     expect(edit!.height).toBeGreaterThanOrEqual(44);
     expect(del!.height).toBeGreaterThanOrEqual(44);
     expect(del!.x - (edit!.x + edit!.width)).toBeGreaterThanOrEqual(8);
+  });
+
+  test('paired: shows both accounts + average, answers a partner request, and asks to redeem', async ({ page }) => {
+    test.setTimeout(60000);
+    const now = new Date().toISOString();
+    const calls = await setup(page, {
+      success: true,
+      paired: true,
+      me: { balance: 1600, available: 1600 },
+      partner: { balance: 400 },
+      average: 1000,
+      awaiting_me: [
+        { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', kind: 'request', status: 'pending', amount: 100, note: '我幫你寫了劇本', gift_icon: null, owner_id: 'p', created_by: 'p', is_mine: false, created_at: now, responded_at: null },
+      ],
+      awaiting_partner: [],
+      recent: [],
+    });
+    await openShop(page);
+
+    await expect(page.getByTestId('deposit-mine')).toContainText('1600');
+    await expect(page.getByTestId('deposit-partner')).toContainText('400');
+    await expect(page.getByTestId('deposit-average')).toContainText('1000');
+    await expect(page.getByTestId('deposit-history-empty')).toBeVisible();
+
+    await page.getByTestId('deposit-confirm').click();
+    await expect.poll(() => calls.some((c) => c.url.endsWith('/coins/transactions/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/respond') && c.body.includes('"confirm"'))).toBe(true);
+
+    // 全身按摩 costs 1500 ≤ 1600 available → redeemable; 浪漫晚餐 (2000) is 400 short.
+    const dinner = page.getByTestId('gift-card').filter({ hasText: '浪漫晚餐' }).getByTestId('redeem-gift');
+    await expect(dinner).toBeDisabled();
+    await expect(dinner).toContainText('存款還差 400');
+    await page.getByTestId('gift-card').filter({ hasText: '全身按摩' }).getByTestId('redeem-gift').click();
+    await expect.poll(() => calls.find((c) => c.url.endsWith('/coins/redemptions'))?.body ?? '').toContain('"cost":1500');
+
+    // 感謝存款 form posts to the partner's account.
+    await page.getByTestId('open-thanks-deposit').click();
+    await page.locator('#deposit-note').fill('謝謝你煮晚餐');
+    await page.getByTestId('submit-deposit').click();
+    await expect.poll(() => calls.find((c) => c.url.endsWith('/coins/deposits'))?.body ?? '').toContain('"kind":"thanks"');
+  });
+
+  test('unpaired: three-part gate and redeem disabled', async ({ page }) => {
+    test.setTimeout(60000);
+    await setup(page);
+    await openShop(page);
+    await expect(page.getByTestId('deposit-unpaired-gate')).toContainText('邀請另一半');
+    await expect(page.getByTestId('redeem-gift').first()).toBeDisabled();
+    await expect(page.getByTestId('redeem-gift').first()).toContainText('配對後才能兌換');
   });
 });

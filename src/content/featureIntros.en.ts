@@ -150,8 +150,8 @@ export const FEATURE_INTROS_EN: Record<string, IntroCopy> = {
         a: 'Tap any calendar day to log your mood and how you feel about intimacy in one tap. Only you can see it by default; your partner sees a day only if you turn on sharing for it, and you can turn that off or clear it any time. Your partner can never fill it in for you, and not recording never means "no".',
       },
       {
-        q: 'What are coins?',
-        a: 'You earn coins by recording and interacting. Spend them in the coin shop (profile menu, top right) on small gifts for your partner.',
+        q: 'What are deposits?',
+        a: 'You each have a deposit account that only your partner can add to: they make a thank-you deposit when they want to thank you, or you ask for a deposit and they confirm it. Spend your deposits in Deposits (profile menu, top right) on a gift from your partner; it\'s deducted only after they agree.',
       },
     ],
   },

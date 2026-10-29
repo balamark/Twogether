@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, Trash2, Pencil, Crown, Home as HomeIcon, TrendingUp, HeartHandshake } from 'lucide-react';
+import { Calendar, MessageCircle, Clock, MapPin, Play, User, Trash2, Pencil, Crown, Home as HomeIcon, TrendingUp, HeartHandshake } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import HomeView from './components/HomeView';
 import UsView from './components/UsView';
@@ -139,11 +139,6 @@ export interface Notification {
   duration?: number;
 }
 
-interface CoinActivity {
-  type: string;
-  baseCoins: number;
-  bonusConditions?: { condition: string; bonus: number }[];
-}
 
 export interface RoleplayScript {
   id: string;
@@ -520,7 +515,6 @@ export interface ForeplayActivity {
   title: string;
   description: string;
   duration: string;
-  coins: number;
   tips: string[];
 }
 
@@ -528,7 +522,6 @@ export interface PositionSuggestion {
   name: string;
   difficulty: string;
   description: string;
-  coins: number;
   benefits: string[];
 }
 
@@ -1246,7 +1239,7 @@ const LoveTimeApp = () => {
       partnerConnected: false
     });
     // Reset the view so we land back on the logged-out home, not whatever
-    // authenticated panel (設定 / 金幣商店 / …) was open at logout time.
+    // authenticated panel (設定 / 存款 / …) was open at logout time.
     setCurrentView('home');
     // Drop the counselor role too so the next login (possibly a different
     // account) never flashes a stale switch or workstation.
@@ -1285,45 +1278,6 @@ const LoveTimeApp = () => {
   };
 
   // Coin activities configuration
-  const coinActivities: { [key: string]: CoinActivity } = {
-    'roleplay': { 
-      type: '角色扮演', 
-      baseCoins: 500,
-      bonusConditions: [
-        { condition: '使用新劇本', bonus: 200 },
-        { condition: '超過30分鐘', bonus: 300 }
-      ]
-    },
-    'new_position': { 
-      type: '嘗試新姿勢', 
-      baseCoins: 200,
-      bonusConditions: [
-        { condition: '第一次嘗試', bonus: 300 }
-      ]
-    },
-    'long_session': { 
-      type: '長時間親密', 
-      baseCoins: 1000,
-      bonusConditions: [
-        { condition: '超過1小時', bonus: 500 }
-      ]
-    },
-    'new_location': { 
-      type: '新地點', 
-      baseCoins: 300,
-      bonusConditions: [
-        { condition: '戶外', bonus: 400 }
-      ]
-    },
-    'foreplay': { 
-      type: '前戲活動', 
-      baseCoins: 150 
-    },
-    'regular': { 
-      type: '親密時光', 
-      baseCoins: 100 
-    }
-  };
 
   // Default gift catalog
   const defaultGifts: CoinGift[] = [
@@ -1608,12 +1562,12 @@ const LoveTimeApp = () => {
           }
         }
 
-        // Load coin balance from backend
+        // Load my 存款 balance from backend
         try {
           const coinBalance = await apiService.getCoinBalance();
           setTotalCoins(coinBalance.balance);
         } catch (coinError) {
-          console.error('Failed to load coin balance:', coinError);
+          console.error('Failed to load deposit balance:', coinError);
           // Keep local value if API fails
         }
 
@@ -1749,22 +1703,6 @@ const LoveTimeApp = () => {
     }
   };
 
-  const calculateCoins = (activityType: string, duration?: string, isNewScript?: boolean): number => {
-    const activity = coinActivities[activityType] || coinActivities['regular'];
-    let coins = activity.baseCoins;
-    
-    // Apply bonus conditions
-    if (activity.bonusConditions) {
-      activity.bonusConditions.forEach(bonus => {
-        if (bonus.condition === '使用新劇本' && isNewScript === true) coins += bonus.bonus;
-        if (bonus.condition === '超過30分鐘' && duration && parseInt(duration) > 30) coins += bonus.bonus;
-        if (bonus.condition === '超過1小時' && duration && parseInt(duration) > 60) coins += bonus.bonus;
-      });
-    }
-    
-    return coins;
-  };
-
   const checkBadgeProgress = () => {
     const thisWeek = getWeeklyStats();
     const total = intimateRecords.length;
@@ -1837,9 +1775,6 @@ const LoveTimeApp = () => {
     activityType: string = 'regular'
   ) => {
     try {
-      const isNewScript = roleplayScript ? !intimateRecords.some(r => r.roleplayScript === roleplayScript) : false;
-      const coinsEarned = calculateCoins(activityType, duration, isNewScript);
-      
       let photoId: string | null = null;
       let photoUrl: string | null = null;
 
@@ -1892,16 +1827,6 @@ const LoveTimeApp = () => {
       // Update local state
       setIntimateRecords(prev => [...prev, newRecord]);
       
-      // Update coins using API service (non-blocking)
-      try {
-        await apiService.updateCoins(coinsEarned);
-        setTotalCoins(prev => prev + coinsEarned);
-      } catch (coinsError) {
-        console.warn('Failed to update coins via API, using local update only:', coinsError);
-        // Still update coins locally even if API fails
-        setTotalCoins(prev => prev + coinsEarned);
-      }
-      
       // Show success notification. First-success nudge (playbook P1-3): point
       // at the natural next action once, then stay quiet.
       const firstRecord = !localStorage.getItem('nudgeFirstRecordDone');
@@ -1915,7 +1840,6 @@ const LoveTimeApp = () => {
           : firstRecord
             ? tr(`${badgeProgress} 月曆會慢慢看見你們的節奏；也可以到「我們的牆」留句想說的話。`, `${badgeProgress} The calendar will slowly show your rhythm; you can also leave a note on "Our wall".`)
             : badgeProgress,
-        coins: coinsEarned,
         duration: firstRecord ? 9000 : 6000
       });
     } catch (error: unknown) {
@@ -2118,20 +2042,10 @@ const LoveTimeApp = () => {
       setShowScriptUploadModal(false);
       setPendingScriptDraft(null);
 
-      // Reward for creating content
-      try {
-        await apiService.updateCoins(200);
-        setTotalCoins(prev => prev + 200);
-      } catch (error) {
-        console.warn('Failed to update coins via API, using local update only:', error);
-        setTotalCoins(prev => prev + 200);
-      }
-
       showNotification({
         type: 'success',
         title: tr('劇本上傳成功！', 'Script uploaded!'),
         message: tr(`${title} 已加入你的劇本庫`, `${title} was added to your script library`),
-        coins: 200,
         duration: 5000
       });
 
@@ -2416,41 +2330,6 @@ const LoveTimeApp = () => {
     }
   };
 
-  const purchaseGift = async (gift: CoinGift) => {
-    if (totalCoins >= gift.cost) {
-      try {
-        // Update coins via backend API
-        await apiService.updateCoins(-gift.cost); // Negative amount for spending
-        setTotalCoins(prev => prev - gift.cost);
-
-        showNotification({
-          type: 'success',
-          title: tr('購買成功！', 'Purchased!'),
-          message: tr(`你獲得了 ${gift.title}！記得兌現承諾哦～`, `You got ${gift.title}! Remember to keep your promise~`),
-          duration: 5000
-        });
-      } catch (error) {
-        console.error('Failed to update coins via API:', error);
-        // Still update locally for immediate UI feedback
-        setTotalCoins(prev => prev - gift.cost);
-
-        showNotification({
-          type: 'success',
-          title: tr('購買成功！', 'Purchased!'),
-          message: tr(`你獲得了 ${gift.title}！記得兌現承諾哦～`, `You got ${gift.title}! Remember to keep your promise~`),
-          duration: 5000
-        });
-      }
-    } else {
-      showNotification({
-        type: 'warning',
-        title: tr('金幣不足', 'Not enough coins'),
-        message: tr(`還需要 ${gift.cost - totalCoins} 枚金幣`, `You need ${gift.cost - totalCoins} more coins`),
-        duration: 3000
-      });
-    }
-  };
-
   const getWeeklyStats = () => {
     const now = new Date();
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -2695,7 +2574,6 @@ const LoveTimeApp = () => {
         );
       case 'shop': return (
         <CoinShopView
-          totalCoins={totalCoins}
           defaultGifts={defaultGifts.filter(g => !hiddenDefaultGifts.includes(g.id))}
           hiddenDefaultCount={defaultGifts.filter(g => hiddenDefaultGifts.includes(g.id)).length}
           customGifts={customGifts}
@@ -2703,16 +2581,16 @@ const LoveTimeApp = () => {
           updateGift={updateGift}
           removeGift={removeGift}
           restoreDefaultGifts={restoreDefaultGifts}
-          purchaseGift={purchaseGift}
+          onBalanceChange={setTotalCoins}
+          onInvitePartner={openPairingPrompt}
+          showNotification={showNotification}
         />
       );
       case 'foreplay':
       case 'games':
         return <GamesView
-        totalCoins={totalCoins}
         customMemoryQuestions={customMemoryQuestions}
         customEmotions={customEmotions}
-        setTotalCoins={setTotalCoins}
         showNotification={showNotification}
       />;
       // 好好說話：merged tab (playbook §6 Q1). Two sub-views share one nav
@@ -2788,10 +2666,8 @@ const LoveTimeApp = () => {
             initialScriptTitle={pendingScriptTitle}
             onInitialScriptConsumed={() => setPendingScriptTitle(null)}
             renderGames={() => <GamesView
-              totalCoins={totalCoins}
               customMemoryQuestions={customMemoryQuestions}
               customEmotions={customEmotions}
-              setTotalCoins={setTotalCoins}
               showNotification={showNotification}
             />}
           />
@@ -2893,10 +2769,8 @@ const LoveTimeApp = () => {
       case 'feedback': return <FeedbackView authState={authState} showNotification={showNotification} setShowAuthModal={setShowAuthModal} />;
       case 'love-language': return <LoveLanguageView authState={authState} showNotification={showNotification} setShowAuthModal={setShowAuthModal} />;
       default: return <GamesView
-        totalCoins={totalCoins}
         customMemoryQuestions={customMemoryQuestions}
         customEmotions={customEmotions}
-        setTotalCoins={setTotalCoins}
         showNotification={showNotification}
       />;
     }
@@ -3565,12 +3439,6 @@ const LoveTimeApp = () => {
                       <Play className="w-5 h-5 text-petal-sage-deep" />
                       <span className="font-body text-sm text-petal-ink group-hover:text-petal-sage-deep group-hover:underline underline-offset-2 transition-colors">{tr('劇本:', 'Script: ')} {selectedRecord.roleplayScript}</span>
                     </button>
-                  )}
-                  {!!selectedRecord.coinsEarned && (
-                    <div className="flex items-center space-x-2">
-                      <Coins className="w-5 h-5 text-yellow-500" />
-                      <span className="font-body text-sm text-petal-ink">{tr('獲得金幣:', 'Coins earned: ')} {selectedRecord.coinsEarned}</span>
-                    </div>
                   )}
                 </div>
 

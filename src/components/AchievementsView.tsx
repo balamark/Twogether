@@ -320,8 +320,8 @@ export function AchievementsView() {
                 },
                 {
                   id: '7',
-                  title: tr('金幣收集者', 'Coin collector'),
-                  description: tr('累積1000金幣', 'Collect 1,000 coins'),
+                  title: tr('存款收集者', 'Deposit collector'),
+                  description: tr('累積 1000 存款', 'Build up 1,000 in deposits'),
                   icon: '💰',
                   category: 'coins',
                   progress: stats?.total_coins_earned || 0,
@@ -330,8 +330,8 @@ export function AchievementsView() {
                 },
                 {
                   id: '8',
-                  title: tr('金幣大師', 'Coin master'),
-                  description: tr('累積5000金幣', 'Collect 5,000 coins'),
+                  title: tr('存款大師', 'Deposit master'),
+                  description: tr('累積 5000 存款', 'Build up 5,000 in deposits'),
                   icon: '💎',
                   category: 'coins',
                   progress: stats?.total_coins_earned || 0,

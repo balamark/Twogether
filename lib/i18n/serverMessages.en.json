@@ -10,6 +10,8 @@
 "上傳第一張照片": "Upload your first photo",
 "金幣收集家": "Coin collector",
 "累積100金幣": "Collect 100 coins",
+"存款收集家": "Deposit collector",
+"累積100存款": "Build up 100 in deposits",
 "親密達人": "Intimacy pro",
 "記錄100次親密時光": "Record 100 intimate moments",
 "完美情侶": "Perfect couple",
@@ -190,6 +192,45 @@
 "創建禮品失敗，請稍後再試": "Couldn't create the gift. Please try again in a moment",
 "更新禮品失敗，請稍後再試": "Couldn't update the gift. Please try again in a moment",
 "刪除禮品失敗，請稍後再試": "Couldn't delete the gift. Please try again in a moment",
+"存款需要另一半才能運作：配對後，TA 就能為你存入感謝存款。先到「設定」邀請另一半加入吧": "Deposits need your partner: once you're paired, they can make thank-you deposits for you. Invite your partner from Settings first",
+"讀取存款失敗，請稍後再試": "Couldn't load deposits. Please try again in a moment",
+"存款類型必須是感謝存款或申請存款": "The deposit type must be a thank-you deposit or a deposit request",
+"金額必須是 1 到 10000 之間的整數": "The amount must be a whole number from 1 to 10000",
+"請寫下這筆存款的原因（1-100 個字）": "Write down what this deposit is for (1–100 characters)",
+"感謝存款已存入": "Thank-you deposit made",
+"已送出存款申請，等待對方確認": "Deposit request sent. Waiting for your partner to confirm",
+"存款失敗，請稍後再試": "Couldn't make the deposit. Please try again in a moment",
+"禮品名稱必須在1-100個字符之間": "The gift name must be 1–100 characters",
+"已送出兌換申請，等待對方同意": "Redemption request sent. Waiting for your partner to agree",
+"兌換申請送出失敗，請稍後再試": "Couldn't send the redemption request. Please try again in a moment",
+"找不到這筆存款紀錄，請重新整理後再試": "Couldn't find this deposit. Refresh and try again",
+"請選擇同意或婉拒": "Choose agree or decline",
+"找不到這筆存款紀錄，可能已被對方取消；重新整理就能看到最新狀態": "Couldn't find this deposit; your partner may have cancelled it. Refresh to see the latest",
+"這筆要由另一半確認；你可以在「等待對方確認」裡取消它": "Your partner needs to confirm this one; you can cancel it under \"Waiting on your partner\"",
+"這筆已經處理過了，重新整理就能看到最新狀態": "This one has already been handled. Refresh to see the latest",
+"已同意兌換，對方的存款已扣除": "Redemption agreed. It was deducted from your partner's deposits",
+"已婉拒兌換，對方的存款不會被扣除": "Redemption declined. Your partner's deposits stay as they are",
+"已確認，存款已存入對方帳戶": "Confirmed. The deposit is in your partner's account",
+"已婉拒這筆存款申請": "Deposit request declined",
+"處理失敗，請稍後再試": "Couldn't process that. Please try again in a moment",
+"這筆已經無法取消（可能對方剛處理完），重新整理就能看到最新狀態": "This can't be cancelled anymore (your partner may have just handled it). Refresh to see the latest",
+"已取消": "Cancelled",
+"取消失敗，請稍後再試": "Couldn't cancel. Please try again in a moment",
+"讀取存款紀錄失敗，請稍後再試": "Couldn't load deposit history. Please try again in a moment",
+"為你存入了一筆感謝存款": "made a thank-you deposit for you",
+"打開「存款」看看 TA 謝謝你什麼": "Open Deposits to see what they're thanking you for",
+"申請了一筆存款，等你確認": "asked for a deposit and is waiting for you to confirm",
+"打開「存款」確認或婉拒": "Open Deposits to confirm or decline",
+"確認了你的存款申請": "confirmed your deposit request",
+"存款已存入你的帳戶": "The deposit is in your account",
+"婉拒了你的存款申請": "declined your deposit request",
+"可以聊聊這件事對彼此的意義": "Maybe talk about what this means to each of you",
+"想用存款兌換你的禮物，等你同意": "wants to redeem a gift from you with their deposits",
+"打開「存款」同意或婉拒": "Open Deposits to agree or decline",
+"同意了你的禮物兌換": "agreed to your gift redemption",
+"存款已扣除，記得一起兌現這份心意": "It's been deducted from your deposits. Enjoy the gift together",
+"婉拒了你的禮物兌換": "declined your gift redemption",
+"存款沒有被扣除，可以換個時間或換個禮物再試": "Nothing was deducted. Try another time or a different gift",
 "找不到要修改的預設禮品，請重新整理頁面後再試": "Couldn't find the default gift to edit. Refresh the page and try again",
 "找不到要移除的預設禮品，請重新整理頁面後再試": "Couldn't find the default gift to remove. Refresh the page and try again",
 "已恢復預設禮品": "Default gifts restored",
@@ -1926,6 +1967,82 @@
 [
 "{0}雙方都認可了，已加入共同方案清單",
 "{0}: you both approved it, and it's on your shared list now"
+],
+[
+"存款還差 {0}。可以向另一半申請存款，或先選一個價格較低的禮品",
+"You're {0} short. Ask your partner for a deposit, or pick a less expensive gift for now"
+],
+[
+"對方目前的存款只有 {0}，不足以兌換這份禮品。可以先婉拒，等存款足夠再兌換",
+"Your partner only has {0} in deposits, not enough for this gift. You can decline for now and redeem once there's enough"
+],
+[
+"為另一半存入感謝存款：{0}",
+"made a thank-you deposit for their partner: {0}"
+],
+[
+"的存款申請已被確認：{0}",
+"had a deposit request confirmed: {0}"
+],
+[
+"用存款兌換了「{0}」",
+"redeemed \"{0}\" with deposits"
+],
+[
+"{0} {1}為你存入了一筆感謝存款",
+"{0} {1} made a thank-you deposit for you"
+],
+[
+"{0}為你存入了一筆感謝存款",
+"{0} made a thank-you deposit for you"
+],
+[
+"{0} {1}申請了一筆存款，等你確認",
+"{0} {1} asked for a deposit and is waiting for you to confirm"
+],
+[
+"{0}申請了一筆存款，等你確認",
+"{0} asked for a deposit and is waiting for you to confirm"
+],
+[
+"{0} {1}確認了你的存款申請",
+"{0} {1} confirmed your deposit request"
+],
+[
+"{0}確認了你的存款申請",
+"{0} confirmed your deposit request"
+],
+[
+"{0} {1}婉拒了你的存款申請",
+"{0} {1} declined your deposit request"
+],
+[
+"{0}婉拒了你的存款申請",
+"{0} declined your deposit request"
+],
+[
+"{0} {1}想用存款兌換你的禮物，等你同意",
+"{0} {1} wants to redeem a gift from you with their deposits"
+],
+[
+"{0}想用存款兌換你的禮物，等你同意",
+"{0} wants to redeem a gift from you with their deposits"
+],
+[
+"{0} {1}同意了你的禮物兌換",
+"{0} {1} agreed to your gift redemption"
+],
+[
+"{0}同意了你的禮物兌換",
+"{0} agreed to your gift redemption"
+],
+[
+"{0} {1}婉拒了你的禮物兌換",
+"{0} {1} declined your gift redemption"
+],
+[
+"{0}婉拒了你的禮物兌換",
+"{0} declined your gift redemption"
 ]
 ]
 }

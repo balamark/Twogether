@@ -1,13 +1,11 @@
-import { Coins, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import ForeplayView from './ForeplayView';
 import type { Notification } from '../App';
 import { tr } from '../i18n/tr';
 
 interface GamesViewProps {
-  totalCoins: number;
   customMemoryQuestions: string[];
   customEmotions: string[];
-  setTotalCoins: React.Dispatch<React.SetStateAction<number>>;
   showNotification: (notification: Omit<Notification, 'id'>) => void;
 }
 
@@ -15,10 +13,8 @@ interface GamesViewProps {
 // is stable across App re-renders. See issue #41. The romanticGames list embeds
 // the user's custom memory questions / emotions, so it is built from props.
 const GamesView = ({
-  totalCoins,
   customMemoryQuestions,
   customEmotions,
-  setTotalCoins,
   showNotification,
 }: GamesViewProps) => {
   const romanticGames = [
@@ -186,10 +182,6 @@ const GamesView = ({
               {tr('增進彼此感情的遊戲、前戲與姿勢建議 — 一個個慢慢來。', 'Games, foreplay and position ideas to bring you closer. Take it one at a time.')}
             </p>
           </div>
-          <div className="font-display italic font-light text-xl text-petal-ink">
-            <Coins className="inline w-4 h-4 mr-1.5 text-petal-rose-deep" strokeWidth={1.5} />
-            <b className="not-italic font-medium">{totalCoins}</b> <span className="text-sm text-petal-muted">{tr('枚', 'coins')}</span>
-          </div>
         </div>
       </div>
 
@@ -265,7 +257,7 @@ const GamesView = ({
         </div>
       </div>
 
-      <ForeplayView setTotalCoins={setTotalCoins} showNotification={showNotification} />
+      <ForeplayView showNotification={showNotification} />
     </div>
   );
 };

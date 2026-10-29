@@ -44,12 +44,12 @@ router.get('/', async (req, res) => {
         COUNT(DISTINCT lm.id) as love_moments_count,
         COUNT(DISTINCT p.id) as photos_count,
         COUNT(DISTINCT a.id) as achievements_count,
-        COALESCE(SUM(CASE WHEN ct.transaction_type = 'earn' THEN ct.amount ELSE -ct.amount END), 0) as total_coins
+        (SELECT COALESCE(SUM(CASE WHEN ct.transaction_type = 'earn' THEN ct.amount ELSE -ct.amount END), 0)
+           FROM coin_transactions ct WHERE ct.couple_id = c.id AND ct.status = 'confirmed') as total_coins
       FROM couples c
       LEFT JOIN love_moments lm ON c.id = lm.couple_id
       LEFT JOIN photos p ON c.id = p.couple_id
       LEFT JOIN achievements a ON c.id = a.couple_id
-      LEFT JOIN coin_transactions ct ON c.id = ct.couple_id
       WHERE c.id = $1
       GROUP BY c.id
     `, [coupleId]);
@@ -178,11 +178,11 @@ router.get('/achievements', async (req, res) => {
         COUNT(DISTINCT p.id) as total_photos,
         EXTRACT(DAY FROM (NOW() - c.created_at)) as days_together,
         COUNT(DISTINCT DATE(lm.moment_date)) as active_days,
-        COALESCE(SUM(CASE WHEN ct.transaction_type = 'earn' THEN ct.amount ELSE -ct.amount END), 0) as total_coins
+        (SELECT COALESCE(SUM(CASE WHEN ct.transaction_type = 'earn' THEN ct.amount ELSE -ct.amount END), 0)
+           FROM coin_transactions ct WHERE ct.couple_id = c.id AND ct.status = 'confirmed') as total_coins
       FROM couples c
       LEFT JOIN love_moments lm ON c.id = lm.couple_id
       LEFT JOIN photos p ON c.id = p.couple_id
-      LEFT JOIN coin_transactions ct ON c.id = ct.couple_id
       WHERE c.id = $1
       GROUP BY c.id, c.created_at
     `, [coupleId]);

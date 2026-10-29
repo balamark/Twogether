@@ -174,6 +174,13 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       case 'custom_gift_created':
       case 'custom_gift_updated':
       case 'custom_gift_deleted':
+      case 'deposit_thanks':
+      case 'deposit_requested':
+      case 'deposit_confirmed':
+      case 'deposit_declined':
+      case 'redemption_requested':
+      case 'redemption_approved':
+      case 'redemption_declined':
         onNavigate('shop');
         break;
       case 'assessment_saved':

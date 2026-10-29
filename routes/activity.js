@@ -65,12 +65,13 @@ router.get('/', async (req, res) => {
           FROM achievements a WHERE a.couple_id = $1
 
         UNION ALL
-        SELECT 'coins', NULL,
-               CASE WHEN ct.transaction_type = 'earn'
-                    THEN '獲得 ' || ct.amount || ' 金幣'
-                    ELSE '使用了 ' || ct.amount || ' 金幣' END,
-               ct.transaction_date
-          FROM coin_transactions ct WHERE ct.couple_id = $1
+        SELECT 'coins', CASE WHEN ct.kind = 'thanks' THEN ct.created_by ELSE ct.owner_id END,
+               CASE ct.kind
+                    WHEN 'thanks' THEN '為另一半存入感謝存款：' || ct.description
+                    WHEN 'request' THEN '的存款申請已被確認：' || ct.description
+                    ELSE '用存款兌換了「' || ct.description || '」' END,
+               COALESCE(ct.responded_at, ct.transaction_date)
+          FROM coin_transactions ct WHERE ct.couple_id = $1 AND ct.status = 'confirmed'
 
         UNION ALL
         SELECT 'checkin', rc.user_id, '完成了一次關係檢查', rc.created_at

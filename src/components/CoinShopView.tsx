@@ -1,16 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Coins, Pencil, Plus, RotateCcw, Trash2, X } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { Button } from './ui/Button';
 import { Spinner } from './ui/Spinner';
-import type { CoinGift } from '../App';
+import DepositPanel from './DepositPanel';
+import type { CoinGift, Notification } from '../App';
+import { apiService } from '../services/api';
+import { useCachedQuery, userKey } from '../services/queryCache';
 import { tr } from '../i18n/tr';
+import { newIdemKey } from '../utils/idempotency';
 
 type GiftFields = Omit<CoinGift, 'id' | 'isCustom' | 'createdBy'>;
 
 interface CoinShopViewProps {
-  totalCoins: number;
   /** Built-in gifts still shown (removed/replaced ones already filtered out). */
   defaultGifts: CoinGift[];
   /** How many built-in gifts this couple removed — drives 恢復預設禮品. */
@@ -26,7 +29,10 @@ interface CoinShopViewProps {
   updateGift: (gift: CoinGift, fields: GiftFields) => Promise<void>;
   removeGift: (gift: CoinGift) => Promise<void>;
   restoreDefaultGifts: () => Promise<void>;
-  purchaseGift: (gift: CoinGift) => void;
+  /** Keeps the header's 存款 chip in sync with the latest summary. */
+  onBalanceChange: (balance: number) => void;
+  onInvitePartner: () => void;
+  showNotification: (notification: Omit<Notification, 'id'>) => void;
 }
 
 const EMPTY_GIFT: GiftFields = { title: '', description: '', cost: 1000, category: 'service', icon: '🎁' };
@@ -35,11 +41,12 @@ const EMPTY_GIFT: GiftFields = { title: '', description: '', cost: 1000, categor
 // can be redeemed but not edited/removed yet (there's no row to target).
 const isPending = (gift: CoinGift) => gift.id.startsWith('temp-');
 
-// Coin Shop View Component. Defined at module scope (not inside App) so its
+// 存款 page: both partners' deposit accounts (DepositPanel) plus the gift shop
+// where you spend your own deposit on a gift from your partner — the partner
+// has to agree before anything is deducted. Defined at module scope (not inside App) so its
 // identity is stable across App re-renders — a nested definition would remount
 // on every render and wipe the in-progress "add custom gift" form. See issue #41.
 const CoinShopView = ({
-  totalCoins,
   defaultGifts,
   hiddenDefaultCount,
   customGifts,
@@ -47,8 +54,19 @@ const CoinShopView = ({
   updateGift,
   removeGift,
   restoreDefaultGifts,
-  purchaseGift,
+  onBalanceChange,
+  onInvitePartner,
+  showNotification,
 }: CoinShopViewProps) => {
+  const summaryQuery = useCachedQuery(userKey('/coins/summary'), () => apiService.getDepositSummary());
+  const summary = summaryQuery.data;
+  const paired = summary?.paired ?? false;
+  const available = summary?.me.available ?? 0;
+  const myBalance = summary?.me.balance;
+  useEffect(() => {
+    if (myBalance !== undefined) onBalanceChange(myBalance);
+  }, [myBalance, onBalanceChange]);
+
   const [showAddGiftModal, setShowAddGiftModal] = useState(false);
   useScrollLock(showAddGiftModal);
   // null = adding a new gift; otherwise the gift being edited.
@@ -97,16 +115,33 @@ const CoinShopView = ({
       }
     }
   );
-  // The buy button is rendered per gift card, so track which one is in flight
-  // to spin only that card. The hook's ref lock still drops any concurrent
-  // second click (same or other card) so coins can't be double-spent.
+  // Redeeming spends money, so it blocks (playbook §R7) — but it only sends a
+  // request: the partner has to agree before the deposit is deducted. The
+  // button is per card, so track which one is in flight; the hook's ref lock
+  // drops a concurrent second click (same or other card).
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
   const { run: buyGift } = useAsyncAction(async (gift: CoinGift) => {
     setPurchasingId(gift.id);
     try {
-      await purchaseGift(gift);
+      await apiService.requestRedemption({ title: gift.title, icon: gift.icon, cost: gift.cost }, newIdemKey());
+      showNotification({
+        type: 'info',
+        title: tr('已送出兌換申請 🎁', 'Redemption request sent 🎁'),
+        message: tr(`等 TA 同意後，才會從你的存款扣除 ${gift.cost}`, `${gift.cost} is deducted from your deposits only after your partner agrees`),
+        duration: 4000,
+      });
+    } catch (error) {
+      const e = error as { message?: string; error_code?: string };
+      const expected = e?.error_code === 'INSUFFICIENT_DEPOSIT' || e?.error_code === 'NOT_PAIRED';
+      showNotification({
+        type: expected ? 'warning' : 'error',
+        title: tr('沒有送出兌換', 'Redemption not sent'),
+        message: e?.message && !/^Request failed/.test(e.message) ? e.message : tr('兌換申請送出失敗，請稍後再試', 'Couldn\'t send the redemption request. Please try again in a moment'),
+        duration: 6000,
+      });
     } finally {
       setPurchasingId(null);
+      await summaryQuery.refetch();
     }
   });
 
@@ -116,20 +151,37 @@ const CoinShopView = ({
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
           <div>
             <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-              {tr('— 商店', '— Shop')}
+              {tr('— 存款', '— Deposits')}
             </div>
             <h2 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
-              {tr('金幣', 'Coin')}<em className="not-italic font-light italic text-pink-600">{tr('商店', ' shop')}</em>
+              {tr('我們的', 'Our ')}<em className="not-italic font-light italic text-pink-600">{tr('存款', 'deposits')}</em>
             </h2>
             <p className="font-display italic font-light text-base text-petal-muted">
-              {tr('用愛賺來的金幣，兌換特別禮品。', 'Trade the coins you earned with love for special gifts.')}
+              {tr('只有另一半能為你存款；用自己的存款，兌換對方的心意。', 'Only your partner can add to your deposits; spend your own on a gift from them.')}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <DepositPanel
+        summary={summary}
+        loading={summaryQuery.loading}
+        refresh={summaryQuery.refetch}
+        onInvitePartner={onInvitePartner}
+        showNotification={showNotification}
+      />
+
+      <div className="border-t border-petal-rule pt-8">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+          <div>
+            <h3 className="font-display text-2xl font-medium tracking-tight text-petal-ink">
+              {tr('用存款', 'Spend on a ')}<em className="not-italic font-light italic text-pink-600">{tr('兌換禮品', 'gift')}</em>
+            </h3>
+            <p className="font-body text-sm text-petal-muted mt-1">
+              {tr('一起設計你們想要的禮品；兌換要等對方同意後才會扣款。', 'Design the gifts you both want; a redemption is deducted only after the other agrees.')}
             </p>
           </div>
           <div className="flex flex-col items-start md:items-end gap-2">
-            <div className="font-display italic font-light text-2xl text-petal-ink">
-              <Coins className="inline w-4 h-4 mr-1.5 text-petal-rose-deep" strokeWidth={1.5} />
-              <b className="not-italic font-medium">{totalCoins}</b> <span className="text-base text-petal-muted">{tr('枚', 'coins')}</span>
-            </div>
             <div className="flex flex-wrap items-center gap-2">
               {hiddenDefaultCount > 0 && (
                 <button
@@ -161,7 +213,7 @@ const CoinShopView = ({
             {tr('把你們真正想要的小幸福放進商店', 'Fill the shop with the little joys you two actually want')}
           </p>
           <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-5">
-            {tr('例如「💆 睡前肩頸按摩 · 800 金幣」——金幣存到了，就兌換一份對方的心意。', 'For example "💆 A bedtime shoulder rub · 800 coins" — once the coins add up, trade them for a gesture from each other.')}
+            {tr('例如「💆 睡前肩頸按摩 · 800」——存款夠了，就兌換一份對方的心意。', 'For example "💆 A bedtime shoulder rub · 800": once your deposits add up, redeem a gesture from the other.')}
           </p>
           <div className="flex flex-wrap justify-center gap-2">
             <Button onClick={openAddModal}>{tr('新增第一個禮品', 'Add your first gift')}</Button>
@@ -244,18 +296,31 @@ const CoinShopView = ({
               </div>
             </div>
 
-            <button
-              onClick={() => buyGift(gift)}
-              disabled={totalCoins < gift.cost || purchasingId === gift.id}
-              className={`w-full py-2.5 rounded-md font-display italic text-base transition-colors flex items-center justify-center gap-2 ${
-                totalCoins >= gift.cost
-                  ? 'bg-petal-ink text-petal-cream hover:bg-pink-700 disabled:opacity-40 disabled:cursor-not-allowed'
-                  : 'bg-petal-cream-2 text-petal-muted cursor-not-allowed'
-              }`}
-            >
-              {purchasingId === gift.id && <Spinner />}
-              {totalCoins >= gift.cost ? (purchasingId === gift.id ? tr('兌換中…', 'Redeeming…') : tr('立即兌換 →', 'Redeem now →')) : tr('金幣不足', 'Not enough coins')}
-            </button>
+            {(() => {
+              const canRedeem = paired && available >= gift.cost;
+              const label = !paired
+                ? tr('配對後才能兌換', 'Pair up to redeem')
+                : purchasingId === gift.id
+                  ? tr('送出中…', 'Sending…')
+                  : canRedeem
+                    ? tr('申請兌換 →', 'Ask to redeem →')
+                    : tr(`存款還差 ${gift.cost - available}`, `${gift.cost - available} short`);
+              return (
+                <button
+                  onClick={() => buyGift(gift)}
+                  disabled={!canRedeem || purchasingId === gift.id}
+                  data-testid="redeem-gift"
+                  className={`w-full py-2.5 rounded-md font-display italic text-base transition-colors flex items-center justify-center gap-2 ${
+                    canRedeem
+                      ? 'bg-petal-ink text-petal-cream hover:bg-pink-700 disabled:opacity-40 disabled:cursor-not-allowed'
+                      : 'bg-petal-cream-2 text-petal-muted cursor-not-allowed'
+                  }`}
+                >
+                  {purchasingId === gift.id && <Spinner />}
+                  {label}
+                </button>
+              );
+            })()}
           </div>
         ))}
       </div>
@@ -321,7 +386,7 @@ const CoinShopView = ({
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="gift-cost" className="block text-sm font-medium text-gray-700 mb-2">
-                    {tr('金幣價格', 'Price in coins')}
+                    {tr('價格（存款）', 'Price (deposits)')}
                   </label>
                   <input
                     id="gift-cost"

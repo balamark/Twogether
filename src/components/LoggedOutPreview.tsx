@@ -1152,38 +1152,54 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       </div>
     ),
   },
-  // 金幣商店：the gift catalog is the couple's own — every gift (built-in ones
-  // included) can be added, edited or removed.
+  // 存款：each partner's own deposit account, paid into only by the other
+  // (感謝存款 / 申請存款), spent on the other's gifts with their agreement.
   shop: {
     icon: Coins,
-    eyebrow: tr('金幣商店', 'Coin shop'),
+    eyebrow: tr('存款', 'Deposits'),
     title: (
       <>
-        {tr('用愛賺來的金幣，換', 'Trade the coins you earned with love for ')}<em className="not-italic font-light italic text-pink-600">{tr('你們想要的禮物', 'the gifts you want')}</em>
+        {tr('讓「被在乎」', 'Make feeling cared for ')}<em className="not-italic font-light italic text-pink-600">{tr('看得見', 'visible')}</em>
       </>
     ),
     description:
-      tr('一起記錄親密、完成挑戰就能累積金幣，兌換對方的小心意。商店裡的每個禮品都由你們決定：新增自己的禮品，也能修改或移除內建的禮品，隨時一鍵恢復預設。', 'Log intimacy and finish challenges together to earn coins, then trade them for a little gesture from each other. Every gift in the shop is yours to decide: add your own, edit or remove the built-in ones, and restore the defaults with one tap.'),
+      tr('你們各有一個存款帳戶，只有另一半能為你存入：TA 幫你做了一件重要的事，你就為 TA 存一筆「感謝存款」；你為 TA 做了什麼，也能「申請存款」請 TA 確認。存款可以兌換對方的禮品，對方同意才會扣除；兩人存款的平均，讓彼此大概知道感情的狀態。', 'You each have a deposit account that only the other can add to: when they do something that matters to you, make a thank-you deposit for them; when you do something for them, ask for a deposit and they confirm it. Spend deposits on the other\'s gifts, deducted only once they agree. The average of both shows roughly how things are between you.'),
     sample: (
       <div className="space-y-2.5">
-        {[
-          { icon: '💆‍♀️', title: tr('睡前肩頸按摩', 'Bedtime shoulder rub'), cost: 800 },
-          { icon: '🍳', title: tr('週末早午餐我來煮', 'I cook weekend brunch'), cost: 1200 },
-        ].map((g) => (
-          <SampleCard key={g.title}>
-            <div className="flex items-center justify-between">
-              <span className="font-body text-sm text-petal-ink">{g.icon} {g.title}</span>
-              <div className="flex items-center gap-2 text-petal-muted">
-                <span className="font-display italic text-sm text-petal-ink">
-                  <Coins className="inline w-3.5 h-3.5 mr-1 text-petal-rose-deep" strokeWidth={1.5} />{g.cost}
-                </span>
-                <Pencil className="w-3.5 h-3.5" aria-hidden />
-                <Trash2 className="w-3.5 h-3.5" aria-hidden />
-                <SampleTag />
+        <SampleCard>
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-body text-xs text-petal-muted">{tr('你們的存款', 'Your deposits')}</span>
+            <SampleTag />
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            {[
+              { label: tr('我的', 'Mine'), value: 1200 },
+              { label: tr('TA 的', 'Theirs'), value: 900 },
+              { label: tr('平均', 'Average'), value: 1050 },
+            ].map((d) => (
+              <div key={d.label}>
+                <div className="font-display text-xl text-petal-ink">{d.value}</div>
+                <div className="font-body text-[11px] text-petal-muted">{d.label}</div>
               </div>
+            ))}
+          </div>
+        </SampleCard>
+        <SampleCard>
+          <div className="flex items-center justify-between">
+            <span className="font-body text-sm text-petal-ink">{tr('💝 TA 為你感謝存款 100｜謝謝你幫我寫了一個劇本', '💝 They thanked you with 100 | Thanks for writing a script for me')}</span>
+            <SampleTag />
+          </div>
+        </SampleCard>
+        <SampleCard>
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-body text-sm text-petal-ink">{tr('🎁 想兌換「睡前肩頸按摩 · 800」', '🎁 Wants to redeem "Bedtime shoulder rub · 800"')}</span>
+            <div className="flex items-center gap-2 text-petal-muted">
+              <span className="font-body text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{tr('等 TA 同意', 'Waiting to agree')}</span>
+              <Pencil className="w-3.5 h-3.5" aria-hidden />
+              <Trash2 className="w-3.5 h-3.5" aria-hidden />
             </div>
-          </SampleCard>
-        ))}
+          </div>
+        </SampleCard>
       </div>
     ),
   },
