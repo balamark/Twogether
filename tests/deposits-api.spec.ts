@@ -130,6 +130,27 @@ test('redeeming reserves the amount and deducts only after the partner agrees', 
   expect(end.available).toBe(start.available - 200);
 });
 
+test('a retried redemption with the same key returns the first one instead of reserving twice', async () => {
+  await deposit(a, 'thanks', 100);
+  const start = (await summary(b)).me;
+  const cost = start.available; // the first request reserves everything available
+  const payload = { gift_title: '重送測試', cost, idempotency_key: key() };
+
+  const first = await b.post(`${API}/coins/redemptions`, { data: payload });
+  expect(first.status(), await first.text()).toBe(200);
+  const firstId = (await first.json()).transaction.id;
+
+  // Same key again (e.g. the first response was lost): not INSUFFICIENT_DEPOSIT.
+  const retry = await b.post(`${API}/coins/redemptions`, { data: payload });
+  expect(retry.status(), await retry.text()).toBe(200);
+  const body = await retry.json();
+  expect(body.deduped).toBe(true);
+  expect(body.transaction.id).toBe(firstId);
+  expect((await summary(b)).me.available).toBe(start.available - cost);
+
+  await b.post(`${API}/coins/transactions/${firstId}/cancel`);
+});
+
 test('the owner can cancel a pending request, after which it cannot be answered', async () => {
   const { transaction } = await (await deposit(b, 'request', 30)).json();
   const cancel = await b.post(`${API}/coins/transactions/${transaction.id}/cancel`);

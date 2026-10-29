@@ -13,6 +13,11 @@
 -- All accounts so far are testers, and the old rows were auto-granted coins
 -- that have no owner/depositor, so they can't be mapped onto the new model.
 
+-- Block writers for the rest of this migration: old code still serving
+-- during the deploy could otherwise insert a row (without owner_id etc.)
+-- between the DELETE and the NOT NULL ADD COLUMNs, failing the migration.
+LOCK TABLE coin_transactions IN ACCESS EXCLUSIVE MODE;
+
 DELETE FROM coin_transactions;
 
 ALTER TABLE coin_transactions

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Coins, Pencil, Plus, RotateCcw, Trash2, X } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useAsyncAction } from '../hooks/useAsyncAction';
@@ -120,10 +120,19 @@ const CoinShopView = ({
   // button is per card, so track which one is in flight; the hook's ref lock
   // drops a concurrent second click (same or other card).
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
+  // One idempotency key per gift (and price) that survives a lost response:
+  // a retry after a timeout reuses it, so the server returns the redemption
+  // it already created instead of reserving the amount a second time. The key
+  // is dropped once the server has given a definitive answer.
+  const redeemKeys = useRef(new Map<string, string>());
   const { run: buyGift } = useAsyncAction(async (gift: CoinGift) => {
     setPurchasingId(gift.id);
+    const intent = `${gift.id}:${gift.cost}`;
+    const key = redeemKeys.current.get(intent) ?? newIdemKey();
+    redeemKeys.current.set(intent, key);
     try {
-      await apiService.requestRedemption({ title: gift.title, icon: gift.icon, cost: gift.cost }, newIdemKey());
+      await apiService.requestRedemption({ title: gift.title, icon: gift.icon, cost: gift.cost }, key);
+      redeemKeys.current.delete(intent);
       showNotification({
         type: 'info',
         title: tr('已送出兌換申請 🎁', 'Redemption request sent 🎁'),
@@ -131,7 +140,20 @@ const CoinShopView = ({
         duration: 4000,
       });
     } catch (error) {
-      const e = error as { message?: string; error_code?: string };
+      const e = error as { message?: string; error_code?: string; status?: number };
+      // No response at all: the request may have gone through. Keep the key
+      // so a retry is deduped, and say "maybe sent" rather than inviting a
+      // second request with a red error (playbook §R7).
+      if (e?.error_code === 'TIMEOUT' || e?.error_code === 'NETWORK_ERROR') {
+        showNotification({
+          type: 'warning',
+          title: tr('兌換申請可能已送出', 'Your redemption may have been sent'),
+          message: tr('連線不穩，申請可能已經送出。請看「等待 TA 回應」確認；再按一次也不會重複申請。', 'The connection was unstable and the request may have gone through. Check "Waiting on your partner"; tapping again won\'t create a duplicate.'),
+          duration: 6000,
+        });
+        return;
+      }
+      redeemKeys.current.delete(intent);
       const expected = e?.error_code === 'INSUFFICIENT_DEPOSIT' || e?.error_code === 'NOT_PAIRED';
       showNotification({
         type: expected ? 'warning' : 'error',
@@ -166,6 +188,7 @@ const CoinShopView = ({
       <DepositPanel
         summary={summary}
         loading={summaryQuery.loading}
+        error={summaryQuery.error}
         refresh={summaryQuery.refetch}
         onInvitePartner={onInvitePartner}
         showNotification={showNotification}
@@ -298,7 +321,9 @@ const CoinShopView = ({
 
             {(() => {
               const canRedeem = paired && available >= gift.cost;
-              const label = !paired
+              const label = !summary
+                ? (summaryQuery.error ? tr('暫時無法兌換', 'Can\'t redeem right now') : tr('讀取中…', 'Loading…'))
+                : !paired
                 ? tr('配對後才能兌換', 'Pair up to redeem')
                 : purchasingId === gift.id
                   ? tr('送出中…', 'Sending…')

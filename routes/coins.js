@@ -266,6 +266,18 @@ router.post('/redemptions', [
       const couple = await findCouple(userId, client, { lock: true });
       if (!couple || !couple.partnerId) return { notPaired: true };
 
+      // A retry of a request that already went through (e.g. its response was
+      // lost to a timeout) must come back as that same redemption — checked
+      // BEFORE the balance, because the first attempt has already reserved
+      // the amount and would otherwise make the retry look unaffordable.
+      if (idempotency_key) {
+        const existing = await client.query(
+          `SELECT ${TRANSACTION_COLUMNS} FROM coin_transactions WHERE idempotency_key = $1 AND created_by = $2`,
+          [idempotency_key, userId]
+        );
+        if (existing.rows[0]) return { couple, transaction: existing.rows[0], deduped: true };
+      }
+
       const account = await accountFor(client, couple.id, userId);
       if (account.available < cost) return { insufficient: true, account };
 
@@ -294,9 +306,14 @@ router.post('/redemptions', [
         required: cost
       });
     }
-    if (!outcome.transaction) {
+    if (outcome.deduped || !outcome.transaction) {
       logWarn('Redemption deduped by idempotency key', { user_id: userId, idempotency_key });
-      return res.json({ success: true, deduped: true, message: '已送出兌換申請，等待對方同意' });
+      return res.json({
+        success: true,
+        deduped: true,
+        message: '已送出兌換申請，等待對方同意',
+        transaction: outcome.transaction ? toApiTransaction(outcome.transaction, userId) : null
+      });
     }
 
     const transaction = outcome.transaction;

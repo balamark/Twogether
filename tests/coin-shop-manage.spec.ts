@@ -195,4 +195,53 @@ test.describe('Coin shop gift management', () => {
     await expect(page.getByTestId('redeem-gift').first()).toBeDisabled();
     await expect(page.getByTestId('redeem-gift').first()).toContainText('配對後才能兌換');
   });
+
+  test('a failed summary load shows a retryable error, not the unpaired gate', async ({ page }) => {
+    test.setTimeout(60000);
+    await setup(page);
+    let fail = true;
+    await page.route('**/api/coins/summary', (route) =>
+      fail
+        ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ success: false, message: '讀取感情存款失敗，請稍後再試' }) })
+        : route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ success: true, paired: true, me: { balance: 1600, available: 1600 }, partner: { balance: 0 }, average: 800, awaiting_me: [], awaiting_partner: [], recent: [] }),
+          }),
+    );
+    await openShop(page);
+
+    await expect(page.getByTestId('deposit-load-error')).toBeVisible();
+    await expect(page.getByTestId('deposit-unpaired-gate')).toHaveCount(0);
+    await expect(page.getByTestId('redeem-gift').first()).not.toContainText('配對後才能兌換');
+
+    fail = false;
+    await page.getByTestId('deposit-load-retry').click();
+    await expect(page.getByTestId('deposit-mine')).toContainText('1600');
+  });
+
+  test('a redemption whose response is lost is retried with the same key', async ({ page }) => {
+    test.setTimeout(60000);
+    await setup(page, {
+      success: true, paired: true,
+      me: { balance: 1600, available: 1600 }, partner: { balance: 0 }, average: 800,
+      awaiting_me: [], awaiting_partner: [], recent: [],
+    });
+    const keys: string[] = [];
+    await page.route('**/api/coins/redemptions', (route) => {
+      keys.push(JSON.parse(route.request().postData() || '{}').idempotency_key);
+      // First attempt: no response ("maybe sent"); second: the server answers.
+      return keys.length === 1
+        ? route.abort('connectionfailed')
+        : route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, deduped: true }) });
+    });
+    await openShop(page);
+
+    const redeem = page.getByTestId('gift-card').filter({ hasText: '全身按摩' }).getByTestId('redeem-gift');
+    await redeem.click();
+    await expect(page.getByText('兌換申請可能已送出')).toBeVisible();
+    await redeem.click();
+    await expect.poll(() => keys.length).toBe(2);
+    expect(keys[1]).toBe(keys[0]);
+  });
 });

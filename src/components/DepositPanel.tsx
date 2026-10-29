@@ -16,6 +16,8 @@ const QUICK_AMOUNTS = [50, 100, 200, 500];
 interface DepositPanelProps {
   summary: DepositSummary | undefined;
   loading: boolean;
+  /** Set when the summary couldn't be loaded and there's nothing to show. */
+  error: Error | null;
   /** Re-load the summary after a change (server is the source of truth). */
   refresh: () => Promise<void>;
   onInvitePartner: () => void;
@@ -65,7 +67,7 @@ const signedAmount = (t: DepositTransaction) => {
   return t.kind === 'redeem' ? `−${t.amount}` : `+${t.amount}`;
 };
 
-const DepositPanel = ({ summary, loading, refresh, onInvitePartner, showNotification }: DepositPanelProps) => {
+const DepositPanel = ({ summary, loading, error, refresh, onInvitePartner, showNotification }: DepositPanelProps) => {
   const [formKind, setFormKind] = useState<DepositKind | null>(null);
   useScrollLock(formKind !== null);
   const [amount, setAmount] = useState(100);
@@ -170,6 +172,22 @@ const DepositPanel = ({ summary, loading, refresh, onInvitePartner, showNotifica
   if (loading && !summary) {
     return (
       <div className="flex justify-center py-8"><Spinner /></div>
+    );
+  }
+
+  // A failed load is not "unpaired": without this, a paired user whose
+  // summary request 500s/times out would see 0 balances and an 邀請另一半 gate.
+  if (!summary) {
+    return (
+      <div className="bg-white rounded-2xl border border-petal-rule p-5" data-testid="deposit-load-error">
+        <p className="font-display text-lg text-petal-ink mb-1">{tr('暫時讀不到感情存款', 'Couldn\'t load your Love Bank')}</p>
+        <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-4">
+          {error?.message || tr('請檢查網路連線後再試一次。', 'Check your connection and try again.')}
+        </p>
+        <button type="button" onClick={() => void refresh()} data-testid="deposit-load-retry" className="rounded-full bg-petal-ink px-4 py-1.5 font-body text-[13px] font-medium text-petal-cream hover:bg-petal-ink/85 transition-colors">
+          {tr('重新載入', 'Reload')}
+        </button>
+      </div>
     );
   }
 
