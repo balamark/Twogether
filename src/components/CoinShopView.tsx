@@ -207,7 +207,7 @@ const CoinShopView = ({
       </div>
 
       {allGifts.length === 0 && (
-        <div className="bg-white rounded-md border border-dashed border-petal-rule p-8 text-center max-w-lg mx-auto" data-testid="gift-shop-empty">
+        <div className="bg-white rounded-2xl border border-dashed border-petal-rule p-8 text-center max-w-lg mx-auto" data-testid="gift-shop-empty">
           <div className="text-3xl mb-3">🎁</div>
           <p className="font-display text-lg text-petal-ink mb-2">
             {tr('把你們真正想要的小幸福放進商店', 'Fill the shop with the little joys you two actually want')}
@@ -216,7 +216,7 @@ const CoinShopView = ({
             {tr('例如「💆 睡前肩頸按摩 · 800」——感情存款夠了，就兌換一份對方的心意。', 'For example "💆 A bedtime shoulder rub · 800": once your deposits add up, redeem a gesture from the other.')}
           </p>
           <div className="flex flex-wrap justify-center gap-2">
-            <Button onClick={openAddModal} className="px-5 py-2.5 text-sm">{tr('新增第一個禮品', 'Add your first gift')}</Button>
+            <button type="button" onClick={openAddModal} className="rounded-full bg-petal-ink px-4 py-1.5 font-body text-[13px] font-medium text-petal-cream hover:bg-petal-ink/85 transition-colors">{tr('新增第一個禮品', 'Add your first gift')}</button>
             {hiddenDefaultCount > 0 && (
               <button
                 onClick={() => void restoreDefaultGifts()}
@@ -231,7 +231,7 @@ const CoinShopView = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {allGifts.map((gift) => (
-          <div key={gift.id} className="bg-white rounded-md border border-petal-rule p-6 hover:border-petal-rose transition-colors" data-testid="gift-card">
+          <div key={gift.id} className="bg-white rounded-2xl border border-petal-rule p-6 hover:border-petal-rose transition-colors" data-testid="gift-card">
             <div className="mb-4 pb-4 border-b border-petal-rule-soft">
               <div className="flex items-start justify-between mb-3">
                 <div className="text-2xl opacity-75 saturate-75">{gift.icon}</div>
@@ -310,10 +310,10 @@ const CoinShopView = ({
                   onClick={() => buyGift(gift)}
                   disabled={!canRedeem || purchasingId === gift.id}
                   data-testid="redeem-gift"
-                  className={`w-full py-2.5 rounded-md font-display italic text-base transition-colors flex items-center justify-center gap-2 ${
+                  className={`w-full py-2.5 rounded-full border font-body text-[13px] font-medium transition-colors flex items-center justify-center gap-2 ${
                     canRedeem
-                      ? 'bg-petal-ink text-petal-cream hover:bg-pink-700 disabled:opacity-40 disabled:cursor-not-allowed'
-                      : 'bg-petal-cream-2 text-petal-muted cursor-not-allowed'
+                      ? 'bg-petal-rose-soft/25 border-petal-rose-soft text-petal-ink hover:border-petal-ink disabled:opacity-40 disabled:cursor-not-allowed'
+                      : 'bg-petal-cream-2 border-transparent text-petal-muted cursor-not-allowed'
                   }`}
                 >
                   {purchasingId === gift.id && <Spinner />}

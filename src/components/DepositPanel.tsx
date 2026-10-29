@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, HandHeart, HeartHandshake, X } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { Button } from './ui/Button';
@@ -133,35 +133,35 @@ const DepositPanel = ({ summary, loading, refresh, onInvitePartner, showNotifica
   });
 
   const stat = (label: string, value: number | string, testId: string, hint?: string) => (
-    <div className="bg-white rounded-xl border border-petal-rule px-4 py-3.5" data-testid={testId}>
+    <div className="bg-white rounded-2xl border border-petal-rule px-4 py-3.5" data-testid={testId}>
       <div className="font-body text-[11px] tracking-[0.08em] text-petal-muted">{label}</div>
       <div className="font-display text-3xl font-light text-petal-ink leading-tight mt-1">{value}</div>
       {hint && <div className="font-body text-[11px] text-petal-muted mt-1 leading-snug">{hint}</div>}
     </div>
   );
 
-  // The two ways money comes in, as an even pair of tiles: same size, icon +
-  // name + a one-line "what happens", so neither reads as an afterthought.
+  // The two ways money comes in, styled like the 今天 action cards
+  // (HomeView TodayActions): soft tint, emoji, title + one-line "what
+  // happens". 感謝存款 takes the brand rose tint, 申請存款 stays neutral.
   const actionTile = (kind: DepositKind) => {
     const thanks = kind === 'thanks';
-    const Icon = thanks ? HandHeart : HeartHandshake;
     return (
       <button
         type="button"
         onClick={() => openForm(kind)}
         data-testid={thanks ? 'open-thanks-deposit' : 'open-request-deposit'}
-        className={`flex flex-col items-start gap-1 rounded-xl px-4 py-3.5 text-left min-h-[72px] transition-colors ${
-          thanks
-            ? 'bg-petal-ink text-petal-cream hover:bg-pink-700'
-            : 'bg-white text-petal-ink border border-petal-rule hover:border-petal-ink'
+        className={`flex items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition-colors hover:border-petal-ink ${
+          thanks ? 'bg-petal-rose-soft/25 border-petal-rose-soft' : 'bg-white border-petal-rule'
         }`}
       >
-        <span className="inline-flex items-center gap-2 font-display text-base">
-          <Icon className="w-4 h-4 shrink-0" strokeWidth={1.5} />
-          {thanks ? tr('感謝存款', 'Thank-you deposit') : tr('申請存款', 'Ask for a deposit')}
-        </span>
-        <span className={`font-body text-[11px] ${thanks ? 'text-petal-cream/70' : 'text-petal-muted'}`}>
-          {thanks ? tr('存一筆給 TA', 'Add to their account') : tr('請 TA 確認後入帳', 'They confirm, then it lands')}
+        <span className="text-lg shrink-0" aria-hidden>{thanks ? '💝' : '🙋'}</span>
+        <span className="min-w-0">
+          <span className="block font-display text-sm text-petal-ink">
+            {thanks ? tr('感謝存款', 'Thank-you deposit') : tr('申請存款', 'Ask for a deposit')}
+          </span>
+          <span className="block font-body text-[12px] text-petal-muted leading-relaxed">
+            {thanks ? tr('存一筆給 TA', 'Add to their account') : tr('請 TA 確認後入帳', 'They confirm, then it lands')}
+          </span>
         </span>
       </button>
     );
@@ -188,12 +188,12 @@ const DepositPanel = ({ summary, loading, refresh, onInvitePartner, showNotifica
       </div>
 
       {!paired ? (
-        <div className="bg-petal-cream-2 border border-petal-rule rounded-md p-5" data-testid="deposit-unpaired-gate">
+        <div className="bg-petal-cream-2 border border-petal-rule rounded-2xl p-5" data-testid="deposit-unpaired-gate">
           <p className="font-display text-lg text-petal-ink mb-1">{tr('感情存款只能由另一半存入', 'Only your partner can add to your Love Bank')}</p>
           <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-4">
             {tr('配對後，TA 每次想謝謝你，都能為你存一筆；你也能用感情存款兌換 TA 的心意。現在可以先把你們想要的禮品放進下方商店。', 'Once you\'re paired, your partner can make a deposit whenever they want to thank you, and you can redeem gifts from them. For now, you can fill the shop below with gifts you\'d both like.')}
           </p>
-          <Button onClick={onInvitePartner} className="px-5 py-2.5 text-sm">{tr('邀請另一半', 'Invite your partner')}</Button>
+          <button type="button" onClick={onInvitePartner} className="rounded-full bg-petal-ink px-4 py-1.5 font-body text-[13px] font-medium text-petal-cream hover:bg-petal-ink/85 transition-colors">{tr('邀請另一半', 'Invite your partner')}</button>
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3">
@@ -207,7 +207,7 @@ const DepositPanel = ({ summary, loading, refresh, onInvitePartner, showNotifica
           <h3 className="font-display text-xl text-petal-ink mb-3">{tr('等你回應', 'Waiting on you')}</h3>
           <ul className="space-y-2">
             {summary.awaitingMe.map((t) => (
-              <li key={t.id} className="bg-white rounded-md border border-petal-rose p-4 flex flex-col sm:flex-row sm:items-center gap-3" data-testid="deposit-awaiting-item">
+              <li key={t.id} className="bg-white rounded-2xl border border-petal-rose p-4 flex flex-col sm:flex-row sm:items-center gap-3" data-testid="deposit-awaiting-item">
                 <div className="flex-1 min-w-0">
                   <div className="font-body text-sm text-petal-ink break-words">{describe(t)}</div>
                   <div className="font-body text-xs text-petal-muted mt-0.5">
@@ -243,7 +243,7 @@ const DepositPanel = ({ summary, loading, refresh, onInvitePartner, showNotifica
           <h3 className="font-display text-xl text-petal-ink mb-3">{tr('等待 TA 回應', 'Waiting on your partner')}</h3>
           <ul className="space-y-2">
             {summary.awaitingPartner.map((t) => (
-              <li key={t.id} className="bg-white rounded-md border border-petal-rule p-4 flex items-center gap-3">
+              <li key={t.id} className="bg-white rounded-2xl border border-petal-rule p-4 flex items-center gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="font-body text-sm text-petal-ink break-words">{describe(t)}</div>
                   <div className="font-body text-xs text-petal-muted mt-0.5">{t.amount} · {formatDate(t.created_at)}</div>
@@ -261,17 +261,17 @@ const DepositPanel = ({ summary, loading, refresh, onInvitePartner, showNotifica
         <section>
           <h3 className="font-display text-xl text-petal-ink mb-3">{tr('最近的感情存款', 'Recent Love Bank activity')}</h3>
           {summary.recent.length === 0 ? (
-            <div className="bg-white rounded-md border border-dashed border-petal-rule p-5" data-testid="deposit-history-empty">
+            <div className="bg-white rounded-2xl border border-dashed border-petal-rule p-5" data-testid="deposit-history-empty">
               <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-2">
                 {tr('把對方的付出記下來，讓「被在乎」看得見。TA 幫你做了一件重要的事，就為 TA 存一筆吧。', 'Write down what the other one does for you, so feeling cared for becomes visible. When they do something that matters to you, make a deposit for them.')}
               </p>
               <p className="font-body text-xs text-petal-muted mb-4">{tr('例：💝 100｜謝謝你幫我寫了一個劇本', 'e.g. 💝 100 | Thanks for writing a script for me')}</p>
-              <Button onClick={() => openForm('thanks')} icon={<HandHeart className="w-4 h-4" strokeWidth={1.5} />} className="px-5 py-2.5 text-sm">
+              <button type="button" onClick={() => openForm('thanks')} className="rounded-full bg-petal-ink px-4 py-1.5 font-body text-[13px] font-medium text-petal-cream hover:bg-petal-ink/85 transition-colors">
                 {tr('存下第一筆感謝', 'Make your first thank-you deposit')}
-              </Button>
+              </button>
             </div>
           ) : (
-            <ul className="divide-y divide-petal-rule-soft bg-white rounded-md border border-petal-rule">
+            <ul className="divide-y divide-petal-rule-soft bg-white rounded-2xl border border-petal-rule">
               {summary.recent.map((t) => (
                 <li key={t.id} className="px-4 py-3 flex items-center gap-3" data-testid="deposit-history-item">
                   <div className="flex-1 min-w-0">
