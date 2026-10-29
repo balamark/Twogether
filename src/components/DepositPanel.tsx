@@ -133,12 +133,39 @@ const DepositPanel = ({ summary, loading, refresh, onInvitePartner, showNotifica
   });
 
   const stat = (label: string, value: number | string, testId: string, hint?: string) => (
-    <div className="bg-white rounded-md border border-petal-rule p-4" data-testid={testId}>
-      <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1">{label}</div>
-      <div className="font-display text-3xl font-light text-petal-ink">{value}</div>
-      {hint && <div className="font-body text-xs text-petal-muted mt-1 leading-snug">{hint}</div>}
+    <div className="bg-white rounded-xl border border-petal-rule px-4 py-3.5" data-testid={testId}>
+      <div className="font-body text-[11px] tracking-[0.08em] text-petal-muted">{label}</div>
+      <div className="font-display text-3xl font-light text-petal-ink leading-tight mt-1">{value}</div>
+      {hint && <div className="font-body text-[11px] text-petal-muted mt-1 leading-snug">{hint}</div>}
     </div>
   );
+
+  // The two ways money comes in, as an even pair of tiles: same size, icon +
+  // name + a one-line "what happens", so neither reads as an afterthought.
+  const actionTile = (kind: DepositKind) => {
+    const thanks = kind === 'thanks';
+    const Icon = thanks ? HandHeart : HeartHandshake;
+    return (
+      <button
+        type="button"
+        onClick={() => openForm(kind)}
+        data-testid={thanks ? 'open-thanks-deposit' : 'open-request-deposit'}
+        className={`flex flex-col items-start gap-1 rounded-xl px-4 py-3.5 text-left min-h-[72px] transition-colors ${
+          thanks
+            ? 'bg-petal-ink text-petal-cream hover:bg-pink-700'
+            : 'bg-white text-petal-ink border border-petal-rule hover:border-petal-ink'
+        }`}
+      >
+        <span className="inline-flex items-center gap-2 font-display text-base">
+          <Icon className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+          {thanks ? tr('感謝存款', 'Thank-you deposit') : tr('申請存款', 'Ask for a deposit')}
+        </span>
+        <span className={`font-body text-[11px] ${thanks ? 'text-petal-cream/70' : 'text-petal-muted'}`}>
+          {thanks ? tr('存一筆給 TA', 'Add to their account') : tr('請 TA 確認後入帳', 'They confirm, then it lands')}
+        </span>
+      </button>
+    );
+  };
 
   if (loading && !summary) {
     return (
@@ -148,22 +175,16 @@ const DepositPanel = ({ summary, loading, refresh, onInvitePartner, showNotifica
 
   return (
     <div className="space-y-8">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         {stat(
           tr('我的感情存款', 'My Love Bank'),
           summary?.me.balance ?? 0,
           'deposit-mine',
           summary && summary.me.available < summary.me.balance
             ? tr(`可用 ${summary.me.available}（兌換申請中的已先保留）`, `${summary.me.available} available (pending redemptions are held)`)
-            : tr('只有 TA 能為你存入', 'Only your partner can add to it'),
+            : undefined,
         )}
-        {stat(tr('TA 的感情存款', 'Their Love Bank'), paired ? summary?.partner?.balance ?? 0 : '—', 'deposit-partner', tr('只有你能為 TA 存入', 'Only you can add to it'))}
-        {stat(
-          tr('兩人平均', 'Average of both'),
-          paired ? summary?.average ?? 0 : '—',
-          'deposit-average',
-          tr('唯讀參考，讓彼此大概知道感情的狀態', 'Read-only: a rough sense of how things are between you'),
-        )}
+        {stat(tr('TA 的感情存款', 'Their Love Bank'), paired ? summary?.partner?.balance ?? 0 : '—', 'deposit-partner')}
       </div>
 
       {!paired ? (
@@ -172,16 +193,12 @@ const DepositPanel = ({ summary, loading, refresh, onInvitePartner, showNotifica
           <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-4">
             {tr('配對後，TA 每次想謝謝你，都能為你存一筆；你也能用感情存款兌換 TA 的心意。現在可以先把你們想要的禮品放進下方商店。', 'Once you\'re paired, your partner can make a deposit whenever they want to thank you, and you can redeem gifts from them. For now, you can fill the shop below with gifts you\'d both like.')}
           </p>
-          <Button onClick={onInvitePartner}>{tr('邀請另一半', 'Invite your partner')}</Button>
+          <Button onClick={onInvitePartner} className="px-5 py-2.5 text-sm">{tr('邀請另一半', 'Invite your partner')}</Button>
         </div>
       ) : (
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={() => openForm('thanks')} icon={<HandHeart className="w-4 h-4" strokeWidth={1.5} />} data-testid="open-thanks-deposit">
-            {tr('感謝存款', 'Thank-you deposit')}
-          </Button>
-          <Button variant="secondary" onClick={() => openForm('request')} icon={<HeartHandshake className="w-4 h-4" strokeWidth={1.5} />} data-testid="open-request-deposit">
-            {tr('申請存款', 'Ask for a deposit')}
-          </Button>
+        <div className="grid grid-cols-2 gap-3">
+          {actionTile('thanks')}
+          {actionTile('request')}
         </div>
       )}
 
@@ -249,7 +266,9 @@ const DepositPanel = ({ summary, loading, refresh, onInvitePartner, showNotifica
                 {tr('把對方的付出記下來，讓「被在乎」看得見。TA 幫你做了一件重要的事，就為 TA 存一筆吧。', 'Write down what the other one does for you, so feeling cared for becomes visible. When they do something that matters to you, make a deposit for them.')}
               </p>
               <p className="font-body text-xs text-petal-muted mb-4">{tr('例：💝 100｜謝謝你幫我寫了一個劇本', 'e.g. 💝 100 | Thanks for writing a script for me')}</p>
-              <Button onClick={() => openForm('thanks')}>{tr('存下第一筆感謝', 'Make your first thank-you deposit')}</Button>
+              <Button onClick={() => openForm('thanks')} icon={<HandHeart className="w-4 h-4" strokeWidth={1.5} />} className="px-5 py-2.5 text-sm">
+                {tr('存下第一筆感謝', 'Make your first thank-you deposit')}
+              </Button>
             </div>
           ) : (
             <ul className="divide-y divide-petal-rule-soft bg-white rounded-md border border-petal-rule">

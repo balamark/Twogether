@@ -216,7 +216,7 @@ const CoinShopView = ({
             {tr('例如「💆 睡前肩頸按摩 · 800」——感情存款夠了，就兌換一份對方的心意。', 'For example "💆 A bedtime shoulder rub · 800": once your deposits add up, redeem a gesture from the other.')}
           </p>
           <div className="flex flex-wrap justify-center gap-2">
-            <Button onClick={openAddModal}>{tr('新增第一個禮品', 'Add your first gift')}</Button>
+            <Button onClick={openAddModal} className="px-5 py-2.5 text-sm">{tr('新增第一個禮品', 'Add your first gift')}</Button>
             {hiddenDefaultCount > 0 && (
               <button
                 onClick={() => void restoreDefaultGifts()}

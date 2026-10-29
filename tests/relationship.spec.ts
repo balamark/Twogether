@@ -121,6 +121,10 @@ test.describe('關係之屋 dashboard', () => {
     // (goodwill_meter flag off by default).
     await expect(page.getByTestId('love-bank-card')).toBeVisible();
     await expect(page.getByTestId('love-bank-average')).toContainText('500');
+    // Average only; its meaning sits behind the (?).
+    await expect(page.getByTestId('love-bank-card')).not.toContainText('600');
+    await page.getByTestId('love-bank-hint').click();
+    await expect(page.getByTestId('love-bank-hint-text')).toContainText('平均');
     await expect(page.getByTestId('goodwill-details-button')).toHaveCount(0);
 
     // Past check-in results are viewable.
@@ -175,6 +179,5 @@ test.describe('關係之屋 dashboard', () => {
     );
     await page.goto('/');
     await expect(page.getByTestId('relationship-primary-nudge')).toContainText('感情存款', { timeout: 15000 });
-    await expect(page.getByTestId('love-bank-card')).toContainText('1 筆在等你回應');
   });
 });

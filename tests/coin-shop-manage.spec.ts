@@ -166,7 +166,8 @@ test.describe('Coin shop gift management', () => {
 
     await expect(page.getByTestId('deposit-mine')).toContainText('1600');
     await expect(page.getByTestId('deposit-partner')).toContainText('400');
-    await expect(page.getByTestId('deposit-average')).toContainText('1000');
+    // The average lives on 我們 / 關係之屋, not here.
+    await expect(page.getByTestId('deposit-average')).toHaveCount(0);
     await expect(page.getByTestId('deposit-history-empty')).toBeVisible();
 
     await page.getByTestId('deposit-confirm').click();

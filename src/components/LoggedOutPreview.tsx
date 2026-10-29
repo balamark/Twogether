@@ -32,6 +32,7 @@ import {
   Globe,
   Coins,
   Trash2,
+  HelpCircle,
   type LucideIcon,
 } from 'lucide-react';
 import { daysSinceLastNudge } from './AchievementsView';
@@ -1131,26 +1132,11 @@ const PREVIEWS: Record<string, PreviewConfig> = {
           </div>
         </div>
         <SampleCard>
-          <div className="text-center">
-            <div className="flex items-center justify-between mb-1">
-              <span className="font-body text-[10px] uppercase tracking-[0.16em] text-petal-muted">{tr('💝 感情存款', '💝 Love Bank')}</span>
-              <SampleTag />
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { label: tr('我的', 'Mine'), value: 1200 },
-                { label: tr('TA 的', 'Theirs'), value: 900 },
-                { label: tr('平均', 'Average'), value: 1050 },
-              ].map((d) => (
-                <div key={d.label}>
-                  <div className="font-display text-2xl font-light text-petal-rose-deep leading-none">{d.value}</div>
-                  <div className="font-body text-[11px] text-petal-muted">{d.label}</div>
-                </div>
-              ))}
-            </div>
-            <p className="mt-1.5 font-body text-[11px] text-petal-ink-soft leading-relaxed">
-              {tr('只有對方能為你存入：TA 幫你做了重要的事，就為 TA 存一筆。', 'Only the other can add to yours: when they do something that matters, make a deposit for them.')}
-            </p>
+          <div className="flex items-center gap-3">
+            <span className="font-body text-[10px] uppercase tracking-[0.16em] text-petal-muted">{tr('感情存款', 'Love Bank')}</span>
+            <span className="ml-auto font-display text-3xl font-light text-petal-rose-deep leading-none">1050</span>
+            <HelpCircle className="w-3.5 h-3.5 text-petal-muted" strokeWidth={1.5} aria-hidden />
+            <SampleTag />
           </div>
         </SampleCard>
         {/* 親密節奏 lives one tap down (記錄時光 calendar); preview it here too
@@ -1184,11 +1170,10 @@ const PREVIEWS: Record<string, PreviewConfig> = {
             <span className="font-body text-xs text-petal-muted">{tr('你們的感情存款', 'Your Love Bank')}</span>
             <SampleTag />
           </div>
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="grid grid-cols-2 gap-2 text-center">
             {[
               { label: tr('我的', 'Mine'), value: 1200 },
               { label: tr('TA 的', 'Theirs'), value: 900 },
-              { label: tr('平均', 'Average'), value: 1050 },
             ].map((d) => (
               <div key={d.label}>
                 <div className="font-display text-xl text-petal-ink">{d.value}</div>
