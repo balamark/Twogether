@@ -492,8 +492,8 @@ class EmailService {
         cta: '💗 傳個邀請',
       },
       appreciation_gap: {
-        emoji: '🌱', title: '存一筆好感吧', subtitle: '正向的話語，是關係的存款',
-        body: `<p>嗨 ${name}，</p><p>這陣子還沒對 TA 說一句欣賞的話。一句真誠的稱讚，就是替你們的關係「存好感」，讓日後的衝突更容易化解。</p>`,
+        emoji: '🌱', title: '說一句欣賞的話吧', subtitle: '正向的話語，讓 TA 感覺被看見',
+        body: `<p>嗨 ${name}，</p><p>這陣子還沒對 TA 說一句欣賞的話。一句真誠的稱讚，能讓 TA 感覺被看見，也讓日後的衝突更容易化解。</p>`,
         cta: '🌱 寫一句稱讚',
       },
     };

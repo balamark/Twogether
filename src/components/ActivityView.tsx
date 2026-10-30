@@ -7,6 +7,7 @@ import { useTimezone } from '../contexts/TimezoneContext';
 import { clientLog } from '../utils/telemetry';
 import { isPositiveInteraction, POSITIVE_INTERACTION_ACTIONS } from '../content/positiveInteractions';
 import { tr } from '../i18n/tr';
+import { useFeatureFlag } from '../contexts/FeatureFlagsContext';
 
 interface Notification {
   id: string;
@@ -37,6 +38,9 @@ function dotClass(type: ActivityItem['type']): string {
 // 最近動態 — recent activity (you + partner), shown as its own view reached from
 // the profile dropdown.
 const ActivityView: React.FC<ActivityViewProps> = ({ showNotification }) => {
+  // The +1 legend/badges belong to the auto-counted 好感存款, paused while
+  // 感情存款 is the app's one 存款 (lib/featureFlags.js goodwill_meter).
+  const showGoodwill = useFeatureFlag('goodwill_meter');
   const tz = useTimezone();
   // Shared cached feed with the 首頁 teaser (src/hooks/usePageData.ts).
   const feed = useActivityFeed();
@@ -76,6 +80,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({ showNotification }) => {
 
       {/* Ties the feed back to「我們正在愛」的那個數字: which rows earned a +1,
           and what all counts. So the number on 我們 stops being a mystery. */}
+      {showGoodwill && (
       <div
         className="rounded-2xl border border-petal-rose-soft bg-petal-rose-soft/20 p-4 sm:p-5"
         data-testid="activity-positive-legend"
@@ -95,6 +100,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({ showNotification }) => {
           ))}
         </ul>
       </div>
+      )}
 
       <div className="bg-white rounded-2xl shadow-lg p-4 sm:p-6" data-testid="activity-feed">
         {loading ? (
@@ -122,7 +128,7 @@ const ActivityView: React.FC<ActivityViewProps> = ({ showNotification }) => {
                     <span className="font-medium">{a.isSelf ? tr('你', 'You') : (a.actorNickname || tr('你們', 'You both'))}</span>
                     {' '}
                     {a.description}
-                    {isPositiveInteraction(a.type) && (
+                    {showGoodwill && isPositiveInteraction(a.type) && (
                       <span
                         className="ml-1.5 inline-flex items-center rounded-full bg-petal-rose-deep px-1.5 py-0.5 align-middle font-body text-[10px] font-semibold text-white"
                         data-testid="activity-plus-one"

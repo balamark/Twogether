@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Calendar, MessageCircle, Clock, MapPin, Play, Coins, User, Trash2, Pencil, Crown, Home as HomeIcon, TrendingUp, HeartHandshake } from 'lucide-react';
+import { Calendar, MessageCircle, Clock, MapPin, Play, User, Trash2, Pencil, Crown, Home as HomeIcon, TrendingUp, HeartHandshake } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import HomeView from './components/HomeView';
 import UsView from './components/UsView';
@@ -139,11 +139,6 @@ export interface Notification {
   duration?: number;
 }
 
-interface CoinActivity {
-  type: string;
-  baseCoins: number;
-  bonusConditions?: { condition: string; bonus: number }[];
-}
 
 export interface RoleplayScript {
   id: string;
@@ -520,7 +515,6 @@ export interface ForeplayActivity {
   title: string;
   description: string;
   duration: string;
-  coins: number;
   tips: string[];
 }
 
@@ -528,7 +522,6 @@ export interface PositionSuggestion {
   name: string;
   difficulty: string;
   description: string;
-  coins: number;
   benefits: string[];
 }
 
@@ -670,6 +663,8 @@ const LoveTimeApp = () => {
 
   const [totalCoins, setTotalCoins] = useState(0);
   const [customGifts, setCustomGifts] = useState<CoinGift[]>([]);
+  // Keys of built-in gifts this couple removed (or replaced with an edit).
+  const [hiddenDefaultGifts, setHiddenDefaultGifts] = useState<string[]>([]);
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
     isAuthenticated: false,
@@ -1244,7 +1239,7 @@ const LoveTimeApp = () => {
       partnerConnected: false
     });
     // Reset the view so we land back on the logged-out home, not whatever
-    // authenticated panel (設定 / 金幣商店 / …) was open at logout time.
+    // authenticated panel (設定 / 存款 / …) was open at logout time.
     setCurrentView('home');
     // Drop the counselor role too so the next login (possibly a different
     // account) never flashes a stale switch or workstation.
@@ -1283,45 +1278,6 @@ const LoveTimeApp = () => {
   };
 
   // Coin activities configuration
-  const coinActivities: { [key: string]: CoinActivity } = {
-    'roleplay': { 
-      type: '角色扮演', 
-      baseCoins: 500,
-      bonusConditions: [
-        { condition: '使用新劇本', bonus: 200 },
-        { condition: '超過30分鐘', bonus: 300 }
-      ]
-    },
-    'new_position': { 
-      type: '嘗試新姿勢', 
-      baseCoins: 200,
-      bonusConditions: [
-        { condition: '第一次嘗試', bonus: 300 }
-      ]
-    },
-    'long_session': { 
-      type: '長時間親密', 
-      baseCoins: 1000,
-      bonusConditions: [
-        { condition: '超過1小時', bonus: 500 }
-      ]
-    },
-    'new_location': { 
-      type: '新地點', 
-      baseCoins: 300,
-      bonusConditions: [
-        { condition: '戶外', bonus: 400 }
-      ]
-    },
-    'foreplay': { 
-      type: '前戲活動', 
-      baseCoins: 150 
-    },
-    'regular': { 
-      type: '親密時光', 
-      baseCoins: 100 
-    }
-  };
 
   // Default gift catalog
   const defaultGifts: CoinGift[] = [
@@ -1606,12 +1562,12 @@ const LoveTimeApp = () => {
           }
         }
 
-        // Load coin balance from backend
+        // Load my 存款 balance from backend
         try {
           const coinBalance = await apiService.getCoinBalance();
           setTotalCoins(coinBalance.balance);
         } catch (coinError) {
-          console.error('Failed to load coin balance:', coinError);
+          console.error('Failed to load deposit balance:', coinError);
           // Keep local value if API fails
         }
 
@@ -1666,8 +1622,9 @@ const LoveTimeApp = () => {
 
         // Load custom gifts from backend
         try {
-          const gifts = await apiService.getCustomGifts();
+          const { gifts, hiddenDefaults } = await apiService.getCustomGifts();
           setCustomGifts(gifts as ApiCustomGift[]);
+          setHiddenDefaultGifts(hiddenDefaults);
         } catch (giftError) {
           console.error('Failed to load custom gifts:', giftError);
         }
@@ -1746,22 +1703,6 @@ const LoveTimeApp = () => {
     }
   };
 
-  const calculateCoins = (activityType: string, duration?: string, isNewScript?: boolean): number => {
-    const activity = coinActivities[activityType] || coinActivities['regular'];
-    let coins = activity.baseCoins;
-    
-    // Apply bonus conditions
-    if (activity.bonusConditions) {
-      activity.bonusConditions.forEach(bonus => {
-        if (bonus.condition === '使用新劇本' && isNewScript === true) coins += bonus.bonus;
-        if (bonus.condition === '超過30分鐘' && duration && parseInt(duration) > 30) coins += bonus.bonus;
-        if (bonus.condition === '超過1小時' && duration && parseInt(duration) > 60) coins += bonus.bonus;
-      });
-    }
-    
-    return coins;
-  };
-
   const checkBadgeProgress = () => {
     const thisWeek = getWeeklyStats();
     const total = intimateRecords.length;
@@ -1834,9 +1775,6 @@ const LoveTimeApp = () => {
     activityType: string = 'regular'
   ) => {
     try {
-      const isNewScript = roleplayScript ? !intimateRecords.some(r => r.roleplayScript === roleplayScript) : false;
-      const coinsEarned = calculateCoins(activityType, duration, isNewScript);
-      
       let photoId: string | null = null;
       let photoUrl: string | null = null;
 
@@ -1889,16 +1827,6 @@ const LoveTimeApp = () => {
       // Update local state
       setIntimateRecords(prev => [...prev, newRecord]);
       
-      // Update coins using API service (non-blocking)
-      try {
-        await apiService.updateCoins(coinsEarned);
-        setTotalCoins(prev => prev + coinsEarned);
-      } catch (coinsError) {
-        console.warn('Failed to update coins via API, using local update only:', coinsError);
-        // Still update coins locally even if API fails
-        setTotalCoins(prev => prev + coinsEarned);
-      }
-      
       // Show success notification. First-success nudge (playbook P1-3): point
       // at the natural next action once, then stay quiet.
       const firstRecord = !localStorage.getItem('nudgeFirstRecordDone');
@@ -1912,7 +1840,6 @@ const LoveTimeApp = () => {
           : firstRecord
             ? tr(`${badgeProgress} 月曆會慢慢看見你們的節奏；也可以到「我們的牆」留句想說的話。`, `${badgeProgress} The calendar will slowly show your rhythm; you can also leave a note on "Our wall".`)
             : badgeProgress,
-        coins: coinsEarned,
         duration: firstRecord ? 9000 : 6000
       });
     } catch (error: unknown) {
@@ -2115,20 +2042,10 @@ const LoveTimeApp = () => {
       setShowScriptUploadModal(false);
       setPendingScriptDraft(null);
 
-      // Reward for creating content
-      try {
-        await apiService.updateCoins(200);
-        setTotalCoins(prev => prev + 200);
-      } catch (error) {
-        console.warn('Failed to update coins via API, using local update only:', error);
-        setTotalCoins(prev => prev + 200);
-      }
-
       showNotification({
         type: 'success',
         title: tr('劇本上傳成功！', 'Script uploaded!'),
         message: tr(`${title} 已加入你的劇本庫`, `${title} was added to your script library`),
-        coins: 200,
         duration: 5000
       });
 
@@ -2288,7 +2205,15 @@ const LoveTimeApp = () => {
   };
 
   // Gift management functions
-  const addCustomGift = async (title: string, description: string, cost: number, category: CoinGift['category'], icon: string) => {
+  // The server's message already says what failed and what to do next (and is
+  // translated for English); fall back to a generic retry hint otherwise.
+  const giftErrorMessage = (error: unknown, fallback: string) => {
+    const message = (error as { message?: string })?.message;
+    return message && !/^Request failed/.test(message) ? message : fallback;
+  };
+
+  const addCustomGift = async (title: string, description: string, cost: number, category: CoinGift['category'], icon: string): Promise<boolean> => {
+    let added = false;
     try {
       // Create gift via backend API
       const newGift = await apiService.createCustomGift({
@@ -2301,6 +2226,7 @@ const LoveTimeApp = () => {
 
       // Update local state
       setCustomGifts(prev => [...prev, newGift]);
+      added = true;
 
       showNotification({
         type: 'success',
@@ -2314,43 +2240,92 @@ const LoveTimeApp = () => {
       showNotification({
         type: 'error',
         title: tr('禮品添加失敗', 'Couldn\'t add the gift'),
-        message: tr('無法保存禮品到服務器，請稍後再試', 'Couldn\'t save the gift to the server. Please try again in a moment'),
+        message: giftErrorMessage(error, tr('無法保存禮品到服務器，請稍後再試', 'Couldn\'t save the gift to the server. Please try again in a moment')),
         duration: 5000
       });
     }
+    return added;
   };
 
-  const purchaseGift = async (gift: CoinGift) => {
-    if (totalCoins >= gift.cost) {
+  // Edit a gift. Optimistic (playbook §R7): the card updates immediately and
+  // rolls back with a notification if the save fails. A built-in gift can't be
+  // edited in place, so editing one saves a custom copy that replaces it.
+  const updateGift = async (gift: CoinGift, fields: Omit<CoinGift, 'id' | 'isCustom' | 'createdBy'>) => {
+    const failTitle = tr('禮品修改失敗', 'Couldn\'t update the gift');
+    const failFallback = tr('已恢復成修改前的內容，請稍後再試一次', 'We put back the previous version. Please try again in a moment');
+    if (gift.isCustom) {
+      const previous = customGifts;
+      setCustomGifts(prev => prev.map(g => (g.id === gift.id ? { ...g, ...fields } : g)));
       try {
-        // Update coins via backend API
-        await apiService.updateCoins(-gift.cost); // Negative amount for spending
-        setTotalCoins(prev => prev - gift.cost);
-
-        showNotification({
-          type: 'success',
-          title: tr('購買成功！', 'Purchased!'),
-          message: tr(`你獲得了 ${gift.title}！記得兌現承諾哦～`, `You got ${gift.title}! Remember to keep your promise~`),
-          duration: 5000
-        });
+        await apiService.updateCustomGift(gift.id, fields);
       } catch (error) {
-        console.error('Failed to update coins via API:', error);
-        // Still update locally for immediate UI feedback
-        setTotalCoins(prev => prev - gift.cost);
-
-        showNotification({
-          type: 'success',
-          title: tr('購買成功！', 'Purchased!'),
-          message: tr(`你獲得了 ${gift.title}！記得兌現承諾哦～`, `You got ${gift.title}! Remember to keep your promise~`),
-          duration: 5000
-        });
+        console.error('Failed to update custom gift:', error);
+        setCustomGifts(previous);
+        showNotification({ type: 'error', title: failTitle, message: giftErrorMessage(error, failFallback), duration: 5000 });
       }
-    } else {
+      return;
+    }
+    const tempId = `temp-${gift.id}-${Date.now()}`;
+    setHiddenDefaultGifts(prev => (prev.includes(gift.id) ? prev : [...prev, gift.id]));
+    setCustomGifts(prev => [{ ...fields, id: tempId, isCustom: true }, ...prev]);
+    try {
+      const saved = await apiService.createCustomGift({ ...fields, replaces_default: gift.id }) as CoinGift;
+      setCustomGifts(prev => prev.map(g => (g.id === tempId ? saved : g)));
+    } catch (error) {
+      console.error('Failed to replace default gift:', error);
+      setCustomGifts(prev => prev.filter(g => g.id !== tempId));
+      setHiddenDefaultGifts(prev => prev.filter(k => k !== gift.id));
+      showNotification({ type: 'error', title: failTitle, message: giftErrorMessage(error, failFallback), duration: 5000 });
+    }
+  };
+
+  // Remove a gift (custom → deleted, built-in → hidden for this couple).
+  // Optimistic: gone immediately, put back with a notification on failure.
+  const removeGift = async (gift: CoinGift) => {
+    const failTitle = tr('禮品移除失敗', 'Couldn\'t remove the gift');
+    const failFallback = tr(`「${gift.title}」已放回商店，請稍後再試一次`, `"${gift.title}" is back in the shop. Please try again in a moment`);
+    if (gift.isCustom) {
+      const previous = customGifts;
+      setCustomGifts(prev => prev.filter(g => g.id !== gift.id));
+      try {
+        await apiService.deleteCustomGift(gift.id);
+      } catch (error) {
+        console.error('Failed to delete custom gift:', error);
+        setCustomGifts(previous);
+        showNotification({ type: 'error', title: failTitle, message: giftErrorMessage(error, failFallback), duration: 5000 });
+      }
+      return;
+    }
+    setHiddenDefaultGifts(prev => (prev.includes(gift.id) ? prev : [...prev, gift.id]));
+    try {
+      await apiService.hideDefaultGift(gift.id);
+    } catch (error) {
+      console.error('Failed to hide default gift:', error);
+      setHiddenDefaultGifts(prev => prev.filter(k => k !== gift.id));
+      showNotification({ type: 'error', title: failTitle, message: giftErrorMessage(error, failFallback), duration: 5000 });
+    }
+  };
+
+  // Bring back every removed built-in gift (edited copies stay as they are).
+  const restoreDefaultGifts = async () => {
+    const previous = hiddenDefaultGifts;
+    setHiddenDefaultGifts([]);
+    try {
+      await apiService.restoreDefaultGifts();
       showNotification({
-        type: 'warning',
-        title: tr('金幣不足', 'Not enough coins'),
-        message: tr(`還需要 ${gift.cost - totalCoins} 枚金幣`, `You need ${gift.cost - totalCoins} more coins`),
+        type: 'success',
+        title: tr('已恢復預設禮品', 'Default gifts restored'),
+        message: tr('內建禮品都回到商店了；你修改過的版本也會保留', 'The built-in gifts are back in the shop; your edited versions stay too'),
         duration: 3000
+      });
+    } catch (error) {
+      console.error('Failed to restore default gifts:', error);
+      setHiddenDefaultGifts(previous);
+      showNotification({
+        type: 'error',
+        title: tr('恢復預設禮品失敗', 'Couldn\'t restore the default gifts'),
+        message: giftErrorMessage(error, tr('請稍後再試一次', 'Please try again in a moment')),
+        duration: 5000
       });
     }
   };
@@ -2498,6 +2473,7 @@ const LoveTimeApp = () => {
             onGoToActivity={() => setCurrentView('activity')}
             onGoToTalk={() => setCurrentView('events')}
             onGoToDailyLove={() => setCurrentView('daily-love')}
+            onOpenLoveBank={() => setCurrentView('shop')}
           />
         );
       case 'grow':
@@ -2599,20 +2575,23 @@ const LoveTimeApp = () => {
         );
       case 'shop': return (
         <CoinShopView
-          totalCoins={totalCoins}
-          defaultGifts={defaultGifts}
+          defaultGifts={defaultGifts.filter(g => !hiddenDefaultGifts.includes(g.id))}
+          hiddenDefaultCount={defaultGifts.filter(g => hiddenDefaultGifts.includes(g.id)).length}
           customGifts={customGifts}
           addCustomGift={addCustomGift}
-          purchaseGift={purchaseGift}
+          updateGift={updateGift}
+          removeGift={removeGift}
+          restoreDefaultGifts={restoreDefaultGifts}
+          onBalanceChange={setTotalCoins}
+          onInvitePartner={openPairingPrompt}
+          showNotification={showNotification}
         />
       );
       case 'foreplay':
       case 'games':
         return <GamesView
-        totalCoins={totalCoins}
         customMemoryQuestions={customMemoryQuestions}
         customEmotions={customEmotions}
-        setTotalCoins={setTotalCoins}
         showNotification={showNotification}
       />;
       // 好好說話：merged tab (playbook §6 Q1). Two sub-views share one nav
@@ -2688,10 +2667,8 @@ const LoveTimeApp = () => {
             initialScriptTitle={pendingScriptTitle}
             onInitialScriptConsumed={() => setPendingScriptTitle(null)}
             renderGames={() => <GamesView
-              totalCoins={totalCoins}
               customMemoryQuestions={customMemoryQuestions}
               customEmotions={customEmotions}
-              setTotalCoins={setTotalCoins}
               showNotification={showNotification}
             />}
           />
@@ -2793,10 +2770,8 @@ const LoveTimeApp = () => {
       case 'feedback': return <FeedbackView authState={authState} showNotification={showNotification} setShowAuthModal={setShowAuthModal} />;
       case 'love-language': return <LoveLanguageView authState={authState} showNotification={showNotification} setShowAuthModal={setShowAuthModal} />;
       default: return <GamesView
-        totalCoins={totalCoins}
         customMemoryQuestions={customMemoryQuestions}
         customEmotions={customEmotions}
-        setTotalCoins={setTotalCoins}
         showNotification={showNotification}
       />;
     }
@@ -3465,12 +3440,6 @@ const LoveTimeApp = () => {
                       <Play className="w-5 h-5 text-petal-sage-deep" />
                       <span className="font-body text-sm text-petal-ink group-hover:text-petal-sage-deep group-hover:underline underline-offset-2 transition-colors">{tr('劇本:', 'Script: ')} {selectedRecord.roleplayScript}</span>
                     </button>
-                  )}
-                  {!!selectedRecord.coinsEarned && (
-                    <div className="flex items-center space-x-2">
-                      <Coins className="w-5 h-5 text-yellow-500" />
-                      <span className="font-body text-sm text-petal-ink">{tr('獲得金幣:', 'Coins earned: ')} {selectedRecord.coinsEarned}</span>
-                    </div>
                   )}
                 </div>
 

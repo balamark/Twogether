@@ -30,6 +30,9 @@ import {
   ThumbsDown,
   Send,
   Globe,
+  Coins,
+  Trash2,
+  HelpCircle,
   type LucideIcon,
 } from 'lucide-react';
 import { daysSinceLastNudge } from './AchievementsView';
@@ -1129,13 +1132,11 @@ const PREVIEWS: Record<string, PreviewConfig> = {
           </div>
         </div>
         <SampleCard>
-          <div className="text-center">
-            <div className="text-lg" aria-hidden>❤️</div>
-            <div className="font-body text-[10px] uppercase tracking-[0.16em] text-petal-muted">{tr('我們正在愛', 'We are loving')}</div>
-            <div className="font-display text-3xl font-light text-petal-rose-deep leading-none my-0.5">10</div>
-            <p className="font-body text-[11px] text-petal-ink-soft leading-relaxed">
-              {tr('每次留言、記錄美好、化解衝突都', 'Every note, good moment and resolved conflict adds ')} <span className="font-medium text-petal-rose-deep">+1</span>{tr('，美好存款越存越厚。', ', and your savings of good moments keep growing.')}
-            </p>
+          <div className="flex items-center gap-3">
+            <span className="font-body text-[10px] uppercase tracking-[0.16em] text-petal-muted">{tr('感情存款', 'Love Bank')}</span>
+            <span className="ml-auto font-display text-3xl font-light text-petal-rose-deep leading-none">1050</span>
+            <HelpCircle className="w-3.5 h-3.5 text-petal-muted" strokeWidth={1.5} aria-hidden />
+            <SampleTag />
           </div>
         </SampleCard>
         {/* 親密節奏 lives one tap down (記錄時光 calendar); preview it here too
@@ -1146,6 +1147,62 @@ const PREVIEWS: Record<string, PreviewConfig> = {
           <p className="font-display italic font-light text-sm text-petal-ink leading-relaxed">
             {tr('「還記得第一次注意到他的時候，是他笑起來眼睛會彎的樣子。」', '"I remember the first time I noticed him: the way his eyes curved when he smiled."')}
           </p>
+        </SampleCard>
+      </div>
+    ),
+  },
+  // 感情存款：each partner's own deposit account, paid into only by the other
+  // (感謝存款 / 申請存款), spent on the other's gifts with their agreement.
+  shop: {
+    icon: Coins,
+    eyebrow: tr('感情存款', 'Love Bank'),
+    title: (
+      <>
+        {tr('讓「被在乎」', 'Make feeling cared for ')}<em className="not-italic font-light italic text-pink-600">{tr('看得見', 'visible')}</em>
+      </>
+    ),
+    description:
+      tr('你們各有一個感情存款帳戶，只有另一半能為你存入：TA 幫你做了一件重要的事，你就為 TA 存一筆「感謝存款」；你為 TA 做了什麼，也能「申請存款」請 TA 確認。感情存款可以兌換對方的禮品，對方同意才會扣除；兩人感情存款的平均，讓彼此大概知道感情的狀態。', 'You each have a Love Bank account that only the other can add to: when they do something that matters to you, make a thank-you deposit for them; when you do something for them, ask for a deposit and they confirm it. Spend deposits on the other\'s gifts, deducted only once they agree. The average of both shows roughly how things are between you.'),
+    sample: (
+      <div className="space-y-2.5">
+        <SampleCard>
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-body text-xs text-petal-muted">{tr('你們的感情存款', 'Your Love Bank')}</span>
+            <SampleTag />
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-center">
+            {[
+              { label: tr('我的', 'Mine'), value: 1200 },
+              { label: tr('TA 的', 'Theirs'), value: 900 },
+            ].map((d) => (
+              <div key={d.label}>
+                <div className="font-display text-xl text-petal-ink">{d.value}</div>
+                <div className="font-body text-[11px] text-petal-muted">{d.label}</div>
+              </div>
+            ))}
+          </div>
+        </SampleCard>
+        <SampleCard>
+          <div className="flex items-center justify-between">
+            <span className="font-body text-sm text-petal-ink">{tr('💝 TA 為你感謝存款 100｜謝謝你幫我寫了一個劇本', '💝 They thanked you with 100 | Thanks for writing a script for me')}</span>
+            <SampleTag />
+          </div>
+        </SampleCard>
+        <SampleCard>
+          <div className="flex items-center justify-between">
+            <span className="font-body text-sm text-petal-ink">{tr('❤️ TA 自動為你存入 +1｜今天你還喜歡他什麼', '❤️ Auto-deposit from them +1 | What do you still love about them today?')}</span>
+            <SampleTag />
+          </div>
+        </SampleCard>
+        <SampleCard>
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-body text-sm text-petal-ink">{tr('🎁 想兌換「睡前肩頸按摩 · 800」', '🎁 Wants to redeem "Bedtime shoulder rub · 800"')}</span>
+            <div className="flex items-center gap-2 text-petal-muted">
+              <span className="font-body text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{tr('等 TA 同意', 'Waiting to agree')}</span>
+              <Pencil className="w-3.5 h-3.5" aria-hidden />
+              <Trash2 className="w-3.5 h-3.5" aria-hidden />
+            </div>
+          </div>
         </SampleCard>
       </div>
     ),

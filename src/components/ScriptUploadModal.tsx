@@ -728,7 +728,7 @@ const ScriptUploadModal = ({
               data-testid="script-upload-submit-button"
               className="flex-1 py-3 text-base"
             >
-              {isEditMode ? tr('保存修改 →', 'Save changes →') : tr('上傳劇本 (+200 金幣)', 'Upload script (+200 coins)')}
+              {isEditMode ? tr('保存修改 →', 'Save changes →') : tr('上傳劇本 →', 'Upload script →')}
             </Button>
           </div>
           {isEditMode && editingScript && (

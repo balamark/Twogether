@@ -174,6 +174,13 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       case 'custom_gift_created':
       case 'custom_gift_updated':
       case 'custom_gift_deleted':
+      case 'deposit_thanks':
+      case 'deposit_requested':
+      case 'deposit_confirmed':
+      case 'deposit_declined':
+      case 'redemption_requested':
+      case 'redemption_approved':
+      case 'redemption_declined':
         onNavigate('shop');
         break;
       case 'assessment_saved':
@@ -197,7 +204,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       case 'story_comment':
         onNavigate('stories');
         break;
-      // 關係之屋提醒（每週檢視 / 好久沒親密 / 存好感）→ 首頁的關係儀表板。
+      // 關係之屋提醒（每週檢視 / 好久沒親密 / 說句欣賞的話）→ 首頁的關係儀表板。
       case 'relationship_checkin_due':
       case 'relationship_intimacy_gap':
       case 'relationship_appreciation_gap':

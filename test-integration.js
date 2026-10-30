@@ -346,53 +346,29 @@ class TestRunner {
   async testCoinsSystem() {
     console.log('\n🪙 Testing Coins System');
 
-    // Test get coin balance (currently a placeholder)
-    await this.test('Get Coin Balance', async () => {
+    // 存款 (migration 108): balances only move through a partner, so the
+    // integration user (unpaired or paired) can read a balance but can never
+    // credit themselves.
+    await this.test('Get Deposit Balance', async () => {
       const response = await this.makeRequest('GET', '/coins/balance');
       this.assertStatus(response, 200, 'Get balance should succeed');
       this.assertTrue(typeof response.data.balance === 'number', 'Should return numeric balance');
-      this.assertTrue(response.data.balance >= 0, 'Balance should be non-negative');
-      // Note: Currently returns 0 with "Coming soon!" message - this is expected
+      this.assertTrue(typeof response.data.paired === 'boolean', 'Should say whether the user is paired');
     });
 
-    // Test create coin transaction (currently a placeholder)
-    await this.test('Create Coin Transaction Placeholder', async () => {
-      const transactionData = {
+    await this.test('Self-crediting endpoint is gone', async () => {
+      const response = await this.makeRequest('POST', '/coins/transaction', {
         amount: 50,
         transaction_type: 'earn',
         description: 'Test earn transaction'
-      };
-
-      const response = await this.makeRequest('POST', '/coins/transaction', transactionData);
-      // Expect either 200 (if implemented) or appropriate status for placeholder
-      this.assertTrue(response.status === 200 || response.status >= 400, 'Should return valid response status');
+      });
+      this.assertStatus(response, 404, 'The client-trusted grant endpoint should no longer exist');
     });
 
-    // A repeated earn carrying the same idempotency_key must grant only once
-    // (migration 085). This is what lets the client credit optimistically and
-    // still be safe against a retry / a timeout that actually succeeded.
-    await this.test('Coin Transaction Idempotency', async () => {
-      const before = await this.makeRequest('GET', '/coins/balance');
-      if (before.status !== 200 || typeof before.data.balance !== 'number') {
-        return; // No couple / balance unavailable in this env — nothing to assert.
-      }
-      const startBalance = before.data.balance;
-      const key = `test-idem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-      const payload = { amount: 7, transaction_type: 'earn', description: 'Idempotency test', idempotency_key: key };
-
-      const first = await this.makeRequest('POST', '/coins/transaction', payload);
-      if (first.status !== 200) return; // Earn not grantable in this env — skip strict check.
-      this.assertTrue(!first.data.deduped, 'First grant should not be flagged deduped');
-
-      const second = await this.makeRequest('POST', '/coins/transaction', payload);
-      this.assertStatus(second, 200, 'Repeat with same key should still succeed (idempotent)');
-      this.assertTrue(second.data.deduped === true, 'Repeat with same key should be deduped');
-
-      const after = await this.makeRequest('GET', '/coins/balance');
-      this.assertTrue(
-        after.data.balance === startBalance + 7,
-        `Balance should rise by 7 once, not twice (delta ${after.data.balance - startBalance})`
-      );
+    await this.test('Deposit Summary', async () => {
+      const response = await this.makeRequest('GET', '/coins/summary');
+      this.assertStatus(response, 200, 'Summary should succeed');
+      this.assertTrue(Array.isArray(response.data.awaiting_me), 'Summary should list items awaiting me');
     });
   }
 

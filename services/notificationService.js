@@ -50,6 +50,14 @@ const CATALOG = {
   custom_gift_created: { emoji: '🎁', verb: '新增了一個客製禮物', fallback: '打開 App 看看新的禮物' },
   custom_gift_updated: { emoji: '🎁', verb: '更新了一個客製禮物', fallback: '打開 App 看看更新後的禮物' },
   custom_gift_deleted: { emoji: '🎁', verb: '刪除了一個客製禮物', fallback: '一個客製禮物已被移除' },
+  // 存款 — personal deposit accounts (routes/coins.js). Content is "金額｜原因".
+  deposit_thanks: { emoji: '💝', verb: '為你存入了一筆感謝存款', fallback: '打開「感情存款」看看 TA 謝謝你什麼' },
+  deposit_requested: { emoji: '🙋', verb: '申請了一筆存款，等你確認', fallback: '打開「感情存款」確認或婉拒', priority: 2 },
+  deposit_confirmed: { emoji: '✅', verb: '確認了你的存款申請', fallback: '感情存款已存入你的帳戶' },
+  deposit_declined: { emoji: '🕊️', verb: '婉拒了你的存款申請', fallback: '可以聊聊這件事對彼此的意義' },
+  redemption_requested: { emoji: '🎁', verb: '想用感情存款兌換你的禮物，等你同意', fallback: '打開「感情存款」同意或婉拒', priority: 2 },
+  redemption_approved: { emoji: '🎁', verb: '同意了你的禮物兌換', fallback: '感情存款已扣除，記得一起兌現這份心意' },
+  redemption_declined: { emoji: '🕊️', verb: '婉拒了你的禮物兌換', fallback: '感情存款沒有被扣除，可以換個時間或換個禮物再試' },
   // 愛的語言 — assessments & love wishes
   assessment_saved: { emoji: '📋', verb: '更新了關係評估', fallback: '打開 App 看看 TA 的評估結果' },
   love_wish_created: { emoji: '💫', verb: '許下了一個愛的願望', fallback: '打開 App 看看 TA 的願望' },

@@ -39,8 +39,8 @@ const ACHIEVEMENT_TYPES = {
     points: 20
   },
   'coin_collector': {
-    name: '金幣收集家',
-    description: '累積100金幣',
+    name: '感情存款收集家',
+    description: '累積100感情存款',
     icon: '🪙',
     category: 'coins',
     points: 30
@@ -203,11 +203,11 @@ router.post('/check', async (req, res) => {
         COUNT(DISTINCT p.id) as photos_count,
         EXTRACT(DAY FROM (NOW() - c.created_at)) as days_together,
         COUNT(DISTINCT DATE(lm.moment_date)) as active_days,
-        COALESCE(SUM(CASE WHEN ct.transaction_type = 'earn' THEN ct.amount ELSE -ct.amount END), 0) as total_coins
+        (SELECT COALESCE(SUM(CASE WHEN ct.transaction_type = 'earn' THEN ct.amount ELSE -ct.amount END), 0)
+           FROM coin_transactions ct WHERE ct.couple_id = c.id AND ct.status = 'confirmed') as total_coins
       FROM couples c
       LEFT JOIN love_moments lm ON c.id = lm.couple_id
       LEFT JOIN photos p ON c.id = p.couple_id
-      LEFT JOIN coin_transactions ct ON c.id = ct.couple_id
       WHERE c.id = $1
       GROUP BY c.id, c.created_at
     `, [coupleId]);

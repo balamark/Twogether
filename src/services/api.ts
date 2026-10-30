@@ -117,6 +117,37 @@ export type ActivityType =
   | 'love_moment' | 'custom_script' | 'wall_post' | 'event'
   | 'achievement' | 'coins' | 'checkin';
 
+export interface DepositTransaction {
+  id: string;
+  /** 'auto': the partner's automatic deposit for a positive interaction. */
+  kind: 'thanks' | 'request' | 'redeem' | 'auto';
+  status: 'pending' | 'confirmed' | 'declined' | 'cancelled';
+  amount: number;
+  note: string;
+  gift_icon: string | null;
+  /** For kind 'auto': the positive interaction that earned it. */
+  category: string | null;
+  owner_id: string;
+  created_by: string;
+  /** True when the row belongs to the caller's own account. */
+  is_mine: boolean;
+  created_at: string;
+  responded_at: string | null;
+}
+
+export interface DepositSummary {
+  paired: boolean;
+  me: { balance: number; available: number };
+  partner: { balance: number } | null;
+  /** Read-only average of both balances. */
+  average: number;
+  /** Partner's pending requests/redemptions that only the caller can answer. */
+  awaitingMe: DepositTransaction[];
+  /** Caller's own pending requests/redemptions, waiting on the partner. */
+  awaitingPartner: DepositTransaction[];
+  recent: DepositTransaction[];
+}
+
 export interface ActivityItem {
   id: string;
   type: ActivityType;
@@ -2558,55 +2589,107 @@ class ApiService {
     await apiClient.put('/couples/nicknames', { nickname: myNickname });
   }
 
-  // Coins
-  async getTotalCoins(): Promise<number> {
-    try {
-      const response = await apiClient.get('/coins/balance');
-      return response.data.balance || 0;
-    } catch (error) {
-      console.error('Failed to fetch coins:', error);
-      throw error;
-    }
-  }
-
-  async getCoinBalance(): Promise<{ balance: number; totalEarned: number; totalSpent: number }> {
+  // 存款 — personal deposit accounts (routes/coins.js). Money only moves by a
+  // person: 感謝存款, 申請存款 (partner confirms) and 兌換禮品 (partner agrees).
+  async getCoinBalance(): Promise<{ balance: number; available: number; paired: boolean }> {
     try {
       const response = await apiClient.get('/coins/balance');
       return {
         balance: response.data.balance || 0,
-        totalEarned: response.data.total_earned || 0,
-        totalSpent: response.data.total_spent || 0,
+        available: response.data.available || 0,
+        paired: !!response.data.paired,
       };
     } catch (error) {
-      console.error('Failed to fetch coin balance:', error);
+      console.error('Failed to fetch deposit balance:', error);
       throw error;
     }
   }
 
-  async getCoinTransactions(): Promise<unknown[]> {
+  async getDepositSummary(): Promise<DepositSummary> {
     try {
-      const response = await apiClient.get('/coins/transactions');
-      return response.data || [];
+      const response = await apiClient.get('/coins/summary');
+      const d = response.data;
+      return {
+        paired: !!d.paired,
+        me: d.me || { balance: 0, available: 0 },
+        partner: d.partner || null,
+        average: d.average || 0,
+        awaitingMe: d.awaiting_me || [],
+        awaitingPartner: d.awaiting_partner || [],
+        recent: d.recent || [],
+      };
     } catch (error) {
-      console.error('Failed to fetch coin transactions:', error);
+      console.error('Failed to fetch deposit summary:', error);
       throw error;
     }
   }
 
-  // `idempotencyKey`: a UUID identifying one earn/spend intent. Passing it lets
-  // the server dedupe a retried or double-submitted request (it grants once),
-  // which is what makes it safe for callers to credit optimistically instead of
-  // blocking the button for the whole round-trip.
-  async updateCoins(amount: number, idempotencyKey?: string): Promise<void> {
+  // kind 'thanks' pays into the partner's account; 'request' asks the partner
+  // to pay into mine. `idempotencyKey` (one per user intent) makes a retried
+  // submit a no-op server-side instead of a second deposit.
+  async createDeposit(input: { kind: 'thanks' | 'request'; amount: number; note: string }, idempotencyKey: string): Promise<DepositTransaction | null> {
     try {
-      await apiClient.post('/coins/transaction', {
-        amount: Math.abs(amount),
-        transaction_type: amount > 0 ? 'earn' : 'spend',
-        description: amount > 0 ? tr('記錄愛的時光', 'Recorded a moment of love') : tr('購買禮品', 'Bought a gift'),
-        ...(idempotencyKey ? { idempotency_key: idempotencyKey } : {}),
+      const response = await apiClient.post('/coins/deposits', { ...input, idempotency_key: idempotencyKey });
+      return response.data.transaction || null;
+    } catch (error) {
+      console.error('Failed to create deposit:', error);
+      throw error;
+    }
+  }
+
+  async requestRedemption(gift: { title: string; icon: string; cost: number }, idempotencyKey: string): Promise<DepositTransaction | null> {
+    try {
+      const response = await apiClient.post('/coins/redemptions', {
+        gift_title: gift.title,
+        gift_icon: gift.icon,
+        cost: gift.cost,
+        idempotency_key: idempotencyKey,
       });
+      return response.data.transaction || null;
     } catch (error) {
-      console.error('Failed to update coins:', error);
+      console.error('Failed to request redemption:', error);
+      throw error;
+    }
+  }
+
+  async respondToDeposit(id: string, decision: 'confirm' | 'decline'): Promise<DepositTransaction> {
+    try {
+      const response = await apiClient.post(`/coins/transactions/${id}/respond`, { decision });
+      return response.data.transaction;
+    } catch (error) {
+      console.error('Failed to respond to deposit:', error);
+      throw error;
+    }
+  }
+
+  // 自動存入設定: how much I auto-deposit into my partner's account when they
+  // do each kind of positive interaction (default 1, 0 = off).
+  async getLoveBankRates(): Promise<Record<string, number>> {
+    try {
+      const response = await apiClient.get('/coins/rates');
+      return response.data.rates || {};
+    } catch (error) {
+      console.error('Failed to fetch love bank rates:', error);
+      throw error;
+    }
+  }
+
+  async updateLoveBankRates(rates: Record<string, number>): Promise<Record<string, number>> {
+    try {
+      const response = await apiClient.put('/coins/rates', { rates });
+      return response.data.rates || rates;
+    } catch (error) {
+      console.error('Failed to update love bank rates:', error);
+      throw error;
+    }
+  }
+
+  async cancelDeposit(id: string): Promise<DepositTransaction> {
+    try {
+      const response = await apiClient.post(`/coins/transactions/${id}/cancel`);
+      return response.data.transaction;
+    } catch (error) {
+      console.error('Failed to cancel deposit:', error);
       throw error;
     }
   }
@@ -4353,10 +4436,14 @@ class ApiService {
   }
 
   // Custom Gifts API
-  async getCustomGifts(): Promise<unknown[]> {
+  // Custom gifts plus the keys of built-in gifts this couple removed/replaced.
+  async getCustomGifts(): Promise<{ gifts: unknown[]; hiddenDefaults: string[] }> {
     try {
       const response = await apiClient.get('/custom-gifts');
-      return response.data.custom_gifts || [];
+      return {
+        gifts: response.data.custom_gifts || [],
+        hiddenDefaults: response.data.hidden_defaults || [],
+      };
     } catch (error) {
       console.error('Failed to fetch custom gifts:', error);
       throw error;
@@ -4369,6 +4456,8 @@ class ApiService {
     cost: number;
     category: 'service' | 'experience' | 'physical' | 'intimate';
     icon?: string;
+    /** Key of a built-in gift this one replaces (edit of a default gift). */
+    replaces_default?: string;
   }): Promise<unknown> {
     try {
       const response = await apiClient.post('/custom-gifts', gift);
@@ -4400,6 +4489,26 @@ class ApiService {
       await apiClient.delete(`/custom-gifts/${id}`);
     } catch (error) {
       console.error('Failed to delete custom gift:', error);
+      throw error;
+    }
+  }
+
+  // Remove a built-in gift from this couple's shop.
+  async hideDefaultGift(key: string): Promise<void> {
+    try {
+      await apiClient.delete(`/custom-gifts/defaults/${encodeURIComponent(key)}`);
+    } catch (error) {
+      console.error('Failed to hide default gift:', error);
+      throw error;
+    }
+  }
+
+  // Bring back every removed/replaced built-in gift.
+  async restoreDefaultGifts(): Promise<void> {
+    try {
+      await apiClient.delete('/custom-gifts/defaults/hidden');
+    } catch (error) {
+      console.error('Failed to restore default gifts:', error);
       throw error;
     }
   }

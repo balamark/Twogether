@@ -3,6 +3,7 @@ import { User, Users, CheckCircle, Trash2 } from 'lucide-react';
 import { apiService, type CycleRecord } from '../services/api';
 import { AiCompanionList } from './AiCompanionPicker';
 import LineNotificationSettings from './LineNotificationSettings';
+import LoveBankRatesSettings from './LoveBankRatesSettings';
 import { PairingInviteShare } from './PairingInviteShare';
 import { resolveCompanion } from '../utils/aiCompanions';
 import { averageCycleLength, predictCycle, computeCycleLengths } from '../utils/cycle';
@@ -1153,6 +1154,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
       )}
+
+      <LoveBankRatesSettings partnerConnected={authState.partnerConnected} showNotification={showNotification} />
 
       {/* Account Email (login email) */}
       {authState.isAuthenticated && authState.user && (

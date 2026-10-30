@@ -18,6 +18,7 @@ const TRUNCATE_TABLES = [
   'love_moments',
   'custom_scripts',
   'custom_gifts',
+  'hidden_default_gifts',
   'coin_transactions',
   'notifications',
   'user_assessments',

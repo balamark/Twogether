@@ -320,8 +320,8 @@ export function AchievementsView() {
                 },
                 {
                   id: '7',
-                  title: tr('金幣收集者', 'Coin collector'),
-                  description: tr('累積1000金幣', 'Collect 1,000 coins'),
+                  title: tr('感情存款收集者', 'Love Bank collector'),
+                  description: tr('累積 1000 感情存款', 'Build up 1,000 in your Love Bank'),
                   icon: '💰',
                   category: 'coins',
                   progress: stats?.total_coins_earned || 0,
@@ -330,8 +330,8 @@ export function AchievementsView() {
                 },
                 {
                   id: '8',
-                  title: tr('金幣大師', 'Coin master'),
-                  description: tr('累積5000金幣', 'Collect 5,000 coins'),
+                  title: tr('感情存款大師', 'Love Bank master'),
+                  description: tr('累積 5000 感情存款', 'Build up 5,000 in your Love Bank'),
                   icon: '💎',
                   category: 'coins',
                   progress: stats?.total_coins_earned || 0,

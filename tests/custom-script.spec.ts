@@ -293,62 +293,6 @@ test.describe.serial('Custom Script Upload and Persistence', () => {
     expect(isRequired).not.toBeNull();
   });
 
-  test('should award coins for uploading custom script', async ({ page }) => {
-    // The coin balance moved into the Profile dropdown (src/components/Header.tsx);
-    // the balance span still carries data-testid="coin-balance" but is only in the
-    // DOM while the dropdown is open. Open the menu, read totalCoins, then close.
-    const menuToggle = page.getByTestId('user-menu-toggle');
-
-    const readCoins = async (): Promise<number> => {
-      await menuToggle.click(); // open dropdown
-      const coinDisplay = page.getByTestId('coin-balance');
-      await expect(coinDisplay).toBeVisible({ timeout: 5000 });
-      const text = await coinDisplay.textContent();
-      // The open dropdown renders a full-screen overlay (fixed inset-0) that
-      // closes the menu on click; tap a top corner to dismiss it.
-      await page.mouse.click(5, 5);
-      await expect(coinDisplay).toBeHidden({ timeout: 5000 });
-      return parseInt(text?.match(/\d+/)?.[0] || '0');
-    };
-
-    const initialCoins = await readCoins();
-
-    // Navigate to roleplay and upload a script
-    await page.getByTestId('nav-tab-talk').click();
-    await page.getByTestId('talk-roleplay-entry').click();
-    await page.waitForTimeout(2000);
-
-    const uploadButton = page.getByTestId('script-upload-button');
-    await uploadButton.click();
-    await page.waitForTimeout(1000);
-
-    // Fill and submit
-    const uniqueTitle = `Coin Test ${Date.now()}`;
-    await page.locator('input#script-title').fill(uniqueTitle);
-    await page.locator('select#script-category').selectOption('romantic');
-    await page.locator('input#script-scenario').fill('Test scenario');
-    await page.locator('textarea#script-content').fill('[男]: Test\n[女]: Response');
-
-    await page.getByTestId('script-upload-submit-button').click();
-
-    const successNotification = page.locator('text=劇本上傳成功');
-    await expect(successNotification.first()).toBeVisible({ timeout: 10000 });
-
-    // Check for coin reward notification (ErrorNotification renders "+200" next
-    // to the Coins icon when a notification carries a `coins` field).
-    const coinReward = page.locator('text=/\\+\\s*200/');
-    await expect(coinReward.first()).toBeVisible({ timeout: 5000 });
-
-    // The test user is unpaired, so /coins/transaction returns 404 with
-    // "您還沒有情侶關係". The frontend (src/App.tsx addCustomScript) catches
-    // that and still bumps totalCoins locally by 200, so the header value
-    // increases either way. Coin persistence for paired couples is covered
-    // separately by the coins API tests.
-    await expect
-      .poll(async () => readCoins(), { timeout: 10000 })
-      .toBe(initialCoins + 200);
-  });
-
   test('a freshly created script shows created date, NEW tag, and a working share button', async ({ page }) => {
     await page.getByTestId('nav-tab-talk').click();
     const roleplayTab = page.getByTestId('talk-roleplay-entry');
