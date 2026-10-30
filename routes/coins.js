@@ -4,6 +4,7 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 const { notifyPartnerAction } = require('../services/notificationService');
+const { AUTO_CATEGORIES, getRates } = require('../lib/loveBankAuto');
 
 // 存款 — each partner has their own deposit account (rows in coin_transactions
 // owned by owner_id, see migration 108). Money only ever moves by a person:
@@ -59,6 +60,8 @@ const toApiTransaction = (row, userId) => ({
   amount: row.amount,
   note: row.description,
   gift_icon: row.gift_icon,
+  // For kind 'auto': which positive interaction earned it (lib/loveBankAuto).
+  category: row.kind === 'auto' ? row.earned_from : null,
   owner_id: row.owner_id,
   created_by: row.created_by,
   is_mine: row.owner_id === userId,
@@ -66,7 +69,7 @@ const toApiTransaction = (row, userId) => ({
   responded_at: row.responded_at
 });
 
-const TRANSACTION_COLUMNS = 'id, kind, status, amount, description, gift_icon, owner_id, created_by, transaction_date, responded_at';
+const TRANSACTION_COLUMNS = 'id, kind, status, amount, description, gift_icon, earned_from, owner_id, created_by, transaction_date, responded_at';
 
 const rejectInvalid = (req, res) => {
   const errors = validationResult(req);
@@ -469,6 +472,59 @@ router.post('/transactions/:id/cancel', [
   } catch (error) {
     logError('Cancel deposit failed', { err: error.message, stack: error.stack });
     res.status(500).json({ success: false, message: '取消失敗，請稍後再試' });
+  }
+});
+
+// 自動存入設定: how much *I* automatically deposit into my partner's account
+// when they do each kind of positive interaction (default 1, 0 = off).
+router.get('/rates', async (req, res) => {
+  try {
+    const rates = await getRates(req.user.id);
+    res.json({ success: true, rates });
+  } catch (error) {
+    logError('Get love bank rates failed', { err: error.message, stack: error.stack });
+    res.status(500).json({ success: false, message: '讀取自動存入設定失敗，請稍後再試' });
+  }
+});
+
+router.put('/rates', [
+  body('rates')
+    .isObject()
+    .withMessage('自動存入設定格式錯誤，請重新整理後再試'),
+  body('rates.*')
+    .isInt({ min: 0, max: MAX_AMOUNT })
+    .withMessage(`每一項的金額必須是 0 到 ${MAX_AMOUNT} 之間的整數（0 代表不自動存入）`)
+    .toInt()
+], async (req, res) => {
+  try {
+    if (rejectInvalid(req, res)) return;
+
+    const userId = req.user.id;
+    const entries = Object.entries(req.body.rates).filter(([category]) => AUTO_CATEGORIES.includes(category));
+    if (entries.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '沒有可儲存的項目，請重新整理後再試',
+        error_code: 'DEPOSIT_VALIDATION_FAILED'
+      });
+    }
+
+    await db.transaction(async (client) => {
+      for (const [category, amount] of entries) {
+        await client.query(`
+          INSERT INTO love_bank_rates (user_id, category, amount, updated_at)
+          VALUES ($1, $2, $3, NOW())
+          ON CONFLICT (user_id, category) DO UPDATE SET amount = EXCLUDED.amount, updated_at = NOW()
+        `, [userId, category, amount]);
+      }
+    });
+
+    const rates = await getRates(userId);
+    logInfo('Love bank rates updated', { user_id: userId, rates });
+    res.json({ success: true, message: '自動存入設定已儲存', rates });
+  } catch (error) {
+    logError('Update love bank rates failed', { err: error.message, stack: error.stack });
+    res.status(500).json({ success: false, message: '儲存自動存入設定失敗，請稍後再試' });
   }
 });
 

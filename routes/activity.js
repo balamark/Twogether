@@ -71,7 +71,7 @@ router.get('/', async (req, res) => {
                     WHEN 'request' THEN '的存款申請已被確認：' || ct.description
                     ELSE '用感情存款兌換了「' || ct.description || '」' END,
                COALESCE(ct.responded_at, ct.transaction_date)
-          FROM coin_transactions ct WHERE ct.couple_id = $1 AND ct.status = 'confirmed'
+          FROM coin_transactions ct WHERE ct.couple_id = $1 AND ct.status = 'confirmed' AND ct.kind <> 'auto'
 
         UNION ALL
         SELECT 'checkin', rc.user_id, '完成了一次關係檢查', rc.created_at

@@ -1189,6 +1189,12 @@ const PREVIEWS: Record<string, PreviewConfig> = {
           </div>
         </SampleCard>
         <SampleCard>
+          <div className="flex items-center justify-between">
+            <span className="font-body text-sm text-petal-ink">{tr('❤️ TA 自動為你存入 +1｜今天你還喜歡他什麼', '❤️ Auto-deposit from them +1 | What do you still love about them today?')}</span>
+            <SampleTag />
+          </div>
+        </SampleCard>
+        <SampleCard>
           <div className="flex items-center justify-between gap-2">
             <span className="font-body text-sm text-petal-ink">{tr('🎁 想兌換「睡前肩頸按摩 · 800」', '🎁 Wants to redeem "Bedtime shoulder rub · 800"')}</span>
             <div className="flex items-center gap-2 text-petal-muted">

@@ -11,6 +11,7 @@ const { checkLimit } = require('../lib/entitlements');
 const { resolveCompanion } = require('../lib/aiCompanions');
 const { resolveAiLimit, countTodayAiUsage, recordAiUsage } = require('../lib/aiUsage');
 const { translationStatus } = require('../lib/translationStatus');
+const { creditPositiveInteraction, reverseAutoDeposit, wallPostCategory } = require('../lib/loveBankAuto');
 const {
   uploadMedia,
   checkMediaSizes,
@@ -702,6 +703,10 @@ router.post(
           senderName: enriched.rows[0]?.author_nickname || null,
           postId: post.id,
         });
+        // 感情存款: the partner's auto-deposit for this kind of post. Private
+        // posts never earn one — the partner can't see them, and a deposit
+        // would reveal they exist.
+        await creditPositiveInteraction({ actorId: userId, category: wallPostCategory(moodTag), sourceId: post.id });
       }
 
       res.json({
@@ -918,6 +923,7 @@ router.delete('/:id', async (req, res) => {
     }
 
     await db.query(`DELETE FROM wall_posts WHERE id = $1`, [postId]);
+    await reverseAutoDeposit({ sourceId: postId });
 
     res.json({ success: true, message: '貼文已刪除' });
   } catch (error) {

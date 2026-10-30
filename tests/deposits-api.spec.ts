@@ -168,6 +168,67 @@ test('the same idempotency key deposits once', async () => {
   expect((await summary(b)).me.balance).toBe(before + 7);
 });
 
+test('自動存入: the partner deposits at the rate THEY set per category (default 1, 0 = off)', async () => {
+  // A's rates decide what B earns. Start from the defaults.
+  const defaults = await (await a.get(`${API}/coins/rates`)).json();
+  expect(Object.keys(defaults.rates).sort()).toEqual(['conflict_resolved', 'daily_love', 'love_moment', 'secret', 'see_you', 'wall_post']);
+  await a.put(`${API}/coins/rates`, { data: { rates: { daily_love: 1, wall_post: 1 } } });
+
+  const post = async (data: Record<string, unknown>) => {
+    const res = await b.post(`${API}/wall`, { data: { category: 'general', ...data } });
+    expect(res.status(), await res.text()).toBe(200);
+    return (await res.json()).wall_post.id as string;
+  };
+  const balance = async () => (await summary(b)).me.balance as number;
+
+  let before = await balance();
+  await post({ content: '今天喜歡你笑的樣子', mood_tag: '今天喜歡你' });
+  expect(await balance()).toBe(before + 1);
+
+  // A raises 今天你還喜歡他什麼 to 5 and turns plain wall notes off.
+  const saved = await a.put(`${API}/coins/rates`, { data: { rates: { daily_love: 5, wall_post: 0 } } });
+  expect(saved.status(), await saved.text()).toBe(200);
+  expect((await saved.json()).rates).toMatchObject({ daily_love: 5, wall_post: 0, see_you: 1 });
+
+  before = await balance();
+  const loved = await post({ content: '謝謝你今天陪我', mood_tag: '今天喜歡你' });
+  expect(await balance()).toBe(before + 5);
+  await post({ content: '一般留言' });
+  expect(await balance()).toBe(before + 5);
+  // Private posts never earn a deposit (the partner can't see them).
+  await post({ content: '只有我看得到', mood_tag: '今天喜歡你', is_private: true });
+  expect(await balance()).toBe(before + 5);
+
+  // B's own rates don't affect what B earns.
+  await b.put(`${API}/coins/rates`, { data: { rates: { daily_love: 100 } } });
+  const before2 = await balance();
+  await post({ content: '再一次', mood_tag: '今天喜歡你' });
+  expect(await balance()).toBe(before2 + 5);
+
+  // Deleting the post withdraws its deposit.
+  const beforeDelete = await balance();
+  expect((await b.delete(`${API}/wall/${loved}`)).status()).toBe(200);
+  expect(await balance()).toBe(beforeDelete - 5);
+
+  // Out-of-range amounts are rejected with a specific message.
+  const bad = await a.put(`${API}/coins/rates`, { data: { rates: { daily_love: -1 } } });
+  expect(bad.status()).toBe(400);
+  expect((await bad.json()).error_code).toBe('DEPOSIT_VALIDATION_FAILED');
+
+  // Recording a good moment earns A's love_moment rate; deleting it withdraws it.
+  await a.put(`${API}/coins/rates`, { data: { rates: { love_moment: 3 } } });
+  const beforeMoment = await balance();
+  const moment = await b.post(`${API}/love-moments`, { data: { moment_date: '2026-01-10T12:00:00Z', description: 'test' } });
+  expect(moment.status(), await moment.text()).toBe(201);
+  expect(await balance()).toBe(beforeMoment + 3);
+  const momentId = (await moment.json()).love_moment.id;
+  expect((await b.delete(`${API}/love-moments/${momentId}`)).status()).toBe(200);
+  expect(await balance()).toBe(beforeMoment);
+
+  await a.put(`${API}/coins/rates`, { data: { rates: { daily_love: 1, wall_post: 1 } } });
+  await b.put(`${API}/coins/rates`, { data: { rates: { daily_love: 1 } } });
+});
+
 test('unpaired users get a specific NOT_PAIRED gate; self-crediting is gone', async () => {
   const base = await request.newContext();
   const token = await loginOrRegister(base, SOLO);

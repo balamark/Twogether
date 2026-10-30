@@ -8,6 +8,7 @@ import { apiService, type DepositSummary, type DepositTransaction } from '../ser
 import type { Notification } from '../App';
 import { tr, dateLocale } from '../i18n/tr';
 import { newIdemKey } from '../utils/idempotency';
+import { loveBankCategoryLabel } from '../content/loveBankCategories';
 
 type DepositKind = 'thanks' | 'request';
 
@@ -42,6 +43,12 @@ const describe = (t: DepositTransaction) => {
     return t.is_mine
       ? tr(`你用感情存款兌換 ${t.gift_icon || '🎁'} ${t.note}`, `You redeem ${t.gift_icon || '🎁'} ${t.note}`)
       : tr(`TA 想用感情存款兌換 ${t.gift_icon || '🎁'} ${t.note}`, `Your partner wants to redeem ${t.gift_icon || '🎁'} ${t.note}`);
+  }
+  if (t.kind === 'auto') {
+    const label = loveBankCategoryLabel(t.category);
+    return t.is_mine
+      ? tr(`TA 自動為你存入：${label}`, `Auto-deposit from your partner: ${label}`)
+      : tr(`你自動為 TA 存入：${label}`, `Your auto-deposit for them: ${label}`);
   }
   if (t.kind === 'request') {
     return t.is_mine

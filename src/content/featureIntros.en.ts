@@ -151,7 +151,7 @@ export const FEATURE_INTROS_EN: Record<string, IntroCopy> = {
       },
       {
         q: 'What is the Love Bank?',
-        a: 'You each have a deposit account that only your partner can add to: they make a thank-you deposit when they want to thank you, or you ask for a deposit and they confirm it. Spend your deposits in Love Bank (profile menu, top right, or the relationship house on Today) on a gift from your partner; it\'s deducted only after they agree.',
+        a: 'You each have a deposit account that only your partner can add to: they make a thank-you deposit when they want to thank you, or you ask for a deposit and they confirm it. When they answer "What do you still love about them today?", leave a note, record a good moment or resolve a conflict, you also deposit for them automatically, at the amounts in Settings → Love Bank: auto-deposits (1 by default). Spend your deposits in Love Bank (profile menu, top right, or the relationship house on Today) on a gift from your partner; it\'s deducted only after they agree.',
       },
     ],
   },

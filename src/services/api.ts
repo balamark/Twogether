@@ -119,11 +119,14 @@ export type ActivityType =
 
 export interface DepositTransaction {
   id: string;
-  kind: 'thanks' | 'request' | 'redeem';
+  /** 'auto': the partner's automatic deposit for a positive interaction. */
+  kind: 'thanks' | 'request' | 'redeem' | 'auto';
   status: 'pending' | 'confirmed' | 'declined' | 'cancelled';
   amount: number;
   note: string;
   gift_icon: string | null;
+  /** For kind 'auto': the positive interaction that earned it. */
+  category: string | null;
   owner_id: string;
   created_by: string;
   /** True when the row belongs to the caller's own account. */
@@ -2655,6 +2658,28 @@ class ApiService {
       return response.data.transaction;
     } catch (error) {
       console.error('Failed to respond to deposit:', error);
+      throw error;
+    }
+  }
+
+  // 自動存入設定: how much I auto-deposit into my partner's account when they
+  // do each kind of positive interaction (default 1, 0 = off).
+  async getLoveBankRates(): Promise<Record<string, number>> {
+    try {
+      const response = await apiClient.get('/coins/rates');
+      return response.data.rates || {};
+    } catch (error) {
+      console.error('Failed to fetch love bank rates:', error);
+      throw error;
+    }
+  }
+
+  async updateLoveBankRates(rates: Record<string, number>): Promise<Record<string, number>> {
+    try {
+      const response = await apiClient.put('/coins/rates', { rates });
+      return response.data.rates || rates;
+    } catch (error) {
+      console.error('Failed to update love bank rates:', error);
       throw error;
     }
   }

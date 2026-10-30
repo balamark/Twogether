@@ -28,6 +28,7 @@ const llmService = require('../services/llmService');
 const { checkLimit } = require('../lib/entitlements');
 const { resolveCompanion } = require('../lib/aiCompanions');
 const { countTodayAiUsage, resolveAiLimit, recordAiUsage } = require('../lib/aiUsage');
+const { creditBothPartners } = require('../lib/loveBankAuto');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 const { assertEventAccess, sendValidationError } = require('../lib/eventAccess');
 const { notify } = require('../lib/eventNotify');
@@ -337,6 +338,10 @@ async function maybeFinalizeClosure(eventId, { force = false } = {}) {
     forced: force,
     commitments: activated.rows.length,
   });
+
+  // 感情存款: resolving a conflict together earns each partner the other's
+  // auto-deposit (keyed per event, so a reopen + re-resolve doesn't repeat it).
+  await creditBothPartners({ coupleId: event.couple_id, category: 'conflict_resolved', sourceId: eventId });
 
   return { event, commitments: activated.rows };
 }

@@ -10,6 +10,7 @@ const lineService = require('../services/lineService');
 const llmService = require('../services/llmService');
 const { resolveAiLimit, countTodayAiUsage, recordAiUsage } = require('../lib/aiUsage');
 const { checkLimit, getCoupleIdForUser } = require('../lib/entitlements');
+const { creditPositiveInteraction, reverseAutoDeposit } = require('../lib/loveBankAuto');
 
 const router = express.Router();
 
@@ -186,6 +187,7 @@ router.post('/', [
     }
 
     logInfo('Love moment created', { momentId, coupleId, hasPhoto: !!moment.photo_id });
+    await creditPositiveInteraction({ actorId: userId, category: 'love_moment', sourceId: momentId });
 
     // Let the partner know (in-app + LINE + email), best-effort.
     notifyPartnerAction({
@@ -636,6 +638,7 @@ router.delete('/:id', async (req, res) => {
     }
 
     logInfo('Love moment deleted', { momentId });
+    await reverseAutoDeposit({ category: 'love_moment', sourceId: momentId });
 
     notifyPartnerAction({ actorId: userId, type: 'love_moment_deleted' });
 
