@@ -52,6 +52,9 @@ const hideDefaultGift = (client, coupleId, userId, giftKey) => (
       `, [userId, giftKey])
 );
 
+// Postgres INTEGER max: the only limit on a gift's price.
+const GIFT_COST_MAX = 2147483647;
+
 const giftValidators = (optional) => {
   const field = (name) => (optional ? body(name).optional() : body(name));
   return [
@@ -62,8 +65,9 @@ const giftValidators = (optional) => {
       .isLength({ min: 1, max: 500 })
       .withMessage('描述必須在1-500個字符之間'),
     field('cost')
-      .isInt({ min: 1, max: 10000 })
-      .withMessage('花費必須是1-10000之間的整數'),
+      // No product cap on a gift's price — only the INTEGER column's ceiling.
+      .isInt({ min: 1, max: GIFT_COST_MAX })
+      .withMessage('花費必須是大於 0 的整數'),
     field('category')
       .isIn(['service', 'experience', 'physical', 'intimate'])
       .withMessage('無效的禮品類別'),

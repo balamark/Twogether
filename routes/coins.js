@@ -94,6 +94,14 @@ const amountValidator = (field) => body(field)
   .withMessage(`金額必須是 1 到 ${MAX_AMOUNT} 之間的整數`)
   .toInt();
 
+// A gift's price has no product cap (deposits keep MAX_AMOUNT), so a redemption
+// may cost anything up to the INTEGER column's ceiling.
+const GIFT_COST_MAX = 2147483647;
+const giftCostValidator = body('cost')
+  .isInt({ min: 1, max: GIFT_COST_MAX })
+  .withMessage('兌換金額必須是大於 0 的整數')
+  .toInt();
+
 const idempotencyValidator = body('idempotency_key')
   .optional({ nullable: true })
   .isString()
@@ -254,7 +262,7 @@ router.post('/redemptions', [
     .optional({ nullable: true })
     .isLength({ max: 10 })
     .withMessage('圖標不能超過10個字符'),
-  amountValidator('cost'),
+  giftCostValidator,
   idempotencyValidator
 ], async (req, res) => {
   try {
