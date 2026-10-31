@@ -10,6 +10,7 @@ import { apiService } from '../services/api';
 import { useCachedQuery, userKey } from '../services/queryCache';
 import { tr } from '../i18n/tr';
 import { newIdemKey } from '../utils/idempotency';
+import { parseDigits, digitsValue } from '../utils/digits';
 
 type GiftFields = Omit<CoinGift, 'id' | 'isCustom' | 'createdBy'>;
 
@@ -34,6 +35,9 @@ interface CoinShopViewProps {
   onInvitePartner: () => void;
   showNotification: (notification: Omit<Notification, 'id'>) => void;
 }
+
+// Gift prices have no product cap — only the server's INTEGER ceiling.
+const GIFT_COST_MAX = 2147483647;
 
 const EMPTY_GIFT: GiftFields = { title: '', description: '', cost: 1000, category: 'service', icon: '🎁' };
 
@@ -252,90 +256,86 @@ const CoinShopView = ({
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {allGifts.map((gift) => (
-          <div key={gift.id} className="bg-white rounded-2xl border border-petal-rule p-6 hover:border-petal-rose transition-colors" data-testid="gift-card">
-            <div className="mb-4 pb-4 border-b border-petal-rule-soft">
-              <div className="flex items-start justify-between mb-3">
-                <div className="text-2xl opacity-75 saturate-75">{gift.icon}</div>
-                {!isPending(gift) && (
-                  confirmingRemoveId === gift.id ? (
-                    <div className="flex items-center gap-2 -mt-2 -mr-2 font-body text-xs">
-                      <span className="text-petal-muted">{tr('確定移除？', 'Remove it?')}</span>
-                      <button
-                        onClick={() => { setConfirmingRemoveId(null); void removeGift(gift); }}
-                        data-testid="confirm-remove-gift"
-                        className="px-3 min-h-[44px] rounded-md bg-red-50 text-red-700 hover:bg-red-100"
-                      >
-                        {tr('移除', 'Remove')}
-                      </button>
-                      <button
-                        onClick={() => setConfirmingRemoveId(null)}
-                        className="px-3 min-h-[44px] rounded-md text-petal-ink-soft hover:text-petal-ink"
-                      >
-                        {tr('取消', 'Cancel')}
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 -mt-2 -mr-2">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        {allGifts.map((gift) => {
+          const canRedeem = paired && available >= gift.cost;
+          const label = !summary
+            ? (summaryQuery.error ? tr('暫時無法兌換', 'Can\'t redeem right now') : tr('讀取中…', 'Loading…'))
+            : !paired
+            ? tr('配對後才能兌換', 'Pair up to redeem')
+            : purchasingId === gift.id
+              ? tr('送出中…', 'Sending…')
+              : canRedeem
+                ? tr('申請兌換', 'Ask to redeem')
+                : tr(`存款還差 ${(gift.cost - available).toLocaleString()}`, `${(gift.cost - available).toLocaleString()} short`);
+          return (
+          <div key={gift.id} className="bg-white rounded-xl border border-petal-rule p-3 flex flex-col hover:border-petal-rose transition-colors" data-testid="gift-card">
+            {confirmingRemoveId === gift.id && !isPending(gift) ? (
+              <div className="flex flex-col items-center justify-center gap-2 flex-1 py-2 font-body text-xs text-center">
+                <span className="text-petal-muted">{tr(`移除「${gift.title}」？`, `Remove "${gift.title}"?`)}</span>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => { setConfirmingRemoveId(null); void removeGift(gift); }}
+                    data-testid="confirm-remove-gift"
+                    className="px-3 min-h-[44px] rounded-md bg-red-50 text-red-700 hover:bg-red-100"
+                  >
+                    {tr('移除', 'Remove')}
+                  </button>
+                  <button
+                    onClick={() => setConfirmingRemoveId(null)}
+                    className="px-3 min-h-[44px] rounded-md text-petal-ink-soft hover:text-petal-ink"
+                  >
+                    {tr('取消', 'Cancel')}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-start justify-between -mt-2 -mr-2">
+                  <div className="text-xl leading-none pt-1 opacity-75 saturate-75">{gift.icon}</div>
+                  {!isPending(gift) && (
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => openEditModal(gift)}
                         aria-label={tr(`修改「${gift.title}」`, `Edit "${gift.title}"`)}
                         title={tr('修改', 'Edit')}
                         data-testid="edit-gift"
-                        className="p-2.5 min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-md text-petal-muted hover:text-petal-ink hover:bg-petal-cream-2 transition-colors"
+                        className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-md text-petal-muted hover:text-petal-ink hover:bg-petal-cream-2 transition-colors"
                       >
-                        <Pencil className="w-4 h-4" strokeWidth={1.5} />
+                        <Pencil className="w-3.5 h-3.5" strokeWidth={1.5} />
                       </button>
-                      <span aria-hidden className="w-px h-5 bg-petal-rule" />
                       <button
                         type="button"
                         onClick={() => setConfirmingRemoveId(gift.id)}
                         aria-label={tr(`移除「${gift.title}」`, `Remove "${gift.title}"`)}
                         title={tr('移除', 'Remove')}
                         data-testid="remove-gift"
-                        className="p-2.5 min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-md text-petal-muted hover:text-petal-rose-deep hover:bg-petal-cream-2 transition-colors"
+                        className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-md text-petal-muted hover:text-petal-rose-deep hover:bg-petal-cream-2 transition-colors"
                       >
-                        <Trash2 className="w-4 h-4" strokeWidth={1.5} />
+                        <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
                       </button>
                     </div>
-                  )
-                )}
-              </div>
-              <h3 className="font-display text-lg font-medium tracking-tight text-petal-ink mb-1">{gift.title}</h3>
-              <p className="font-body text-sm text-petal-ink-soft leading-relaxed">{gift.description}</p>
-            </div>
-
-            <div className="flex items-center justify-between mb-4">
-              <span className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted">
-                {gift.category === 'service' ? tr('服務', 'Service') :
-                 gift.category === 'experience' ? tr('體驗', 'Experience') :
-                 gift.category === 'physical' ? tr('實物', 'Physical') : tr('親密', 'Intimate')}
-              </span>
-              <div className="font-display italic font-light text-base text-petal-ink">
-                <Coins className="inline w-3.5 h-3.5 mr-1 text-petal-rose-deep" strokeWidth={1.5} />
-                <b className="not-italic font-normal">{gift.cost}</b>
-              </div>
-            </div>
-
-            {(() => {
-              const canRedeem = paired && available >= gift.cost;
-              const label = !summary
-                ? (summaryQuery.error ? tr('暫時無法兌換', 'Can\'t redeem right now') : tr('讀取中…', 'Loading…'))
-                : !paired
-                ? tr('配對後才能兌換', 'Pair up to redeem')
-                : purchasingId === gift.id
-                  ? tr('送出中…', 'Sending…')
-                  : canRedeem
-                    ? tr('申請兌換 →', 'Ask to redeem →')
-                    : tr(`感情存款還差 ${gift.cost - available}`, `${gift.cost - available} short`);
-              return (
+                  )}
+                </div>
+                <h3 className="font-display text-[15px] font-medium leading-snug tracking-tight text-petal-ink mt-1 line-clamp-2">{gift.title}</h3>
+                <p className="font-body text-xs text-petal-ink-soft leading-snug mt-0.5 line-clamp-2" title={gift.description}>{gift.description}</p>
+                <div className="flex items-center justify-between gap-1 mt-auto pt-2">
+                  <span className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted">
+                    {gift.category === 'service' ? tr('服務', 'Service') :
+                     gift.category === 'experience' ? tr('體驗', 'Experience') :
+                     gift.category === 'physical' ? tr('實物', 'Physical') : tr('親密', 'Intimate')}
+                  </span>
+                  <span className="font-display text-sm text-petal-ink whitespace-nowrap">
+                    <Coins className="inline w-3 h-3 mr-0.5 -mt-0.5 text-petal-rose-deep" strokeWidth={1.5} />
+                    {gift.cost.toLocaleString()}
+                  </span>
+                </div>
                 <button
                   onClick={() => buyGift(gift)}
                   disabled={!canRedeem || purchasingId === gift.id}
                   data-testid="redeem-gift"
-                  className={`w-full py-2.5 rounded-full border font-body text-[13px] font-medium transition-colors flex items-center justify-center gap-2 ${
+                  className={`mt-2 w-full min-h-[36px] px-2 rounded-full border font-body text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
                     canRedeem
                       ? 'bg-petal-rose-soft/25 border-petal-rose-soft text-petal-ink hover:border-petal-ink disabled:opacity-40 disabled:cursor-not-allowed'
                       : 'bg-petal-cream-2 border-transparent text-petal-muted cursor-not-allowed'
@@ -344,10 +344,11 @@ const CoinShopView = ({
                   {purchasingId === gift.id && <Spinner />}
                   {label}
                 </button>
-              );
-            })()}
+              </>
+            )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Add Custom Gift Modal */}
@@ -416,13 +417,13 @@ const CoinShopView = ({
                   <input
                     id="gift-cost"
                     name="gift-cost"
-                    type="number"
-                    value={newGift.cost}
-                    onChange={(e) => setNewGift(prev => ({ ...prev, cost: parseInt(e.target.value) || 0 }))}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[1-9][0-9]*"
+                    value={digitsValue(newGift.cost)}
+                    onChange={(e) => setNewGift(prev => ({ ...prev, cost: parseDigits(e.target.value, GIFT_COST_MAX) }))}
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500"
-                    min="1"
-                    max="10000"
-                    step="1"
+                    placeholder="1000"
                     required
                   />
                 </div>

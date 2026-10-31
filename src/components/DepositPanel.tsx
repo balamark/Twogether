@@ -9,6 +9,7 @@ import type { Notification } from '../App';
 import { tr, dateLocale } from '../i18n/tr';
 import { newIdemKey } from '../utils/idempotency';
 import { loveBankCategoryLabel } from '../content/loveBankCategories';
+import { parseDigits, digitsValue } from '../utils/digits';
 
 type DepositKind = 'thanks' | 'request';
 
@@ -363,12 +364,11 @@ const DepositPanel = ({ summary, loading, error, refresh, onInvitePartner, showN
                 </div>
                 <input
                   id="deposit-amount"
-                  type="number"
-                  value={amount}
-                  onChange={(e) => setAmount(parseInt(e.target.value) || 0)}
-                  min="1"
-                  max="10000"
-                  step="1"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[1-9][0-9]*"
+                  value={digitsValue(amount)}
+                  onChange={(e) => setAmount(parseDigits(e.target.value, 10000))}
                   required
                   className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-300"
                 />
