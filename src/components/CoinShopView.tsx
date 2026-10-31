@@ -267,7 +267,7 @@ const CoinShopView = ({
               ? tr('送出中…', 'Sending…')
               : canRedeem
                 ? tr('申請兌換', 'Ask to redeem')
-                : tr(`還差 ${(gift.cost - available).toLocaleString()}`, `${(gift.cost - available).toLocaleString()} short`);
+                : tr(`存款還差 ${(gift.cost - available).toLocaleString()}`, `${(gift.cost - available).toLocaleString()} short`);
           return (
           <div key={gift.id} className="bg-white rounded-xl border border-petal-rule p-3 flex flex-col hover:border-petal-rose transition-colors" data-testid="gift-card">
             {confirmingRemoveId === gift.id && !isPending(gift) ? (
@@ -291,17 +291,17 @@ const CoinShopView = ({
               </div>
             ) : (
               <>
-                <div className="flex items-start justify-between -mt-1 -mr-1">
+                <div className="flex items-start justify-between -mt-2 -mr-2">
                   <div className="text-xl leading-none pt-1 opacity-75 saturate-75">{gift.icon}</div>
                   {!isPending(gift) && (
-                    <div className="flex items-center">
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
                         onClick={() => openEditModal(gift)}
                         aria-label={tr(`修改「${gift.title}」`, `Edit "${gift.title}"`)}
                         title={tr('修改', 'Edit')}
                         data-testid="edit-gift"
-                        className="min-w-[36px] min-h-[36px] inline-flex items-center justify-center rounded-md text-petal-muted hover:text-petal-ink hover:bg-petal-cream-2 transition-colors"
+                        className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-md text-petal-muted hover:text-petal-ink hover:bg-petal-cream-2 transition-colors"
                       >
                         <Pencil className="w-3.5 h-3.5" strokeWidth={1.5} />
                       </button>
@@ -311,7 +311,7 @@ const CoinShopView = ({
                         aria-label={tr(`移除「${gift.title}」`, `Remove "${gift.title}"`)}
                         title={tr('移除', 'Remove')}
                         data-testid="remove-gift"
-                        className="min-w-[36px] min-h-[36px] inline-flex items-center justify-center rounded-md text-petal-muted hover:text-petal-rose-deep hover:bg-petal-cream-2 transition-colors"
+                        className="min-w-[44px] min-h-[44px] inline-flex items-center justify-center rounded-md text-petal-muted hover:text-petal-rose-deep hover:bg-petal-cream-2 transition-colors"
                       >
                         <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
                       </button>
