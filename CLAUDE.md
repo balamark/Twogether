@@ -31,7 +31,12 @@ anyone, so when you add or change a feature:
   the same JSON shape the server does (unhandled routes fall back to an empty
   success, which usually renders an empty state — not good enough for a
   headline feature). AI endpoints answer from on-device heuristics
-  (`guestSoften.ts`); never call the LLM or the network for guest data.
+  (`guestSoften.ts`), except the four core ones (icebreaker, draft analysis,
+  reply rewrite, emotion acceptance), which spend one of the guest's **5 real
+  AI tries** via the public `routes/guest-ai.js` (`src/guest/guestAi.ts`; text
+  is never stored, per-guest + per-IP + global caps) and fall back to the
+  on-device demo when used up or unreachable. Never send other guest data to
+  the network.
 - **Seed it**: add realistic sample rows to `src/guest/guestSeed.ts` (all
   copy via `tr()`, dates relative to now) and bump `buildSeed.VERSION` when the
   shape changes.

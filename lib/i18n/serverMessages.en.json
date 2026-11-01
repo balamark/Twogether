@@ -1,5 +1,15 @@
 {
 "exact": {
+"試玩的 5 次 AI 已經用完了。免費註冊後每天都有 AI 額度，還能邀請另一半一起用。": "You've used all 5 preview AI tries. Sign up free for a daily AI allowance — and invite your partner to use it together.",
+"訪客編號格式不正確，請重新整理頁面再試": "The guest id looks invalid. Please refresh the page and try again.",
+"暫時讀不到試用額度，請稍後再試": "Couldn't load your preview allowance right now. Please try again in a moment.",
+"文字需在 1–4000 字之間": "Text must be 1–4000 characters.",
+"草稿需在 1–2000 字之間": "The draft must be 1–2000 characters.",
+"回覆需在 1–2000 字之間": "The reply must be 1–2000 characters.",
+"請先寫下想說的事": "Write what you want to say first.",
+"請先寫下想送出的話": "Write what you want to send first.",
+"請先寫下想回覆的話": "Write your reply first.",
+"AI 暫時沒有回應，這次不扣試用次數。請稍後再試。": "The AI didn't respond this time, and it didn't use up a try. Please try again in a moment.",
 "初戀": "First love",
 "記錄第一次親密時光": "Record your first intimate moment",
 "一週年": "One year together",

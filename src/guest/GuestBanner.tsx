@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Eye, PlayCircle } from 'lucide-react';
+import { Eye, PlayCircle, Sparkles } from 'lucide-react';
+import { apiService } from '../services/api';
+import { GUEST_AI_LIMIT } from './guestAi';
 import { tr } from '../i18n/tr';
 import { trackAction } from '../utils/track';
 import GuestTutorial from './GuestTutorial';
@@ -26,6 +28,19 @@ function tourSeen(): boolean {
 
 const GuestBanner: React.FC<Props> = ({ onSignUp, onNavigate, suppressAutoTour }) => {
   const [showTour, setShowTour] = useState(false);
+  const [aiLeft, setAiLeft] = useState<number | null>(null);
+
+  // Real-AI tries left (5 per guest). Updated live after every guest AI call.
+  useEffect(() => {
+    let alive = true;
+    apiService.getAiUsageToday().then((u) => { if (alive && u) setAiLeft(u.remaining); }).catch(() => {});
+    const onUsage = (e: Event) => {
+      const u = (e as CustomEvent<{ remaining?: number }>).detail;
+      if (typeof u?.remaining === 'number') setAiLeft(u.remaining);
+    };
+    window.addEventListener('guest:ai-usage', onUsage);
+    return () => { alive = false; window.removeEventListener('guest:ai-usage', onUsage); };
+  }, []);
 
   useEffect(() => {
     if (suppressAutoTour || tourSeen()) return;
@@ -49,8 +64,16 @@ const GuestBanner: React.FC<Props> = ({ onSignUp, onNavigate, suppressAutoTour }
             <span>
               <strong className="font-medium">{tr('試玩模式', 'Guest preview')}</strong>
               {tr(
-                `：每一頁都放好了範例情侶「${guestNickname()} ❤ ${guestPartnerNickname()}」的資料，隨意點、隨意改。內容只存在這個分頁，不會上傳。`,
-                `: every page is filled with a sample couple (${guestNickname()} ❤ ${guestPartnerNickname()}). Tap and change anything. It all stays in this tab and is never uploaded.`,
+                `：每一頁都放好了範例情侶「${guestNickname()} ❤ ${guestPartnerNickname()}」的資料，隨意點、隨意改。內容只存在這個分頁；只有用 AI 時，那段文字會送去給 AI 產生回覆，不會被保存。`,
+                `: every page is filled with a sample couple (${guestNickname()} ❤ ${guestPartnerNickname()}). Tap and change anything. It all stays in this tab; only when you use AI is that text sent to the AI for a reply, and it isn't stored.`,
+              )}
+              {aiLeft !== null && (
+                <span className="mt-1 flex items-center gap-1 text-[12px] text-petal-ink-soft" data-testid="guest-ai-left">
+                  <Sparkles className="w-3.5 h-3.5 text-pink-600" strokeWidth={1.5} />
+                  {aiLeft > 0
+                    ? tr(`還有 ${aiLeft}／${GUEST_AI_LIMIT} 次真的 AI 可以試（說開一件事、送出前情緒檢查、改寫、接住情緒）`, `${aiLeft} of ${GUEST_AI_LIMIT} real AI tries left (talk it through, pre-send check, rewrite, receive feelings)`)
+                    : tr(`${GUEST_AI_LIMIT} 次 AI 試用已用完，之後改用示範回應；免費註冊每天都有 AI 額度。`, `All ${GUEST_AI_LIMIT} AI tries used — demo responses from here; sign up free for a daily AI allowance.`)}
+                </span>
               )}
             </span>
           </p>

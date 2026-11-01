@@ -12,6 +12,7 @@ import {
   guestPartnerNickname,
 } from './guestMode';
 import { GuestError, blocked } from './guestErrors';
+import { callGuestAi, fetchGuestAiUsage } from './guestAi';
 
 // ─── Guest mock backend: the routes ─────────────────────────────────────────
 // Each handler mimics the real server's JSON for that endpoint (same keys the
@@ -61,6 +62,16 @@ function eventView(e: Row, withMessages = true): Row {
     unread_count: unread,
     last_message_preview: last ? str(last.content).slice(0, 60) : null,
     messages: withMessages ? messages : undefined,
+  };
+}
+
+// What the real endpoints read from the DB, sent along for the guest AI call.
+function threadContext(e: Row) {
+  const msgs = ((e.messages as Row[]) || []).filter((m) => !m.is_ai).slice(-10);
+  return {
+    eventSummary: str(e.summary).slice(0, 1000),
+    recentMessages: msgs.map((m) => ({ fromSelf: m.sender_id === ME, content: str(m.content).slice(0, 1000) })),
+    createdBySelf: e.created_by === ME,
   };
 }
 
@@ -184,7 +195,8 @@ export const ROUTES: GuestRoute[] = [
   ] }) },
   { method: 'get', re: P('/billing/orders'), handler: () => ok({ orders: [] }) },
   { method: 'post', re: /^\/billing\//, handler: () => blocked() },
-  { method: 'get', re: P('/ai-usage/today'), handler: () => ok({ usage: { tier: 'free', limit: 20, used: 3, remaining: 17 } }) },
+  // 5 real AI tries for guests (guestAi.ts); the「剩 N 次」hint reads this.
+  { method: 'get', re: P('/ai-usage/today'), handler: async ({ db }) => ok({ usage: await fetchGuestAiUsage(db) }) },
   { method: 'get', re: P('/line/status'), handler: () => ok({ linked: false }) },
   { method: 'any', re: /^\/(line|email)\//, handler: () => blocked() },
   { method: 'post', re: /^\/(couples|pairing-requests)\//, handler: () => blocked() },
@@ -371,7 +383,10 @@ export const ROUTES: GuestRoute[] = [
     ev.sort((a, b) => str(b.updated_at).localeCompare(str(a.updated_at)));
     return ok({ events: ev.map((e) => eventView(e, false)), total: ev.length });
   } },
-  { method: 'post', re: P('/events/icebreaker'), handler: ({ body }) => ok({ preview: softenPreview(str(body.rawText)) }) },
+  { method: 'post', re: P('/events/icebreaker'), handler: async ({ db, body }) => {
+    const real = await callGuestAi(db, 'icebreaker', { rawText: str(body.rawText) });
+    return ok({ preview: real ?? softenPreview(str(body.rawText)) });
+  } },
   { method: 'post', re: P('/events'), handler: ({ db, body }) => {
     const id = gid('ge');
     const versions = { neutral: str(body.ai_neutral), firm: str(body.ai_firm), warm: str(body.ai_warm) };
@@ -416,7 +431,9 @@ export const ROUTES: GuestRoute[] = [
     if (m) m.read_at = now();
     return ok();
   } },
-  { method: 'post', re: P('/events/:id/messages/analyze-draft'), handler: ({ body }) => {
+  { method: 'post', re: P('/events/:id/messages/analyze-draft'), handler: async ({ db, params, body }) => {
+    const real = await callGuestAi(db, 'draft_analysis', { draft: str(body.draft), ...threadContext(findEvent(db, params.id)) });
+    if (real) return ok({ analysis: real });
     const r = analyzeSoften(str(body.draft));
     return ok({ analysis: {
       emotions: r.emotions.map((e) => ({ label: e.label, emoji: e.emoji, intensity: e.intensity })),
@@ -426,12 +443,16 @@ export const ROUTES: GuestRoute[] = [
       toxicityFlags: r.heat > 70 ? [tr('絕對化用語', 'Absolute words')] : [],
     } });
   } },
-  { method: 'post', re: P('/events/:id/messages/preview-rewrite'), handler: ({ body }) => {
+  { method: 'post', re: P('/events/:id/messages/preview-rewrite'), handler: async ({ db, params, body }) => {
+    const real = await callGuestAi(db, 'reply_rewrite', { rawReply: str(body.rawReply), ...threadContext(findEvent(db, params.id)) });
+    if (real) return ok({ preview: real });
     const p = softenPreview(str(body.rawReply));
     return ok({ preview: { versions: p.versions, toxicityFlags: p.toxicityFlags } });
   } },
-  { method: 'post', re: P('/events/:id/messages/preview-acceptance'), handler: ({ db, params }) => {
+  { method: 'post', re: P('/events/:id/messages/preview-acceptance'), handler: async ({ db, params }) => {
     const e = findEvent(db, params.id);
+    const real = await callGuestAi(db, 'emotion_acceptance', threadContext(e));
+    if (real) return ok({ preview: real });
     const g = getEmotionAcceptance(((e.emotions as string[]) || [])[0] || '');
     return ok({ preview: { empathy: g.meaning, acceptances: g.sampleLines.map((text, i) => ({ label: [tr('承認', 'Acknowledge'), tr('理解', 'Understand'), tr('陪伴', 'Be there')][i] || '', text })), toxicityFlags: [] } });
   } },

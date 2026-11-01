@@ -11,7 +11,7 @@ const DB_KEY = 'tw_guest_db_v1';
 // anonymous tracking. Anything else means guest data leaked to the network.
 const ALLOWED = [
   /\/api\/auth\//, /\/api\/track\//, /\/api\/feature-flags$/, /\/api\/feedback\/approved$/,
-  /\/api\/intimacy-plans\/samples$/, /\/api\/therapists$/, /\/api\/stories(\/[0-9a-f-]{36})?$/,
+  /\/api\/intimacy-plans\/samples$/, /\/api\/guest-ai\//, /\/api\/therapists$/, /\/api\/stories(\/[0-9a-f-]{36})?$/,
 ];
 
 function watchNetwork(page: Page): string[] {
@@ -62,7 +62,7 @@ test.describe('guest mode', () => {
     expect(leaks).toEqual([]);
   });
 
-  test('compose → emotion check → love-language quiz, all on-device', async ({ page }) => {
+  test('compose → emotion check → quiz still work when the AI server is unreachable (on-device fallback)', async ({ page }) => {
     await skipTour(page);
     const leaks = watchNetwork(page);
     await page.goto('/');
@@ -102,5 +102,40 @@ test.describe('guest mode', () => {
     await page.getByTestId('user-menu-toggle').click();
     await page.getByText('重置試玩資料').click();
     await expect.poll(count).toBe(3);
+  });
+
+  test('5 real AI tries: real result, live counter, then demo fallback', async ({ page }) => {
+    await skipTour(page);
+    let calls = 0;
+    await page.route('**/api/guest-ai/quota**', (route) =>
+      route.fulfill({ json: { success: true, usage: { tier: 'guest', limit: 5, used: calls, remaining: 5 - calls } } }));
+    await page.route('**/api/guest-ai/draft_analysis', async (route) => {
+      const body = route.request().postDataJSON();
+      // The thread context travels with the call; the guest id is anonymous.
+      expect(body.guest_id).toMatch(/^[A-Za-z0-9-]{8,64}$/);
+      expect(Array.isArray(body.recentMessages)).toBe(true);
+      if (calls >= 5) return route.fulfill({ status: 429, json: { success: false, error_code: 'GUEST_AI_LIMIT', message: 'used up' } });
+      calls += 1;
+      return route.fulfill({ json: { success: true, result: {
+        emotions: [{ label: '真AI情緒', emoji: '🤖', intensity: 77 }],
+        partnerHears: { misread: 'm', real: 'r' }, need: 'n', rewrite: '這是真的 AI 改寫', toxicityFlags: [],
+      }, usage: { tier: 'guest', limit: 5, used: calls, remaining: 5 - calls } } });
+    });
+
+    await page.goto('/');
+    await expect(page.getByTestId('guest-ai-left')).toContainText('5／5');
+    await page.getByTestId('nav-tab-talk').click();
+    await page.getByText('說好的晚餐，他又遲到沒說').click();
+    for (let i = 1; i <= 6; i++) {
+      await page.getByTestId('event-reply-input').fill(`算了，反正你從來都不在乎 ${i}`);
+      await page.getByTestId('event-draft-analyze-button').click();
+      const meter = page.getByTestId('draft-emotion-meter');
+      await expect(meter).toBeVisible();
+      if (i <= 5) await expect(meter).toContainText('真AI情緒');
+      else await expect(meter).not.toContainText('真AI情緒'); // demo fallback, flow not blocked
+      await page.getByTestId('draft-emotion-meter-close').click();
+    }
+    await page.getByTestId('nav-tab-home').click();
+    await expect(page.getByTestId('guest-ai-left')).toContainText('已用完');
   });
 });

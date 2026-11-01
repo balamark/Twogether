@@ -141,7 +141,7 @@ function PrivacyScene() {
         <Lock className="h-6 w-6 text-petal-sage-deeper" strokeWidth={1.5} />
       </div>
       <p className="font-body text-[13px] text-petal-ink leading-relaxed motion-safe:animate-guest-rise" style={d(400)}>
-        {tr('不用註冊。每個分頁都已放好範例情侶的資料，隨便點、隨便改；你做的一切只存在這個瀏覽器分頁，不會上傳，關掉就消失。', 'No sign-up. Every tab is filled with a sample couple\'s data: tap and change anything. Everything stays in this browser tab, never uploaded, gone when you close it.')}
+        {tr('不用註冊。每個分頁都已放好範例情侶的資料，隨便點、隨便改；你做的一切只存在這個瀏覽器分頁，關掉就消失。還送你 5 次真的 AI（文字只拿來產生回覆，不保存）。', 'No sign-up. Every tab is filled with a sample couple\'s data: tap and change anything. It all stays in this browser tab and is gone when you close it. Plus 5 real AI tries (your text is only used for the reply, never stored).')}
       </p>
       <p className="mt-2 font-body text-[11px] text-petal-muted motion-safe:animate-guest-rise" style={d(900)}>
         {tr('想留下紀錄、邀請另一半？隨時按右上角「免費註冊」。', 'Want to keep it and invite your partner? Tap "Sign up free" any time.')}
