@@ -15,6 +15,7 @@ const {
   selectToneIds,
   buildSuggestions: buildNudgeSuggestions,
   DEFAULT_COUNT: NUDGE_OPTION_COUNT,
+  loadActiveTones: loadNudgeTones,
 } = require('../lib/intimacyNudgeTones');
 const { translateString } = require('../middleware/locale');
 const { notifyPartnerAction } = require('../services/notificationService');
@@ -28,10 +29,18 @@ const NUDGE_THRESHOLD = 3;
 
 // The nudge copy lives in `text`, which the locale middleware deliberately
 // doesn't translate (it's the message that gets sent), so localize it here.
-// The cache keeps the 繁中 originals; English is applied on the way out.
-const localizeNudges = (suggestions, locale) => (locale === 'en'
-  ? suggestions.map((s) => ({ ...s, text: translateString(String(s.text || '')) }))
-  : suggestions);
+// The cache keeps the 繁中 originals (+ any admin-authored `text_en` /
+// `label_en`); English is applied on the way out, preferring the admin's
+// English and falling back to the dictionary. The *_en fields never leave.
+const localizeNudges = (suggestions, locale) => suggestions.map((s) => {
+  const { text_en: textEn, label_en: labelEn, ...rest } = s;
+  if (locale !== 'en') return rest;
+  return {
+    ...rest,
+    text: textEn || translateString(String(s.text || '')),
+    label: labelEn || s.label,
+  };
+});
 
 // AI usage gating — the roleplay invitation generator hits the paid LLM, so it
 // shares the tier-aware daily AI budget with every other paid-LLM feature. The
@@ -663,8 +672,9 @@ router.post('/nudge-suggestions', [
 
     // Cache miss / reshuffle → randomly select tones (recommended always included)
     // and render the platform-voiced copy with the real day count.
-    const toneIds = selectToneIds(NUDGE_OPTION_COUNT);
-    const suggestions = buildNudgeSuggestions(toneIds, days);
+    const tones = await loadNudgeTones(db, { logWarn });
+    const toneIds = selectToneIds(NUDGE_OPTION_COUNT, tones);
+    const suggestions = buildNudgeSuggestions(toneIds, days, tones);
     logInfo('intimacy.nudge.built', { userId, coupleId, days, regenerate, tones: toneIds });
 
     try {

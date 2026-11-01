@@ -14,6 +14,8 @@ const {
   selectToneIds,
   buildSuggestions,
   renderTone,
+  loadActiveTones,
+  invalidateToneCache,
 } = require('../../lib/intimacyNudgeTones.js');
 const { translateString } = require('../../middleware/locale.js');
 
@@ -65,5 +67,44 @@ describe('intimacy nudge tone catalog', () => {
       expect(en).toContain('12');
       expect(translateString(t.label)).not.toMatch(/[一-鿿]/);
     }
+  });
+
+  // ── Admin-managed catalog (table intimacy_nudge_tones) ──────────────────
+  const adminTones = [
+    { id: 'a', label: '甲', emoji: '🌟', sample: '已經 {days} 天囉', sample_en: '{days} days already', label_en: 'Alpha', recommended: false },
+    { id: 'b', label: '乙', sample: '沒有天數的提醒', recommended: true },
+    { id: 'c', label: '丙', sample: '{days} 天了', recommended: false },
+  ];
+
+  it('selects from an admin-supplied list, honoring its recommended tone', () => {
+    for (let i = 0; i < 20; i += 1) {
+      const ids = selectToneIds(3, adminTones);
+      expect(ids[0]).toBe('b');
+      expect([...ids].sort()).toEqual(['a', 'b', 'c']);
+    }
+    // Fewer tones than the requested count → only what exists.
+    expect(selectToneIds(3, adminTones.slice(0, 2))).toHaveLength(2);
+  });
+
+  it('carries admin-authored English and renders {days} in it', () => {
+    const [a, b] = buildSuggestions(['a', 'b'], 5, adminTones);
+    expect(a).toMatchObject({ text: '已經 5 天囉', text_en: '5 days already', label_en: 'Alpha', emoji: '🌟' });
+    expect(b.text_en).toBeUndefined();
+    expect(b.emoji).toBe('💛');
+    expect(buildSuggestions(['a'], null, adminTones)[0].text_en).toBe('a while already');
+  });
+
+  it('loadActiveTones reads the DB, caches it, and falls back to the built-ins', async () => {
+    invalidateToneCache();
+    let calls = 0;
+    const db = { query: async () => { calls += 1; return { rows: adminTones }; } };
+    expect(await loadActiveTones(db)).toBe(adminTones);
+    await loadActiveTones(db);
+    expect(calls).toBe(1); // cached
+    invalidateToneCache();
+    expect(await loadActiveTones({ query: async () => ({ rows: [] }) })).toBe(TONES);
+    invalidateToneCache();
+    expect(await loadActiveTones({ query: async () => { throw new Error('down'); } })).toBe(TONES);
+    invalidateToneCache();
   });
 });
