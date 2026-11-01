@@ -1581,6 +1581,27 @@ const ExploreLinks: React.FC<{ view: string; onNavigate?: (view: string) => void
   );
 };
 
+// 免註冊試玩 teaser — on every logged-out preview tab, the samples above are
+// read-only; this hands the visitor the interactive, session-only sandbox.
+const GuestPlayTeaser: React.FC<{ onNavigate?: (view: string) => void }> = ({ onNavigate }) => {
+  if (!onNavigate) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => { trackAction('onboarding.guest.teaser_click'); onNavigate('play'); }}
+      data-testid="guest-play-teaser"
+      className="w-full mb-6 flex items-center gap-3 rounded-xl border border-petal-sage/50 bg-petal-sage/10 px-4 py-3 text-left hover:border-petal-sage-deep transition-colors"
+    >
+      <span className="text-2xl leading-none">🎮</span>
+      <span className="flex-1">
+        <span className="block font-body text-sm font-medium text-petal-ink">{tr('不想註冊？先直接玩玩看', 'Not ready to sign up? Just try it')}</span>
+        <span className="block font-body text-xs text-petal-ink-soft">{tr('5 個一個人也能用的功能，已放好範例資料；內容只存在這個分頁。', '5 solo features with sample data ready; nothing leaves this tab.')}</span>
+      </span>
+      <span className="font-body text-sm text-petal-sage-deeper">{tr('開始 →', 'Go →')}</span>
+    </button>
+  );
+};
+
 // Roleplay scripts mix [partner1]/[partner2] and [男]/[女]/[他]/[她] role
 // tags. The preview substitutes sample nicknames the same way the app swaps
 // in the couple's real nicknames by gender after login.
@@ -1892,6 +1913,8 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scr
           {config.description}
         </p>
       </div>
+
+      <GuestPlayTeaser onNavigate={onNavigate} />
 
       {/* Read-only sample */}
       <div className="mb-8">{config.sample}</div>

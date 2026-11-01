@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Calendar, MessageCircle, Clock, MapPin, Play, User, Trash2, Pencil, Crown, Home as HomeIcon, TrendingUp, HeartHandshake } from 'lucide-react';
+import { Calendar, MessageCircle, Clock, MapPin, Play, User, Trash2, Pencil, Crown, Home as HomeIcon, TrendingUp, HeartHandshake, Sparkles } from 'lucide-react';
 import SettingsView from './components/SettingsView';
 import HomeView from './components/HomeView';
 import UsView from './components/UsView';
@@ -24,6 +24,9 @@ import WallView from './components/WallView';
 import EventsView from './components/EventsView';
 import TherapistsView from './components/TherapistsView';
 import LoggedOutPreview, { CommunicationPrinciples } from './components/LoggedOutPreview';
+import GuestPlayground from './components/guest/GuestPlayground';
+import { trackAction } from './utils/track';
+import { ensureGuestSeed } from './components/guest/guestStore';
 import Testimonials from './components/Testimonials';
 import FeedbackView from './components/FeedbackView';
 import LoveLanguageView from './components/LoveLanguageView';
@@ -532,7 +535,7 @@ const PERSISTED_VIEWS = new Set([
   'home', 'talk', 'us', 'grow',
   'record', 'calendar', 'rediscover', 'see-you', 'secret', 'daily-love', 'achievements', 'conflict', 'events', 'roleplay', 'wall',
   'therapists', 'counselor', 'stories', 'shop', 'journey', 'intimacy-history', 'settings', 'activity',
-  'feedback', 'love-language', 'upgrade', 'pricing', 'foreplay', 'games', 'communicate', 'help',
+  'feedback', 'love-language', 'upgrade', 'pricing', 'foreplay', 'games', 'communicate', 'help', 'play',
 ]);
 
 const LoveTimeApp = () => {
@@ -732,6 +735,14 @@ const LoveTimeApp = () => {
   // unauthenticated visitor reaches the app, so the /admin dashboard can count
   // distinct landing IPs vs signups. Skipped for already-authenticated users
   // so reloads don't inflate the visit count.
+  // 訪客試玩: seed this tab's session-only playground with sample data the
+  // moment a logged-out visitor lands, so every guest feature already has
+  // something to play with (idempotent — never overwrites their session).
+  useEffect(() => {
+    if (authState.isAuthenticated) return;
+    if (ensureGuestSeed()) trackAction('onboarding.guest.seeded');
+  }, [authState.isAuthenticated]);
+
   useEffect(() => {
     if (authState.isAuthenticated) return;
     try {
@@ -2404,6 +2415,8 @@ const LoveTimeApp = () => {
     ? [{ id: 'counselor', label: t('nav.counselor'), icon: HeartHandshake }]
     : [
         { id: 'home', label: t('nav.home'), icon: HomeIcon },
+        // 免註冊試玩: logged-out only — the no-account sandbox (sessionStorage).
+        ...(!authState.isAuthenticated ? [{ id: 'play', label: t('nav.play'), icon: Sparkles }] : []),
         { id: 'talk', label: t('nav.talk'), icon: MessageCircle },
         { id: 'us', label: t('nav.us'), icon: Calendar },
         { id: 'grow', label: t('nav.grow'), icon: TrendingUp },
@@ -2443,6 +2456,8 @@ const LoveTimeApp = () => {
             onFindTherapist={() => setCurrentView('therapists')}
           />
         );
+        // 免註冊試玩 — a real, interactive sandbox kept in sessionStorage only.
+        case 'play': return <GuestPlayground onSignUp={() => setShowAuthModal(true)} />;
         // Each nav tab previews its own feature (read-only) instead of all
         // falling through to one generic login wall. See LoggedOutPreview.
         default: return <LoggedOutPreview view={currentView} onSignUp={() => setShowAuthModal(true)} scripts={defaultRoleplayScripts} onNavigate={setCurrentView} />;
@@ -2451,6 +2466,8 @@ const LoveTimeApp = () => {
 
     // Show authenticated content
     switch (currentView) {
+      // 'play' is the logged-out sandbox; a signed-in user restoring it lands on 今天.
+      case 'play':
       case 'home':
         return (
           <HomeView
