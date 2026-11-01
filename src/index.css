@@ -292,6 +292,7 @@ video {
 .dark .bg-violet-50,
 .dark .bg-violet-50\/60 { background-color: #1E1729 !important; }
 .dark .bg-violet-100\/80 { background-color: #251C33 !important; }
+.dark .text-violet-600,
 .dark .text-violet-700,
 .dark .text-violet-800 { color: #A371F7 !important; }
 .dark .border-violet-200,
