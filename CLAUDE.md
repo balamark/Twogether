@@ -18,19 +18,35 @@ When you ship a user-facing UI feature change:
    plain language, emoji ok) and give it to the user to share publicly. The thread
    post goes in the chat reply, not the repo (unless asked).
 
-## Logged-out preview sync (every UI feature change)
+## Guest mode / 訪客模式 (every UI feature change)
 
-When you add or change a user-facing UI feature or a core flow, **also surface it
-on the logged-out showroom** (`src/components/LoggedOutPreview.tsx`). Every nav
-tab there previews its feature read-only to funnel unregistered visitors into
-sign-up — a feature that only exists behind the login wall can't attract anyone.
+Visitors without an account run the **real app** on a sample couple
+(小安 ❤ 阿哲) — see `src/guest/`. While no `authToken` exists,
+`guestAdapter` (wired into the axios client in `src/services/api.ts`) answers
+every request from an in-browser mock backend whose data lives only in the
+tab's `sessionStorage`. A feature that only works behind login can't attract
+anyone, so when you add or change a feature:
 
-- Add or update the matching tab's `PREVIEWS[...]` entry (or a dedicated layout)
-  with a read-only sample of the new flow.
-- Always mark samples with the shared `<SampleTag />` ("範例") so visitors know
-  it's an illustration, not their own data.
-- Keep samples static (no auth'd data fetches) and follow the image rule below
-  (`object-contain`, never crop).
+- **New endpoint → add a guest route** in `src/guest/guestRoutes.ts` returning
+  the same JSON shape the server does (unhandled routes fall back to an empty
+  success, which usually renders an empty state — not good enough for a
+  headline feature). AI endpoints answer from on-device heuristics
+  (`guestSoften.ts`); never call the LLM or the network for guest data.
+- **Seed it**: add realistic sample rows to `src/guest/guestSeed.ts` (all
+  copy via `tr()`, dates relative to now) and bump `buildSeed.VERSION` when the
+  shape changes.
+- Money, emailing real people, real counselors and uploads answer with
+  `blocked()` (`GUEST_MODE` + a sign-up message), never a generic error.
+- Never persist guest identity to `localStorage`; read the user id via
+  `currentUserId()` (`src/guest/guestMode.ts`). Check `authState.isGuest` for
+  account-only UI.
+- Public read-only content (stories, counselor directory, testimonials) passes
+  through to the real server — keep `PUBLIC_GETS` in sync with the server's
+  unauthenticated routes.
+- Run `tests/guest-mode.spec.ts`; it fails if a guest request leaks to the API.
+
+`src/components/LoggedOutPreview.tsx` is now only the fallback for when guest
+mode is off; keep its samples marked with `<SampleTag />`.
 
 ## Bilingual UI (繁中 / English)
 

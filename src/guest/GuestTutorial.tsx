@@ -1,10 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { X, ChevronRight, ChevronLeft, Lock } from 'lucide-react';
-import { tr } from '../../i18n/tr';
-import { GUEST_FEATURES } from './guestFeatures';
+import { tr } from '../i18n/tr';
+import { GUEST_TOUR } from './guestTour';
 
-// ─── 30 秒看懂：訪客試玩教學動畫 ─────────────────────────────────────────────
-// A story-style, auto-advancing walkthrough of the ranked guest features. Each
+// ─── 30 秒看懂：訪客模式教學動畫 ─────────────────────────────────────────────
+// Shown once per tab session when a visitor lands in 訪客模式 (the real app on
+// a sample couple). A story-style, auto-advancing walkthrough of the features
+// that are most fun for ONE person, ranked by appeal:
+//   1. 說開一件事 + 送出前情緒檢查 — instant "wow", the product's core.
+//   2. 愛的語言測驗 — 2-minute quiz with a shareable result.
+//   3. 今日心情 (我們 › 月曆) — one tap a day, see your rhythm.
+//   4. 記錄時光 (我們 › 時間軸) — collect sweet moments.
+//   5. 和解步驟 — ready-made lines for the middle of a fight.
+// Each scene has a「去試試」button that opens that real tab. Each
 // scene is a tiny animated mock (pure CSS keyframes from tailwind.config.js:
 // guest-rise / guest-pop / guest-type / guest-drain / guest-progress). The
 // progress bar's animationend drives the auto-advance, so pressing/hovering
@@ -15,8 +23,8 @@ const SCENE_MS = 3600;
 
 interface Props {
   onClose: (reason: 'done' | 'skip') => void;
-  /** Jump straight into a feature from the last scene. */
-  onStart: () => void;
+  /** Open a real tab (「去試試」/「開始玩」). */
+  onNavigate: (view: string) => void;
 }
 
 const d = (ms: number): React.CSSProperties => ({ animationDelay: `${ms}ms` });
@@ -133,10 +141,10 @@ function PrivacyScene() {
         <Lock className="h-6 w-6 text-petal-sage-deeper" strokeWidth={1.5} />
       </div>
       <p className="font-body text-[13px] text-petal-ink leading-relaxed motion-safe:animate-guest-rise" style={d(400)}>
-        {tr('不用註冊。你寫的一切只存在這個瀏覽器分頁，不會上傳；關掉分頁就消失。', 'No sign-up. Everything you write stays in this browser tab, never uploaded, and disappears when you close it.')}
+        {tr('不用註冊。每個分頁都已放好範例情侶的資料，隨便點、隨便改；你做的一切只存在這個瀏覽器分頁，不會上傳，關掉就消失。', 'No sign-up. Every tab is filled with a sample couple\'s data: tap and change anything. Everything stays in this browser tab, never uploaded, gone when you close it.')}
       </p>
       <p className="mt-2 font-body text-[11px] text-petal-muted motion-safe:animate-guest-rise" style={d(900)}>
-        {tr('已經幫你放好範例資料，直接點點看。', 'We\'ve added sample data so you can just start tapping.')}
+        {tr('想留下紀錄、邀請另一半？隨時按右上角「免費註冊」。', 'Want to keep it and invite your partner? Tap "Sign up free" any time.')}
       </p>
     </div>
   );
@@ -150,7 +158,7 @@ const SCENES: { render: () => React.ReactNode }[] = [
   { render: RepairScene },
 ];
 
-const GuestTutorial: React.FC<Props> = ({ onClose, onStart }) => {
+const GuestTutorial: React.FC<Props> = ({ onClose, onNavigate }) => {
   const [idx, setIdx] = useState(0);
   const [paused, setPaused] = useState(false);
   const total = SCENES.length + 1; // + privacy outro
@@ -169,13 +177,15 @@ const GuestTutorial: React.FC<Props> = ({ onClose, onStart }) => {
   }, [onClose, total]);
 
   const isOutro = idx === total - 1;
-  const feature = GUEST_FEATURES[idx];
+  const feature = GUEST_TOUR[idx];
   const next = () => (isOutro ? onClose('done') : setIdx((i) => i + 1));
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-petal-ink/40 px-4 pb-4 sm:pb-0" role="dialog" aria-modal="true" aria-label={tr('試玩教學', 'Playground tour')} data-testid="guest-tutorial">
+    // Non-blocking bottom card: the page (and the header's sign-up button) stays
+    // usable behind it, so the tour never stands between a visitor and the app.
+    <div className="fixed inset-x-0 bottom-0 z-[70] flex justify-center px-4 pb-4 pointer-events-none safe-pb" role="dialog" aria-modal="false" aria-label={tr('試玩教學', 'Guest tour')} data-testid="guest-tutorial">
       <div
-        className="w-full max-w-sm rounded-2xl bg-petal-cream border border-petal-rule shadow-petal overflow-hidden"
+        className="pointer-events-auto w-full max-w-sm rounded-2xl bg-petal-cream border border-petal-rule shadow-[0_12px_40px_-8px_rgba(42,37,32,0.35)] overflow-hidden"
         onPointerDown={() => setPaused(true)}
         onPointerUp={() => setPaused(false)}
         onPointerLeave={() => setPaused(false)}
@@ -229,13 +239,18 @@ const GuestTutorial: React.FC<Props> = ({ onClose, onStart }) => {
               </button>
             )}
             {isOutro ? (
-              <button type="button" onClick={() => { onStart(); onClose('done'); }} className="rounded-full bg-petal-ink text-petal-cream px-4 py-1.5 font-body text-sm hover:bg-pink-700" data-testid="guest-tutorial-start">
+              <button type="button" onClick={() => { onNavigate(GUEST_TOUR[0].view); onClose('done'); }} className="rounded-full bg-petal-ink text-petal-cream px-4 py-1.5 font-body text-sm hover:bg-pink-700" data-testid="guest-tutorial-start">
                 {tr('開始玩 →', 'Start playing →')}
               </button>
             ) : (
+              <>
+              <button type="button" onClick={() => { onNavigate(feature.view); onClose('done'); }} className="rounded-full border border-petal-ink px-3 py-1.5 font-body text-sm text-petal-ink hover:bg-petal-cream-2" data-testid="guest-tutorial-try">
+                {tr('去試試', 'Try it')}
+              </button>
               <button type="button" onClick={next} className="inline-flex items-center gap-1 rounded-full bg-petal-ink text-petal-cream px-4 py-1.5 font-body text-sm hover:bg-pink-700" data-testid="guest-tutorial-next">
                 {tr('下一步', 'Next')} <ChevronRight className="w-4 h-4" strokeWidth={1.5} />
               </button>
+              </>
             )}
           </div>
         </div>

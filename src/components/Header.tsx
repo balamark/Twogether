@@ -17,6 +17,8 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   partnerConnected: boolean;
+  /** 訪客模式: browsing the real app on a sample couple, no account. */
+  isGuest?: boolean;
 }
 
 interface HeaderProps {
@@ -161,7 +163,7 @@ const Header: React.FC<HeaderProps> = ({
             )}
 
             {/* Intimacy Request Button */}
-            {authState.isAuthenticated && authState.partnerConnected && (
+            {authState.isAuthenticated && authState.partnerConnected && !authState.isGuest && (
               <button
                 onClick={onShowIntimacyRequest}
                 data-testid="header-intimacy-button"
@@ -177,7 +179,7 @@ const Header: React.FC<HeaderProps> = ({
             {authState.isAuthenticated && (
               <button
                 onClick={onShowNotifications}
-                className="relative p-2 text-petal-ink-soft hover:text-petal-ink hover:bg-petal-cream-2 rounded-full transition-colors"
+                className={`${authState.isGuest ? 'hidden sm:block ' : ''}relative p-2 text-petal-ink-soft hover:text-petal-ink hover:bg-petal-cream-2 rounded-full transition-colors`}
                 title={t('header.notifications')}
                 aria-label={t('header.notifications')}
               >
@@ -199,7 +201,8 @@ const Header: React.FC<HeaderProps> = ({
                   className="flex items-center space-x-1 sm:space-x-1.5 border border-petal-rule hover:border-petal-ink px-2 sm:px-3 py-1.5 rounded-full transition-colors min-h-[40px] max-w-[140px] sm:max-w-none"
                 >
                   <User className="w-3.5 h-3.5 text-petal-ink-soft shrink-0" strokeWidth={1.5} />
-                  <span className="font-body text-sm text-petal-ink truncate">
+                  {/* Guests on a phone: icon only, so the logo + 免費註冊 + 語言 still fit. */}
+                  <span className={`${authState.isGuest ? 'hidden sm:inline ' : ''}font-body text-sm text-petal-ink truncate`}>
                     {authState.user?.nickname || t('header.userFallback')}
                   </span>
                 </button>
@@ -414,7 +417,7 @@ const Header: React.FC<HeaderProps> = ({
                         className="w-full flex items-center space-x-2 px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
                       >
                         <LogOut className="w-3.5 h-3.5" strokeWidth={1.5} />
-                        <span>{t('menu.logout')}</span>
+                        <span>{authState.isGuest ? t('menu.guestReset') : t('menu.logout')}</span>
                       </button>
                     </div>
                   </div>
@@ -428,19 +431,21 @@ const Header: React.FC<HeaderProps> = ({
                   />
                 )}
               </div>
-            ) : (
+            ) : null}
+            {/* Visitors (signed out, or browsing as a guest) always keep the sign-in door. */}
+            {(!authState.isAuthenticated || authState.isGuest) && (
               <button
                 onClick={onShowAuthModal}
                 data-testid="header-auth-button"
-                className="bg-petal-ink text-white px-5 py-2 rounded-full hover:bg-pink-700 transition-colors text-sm font-medium tracking-wide"
+                className={`bg-petal-ink text-white ${authState.isGuest ? 'px-3 sm:px-5' : 'px-5'} py-2 rounded-full hover:bg-pink-700 transition-colors text-sm font-medium tracking-wide whitespace-nowrap`}
               >
-                {t('header.signIn')}
+                {authState.isGuest ? t('header.guestSignUp') : t('header.signIn')}
               </button>
             )}
 
             {/* 語言切換：登入前放在最右上角；登入後收進個人選單（見上方），
                 讓 390px 寬的手機 header 不會擠成一排按鈕。 */}
-            {!authState.isAuthenticated && <LanguageSwitch />}
+            {(!authState.isAuthenticated || authState.isGuest) && <LanguageSwitch />}
           </div>
         </div>
       </div>

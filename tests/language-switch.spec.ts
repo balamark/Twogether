@@ -15,12 +15,13 @@ test.describe('language switch', () => {
     await expect(sw).toBeVisible();
     await expect(page.getByTestId('language-switch-zh-TW')).toHaveAttribute('aria-checked', 'true');
     await expect(page.getByTestId('nav-tab-home')).toContainText('今天');
-    await expect(page.getByTestId('header-auth-button')).toContainText('登入');
+    // Signed-out visitors browse in 訪客模式, whose header door reads 免費註冊.
+    await expect(page.getByTestId('header-auth-button')).toContainText('免費註冊');
 
     await page.getByTestId('language-switch-en').click();
     await expect(page.getByTestId('language-switch-en')).toHaveAttribute('aria-checked', 'true');
     await expect(page.getByTestId('nav-tab-home')).toContainText('Today');
-    await expect(page.getByTestId('header-auth-button')).toContainText('Sign in');
+    await expect(page.getByTestId('header-auth-button')).toContainText('Sign up free');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 
     await page.reload();
@@ -52,13 +53,17 @@ test.describe('language switch', () => {
 });
 
 test.describe('English beyond the header', () => {
-  test('logged-out showroom content follows the switch, not just the nav', async ({ page }) => {
+  test('logged-out (guest mode) content follows the switch, not just the nav', async ({ page }) => {
+    await page.addInitScript(() => sessionStorage.setItem('tw_guest_tour_seen', '1'));
     await page.goto('/');
     await page.getByTestId('language-switch-en').click();
     await expect(page.getByTestId('nav-tab-home')).toContainText('Today');
-    // Showroom copy lives in LoggedOutPreview (tr() strings), not messages.ts.
-    await expect(page.getByText('Today, the one thing most')).toBeVisible();
-    await expect(page.getByText('今天，最值得做的')).toHaveCount(0);
+    // The guest banner (tr() strings) and the untouched sample couple both
+    // re-render in English after the switch.
+    await expect(page.getByTestId('guest-banner')).toContainText('Guest preview');
+    await page.getByTestId('nav-tab-talk').click();
+    await expect(page.getByText('He was late for dinner again without telling me')).toBeVisible();
+    await expect(page.getByText('說好的晚餐，他又遲到沒說')).toHaveCount(0);
   });
 
   test('server messages come back in English with X-Locale: en', async () => {

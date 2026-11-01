@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { guestAdapter } from '../guest/guestApi';
+import { currentUserId } from '../guest/guestMode';
 import { formatYmdInTz, browserTz } from '../utils/datetime';
 import { setLastRequestId } from '../utils/telemetry';
 import { startApiTimer, recordApiTiming } from '../utils/perf';
@@ -1574,7 +1576,9 @@ const apiClient = axios.create({
 });
 // Repeat GETs of page data answer from memory for a few seconds and share
 // in-flight requests (src/services/responseCache.ts).
-apiClient.defaults.adapter = cachingAdapter(axios.getAdapter(apiClient.defaults.adapter));
+// 訪客模式: while a visitor has no account, guestAdapter answers every request
+// from the session-only mock backend (src/guest/) instead of the network.
+apiClient.defaults.adapter = guestAdapter(cachingAdapter(axios.getAdapter(apiClient.defaults.adapter)));
 
 // An LLM generation regularly runs past the 15s client default. The 諮商師
 // comment is the worst case: it can chain three sequential Claude calls
@@ -2541,22 +2545,21 @@ class ApiService {
       const couple = coupleData || await this.getCouple();
 
       // Get current user info from localStorage
-      const authUserRaw = localStorage.getItem('authUser');
-      const currentUserId = authUserRaw ? JSON.parse(authUserRaw)?.id : null;
+      const currentUserIdValue = currentUserId();
 
       let currentUserNickname = tr('親愛的', 'Dear');
       let partnerNickname = tr('寶貝', 'Babe');
       let currentUserGender: string | undefined;
       let partnerGender: string | undefined;
 
-      if (currentUserId && couple) {
+      if (currentUserIdValue && couple) {
         // Determine which user in the couple is the current user
-        if (couple.user1Id === currentUserId) {
+        if (couple.user1Id === currentUserIdValue) {
           currentUserNickname = couple.user1Nickname || tr('親愛的', 'Dear');
           partnerNickname = couple.user2Nickname || tr('寶貝', 'Babe');
           currentUserGender = couple.user1Gender;
           partnerGender = couple.user2Gender;
-        } else if (couple.user2Id === currentUserId) {
+        } else if (couple.user2Id === currentUserIdValue) {
           currentUserNickname = couple.user2Nickname || tr('親愛的', 'Dear');
           partnerNickname = couple.user1Nickname || tr('寶貝', 'Babe');
           currentUserGender = couple.user2Gender;
@@ -2578,9 +2581,7 @@ class ApiService {
   }
 
   async updateNicknames(nicknames: { partner1?: string; partner2?: string }): Promise<void> {
-    const authUserRaw = localStorage.getItem('authUser');
-    const currentUserId = authUserRaw ? JSON.parse(authUserRaw)?.id : null;
-    if (!currentUserId) return;
+    if (!currentUserId()) return;
 
     // partner1 always represents the current user (see getNicknames convention).
     const myNickname = nicknames.partner1?.trim();

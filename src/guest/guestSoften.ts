@@ -1,5 +1,5 @@
-import { tr } from '../../i18n/tr';
-import { getEmotionAcceptance } from '../../data/emotionAcceptance';
+import { tr } from '../i18n/tr';
+import { getEmotionAcceptance } from '../data/emotionAcceptance';
 
 // ─── 說之前，先看看 (local, no-AI) ──────────────────────────────────────────
 // A deterministic, on-device version of the logged-in emotion meter for the
