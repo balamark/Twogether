@@ -17,6 +17,7 @@ try {
 
 module.exports = {
   generateIcebreaker: provider.generateIcebreaker,
+  generateGuestPartnerReply: provider.generateGuestPartnerReply,
   rewriteReply: provider.rewriteReply,
   generateRoleplayMessages: provider.generateRoleplayMessages,
   generateWallCounselorComment: provider.generateWallCounselorComment,

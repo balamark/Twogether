@@ -28,6 +28,7 @@ import { trackAction } from './utils/track';
 import { isGuestActive, buildGuestUser } from './guest/guestMode';
 import { ensureGuestDb, resetGuestDb, wipeGuestDb } from './guest/guestDb';
 import GuestBanner from './guest/GuestBanner';
+import GuestCoach from './guest/GuestCoach';
 import Testimonials from './components/Testimonials';
 import FeedbackView from './components/FeedbackView';
 import LoveLanguageView from './components/LoveLanguageView';
@@ -3192,7 +3193,10 @@ const LoveTimeApp = () => {
         {authState.isGuest && (
           <GuestBanner
             onSignUp={() => setShowAuthModal(true)}
-            onNavigate={setCurrentView}
+            onStartConversation={() => {
+              setPendingEventsCompose(true);
+              setCurrentView('events');
+            }}
             suppressAutoTour={showAuthModal || showPairingInvitation}
           />
         )}
@@ -3201,6 +3205,17 @@ const LoveTimeApp = () => {
         <div className="max-w-6xl mx-auto">
           {renderView()}
         </div>
+
+        {/* 訪客模式: walks the guest through partner reply → AI counselor. */}
+        {authState.isGuest && (
+          <GuestCoach
+            onSignUp={() => setShowAuthModal(true)}
+            onOpenEvent={(id) => {
+              setPendingEventId(id);
+              setCurrentView('events');
+            }}
+          />
+        )}
 
         {/* Logged-out design philosophy — the three communication principles that
             run through the whole app, so a visitor can recognise their own

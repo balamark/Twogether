@@ -3,15 +3,18 @@ import type { GuestDb } from './guestSeed';
 import { GuestError } from './guestErrors';
 
 // ─── 訪客模式：5 次真的 AI ───────────────────────────────────────────────────
-// The guest's four core AI actions (整理成三種版本 / 送出前情緒檢查 / 改寫回覆 /
-// 接住情緒) call the real LLM through the public /api/guest-ai endpoint,
-// capped at GUEST_AI_LIMIT per guest. The server answers and does NOT store the
-// text. Only those requests leave the tab; everything else stays on-device.
+// The guest's core loop runs on the real LLM through the public /api/guest-ai
+// endpoint: 整理成三種版本 (icebreaker) and 請 AI 諮商師介入 (event_counselor)
+// spend the GUEST_AI_LIMIT tries; the sample partner's replies (partner_reply)
+// don't count but have their own server cap. The server answers and does NOT
+// store the text. Only those requests leave the tab; everything else stays
+// on-device.
 // When the server can't be reached we fall back to the on-device demo (and the
 // try isn't counted); when the 5 are used up the guest gets a sign-up reason.
 
 export const GUEST_AI_LIMIT = 5;
-export type GuestAiKind = 'icebreaker' | 'draft_analysis' | 'reply_rewrite' | 'emotion_acceptance';
+export type GuestAiKind = 'icebreaker' | 'event_counselor' | 'partner_reply';
+const COUNTED: GuestAiKind[] = ['icebreaker', 'event_counselor'];
 
 const ID_KEY = 'tw_guest_ai_id';
 
@@ -59,7 +62,8 @@ export async function fetchGuestAiUsage(db: GuestDb): Promise<GuestAiUsage> {
  * end: a guest can always finish the flow.
  */
 export async function callGuestAi(db: GuestDb, kind: GuestAiKind, input: Record<string, unknown>): Promise<Record<string, unknown> | null> {
-  if (cachedUsage(db).remaining <= 0) return null;
+  const counted = COUNTED.includes(kind);
+  if (counted && cachedUsage(db).remaining <= 0) return null;
   let res: Response;
   try {
     res = await fetch(`/api/guest-ai/${kind}`, {
@@ -72,6 +76,8 @@ export async function callGuestAi(db: GuestDb, kind: GuestAiKind, input: Record<
   }
   let body: Record<string, unknown> = {};
   try { body = await res.json(); } catch { /* non-JSON (proxy error) */ }
+  // Partner replies have their own cap; past it the on-device reply takes over.
+  if (res.status === 429 && body.error_code === 'GUEST_PARTNER_LIMIT') return null;
   if (res.status === 429 && body.error_code === 'GUEST_AI_LIMIT') {
     db.ai_usage = { tier: 'guest', limit: GUEST_AI_LIMIT, used: GUEST_AI_LIMIT, remaining: 0 };
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('guest:ai-usage', { detail: db.ai_usage }));
@@ -79,7 +85,7 @@ export async function callGuestAi(db: GuestDb, kind: GuestAiKind, input: Record<
   }
   if (res.status === 400) throw new GuestError(400, String(body.message || tr('內容格式不符，請調整後再試一次。', 'That input isn\'t valid. Please adjust it and try again.')), String(body.error_code || 'VALIDATION_ERROR'));
   if (!res.ok || !body.result) return null;
-  if (body.usage) {
+  if (body.usage && counted) {
     db.ai_usage = body.usage;
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('guest:ai-usage', { detail: body.usage }));
   }

@@ -58,3 +58,13 @@ export function gid(prefix = 'g'): string {
   seq += 1;
   return `${prefix}-${Date.now().toString(36)}-${seq}`;
 }
+
+/**
+ * 重新開始對話: put the conversations back to the sample ones (drops what the
+ * guest wrote there) and leave the rest of the session as is.
+ */
+export function resetGuestConversations(): void {
+  const db = loadDb();
+  db.events = buildSeed().events;
+  saveDb(db);
+}

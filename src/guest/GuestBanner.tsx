@@ -1,23 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { Eye, PlayCircle, Sparkles } from 'lucide-react';
-import { apiService } from '../services/api';
-import { GUEST_AI_LIMIT } from './guestAi';
+import { Eye, PlayCircle, RotateCcw } from 'lucide-react';
 import { tr } from '../i18n/tr';
 import { trackAction } from '../utils/track';
 import GuestTutorial from './GuestTutorial';
 import { guestNickname, guestPartnerNickname } from './guestMode';
+import { GUEST_AI_LIMIT } from './guestAi';
+import { resetGuestConversations } from './guestDb';
+import { clearQueryCache } from '../services/queryCache';
+import { clearResponseCache } from '../services/responseCache';
 
-// Slim, always-visible strip while browsing in 訪客模式: says whose data this
-// is (a sample couple), where it lives (this tab only), and keeps the two exits
-// in reach — the 30-second tour and sign-up. It also owns the tour: auto-shown
-// once per tab session on first landing (one blocking modal; 稍後再說 never
-// re-fires it in the same session).
+// Slim, always-visible strip while browsing in 訪客模式. It points the guest at
+// the one thing worth trying (write your own frustration → AI organizes it →
+// the sample partner replies → ask the AI counselor), says where the data lives,
+// and keeps the exits in reach: the tour, 重新開始對話 and sign-up. It also owns
+// the tour: auto-shown once per tab session (稍後再說 never re-fires it).
 
 const TOUR_SEEN_KEY = 'tw_guest_tour_seen';
 
 interface Props {
   onSignUp: () => void;
-  onNavigate: (view: string) => void;
+  /** Open 說開一件事 straight on the compose screen. */
+  onStartConversation: () => void;
   /** Hold the auto tour while another modal (e.g. auth) is open. */
   suppressAutoTour?: boolean;
 }
@@ -26,21 +29,10 @@ function tourSeen(): boolean {
   try { return sessionStorage.getItem(TOUR_SEEN_KEY) === '1'; } catch { return false; }
 }
 
-const GuestBanner: React.FC<Props> = ({ onSignUp, onNavigate, suppressAutoTour }) => {
-  const [showTour, setShowTour] = useState(false);
-  const [aiLeft, setAiLeft] = useState<number | null>(null);
+const linkBtn = 'inline-flex items-center gap-1 font-body text-xs text-petal-ink-soft hover:text-petal-ink underline underline-offset-2';
 
-  // Real-AI tries left (5 per guest). Updated live after every guest AI call.
-  useEffect(() => {
-    let alive = true;
-    apiService.getAiUsageToday().then((u) => { if (alive && u) setAiLeft(u.remaining); }).catch(() => {});
-    const onUsage = (e: Event) => {
-      const u = (e as CustomEvent<{ remaining?: number }>).detail;
-      if (typeof u?.remaining === 'number') setAiLeft(u.remaining);
-    };
-    window.addEventListener('guest:ai-usage', onUsage);
-    return () => { alive = false; window.removeEventListener('guest:ai-usage', onUsage); };
-  }, []);
+const GuestBanner: React.FC<Props> = ({ onSignUp, onStartConversation, suppressAutoTour }) => {
+  const [showTour, setShowTour] = useState(false);
 
   useEffect(() => {
     if (suppressAutoTour || tourSeen()) return;
@@ -55,6 +47,14 @@ const GuestBanner: React.FC<Props> = ({ onSignUp, onNavigate, suppressAutoTour }
     trackAction(`onboarding.guest.tour_${reason}`);
   };
 
+  const restart = () => {
+    resetGuestConversations();
+    clearQueryCache();
+    clearResponseCache();
+    trackAction('onboarding.guest.restart_conversation');
+    onStartConversation();
+  };
+
   return (
     <>
       <div className="max-w-6xl mx-auto mb-4" data-testid="guest-banner">
@@ -64,40 +64,29 @@ const GuestBanner: React.FC<Props> = ({ onSignUp, onNavigate, suppressAutoTour }
             <span>
               <strong className="font-medium">{tr('試玩模式', 'Guest preview')}</strong>
               {tr(
-                `：每一頁都放好了範例情侶「${guestNickname()} ❤ ${guestPartnerNickname()}」的資料，隨意點、隨意改。內容只存在這個分頁；只有用 AI 時，那段文字會送去給 AI 產生回覆，不會被保存。`,
-                `: every page is filled with a sample couple (${guestNickname()} ❤ ${guestPartnerNickname()}). Tap and change anything. It all stays in this tab; only when you use AI is that text sent to the AI for a reply, and it isn't stored.`,
-              )}
-              {aiLeft !== null && (
-                <span className="mt-1 flex items-center gap-1 text-[12px] text-petal-ink-soft" data-testid="guest-ai-left">
-                  <Sparkles className="w-3.5 h-3.5 text-pink-600" strokeWidth={1.5} />
-                  {aiLeft > 0
-                    ? tr(`還有 ${aiLeft}／${GUEST_AI_LIMIT} 次真的 AI 可以試（說開一件事、送出前情緒檢查、改寫、接住情緒）`, `${aiLeft} of ${GUEST_AI_LIMIT} real AI tries left (talk it through, pre-send check, rewrite, receive feelings)`)
-                    : tr(`${GUEST_AI_LIMIT} 次 AI 試用已用完，之後改用示範回應；免費註冊每天都有 AI 額度。`, `All ${GUEST_AI_LIMIT} AI tries used — demo responses from here; sign up free for a daily AI allowance.`)}
-                </span>
+                `：寫下你自己的一件事，看 AI 怎麼幫你整理、試玩伴侶「${guestPartnerNickname()}」怎麼回，再請 AI 諮商師介入（送你 ${GUEST_AI_LIMIT} 次真的 AI）。你是「${guestNickname()}」，內容只存在這個分頁；用 AI 時那段文字只拿來產生回覆，不會被保存。`,
+                `: write about something of your own, see how AI organizes it, how the sample partner ${guestPartnerNickname()} replies, then bring in the AI counselor (${GUEST_AI_LIMIT} real AI tries on us). You're ${guestNickname()}; it all stays in this tab, and text sent to the AI is only used for the reply, never stored.`,
               )}
             </span>
           </p>
-          <div className="flex items-center gap-3 shrink-0 pl-6 sm:pl-0">
-            <button
-              type="button"
-              onClick={() => { setShowTour(true); trackAction('onboarding.guest.tour_replay'); }}
-              className="inline-flex items-center gap-1 font-body text-xs text-petal-ink-soft hover:text-petal-ink underline underline-offset-2"
-              data-testid="guest-replay-tour"
-            >
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 shrink-0 pl-6 sm:pl-0">
+            <button type="button" onClick={() => { trackAction('onboarding.guest.start_conversation'); onStartConversation(); }}
+              className="rounded-full bg-petal-ink text-petal-cream px-3.5 py-1 font-body text-xs hover:bg-pink-700" data-testid="guest-start-conversation">
+              {tr('開始對話', 'Start a conversation')}
+            </button>
+            <button type="button" onClick={restart} className={linkBtn} data-testid="guest-restart-conversation">
+              <RotateCcw className="w-3.5 h-3.5" /> {tr('重新開始對話', 'Start over')}
+            </button>
+            <button type="button" onClick={() => { setShowTour(true); trackAction('onboarding.guest.tour_replay'); }} className={linkBtn} data-testid="guest-replay-tour">
               <PlayCircle className="w-3.5 h-3.5" /> {tr('30 秒教學', '30-sec tour')}
             </button>
-            <button
-              type="button"
-              onClick={() => { trackAction('onboarding.guest.signup_click'); onSignUp(); }}
-              className="rounded-full bg-petal-ink text-petal-cream px-3.5 py-1 font-body text-xs hover:bg-pink-700"
-              data-testid="guest-banner-signup"
-            >
+            <button type="button" onClick={() => { trackAction('onboarding.guest.signup_click'); onSignUp(); }} className={linkBtn} data-testid="guest-banner-signup">
               {tr('免費註冊保存', 'Sign up to keep it')}
             </button>
           </div>
         </div>
       </div>
-      {showTour && <GuestTutorial onClose={closeTour} onNavigate={onNavigate} />}
+      {showTour && <GuestTutorial onClose={closeTour} onStart={onStartConversation} />}
     </>
   );
 };

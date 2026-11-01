@@ -539,6 +539,18 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
     }
   };
 
+  // Something outside this view changed the thread (e.g. the 訪客模式 sample
+  // partner replied): refetch when an `event:updated` names this event.
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+  useEffect(() => {
+    const onUpdated = (e: Event) => {
+      if ((e as CustomEvent<{ eventId?: string }>).detail?.eventId === eventId) void refreshRef.current();
+    };
+    window.addEventListener('event:updated', onUpdated);
+    return () => window.removeEventListener('event:updated', onUpdated);
+  }, [eventId]);
+
   useEffect(() => {
     setLoading(true);
     setAdvancePaused(false);

@@ -13,6 +13,7 @@ import {
 } from './guestMode';
 import { GuestError, blocked } from './guestErrors';
 import { callGuestAi, fetchGuestAiUsage } from './guestAi';
+import { schedulePartnerReply, threadForAi } from './guestPartner';
 
 // ─── Guest mock backend: the routes ─────────────────────────────────────────
 // Each handler mimics the real server's JSON for that endpoint (same keys the
@@ -65,14 +66,10 @@ function eventView(e: Row, withMessages = true): Row {
   };
 }
 
-// What the real endpoints read from the DB, sent along for the guest AI call.
-function threadContext(e: Row) {
-  const msgs = ((e.messages as Row[]) || []).filter((m) => !m.is_ai).slice(-10);
-  return {
-    eventSummary: str(e.summary).slice(0, 1000),
-    recentMessages: msgs.map((m) => ({ fromSelf: m.sender_id === ME, content: str(m.content).slice(0, 1000) })),
-    createdBySelf: e.created_by === ME,
-  };
+// Window events fire after the response is handed back, so listeners that
+// refetch see the saved state.
+function emitLater(name: string, detail: Record<string, unknown>) {
+  if (typeof window !== 'undefined') setTimeout(() => window.dispatchEvent(new CustomEvent(name, { detail })), 0);
 }
 
 function findEvent(db: GuestDb, id: string): Row {
@@ -396,10 +393,12 @@ export const ROUTES: GuestRoute[] = [
       id, couple_id: COUPLE, created_by: ME, title: body.title, summary: body.summary, detail: body.detail ?? null,
       emotions: body.emotions || [], tags: body.tags || [], toxicity_flags: body.toxicity_flags || [], versions,
       selected_version: selected, status: 'open', is_private: !!body.is_private, public_status: 'private',
-      created_at: now(), updated_at: now(), translation_enabled: false,
+      created_at: now(), updated_at: now(), translation_enabled: false, guest_created: true,
       messages: opening ? [{ id: gid('gmsg'), event_id: id, sender_id: ME, content: opening, is_ai: false, created_at: now(), read_at: null }] : [],
     };
     t(db, 'events').unshift(e);
+    // 阿哲 answers the guest's opener (after the save below completes).
+    if (opening && !e.is_private) setTimeout(() => schedulePartnerReply(id), 0);
     return ok({ event: eventView(e) });
   } },
   { method: 'get', re: P('/events/:id'), handler: ({ db, params }) => ok({ event: eventView(findEvent(db, params.id)) }) },
@@ -417,6 +416,7 @@ export const ROUTES: GuestRoute[] = [
     const m = { id: gid('gmsg'), event_id: e.id, sender_id: ME, content: str(body.content), is_ai: false, created_at: now(), read_at: null };
     (e.messages as Row[]).push(m);
     e.updated_at = now();
+    if (!e.is_private) setTimeout(() => schedulePartnerReply(str(e.id)), 0);
     return ok({ message: m });
   } },
   { method: 'patch', re: P('/events/:id/messages/:mid'), handler: ({ db, params, body }) => {
@@ -431,9 +431,7 @@ export const ROUTES: GuestRoute[] = [
     if (m) m.read_at = now();
     return ok();
   } },
-  { method: 'post', re: P('/events/:id/messages/analyze-draft'), handler: async ({ db, params, body }) => {
-    const real = await callGuestAi(db, 'draft_analysis', { draft: str(body.draft), ...threadContext(findEvent(db, params.id)) });
-    if (real) return ok({ analysis: real });
+  { method: 'post', re: P('/events/:id/messages/analyze-draft'), handler: ({ body }) => {
     const r = analyzeSoften(str(body.draft));
     return ok({ analysis: {
       emotions: r.emotions.map((e) => ({ label: e.label, emoji: e.emoji, intensity: e.intensity })),
@@ -443,21 +441,21 @@ export const ROUTES: GuestRoute[] = [
       toxicityFlags: r.heat > 70 ? [tr('絕對化用語', 'Absolute words')] : [],
     } });
   } },
-  { method: 'post', re: P('/events/:id/messages/preview-rewrite'), handler: async ({ db, params, body }) => {
-    const real = await callGuestAi(db, 'reply_rewrite', { rawReply: str(body.rawReply), ...threadContext(findEvent(db, params.id)) });
-    if (real) return ok({ preview: real });
+  { method: 'post', re: P('/events/:id/messages/preview-rewrite'), handler: ({ body }) => {
     const p = softenPreview(str(body.rawReply));
     return ok({ preview: { versions: p.versions, toxicityFlags: p.toxicityFlags } });
   } },
-  { method: 'post', re: P('/events/:id/messages/preview-acceptance'), handler: async ({ db, params }) => {
+  { method: 'post', re: P('/events/:id/messages/preview-acceptance'), handler: ({ db, params }) => {
     const e = findEvent(db, params.id);
-    const real = await callGuestAi(db, 'emotion_acceptance', threadContext(e));
-    if (real) return ok({ preview: real });
     const g = getEmotionAcceptance(((e.emotions as string[]) || [])[0] || '');
     return ok({ preview: { empathy: g.meaning, acceptances: g.sampleLines.map((text, i) => ({ label: [tr('承認', 'Acknowledge'), tr('理解', 'Understand'), tr('陪伴', 'Be there')][i] || '', text })), toxicityFlags: [] } });
   } },
-  { method: 'post', re: P('/events/:id/ai-comment/preview'), handler: ({ db, params }) => {
+  // 請 AI 諮商師介入: the real counselor (spends 1 of the 5 tries); on-device
+  // demo comment once they're used up or the server is unreachable.
+  { method: 'post', re: P('/events/:id/ai-comment/preview'), handler: async ({ db, params }) => {
     const e = findEvent(db, params.id);
+    const real = await callGuestAi(db, 'event_counselor', threadForAi(e));
+    if (real && typeof real.comment === 'string' && real.comment.trim()) return ok({ comment: real.comment });
     const g = getEmotionAcceptance(((e.emotions as string[]) || [])[0] || '');
     return ok({ comment: `${g.meaning}\n\n${g.howToReceive}\n\n${AI_NOTE}` });
   } },
@@ -465,6 +463,7 @@ export const ROUTES: GuestRoute[] = [
     const e = findEvent(db, params.id);
     const m = { id: gid('gmsg'), event_id: e.id, sender_id: '', content: str(body.content), is_ai: true, ai_therapist: 'luma', created_at: now(), read_at: now() };
     (e.messages as Row[]).push(m);
+    emitLater('guest:counselor', { eventId: e.id });
     return ok({ message: m });
   } },
   { method: 'patch', re: P('/events/:id/translation'), handler: ({ db, params, body }) => {
@@ -531,6 +530,9 @@ export const ROUTES: GuestRoute[] = [
   } },
   { method: 'post', re: /^\/events\/[^/]+\/closure\/(finalize|insight)$/, handler: ({ db, path }) => ok({ closure: closureView(db, findEvent(db, path.split('/')[2])) }) },
   { method: 'get', re: P('/events/:id/facilitation'), handler: () => ok({ session: null }) },
+  { method: 'post', re: /^\/events\/[^/]+\/facilitation\//, handler: () => {
+    throw new GuestError(403, tr('試玩模式開放「給建議」：請諮商師看看你們的對話。帶你們一起做練習卡要真的兩個人，免費註冊、邀請另一半後就能用。', 'The preview includes "Give advice": the counselor reads your conversation. Practice cards need two real people; sign up free and invite your partner to use them.'), 'GUEST_MODE');
+  } },
   { method: 'any', re: /^\/events\/[^/]+\/(publish|share)/, handler: () => blocked() },
 
   // Sophie 衝突即時介入: deliver straight into the thread (no hold in the preview).
@@ -541,6 +543,7 @@ export const ROUTES: GuestRoute[] = [
       const e = findEvent(db, id);
       (e.messages as Row[]).push({ id: gid('gmsg'), event_id: id, sender_id: ME, content: str(body.content), is_ai: false, created_at: now(), read_at: null });
       e.updated_at = now();
+      if (!e.is_private) setTimeout(() => schedulePartnerReply(id), 0);
     }
     return ok({ delivered: true, held: false, level: 0 });
   } },

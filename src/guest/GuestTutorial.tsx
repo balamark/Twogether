@@ -1,31 +1,33 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { X, ChevronRight, ChevronLeft, Lock } from 'lucide-react';
 import { tr } from '../i18n/tr';
-import { GUEST_TOUR } from './guestTour';
 
 // ─── 30 秒看懂：訪客模式教學動畫 ─────────────────────────────────────────────
-// Shown once per tab session when a visitor lands in 訪客模式 (the real app on
-// a sample couple). A story-style, auto-advancing walkthrough of the features
-// that are most fun for ONE person, ranked by appeal:
-//   1. 說開一件事 + 送出前情緒檢查 — instant "wow", the product's core.
-//   2. 愛的語言測驗 — 2-minute quiz with a shareable result.
-//   3. 今日心情 (我們 › 月曆) — one tap a day, see your rhythm.
-//   4. 記錄時光 (我們 › 時間軸) — collect sweet moments.
-//   5. 和解步驟 — ready-made lines for the middle of a fight.
-// Each scene has a「去試試」button that opens that real tab. Each
-// scene is a tiny animated mock (pure CSS keyframes from tailwind.config.js:
-// guest-rise / guest-pop / guest-type / guest-drain / guest-progress). The
-// progress bar's animationend drives the auto-advance, so pressing/hovering
-// (which pauses the bar) pauses the whole tour for free. With reduced motion
-// the scenes render static and advance only on tap.
+// Shown once per tab session when a visitor lands in 訪客模式. A story-style,
+// auto-advancing walkthrough of the ONE loop the guest preview is about:
+//   1. 寫下你的想法 — your own words, as raw as they are.
+//   2. AI 整理成三種版本 — real AI (1 of the 5 tries).
+//   3. 試玩伴侶回覆 — the sample partner answers like a real person.
+//   4. 請 AI 諮商師介入 — real AI counselor (1 of the 5 tries).
+// then a privacy outro. Each scene is a tiny animated mock (CSS keyframes in
+// tailwind.config.js: guest-rise / guest-pop / guest-type / guest-progress).
+// The progress bar's animationend drives the auto-advance, so pressing (which
+// pauses the bar) pauses the tour. Reduced motion: static, tap to advance.
 
 const SCENE_MS = 3600;
 
 interface Props {
   onClose: (reason: 'done' | 'skip') => void;
-  /** Open a real tab (「去試試」/「開始玩」). */
-  onNavigate: (view: string) => void;
+  /** Open 說開一件事 on the compose screen (「去試試」/「開始」). */
+  onStart: () => void;
 }
+
+const STEPS = [
+  { emoji: '✍️', title: tr('寫下你的想法', 'Write what\'s on your mind'), hook: tr('想罵、想抱怨都可以，不會直接傳給對方。', 'Vent or complain; it isn\'t sent to them as is.') },
+  { emoji: '🪄', title: tr('AI 整理成三種說法', 'AI shapes it three ways'), hook: tr('平靜、堅定、溫柔，挑一個對方聽得進去的版本送出。', 'Neutral, firm or warm: pick the one they can actually hear.') },
+  { emoji: '💬', title: tr('試玩伴侶會回你', 'The sample partner replies'), hook: tr('就像真的另一半：在乎你，但也會先解釋一下。', 'Like a real partner: cares, but explains first.') },
+  { emoji: '🫶', title: tr('請 AI 諮商師介入', 'Bring in the AI counselor'), hook: tr('看見你們兩個人底下的需要，給雙方好開口的下一步。', 'Sees what each of you needs underneath and gives you both an easy next step.') },
+];
 
 const d = (ms: number): React.CSSProperties => ({ animationDelay: `${ms}ms` });
 
@@ -40,96 +42,64 @@ const Bubble: React.FC<{ tone: 'hot' | 'soft'; children: React.ReactNode; style?
   </div>
 );
 
-function SoftenScene() {
+function WriteScene() {
   return (
     <div className="flex flex-col gap-2">
-      <Bubble tone="hot" className="motion-safe:animate-guest-rise">
-        <span className="inline-block overflow-hidden whitespace-nowrap align-bottom motion-safe:animate-guest-type max-w-full">
-          {tr('你每次都不回訊息！', 'You never text back!')}
-        </span>
-      </Bubble>
-      <div className="rounded-xl border border-petal-rule bg-white px-3 py-2 motion-safe:animate-guest-rise" style={d(900)}>
-        <div className="flex justify-between font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-1">
-          <span>{tr('火藥味', 'Heat')}</span>
-          <span>{tr('😠 憤怒 · 📵 被忽視', '😠 anger · 📵 ignored')}</span>
-        </div>
-        <div className="h-2 rounded-full bg-petal-cream-2 overflow-hidden">
-          <div className="h-full w-[18%] rounded-full bg-gradient-to-r from-petal-sage to-vivid-rose motion-safe:animate-guest-drain" style={d(1200)} />
-        </div>
-      </div>
-      <Bubble tone="soft" className="motion-safe:animate-guest-rise" style={d(2000)}>
-        {tr('沒等到回覆時我會胡思亂想，晚歸可以先跟我說一聲嗎？', 'When I don\'t hear back I start worrying. Could you give me a heads-up when you\'re late?')}
-      </Bubble>
-    </div>
-  );
-}
-
-function LoveLanguageScene() {
-  return (
-    <div className="space-y-2">
-      <p className="font-body text-[13px] text-petal-ink motion-safe:animate-guest-rise">{tr('辛苦了一天，你更希望 TA…', 'After a long day, you\'d rather they…')}</p>
-      <div className="rounded-xl border border-petal-rule bg-white px-3 py-2 font-body text-[13px] text-petal-ink-soft motion-safe:animate-guest-rise" style={d(300)}>{tr('🤝 把晚餐和家事都打理好', '🤝 Handled dinner and chores')}</div>
-      <div className="rounded-xl border-2 border-pink-500 bg-petal-rose-soft/30 px-3 py-2 font-body text-[13px] text-petal-ink motion-safe:animate-guest-pop" style={d(900)}>{tr('🤗 給我一個長長的擁抱', '🤗 Gave me a long hug')}</div>
-      <div className="flex justify-center pt-1">
-        <span className="rounded-full bg-petal-ink text-petal-cream px-3 py-1 font-body text-xs motion-safe:animate-guest-pop" style={d(1900)}>
-          {tr('你的愛的語言：⏳ 精心的相處', 'Your love language: ⏳ Quality time')}
+      <div className="rounded-xl border border-petal-rule bg-white px-3 py-2 motion-safe:animate-guest-rise">
+        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-1">{tr('你輸入的內容（不會直接傳給對方）', 'What you write (not sent as is)')}</div>
+        <span className="inline-block overflow-hidden whitespace-nowrap align-bottom motion-safe:animate-guest-type max-w-full font-body text-[13px] text-vivid-rose-ink">
+          {tr('你每次都說好要早點回來，又不回訊息！', 'You always say you\'ll be early, then don\'t text!')}
         </span>
       </div>
-    </div>
-  );
-}
-
-function MoodScene() {
-  const days = ['🙂', '😊', '😐', '😣', '😔', '🙂', '😊'];
-  return (
-    <div>
-      <div className="flex justify-between gap-1">
-        {days.map((e, i) => (
-          <div key={i} className="flex flex-col items-center gap-1 motion-safe:animate-guest-pop" style={d(i * 220)}>
-            <span className={`flex h-9 w-9 items-center justify-center rounded-full text-lg ${i === days.length - 1 ? 'bg-pink-500/20 ring-2 ring-pink-500' : 'bg-petal-cream-2'}`}>{e}</span>
-            <span className="font-body text-[10px] text-petal-muted">{i === days.length - 1 ? tr('今天', 'Today') : `D-${days.length - 1 - i}`}</span>
-          </div>
-        ))}
+      <div className="self-end rounded-full bg-petal-ink text-petal-cream px-3 py-1 font-body text-xs motion-safe:animate-guest-pop" style={d(1500)}>
+        {tr('讓 AI 整理', 'Let AI organize it')}
       </div>
-      <p className="mt-3 rounded-xl bg-white border border-petal-rule px-3 py-2 font-body text-[13px] text-petal-ink-soft motion-safe:animate-guest-rise" style={d(1800)}>
-        {tr('📈 這週 4 天心情不錯；週四壓力最大。', '📈 4 good days this week; Thursday was the most stressful.')}
-      </p>
     </div>
   );
 }
 
-function MemoriesScene() {
-  const items = [
-    ['🍜', tr('深夜一起煮泡麵', 'Late-night noodles together'), tr('3 天前', '3 days ago')],
-    ['🌊', tr('第一次一起看海', 'First time at the sea'), tr('17 天前', '17 days ago')],
-    ['☕', tr('第一次約會', 'Our first date'), tr('120 天前', '120 days ago')],
+function VersionsScene() {
+  const rows = [
+    [tr('平靜', 'Neutral'), tr('昨天約七點，你八點才到，中間沒有訊息。', 'We said 7; you came at 8, no message.')],
+    [tr('堅定', 'Firm'), tr('遲到又不回訊息讓我很不舒服，下次請先說。', 'Late with no text bothers me. Tell me first next time.')],
+    [tr('溫柔', 'Warm'), tr('等你的時候我有點失落，下次會晚可以先說一聲嗎？', 'I felt let down waiting. Could you text if you\'ll be late?')],
   ];
   return (
-    <div className="relative border-l-2 border-petal-rose-soft pl-4 space-y-2">
-      {items.map(([emoji, title, when], i) => (
-        <div key={i} className="relative rounded-xl bg-white border border-petal-rule px-3 py-2 motion-safe:animate-guest-rise" style={d(i * 450)}>
-          <span className="absolute -left-[23px] top-3 h-2.5 w-2.5 rounded-full bg-pink-500" />
-          <div className="font-body text-[13px] text-petal-ink">{emoji} {title}</div>
-          <div className="font-body text-[10px] text-petal-muted">{when}</div>
+    <div className="space-y-1.5">
+      {rows.map(([label, text], i) => (
+        <div key={label} className={`rounded-xl border px-3 py-1.5 font-body text-[12px] motion-safe:animate-guest-rise ${i === 2 ? 'border-pink-500 bg-petal-rose-soft/30 text-petal-ink' : 'border-petal-rule bg-white text-petal-ink-soft'}`} style={d(i * 350)}>
+          <span className="font-medium mr-1">{label}</span>{text}
+          {i === 2 && <span className="ml-1 inline-block motion-safe:animate-guest-pop" style={d(1600)}>✓</span>}
         </div>
       ))}
     </div>
   );
 }
 
-function RepairScene() {
+function PartnerScene() {
   return (
-    <div className="space-y-2">
-      <div className="flex gap-1.5 flex-wrap motion-safe:animate-guest-rise">
-        {[tr('① 先停一下', '① Pause'), tr('② 承認情緒', '② Acknowledge'), tr('③ 語氣放軟', '③ Soften')].map((s, i) => (
-          <span key={i} className={`rounded-full px-2.5 py-0.5 font-body text-[11px] border ${i === 1 ? 'bg-petal-ink text-petal-cream border-petal-ink' : 'border-petal-rule text-petal-ink-soft'}`}>{s}</span>
-        ))}
+    <div className="flex flex-col gap-2">
+      <Bubble tone="hot" className="motion-safe:animate-guest-rise">{tr('等你的時候我有點失落，下次會晚可以先說一聲嗎？', 'I felt let down waiting. Could you text if you\'ll be late?')}</Bubble>
+      <div className="self-start flex items-center gap-1 rounded-2xl bg-white border border-petal-rule px-3 py-2 motion-safe:animate-guest-rise" style={d(600)}>
+        {[0, 1, 2].map((i) => <span key={i} className="h-1.5 w-1.5 rounded-full bg-petal-muted motion-safe:animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />)}
       </div>
-      <div className="rounded-xl bg-amber-50/70 border border-amber-200 px-3 py-2 font-body text-[13px] text-petal-ink motion-safe:animate-guest-rise" style={d(500)}>
-        {tr('「我看得出來你現在不開心。」', '"I can see you\'re upset right now."')}
-        <span className="ml-2 inline-block motion-safe:animate-guest-pop" style={d(1400)}>⭐</span>
+      <Bubble tone="soft" className="motion-safe:animate-guest-rise" style={d(1700)}>
+        {tr('我不是故意的，那時候被主管叫住…但我知道你等很久。', 'I didn\'t mean to, my boss caught me… but I know you waited ages.')}
+      </Bubble>
+    </div>
+  );
+}
+
+function CounselorScene() {
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div className="rounded-full bg-gradient-to-r from-violet-500 to-vivid-rose text-white px-4 py-1.5 font-body text-xs shadow-sm motion-safe:animate-guest-pop">
+        {tr('✨ 請 Luma 加入', '✨ Invite Luma')}
       </div>
-      <p className="font-body text-[11px] text-petal-muted motion-safe:animate-guest-rise" style={d(1900)}>{tr('收藏起來，吵架時一鍵複製。', 'Save it; copy it in one tap mid-argument.')}</p>
+      <div className="w-full rounded-xl border border-violet-200 bg-white px-3 py-2 font-body text-[12px] text-petal-ink leading-relaxed motion-safe:animate-guest-rise" style={d(900)}>
+        <div className="text-[10px] text-violet-600 mb-0.5">🫶 {tr('AI 諮商師', 'AI counselor')}</div>
+        {tr('你想要的是「被放在心上」，他想讓你知道「不是不在乎」。試著先接住彼此的這一句。', 'You want to feel "on their mind"; he wants you to know "it\'s not that I don\'t care". Try receiving that first.')}
+      </div>
     </div>
   );
 }
@@ -141,7 +111,7 @@ function PrivacyScene() {
         <Lock className="h-6 w-6 text-petal-sage-deeper" strokeWidth={1.5} />
       </div>
       <p className="font-body text-[13px] text-petal-ink leading-relaxed motion-safe:animate-guest-rise" style={d(400)}>
-        {tr('不用註冊。每個分頁都已放好範例情侶的資料，隨便點、隨便改；你做的一切只存在這個瀏覽器分頁，關掉就消失。還送你 5 次真的 AI（文字只拿來產生回覆，不保存）。', 'No sign-up. Every tab is filled with a sample couple\'s data: tap and change anything. It all stays in this browser tab and is gone when you close it. Plus 5 real AI tries (your text is only used for the reply, never stored).')}
+        {tr('不用註冊，送你 5 次真的 AI（整理和諮商師各算一次）。你寫的內容只存在這個瀏覽器分頁，關掉就消失；送去給 AI 的文字只拿來產生回覆，不會被保存。', 'No sign-up, and 5 real AI tries on us (organizing and the counselor each use one). What you write stays in this browser tab and is gone when you close it; text sent to the AI is only used for the reply, never stored.')}
       </p>
       <p className="mt-2 font-body text-[11px] text-petal-muted motion-safe:animate-guest-rise" style={d(900)}>
         {tr('想留下紀錄、邀請另一半？隨時按右上角「免費註冊」。', 'Want to keep it and invite your partner? Tap "Sign up free" any time.')}
@@ -150,15 +120,9 @@ function PrivacyScene() {
   );
 }
 
-const SCENES: { render: () => React.ReactNode }[] = [
-  { render: SoftenScene },
-  { render: LoveLanguageScene },
-  { render: MoodScene },
-  { render: MemoriesScene },
-  { render: RepairScene },
-];
+const SCENES: (() => React.ReactNode)[] = [WriteScene, VersionsScene, PartnerScene, CounselorScene];
 
-const GuestTutorial: React.FC<Props> = ({ onClose, onNavigate }) => {
+const GuestTutorial: React.FC<Props> = ({ onClose, onStart }) => {
   const [idx, setIdx] = useState(0);
   const [paused, setPaused] = useState(false);
   const total = SCENES.length + 1; // + privacy outro
@@ -177,7 +141,7 @@ const GuestTutorial: React.FC<Props> = ({ onClose, onNavigate }) => {
   }, [onClose, total]);
 
   const isOutro = idx === total - 1;
-  const feature = GUEST_TOUR[idx];
+  const feature = STEPS[idx];
   const next = () => (isOutro ? onClose('done') : setIdx((i) => i + 1));
 
   return (
@@ -209,7 +173,7 @@ const GuestTutorial: React.FC<Props> = ({ onClose, onNavigate }) => {
 
         <div className="flex items-center justify-between px-4 pt-3">
           <span className="font-body text-[10px] font-medium uppercase tracking-[0.16em] text-petal-muted">
-            {isOutro ? tr('30 秒看懂 · 最後一步', '30-second tour · last step') : tr(`30 秒看懂 · 第 ${feature.rank} 名`, `30-second tour · #${feature.rank}`)}
+            {isOutro ? tr('30 秒看懂 · 最後一步', '30-second tour · last step') : tr(`30 秒看懂 · 第 ${idx + 1} 步`, `30-second tour · step ${idx + 1}`)}
           </span>
           <button type="button" onClick={() => onClose('skip')} aria-label={tr('關閉', 'Close')} className="p-1 text-petal-muted hover:text-petal-ink" data-testid="guest-tutorial-close">
             <X className="w-4 h-4" strokeWidth={1.5} />
@@ -225,7 +189,7 @@ const GuestTutorial: React.FC<Props> = ({ onClose, onNavigate }) => {
 
         {/* key forces the CSS animations to replay on every scene change */}
         <div key={idx} className="mx-4 mb-4 min-h-[188px] rounded-xl bg-petal-cream-2 p-3 flex flex-col justify-center" data-testid={`guest-tutorial-scene-${idx}`}>
-          {isOutro ? <PrivacyScene /> : SCENES[idx].render()}
+          {isOutro ? <PrivacyScene /> : SCENES[idx]()}
         </div>
 
         <div className="flex items-center justify-between gap-2 border-t border-petal-rule px-4 py-3">
@@ -239,12 +203,12 @@ const GuestTutorial: React.FC<Props> = ({ onClose, onNavigate }) => {
               </button>
             )}
             {isOutro ? (
-              <button type="button" onClick={() => { onNavigate(GUEST_TOUR[0].view); onClose('done'); }} className="rounded-full bg-petal-ink text-petal-cream px-4 py-1.5 font-body text-sm hover:bg-pink-700" data-testid="guest-tutorial-start">
-                {tr('開始玩 →', 'Start playing →')}
+              <button type="button" onClick={() => { onStart(); onClose('done'); }} className="rounded-full bg-petal-ink text-petal-cream px-4 py-1.5 font-body text-sm hover:bg-pink-700" data-testid="guest-tutorial-start">
+                {tr('寫下我的一件事 →', 'Write mine →')}
               </button>
             ) : (
               <>
-              <button type="button" onClick={() => { onNavigate(feature.view); onClose('done'); }} className="rounded-full border border-petal-ink px-3 py-1.5 font-body text-sm text-petal-ink hover:bg-petal-cream-2" data-testid="guest-tutorial-try">
+              <button type="button" onClick={() => { onStart(); onClose('done'); }} className="rounded-full border border-petal-ink px-3 py-1.5 font-body text-sm text-petal-ink hover:bg-petal-cream-2" data-testid="guest-tutorial-try">
                 {tr('去試試', 'Try it')}
               </button>
               <button type="button" onClick={next} className="inline-flex items-center gap-1 rounded-full bg-petal-ink text-petal-cream px-4 py-1.5 font-body text-sm hover:bg-pink-700" data-testid="guest-tutorial-next">

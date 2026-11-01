@@ -104,38 +104,71 @@ test.describe('guest mode', () => {
     await expect.poll(count).toBe(3);
   });
 
-  test('5 real AI tries: real result, live counter, then demo fallback', async ({ page }) => {
+  test('core loop: write → real AI versions → sample partner replies → AI counselor joins', async ({ page }) => {
     await skipTour(page);
-    let calls = 0;
-    await page.route('**/api/guest-ai/quota**', (route) =>
-      route.fulfill({ json: { success: true, usage: { tier: 'guest', limit: 5, used: calls, remaining: 5 - calls } } }));
-    await page.route('**/api/guest-ai/draft_analysis', async (route) => {
+    const leaks = watchNetwork(page);
+    let used = 0;
+    const usage = () => ({ tier: 'guest', limit: 5, used, remaining: 5 - used });
+    const seen: Record<string, number> = {};
+    await page.route('**/api/guest-ai/**', async (route) => {
+      const url = route.request().url();
+      if (url.includes('/quota')) return route.fulfill({ json: { success: true, usage: usage() } });
+      const kind = url.split('/').pop() as string;
+      seen[kind] = (seen[kind] || 0) + 1;
       const body = route.request().postDataJSON();
-      // The thread context travels with the call; the guest id is anonymous.
       expect(body.guest_id).toMatch(/^[A-Za-z0-9-]{8,64}$/);
-      expect(Array.isArray(body.recentMessages)).toBe(true);
-      if (calls >= 5) return route.fulfill({ status: 429, json: { success: false, error_code: 'GUEST_AI_LIMIT', message: 'used up' } });
-      calls += 1;
-      return route.fulfill({ json: { success: true, result: {
-        emotions: [{ label: '真AI情緒', emoji: '🤖', intensity: 77 }],
-        partnerHears: { misread: 'm', real: 'r' }, need: 'n', rewrite: '這是真的 AI 改寫', toxicityFlags: [],
-      }, usage: { tier: 'guest', limit: 5, used: calls, remaining: 5 - calls } } });
+      if (kind === 'icebreaker') {
+        used += 1;
+        return route.fulfill({ json: { success: true, usage: usage(), result: {
+          title: '真AI標題', summary: '真AI摘要', detail: '', emotions: ['失望'], tags: ['溝通'], toxicityFlags: [],
+          versions: { neutral: '真AI平靜版', firm: '真AI堅定版', warm: '真AI溫柔版' } } } });
+      }
+      if (kind === 'partner_reply') {
+        // The partner answers the guest's own words.
+        expect(body.recentMessages.at(-1).fromSelf).toBe(true);
+        return route.fulfill({ json: { success: true, usage: usage(), result: { reply: '真AI阿哲：我不是故意的，但我懂你等很久。' } } });
+      }
+      used += 1;
+      expect(body.names).toEqual({ me: '小安', partner: '阿哲' });
+      return route.fulfill({ json: { success: true, usage: usage(), result: { comment: '真AI諮商師：你們都在乎彼此。', toxicityFlags: [] } } });
     });
 
     await page.goto('/');
-    await expect(page.getByTestId('guest-ai-left')).toContainText('5／5');
-    await page.getByTestId('nav-tab-talk').click();
-    await page.getByText('說好的晚餐，他又遲到沒說').click();
-    for (let i = 1; i <= 6; i++) {
-      await page.getByTestId('event-reply-input').fill(`算了，反正你從來都不在乎 ${i}`);
-      await page.getByTestId('event-draft-analyze-button').click();
-      const meter = page.getByTestId('draft-emotion-meter');
-      await expect(meter).toBeVisible();
-      if (i <= 5) await expect(meter).toContainText('真AI情緒');
-      else await expect(meter).not.toContainText('真AI情緒'); // demo fallback, flow not blocked
-      await page.getByTestId('draft-emotion-meter-close').click();
-    }
-    await page.getByTestId('nav-tab-home').click();
-    await expect(page.getByTestId('guest-ai-left')).toContainText('已用完');
+    await page.getByTestId('guest-start-conversation').click();
+    await page.getByTestId('compose-raw-input').fill('你每次都說好要早點回來，結果又不回訊息！');
+    await page.getByRole('button', { name: /讓 AI 整理/ }).click();
+    await expect(page.getByText('真AI溫柔版')).toBeVisible();
+    await page.locator('button').filter({ hasText: /送出|建立/ }).last().click();
+
+    await expect(page.getByTestId('guest-coach')).toHaveAttribute('data-state', 'typing');
+    await expect(page.getByTestId('guest-coach')).toHaveAttribute('data-state', 'replied', { timeout: 10000 });
+    await expect(page.getByText('真AI阿哲：我不是故意的')).toBeVisible();
+
+    await page.getByTestId('guest-coach-counselor').click();
+    await page.getByTestId('event-sophie-help-advice').click();
+    await expect(page.getByTestId('event-ai-counselor-modal')).toContainText('真AI諮商師');
+    await page.getByTestId('event-ai-counselor-post').click();
+    await expect(page.getByTestId('guest-coach')).toHaveAttribute('data-state', 'counselor');
+    await expect(page.getByText('真AI諮商師：你們都在乎彼此。')).toBeVisible();
+    expect(seen).toEqual({ icebreaker: 1, partner_reply: 1, event_counselor: 1 });
+
+    // 重新開始對話 brings back the sample conversations only.
+    await page.getByTestId('guest-restart-conversation').click();
+    await expect.poll(() => page.evaluate((k) => JSON.parse(sessionStorage.getItem(k) || '{}').events.length, DB_KEY)).toBe(3);
+    expect(leaks).toEqual([]);
+  });
+
+  test('when the 5 tries are used up the flow continues on the demo and the coach says why', async ({ page }) => {
+    await skipTour(page);
+    await page.route('**/api/guest-ai/**', (route) =>
+      route.fulfill({ status: 429, json: { success: false, error_code: 'GUEST_AI_LIMIT', message: 'used up' } }));
+    await page.goto('/');
+    await page.getByTestId('guest-start-conversation').click();
+    await page.getByTestId('compose-raw-input').fill('你每次都不回訊息！');
+    await page.getByRole('button', { name: /讓 AI 整理/ }).click();
+    // On-device versions still appear: no dead end.
+    await expect(page.getByTestId('compose-event-summary')).toBeVisible();
+    await expect(page.getByTestId('guest-coach')).toHaveAttribute('data-state', 'limit');
+    await expect(page.getByTestId('guest-coach-signup')).toBeVisible();
   });
 });

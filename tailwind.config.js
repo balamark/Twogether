@@ -161,7 +161,6 @@ export default {
         'guest-rise':     'guest-rise 0.5s ease-out both',
         'guest-pop':      'guest-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both',
         'guest-type':     'guest-type 1.1s steps(20, end) both',
-        'guest-drain':    'guest-drain 1.4s ease-in-out both',
         'guest-progress': 'guest-progress 3.6s linear forwards',
       },
       keyframes: {
@@ -176,13 +175,6 @@ export default {
         'guest-type': {
           '0%':   { maxWidth: '0' },
           '100%': { maxWidth: '100%' },
-        },
-        // Heat meter: starts near-full (the angry draft) and drains to its
-        // final width (the rewrite), so the visitor sees the temperature drop.
-        'guest-drain': {
-          '0%':   { width: '86%' },
-          '35%':  { width: '86%' },
-          '100%': { width: '18%' },
         },
         'guest-progress': {
           '0%':   { width: '0%' },
