@@ -77,7 +77,7 @@ test.describe('guest mode', () => {
     await page.getByTestId('event-draft-analyze-button').click();
     await expect(page.getByTestId('draft-emotion-meter')).toBeVisible();
 
-    await page.getByTestId('user-menu-toggle').click();
+    await page.getByTestId('guest-menu-toggle').click();
     await page.getByTestId('user-menu-love-language').click();
     await page.getByTestId('love-language-start').click();
     for (let i = 0; i < 15; i++) await page.getByTestId('love-language-quiz').locator('button').nth(1).click();
@@ -99,7 +99,7 @@ test.describe('guest mode', () => {
     const count = () => page.evaluate((k) => JSON.parse(sessionStorage.getItem(k) || '{}').events.length, DB_KEY);
     await expect.poll(count).toBe(4);
 
-    await page.getByTestId('user-menu-toggle').click();
+    await page.getByTestId('guest-menu-toggle').click();
     await page.getByText('重置試玩資料').click();
     await expect.poll(count).toBe(3);
   });

@@ -197,7 +197,9 @@ const Header: React.FC<HeaderProps> = ({
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  data-testid="user-menu-toggle"
+                  // A guest's menu is not a signed-in account: keep user-menu-toggle
+                  // meaning "a real account is signed in" (tests and tooling rely on it).
+                  data-testid={authState.isGuest ? 'guest-menu-toggle' : 'user-menu-toggle'}
                   className="flex items-center space-x-1 sm:space-x-1.5 border border-petal-rule hover:border-petal-ink px-2 sm:px-3 py-1.5 rounded-full transition-colors min-h-[40px] max-w-[140px] sm:max-w-none"
                 >
                   <User className="w-3.5 h-3.5 text-petal-ink-soft shrink-0" strokeWidth={1.5} />

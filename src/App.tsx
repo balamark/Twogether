@@ -2474,6 +2474,10 @@ const LoveTimeApp = () => {
     currentView !== 'therapists' &&
     (!authState.isAuthenticated || (!!authState.isGuest && currentView === 'home'));
 
+  // Public surfaces (真實故事, the counselor directory) show real content and
+  // their own sign-in prompts: a guest is a visitor there, not the sample couple.
+  const visitorAuthState: AuthState = authState.isGuest ? { ...authState, isAuthenticated: false } : authState;
+
   const renderView = () => {
     // Show login prompt for private content when not authenticated
     if (!authState.isAuthenticated) {
@@ -2780,7 +2784,7 @@ const LoveTimeApp = () => {
       case 'help': return <HelpView onFeedback={() => setCurrentView('feedback')} />;
       case 'stories': return (
         <StoriesView
-          authState={authState}
+          authState={visitorAuthState}
           showNotification={showNotification}
           setShowAuthModal={setShowAuthModal}
           onFindTherapist={() => setCurrentView('therapists')}
@@ -2819,7 +2823,7 @@ const LoveTimeApp = () => {
       case 'therapists': return (
         <div>
           <TalkSwitcher current="therapists" onNavigate={setCurrentView} />
-          <TherapistsView authState={authState} showNotification={showNotification} mode="user" />
+          <TherapistsView authState={visitorAuthState} showNotification={showNotification} mode="user" />
         </div>
       );
       // 諮商師工作台 — the counselor role's own page. Only reachable while
@@ -3198,6 +3202,7 @@ const LoveTimeApp = () => {
               setCurrentView('events');
             }}
             suppressAutoTour={showAuthModal || showPairingInvitation}
+            currentView={currentView}
           />
         )}
 
@@ -3207,7 +3212,7 @@ const LoveTimeApp = () => {
         </div>
 
         {/* 訪客模式: walks the guest through partner reply → AI counselor. */}
-        {authState.isGuest && (
+        {authState.isGuest && !showAuthModal && !showPairingInvitation && (
           <GuestCoach
             onSignUp={() => setShowAuthModal(true)}
             onOpenEvent={(id) => {

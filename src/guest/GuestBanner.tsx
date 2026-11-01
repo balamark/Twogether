@@ -21,8 +21,10 @@ interface Props {
   onSignUp: () => void;
   /** Open 說開一件事 straight on the compose screen. */
   onStartConversation: () => void;
-  /** Hold the auto tour while another modal (e.g. auth) is open. */
+  /** Another modal (e.g. sign-in) is open: hide the tour and don't auto-start it. */
   suppressAutoTour?: boolean;
+  /** Current app view: the tour auto-starts only on the landing page (home). */
+  currentView: string;
 }
 
 function tourSeen(): boolean {
@@ -31,15 +33,33 @@ function tourSeen(): boolean {
 
 const linkBtn = 'inline-flex items-center gap-1 font-body text-xs text-petal-ink-soft hover:text-petal-ink underline underline-offset-2';
 
-const GuestBanner: React.FC<Props> = ({ onSignUp, onStartConversation, suppressAutoTour }) => {
+const GuestBanner: React.FC<Props> = ({ onSignUp, onStartConversation, suppressAutoTour, currentView }) => {
   const [showTour, setShowTour] = useState(false);
 
+  // Another modal (sign-in, pairing invite) took over: the tour steps aside
+  // so it never covers that modal's buttons.
   useEffect(() => {
-    if (suppressAutoTour || tourSeen()) return;
+    if (suppressAutoTour) setShowTour(false);
+  }, [suppressAutoTour]);
+
+  // The tour steps aside once the visitor starts exploring: moving to another
+  // view closes it, or cancels it before it opens (counts as 稍後再說, so it
+  // doesn't auto-fire later this session).
+  const [landingView] = useState(currentView);
+  useEffect(() => {
+    if (currentView === landingView) return;
+    try { sessionStorage.setItem(TOUR_SEEN_KEY, '1'); } catch { /* ignore */ }
+    setShowTour(false);
+  }, [currentView, landingView]);
+
+  useEffect(() => {
+    // Auto-start only on a fresh landing on 今天 (a deep link or a visitor who
+    // already moved on gets the tour from the banner's 30 秒教學 instead).
+    if (suppressAutoTour || tourSeen() || currentView !== 'home' || currentView !== landingView) return;
     // Let the first page paint before the tour slides in.
     const t = window.setTimeout(() => setShowTour(true), 600);
     return () => window.clearTimeout(t);
-  }, [suppressAutoTour]);
+  }, [suppressAutoTour, currentView, landingView]);
 
   const closeTour = (reason: 'done' | 'skip') => {
     setShowTour(false);
