@@ -2468,11 +2468,15 @@ const LoveTimeApp = () => {
         ...(!authState.isAuthenticated || authState.isGuest ? [{ id: 'pricing', label: t('nav.pricing'), icon: Crown }] : []),
       ];
 
-  // Marketing blocks under the page (principles, reviews, counselor footer):
+  // Marketing blocks under the page (reviews, counselor footer):
   // every tab while signed out; only 今天 for a guest exploring the real app.
   const showVisitorExtras =
     currentView !== 'therapists' &&
     (!authState.isAuthenticated || (!!authState.isGuest && currentView === 'home'));
+  // 「我們怎麼幫你溝通」(the three communication principles) lives in one place
+  // only: under 成長, for signed-out visitors and guests alike.
+  const isVisitor = !authState.isAuthenticated || !!authState.isGuest;
+  const showPrinciples = isVisitor && (currentView === 'grow' || currentView === 'achievements');
 
   // Public surfaces (真實故事, the counselor directory) show real content and
   // their own sign-in prompts: a guest is a visitor there, not the sample couple.
@@ -3225,8 +3229,8 @@ const LoveTimeApp = () => {
         {/* Logged-out design philosophy — the three communication principles that
             run through the whole app, so a visitor can recognise their own
             struggle and anticipate how Twogether helps before signing up.
-            Hidden on the therapists sub-page (its own context). */}
-        {showVisitorExtras && (
+            Shown once, under 成長. */}
+        {showPrinciples && (
           <CommunicationPrinciples onSignUp={() => setShowAuthModal(true)} />
         )}
 

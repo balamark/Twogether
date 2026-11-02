@@ -11,11 +11,8 @@ import {
   TrendingUp,
   Sparkles,
   HeartHandshake,
-  HandHeart,
-  Hand,
   Compass,
   Library,
-  NotebookPen,
   Gauge,
   ClipboardCheck,
   ClipboardList,
@@ -26,8 +23,6 @@ import {
   ShieldCheck,
   MessageSquare,
   Eye,
-  ThumbsUp,
-  ThumbsDown,
   Send,
   Globe,
   Coins,
@@ -426,14 +421,6 @@ const RhythmDayCardSample: React.FC = () => (
   </SampleCard>
 );
 
-// The 衝突事件 "repair flywheel" — the heart of the product. Four connected
-// steps, escalating to an AI / human counselor when the couple gets stuck.
-const FLYWHEEL: { icon: LucideIcon; step: string; title: string; desc: string }[] = [
-  { icon: Pencil, step: '1', title: tr('記錄衝突', 'Record a conflict'), desc: tr('把這次的經過與委屈寫下來，當下不必急著送出。', 'Write down what happened and what hurt. No need to send it right away.') },
-  { icon: TrendingUp, step: '2', title: tr('分析走勢', 'See the trends'), desc: tr('看見過往衝突大多來自哪些原因，掌握你們的相處模式。', 'See what your past conflicts usually came from, and understand how you two relate.') },
-  { icon: Sparkles, step: '3', title: tr('學習開口', 'Learn how to speak up'), desc: tr('AI 幫你把話說得更中性、更容易和好。', 'AI helps you say it more neutrally, so it\'s easier to make up.') },
-  { icon: HeartHandshake, step: '4', title: tr('請諮商師協助', 'Get a counselor\'s help'), desc: tr('真的卡住了，你挑選的 AI 諮商師（Luma、Sophie、Kai⋯共 9 位個性不同的陪伴者）陪你聊，或預約真人諮商師。', 'When you\'re truly stuck, the AI counselor you chose (Luma, Sophie, Kai… 9 companions with different personalities) talks with you, or book a real counselor.') },
-];
 
 // Sample "過往衝突主因" mini-analysis shown read-only in the preview.
 const CAUSE_BARS: { label: string; pct: number }[] = [
@@ -442,39 +429,6 @@ const CAUSE_BARS: { label: string; pct: number }[] = [
   { label: tr('作息差異', 'Different schedules'), pct: 25 },
 ];
 
-// The new "情緒接住" lead — a three-beat example of the emotion-acceptance flow:
-// one partner writes a feeling, AI softens it, the other receives an AI-suggested
-// way to "catch" it. Shown read-only to logged-out visitors.
-const EmotionAcceptanceSample: React.FC = () => (
-  <SampleCard>
-    <div className="flex items-center justify-between mb-3">
-      <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
-        <HandHeart className="w-3.5 h-3.5 text-petal-rose-deep" />
-        {tr('先接住情緒，溝通才開始', 'Feelings need to be held before communication can begin')}
-      </span>
-      <SampleTag />
-    </div>
-    <div className="space-y-2.5">
-      <div className="rounded-md bg-petal-cream-2 px-3 py-2">
-        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-1">{tr('① 小晴寫下情緒', '① Ching writes down her feelings')}</div>
-        <p className="font-body text-sm text-petal-ink">{tr('「你又忘記了，我覺得自己一點都不重要。」', '"You forgot again. I feel like I don\'t matter at all."')}</p>
-      </div>
-      <div className="rounded-md bg-white border border-petal-rule px-3 py-2">
-        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-1">{tr('② AI 整理對話＋翻成不傷人的話', '② AI summarizes + translates it into words that don\'t hurt')}</div>
-        <div className="rounded bg-petal-cream-2 px-2 py-1.5 mb-1.5">
-          <div className="font-body text-[10px] text-petal-muted">{tr('對話簡介（中性紀錄）', 'Conversation summary (neutral record)')}</div>
-          <p className="font-body text-xs text-petal-ink-soft">{tr('兩人約好的紀念日晚餐，其中一方因加班忘記赴約。', 'The two had planned an anniversary dinner, and one forgot to show up because of overtime.')}</p>
-        </div>
-        <p className="font-body text-sm text-petal-ink">{tr('「當約定被忘記時，我會覺得失落，因為我很在乎我們的相處。」', '"When a plan is forgotten, I feel let down, because I really care about our time together."')}</p>
-        <div className="font-body text-[10px] text-petal-muted mt-1">{tr('✎ 送出前後都可以再修改', '✎ You can edit before and after sending')}</div>
-      </div>
-      <div className="rounded-md bg-petal-rose-soft/30 border border-petal-rose-soft px-3 py-2">
-        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep mb-1">{tr('③ AI 教阿哲怎麼接住', '③ AI shows Jay how to hold it')}</div>
-        <p className="font-body text-sm text-petal-ink">{tr('「我聽到你很失落，這對你來說很重要，謝謝你願意告訴我。」', '"I hear that you\'re really let down. This matters a lot to you, and thank you for telling me."')}</p>
-      </div>
-    </div>
-  </SampleCard>
-);
 
 // "婚姻檢查" read-only sample — each partner rates a few dimensions, then both
 // reveal side-by-side with an AI neutral summary.
@@ -484,44 +438,6 @@ const CHECKUP_ROWS: { label: string; a: number; b: number }[] = [
   { label: tr('🏠 家務分工', '🏠 Chores'), a: 3, b: 2 },
 ];
 
-// Sophie 衝突即時介入 read-only sample: the held-message loop — your original
-// words are saved (never rewritten), then released alongside Sophie's read of
-// the need underneath. Static 範例 data.
-const SophieMediatorSample: React.FC = () => (
-  <div className="space-y-2.5">
-    <div className="flex items-center justify-between">
-      <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
-        <Sparkles className="w-3.5 h-3.5 text-petal-rose-deep" strokeWidth={1.5} />
-        {tr('Sophie 即時介入', 'Sophie steps in live')}
-      </span>
-      <SampleTag />
-    </div>
-    {/* The Conflict Intervention card: translation first, the heated original
-        blurred behind a reveal. Static illustration of the real UI. */}
-    <SampleCard>
-      <div className="font-body text-[11px] font-medium text-petal-rose-deep inline-flex items-center gap-1.5 mb-1">
-        <HeartHandshake className="w-3.5 h-3.5" strokeWidth={1.5} />
-        {tr('Sophie 協助表達', 'Sophie helped phrase it')}
-      </div>
-      <p className="font-body text-sm text-petal-ink leading-relaxed">
-        {tr('「我現在心裡真的很痛，剛才那件事讓我覺得自己不被尊重，我希望我們可以坐下來好好談。」', '"I\'m really hurting right now. What just happened made me feel disrespected, and I hope we can sit down and talk properly."')}
-      </p>
-      <span className="mt-2 inline-flex items-center gap-1.5 rounded bg-amber-50 text-amber-700 border border-amber-200/60 font-body text-[11px] font-medium px-2 py-0.5">
-        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" aria-hidden />
-        {tr('TA需要被尊重', 'They need to feel respected')}
-      </span>
-      <div className="mt-3 pt-3 border-t border-dashed border-petal-rose-deep/30">
-        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-1">{tr('原本的訊息', 'Original message')}</div>
-        <p aria-hidden className="font-body text-sm text-petal-ink/70 leading-relaxed select-none blur-[6px]">
-          {tr('你欺人太甚，要離婚就來啊！', 'You\'re impossible. If you want a divorce, just say it!')}
-        </p>
-        <span className="mt-1.5 inline-flex items-center gap-1 font-body text-xs text-slate-500">
-          {tr('查看原本的訊息 ›', 'See the original message ›')}
-        </span>
-      </div>
-    </SampleCard>
-  </div>
-);
 
 const MarriageCheckupSample: React.FC = () => (
   <SampleCard>
@@ -558,38 +474,6 @@ const MarriageCheckupSample: React.FC = () => (
   </SampleCard>
 );
 
-// Post-conflict 治療摘要 read-only sample: after a fight is resolved, AI leaves
-// a structured therapy note (trigger, real needs, the negative cycle, a
-// next-time line) instead of a plain summary.
-const TherapyNoteSample: React.FC = () => (
-  <SampleCard>
-    <div className="flex items-center justify-between mb-3">
-      <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
-        <NotebookPen className="w-3.5 h-3.5 text-petal-sage-deep" />
-        {tr('吵完之後，AI 留下一份治療摘要', 'After a fight, AI leaves session notes')}
-      </span>
-      <SampleTag />
-    </div>
-    <div className="space-y-2.5">
-      <div>
-        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-0.5">{tr('這次最大的觸發點', 'The biggest trigger this time')}</div>
-        <p className="font-body text-sm text-petal-ink">{tr('沒有回訊息', 'Not replying to messages')}</p>
-      </div>
-      <div>
-        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-0.5">{tr('真正的需求', 'The real need')}</div>
-        <p className="font-body text-sm text-petal-ink">{tr('小晴 需要', 'Ching needs ')}<span className="text-petal-rose-deep">{tr('安全感', 'safety')}</span>{tr('・阿哲 需要', ' · Jay needs ')}<span className="text-petal-rose-deep">{tr('被信任', 'to be trusted')}</span></p>
-      </div>
-      <div>
-        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-0.5">{tr('負向循環', 'Negative cycle')}</div>
-        <p className="font-body text-xs text-petal-ink-soft">{tr('小晴 追 → 阿哲 逃 → 小晴 追更兇 → 阿哲 更沉默', 'Ching pursues → Jay withdraws → Ching pursues harder → Jay goes quieter')}</p>
-      </div>
-      <div className="rounded-md bg-petal-rose-soft/30 border border-petal-rose-soft px-3 py-2">
-        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep mb-0.5">{tr('下次可以先說', 'Next time, try opening with')}</div>
-        <p className="font-body text-sm text-petal-ink">{tr('「我現在不是生氣，我只是有點害怕。」', '"I\'m not angry right now. I\'m just a little scared."')}</p>
-      </div>
-    </div>
-  </SampleCard>
-);
 
 // 話題建議 read-only sample: AI proactively suggests topics for the NEXT
 // session even without a fresh conflict, plus a always-available 話題庫 for
@@ -628,219 +512,11 @@ const TherapyTopicsSample: React.FC = () => (
   </SampleCard>
 );
 
-// Batch 1 一起收尾 read-only sample. Shows the closure summary card as it
-// appears after both partners have written — commitments in the
-// couple's own words, the shared decision, and the AI's short 見解. Static, no
-// fetches, mirrors ClosureSummaryCard layout.
-const CloseTogetherSample: React.FC = () => (
-  <SampleCard>
-    <div className="flex items-center justify-between mb-3">
-      <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
-        <NotebookPen className="w-3.5 h-3.5 text-petal-sage-deep" />
-        {tr('一起收尾：各自寫下「下次我願意做的一件小事」', 'Wrap up together: each write one small thing you\'re willing to do next time')}
-      </span>
-      <SampleTag />
-    </div>
-    <div className="space-y-2">
-      <div className="bg-petal-cream-2 border border-petal-rule rounded-xl p-2.5">
-        <div className="font-body text-[11px] text-petal-muted mb-0.5">{tr('小晴的約定', 'Ching\'s commitment')}</div>
-        <div className="font-body text-sm text-petal-ink">{tr('即使很生氣，也不在孩子面前說你', 'Even when I\'m angry, I won\'t criticize you in front of the kids')}</div>
-      </div>
-      <div className="bg-petal-cream-2 border border-petal-rule rounded-xl p-2.5">
-        <div className="font-body text-[11px] text-petal-muted mb-0.5">{tr('阿哲的約定', 'Jay\'s commitment')}</div>
-        <div className="font-body text-sm text-petal-ink">{tr('要動孩子之前，我會先問你一聲', 'Before moving the kids, I\'ll check with you first')}</div>
-      </div>
-      <div className="bg-petal-cream-2 border border-petal-rule rounded-xl p-2.5">
-        <div className="font-body text-[11px] text-petal-muted mb-0.5">{tr('我們一起決定', 'We decided together')}</div>
-        <div className="font-body text-sm text-petal-ink">{tr('孩子睡著後若沒有立即危險，就不移動', 'If there\'s no immediate danger, we don\'t move the kids once they\'re asleep')}</div>
-      </div>
-      <div className="rounded-md bg-petal-sage/15 border border-petal-sage/40 px-3 py-2">
-        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-0.5">{tr('小小的觀察', 'A small observation')}</div>
-        <p className="font-body text-sm text-petal-ink">{tr('你們都選擇「當著孩子面的克制」，聽起來共同關心的是孩子看到的畫面。', 'You both chose "holding back in front of the kids". It sounds like what you both care about is what the kids see.')}</p>
-      </div>
-    </div>
-  </SampleCard>
-);
 
-// Stage 0 safety-check read-only sample: when a thread heats up, AI names what
-// is happening and offers a pause instead of taking sides.
-const SafetyBannerSample: React.FC = () => (
-  <div className="rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 flex items-start gap-2.5">
-    <Hand className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" strokeWidth={1.5} />
-    <div className="min-w-0 flex-1">
-      <div className="flex items-center gap-2">
-        <p className="font-body text-sm font-medium text-orange-900">{tr('先暫停一下', 'Let\'s pause for a moment')}</p>
-        <SampleTag />
-      </div>
-      <p className="font-body text-[13px] leading-relaxed mt-0.5 text-orange-900/90">
-        {tr('我注意到你們現在比較像是在保護自己，而不是理解彼此。要不要先暫停十分鐘、深呼吸一下， 等平靜一點再繼續？', 'It looks like you\'re both protecting yourselves more than trying to understand each other right now. How about a ten-minute break and a few deep breaths, then continue once you\'re calmer?')}
-      </p>
-    </div>
-  </div>
-);
 
-// Per-message emotion meter read-only sample: before a charged reply is sent,
-// AI shows the emotions, how the partner may mishear it vs the real worry, the
-// need, and a rewrite.
-const EmotionMeterSample: React.FC = () => {
-  const bars = [
-    { emoji: '😢', label: tr('傷心', 'Sad'), pct: 70 },
-    { emoji: '😰', label: tr('焦慮', 'Anxious'), pct: 80 },
-    { emoji: '😠', label: tr('生氣', 'Angry'), pct: 50 },
-  ];
-  return (
-    <SampleCard>
-      <div className="flex items-center justify-between mb-3">
-        <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
-          <Gauge className="w-3.5 h-3.5 text-petal-rose-deep" />
-          {tr('送出前，先看看這句話', 'Before sending, take a look at this')}
-        </span>
-        <SampleTag />
-      </div>
-      <div className="rounded-md bg-petal-cream-2 px-3 py-2 mb-2.5">
-        <p className="font-body text-sm text-petal-ink">{tr('你到底要不要回家？', 'Are you coming home or not?')}</p>
-      </div>
-      <div className="space-y-1.5 mb-2.5">
-        {bars.map((b) => (
-          <div key={b.label} className="flex items-center gap-2">
-            <span className="w-14 shrink-0 font-body text-xs text-petal-ink">{b.emoji} {b.label}</span>
-            <div className="flex-1 h-2 rounded-full bg-white overflow-hidden">
-              <div className="h-full rounded-full bg-petal-rose-deep" style={{ width: `${b.pct}%` }} />
-            </div>
-            <span className="w-8 text-right font-body text-[11px] text-petal-muted">{b.pct}%</span>
-          </div>
-        ))}
-      </div>
-      <div className="font-body text-[13px] text-petal-ink space-y-0.5 mb-2.5">
-        <p><span className="text-red-500 mr-1">✕</span>{tr('對方可能聽成：你很爛。', 'They might hear: you\'re terrible.')}</p>
-        <p><span className="text-petal-sage-deep mr-1">✓</span>{tr('其實想說：你是不是不要這個家了？', 'What you really mean: do you not want this family anymore?')}</p>
-      </div>
-      <div className="rounded-md bg-petal-rose-soft/30 border border-petal-rose-soft px-3 py-2">
-        <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep mb-0.5">{tr('試著這樣說', 'Try saying it like this')}</div>
-        <p className="font-body text-sm text-petal-ink">{tr('「我今天很想你，不知道你今晚會不會回來？」', '"I really missed you today. Will you be home tonight?"')}</p>
-      </div>
-    </SampleCard>
-  );
-};
 
-// Therapist Mode ("引導模式") read-only sample: the AI runs a turn-based
-// exercise (a "card") instead of an advice essay, then scores it — with a
-// 今日練習 scoreboard so therapy feels measurable.
-const TherapistModeSample: React.FC = () => (
-  <SampleCard>
-    {/* 引導是 Luma 的第二種 mode，不是第四個角色 —— 靠 🧭 與版型分辨，不靠顏色。
-        真實 app 裡這一整段會抽離到全螢幕專注層（GuideSessionView）。 */}
-    <div className="flex items-center justify-between mb-3">
-      <span className="inline-flex items-center gap-1.5 font-body text-xs text-petal-rose-deep">
-        <ParticipantAvatar size="xs" role="ai" companionId="luma" name="Luma" />
-        <Compass className="w-3.5 h-3.5" strokeWidth={1.5} />
-        {tr('Luma・引導', 'Luma · guide')}
-      </span>
-      <SampleTag />
-    </div>
-    <div className="rounded-2xl border border-petal-rule bg-white shadow-sm p-3 space-y-2">
-      <div className="flex items-center gap-2">
-        <span className="rounded-full border border-petal-sage bg-petal-sage/20 text-petal-sage-deep px-2 py-0.5 font-body text-[11px] font-medium">{tr('🪞 鏡映', '🪞 Mirroring')}</span>
-        <span className="rounded-full border border-petal-sage bg-petal-sage/20 text-petal-sage-deep px-2 py-0.5 font-body text-[11px] font-medium">{tr('✅ 做到了', '✅ Nailed it')}</span>
-      </div>
-      <p className="font-body text-sm text-petal-ink leading-relaxed">{tr('我們一次只做一小步。先不要解釋，只重複你聽到的。', 'We\'ll take one small step at a time. Don\'t explain yet; just repeat what you heard.')}</p>
-      <div className="rounded-xl border border-petal-rose-deep bg-petal-rose-soft/20 px-3 py-2">
-        <div className="font-body text-[11px] font-medium text-petal-rose-deep mb-0.5">{tr('換你了', 'Your turn')}</div>
-        <p className="font-body text-sm text-petal-ink">{tr('用「我聽到你說的是…」開頭，說出你聽到的。', 'Start with "What I heard you say is…" and say what you heard.')}</p>
-      </div>
-    </div>
-    <div className="mt-3 rounded-xl border border-petal-rule bg-petal-cream-2 px-3 py-2">
-      <div className="flex items-center justify-between">
-        <span className="font-display italic text-sm text-petal-ink">{tr('今日練習', 'Today\'s practice')}</span>
-        <span className="font-body text-xs text-petal-muted">{tr('關係技巧分數', 'Relationship skill score')} <span className="font-display italic text-petal-rose-deep">78%</span></span>
-      </div>
-      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5 font-body text-xs text-petal-ink">
-        <span>{tr('✓ 🎯 情緒標記', '✓ 🎯 Naming feelings')}</span>
-        <span>{tr('✓ 🪞 鏡映', '✓ 🪞 Mirroring')}</span>
-        <span className="text-petal-muted">{tr('… 🫶 肯定', '… 🫶 Affirmation')}</span>
-      </div>
-    </div>
-  </SampleCard>
-);
 
-// 三方對話的空間規則：左邊是對方、右邊是我、中間是諮商師。多人對話難讀的地方不是
-// 顏色不夠，而是不知道規則 —— 講一次，之後空間本身就會替我們說話。
-const ThreeSeatSample: React.FC = () => (
-  <SampleCard>
-    <div className="flex items-center justify-between mb-3">
-      <span className="font-body text-xs text-petal-muted">{tr('誰在說話，看位置就知道', 'Who\'s talking? Just look at the position')}</span>
-      <SampleTag />
-    </div>
-    <div className="space-y-2">
-      <div className="flex justify-start">
-        <div className="max-w-[80%] rounded-2xl px-3.5 py-2 bg-white border border-petal-rule">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <ParticipantAvatar size="xs" name={tr("小晴", 'Ching')} colorKey={tr("小晴", 'Ching')} />
-            <span className="font-body text-[11px] text-petal-muted">{tr('小晴', 'Ching')}</span>
-          </div>
-          <p className="font-body text-sm text-petal-ink">{tr('我覺得你根本沒有在聽我說話。', 'I feel like you\'re not listening to me at all.')}</p>
-        </div>
-      </div>
-      <div className="flex justify-end">
-        <div className="max-w-[80%] rounded-2xl px-3.5 py-2 bg-petal-cream-2 border border-petal-rule-soft">
-          <div className="flex items-center gap-1.5 mb-0.5 justify-end">
-            <span className="font-body text-[11px] text-petal-muted">{tr('我', 'Me')}</span>
-          </div>
-          <p className="font-body text-sm text-petal-ink">{tr('我其實有在聽。', 'I am listening, actually.')}</p>
-        </div>
-      </div>
-      <div className="flex justify-center">
-        <div className="max-w-[92%] w-full rounded-2xl px-3.5 py-2 bg-petal-rose-soft/25 border border-petal-rose-soft">
-          <div className="flex items-center gap-1.5 mb-0.5">
-            <ParticipantAvatar size="xs" role="ai" companionId="luma" name="Luma" />
-            <span className="font-body text-[11px] font-medium text-petal-rose-deep">{tr('Luma・AI 諮商師', 'Luma · AI counselor')}</span>
-          </div>
-          <p className="font-body text-sm text-petal-ink">
-            {tr('我想在這裡停一下。你們現在都在描述「對方做了什麼」。', 'I\'d like to pause here. You\'re both describing "what the other person did".')}
-          </p>
-          {/* 每則 AI 回應都能一秒回饋；不通順就按 👎，我們會把它變得更準。範例僅展示。 */}
-          <div className="flex items-center gap-1.5 mt-1.5">
-            <ThumbsUp className="w-3.5 h-3.5 text-petal-muted" strokeWidth={1.5} />
-            <ThumbsDown className="w-3.5 h-3.5 text-petal-muted" strokeWidth={1.5} />
-            <span className="font-body text-[10px] text-petal-muted">{tr('這則回應如何？', 'How was this response?')}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-    <p className="font-body text-[11px] text-petal-muted mt-2.5 leading-relaxed">
-      {tr('左邊是對方、右邊是你、中間是 Luma —— 諮商師不站在任何一方，所以坐在你們兩個中間。', 'Your partner is on the left, you\'re on the right, and Luma is in the middle: the counselor doesn\'t take sides, so they sit between you.')}
-    </p>
-  </SampleCard>
-);
 
-// 長文不會被縮成一小段：短摘要給對方一眼看懂，「完整經過」保留原文所有內容。
-// 順帶說明私人對話一個人也能繼續寫、找 AI 討論。
-const LongDraftSample: React.FC = () => (
-  <SampleCard>
-    <div className="flex items-center justify-between mb-2">
-      <span className="font-body text-xs text-petal-muted">{tr('寫了很長也不會被縮掉', 'Long messages never get cut off')}</span>
-      <SampleTag />
-    </div>
-    <div className="rounded-md border border-petal-rule bg-white px-3 py-2">
-      <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-0.5">
-        {tr('事件紀錄（雙方都看得到的中性摘要）', 'Event record (a neutral summary you both see)')}
-      </div>
-      <p className="font-body text-sm text-petal-ink">{tr('晚餐時，兩人就育兒的分工談到後來沒有結論。', 'At dinner, the two talked about splitting childcare and didn\'t reach a conclusion.')}</p>
-    </div>
-    <div className="mt-2 rounded-md border border-petal-rule bg-petal-cream-2 px-3 py-2">
-      <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep mb-0.5">
-        {tr('完整經過 ▾（原文全部保留，只拿掉攻擊性字眼）', 'The full story ▾ (all the original text kept, only hurtful words removed)')}
-      </div>
-      <p className="font-body text-sm text-petal-ink leading-relaxed">
-        {tr('我想把這件事完整說清楚。第一件事是上週三的接送⋯⋯另外，昨天的午睡時間⋯⋯還有我一直沒說出口的是⋯⋯', 'I want to explain this fully. First, the pickup last Wednesday…… Also, yesterday\'s nap time…… And what I\'ve never said is……')}
-      </p>
-    </div>
-    <div className="mt-2 flex items-start gap-1.5 font-body text-[11px] text-petal-muted">
-      <Lock className="w-3 h-3 mt-0.5 shrink-0" strokeWidth={1.5} />
-      <span>{tr('也可以先存成只有你看得到的私人對話，一個人慢慢補充、先找 AI 討論，想清楚再決定要不要讓另一半看到。', 'You can also save it as a private conversation only you can see: add to it slowly on your own, talk it over with AI first, and decide later whether your partner should see it.')}</span>
-    </div>
-  </SampleCard>
-);
 
 // Read-only sample of the redesigned chat input — the split at the heart of the
 // UI overhaul. Public mediation (請 Sophie 加入) lives in the shared thread and
@@ -899,67 +575,27 @@ const PublicPrivateSophieSample: React.FC = () => (
   </SampleCard>
 );
 
-const ConflictFlywheelSample: React.FC = () => (
-  <div className="space-y-4">
-    <SafetyBannerSample />
-
-    <ThreeSeatSample />
-
-    <PublicPrivateSophieSample />
-
-    <EmotionMeterSample />
-
-    <TherapistModeSample />
-
-    <EmotionAcceptanceSample />
-
-    <LongDraftSample />
-
-    <TherapyNoteSample />
-
-    <CloseTogetherSample />
-
-    {/* Mini trend analysis */}
-    <SampleCard>
-      <div className="flex items-center justify-between mb-3">
-        <span className="font-body text-xs text-petal-muted">{tr('過往衝突主因（近 90 天）', 'Main causes of past conflicts (last 90 days)')}</span>
-        <SampleTag />
-      </div>
-      <div className="space-y-2">
-        {CAUSE_BARS.map((c) => (
-          <div key={c.label} className="flex items-center gap-2">
-            <span className="font-body text-xs text-petal-ink w-16 shrink-0">{c.label}</span>
-            <div className="flex-1 h-2 rounded-full bg-petal-cream-2 overflow-hidden">
-              <div className="h-full rounded-full bg-petal-rose-deep" style={{ width: `${c.pct}%` }} />
-            </div>
-            <span className="font-body text-[11px] text-petal-muted w-8 text-right">{c.pct}%</span>
-          </div>
-        ))}
-      </div>
-    </SampleCard>
-
-    {/* The four-step repair flywheel */}
-    <div className="space-y-2.5">
-      {FLYWHEEL.map((s) => {
-        const Icon = s.icon;
-        return (
-          <div key={s.step} className="flex items-start gap-3 text-left">
-            <div className="shrink-0 w-9 h-9 rounded-full bg-petal-cream-2 text-pink-600 flex items-center justify-center">
-              <Icon className="w-4 h-4" strokeWidth={1.5} />
-            </div>
-            <div className="min-w-0">
-              <div className="font-body text-sm font-medium text-petal-ink">
-                <span className="text-petal-muted mr-1">{s.step}.</span>
-                {s.title}
-              </div>
-              <div className="font-body text-xs text-petal-muted leading-relaxed">{s.desc}</div>
-            </div>
-          </div>
-        );
-      })}
+// Read-only「過往衝突主因」mini-analysis: what 對話 shows you over time.
+const ConflictCausesSample: React.FC = () => (
+  <SampleCard>
+    <div className="flex items-center justify-between mb-3">
+      <span className="font-body text-xs text-petal-muted">{tr('過往衝突主因（近 90 天）', 'Main causes of past conflicts (last 90 days)')}</span>
+      <SampleTag />
     </div>
-  </div>
+    <div className="space-y-2">
+      {CAUSE_BARS.map((c) => (
+        <div key={c.label} className="flex items-center gap-2">
+          <span className="font-body text-xs text-petal-ink w-16 shrink-0">{c.label}</span>
+          <div className="flex-1 h-2 rounded-full bg-petal-cream-2 overflow-hidden">
+            <div className="h-full rounded-full bg-petal-rose-deep" style={{ width: `${c.pct}%` }} />
+          </div>
+          <span className="font-body text-[11px] text-petal-muted w-8 text-right">{c.pct}%</span>
+        </div>
+      ))}
+    </div>
+  </SampleCard>
 );
+
 
 // Static Premium pricing shown to logged-out visitors. Kept in sync with the
 // server catalog (routes/billing.js PLANS) and public/pricing.html. Visitors
@@ -1036,35 +672,6 @@ const PairingReminderSample: React.FC = () => (
   </div>
 );
 
-// Read-only「情緒深潛」sample: hint at the journey from a present feeling down to
-// a familiar one, and the private-letter promise. Static 範例 data.
-const DeepDiveSample: React.FC = () => (
-  <div className="rounded-md border border-petal-rule bg-petal-cream overflow-hidden">
-    <div className="flex items-center justify-between px-3 py-2 border-b border-petal-rule bg-petal-cream-2">
-      <div className="flex items-center gap-1.5">
-        <Compass className="w-4 h-4 text-petal-rose-deep" strokeWidth={1.5} />
-        <span className="font-body text-xs font-medium text-petal-ink">{tr('情緒深潛', 'Emotion deep dive')}</span>
-      </div>
-      <SampleTag />
-    </div>
-    <div className="p-3 space-y-2">
-      <div className="flex flex-wrap gap-1.5">
-        {[tr('不被重視', 'Not valued'), tr('孤單', 'Lonely'), tr('委屈', 'Wronged')].map((e) => (
-          <span key={e} className="rounded-full bg-white border border-petal-rule px-2.5 py-0.5 font-body text-[11px] text-petal-ink">{e}</span>
-        ))}
-      </div>
-      <SampleCard>
-        <p className="font-body text-xs text-petal-ink-soft leading-relaxed">
-          {tr('「聽起來，生氣底下還有一種', '"It sounds like beneath the anger there\'s a hurt of ')}<span className="text-petal-ink">{tr('『我的感受沒被重視』', '\'my feelings weren\'t valued\'')}</span>{tr('的委屈。這種感覺，對你來說熟悉嗎？」', '. Does this feeling feel familiar to you?"')}
-        </p>
-      </SampleCard>
-      <div className="flex items-center gap-1 font-body text-[11px] text-petal-muted">
-        <Lock className="w-3 h-3" strokeWidth={1.5} />
-        {tr('寫給過去的信永遠只留給你自己，只有寫給另一半的信會分享', 'Letters to your past always stay with you alone; only the letter to your partner is shared')}
-      </div>
-    </div>
-  </div>
-);
 
 // Read-only 替代方案協商 sample: the invite type plus the two 示範方案 with
 // both-partner approval chips. 範例 data only: the admin-managed samples
@@ -1279,11 +886,12 @@ const PREVIEWS: Record<string, PreviewConfig> = {
     ),
     description:
       tr('這是 Twogether 的核心，也是「用寫的，把話說對」的地方。先讓情緒被接住：一方寫下感受，AI 幫你說得不傷人，另一方收到後 AI 也教他怎麼接住你。被接住了，再一起看你們反覆卡住的溝通模式、學會怎麼說，真的卡住就請 AI 或真人諮商師陪你們。想更深一點，還能走一趟「情緒深潛」，看看現在的痛是不是碰到了心裡更早的感受。', 'This is the heart of Twogether, and the place to "write it, so it comes out right". First, let feelings be held: one of you writes how you feel, AI helps you say it without hurting, and when your partner receives it, AI shows them how to hold your feelings. Once you feel heard, look together at the communication patterns you keep getting stuck in, learn how to say things, and when you\'re truly stuck, have an AI or human counselor help. To go deeper, take an "emotion deep dive" and see whether today\'s pain touches older feelings.'),
+    // Just the two things a visitor needs to "get" 對話: where you write
+    // (with Sophie on hand) and what it shows you over time.
     sample: (
       <div className="space-y-3">
-        <ConflictFlywheelSample />
-        <SophieMediatorSample />
-        <DeepDiveSample />
+        <PublicPrivateSophieSample />
+        <ConflictCausesSample />
       </div>
     ),
   },
