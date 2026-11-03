@@ -807,6 +807,7 @@ class EmailService {
       event_resolve_request:{ emoji: '🤝', headline: '伴侶覺得可以一起劃下句點了', subject: `🤝 ${senderName || '你的伴侶'} 覺得這個情境可以劃下句點了` },
       event_resolved:       { emoji: '✅', headline: '你們一起走過了這個情境',     subject: `✅ 你們一起走過了這個情境` },
       event_reopened:       { emoji: '🔄', headline: '伴侶想繼續聊聊這個情境',     subject: `🔄 ${senderName || '你的伴侶'} 想繼續聊聊這個情境` },
+      event_nudge:          { emoji: '👋', headline: '伴侶在等你回覆這段對話',     subject: `👋 ${senderName || '你的伴侶'} 在等你回覆你們的對話` },
       // 一起收尾 (migration 083). Invitation, never verdict — nobody is being
       // told they were wrong, they're being asked to write down one small thing.
       event_closing_started:      { emoji: '🤝', headline: '伴侶想和你一起想想下次怎麼做', subject: `🤝 ${senderName || '你的伴侶'} 想和你一起想想下次怎麼做` },

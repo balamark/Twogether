@@ -2511,6 +2511,68 @@ router.post('/:id/reopen', [param('id').isUUID()], async (req, res) => {
   }
 });
 
+// 提醒對方回覆: the share button in a 說開一件事 thread. Sends the partner an
+// in-app notification (+ LINE / email mirror via notify) that lands on this
+// exact thread. Cooldown per (sender, event) so a nudge stays a gentle tap,
+// not a barrage — the frontend surfaces the specific reason when it trips.
+const NUDGE_COOLDOWN_MINUTES = 60;
+router.post('/:id/nudge', [param('id').isUUID()], async (req, res) => {
+  if (sendValidationError(req, res)) return;
+  const eventId = req.params.id;
+  const userId = req.user.id;
+  logInfo('events.nudge_attempt', { userId, eventId });
+  try {
+    const access = await assertEventAccess(eventId, userId);
+    if (!access) return res.status(404).json({ success: false, message: '找不到對話或沒有權限' });
+    if (!access.partnerId) {
+      return res.status(400).json({
+        success: false,
+        error_code: 'NUDGE_NO_PARTNER',
+        message: '你們還沒配對，先邀請伴侶加入，就能提醒對方回覆。',
+      });
+    }
+    if (access.event.is_private) {
+      return res.status(400).json({
+        success: false,
+        error_code: 'NUDGE_PRIVATE_EVENT',
+        message: '這段對話還是私人的，伴侶看不到。先按「讓伴侶看到」分享後，就能提醒對方回覆。',
+      });
+    }
+    const recent = await db.query(
+      `SELECT created_at FROM notifications
+        WHERE user_id = $1 AND related_user_id = $2 AND event_id = $3
+          AND notification_type = 'event_nudge'
+          AND created_at > NOW() - ($4::int * INTERVAL '1 minute')
+        ORDER BY created_at DESC LIMIT 1`,
+      [access.partnerId, userId, eventId, NUDGE_COOLDOWN_MINUTES]
+    );
+    if (recent.rows.length > 0) {
+      logInfo('events.nudge_cooldown', { userId, eventId });
+      return res.status(429).json({
+        success: false,
+        error_code: 'NUDGE_COOLDOWN',
+        message: '一小時內已經提醒過對方了，給 TA 一點時間。也可以複製連結，用 LINE 親自傳給 TA。',
+      });
+    }
+
+    await notify(
+      access.partnerId,
+      'event_nudge',
+      // Tone guideline: invitation, not a reprimand.
+      '伴侶在等你回覆這段對話',
+      access.event.title,
+      eventId,
+      userId,
+      2
+    );
+    logInfo('events.nudge_sent', { userId, eventId, partnerId: access.partnerId });
+    res.json({ success: true, message: '已提醒伴侶，TA 點通知就會直接打開這段對話。' });
+  } catch (err) {
+    logError('Nudge partner failed', { err: err.message, stack: err.stack, eventId });
+    res.status(500).json({ success: false, message: '提醒沒送出，請稍後再試；也可以複製連結用 LINE 傳給伴侶。' });
+  }
+});
+
 // ===========================================================================
 // Therapist Mode ("引導模式") — facilitated, turn-based therapy sessions.
 // The companion joins the event thread as a third participant, runs one small
