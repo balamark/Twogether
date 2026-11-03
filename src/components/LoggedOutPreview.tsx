@@ -858,7 +858,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       </>
     ),
     description:
-      tr('說不出口的時候，AI 諮商師幫你寫出不傷和氣的和解開場白；也能定期做「婚姻檢查」，各自打分後一起揭曉，AI 當中立第三方幫你們把話攤開來看。', 'When the words won\'t come, your AI counselor helps you write a make-up opener that keeps the peace. You can also run regular "relationship check-ins": rate separately, reveal together, and let AI act as a neutral third party to lay it all out.'),
+      tr('說不出口的時候，AI 諮商師針對那次吵架的具體事情，幫你寫出不傷和氣的和解開場白；也能定期做「婚姻檢查」，各自打分後一起揭曉，AI 當中立第三方幫你們把話攤開來看。', 'When the words won\'t come, your AI counselor helps you write a make-up opener about what actually happened, one that keeps the peace. You can also run regular "relationship check-ins": rate separately, reveal together, and let AI act as a neutral third party to lay it all out.'),
     sample: (
       <div className="space-y-4">
         <div className="space-y-2.5">
@@ -867,8 +867,11 @@ const PREVIEWS: Record<string, PreviewConfig> = {
             <SampleTag />
           </div>
           <SampleCard>
+            <p className="font-body text-xs text-petal-muted mb-1.5">
+              {tr('相關對話：週末出遊臨時取消', 'Related conversation: weekend trip cancelled last-minute')}
+            </p>
             <p className="font-display italic font-light text-sm text-petal-ink leading-relaxed">
-              {tr('「剛剛那樣讓你不舒服，我很抱歉。我其實很在乎你的感受，可以等你願意的時候，我們再好好聊聊嗎？」', '"I\'m sorry that made you uncomfortable. I really care about how you feel. Could we talk properly whenever you\'re ready?"')}
+              {tr('「週末沒去成海邊，你一定很失望。我把下週六空下來了，我們再一起去一次好嗎？」', '"I know you were let down when the beach trip fell through. I\'ve cleared next Saturday. Want to go together then?"')}
             </p>
           </SampleCard>
         </div>

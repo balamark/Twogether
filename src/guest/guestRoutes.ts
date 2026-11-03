@@ -529,6 +529,13 @@ export const ROUTES: GuestRoute[] = [
     return ok();
   } },
   { method: 'post', re: /^\/events\/[^/]+\/closure\/(finalize|insight)$/, handler: ({ db, path }) => ok({ closure: closureView(db, findEvent(db, path.split('/')[2])) }) },
+  // 提醒伴侶回覆: the sample partner "sees" the reminder and answers if the
+  // last word is the guest's.
+  { method: 'post', re: P('/events/:id/nudge'), handler: ({ db, params }) => {
+    const e = findEvent(db, params.id);
+    setTimeout(() => schedulePartnerReply(str(e.id)), 0);
+    return ok({ message: tr(`已提醒${guestPartnerNickname()}`, `Reminded ${guestPartnerNickname()}`) });
+  } },
   { method: 'get', re: P('/events/:id/facilitation'), handler: () => ok({ session: null }) },
   { method: 'post', re: /^\/events\/[^/]+\/facilitation\//, handler: () => {
     throw new GuestError(403, tr('試玩模式開放「給建議」：請諮商師看看你們的對話。帶你們一起做練習卡要真的兩個人，免費註冊、邀請另一半後就能用。', 'The preview includes "Give advice": the counselor reads your conversation. Practice cards need two real people; sign up free and invite your partner to use them.'), 'GUEST_MODE');

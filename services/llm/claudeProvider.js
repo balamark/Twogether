@@ -1133,39 +1133,66 @@ async function generateWallCounselorComment({ postContent, postAuthorName, moodT
 // Reconciliation openers
 // ---------------------------------------------------------------------------
 // After a fight / cold war, the user often can't bring themselves to apologize
-// or send sweet love-notes. They need a NEUTRAL, face-saving opening line that
-// tests whether the partner is willing to reopen the conversation — a "step
-// down" rather than an admission of fault. Given a chosen intensity and an
-// optional past-event context, produce THREE short, ready-to-send openers.
+// or send sweet love-notes. They need a face-saving opening line that tests
+// whether the partner is willing to reopen the conversation — a "step down"
+// rather than an admission of fault. Given a chosen intensity and an optional
+// past-event context, produce THREE short, ready-to-send openers.
+//
+// When an event IS picked, the openers must be anchored to its concrete
+// details (the trigger, the objects, the plans involved). An earlier version
+// told the model to stay away from the event entirely, which produced canned
+// "在忙嗎？有吃飯嗎" lines unrelated to the fight the user had just picked.
+// Generic everyday greetings are now only the fallback for "不選對話".
 
 const RECONCILIATION_INTENSITY_GUIDE = {
   goodwill:
-    '「先釋出善意」：使用者還沒準備好談這件事，只想先破冰、釋出善意。完全不要提爭執本身、不要道歉、不要認錯，' +
-    '用輕鬆日常的問候或小關心讓氣氛軟化（例如關心對方吃飯了沒、分享一件小事）。',
+    '「先釋出善意」（遞出具體橄欖枝）：使用者還沒準備好深聊對錯，但願意先為這次衝突的「具體導火線」主動做一小步：' +
+    '提出一個具體、做得到的小行動或貼心安排（例如重新安排沒完成的計畫、處理事件裡卡住的那件事）。' +
+    '不卑不亢：不要道歉認錯、不要分析誰對誰錯、不要提對方說過的重話。',
   reflect:
-    '「各退一步」：使用者願意承認自己也有可以調整的地方，想各退一步。語氣溫和、對等，' +
-    '可以用「我們」的角度、表達不想繼續僵著，但不要卑微、不要把所有錯都攬在自己身上。',
+    '「各退一步」（中性、對事不對人）：就事論事，點出雙方在這件具體事情上的卡點（用「我們」或描述情境，不針對對方的人格），' +
+    '表達「我想處理這件事，也想先把彼此的語氣照顧好」，可以提議先暫停情緒、晚點再談或一起把事情安排順。' +
+    '不要把錯都攬在自己身上，也不要指責。',
   talk:
-    '「想好好談談」：使用者真心想化解、好好溝通。可以帶一點歉意與在乎，主動邀請找時間談，' +
-    '但仍保有尊嚴、不卑微、不逼迫對方一定要馬上回應。',
+    '「想好好談談」（守住界線，也開放對話）：真心想化解，願意直接面對。若事件中出現攻擊、威脅、拿關係或生活當籌碼等傷人的言行，' +
+    '溫和但明確地說出「那句話／那個做法讓我受傷」，並表明自己的在乎與底線；同時邀請對方在彼此冷靜、安全的狀態下好好談。' +
+    '不卑微、不翻舊帳（不要說「你每次都…」）、不逼對方馬上回應。若事件沒有傷人言行，就以在乎與想好好溝通為主。',
 };
 
-const RECONCILIATION_SYSTEM_PROMPT = `你是一位溫柔、中立的伴侶溝通教練。一方在和另一半冷戰或吵架後，想傳出「第一句」破冰開場白，但拉不下臉、還不想認錯。請永遠以繁體中文回覆。
+const RECONCILIATION_SYSTEM_PROMPT = `你是一位專注於伴侶關係修復的「破冰溝通教練」。一方在和另一半冷戰或吵架後，想傳出「第一句」破冰開場白，但拉不下臉、還不想認錯。請永遠以繁體中文回覆。
 
 任務：依使用者選的「強度」與（可選的）事件脈絡，寫出「三則」可以直接傳給伴侶的破冰開場白候選。
 
-核心守則：
-- 絕對不要逼使用者認錯或低頭。開場白的目的是「給對方台階、表達想連結的意願」，並溫和地邀請（而非要求）對方開啟對話。
-- 三則語氣要略有不同（例如：輕鬆問候／表達想念／主動邀約聊聊），讓使用者有得挑。
-- 每則都要簡短（建議 1～2 句、口語、像真的會在訊息裡傳的話），溫暖但不肉麻、不卑微、不說教。
-- 如果有提供事件脈絡，語氣可以貼合該主題的氛圍，但「絕對不要複述爭吵細節、不要翻舊帳、不要指責」，也不得編造事件裡沒有的事。
+核心理念：守住界線不卑微，同時遞出具體的橄欖枝。
+
+有提供事件脈絡時（最重要）：
+- 每一則都必須錨定這次事件的具體細節：至少提到一個事件裡真實出現的人事物、計畫或導火線（例如事件裡提到的物品、行程、地點、那頓飯、那段等待），讓對方一看就知道你在回應「這件事」，而不是罐頭訊息。
+- 絕對不要寫和事件無關的泛用問候（例如單純的「在忙嗎？」「今天過得怎麼樣？」「剛剛想到一件有趣的事」）。
+- 細節只能來自事件內容，不得編造事件裡沒有的事情、對話或承諾；提出的小行動要合理、做得到。
+- 可以提到事件，但不要逐字重播整段爭吵、不要列舉對方的錯、不要翻舊帳。
+- 摘要可能以第三人稱敘述（例如「丈夫」「太太」）。請依「使用者在事件中的位置」判斷誰是使用者、誰是伴侶，開場白一律以使用者的口吻直接對伴侶說（用「我」「你／妳」），不要用第三人稱稱呼。
+
+沒有提供事件脈絡時：才產生通用、輕鬆的日常破冰問候或小關心。
+
+共同守則：
+- 不低頭諂媚：不要說「都是我不好」「是我的錯」這類自貶的話。
+- 不指責引戰：不要說「你每次都這樣」「你就是…」這類會二度點燃戰火的話。
+- 三則的切入角度要不同（例如：針對導火線的具體行動／關心對方當下的感受／提議接下來怎麼安排），讓使用者有得挑。
+- 每則簡短（1～2 句），口語自然，像在台灣傳 LINE 的語氣；溫暖但不肉麻、不說教。
+- label 用 4～8 字描述這一則的切入角度（例如「重新安排」「關心感受」「說出受傷」），不要千篇一律用「輕鬆問候」。
 - 只使用繁體中文。
+
+示範（僅示範「如何錨定細節」與三種強度的差別；實際內容必須來自本次提供的事件，不可沿用範例裡的鞋子、晚餐等細節）：
+範例事件：太太想買鞋，到店時老闆不在要等三十分鐘，丈夫建議晚點或明天再去；回家路上太太說晚餐自己解決、明天別期待親密關係。使用者是丈夫。
+- 先釋出善意：「剛剛沒買到妳要的鞋子，妳一定很悶。我晚點手邊告一段落，載妳去店裡看看？」／「晚餐想吃什麼？我等一下去買，吃飽我們再慢慢聊。」
+- 各退一步：「下午買鞋改時間大家都急了。我們先各自吃點東西休息一下，晚點心情平靜點再來聊。」／「我知道妳想今天就買到鞋，突然要等我也慌了。晚點我們把行程排順一點。」
+- 想好好談談：「買鞋的事沒溝通好，但拿晚餐跟我們的關係當籌碼，我其實蠻受傷的。我還是在乎妳，等大家都冷靜了我們再來談。」／「鞋子隨時可以再去買，但剛才車上的語氣真的讓我們都刺傷了。我想好好珍惜彼此，晚點再心平氣和地講。」
 
 回應請只呼叫 emit_reconciliation_openers tool，不要輸出其他文字。`;
 
 const RECONCILIATION_TOOL_SCHEMA = {
   name: 'emit_reconciliation_openers',
-  description: 'Return three short, ready-to-send ice-breaking openers for a couple after a fight.',
+  description: 'Return three short, ready-to-send ice-breaking openers for a couple after a fight, anchored to the given event when one is provided.',
   input_schema: {
     type: 'object',
     properties: {
@@ -1176,8 +1203,8 @@ const RECONCILIATION_TOOL_SCHEMA = {
         items: {
           type: 'object',
           properties: {
-            label: { type: 'string', description: '一個 4～8 字的短標題，例如「輕鬆問候」「表達想念」' },
-            text: { type: 'string', description: '可直接傳出的開場白，1～2 句' },
+            label: { type: 'string', description: '4～8 字的切入角度短標題，例如「重新安排」「關心感受」「說出受傷」' },
+            text: { type: 'string', description: '可直接傳出的開場白，1～2 句；有事件時必須提到事件裡的具體細節' },
           },
           required: ['label', 'text'],
         },
@@ -1191,29 +1218,41 @@ const RECONCILIATION_TOOL_SCHEMA = {
   },
 };
 
+function buildReconciliationUserContent({ intensity, eventContext }) {
+  const guide = RECONCILIATION_INTENSITY_GUIDE[intensity];
+  const lines = [];
+  lines.push(`使用者選擇的和解強度：${guide}`);
+  lines.push('');
+  if (eventContext && (eventContext.title || eventContext.summary)) {
+    lines.push('這次的衝突事件（開場白必須錨定其中的具體細節）：');
+    if (eventContext.title) lines.push(`主題：${eventContext.title}`);
+    if (eventContext.summary) lines.push(`事件經過：${eventContext.summary}`);
+    if (Array.isArray(eventContext.emotions) && eventContext.emotions.length) {
+      lines.push(`發起者在事件中的情緒：${eventContext.emotions.join('、')}`);
+    }
+    if (Array.isArray(eventContext.tags) && eventContext.tags.length) {
+      lines.push(`相關主題標籤：${eventContext.tags.join('、')}`);
+    }
+    if (eventContext.isCreator === true) {
+      lines.push('使用者在事件中的位置：這則事件是使用者自己寫的，經過以使用者的角度敘述，上面的情緒是使用者的感受。');
+    } else if (eventContext.isCreator === false) {
+      lines.push('使用者在事件中的位置：這則事件是伴侶寫的，經過以伴侶的角度敘述，上面的情緒是伴侶的感受；開場白要讓伴侶感覺被理解。');
+    }
+    lines.push('');
+    lines.push('請寫三則「針對這件事」的開場白，每則都要提到事件裡的具體人事物或導火線，不要給泛用問候。');
+  } else {
+    lines.push('（沒有提供特定事件，請產生通用、輕鬆的日常破冰開場白。）');
+  }
+  return lines.join('\n');
+}
+
 async function generateReconciliationOpeners({ intensity, eventContext }) {
   const guide = RECONCILIATION_INTENSITY_GUIDE[intensity];
   if (!guide) {
     throw new Error(`unknown reconciliation intensity: ${intensity}`);
   }
 
-  const lines = [];
-  lines.push(`使用者選擇的和解強度：${guide}`);
-  lines.push('');
-  if (eventContext && (eventContext.title || eventContext.summary)) {
-    lines.push('相關事件脈絡（僅供你掌握氛圍，請勿複述細節或翻舊帳）：');
-    if (eventContext.title) lines.push(`主題：${eventContext.title}`);
-    if (eventContext.summary) lines.push(`摘要：${eventContext.summary}`);
-    if (Array.isArray(eventContext.emotions) && eventContext.emotions.length) {
-      lines.push(`涉及情緒：${eventContext.emotions.join('、')}`);
-    }
-    if (Array.isArray(eventContext.tags) && eventContext.tags.length) {
-      lines.push(`相關主題標籤：${eventContext.tags.join('、')}`);
-    }
-  } else {
-    lines.push('（沒有提供特定事件，請產生通用的破冰開場白。）');
-  }
-  const userContent = lines.join('\n');
+  const userContent = buildReconciliationUserContent({ intensity, eventContext });
 
   const startedAt = Date.now();
   const response = await getClient().messages.create({
@@ -1238,6 +1277,7 @@ async function generateReconciliationOpeners({ intensity, eventContext }) {
     model: response.model || MODEL,
     intensity,
     hasEvent: Boolean(eventContext && (eventContext.title || eventContext.summary)),
+    isCreator: eventContext ? eventContext.isCreator ?? null : null,
     durationMs: ms,
     inputTokens: u.input_tokens || 0,
     outputTokens: u.output_tokens || 0,

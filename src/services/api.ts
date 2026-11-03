@@ -6226,6 +6226,18 @@ class ApiService {
     }
   }
 
+  // 提醒對方回覆: in-app (+ LINE / email) nudge that opens this exact thread.
+  // Throws with error_code NUDGE_COOLDOWN / NUDGE_PRIVATE_EVENT / NUDGE_NO_PARTNER.
+  async nudgePartnerOnEvent(eventId: string): Promise<string> {
+    try {
+      const response = await apiClient.post(`/events/${eventId}/nudge`);
+      return response.data.message || tr('已提醒伴侶', 'Reminder sent');
+    } catch (error: unknown) {
+      console.error('Failed to nudge partner on event:', error);
+      this.throwApiError(error, tr('提醒沒送出，請稍後再試；也可以複製連結用 LINE 傳給伴侶。', 'The reminder didn\'t go through. Try again later, or copy the link and send it to your partner on LINE.'));
+    }
+  }
+
   // Share / un-share a conflict event into 公開問答.
   async publishEvent(eventId: string, title?: string): Promise<EventRecord> {
     try {

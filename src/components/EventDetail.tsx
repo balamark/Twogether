@@ -57,6 +57,7 @@ import CloseTogetherModal from './closure/CloseTogetherModal';
 import PrivateCoachDrawer from './PrivateCoachDrawer';
 import ClosurePanel from './closure/ClosurePanel';
 import ClosureSummaryCard from './closure/ClosureSummaryCard';
+import EventShareMenu from './EventShareMenu';
 import { tr } from '../i18n/tr';
 
 interface NotificationInput {
@@ -978,6 +979,11 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
               </span>
             )}
             {statusPill(event.status)}
+            {/* 提醒對方回覆 / 複製連結. Shared threads only — a private one isn't
+                visible to the partner, so the link would dead-end. */}
+            {!event.isPrivate && !editingHeader && (
+              <EventShareMenu eventId={event.id} eventTitle={event.title} showNotification={showNotification} />
+            )}
             {isAuthor && event.status !== 'resolved' && !editingHeader && (
               <button
                 type="button"

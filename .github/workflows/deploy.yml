@@ -209,6 +209,9 @@ jobs:
           
           # Run database migrations
           npm run migrate
+
+          # Fail if any public table has RLS off (Supabase REST API exposure)
+          node scripts/check-rls.js
           
           echo "🧪 Running integration tests with server..."
           npm run test:ci
@@ -233,6 +236,7 @@ jobs:
         run: |
           echo "🗄️ Running production database migrations..."
           npm run migrate
+          node scripts/check-rls.js
 
       # App Engine caps an app at 210 versions and a new deploy fails once the
       # cap is hit. We never pruned versions before (only container images), so
@@ -412,6 +416,7 @@ jobs:
         run: |
           echo "🗄️ Running staging database migrations..."
           npm run migrate
+          node scripts/check-rls.js
 
       # Same version-cap guard as prod, scoped to the 'staging' service so PR
       # staging deploys don't pile up toward the app's 210-version limit.

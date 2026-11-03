@@ -516,8 +516,9 @@ router.post('/script-messages/feedback', [
 
 // ---------------------------------------------------------------------------
 // Reconciliation openers — after a fight, generate THREE neutral, face-saving
-// ice-breaking openers at a chosen intensity. Optionally grounded in a past
-// "event" so the tone fits, but never replaying the argument. Preview only:
+// ice-breaking openers at a chosen intensity. When a past "event" is picked
+// the openers are anchored to its concrete details (not replaying the fight);
+// only "不選對話" falls back to generic everyday greetings. Preview only:
 // the chosen opener flows into the normal intimacy-request send pipeline.
 // ---------------------------------------------------------------------------
 const RECONCILIATION_INTENSITIES = ['goodwill', 'reflect', 'talk'];
@@ -540,7 +541,7 @@ router.post('/reconciliation-openers', [
     let eventContext = null;
     if (eventId) {
       const ev = await db.query(
-        `SELECT e.title, e.summary, e.emotions, e.tags
+        `SELECT e.title, e.summary, e.emotions, e.tags, e.created_by
            FROM events e
            JOIN couples c ON c.id = e.couple_id
           WHERE e.id = $1 AND (c.user1_id = $2 OR c.user2_id = $2)
@@ -562,6 +563,9 @@ router.post('/reconciliation-openers', [
         summary: row.summary,
         emotions: row.emotions || [],
         tags: row.tags || [],
+        // Summaries are often third-person (丈夫／太太); tell the model which
+        // side the user is on so the opener speaks in their voice.
+        isCreator: row.created_by === userId,
       };
     }
 
@@ -573,7 +577,7 @@ router.post('/reconciliation-openers', [
       return res.status(limitCheck.status).json(limitCheck.body);
     }
 
-    logInfo('intimacy.reconciliation.input', { userId, intensity, eventId, hasEvent: !!eventContext });
+    logInfo('intimacy.reconciliation.input', { userId, intensity, eventId, hasEvent: !!eventContext, isCreator: eventContext ? eventContext.isCreator : null });
 
     const result = await llmService.generateReconciliationOpeners({ intensity, eventContext });
     const meta = result._meta;

@@ -259,7 +259,7 @@ async function generateWallCounselorComment({ postContent, postAuthorName, repli
 }
 
 // Deterministic reconciliation openers. Same intensity (+ optional event) →
-// same three openers. No randomness or timestamps. Real provider can replace.
+// same three openers. These generic lines are the 不選對話 fallback. No randomness or timestamps. Real provider can replace.
 const RECONCILIATION_OPENERS = {
   goodwill: [
     { label: '輕鬆問候', text: '欸，今天吃飯了嗎？想到就問一下。' },
@@ -278,11 +278,35 @@ const RECONCILIATION_OPENERS = {
   ],
 };
 
-async function generateReconciliationOpeners({ intensity /* , eventContext */ }) {
-  const openers = RECONCILIATION_OPENERS[intensity];
-  if (!openers) {
+// With an event picked, the real provider anchors every opener to the event's
+// details; the mock mirrors that by weaving the event title into each line.
+const RECONCILIATION_EVENT_OPENERS = {
+  goodwill: [
+    { label: '重新安排', text: '「{t}」那件事沒照計畫走，你一定也很悶。我晚點手邊忙完，我們再重新安排一次？' },
+    { label: '關心感受', text: '剛剛「{t}」弄得不太開心，你還好嗎？要不要先吃點東西，晚點再慢慢聊。' },
+    { label: '遞出台階', text: '「{t}」的事我想了一下，我願意先把能做的部分處理好。' },
+  ],
+  reflect: [
+    { label: '就事論事', text: '「{t}」那時候我們都急了。先各自休息一下，晚點心情平靜點再來聊。' },
+    { label: '各退一步', text: '「{t}」我也有可以調整的地方，不想用情緒溝通，晚點有空再談？' },
+    { label: '一起安排', text: '比起爭對錯，我更想把「{t}」這件事安排順，我們晚點一起想想？' },
+  ],
+  talk: [
+    { label: '說出受傷', text: '「{t}」那時候有些話讓我蠻受傷的。我還是在乎你，等我們都冷靜了好好談談。' },
+    { label: '守住界線', text: '我想好好處理「{t}」，但也希望我們都別用傷人的方式說話。你方便時我們聊聊？' },
+    { label: '邀請對話', text: '「{t}」的事我不想就這樣放著，等你準備好，我們把話講開好嗎？' },
+  ],
+};
+
+async function generateReconciliationOpeners({ intensity, eventContext }) {
+  const generic = RECONCILIATION_OPENERS[intensity];
+  if (!generic) {
     throw new Error(`unknown reconciliation intensity: ${intensity}`);
   }
+  const title = eventContext && eventContext.title ? String(eventContext.title).trim() : '';
+  const openers = title
+    ? RECONCILIATION_EVENT_OPENERS[intensity].map((o) => ({ label: o.label, text: o.text.replace('{t}', title) }))
+    : generic;
   const startedAt = Date.now();
   return {
     openers: openers.map((o) => ({ ...o })),

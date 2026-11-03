@@ -893,6 +893,33 @@ const LoveTimeApp = () => {
     }
   }, [authState.isAuthenticated, setCurrentView]);
 
+  // ?event=<id> deep link (the 說開一件事 share button / LINE pushes): stash it
+  // so it survives a login detour, then open that exact thread once the user
+  // is authenticated (EventsView consumes pendingEventId).
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const eventParam = urlParams.get('event');
+    if (eventParam) {
+      try { sessionStorage.setItem('pendingEventDeepLink', eventParam); } catch { /* storage disabled */ }
+      urlParams.delete('event');
+      const rest = urlParams.toString();
+      window.history.replaceState(window.history.state, document.title, window.location.pathname + (rest ? `?${rest}` : ''));
+      if (!authState.isAuthenticated) setCurrentView('events');
+    }
+    // Mount-only: the URL is read once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (!authState.isAuthenticated) return;
+    let stored: string | null = null;
+    try { stored = sessionStorage.getItem('pendingEventDeepLink'); } catch { /* storage disabled */ }
+    if (stored) {
+      try { sessionStorage.removeItem('pendingEventDeepLink'); } catch { /* ignore */ }
+      setPendingEventId(stored);
+      setCurrentView('events');
+    }
+  }, [authState.isAuthenticated, setCurrentView]);
+
   // Load Premium status on auth (and clear it on logout) so the header badge and
   // the proactive expiry banner have the couple's tier + expiry. Best-effort:
   // a failed lookup just hides the badge/banner.

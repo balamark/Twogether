@@ -55,9 +55,9 @@ const RECONCILE_INTENSITIES: {
   desc: string;
   dot: string;
 }[] = [
-  { key: 'goodwill', label: tr('先釋出善意', 'Extend goodwill first'), emoji: '🌱', desc: tr('還沒準備好談，但想先破冰', 'Not ready to talk yet, but want to break the ice'), dot: 'bg-green-400' },
-  { key: 'reflect', label: tr('各退一步', 'Meet halfway'), emoji: '🤝', desc: tr('我也有需要調整的地方', 'I have things to adjust too'), dot: 'bg-amber-400' },
-  { key: 'talk', label: tr('想好好談談', 'Let\'s really talk'), emoji: '💬', desc: tr('真心想化解、好好溝通', 'I truly want to resolve this and communicate well'), dot: 'bg-rose-500' },
+  { key: 'goodwill', label: tr('先釋出善意', 'Extend goodwill first'), emoji: '🌱', desc: tr('還沒準備好談，先為這件事遞出一個小台階', 'Not ready to talk yet, but offer a small olive branch on this'), dot: 'bg-green-400' },
+  { key: 'reflect', label: tr('各退一步', 'Meet halfway'), emoji: '🤝', desc: tr('就事論事，我也有需要調整的地方', 'Stick to the issue; I have things to adjust too'), dot: 'bg-amber-400' },
+  { key: 'talk', label: tr('想好好談談', 'Let\'s really talk'), emoji: '💬', desc: tr('說出受傷、守住界線，也邀請好好溝通', 'Say what hurt, hold your line, and invite a real talk'), dot: 'bg-rose-500' },
 ];
 
 const SCRIPT_CATEGORY_TABS: { id: 'all' | FormScript['category']; label: string; icon: string }[] = [
@@ -1017,6 +1017,13 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                 ) : (
                   <p className="text-sm text-gray-400">
                     {tr('目前沒有可參考的對話，沒關係，直接挑一個強度就能產生通用的破冰開場白。', 'No conversations to reference right now. That\'s fine; pick an intensity to get a general icebreaker.')}
+                  </p>
+                )}
+                {!reconcileEventsLoading && reconcileEvents.length > 0 && (
+                  <p className="text-xs text-gray-400" data-testid="reconcile-event-hint">
+                    {selectedEventId
+                      ? tr('AI 會根據這段對話的具體細節寫開場白，讓對方知道你在回應這件事。', 'AI will write openers around the details of this conversation, so they know you\'re responding to it.')
+                      : tr('選一段對話，開場白會針對那件事；不選則產生輕鬆的日常問候。', 'Pick a conversation to get openers about that issue; skip it for a light everyday hello.')}
                   </p>
                 )}
               </div>

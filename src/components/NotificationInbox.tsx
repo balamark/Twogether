@@ -107,6 +107,7 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       case 'event_resolve_request':
       case 'event_resolved':
       case 'event_reopened':
+      case 'event_nudge':
       case 'event_closing_started':
       case 'event_closure_partner_ready':
       case 'event_closure_done':
