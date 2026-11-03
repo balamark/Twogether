@@ -1124,7 +1124,13 @@
 "已清除這天的狀態": "Cleared this day's status",
 "已記錄這天的狀態": "Saved this day's status",
 "無法儲存每日狀態，請稍後再試": "Couldn't save your daily status. Please try again in a moment",
-"無法清除每日狀態，請稍後再試": "Couldn't clear your daily status. Please try again in a moment"
+"無法清除每日狀態，請稍後再試": "Couldn't clear your daily status. Please try again in a moment",
+"你們還沒配對，先邀請伴侶加入，就能提醒對方回覆。": "You're not paired yet. Invite your partner first, then you can remind them to reply.",
+"這段對話還是私人的，伴侶看不到。先按「讓伴侶看到」分享後，就能提醒對方回覆。": "This conversation is still private, so your partner can't see it. Share it with your partner first, then you can remind them to reply.",
+"一小時內已經提醒過對方了，給 TA 一點時間。也可以複製連結，用 LINE 親自傳給 TA。": "You already reminded your partner within the last hour, so give them a little time. You can also copy the link and send it to them yourself on LINE.",
+"伴侶在等你回覆這段對話": "Your partner is waiting for your reply in this conversation",
+"已提醒伴侶，TA 點通知就會直接打開這段對話。": "Reminder sent. Tapping the notification takes your partner straight to this conversation.",
+"提醒沒送出，請稍後再試；也可以複製連結用 LINE 傳給伴侶。": "The reminder didn't go through. Try again later, or copy the link and send it to your partner on LINE."
 },
 "patterns": [
 [

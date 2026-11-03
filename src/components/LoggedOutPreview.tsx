@@ -33,6 +33,9 @@ import {
   Coins,
   Trash2,
   HelpCircle,
+  Share2,
+  BellRing,
+  Link2,
   type LucideIcon,
 } from 'lucide-react';
 import { daysSinceLastNudge } from './AchievementsView';
@@ -518,6 +521,45 @@ const SophieMediatorSample: React.FC = () => (
         <span className="mt-1.5 inline-flex items-center gap-1 font-body text-xs text-slate-500">
           {tr('查看原本的訊息 ›', 'See the original message ›')}
         </span>
+      </div>
+    </SampleCard>
+  </div>
+);
+
+// 提醒伴侶回覆 sample: the share icon's menu in a 說開一件事 thread — an in-app
+// reminder or a link to paste into LINE, both landing on that exact thread.
+// Static 範例 data only.
+const ThreadShareSample: React.FC = () => (
+  <div className="space-y-2.5">
+    <div className="flex items-center justify-between">
+      <span className="font-body text-xs text-petal-muted inline-flex items-center gap-1.5">
+        <Share2 className="w-3.5 h-3.5 text-petal-rose-deep" strokeWidth={1.5} />
+        {tr('提醒伴侶回覆', 'Remind your partner to reply')}
+      </span>
+      <SampleTag />
+    </div>
+    <SampleCard>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className="font-serif text-sm text-petal-ink truncate">{tr('週末的安排', 'Weekend plans')}</span>
+        <span className="p-1.5 rounded-full border border-petal-ink text-petal-ink shrink-0" aria-hidden>
+          <Share2 className="w-3.5 h-3.5" />
+        </span>
+      </div>
+      <div className="rounded-lg border border-petal-rule bg-white divide-y divide-petal-rule">
+        <div className="flex items-start gap-2 px-3 py-2">
+          <BellRing className="w-3.5 h-3.5 mt-0.5 text-petal-rose-deep shrink-0" />
+          <span>
+            <span className="block font-body text-xs text-petal-ink">{tr('提醒伴侶回覆', 'Remind your partner')}</span>
+            <span className="block font-body text-[11px] text-petal-muted">{tr('TA 點通知就直接回到這段對話', 'One tap on the notification opens this conversation')}</span>
+          </span>
+        </div>
+        <div className="flex items-start gap-2 px-3 py-2">
+          <Link2 className="w-3.5 h-3.5 mt-0.5 text-petal-rose-deep shrink-0" />
+          <span>
+            <span className="block font-body text-xs text-petal-ink">{tr('複製連結', 'Copy link')}</span>
+            <span className="block font-body text-[11px] text-petal-muted">{tr('貼到 LINE，伴侶點開就到這則對話', 'Paste it into LINE; it opens right on this thread')}</span>
+          </span>
+        </div>
       </div>
     </SampleCard>
   </div>
@@ -1286,6 +1328,7 @@ const PREVIEWS: Record<string, PreviewConfig> = {
       <div className="space-y-3">
         <ConflictFlywheelSample />
         <SophieMediatorSample />
+        <ThreadShareSample />
         <DeepDiveSample />
       </div>
     ),
