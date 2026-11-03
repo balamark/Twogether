@@ -76,6 +76,9 @@ adds a fragment file in `changelog/`; CI compiles them into the block below —
 see `CLAUDE.md`.)
 
 <!-- changelog:begin (generated from changelog/*.md — edit those, not this) -->
+### 2026-11-03
+- **提醒伴侶回覆對話**: 說開一件事的對話標題旁多了一個分享小圖示。可以一鍵送站內通知提醒伴侶回覆（有綁 LINE 也會收到），或複製連結、直接用 LINE 傳給 TA——伴侶點開就會直接打開那一則對話，不用自己找。
+
 ### 2026-11-02
 - **破冰開場白會針對那件事**: 選了相關對話後，AI 寫的開場白會直接提到那次衝突的具體細節（沒完成的計畫、卡住的那件事），不再是「在忙嗎？」這種罐頭問候。三種強度也更清楚：先遞出具體台階、就事論事各退一步、說出受傷並守住界線。不選對話時才給輕鬆的日常問候。
 
