@@ -19,6 +19,13 @@ const TEST_RECORD = {
 // text *is* the contract being verified). See plan: "look-at-recent-commit".
 
 test.describe('Intimacy Record Flow', () => {
+  // These tests cover a signed-in account (or, when not signed in, skip). With
+  // 訪客模式 on, a signed-out visitor gets the real app on a sample couple, so
+  // switch it off here to keep the "no account" branch meaning "no app".
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => sessionStorage.setItem('tw_guest_disabled', '1'));
+  });
+
   // No mocking - use real backend for true E2E testing
 
   test('should complete full intimacy record creation flow', async ({ page }) => {

@@ -1,3 +1,4 @@
+import { currentUserId } from '../guest/guestMode';
 // In-memory stale-while-revalidate cache for page data.
 //
 // Every view remounts when the user switches tab or presses 上一頁, and each
@@ -75,12 +76,8 @@ export function fetchQuery<T>(key: string, fetcher: () => Promise<T>): Promise<T
  * `/events|list|<userId>`. Null when signed out (disables the hooks below).
  */
 export function userKey(resource: string, ...parts: Array<string | number | null | undefined>): string | null {
-  let userId: string | undefined;
-  try {
-    userId = (JSON.parse(localStorage.getItem('authUser') || 'null') as { id?: string } | null)?.id;
-  } catch {
-    userId = undefined;
-  }
+  // Signed-in account id, or the guest id while browsing in 訪客模式.
+  const userId = currentUserId();
   if (!userId) return null;
   return [resource, ...parts.map((p) => String(p ?? '')), userId].join('|');
 }

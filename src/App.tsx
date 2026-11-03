@@ -24,6 +24,11 @@ import WallView from './components/WallView';
 import EventsView from './components/EventsView';
 import TherapistsView from './components/TherapistsView';
 import LoggedOutPreview, { CommunicationPrinciples } from './components/LoggedOutPreview';
+import { trackAction } from './utils/track';
+import { isGuestActive, buildGuestUser } from './guest/guestMode';
+import { ensureGuestDb, resetGuestDb, wipeGuestDb } from './guest/guestDb';
+import GuestBanner from './guest/GuestBanner';
+import GuestCoach from './guest/GuestCoach';
 import Testimonials from './components/Testimonials';
 import FeedbackView from './components/FeedbackView';
 import LoveLanguageView from './components/LoveLanguageView';
@@ -46,6 +51,8 @@ import HelpView from './components/HelpView';
 import StoriesView from './components/StoriesView';
 import { resolveCompanion } from './utils/aiCompanions';
 import { apiService, getTokenExpiry, clearAuthStorage } from './services/api';
+import { clearQueryCache } from './services/queryCache';
+import { clearResponseCache } from './services/responseCache';
 import type { CycleRecord, BillingStatus, PairingInvitationSummary, MomentResponse, MomentReactionKey } from './services/api';
 import { buildPairingAcceptLink } from './utils/pairingLink';
 import { pickPendingInvite } from './utils/pairingReminder';
@@ -227,7 +234,23 @@ export interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   partnerConnected: boolean;
+  /** 訪客模式: no account — the real app runs on a sample couple whose data
+   * lives only in this tab (src/guest/). isAuthenticated is true so every view
+   * renders for real; check isGuest for account-only things. */
+  isGuest?: boolean;
 }
+
+// The signed-out state is a guest session (unless guest mode is off).
+const guestAuthState = (): AuthState =>
+  isGuestActive()
+    ? { user: buildGuestUser(), isAuthenticated: true, partnerConnected: true, isGuest: true }
+    : { user: null, isAuthenticated: false, partnerConnected: false };
+
+// Guest identity must never outlive the tab, so it's never written to localStorage.
+const persistAuthState = (state: AuthState) => {
+  if (state.isGuest) return;
+  localStorage.setItem('authState', JSON.stringify(state));
+};
 
 // Default roleplay scripts
 const defaultRoleplayScripts = [
@@ -665,10 +688,13 @@ const LoveTimeApp = () => {
   const [customGifts, setCustomGifts] = useState<CoinGift[]>([]);
   // Keys of built-in gifts this couple removed (or replaced with an edit).
   const [hiddenDefaultGifts, setHiddenDefaultGifts] = useState<string[]>([]);
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    isAuthenticated: false,
-    partnerConnected: false
+  // Without a stored token the visitor starts as a guest right away (no flash
+  // of the signed-out shell); the mount effect below restores a real session.
+  const [authState, setAuthState] = useState<AuthState>(() => {
+    let hasToken = false;
+    try { hasToken = !!localStorage.getItem('authToken'); } catch { /* ignore */ }
+    if (!hasToken && isGuestActive()) ensureGuestDb();
+    return hasToken ? { user: null, isAuthenticated: false, partnerConnected: false } : guestAuthState();
   });
   const { isAuthenticated, user: authUser, partnerConnected } = authState;
 
@@ -733,7 +759,7 @@ const LoveTimeApp = () => {
   // distinct landing IPs vs signups. Skipped for already-authenticated users
   // so reloads don't inflate the visit count.
   useEffect(() => {
-    if (authState.isAuthenticated) return;
+    if (authState.isAuthenticated && !authState.isGuest) return;
     try {
       if (sessionStorage.getItem('tw_landing_beaconed') === '1') return;
       sessionStorage.setItem('tw_landing_beaconed', '1');
@@ -746,7 +772,7 @@ const LoveTimeApp = () => {
       body: JSON.stringify({ ua: navigator.userAgent }),
       keepalive: true,
     }).catch(() => {});
-  }, [authState.isAuthenticated]);
+  }, [authState.isAuthenticated, authState.isGuest]);
 
   const [customScripts, setCustomScripts] = useState<RoleplayScript[]>([]);
   const [favoriteScriptIds, setFavoriteScriptIds] = useState<Set<string>>(new Set());
@@ -796,7 +822,7 @@ const LoveTimeApp = () => {
   // authenticated users — anon traffic is already covered by landing_visits.
   // Each useEffect below reports an "enter" by calling track(); the hook
   // converts that into an "exit" insert on the next call or on tab close.
-  const trackView = usePageTracking(authState.isAuthenticated);
+  const trackView = usePageTracking(authState.isAuthenticated && !authState.isGuest);
 
   useEffect(() => {
     if (!authState.isAuthenticated) return;
@@ -1043,6 +1069,10 @@ const LoveTimeApp = () => {
         createdAt: userData.created_at || new Date().toISOString()
       };
       
+      // Leaving 訪客模式: drop the sample couple and anything cached for it.
+      wipeGuestDb();
+      clearQueryCache();
+      clearResponseCache();
       setAuthState({
         user,
         isAuthenticated: true,
@@ -1091,6 +1121,10 @@ const LoveTimeApp = () => {
         createdAt: userData.created_at || new Date().toISOString()
       };
       
+      // Leaving 訪客模式: drop the sample couple and anything cached for it.
+      wipeGuestDb();
+      clearQueryCache();
+      clearResponseCache();
       setAuthState({
         user,
         isAuthenticated: true,
@@ -1253,6 +1287,21 @@ const LoveTimeApp = () => {
   };
 
   const handleLogout = async () => {
+    // 訪客模式 has no account to sign out of: the menu item resets the sample couple.
+    if (authState.isGuest) {
+      resetGuestDb();
+      clearQueryCache();
+      clearResponseCache();
+      setAuthState(guestAuthState());
+      setCurrentView('home');
+      trackAction('onboarding.guest.reset');
+      showNotification({
+        type: 'info',
+        title: tr('已重置試玩資料', 'Sample data reset'),
+        message: tr('範例情侶回到初始狀態，你剛剛的操作都清掉了。', 'The sample couple is back to the start; everything you did was cleared.'),
+      });
+      return;
+    }
     // Logout must always clear local state, even if the server call hiccups —
     // otherwise the user stays on an authenticated panel with a cleared token.
     try {
@@ -1260,11 +1309,9 @@ const LoveTimeApp = () => {
     } catch (error: unknown) {
       console.error('Logout request failed (clearing locally anyway):', error);
     }
-    setAuthState({
-      user: null,
-      isAuthenticated: false,
-      partnerConnected: false
-    });
+    // Signed out → back to a fresh guest session (sample couple).
+    resetGuestDb();
+    setAuthState(guestAuthState());
     // Reset the view so we land back on the logged-out home, not whatever
     // authenticated panel (設定 / 存款 / …) was open at logout time.
     setCurrentView('home');
@@ -1373,6 +1420,11 @@ const LoveTimeApp = () => {
         localStorage.removeItem('authState');
         localStorage.removeItem('authToken');
         localStorage.removeItem('authUser');
+        // No account → 訪客模式: seed this tab's sample couple and browse for real.
+        if (isGuestActive()) {
+          if (ensureGuestDb()) trackAction('onboarding.guest.seeded');
+          setAuthState(guestAuthState());
+        }
       }
     };
 
@@ -1386,13 +1438,16 @@ const LoveTimeApp = () => {
   // instead of every component handling 401s independently.
   useEffect(() => {
     const handleSessionExpired = (event: Event) => {
+      // 訪客模式 has no session to expire (a public endpoint answering 401
+      // must not throw a guest into a "登入已過期" prompt).
+      if (isGuestActive()) return;
       const detail = (event as CustomEvent<{ reason?: string }>).detail;
       // Idempotent: if we already showed the modal, don't stack notifications.
-      setAuthState((prev) => {
-        if (!prev.isAuthenticated) return prev;
-        return { user: null, isAuthenticated: false, partnerConnected: false };
-      });
       clearAuthStorage();
+      setAuthState((prev) => {
+        if (!prev.isAuthenticated || prev.isGuest) return prev;
+        return guestAuthState();
+      });
       setCurrentView('home');
       setShowAuthModal(true);
       showNotification({
@@ -1523,6 +1578,7 @@ const LoveTimeApp = () => {
               const updatedAuthState: AuthState = {
                 isAuthenticated: true,
                 partnerConnected: nextPartnerConnected,
+                isGuest: authState.isGuest,
                 user: {
                   ...authUser,
                   partnerId: coupleInfo.id,
@@ -1533,7 +1589,7 @@ const LoveTimeApp = () => {
               };
 
               setAuthState(updatedAuthState);
-              localStorage.setItem('authState', JSON.stringify(updatedAuthState));
+              persistAuthState(updatedAuthState);
             }
             
             // Note: Nickname updates will be handled by the useEffect hook for nicknames state changes
@@ -1661,7 +1717,7 @@ const LoveTimeApp = () => {
     };
 
     loadAuthenticatedData();
-  }, [isAuthenticated, authUser, partnerConnected, showNotification]); // Re-run when auth user changes
+  }, [isAuthenticated, authUser, partnerConnected, showNotification, authState.isGuest]); // Re-run when auth user changes
 
   // Note: Intimate records are now persisted in the backend, no localStorage needed
 
@@ -2436,8 +2492,22 @@ const LoveTimeApp = () => {
         { id: 'grow', label: t('nav.grow'), icon: TrendingUp },
         // Pricing is a sales surface for visitors; signed-in users upgrade via the
         // dedicated 'upgrade' view instead, so this tab is logged-out only.
-        ...(!authState.isAuthenticated ? [{ id: 'pricing', label: t('nav.pricing'), icon: Crown }] : []),
+        ...(!authState.isAuthenticated || authState.isGuest ? [{ id: 'pricing', label: t('nav.pricing'), icon: Crown }] : []),
       ];
+
+  // Marketing blocks under the page (reviews, counselor footer):
+  // every tab while signed out; only 今天 for a guest exploring the real app.
+  const showVisitorExtras =
+    currentView !== 'therapists' &&
+    (!authState.isAuthenticated || (!!authState.isGuest && currentView === 'home'));
+  // 「我們怎麼幫你溝通」(the three communication principles) lives in one place
+  // only: under 成長, for signed-out visitors and guests alike.
+  const isVisitor = !authState.isAuthenticated || !!authState.isGuest;
+  const showPrinciples = isVisitor && (currentView === 'grow' || currentView === 'achievements');
+
+  // Public surfaces (真實故事, the counselor directory) show real content and
+  // their own sign-in prompts: a guest is a visitor there, not the sample couple.
+  const visitorAuthState: AuthState = authState.isGuest ? { ...authState, isAuthenticated: false } : authState;
 
   const renderView = () => {
     // Show login prompt for private content when not authenticated
@@ -2745,7 +2815,7 @@ const LoveTimeApp = () => {
       case 'help': return <HelpView onFeedback={() => setCurrentView('feedback')} />;
       case 'stories': return (
         <StoriesView
-          authState={authState}
+          authState={visitorAuthState}
           showNotification={showNotification}
           setShowAuthModal={setShowAuthModal}
           onFindTherapist={() => setCurrentView('therapists')}
@@ -2784,7 +2854,7 @@ const LoveTimeApp = () => {
       case 'therapists': return (
         <div>
           <TalkSwitcher current="therapists" onNavigate={setCurrentView} />
-          <TherapistsView authState={authState} showNotification={showNotification} mode="user" />
+          <TherapistsView authState={visitorAuthState} showNotification={showNotification} mode="user" />
         </div>
       );
       // 諮商師工作台 — the counselor role's own page. Only reachable while
@@ -2919,7 +2989,7 @@ const LoveTimeApp = () => {
                 ...prev,
                 user: prev.user ? { ...prev.user, selected_therapist: companionId } : prev.user,
               };
-              localStorage.setItem('authState', JSON.stringify(next));
+              persistAuthState(next);
               return next;
             });
             showNotification({
@@ -2940,7 +3010,9 @@ const LoveTimeApp = () => {
           onAccepted={handlePairingInvitationAccepted}
           onRejected={handlePairingInvitationRejected}
           onClose={handlePairingInvitationClosed}
-          authState={authState}
+          // A guest has no account yet: the invite must ask them to sign up
+          // (then auto-accept), never accept on behalf of the sample couple.
+          authState={authState.isGuest ? { ...authState, isAuthenticated: false } : authState}
           setShowAuthModal={setShowAuthModal}
           showNotification={showNotification}
         />
@@ -3152,28 +3224,52 @@ const LoveTimeApp = () => {
           />
         )}
 
+        {/* 訪客模式 strip + first-visit tour (sample couple, this tab only). */}
+        {authState.isGuest && (
+          <GuestBanner
+            onSignUp={() => setShowAuthModal(true)}
+            onStartConversation={() => {
+              setPendingEventsCompose(true);
+              setCurrentView('events');
+            }}
+            suppressAutoTour={showAuthModal || showPairingInvitation}
+            currentView={currentView}
+          />
+        )}
+
         {/* Main Content */}
         <div className="max-w-6xl mx-auto">
           {renderView()}
         </div>
 
+        {/* 訪客模式: walks the guest through partner reply → AI counselor. */}
+        {authState.isGuest && !showAuthModal && !showPairingInvitation && (
+          <GuestCoach
+            onSignUp={() => setShowAuthModal(true)}
+            onOpenEvent={(id) => {
+              setPendingEventId(id);
+              setCurrentView('events');
+            }}
+          />
+        )}
+
         {/* Logged-out design philosophy — the three communication principles that
             run through the whole app, so a visitor can recognise their own
             struggle and anticipate how Twogether helps before signing up.
-            Hidden on the therapists sub-page (its own context). */}
-        {!authState.isAuthenticated && currentView !== 'therapists' && (
+            Shown once, under 成長. */}
+        {showPrinciples && (
           <CommunicationPrinciples onSignUp={() => setShowAuthModal(true)} />
         )}
 
         {/* Logged-out social proof — real approved reviews, or 3 defaults until
             any exist. Hidden on the therapists sub-page (its own context). */}
-        {!authState.isAuthenticated && currentView !== 'therapists' && (
+        {showVisitorExtras && (
           <Testimonials />
         )}
 
         {/* Therapist entry — low-key footer link, kept out of the way of
             regular couples but discoverable for practitioners. */}
-        {!authState.isAuthenticated && currentView !== 'therapists' && (
+        {showVisitorExtras && (
           <footer className="max-w-6xl mx-auto mt-16 pt-6 border-t border-petal-rule text-center safe-pb">
             <p className="font-body text-xs text-petal-muted">
               {t('footer.areYouCounselor')}

@@ -968,8 +968,25 @@ async function generateDeepDiveLetter({ kind } = {}) {
   });
 }
 
+// 訪客模式：試玩伴侶回覆 — deterministic stand-in for local dev / tests.
+async function generateGuestPartnerReply({ recentMessages } = {}) {
+  const last = Array.isArray(recentMessages) ? [...recentMessages].reverse().find((m) => m.fromSelf) : null;
+  const heard = last && last.content ? `「${String(last.content).trim().slice(0, 20)}」` : '你說的';
+  return {
+    reply: `我看到${heard}了。我也不是故意的，最近真的有點忙……但我知道你在意，我們好好聊聊好嗎？`,
+    _meta: {
+      provider: 'mock',
+      model: 'mock',
+      durationMs: 0,
+      usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
+      costUsd: 0,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
+  generateGuestPartnerReply,
   rewriteReply,
   generateRoleplayMessages,
   generateWallCounselorComment,

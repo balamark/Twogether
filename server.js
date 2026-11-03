@@ -30,6 +30,7 @@ const intimacyRequestRoutes = require('./routes/intimacy-requests');
 const pairingRequestRoutes = require('./routes/pairing-requests');
 const customScriptsRoutes = require('./routes/custom-scripts');
 const intimacyPlansRoutes = require('./routes/intimacy-plans');
+const guestAiRoutes = require('./routes/guest-ai');
 const customGiftsRoutes = require('./routes/custom-gifts');
 const wallRoutes = require('./routes/wall');
 const journeyRoutes = require('./routes/journey');
@@ -219,6 +220,8 @@ app.use('/api/coins', coinRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/intimacy-requests', intimacyRequestRoutes);
 app.use('/api/intimacy-plans', intimacyPlansRoutes);
+// 訪客模式 AI 試用 (public, 5 real AI calls per guest; text never stored).
+app.use('/api/guest-ai', guestAiRoutes);
 app.use('/api/pairing-requests', pairingRequestRoutes);
 app.use('/api/custom-scripts', customScriptsRoutes);
 app.use('/api/custom-gifts', customGiftsRoutes);

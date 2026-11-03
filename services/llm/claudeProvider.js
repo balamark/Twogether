@@ -3792,8 +3792,95 @@ async function generateDeepDiveLetter({ kind, context, companion }) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// 訪客模式：試玩伴侶回覆 (guest preview partner reply)
+// ---------------------------------------------------------------------------
+// A visitor without an account writes about a real frustration in the guest
+// preview; the sample partner (阿哲) answers so they can feel the loop and then
+// invite the AI counselor. The partner is believable, not ideal: he cares but
+// gets a little defensive or explains first, which is exactly the moment the
+// counselor helps with. Short, plain, no insults, never mentions being an AI.
+
+const GUEST_PARTNER_SYSTEM_PROMPT = `你在一個伴侶溝通 App 的「試玩模式」裡，扮演使用者的另一半（男生，平常溫和、很在乎對方，但被指出問題時容易先解釋或有點防衛）。使用者會把心裡的委屈或想法傳給你。請永遠以繁體中文回覆。
+
+請用另一半的口吻，回一則像真人傳訊息的回覆：
+- 1～3 句，40～90 字，口語自然，像 LINE 訊息。
+- 真實而不完美：先有一點點解釋或委屈（例如「我也不是故意的」「最近真的很忙」），但看得出在乎、願意聊。不要一下子就完美道歉，也不要冷漠。
+- 只回應對方實際說的內容，不要編造具體的人名、地點或事件細節。
+- 不可以有人身攻擊、貶低、威脅或任何性暗示。
+- 不要提到你是 AI、角色扮演或試玩。
+
+回應請只呼叫 emit_partner_reply tool，不要輸出其他文字。`;
+
+const GUEST_PARTNER_TOOL_SCHEMA = {
+  name: 'emit_partner_reply',
+  description: 'Return the partner\'s chat reply.',
+  input_schema: {
+    type: 'object',
+    properties: { reply: { type: 'string', description: '另一半的回覆，1～3 句' } },
+    required: ['reply'],
+  },
+};
+
+async function generateGuestPartnerReply({ eventSummary, recentMessages }) {
+  const lines = ['角色說明：', '- [你] = 另一半（你要扮演的人）', '- [對方] = 使用者', ''];
+  if (eventSummary && typeof eventSummary === 'string') {
+    lines.push('使用者想說開的事（由 [對方] 寫下）：', eventSummary.trim(), '');
+  }
+  if (Array.isArray(recentMessages) && recentMessages.length > 0) {
+    lines.push('最近對話（最舊在前）：');
+    for (const m of recentMessages) {
+      // fromSelf is from the USER's perspective; the model plays the partner.
+      lines.push(`${m.fromSelf ? '[對方]' : '[你]'}：${(m.content || '').trim()}`);
+    }
+    lines.push('');
+  }
+  lines.push('請以 [你] 的身分回覆 [對方] 最新的訊息。');
+  const userContent = lines.join('\n');
+
+  const startedAt = Date.now();
+  const response = await getClient().messages.create({
+    model: MODEL,
+    max_tokens: 400,
+    system: [{ type: 'text', text: GUEST_PARTNER_SYSTEM_PROMPT + PUNCTUATION_RULE, cache_control: { type: 'ephemeral' } }],
+    tools: [GUEST_PARTNER_TOOL_SCHEMA],
+    tool_choice: { type: 'tool', name: 'emit_partner_reply' },
+    messages: [{ role: 'user', content: userContent }],
+  });
+  const ms = Date.now() - startedAt;
+  const u = response.usage || {};
+  const cost = estimateCostUSD(response.model || MODEL, u);
+  logInfo('llm.claude.guest_partner_reply', {
+    model: response.model || MODEL,
+    durationMs: ms,
+    inputTokens: u.input_tokens || 0,
+    outputTokens: u.output_tokens || 0,
+    costUsd: cost,
+  });
+  const toolUse = response.content.find((b) => b.type === 'tool_use' && b.name === 'emit_partner_reply');
+  if (!toolUse || typeof toolUse.input?.reply !== 'string' || !toolUse.input.reply.trim()) {
+    throw new Error('Claude did not return a partner reply');
+  }
+  return {
+    reply: toolUse.input.reply.trim(),
+    _meta: {
+      provider: 'claude',
+      model: response.model || MODEL,
+      durationMs: ms,
+      usage: {
+        inputTokens: u.input_tokens || 0,
+        outputTokens: u.output_tokens || 0,
+        cacheCreateTokens: u.cache_creation_input_tokens || 0,
+        cacheReadTokens: u.cache_read_input_tokens || 0,
+      },
+      costUsd: cost,
+    },
+  };
+}
+
 module.exports = {
   generateIcebreaker,
+  generateGuestPartnerReply,
   rewriteReply,
   generateRoleplayMessages,
   generateWallCounselorComment,
