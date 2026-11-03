@@ -104,6 +104,13 @@ helper) to routes or services: it costs DB round trips on request paths, takes
 table locks, and hides schema that the migrations never got — migration 105 had
 to backfill four objects that only existed that way.
 
+**Every new table needs `ALTER TABLE public.<t> ENABLE ROW LEVEL SECURITY;`** in
+the migration that creates it. Supabase exposes public tables through its REST
+API with the public anon key; without RLS anyone can read, edit and delete the
+table. The backend connects as `postgres`, which bypasses RLS, so no policies
+are needed. `scripts/check-rls.js` fails CI and deploy if a table is missing it
+(migration 110 had to re-lock ~30 tables that forgot it).
+
 ## UX conventions (every UI change)
 
 Read `docs/UX_PLAYBOOK.md` before UI work — it holds the binding UX rules and
