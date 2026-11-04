@@ -34,6 +34,7 @@ import apiService, {
   type FacilitationSession,
 } from '../services/api';
 import AutoGrowTextarea from './AutoGrowTextarea';
+import VoiceInputButton from './VoiceInputButton';
 import MessageTranslationCard from './MessageTranslationCard';
 import SophieMessageCard from './SophieMessageCard';
 import TherapyNoteCard from './TherapyNoteCard';
@@ -142,6 +143,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reply, setReply] = useState('');
+  const replyRef = useRef<HTMLTextAreaElement>(null);
   // Applied rewrites, inserted phrases and the emotion-meter suggestion all set
   // the draft directly, bypassing the textarea's maxLength — so guard on the
   // composed value, not on typing.
@@ -1526,6 +1528,7 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           </button>
 
           <AutoGrowTextarea
+            ref={replyRef}
             data-testid="event-reply-input"
             value={reply}
             onChange={(e) => setReply(e.target.value)}
@@ -1536,7 +1539,8 @@ export default function EventDetail({ eventId, currentUserId, companionId, myNic
           {/* maxLength only limits typing — an applied AI rewrite or an
               inserted phrase sets the value directly and can land over the
               cap. Show the count so the disabled send button is explainable. */}
-          <div className="flex justify-end">
+          <div className="flex items-start justify-between gap-2">
+            <VoiceInputButton targetRef={replyRef} source="event_reply" testId="event-reply" />
             <span
               data-testid="event-reply-counter"
               className={`font-body text-[11px] ${replyOver ? 'text-red-600' : 'text-petal-muted'}`}

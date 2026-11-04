@@ -100,6 +100,9 @@ export default defineConfig({
         // LLM_PROVIDER=claude leaks into the test server and e2e runs bill
         // real Anthropic tokens with non-deterministic output.
         LLM_PROVIDER: 'mock',
+        // Same for 語音輸入: no key → lib/transcribe.js returns its fixed demo
+        // transcript instead of billing OpenAI.
+        OPENAI_API_KEY: '',
         // Dummy LINE creds so isConfigured()=true and webhook signature verify
         // runs (sign+verify use the same test secret). Never the real secret —
         // that only lives in GitHub secrets → prod. Outbound push/reply no-op.

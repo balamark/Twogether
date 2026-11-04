@@ -91,3 +91,38 @@ export async function callGuestAi(db: GuestDb, kind: GuestAiKind, input: Record<
   }
   return body.result as Record<string, unknown>;
 }
+
+// ─── 訪客模式：3 次真的語音輸入 ─────────────────────────────────────────────
+// A guest's 🎤 clip goes to the public /api/guest-ai/voice (≤60s, transcript
+// returned and never stored). Unlike the AI tries there's no on-device demo to
+// fall back to — a made-up transcript would be confusing — so failures throw
+// with the server's error_code + message and the button shows them inline.
+export async function transcribeGuestVoice(
+  audio: Blob,
+  durationMs: number,
+  signal?: AbortSignal,
+): Promise<{ text: string; usage?: { tier: string; limit: number; used: number; remaining: number } }> {
+  const fd = new FormData();
+  fd.append('guest_id', guestAiId());
+  fd.append('duration_ms', String(Math.round(durationMs)));
+  // Same naming as api.ts voiceFileName (not imported: api.ts imports the guest layer).
+  const t = audio.type;
+  fd.append('audio', audio, /mp4|m4a|aac/.test(t) ? 'clip.m4a' : /ogg/.test(t) ? 'clip.ogg' : /wav/.test(t) ? 'clip.wav' : 'clip.webm');
+  let res: Response;
+  try {
+    res = await fetch('/api/guest-ai/voice', { method: 'POST', headers: { 'X-Locale': getLocale() }, body: fd, signal });
+  } catch (e) {
+    if ((e as Error)?.name === 'AbortError') throw e;
+    throw new GuestError(0, tr('網路好像斷了，錄音沒有送出。請檢查連線後再試，或改用打字。', 'The network seems to be down, so the recording wasn\'t sent. Check your connection and try again, or type instead.'), 'NETWORK_ERROR');
+  }
+  let body: Record<string, unknown> = {};
+  try { body = await res.json(); } catch { /* non-JSON (proxy error) */ }
+  if (!res.ok || body.success === false) {
+    throw new GuestError(
+      res.status,
+      String(body.message || tr('語音轉文字沒有成功，請再錄一次，或改用打字。', 'Voice-to-text didn\'t work. Please record again or type instead.')),
+      String(body.error_code || 'VOICE_FAILED'),
+    );
+  }
+  return { text: String(body.text || ''), usage: body.usage as { tier: string; limit: number; used: number; remaining: number } | undefined };
+}

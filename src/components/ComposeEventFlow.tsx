@@ -6,6 +6,7 @@ import apiService, {
 } from '../services/api';
 import { useAiQuota } from '../hooks/useAiQuota';
 import AiQuotaHint from './AiQuotaHint';
+import VoiceInputButton from './VoiceInputButton';
 import { tr } from '../i18n/tr';
 
 type Step = 'input' | 'loading' | 'select' | 'submitting';
@@ -49,6 +50,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
   const submitLockRef = useRef(false);
   const { quota, refresh: refreshQuota } = useAiQuota();
   const [rawText, setRawText] = useState('');
+  const rawRef = useRef<HTMLTextAreaElement>(null);
   const [preview, setPreview] = useState<IcebreakerPreview | null>(null);
   const [selected, setSelected] = useState<EventVersionKey | null>('neutral');
   // Per-version editable drafts, initialised from the AI originals. Editing one
@@ -182,6 +184,7 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
         <div className="bg-petal-cream border border-petal-rule rounded-2xl p-5">
           <label className="block text-sm text-petal-ink mb-2">{tr('把你現在的感受寫下來', 'Write down how you feel right now')}</label>
           <textarea
+            ref={rawRef}
             data-testid="compose-raw-input"
             value={rawText}
             onChange={(e) => setRawText(e.target.value)}
@@ -194,6 +197,8 @@ export default function ComposeEventFlow({ onCreated, onCancel, showNotification
             <span>{error && <span className="text-red-500">{error}</span>}</span>
             <span>{rawText.length} / 4000</span>
           </div>
+          {/* 說不出口也能先說出來：用講的比打字快，尤其是情緒正滿的時候。 */}
+          <VoiceInputButton targetRef={rawRef} source="compose_raw" testId="compose-raw" className="mt-2" />
           <div className="mt-1">
             <AiQuotaHint quota={quota} />
           </div>

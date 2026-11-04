@@ -39,6 +39,9 @@ env_variables:
   # LLM provider for events × icebreaker (services/llmService.js).
   LLM_PROVIDER: $_LLM_PROVIDER
   ANTHROPIC_API_KEY: $_ANTHROPIC_API_KEY
+  # 語音輸入 speech-to-text (lib/transcribe.js). Missing → voice input answers
+  # VOICE_UNAVAILABLE and users keep typing.
+  OPENAI_API_KEY: $_OPENAI_API_KEY
   # Reflection judge (LLM-as-judge second layer). Both optional: the judge model
   # defaults to ANTHROPIC_MODEL, and the step is on by default. Uncomment to pin
   # a stronger judge model or to disable the step without a code change.
