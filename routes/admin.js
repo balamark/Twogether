@@ -13,6 +13,7 @@ const db = require('../database/db');
 const { logInfo, logError, logWarn } = require('../lib/logger');
 const { optionalAuth, invalidateUserCache } = require('../middleware/auth');
 const featureFlags = require('../lib/featureFlags');
+const { invalidateToneCache: invalidateNudgeToneCache, TONES: BUILTIN_NUDGE_TONES } = require('../lib/intimacyNudgeTones');
 
 const publicRouter = express.Router();
 const adminApiRouter = express.Router();
@@ -1147,6 +1148,185 @@ adminApiRouter.delete('/alt-plan-samples/:id', async (req, res) => {
   }
 });
 
+// ── 溫柔提醒 (intimacy nudge tones) ─────────────────────────────────────────
+// The platform-voiced reminders offered on the 已經幾天沒有親密了 card
+// (POST /api/intimacy-requests/nudge-suggestions draws from the active ones).
+// Schema + seed: migration 110. `{days}` in the copy is the real gap.
+const NUDGE_TONE_FIELDS = `id, label, label_en, emoji, sample, sample_en, recommended, sort_order,
+  active, created_at, updated_at`;
+const NUDGE_TONE_ID_RE = /^[a-z0-9][a-z0-9_-]{0,39}$/;
+
+function nudgeToneInput(body) {
+  const text = (v, max) => {
+    if (typeof v !== 'string') return null;
+    const t = v.trim();
+    return t ? t.slice(0, max) : null;
+  };
+  const sort = parseInt(body.sort_order, 10);
+  return {
+    label: text(body.label, 40),
+    label_en: text(body.label_en, 60),
+    emoji: text(body.emoji, 16),
+    sample: text(body.sample, 400),
+    sample_en: text(body.sample_en, 600),
+    recommended: !!body.recommended,
+    sort_order: Number.isFinite(sort) ? sort : 0,
+    active: body.active === undefined ? true : !!body.active,
+  };
+}
+
+function nudgeToneInvalid(v) {
+  if (!v.label) return '請輸入語氣名稱（例如「溫柔關心」）';
+  if (!v.sample) return '請輸入提醒內容';
+  if (v.recommended && !v.active) return '推薦語氣必須是顯示中的，請先取消「推薦」或改為顯示';
+  return null;
+}
+
+// Every catalog write: drop the in-memory tone cache and the per-couple
+// suggestion cache so edits / hides / deletes show up on the next open instead
+// of a stale set (the cache is template-built, so rebuilding costs nothing).
+async function afterNudgeToneWrite() {
+  invalidateNudgeToneCache();
+  try {
+    await db.query('DELETE FROM intimacy_nudge_cache');
+  } catch (err) {
+    logWarn('Admin nudge cache clear failed', { err: err.message });
+  }
+}
+
+// Map unique-violation errors to an actionable message.
+function nudgeToneDbError(err, fallback) {
+  if (err && err.code === '23505') {
+    if (String(err.constraint || '').includes('recommended')) return '已經有另一個推薦語氣，請重試';
+    return '這個代號已經被使用，請換一個';
+  }
+  return fallback + err.message;
+}
+
+adminApiRouter.get('/nudge-tones', async (req, res) => {
+  try {
+    const r = await db.query(`SELECT ${NUDGE_TONE_FIELDS} FROM intimacy_nudge_tones ORDER BY sort_order, created_at`);
+    res.json({ tones: r.rows, builtin_count: BUILTIN_NUDGE_TONES.length });
+  } catch (err) {
+    logError('Admin nudge tones list failed', { err: err.message });
+    res.status(500).json({ error: '讀取溫柔提醒失敗：' + err.message });
+  }
+});
+
+// Early exits inside a tone transaction: throw one of these, the handler maps
+// it to its status (and db.transaction rolls back).
+class NudgeToneHttpError extends Error {
+  constructor(status, message) { super(message); this.status = status; }
+}
+const NUDGE_TONE_NOT_FOUND = '找不到這則溫柔提醒，可能已被刪除，請重新整理';
+
+function sendNudgeToneError(res, err, fallback, ctx) {
+  if (err instanceof NudgeToneHttpError) {
+    logWarn('admin.nudge_tone.rejected', { ...ctx, status: err.status, reason: err.message });
+    return res.status(err.status).json({ error: err.message });
+  }
+  logError('Admin nudge tone write failed', { ...ctx, err: err.message });
+  return res.status(err.code === '23505' ? 409 : 500).json({ error: nudgeToneDbError(err, fallback) });
+}
+
+adminApiRouter.post('/nudge-tones', express.json(), async (req, res) => {
+  const body = req.body || {};
+  const v = nudgeToneInput(body);
+  const invalid = nudgeToneInvalid(v);
+  if (invalid) return res.status(400).json({ error: invalid });
+  let id = typeof body.id === 'string' ? body.id.trim().toLowerCase() : '';
+  if (id && !NUDGE_TONE_ID_RE.test(id)) {
+    return res.status(400).json({ error: '代號只能用小寫英文、數字、- 或 _（最多 40 字），或留空自動產生' });
+  }
+  if (!id) id = 'tone-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  try {
+    const tone = await db.transaction(async (client) => {
+      // Only one recommended tone: promoting this one demotes the old one.
+      if (v.recommended) await client.query('UPDATE intimacy_nudge_tones SET recommended = FALSE, updated_at = NOW() WHERE recommended');
+      const r = await client.query(
+        `INSERT INTO intimacy_nudge_tones (id, label, label_en, emoji, sample, sample_en, recommended, sort_order, active)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+         RETURNING ${NUDGE_TONE_FIELDS}`,
+        [id, v.label, v.label_en, v.emoji, v.sample, v.sample_en, v.recommended, v.sort_order, v.active]
+      );
+      return r.rows[0];
+    });
+    await afterNudgeToneWrite();
+    logInfo('admin.nudge_tone.created', { id, recommended: v.recommended, active: v.active });
+    res.json({ tone });
+  } catch (err) {
+    sendNudgeToneError(res, err, '建立失敗：', { action: 'create', id });
+  }
+});
+
+adminApiRouter.patch('/nudge-tones/:id', express.json(), async (req, res) => {
+  const id = req.params.id;
+  if (!NUDGE_TONE_ID_RE.test(id)) return res.status(400).json({ error: 'invalid tone id' });
+  const body = req.body || {};
+  const toggleOnly = Object.keys(body).length === 1 && body.active !== undefined;
+  const v = toggleOnly ? null : nudgeToneInput(body);
+  if (v) {
+    const invalid = nudgeToneInvalid(v);
+    if (invalid) return res.status(400).json({ error: invalid });
+  }
+  try {
+    const tone = await db.transaction(async (client) => {
+      const cur = await client.query('SELECT recommended FROM intimacy_nudge_tones WHERE id = $1 FOR UPDATE', [id]);
+      if (cur.rows.length === 0) throw new NudgeToneHttpError(404, NUDGE_TONE_NOT_FOUND);
+      // Toggle-only PATCH ({ active }) keeps every other field as-is.
+      if (toggleOnly) {
+        if (!body.active && cur.rows[0].recommended) {
+          throw new NudgeToneHttpError(400, '推薦語氣不能隱藏，請先把另一個語氣設為推薦');
+        }
+        const r = await client.query(
+          `UPDATE intimacy_nudge_tones SET active = $1, updated_at = NOW() WHERE id = $2 RETURNING ${NUDGE_TONE_FIELDS}`,
+          [!!body.active, id]
+        );
+        return r.rows[0];
+      }
+      if (cur.rows[0].recommended && !v.recommended) {
+        throw new NudgeToneHttpError(400, '至少要有一個推薦語氣：請改把另一個語氣設為推薦，這個就會自動取消');
+      }
+      if (v.recommended) {
+        await client.query('UPDATE intimacy_nudge_tones SET recommended = FALSE, updated_at = NOW() WHERE recommended AND id <> $1', [id]);
+      }
+      const r = await client.query(
+        `UPDATE intimacy_nudge_tones
+            SET label = $1, label_en = $2, emoji = $3, sample = $4, sample_en = $5,
+                recommended = $6, sort_order = $7, active = $8, updated_at = NOW()
+          WHERE id = $9
+          RETURNING ${NUDGE_TONE_FIELDS}`,
+        [v.label, v.label_en, v.emoji, v.sample, v.sample_en, v.recommended, v.sort_order, v.active, id]
+      );
+      return r.rows[0];
+    });
+    await afterNudgeToneWrite();
+    logInfo(toggleOnly ? 'admin.nudge_tone.toggled' : 'admin.nudge_tone.updated', { id, active: tone.active, recommended: tone.recommended });
+    res.json({ tone });
+  } catch (err) {
+    sendNudgeToneError(res, err, '更新失敗：', { action: toggleOnly ? 'toggle' : 'update', id });
+  }
+});
+
+adminApiRouter.delete('/nudge-tones/:id', async (req, res) => {
+  const id = req.params.id;
+  if (!NUDGE_TONE_ID_RE.test(id)) return res.status(400).json({ error: 'invalid tone id' });
+  try {
+    const cur = await db.query('SELECT recommended FROM intimacy_nudge_tones WHERE id = $1', [id]);
+    if (cur.rows.length === 0) return res.status(404).json({ error: NUDGE_TONE_NOT_FOUND });
+    if (cur.rows[0].recommended) {
+      return res.status(400).json({ error: '推薦語氣不能刪除，請先把另一個語氣設為推薦' });
+    }
+    const r = await db.query('DELETE FROM intimacy_nudge_tones WHERE id = $1 RETURNING label', [id]);
+    await afterNudgeToneWrite();
+    logInfo('admin.nudge_tone.deleted', { id, label: r.rows[0] && r.rows[0].label });
+    res.json({ success: true });
+  } catch (err) {
+    logError('Admin nudge tone delete failed', { err: err.message, id });
+    res.status(500).json({ error: '刪除失敗：' + err.message });
+  }
+});
+
 // GET /api/admin/coupons/:id/redemptions — who redeemed this coupon, when,
 // and the Premium window it granted (join couple_entitlements for the exact
 // start/expiry actually applied — stacking can push starts_at into the
@@ -1293,6 +1473,7 @@ const ADMIN_HTML = `<!doctype html>
       <button class="tab" data-panel="pool">分潤</button>
       <button class="tab" data-panel="coupons">優惠碼</button>
       <button class="tab" data-panel="alt-samples">替代方案範例</button>
+      <button class="tab" data-panel="nudge-tones">溫柔提醒</button>
       <button class="tab" data-panel="roleplay">邀請劇本</button>
       <button class="tab" data-panel="ai-usage">AI 用量</button>
       <button class="tab" data-panel="ai-downvotes">AI 負評</button>
@@ -1620,6 +1801,41 @@ const ADMIN_HTML = `<!doctype html>
               <th>互動方式</th>
               <th>時間與準備</th>
               <th>劇本</th>
+              <th>狀態</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Panel: 溫柔提醒 (intimacy nudge tones) -->
+    <div class="panel" id="panel-nudge-tones">
+      <p class="sub">「已經幾天沒有親密了」卡片上，由 Twogether 送出的溫柔提醒。每次會顯示「推薦」那一則，再從其他顯示中的語氣隨機抽兩則。內容裡的 <code>{days}</code> 會換成實際天數（例：「已經 {days} 天沒有記錄親密時光」）。英文欄位留空時，英文介面會用字典翻譯，找不到就顯示中文。推薦語氣只能有一個，不能隱藏或刪除——要換推薦，直接把另一則勾成推薦即可。儲存後新的內容會立刻生效。</p>
+      <div class="controls" style="align-items:flex-end;flex-wrap:wrap">
+        <label>代號<br><input type="text" id="nudgeId" maxlength="40" placeholder="留空自動產生" style="width:120px"></label>
+        <label>語氣名稱<br><input type="text" id="nudgeLabel" maxlength="40" placeholder="溫柔關心" style="width:120px"></label>
+        <label>語氣名稱（英）<br><input type="text" id="nudgeLabelEn" maxlength="60" placeholder="Gentle care" style="width:140px"></label>
+        <label>Emoji<br><input type="text" id="nudgeEmoji" maxlength="16" placeholder="💛" style="width:60px"></label>
+        <label>提醒內容<br><textarea id="nudgeSample" rows="3" maxlength="400" style="width:300px" placeholder="已經 {days} 天沒有記錄親密時光了。…"></textarea></label>
+        <label>提醒內容（英）<br><textarea id="nudgeSampleEn" rows="3" maxlength="600" style="width:300px" placeholder="It's been {days} days since…"></textarea></label>
+        <label>排序<br><input type="number" id="nudgeSort" step="10" value="0" style="width:70px"></label>
+        <label><input type="checkbox" id="nudgeRecommended"> 推薦</label>
+        <label><input type="checkbox" id="nudgeActive" checked> 顯示</label>
+        <button id="nudgeSubmit">建立</button>
+        <button id="nudgeCancelEdit" hidden>取消編輯</button>
+        <span class="muted" id="nudgeStatusMsg"></span>
+      </div>
+      <p class="muted" id="nudgePreview" style="font-size:13px"></p>
+      <div style="overflow-x:auto">
+        <table id="nudgeTonesTable">
+          <thead>
+            <tr>
+              <th class="num">排序</th>
+              <th>語氣</th>
+              <th>提醒內容</th>
+              <th>英文</th>
               <th>狀態</th>
               <th>操作</th>
             </tr>
@@ -2823,6 +3039,158 @@ const ADMIN_HTML = `<!doctype html>
       if (ok) resetAltForm();
     });
 
+    // ── 溫柔提醒 (intimacy nudge tones) ──────────────────────────────────
+    var nudgeEditingId = null;
+    var nudgeRows = [];
+    var nudgeBuiltinCount = 0;
+    var NUDGE_FIELDS = [
+      ['nudgeLabel', 'label'], ['nudgeLabelEn', 'label_en'], ['nudgeEmoji', 'emoji'],
+      ['nudgeSample', 'sample'], ['nudgeSampleEn', 'sample_en']
+    ];
+    function nudgeRender(t) { return String(t || '').replace(/\{days\}/g, '8'); }
+    async function loadNudgeTones() {
+      $('nudgeStatusMsg').textContent = '載入中…';
+      try {
+        var res = await fetch('/api/admin/nudge-tones');
+        var body = await res.json().catch(function () { return {}; });
+        if (!res.ok) throw new Error(body.error || ('tones ' + res.status));
+        nudgeRows = body.tones || [];
+        nudgeBuiltinCount = body.builtin_count || 0;
+        renderNudgeTones();
+        var active = nudgeRows.filter(function (r) { return r.active; }).length;
+        $('nudgeStatusMsg').textContent = '共 ' + nudgeRows.length + ' 則，顯示中 ' + active + ' 則 · 更新於 ' + new Date().toLocaleTimeString('zh-TW');
+      } catch (e) {
+        $('nudgeStatusMsg').textContent = '載入失敗: ' + e.message;
+      }
+    }
+    function renderNudgeTones() {
+      var tbody = document.querySelector('#nudgeTonesTable tbody');
+      var activeCount = nudgeRows.filter(function (r) { return r.active; }).length;
+      if (activeCount === 0) {
+        var note = '目前沒有顯示中的提醒，前台會改用內建的 ' + nudgeBuiltinCount + ' 則。';
+        if (nudgeRows.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" class="muted">' + note + '用上方表單新增第一則吧。</td></tr>';
+          return;
+        }
+        $('nudgePreview').textContent = note;
+      } else if (activeCount < 3) {
+        $('nudgePreview').textContent = '顯示中的提醒少於 3 則，前台只會出現 ' + activeCount + ' 個選項。';
+      } else {
+        $('nudgePreview').textContent = '';
+      }
+      tbody.innerHTML = nudgeRows.map(function (r) {
+        return '<tr>' +
+          '<td class="num">' + r.sort_order + '</td>' +
+          '<td>' + esc(r.emoji || '💛') + ' ' + esc(r.label) +
+            (r.label_en ? '<div class="muted" style="font-size:12px">' + esc(r.label_en) + '</div>' : '') +
+            '<div class="muted" style="font-size:11px">' + esc(r.id) + '</div></td>' +
+          '<td style="font-size:12px;max-width:320px">' + esc(r.sample) + '</td>' +
+          '<td style="font-size:12px;max-width:280px">' + (r.sample_en ? esc(r.sample_en) : '<span class="muted">—（字典翻譯）</span>') + '</td>' +
+          '<td>' + (r.recommended ? '<span class="badge yes">⭐ 推薦</span> ' : '') +
+            (r.active ? '<span class="badge yes">顯示中</span>' : '<span class="badge no">已隱藏</span>') + '</td>' +
+          '<td>' +
+            '<button data-nudge-edit="' + esc(r.id) + '">編輯</button> ' +
+            (r.recommended ? '' :
+              '<button data-nudge-toggle="' + esc(r.id) + '" data-next="' + (!r.active) + '">' + (r.active ? '隱藏' : '顯示') + '</button> ' +
+              '<button class="danger" data-nudge-del="' + esc(r.id) + '">刪除</button>') +
+          '</td>' +
+          '</tr>';
+      }).join('');
+      tbody.querySelectorAll('button[data-nudge-edit]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.getAttribute('data-nudge-edit');
+          startEditNudge(nudgeRows.find(function (r) { return r.id === id; }));
+        });
+      });
+      tbody.querySelectorAll('button[data-nudge-toggle]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          nudgeRequest('/api/admin/nudge-tones/' + encodeURIComponent(btn.getAttribute('data-nudge-toggle')), 'PATCH',
+            { active: btn.getAttribute('data-next') === 'true' }, btn);
+        });
+      });
+      tbody.querySelectorAll('button[data-nudge-del]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          if (!confirm('永久刪除這則溫柔提醒？無法復原（只想暫時不用的話，可以按「隱藏」）。')) return;
+          var id = btn.getAttribute('data-nudge-del');
+          if (nudgeEditingId === id) resetNudgeForm();
+          nudgeRequest('/api/admin/nudge-tones/' + encodeURIComponent(id), 'DELETE', null, btn);
+        });
+      });
+    }
+    function updateNudgePreview() {
+      var zh = $('nudgeSample').value.trim();
+      var en = $('nudgeSampleEn').value.trim();
+      if (!zh && !en) return;
+      $('nudgePreview').textContent = '預覽（8 天）：' + nudgeRender(zh) + (en ? '　｜　' + nudgeRender(en) : '');
+    }
+    function startEditNudge(r) {
+      if (!r) return;
+      nudgeEditingId = r.id;
+      NUDGE_FIELDS.forEach(function (f) { $(f[0]).value = r[f[1]] || ''; });
+      $('nudgeId').value = r.id;
+      $('nudgeId').disabled = true;
+      $('nudgeSort').value = r.sort_order;
+      $('nudgeRecommended').checked = !!r.recommended;
+      $('nudgeActive').checked = !!r.active;
+      $('nudgeSubmit').textContent = '更新';
+      $('nudgeCancelEdit').hidden = false;
+      updateNudgePreview();
+    }
+    function resetNudgeForm() {
+      nudgeEditingId = null;
+      NUDGE_FIELDS.forEach(function (f) { $(f[0]).value = ''; });
+      $('nudgeId').value = '';
+      $('nudgeId').disabled = false;
+      $('nudgeSort').value = '0';
+      $('nudgeRecommended').checked = false;
+      $('nudgeActive').checked = true;
+      $('nudgeSubmit').textContent = '建立';
+      $('nudgeCancelEdit').hidden = true;
+      $('nudgePreview').textContent = '';
+    }
+    async function nudgeRequest(url, method, payload, btn) {
+      if (btn) btn.disabled = true;
+      try {
+        var res = await fetch(url, {
+          method: method,
+          headers: payload ? { 'Content-Type': 'application/json' } : {},
+          body: payload ? JSON.stringify(payload) : undefined,
+        });
+        var body = await res.json().catch(function () { return {}; });
+        if (!res.ok) throw new Error(body.error || (method + ' ' + res.status));
+        await loadNudgeTones();
+        return true;
+      } catch (e) {
+        $('nudgeStatusMsg').textContent = '操作失敗: ' + e.message;
+        return false;
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+    $('nudgeSample').addEventListener('input', updateNudgePreview);
+    $('nudgeSampleEn').addEventListener('input', updateNudgePreview);
+    $('nudgeCancelEdit').addEventListener('click', resetNudgeForm);
+    $('nudgeSubmit').addEventListener('click', async function () {
+      var payload = {
+        sort_order: parseInt($('nudgeSort').value, 10) || 0,
+        recommended: $('nudgeRecommended').checked,
+        active: $('nudgeActive').checked,
+      };
+      NUDGE_FIELDS.forEach(function (f) { payload[f[1]] = $(f[0]).value; });
+      if (!payload.label.trim()) { $('nudgeStatusMsg').textContent = '請輸入語氣名稱'; return; }
+      if (!payload.sample.trim()) { $('nudgeStatusMsg').textContent = '請輸入提醒內容'; return; }
+      if (payload.recommended && !payload.active) {
+        $('nudgeStatusMsg').textContent = '推薦語氣必須是顯示中的'; return;
+      }
+      if (payload.sample.indexOf('{days}') < 0 &&
+          !confirm('提醒內容沒有 {days}，送出的提醒不會顯示天數。確定要這樣儲存嗎？')) return;
+      if (!nudgeEditingId) payload.id = $('nudgeId').value;
+      var ok = await nudgeRequest(
+        nudgeEditingId ? '/api/admin/nudge-tones/' + encodeURIComponent(nudgeEditingId) : '/api/admin/nudge-tones',
+        nudgeEditingId ? 'PATCH' : 'POST', payload, $('nudgeSubmit'));
+      if (ok) resetNudgeForm();
+    });
+
     // ── Roleplay invitations ────────────────────────────────────────────────
     var ROLEPLAY_LEVEL_LABEL = {
       normal: '普通', mild: '輕微', moderate: '中等', explicit: '露骨', intense: '最強烈'
@@ -3019,7 +3387,7 @@ const ADMIN_HTML = `<!doctype html>
 
     // Lazy-load the reviews + pool + roleplay + ai-usage + flags tabs the first
     // time they're opened.
-    var reviewsLoaded = false, feedbackLoaded = false, poolLoaded = false, couponsLoaded = false, altSamplesLoaded = false, roleplayLoaded = false, aiUsageLoaded = false, flagsLoaded = false, storiesLoaded = false, pollsLoaded = false, aiDownvotesLoaded = false;
+    var reviewsLoaded = false, feedbackLoaded = false, poolLoaded = false, couponsLoaded = false, altSamplesLoaded = false, nudgeTonesLoaded = false, roleplayLoaded = false, aiUsageLoaded = false, flagsLoaded = false, storiesLoaded = false, pollsLoaded = false, aiDownvotesLoaded = false;
     document.querySelectorAll('.tab').forEach(function (btn) {
       var panel = btn.getAttribute('data-panel');
       if (panel === 'reviews') btn.addEventListener('click', function () { if (!reviewsLoaded) { reviewsLoaded = true; loadReviews(); } });
@@ -3029,6 +3397,7 @@ const ADMIN_HTML = `<!doctype html>
       if (panel === 'pool') btn.addEventListener('click', function () { if (!poolLoaded) { poolLoaded = true; loadPools(); } });
       if (panel === 'coupons') btn.addEventListener('click', function () { if (!couponsLoaded) { couponsLoaded = true; loadCoupons(); } });
       if (panel === 'alt-samples') btn.addEventListener('click', function () { if (!altSamplesLoaded) { altSamplesLoaded = true; loadAltSamples(); } });
+      if (panel === 'nudge-tones') btn.addEventListener('click', function () { if (!nudgeTonesLoaded) { nudgeTonesLoaded = true; loadNudgeTones(); } });
       if (panel === 'roleplay') btn.addEventListener('click', function () { if (!roleplayLoaded) { roleplayLoaded = true; loadRoleplay(); } });
       if (panel === 'ai-usage') btn.addEventListener('click', function () { if (!aiUsageLoaded) { aiUsageLoaded = true; loadAiUsage(); } });
       if (panel === 'ai-downvotes') btn.addEventListener('click', function () { if (!aiDownvotesLoaded) { aiDownvotesLoaded = true; loadDownvotes(); } });
