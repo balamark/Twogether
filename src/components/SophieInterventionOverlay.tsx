@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ChevronRight, Flame, Heart, Loader2, Pause, Send, ShieldAlert, Sparkles } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
 import AutoGrowTextarea from './AutoGrowTextarea';
+import VoiceInputButton from './VoiceInputButton';
 import { apiService } from '../services/api';
 import type {
   ConflictIntervention,
@@ -76,6 +77,7 @@ const SophieInterventionOverlay = ({
   const [active, setActive] = useState<ConflictIntervention>(intervention);
   const [phase, setPhase] = useState<Phase>(safety ? 'safety' : 'pause');
   const [ownText, setOwnText] = useState('');
+  const ownTextRef = useRef<HTMLTextAreaElement>(null);
   const [showOwnText, setShowOwnText] = useState(false);
   const [translating, setTranslating] = useState(false);
   const [translation, setTranslation] = useState<ConflictTranslation | null>(null);
@@ -430,12 +432,14 @@ const SophieInterventionOverlay = ({
               <div className="space-y-3">
                 <div className="bg-white rounded-md border border-petal-rule p-3">
                   <AutoGrowTextarea
+                    ref={ownTextRef}
                     value={ownText}
                     onChange={(e) => setOwnText(e.target.value)}
                     placeholder={tr("用你自己的話說：我最希望TA理解的是…", 'In your own words: what I most want them to understand is…')}
                     maxLength={500}
                     className="w-full font-body text-sm text-petal-ink leading-relaxed bg-transparent border-0 resize-none focus:outline-none placeholder:text-petal-muted/70 min-h-[5rem]"
                   />
+                  <VoiceInputButton targetRef={ownTextRef} source="sophie_own_words" testId="sophie-own" className="pt-2 mt-1 border-t border-petal-rule-soft" />
                 </div>
                 <div className="flex gap-2">
                   <button

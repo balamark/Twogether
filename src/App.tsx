@@ -1476,6 +1476,13 @@ const LoveTimeApp = () => {
     return () => window.removeEventListener('billing:limit-reached', handleLimitReached);
   }, [setCurrentView]);
 
+  // 訪客模式: an inline gate (e.g. the 🎤 voice tries used up) asks to sign up.
+  useEffect(() => {
+    const openSignUp = () => setShowAuthModal(true);
+    window.addEventListener('guest:signup', openSignUp);
+    return () => window.removeEventListener('guest:signup', openSignUp);
+  }, []);
+
   // Proactive expiration: schedule a logout when the JWT is due to expire,
   // and re-check on visibilitychange so users who put their machine to sleep
   // for days don't wake up to a "dead" page that still shows them logged in.

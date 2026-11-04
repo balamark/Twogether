@@ -1451,6 +1451,21 @@ export const resetSessionExpiredGuard = (): void => {
   sessionExpiredDispatched = false;
 };
 
+// 語音輸入 (POST /voice/transcribe, guest: /guest-ai/voice).
+export interface VoiceUsage {
+  tier: string;
+  // Signed-in users: seconds (null = unlimited). Guests: clip counts.
+  limitSeconds?: number | null;
+  usedSeconds?: number;
+  remainingSeconds?: number | null;
+  limit?: number;
+  used?: number;
+  remaining?: number;
+}
+export interface VoiceTranscription { text: string; usage?: VoiceUsage }
+export const voiceFileName = (mime: string): string =>
+  /mp4|m4a|aac/.test(mime) ? 'clip.m4a' : /ogg/.test(mime) ? 'clip.ogg' : /wav/.test(mime) ? 'clip.wav' : 'clip.webm';
+
 // Freemium: error_codes the backend returns (429) when a free couple hits a
 // usage cap. The response interceptor turns any of these into a global
 // `billing:limit-reached` event so the app can surface the upgrade paywall
@@ -1459,6 +1474,7 @@ export const BILLING_LIMIT_CODES = new Set([
   'AI_DAILY_LIMIT_REACHED',
   'SCRIPT_LIMIT_REACHED',
   'PHOTO_LIMIT_REACHED',
+  'VOICE_DAILY_LIMIT_REACHED',
 ]);
 
 export interface BillingPlan {
@@ -2783,6 +2799,23 @@ class ApiService {
   async getAiUsageToday(): Promise<AiUsageToday> {
     const response = await apiClient.get('/ai-usage/today');
     return response.data.usage as AiUsageToday;
+  }
+
+  // 語音輸入: one ≤60s clip → text the user edits before sending. Blocks (the
+  // text IS what the user waits for) and runs an LLM-class model, so it gets
+  // AI_TIMEOUT. skipBillingRedirect: a used-up voice allowance must not yank
+  // the user off a half-written message — VoiceInputButton shows the gate inline.
+  async transcribeVoice(audio: Blob, durationMs: number, signal?: AbortSignal): Promise<VoiceTranscription> {
+    const fd = new FormData();
+    fd.append('duration_ms', String(Math.round(durationMs)));
+    fd.append('audio', audio, voiceFileName(audio.type));
+    const response = await apiClient.post('/voice/transcribe', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: AI_TIMEOUT,
+      signal,
+      skipBillingRedirect: true,
+    });
+    return { text: response.data.text || '', usage: response.data.usage };
   }
 
   // --- 真實故事 (Relationship Wisdom Archive) ---

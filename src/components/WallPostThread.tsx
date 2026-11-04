@@ -7,6 +7,7 @@ import { formatRelativeOrDate } from '../utils/datetime';
 import { companionName, resolveCompanion } from '../utils/aiCompanions';
 import { ROLE_STYLE, counselorLabel } from '../utils/threadRoles';
 import AutoGrowTextarea from './AutoGrowTextarea';
+import VoiceInputButton from './VoiceInputButton';
 import { useAiQuota } from '../hooks/useAiQuota';
 import AiQuotaHint from './AiQuotaHint';
 import MessageTranslationCard from './MessageTranslationCard';
@@ -66,6 +67,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
   const [replies, setReplies] = useState<WallReply[]>([]);
   const [loading, setLoading] = useState(true);
   const [draft, setDraft] = useState('');
+  const replyRef = useRef<HTMLTextAreaElement>(null);
   const [aiPreview, setAiPreview] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiPosting, setAiPosting] = useState(false);
@@ -485,6 +487,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
 
       <div className="flex items-start gap-2 pt-2">
         <AutoGrowTextarea
+          ref={replyRef}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           maxLength={MAX_REPLY}
@@ -509,6 +512,7 @@ const WallPostThread: React.FC<WallPostThreadProps> = ({
           <Send className="w-4 h-4" strokeWidth={1.5} />
         </button>
       </div>
+      <VoiceInputButton targetRef={replyRef} source="wall_reply" testId={`wall-reply-${postId}`} className="pt-1.5" />
     </div>
   );
 };

@@ -294,6 +294,7 @@ jobs:
           _CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
           _LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'claude' }}
           _ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          _OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           _ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           _LINE_CHANNEL_ID: ${{ secrets.LINE_CHANNEL_ID }}
           _LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}
@@ -466,6 +467,7 @@ jobs:
           _CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
           _LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'claude' }}
           _ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          _OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           _ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
           _LINE_CHANNEL_ID: ${{ secrets.LINE_CHANNEL_ID }}
           _LINE_CHANNEL_SECRET: ${{ secrets.LINE_CHANNEL_SECRET }}

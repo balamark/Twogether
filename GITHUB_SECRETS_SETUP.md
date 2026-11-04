@@ -71,6 +71,15 @@ sender domain must be one you've verified with the provider — see
     - Description: Allowed CORS origins for production
     - Example: `https://yourdomain.com`
 
+### Voice Input (語音輸入)
+
+12. **OPENAI_API_KEY**
+    - Description: OpenAI key for speech-to-text (`gpt-4o-mini-transcribe`,
+      `lib/transcribe.js`). Used by both production and staging deploys.
+    - Missing → the 🎤 button answers `VOICE_UNAVAILABLE` and users keep typing.
+    - Tip: create a dedicated project with a monthly budget limit in the
+      OpenAI dashboard as a hard spend ceiling on top of the in-app caps.
+
 ## Test Environment
 
 The CI pipeline automatically sets up a test environment with:
