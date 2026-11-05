@@ -25,6 +25,7 @@ import TherapySummaryCard from './TherapySummaryCard';
 import TherapyTopicsCard from './TherapyTopicsCard';
 import DedicatedTherapistPanel from './DedicatedTherapistPanel';
 import TherapistClientsPanel from './TherapistClientsPanel';
+import TherapistReferralPanel from './TherapistReferralPanel';
 import ParticipantAvatar from './ParticipantAvatar';
 import { ROLE_STYLE } from '../utils/threadRoles';
 import { tr, dateLocale } from '../i18n/tr';
@@ -231,7 +232,11 @@ const TherapistsView: React.FC<TherapistsViewProps> = ({ authState, showNotifica
           role mode, not just on owning a profile, so it never leaks into a
           regular user's 心理諮商 page. */}
       {isCounselorMode && (
-        <TherapistClientsPanel showNotification={showNotification} autoOpenToken={clientsFocusToken} autoOpenCoupleId={clientsFocusCoupleId} />
+        <>
+          <TherapistClientsPanel showNotification={showNotification} autoOpenToken={clientsFocusToken} autoOpenCoupleId={clientsFocusCoupleId} />
+          {/* 諮商師專屬邀請碼 — hand the app to couples you already see. */}
+          <TherapistReferralPanel showNotification={showNotification} />
+        </>
       )}
 
       {/* 公開問答 moved to the 真實故事 tab (StoriesView) — this view is the
@@ -1068,6 +1073,14 @@ const EarningsModal: React.FC<{
                   ? tr(`新進優惠剩 ${earnings.introSessionsRemaining} 次（10%）`, `${earnings.introSessionsRemaining} intro-rate sessions left (10%)`)
                   : tr('已套用一般分潤（20%）', 'Standard fee applies (20%)')}
               </div>
+              {(earnings.referralDiscount ?? 0) > 0 && (
+                <div className="font-body text-[11px] text-pink-600 mt-0.5" data-testid="earnings-referral-discount">
+                  {tr(
+                    `邀請碼減免 −${earnings.referralDiscount}%（${earnings.referredCouples} 對伴侶）`,
+                    `Invite-code discount −${earnings.referralDiscount} pts (${earnings.referredCouples} couples)`,
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <p className="font-body text-[11px] text-petal-muted">

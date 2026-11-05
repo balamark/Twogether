@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="zh-Hant" data-lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>一句話翻譯 · Twogether</title>
+    <meta
+      name="description"
+      content="吵架時脫口而出的那句話，底下真正想說的是什麼？貼上一句「你都不在乎我」，AI 幫你翻成「我需要被重視」——看見話語底下的情緒與需要。免費、不用註冊、文字不會被保存。"
+    />
+    <meta name="robots" content="index, follow" />
+    <!-- Also served at /translate.html; canonicalize onto /translate. -->
+    <link rel="canonical" href="https://twogether.fun/translate" />
+    <link rel="alternate" hreflang="zh-Hant" href="https://twogether.fun/translate?lang=zh-TW" />
+    <link rel="alternate" hreflang="en" href="https://twogether.fun/translate?lang=en" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#fbf7f2" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Twogether" />
+    <meta property="og:locale" content="zh_TW" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:title" content="一句話翻譯：把「你都不在乎我」翻成真正想說的話" />
+    <meta property="og:description" content="說出口的往往只是冰山一角。貼上一句話，看見底下的情緒與需要。免費、不用註冊。" />
+    <meta property="og:url" content="https://twogether.fun/translate" />
+    <meta property="og:image" content="https://twogether.fun/images/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Noto+Serif+TC:wght@500;600&family=Noto+Sans+TC:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Same palette as public/support.html and the app's petal-* tokens. */
+      :root {
+        --cream: #fbf7f2;
+        --cream-2: #f2ebdf;
+        --rose: #d4938a;
+        --rose-deep: #b86e64;
+        --sage-deep: #7d8f75;
+        --ink: #2a2520;
+        --ink-soft: #5a4f45;
+        --muted: #8a7e72;
+        --rule: #d9cfc1;
+        --rule-soft: #e8dfd0;
+        --card: #ffffff;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        background: var(--cream);
+        color: var(--ink);
+        font-family: "Noto Sans TC", system-ui, -apple-system, sans-serif;
+        line-height: 1.7;
+        -webkit-font-smoothing: antialiased;
+      }
+      h1, h2, h3 { font-family: "Fraunces", "Noto Serif TC", Georgia, serif; font-weight: 600; }
+      a { color: var(--rose-deep); }
+      .wrap { max-width: 680px; margin: 0 auto; padding: 0 16px; }
+
+      /* One page, two languages: every translatable node exists twice and the
+         <html data-lang> attribute decides which one shows. */
+      html[data-lang="en"] .zh, html[data-lang="zh-TW"] .en { display: none !important; }
+
+      header.site { background: var(--cream-2); border-bottom: 1px solid var(--rule-soft); }
+      header.site .wrap { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 14px; padding-bottom: 14px; }
+      .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
+      .brand .logo { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--rose), var(--sage-deep)); }
+      .brand .name { font-family: "Fraunces", serif; font-size: 20px; font-weight: 600; }
+      .lang-switch { display: inline-flex; border: 1px solid var(--rule); border-radius: 999px; padding: 2px; }
+      .lang-switch button {
+        font: inherit; font-size: 13px; font-weight: 500; border: 0; background: transparent; cursor: pointer;
+        color: var(--ink-soft); min-height: 32px; min-width: 44px; padding: 0 10px; border-radius: 999px;
+      }
+      .lang-switch button[aria-checked="true"] { background: var(--ink); color: var(--cream); }
+
+      .hero { padding: 36px 0 8px; }
+      .eyebrow { font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; }
+      .hero h1 { font-size: 32px; line-height: 1.25; margin: 0 0 10px; }
+      .hero p { color: var(--ink-soft); margin: 0; font-size: 16px; }
+
+      .panel { margin: 22px 0 8px; padding: 18px; border-radius: 18px; background: var(--card); border: 1px solid var(--rule-soft); }
+      label.field { display: block; font-weight: 500; font-size: 15px; margin-bottom: 8px; }
+      textarea {
+        width: 100%; min-height: 96px; resize: vertical; font: inherit; font-size: 17px; line-height: 1.6;
+        padding: 12px 14px; border-radius: 12px; border: 1px solid var(--rule); background: var(--cream); color: var(--ink);
+      }
+      textarea:focus { outline: 2px solid var(--rose); outline-offset: 1px; }
+      .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+      .counter { color: var(--muted); font-size: 12px; }
+      .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+      .chip {
+        font: inherit; font-size: 13px; border: 1px solid var(--rule); background: var(--cream); color: var(--ink-soft);
+        border-radius: 999px; padding: 4px 12px; cursor: pointer; min-height: 32px;
+      }
+      .chip:hover { border-color: var(--ink); color: var(--ink); }
+      .btn {
+        display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px;
+        padding: 10px 22px; border-radius: 999px; border: 0; cursor: pointer; text-decoration: none;
+        background: var(--ink); color: var(--cream); font: inherit; font-weight: 600; font-size: 15px;
+      }
+      .btn:hover { background: var(--rose-deep); }
+      .btn[disabled] { opacity: .55; cursor: default; }
+      .btn.secondary { background: transparent; color: var(--ink); border: 1px solid var(--rule); font-weight: 500; }
+      .btn.secondary:hover { border-color: var(--ink); background: transparent; }
+      .privacy { color: var(--muted); font-size: 12px; margin: 10px 0 0; }
+
+      .result { margin-top: 16px; }
+      .said { color: var(--muted); font-size: 14px; margin: 0 0 6px; }
+      .said q { color: var(--ink-soft); }
+      .meaning-label { color: var(--rose-deep); font-size: 13px; font-weight: 600; margin: 0; }
+      .meaning { font-family: "Noto Serif TC", "Fraunces", serif; font-size: 24px; line-height: 1.45; margin: 4px 0 10px; }
+      .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+      .pill { font-size: 12px; border-radius: 999px; padding: 2px 10px; border: 1px solid var(--rule); color: var(--ink-soft); }
+      .pill.need { background: rgba(184, 110, 100, .1); border-color: transparent; color: var(--rose-deep); font-weight: 500; }
+      .actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+      .remaining { color: var(--muted); font-size: 12px; margin-top: 8px; }
+
+      .notice { margin-top: 14px; padding: 12px 14px; border-radius: 12px; font-size: 14px; }
+      .notice.warn { background: #fbefe4; color: #7a4a2a; }
+      .notice.info { background: var(--cream-2); color: var(--ink-soft); }
+      .notice .btn { margin-top: 8px; }
+
+      .cta { margin: 26px 0 8px; padding: 20px; border-radius: 18px; background: var(--cream-2); }
+      .cta h2 { font-size: 20px; margin: 0 0 6px; }
+      .cta p { color: var(--ink-soft); margin: 0 0 12px; font-size: 15px; }
+
+      section.how { padding: 18px 0 4px; }
+      section.how h2 { font-size: 20px; margin: 0 0 8px; }
+      section.how ol { margin: 0; padding-left: 20px; color: var(--ink-soft); font-size: 15px; }
+      section.how p.small { color: var(--muted); font-size: 13px; }
+
+      footer.site { border-top: 1px solid var(--rule-soft); margin-top: 24px; padding: 20px 0 36px; color: var(--muted); font-size: 13px; }
+      footer.site a { margin-right: 14px; }
+      [hidden] { display: none !important; }
+
+      @media (max-width: 520px) {
+        .hero h1 { font-size: 26px; }
+        .meaning { font-size: 21px; }
+        .brand .name { font-size: 18px; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site">
+      <div class="wrap">
+        <a class="brand" href="/" data-track="growth.translate.brand_click">
+          <span class="logo" aria-hidden="true"></span>
+          <span class="name">Twogether</span>
+        </a>
+        <div class="lang-switch" role="radiogroup" aria-label="Language / 介面語言" data-testid="translate-language-switch">
+          <button type="button" role="radio" data-set-lang="zh-TW" lang="zh-Hant" aria-label="繁體中文" aria-checked="true">繁中</button>
+          <button type="button" role="radio" data-set-lang="en" lang="en" aria-label="English" aria-checked="false">EN</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <div class="hero">
+        <p class="eyebrow"><span class="zh">一句話翻譯 · 冰山</span><span class="en">One-line translator · Iceberg</span></p>
+        <h1 data-testid="translate-title">
+          <span class="zh">說出口的，往往只是冰山一角</span>
+          <span class="en">What we say is often just the tip of the iceberg</span>
+        </h1>
+        <p>
+          <span class="zh">吵架時脫口而出的「你都不在乎我」，底下其實是「我需要被重視」。貼上一句話，看見它底下的情緒與需要，再換一個對方聽得進去的說法。</span>
+          <span class="en">"You never care about me," blurted out in a fight, usually means "I need to feel that I matter." Paste one line to see the feeling and need underneath — and a way to say it that the other person can actually hear.</span>
+        </p>
+      </div>
+
+      <form class="panel" id="form" novalidate>
+        <label class="field" for="text">
+          <span class="zh">那句話是什麼？（你說的、或對方說的都可以）</span>
+          <span class="en">What was said? (yours or theirs)</span>
+        </label>
+        <textarea id="text" maxlength="200" data-testid="translate-input"
+          data-ph-zh="例如：你每次都這樣，根本不在乎我的感受"
+          data-ph-en="e.g. You always do this, you don't care how I feel"></textarea>
+        <div class="chips" aria-label="examples">
+          <button type="button" class="chip" data-example-zh="你都不在乎我" data-example-en="You don't care about me">
+            <span class="zh">你都不在乎我</span><span class="en">You don't care about me</span>
+          </button>
+          <button type="button" class="chip" data-example-zh="隨便你啦，我不管了" data-example-en="Whatever, do what you want">
+            <span class="zh">隨便你啦，我不管了</span><span class="en">Whatever, do what you want</span>
+          </button>
+          <button type="button" class="chip" data-example-zh="你每次都只顧著滑手機" data-example-en="You're always on your phone">
+            <span class="zh">你每次都只顧著滑手機</span><span class="en">You're always on your phone</span>
+          </button>
+          <button type="button" class="chip" data-example-zh="我很好，沒事" data-example-en="I'm fine. It's nothing.">
+            <span class="zh">我很好，沒事</span><span class="en">I'm fine. It's nothing.</span>
+          </button>
+        </div>
+        <div class="row">
+          <span class="counter" id="counter">0 / 200</span>
+          <button class="btn" type="submit" id="submit" data-testid="translate-submit">
+            <span class="zh" data-idle>翻成真正想說的話</span><span class="en" data-idle>Translate what it really means</span>
+            <span class="zh" data-busy hidden>翻譯中…</span><span class="en" data-busy hidden>Translating…</span>
+          </button>
+        </div>
+        <p class="privacy">
+          <span class="zh">免費、不用註冊。你的文字只拿來產生這次的翻譯，不會被保存。</span>
+          <span class="en">Free, no sign-up. Your text is only used to produce this translation and is never stored.</span>
+        </p>
+
+        <div class="notice warn" id="error" role="alert" hidden data-testid="translate-error">
+          <div id="errorText"></div>
+          <a class="btn" id="errorCta" href="/" hidden data-track="growth.translate.limit_app_click">
+            <span class="zh">免費試玩整個 App</span><span class="en">Try the full app free</span>
+          </a>
+        </div>
+      </form>
+
+      <div class="panel result" id="result" hidden data-testid="translate-result" aria-live="polite">
+        <p class="said"><span class="zh">說出口的：</span><span class="en">What was said: </span><q id="saidText"></q></p>
+        <p class="meaning-label"><span class="zh">可能真正想表達的是</span><span class="en">What it may really mean</span></p>
+        <p class="meaning" id="meaning" data-testid="translate-meaning"></p>
+        <div class="pills" id="pills"></div>
+        <div class="actions">
+          <button type="button" class="btn" id="shareImage" data-testid="translate-share-image">
+            <span class="zh">分享圖卡</span><span class="en">Share as image</span>
+          </button>
+          <button type="button" class="btn secondary" id="copy" data-testid="translate-copy">
+            <span class="zh">複製文字</span><span class="en">Copy text</span>
+          </button>
+          <button type="button" class="btn secondary" id="again">
+            <span class="zh">再翻一句</span><span class="en">Try another line</span>
+          </button>
+        </div>
+        <div class="remaining" id="remaining"></div>
+        <div class="notice info" id="toast" hidden></div>
+      </div>
+
+      <div class="cta" data-testid="translate-cta">
+        <h2>
+          <span class="zh">想跟另一半真的把話說開？</span>
+          <span class="en">Want to actually talk it through with your partner?</span>
+        </h2>
+        <p>
+          <span class="zh">Twogether 幫你寫下那件事，AI 整理成三種說法，送出前做情緒檢查，對方回覆後還能請 AI 諮商師看見你們底下的需要。不用註冊就能先用範例情侶試玩。</span>
+          <span class="en">Twogether helps you write down what happened, turns it into three ways of saying it, checks the heat before you send, and brings in an AI counselor once your partner replies. Try it on a sample couple — no sign-up needed.</span>
+        </p>
+        <a class="btn" href="/" data-track="growth.translate.app_click" data-testid="translate-app-link">
+          <span class="zh">免費試玩（不用註冊）</span><span class="en">Try it free (no sign-up)</span>
+        </a>
+      </div>
+
+      <section class="how">
+        <h2><span class="zh">為什麼要「翻譯」？</span><span class="en">Why "translate"?</span></h2>
+        <ol>
+          <li><span class="zh">指責是保護殼：「你都…」「你每次…」通常包著受傷、害怕或孤單。</span><span class="en">Blame is a shell: "you always…" usually wraps hurt, fear or loneliness.</span></li>
+          <li><span class="zh">對方只聽得到殼：聽到攻擊的人會防禦，於是越吵越遠。</span><span class="en">People only hear the shell: someone who hears an attack defends, and the gap grows.</span></li>
+          <li><span class="zh">說出需要，對方才接得住：「我需要被重視」比「你都不在乎」更容易被回應。</span><span class="en">Naming the need is what can be answered: "I need to feel I matter" gets a response that "you don't care" never will.</span></li>
+        </ol>
+        <p class="small">
+          <span class="zh">AI 的翻譯是一種可能的解讀，不是診斷；如果關係裡有暴力或安全疑慮，請優先尋求專業協助。</span>
+          <span class="en">The AI's translation is one possible reading, not a diagnosis. If there is violence or a safety concern in the relationship, please seek professional help first.</span>
+        </p>
+      </section>
+    </main>
+
+    <footer class="site">
+      <div class="wrap">
+        <a href="/" data-track="growth.translate.app_click"><span class="zh">開啟 Twogether</span><span class="en">Open Twogether</span></a>
+        <a href="/pricing"><span class="zh">付費方案</span><span class="en">Pricing</span></a>
+        <a href="/support"><span class="zh">客服中心</span><span class="en">Support</span></a>
+        <div style="margin-top:10px;">© 2026 Twogether</div>
+      </div>
+    </footer>
+
+    <canvas id="card" width="1080" height="1350" hidden></canvas>
+
+    <script>
+      (function () {
+        var MAX = 200;
+        var LANG_KEY = 'twogether.locale';
+        var lang = 'zh-TW';
+        var last = null; // { text, translation }
+
+        // ── helpers ────────────────────────────────────────────────────────
+        function $(id) { return document.getElementById(id); }
+        function t(zh, en) { return lang === 'en' ? en : zh; }
+        function rid() {
+          try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) { /* fall through */ }
+          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+            var r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+          });
+        }
+        function sessionValue(key) {
+          try {
+            var v = sessionStorage.getItem(key);
+            if (!v) { v = rid(); sessionStorage.setItem(key, v); }
+            return v;
+          } catch (e) { return rid(); }
+        }
+        // Anonymous per-tab id for the AI caps (never persisted beyond the tab).
+        var guestId = sessionValue('tw_translate_guest');
+        // Same tab-session key as the app's src/utils/track.ts, so a visitor who
+        // goes on to the app stays one row in the admin 成長漏斗.
+        var trackSession = sessionValue('tw_track_session');
+
+        function track(name) {
+          try {
+            var body = JSON.stringify({ view: name, view_type: 'modal', session_id: trackSession, entered_at: new Date().toISOString(), duration_ms: 0 });
+            if (navigator.sendBeacon) { navigator.sendBeacon('/api/track/view', new Blob([body], { type: 'application/json' })); return; }
+            fetch('/api/track/view', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: body, keepalive: true }).catch(function () {});
+          } catch (e) { /* tracking never breaks the page */ }
+        }
+
+        // ── language ──────────────────────────────────────────────────────
+        function applyLang(next, persist) {
+          lang = next;
+          var root = document.documentElement;
+          root.setAttribute('data-lang', next);
+          root.setAttribute('lang', next === 'en' ? 'en' : 'zh-Hant');
+          document.title = next === 'en' ? 'One-line translator · Twogether' : '一句話翻譯 · Twogether';
+          var ta = $('text');
+          ta.setAttribute('placeholder', ta.getAttribute(next === 'en' ? 'data-ph-en' : 'data-ph-zh'));
+          var btns = document.querySelectorAll('[data-set-lang]');
+          for (var i = 0; i < btns.length; i++) {
+            btns[i].setAttribute('aria-checked', btns[i].getAttribute('data-set-lang') === next ? 'true' : 'false');
+          }
+          if (persist) { try { localStorage.setItem(LANG_KEY, next); } catch (e) { /* private mode */ } }
+          updateRemaining();
+        }
+        var initial = 'zh-TW';
+        try {
+          var q = new URLSearchParams(location.search).get('lang');
+          var saved = localStorage.getItem(LANG_KEY);
+          if (q === 'en' || q === 'zh-TW') initial = q;
+          else if (saved === 'en' || saved === 'zh-TW') initial = saved;
+        } catch (e) { /* default */ }
+
+        // ── form ──────────────────────────────────────────────────────────
+        var ta = $('text');
+        function updateCounter() { $('counter').textContent = ta.value.length + ' / ' + MAX; }
+        ta.addEventListener('input', updateCounter);
+        var chips = document.querySelectorAll('[data-example-zh]');
+        for (var c = 0; c < chips.length; c++) {
+          chips[c].addEventListener('click', function () {
+            ta.value = this.getAttribute(lang === 'en' ? 'data-example-en' : 'data-example-zh');
+            updateCounter();
+            track('growth.translate.example');
+            ta.focus();
+          });
+        }
+
+        var remaining = null;
+        function updateRemaining() {
+          var el = $('remaining');
+          if (!el || remaining === null) return;
+          el.textContent = remaining > 0
+            ? t('今天還可以免費翻 ' + remaining + ' 句', remaining + ' free translations left today')
+            : t('今天的免費次數用完了，明天再來，或免費註冊用 App 裡的每日 AI 額度。', 'No free translations left today — come back tomorrow, or sign up free for a daily AI allowance in the app.');
+        }
+
+        function setBusy(busy) {
+          $('submit').disabled = busy;
+          var idle = document.querySelectorAll('#submit [data-idle]');
+          var b = document.querySelectorAll('#submit [data-busy]');
+          for (var i = 0; i < idle.length; i++) idle[i].hidden = busy;
+          for (var j = 0; j < b.length; j++) b[j].hidden = !busy;
+        }
+        function showError(msg, withCta) {
+          $('errorText').textContent = msg;
+          $('errorCta').hidden = !withCta;
+          $('error').hidden = false;
+        }
+
+        function render(text, tr) {
+          last = { text: text, translation: tr };
+          $('saidText').textContent = text;
+          $('meaning').textContent = (lang === 'en' ? '“' : '「') + tr.rewrite + (lang === 'en' ? '”' : '」');
+          var pills = $('pills');
+          pills.innerHTML = '';
+          if (tr.need) {
+            var n = document.createElement('span');
+            n.className = 'pill need';
+            n.textContent = t('需要', 'Need: ') + tr.need;
+            pills.appendChild(n);
+          }
+          (tr.emotions || []).forEach(function (e) {
+            var p = document.createElement('span');
+            p.className = 'pill';
+            p.textContent = e.label;
+            pills.appendChild(p);
+          });
+          $('toast').hidden = true;
+          $('result').hidden = false;
+          updateRemaining();
+          $('result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        $('form').addEventListener('submit', function (ev) {
+          ev.preventDefault();
+          var text = ta.value.trim();
+          $('error').hidden = true;
+          if (text.length < 2) {
+            showError(t('先寫下一句話（至少 2 個字），或點上面的範例試試看。', 'Write one line first (at least 2 characters), or tap an example above.'), false);
+            ta.focus();
+            return;
+          }
+          setBusy(true);
+          track('growth.translate.submit');
+          var headers = { 'Content-Type': 'application/json' };
+          if (lang === 'en') headers['X-Locale'] = 'en';
+          var ctrl = window.AbortController ? new AbortController() : null;
+          var timer = setTimeout(function () { if (ctrl) ctrl.abort(); }, 60000);
+          fetch('/api/guest-ai/translate', {
+            method: 'POST', headers: headers, body: JSON.stringify({ guest_id: guestId, text: text }),
+            signal: ctrl ? ctrl.signal : undefined,
+          })
+            .then(function (r) { return r.json().catch(function () { return {}; }).then(function (b) { return { status: r.status, body: b }; }); })
+            .then(function (res) {
+              var b = res.body || {};
+              if (res.status === 200 && b.success && b.translation) {
+                remaining = typeof b.remaining === 'number' ? b.remaining : null;
+                render(text, b.translation);
+                track('growth.translate.result');
+                return;
+              }
+              if (b.error_code === 'TRANSLATE_LIMIT') {
+                remaining = 0;
+                track('growth.translate.limit');
+                showError(b.message || t('今天的免費翻譯次數用完了。', 'No free translations left today.'), true);
+                return;
+              }
+              showError(b.message || t('AI 暫時沒有回應，這次不扣次數。請稍後再試。', 'The AI didn\'t respond — this one didn\'t count. Please try again in a moment.'), false);
+            })
+            .catch(function () {
+              showError(t('連線逾時或中斷了，這次不扣次數。請確認網路後再試一次。', 'The connection timed out or dropped — this one didn\'t count. Check your connection and try again.'), false);
+            })
+            .then(function () { clearTimeout(timer); setBusy(false); });
+        });
+
+        $('again').addEventListener('click', function () {
+          $('result').hidden = true;
+          ta.value = '';
+          updateCounter();
+          ta.focus();
+        });
+
+        function toast(msg) {
+          var el = $('toast');
+          el.textContent = msg;
+          el.hidden = false;
+        }
+        var shareUrl = location.origin + '/translate';
+        function plainText() {
+          if (!last) return '';
+          return t(
+            '說出口的：「' + last.text + '」\n可能真正想表達的是：「' + last.translation.rewrite + '」' + (last.translation.need ? '\n需要' + last.translation.need : '') + '\n\n試試把你的一句話翻譯看看 👉 ' + shareUrl,
+            'What was said: "' + last.text + '"\nWhat it may really mean: "' + last.translation.rewrite + '"' + (last.translation.need ? '\nNeed: ' + last.translation.need : '') + '\n\nTranslate your own line 👉 ' + shareUrl
+          );
+        }
+        $('copy').addEventListener('click', function () {
+          track('growth.translate.copy');
+          var txt = plainText();
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(txt).then(
+              function () { toast(t('已複製，可以貼到 LINE、Threads 或傳給 TA。', 'Copied — paste it into a chat or a post.')); },
+              function () { toast(txt); }
+            );
+          } else { toast(txt); }
+        });
+
+        // ── share image (1080×1350, IG portrait) ─────────────────────────
+        function wrapLines(ctx, text, maxWidth) {
+          // CJK has no spaces, so wrap per character; keep Latin words whole.
+          var tokens = text.match(/[A-Za-z0-9'’,.!?;:-]+\s*|\s+|./g) || [];
+          var lines = [];
+          var line = '';
+          tokens.forEach(function (tok) {
+            var test = line + tok;
+            if (ctx.measureText(test).width > maxWidth && line) { lines.push(line.trim()); line = tok.trimStart ? tok.trimStart() : tok; }
+            else line = test;
+          });
+          if (line.trim()) lines.push(line.trim());
+          return lines;
+        }
+        function drawCard() {
+          var canvas = $('card');
+          var ctx = canvas.getContext('2d');
+          var W = canvas.width, H = canvas.height, P = 96;
+          var serif = '"Noto Serif TC", "Fraunces", serif';
+          var sans = '"Noto Sans TC", system-ui, sans-serif';
+          ctx.fillStyle = '#fbf7f2'; ctx.fillRect(0, 0, W, H);
+          ctx.fillStyle = '#f2ebdf'; ctx.fillRect(0, H - 170, W, 170);
+          ctx.textBaseline = 'top';
+
+          // Lay the quote block out twice: once to measure, once to draw it
+          // vertically centred above the footer band.
+          function body(y0, draw) {
+            var y = y0;
+            function text(str, x, yy) { if (draw) ctx.fillText(str, x, yy); }
+            ctx.fillStyle = '#8a7e72'; ctx.font = '500 34px ' + sans;
+            text(t('說出口的', 'What was said'), P, y); y += 60;
+            ctx.fillStyle = '#5a4f45'; ctx.font = '400 46px ' + sans;
+            wrapLines(ctx, (lang === 'en' ? '\u201C' : '「') + last.text + (lang === 'en' ? '\u201D' : '」'), W - 2 * P).slice(0, 4).forEach(function (l) { text(l, P, y); y += 66; });
+            y += 40;
+            if (draw) {
+              ctx.strokeStyle = '#d4938a'; ctx.lineWidth = 4; ctx.setLineDash([14, 12]);
+              ctx.beginPath(); ctx.moveTo(P, y); ctx.lineTo(W - P, y); ctx.stroke(); ctx.setLineDash([]);
+            }
+            y += 50;
+            ctx.fillStyle = '#b86e64'; ctx.font = '600 36px ' + sans;
+            text(t('可能真正想表達的是', 'What it may really mean'), P, y); y += 70;
+            ctx.fillStyle = '#2a2520'; ctx.font = '600 64px ' + serif;
+            wrapLines(ctx, (lang === 'en' ? '\u201C' : '「') + last.translation.rewrite + (lang === 'en' ? '\u201D' : '」'), W - 2 * P).slice(0, 6).forEach(function (l) { text(l, P, y); y += 90; });
+            if (last.translation.need) {
+              y += 30;
+              var label = t('需要', 'Need: ') + last.translation.need;
+              ctx.font = '500 38px ' + sans;
+              var w = ctx.measureText(label).width + 56;
+              var r = 34, x = P, h = 68;
+              if (draw) {
+                ctx.fillStyle = 'rgba(184,110,100,0.14)';
+                ctx.beginPath();
+                ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.arc(x + w - r, y + r, r, -Math.PI / 2, Math.PI / 2);
+                ctx.lineTo(x + r, y + h); ctx.arc(x + r, y + r, r, Math.PI / 2, 3 * Math.PI / 2); ctx.fill();
+                ctx.fillStyle = '#b86e64'; ctx.fillText(label, x + 28, y + 14);
+              }
+              y += h;
+            }
+            return y - y0;
+          }
+          var avail = H - 170;
+          var height = body(0, false);
+          body(Math.max(P, (avail - height) / 2), true);
+
+          ctx.fillStyle = '#2a2520'; ctx.font = '600 44px "Fraunces", serif';
+          ctx.fillText('Twogether', P, H - 128);
+          ctx.fillStyle = '#5a4f45'; ctx.font = '400 32px ' + sans;
+          ctx.fillText(t('翻譯你的一句話 → ', 'Translate yours → ') + shareUrl.replace(/^https?:\/\//, ''), P, H - 70);
+          return canvas;
+        }
+        $('shareImage').addEventListener('click', function () {
+          if (!last) return;
+          track('growth.translate.share_image');
+          var ready = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+          ready.then(function () {
+            drawCard().toBlob(function (blob) {
+              if (!blob) { toast(t('這個瀏覽器無法產生圖片，改用「複製文字」分享吧。', 'This browser can\'t make the image — use "Copy text" instead.')); return; }
+              var file = new File([blob], 'twogether-translate.png', { type: 'image/png' });
+              if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                navigator.share({ files: [file], text: plainText() }).catch(function () { /* user cancelled */ });
+                return;
+              }
+              var a = document.createElement('a');
+              a.href = URL.createObjectURL(blob);
+              a.download = 'twogether-translate.png';
+              document.body.appendChild(a); a.click(); a.remove();
+              setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+              toast(t('圖卡已下載，可以貼到 IG、Threads 或傳給 TA。', 'Image downloaded — post it or send it to them.'));
+            }, 'image/png');
+          });
+        });
+
+        // ── links + language switch ───────────────────────────────────────
+        var tracked = document.querySelectorAll('[data-track]');
+        for (var k = 0; k < tracked.length; k++) {
+          tracked[k].addEventListener('click', function () { track(this.getAttribute('data-track')); });
+        }
+        var langBtns = document.querySelectorAll('[data-set-lang]');
+        for (var l = 0; l < langBtns.length; l++) {
+          langBtns[l].addEventListener('click', function () {
+            applyLang(this.getAttribute('data-set-lang'), true);
+            if (last) render(last.text, last.translation);
+          });
+        }
+
+        applyLang(initial, false);
+        updateCounter();
+        track('growth.translate.view');
+      })();
+    </script>
+  </body>
+</html>

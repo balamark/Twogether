@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Users, MessageSquare, ChevronRight } from 'lucide-react';
+import { Users, MessageSquare, ChevronRight, FileText } from 'lucide-react';
 import { apiService, type TherapistClientCouple } from '../services/api';
 import type { Notification } from './ErrorNotification';
 import TherapistClientView from './TherapistClientView';
@@ -18,6 +18,9 @@ interface Props {
   // is ordered most-recent-first, so that's the couple most likely meant.
   autoOpenCoupleId?: string | null;
 }
+
+// A summary from the last 7 days reads as "just brought in" for the next session.
+const isRecent = (iso: string) => Date.now() - new Date(iso).getTime() < 7 * 24 * 60 * 60 * 1000;
 
 const TherapistClientsPanel: React.FC<Props> = ({ showNotification, autoOpenToken = 0, autoOpenCoupleId = null }) => {
   const [clients, setClients] = useState<TherapistClientCouple[]>([]);
@@ -65,7 +68,7 @@ const TherapistClientsPanel: React.FC<Props> = ({ showNotification, autoOpenToke
 
       {clients.length === 0 ? (
         <p className="font-body text-sm text-petal-muted">
-          {tr('還沒有伴侶把你設為專屬心理師。當有人指定你之後，就能在這裡檢視他們的牆與好好說話。', 'No couple has chosen you as their dedicated therapist yet. Once someone does, you can view their wall and conversations here.')}
+          {tr('還沒有伴侶把你設為專屬心理師。把下方的專屬邀請碼傳給你正在諮商的伴侶：他們加入後就會出現在這裡，諮商前也能先讀他們帶來的摘要。', 'No couple has chosen you as their dedicated therapist yet. Send your invite code below to couples you already see: once they join they appear here, and you can read the summaries they bring before each session.')}
         </p>
       ) : (
         <div className="space-y-2">
@@ -88,6 +91,29 @@ const TherapistClientsPanel: React.FC<Props> = ({ showNotification, autoOpenToke
                   )}
                   <span>{tr('· 自', '· Since')} {new Date(c.since).toLocaleDateString(dateLocale())}</span>
                 </div>
+                {((c.summaryCount ?? 0) > 0 || c.referredByMe) && (
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                    {(c.summaryCount ?? 0) > 0 && c.latestSummaryAt && (
+                      <span
+                        data-testid="therapist-client-summary-badge"
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-body text-[11px] ${
+                          isRecent(c.latestSummaryAt) ? 'bg-pink-100 text-pink-700' : 'bg-petal-cream-2 text-petal-ink-soft'
+                        }`}
+                      >
+                        <FileText className="w-3 h-3" strokeWidth={1.5} />
+                        {isRecent(c.latestSummaryAt)
+                          ? tr('帶來了新的諮商摘要', 'Brought a new summary')
+                          : tr(`諮商摘要 ${c.summaryCount} 份`, `${c.summaryCount} summaries`)}
+                        <span className="opacity-70">· {new Date(c.latestSummaryAt).toLocaleDateString(dateLocale())}</span>
+                      </span>
+                    )}
+                    {c.referredByMe && (
+                      <span className="rounded-full bg-petal-sage/15 px-2 py-0.5 font-body text-[11px] text-petal-sage-deeper">
+                        {tr('經你的邀請碼加入', 'Joined via your code')}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               <ChevronRight className="w-4 h-4 text-petal-muted shrink-0" strokeWidth={1.5} />
             </button>

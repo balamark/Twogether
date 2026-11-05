@@ -11,6 +11,7 @@
 const express = require('express');
 const db = require('../database/db');
 const { logInfo, logError, logWarn } = require('../lib/logger');
+const therapistReferrals = require('../lib/therapistReferrals');
 const { optionalAuth, invalidateUserCache } = require('../middleware/auth');
 const featureFlags = require('../lib/featureFlags');
 const { invalidateToneCache: invalidateNudgeToneCache, TONES: BUILTIN_NUDGE_TONES } = require('../lib/intimacyNudgeTones');
@@ -294,6 +295,148 @@ adminApiRouter.get('/funnel', async (req, res) => {
   } catch (err) {
     logError('Admin funnel query failed', { err: err.message, stack: err.stack });
     res.status(500).json({ error: 'funnel query failed' });
+  }
+});
+
+// ──────────────────────────────────────────────────────────────────────────
+// Admin: growth funnel (漏斗 tab). Two halves, both over the [from, to] window:
+//   - 訪客 (acquisition): anonymous steps counted per browser tab session
+//     (page_views.session_id from src/utils/track.ts) — visit → guest preview
+//     → real AI try → opened sign-up → signed up in that same tab.
+//   - 新註冊 (activation): the cohort of users who signed up in the window and
+//     how far each got — sent a pairing invite → paired → first 說開一件事 →
+//     paid Premium.
+// Plus the 諮商師邀請碼 channel (therapist_referrals) and its top therapists.
+// ──────────────────────────────────────────────────────────────────────────
+
+const SIGNUP_CLICK_VIEWS = [
+  'onboarding.auth.open',
+  'onboarding.guest.signup_click',
+  'onboarding.guest.limit_signup',
+  'onboarding.guest.coach_signup',
+  'growth.therapist_ref.signup_click',
+];
+
+adminApiRouter.get('/growth-funnel', async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const thirtyAgo = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+    const from = parseDateOr(req.query.from, thirtyAgo);
+    const to = parseDateOr(req.query.to, today);
+    if (from === null || to === null) {
+      return res.status(400).json({ error: 'invalid date; expected YYYY-MM-DD calendar date' });
+    }
+    if (from > to) {
+      return res.status(400).json({ error: 'from must be <= to' });
+    }
+    const win = `>= $1::date AND %s < ($2::date + INTERVAL '1 day')`;
+    const inWindow = (col) => `${col} ${win.replace('%s', col)}`;
+
+    const [acq, cohort, refTotals, translateRow, refTop] = await Promise.all([
+      db.query(
+        `WITH pv AS (
+           SELECT session_id, view, user_id, entered_at FROM page_views
+            WHERE ${inWindow('entered_at')} AND session_id IS NOT NULL
+         ),
+         guest_sessions AS (
+           SELECT session_id, MIN(entered_at) AS t FROM pv
+            WHERE view = 'onboarding.guest.seeded' GROUP BY session_id
+         )
+         SELECT
+           (SELECT COUNT(DISTINCT ip)::int FROM landing_visits WHERE ${inWindow('visited_at')}) AS visitors,
+           (SELECT COUNT(*)::int FROM guest_sessions) AS guest_started,
+           (SELECT COUNT(DISTINCT guest_id)::int FROM guest_ai_usage WHERE ${inWindow('created_at')}) AS guest_ai,
+           (SELECT COUNT(DISTINCT session_id)::int FROM pv WHERE view = ANY($3)) AS signup_opened,
+           (SELECT COUNT(DISTINCT g.session_id)::int FROM guest_sessions g
+              JOIN pv ON pv.session_id = g.session_id AND pv.user_id IS NOT NULL AND pv.entered_at >= g.t) AS guest_signed_up`,
+        [from, to, SIGNUP_CLICK_VIEWS]
+      ),
+      db.query(
+        `WITH c AS (
+           SELECT id FROM users WHERE ${inWindow('created_at')}
+         ),
+         paired AS (
+           SELECT DISTINCT c.id, cp.id AS couple_id FROM c
+             JOIN couples cp ON (cp.user1_id = c.id OR cp.user2_id = c.id) AND cp.user2_id IS NOT NULL
+         )
+         SELECT
+           (SELECT COUNT(*)::int FROM c) AS signups,
+           (SELECT COUNT(DISTINCT c.id)::int FROM c JOIN pairing_requests pr ON pr.sender_id = c.id) AS invite_sent,
+           (SELECT COUNT(DISTINCT id)::int FROM paired) AS paired,
+           (SELECT COUNT(DISTINCT c.id)::int FROM c JOIN events e ON e.created_by = c.id) AS first_talk,
+           (SELECT COUNT(DISTINCT p.id)::int FROM paired p
+              JOIN couple_entitlements ce ON ce.couple_id = p.couple_id AND ce.order_id IS NOT NULL) AS paid`,
+        [from, to]
+      ),
+      db.query(
+        `SELECT
+           (SELECT COUNT(DISTINCT session_id)::int FROM page_views
+             WHERE view = 'growth.therapist_ref.landing' AND ${inWindow('entered_at')}) AS landings,
+           COUNT(*)::int AS claimed,
+           COUNT(*) FILTER (WHERE new_user)::int AS new_users,
+           COUNT(*) FILTER (WHERE status = 'rewarded')::int AS rewarded
+           FROM therapist_referrals WHERE ${inWindow('created_at')}`,
+        [from, to]
+      ),
+      db.query(
+        `SELECT
+           (SELECT COUNT(DISTINCT session_id)::int FROM page_views
+             WHERE view = 'growth.translate.view' AND ${inWindow('entered_at')}) AS views,
+           (SELECT COUNT(*)::int FROM guest_ai_usage
+             WHERE kind = 'line_translate' AND ${inWindow('created_at')}) AS translations,
+           (SELECT COUNT(DISTINCT session_id)::int FROM page_views
+             WHERE view IN ('growth.translate.share_image', 'growth.translate.copy') AND ${inWindow('entered_at')}) AS shared,
+           (SELECT COUNT(DISTINCT session_id)::int FROM page_views
+             WHERE view IN ('growth.translate.app_click', 'growth.translate.limit_app_click') AND ${inWindow('entered_at')}) AS app_clicks`,
+        [from, to]
+      ),
+      db.query(
+        `SELECT t.display_name, t.referral_code,
+                COUNT(tr.id)::int AS joined,
+                COUNT(tr.id) FILTER (WHERE tr.status = 'rewarded')::int AS rewarded
+           FROM therapist_referrals tr JOIN therapists t ON t.id = tr.therapist_id
+          GROUP BY t.id
+          ORDER BY rewarded DESC, joined DESC
+          LIMIT 20`
+      ),
+    ]);
+
+    const a = acq.rows[0];
+    const c = cohort.rows[0];
+    const r = refTotals.rows[0];
+    res.json({
+      window: { from, to },
+      acquisition: [
+        { key: 'visitors', label: '不重複 IP 進站', count: a.visitors },
+        { key: 'guest_started', label: '開始試玩（分頁）', count: a.guest_started },
+        { key: 'guest_ai', label: '用了真的 AI', count: a.guest_ai },
+        { key: 'signup_opened', label: '打開註冊（分頁）', count: a.signup_opened },
+        { key: 'guest_signed_up', label: '試玩後在同分頁註冊', count: a.guest_signed_up },
+      ],
+      activation: [
+        { key: 'signups', label: '新註冊', count: c.signups },
+        { key: 'invite_sent', label: '送出配對邀請', count: c.invite_sent },
+        { key: 'paired', label: '配對成功', count: c.paired },
+        { key: 'first_talk', label: '說開第一件事', count: c.first_talk },
+        { key: 'paid', label: '付費 Premium', count: c.paid },
+      ],
+      translateTool: [
+        { key: 'views', label: '打開一句話翻譯（分頁）', count: translateRow.rows[0].views },
+        { key: 'translations', label: '翻譯次數', count: translateRow.rows[0].translations },
+        { key: 'shared', label: '分享圖卡／複製（分頁）', count: translateRow.rows[0].shared },
+        { key: 'app_clicks', label: '點進 App（分頁）', count: translateRow.rows[0].app_clicks },
+      ],
+      therapistReferrals: {
+        landings: r.landings,
+        claimed: r.claimed,
+        newUsers: r.new_users,
+        rewarded: r.rewarded,
+        top: refTop.rows.map((t) => ({ ...t, fee_discount: therapistReferrals.feeDiscountFor(t.rewarded) })),
+      },
+    });
+  } catch (err) {
+    logError('Admin growth funnel query failed', { err: err.message, stack: err.stack });
+    res.status(500).json({ error: 'growth funnel query failed' });
   }
 });
 
@@ -1485,6 +1628,10 @@ const ADMIN_HTML = `<!doctype html>
       <div class="funnel" id="funnelCards"></div>
       <div class="arrows" id="funnelRates"></div>
 
+      <h1 style="margin-top:24px">成長漏斗</h1>
+      <p class="sub">訪客：本期每個瀏覽器分頁走到哪一步。新註冊：本期註冊的帳號後來走到哪一步（不限本期內完成）。百分比＝相對上一步。先找流失最多的那一步再決定做什麼。</p>
+      <div id="growthFunnel" class="muted">載入中…</div>
+
       <h1 style="margin-top:24px">最近註冊帳號</h1>
       <p class="sub">依註冊時間倒序。情侶配對狀態、登入天數、互動次數。</p>
       <div style="overflow-x:auto">
@@ -2026,6 +2173,7 @@ const ADMIN_HTML = `<!doctype html>
         const pages = await pagesRes.json();
         const retention = await retRes.json();
         renderFunnel(funnel);
+        loadGrowthFunnel(qs);
         renderUsers(usersBody.users || []);
         renderPages(pages);
         renderRetention(retention);
@@ -2132,6 +2280,53 @@ const ADMIN_HTML = `<!doctype html>
         });
       });
     });
+
+    async function loadGrowthFunnel(qs) {
+      try {
+        const r = await fetch('/api/admin/growth-funnel?' + qs.toString());
+        if (!r.ok) throw new Error('growth-funnel ' + r.status);
+        renderGrowthFunnel(await r.json());
+      } catch (e) {
+        $('growthFunnel').innerHTML = '<div class="error">成長漏斗載入失敗: ' + esc(e.message) + '</div>';
+      }
+    }
+
+    function funnelSteps(title, steps) {
+      const top = steps.length ? (steps[0].count || 0) : 0;
+      let prev = null;
+      const rows = steps.map((st) => {
+        const n = st.count || 0;
+        const ofPrev = prev === null ? null : (prev > 0 ? n / prev : null);
+        const ofTop = top > 0 ? n / top : 0;
+        prev = n;
+        const drop = ofPrev !== null && ofPrev < 0.3 ? ' style="color:#b7635a;font-weight:500"' : '';
+        return '<tr><td>' + esc(st.label) + '</td>' +
+          '<td class="num">' + n.toLocaleString() + '</td>' +
+          '<td' + drop + ' class="num">' + (ofPrev === null ? '—' : fmtPct(ofPrev)) + '</td>' +
+          '<td><div class="bar-wrap"><div class="bar"><div class="bar-fill" style="width:' + (ofTop * 100).toFixed(1) + '%"></div></div></div></td></tr>';
+      }).join('');
+      return '<h2 style="font-size:15px;font-weight:500;margin:16px 0 8px">' + esc(title) + '</h2>' +
+        '<table data-testid="growth-funnel-' + esc(title) + '"><thead><tr><th>步驟</th><th class="num">人數</th><th class="num">相對上一步</th><th>相對第一步</th></tr></thead><tbody>' + rows + '</tbody></table>';
+    }
+
+    function renderGrowthFunnel(g) {
+      const tr = g.therapistReferrals || {};
+      const top = (tr.top || []).map((t) => '<tr><td>' + esc(t.display_name) + '</td><td>' + esc(t.referral_code || '') + '</td>' +
+        '<td class="num">' + t.joined + '</td><td class="num">' + t.rewarded + '</td>' +
+        '<td class="num">' + (t.fee_discount || 0) + '%</td></tr>').join('');
+      $('growthFunnel').className = '';
+      $('growthFunnel').innerHTML =
+        funnelSteps('訪客', g.acquisition || []) +
+        funnelSteps('新註冊', g.activation || []) +
+        funnelSteps('一句話翻譯', g.translateTool || []) +
+        '<h2 style="font-size:15px;font-weight:500;margin:16px 0 8px">諮商師邀請碼</h2>' +
+        '<div class="arrows">點開邀請連結 <span class="rate">' + (tr.landings || 0) + '</span><span>·</span>' +
+        '領取 <span class="rate">' + (tr.claimed || 0) + '</span>（新用戶 ' + (tr.newUsers || 0) + '）<span>·</span>' +
+        '配對並送出 Premium <span class="rate">' + (tr.rewarded || 0) + '</span></div>' +
+        (top
+          ? '<table><thead><tr><th>諮商師</th><th>代碼</th><th class="num">加入</th><th class="num">已配對領取</th><th class="num">平台費減免</th></tr></thead><tbody>' + top + '</tbody></table>'
+          : '<p class="muted">還沒有伴侶透過諮商師邀請碼加入。</p>');
+    }
 
     function renderFunnel(f) {
       $('funnelCards').innerHTML = [

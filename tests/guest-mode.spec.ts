@@ -11,7 +11,7 @@ const DB_KEY = 'tw_guest_db_v1';
 // anonymous tracking. Anything else means guest data leaked to the network.
 const ALLOWED = [
   /\/api\/auth\//, /\/api\/track\//, /\/api\/feature-flags$/, /\/api\/feedback\/approved$/,
-  /\/api\/intimacy-plans\/samples$/, /\/api\/guest-ai\//, /\/api\/therapists$/, /\/api\/stories(\/[0-9a-f-]{36})?$/,
+  /\/api\/intimacy-plans\/samples$/, /\/api\/guest-ai\//, /\/api\/therapists$/, /\/api\/therapists\/referral\/[A-Za-z0-9]+$/, /\/api\/stories(\/[0-9a-f-]{36})?$/,
 ];
 
 function watchNetwork(page: Page): string[] {

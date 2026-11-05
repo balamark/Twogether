@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { v4: uuidv4 } = require('uuid');
 const db = require('../database/db');
+const therapistReferrals = require('../lib/therapistReferrals');
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CODE_LENGTH = 8;
@@ -418,6 +419,9 @@ const acceptPairingInviteByToken = async ({ token, accepter }) => {
       pendingConflicts
     };
   });
+
+  // A referral month (諮商師邀請碼) that was waiting on this pairing.
+  await therapistReferrals.rewardPendingForUsers([invitation.sender_id, accepterId]);
 
   return {
     success: true,

@@ -85,6 +85,112 @@ router.get('/quota', async (req, res) => {
 
 const strArr = (v, max) => (Array.isArray(v) ? v : []).slice(-max);
 
+// ---------------------------------------------------------------------------
+// 一句話翻譯 (public /translate tool page, public/translate.html). Anyone can
+// paste ONE line ("你都不在乎我") and get the 冰山 translation — the feeling and
+// need under it plus how it could be said ("我需要被重視"). Reuses the app's
+// 情緒翻譯 generator. Its own caps, separate from the guest preview's 5 tries:
+// TRANSLATE_PER_GUEST per anonymous tab id and TRANSLATE_IP_DAILY per IP per
+// 24h, plus the shared global ceiling. Same privacy contract: the text is
+// sent to the AI and never stored or logged.
+// ---------------------------------------------------------------------------
+const TRANSLATE_KIND = 'line_translate';
+const TRANSLATE_PER_GUEST = Number(process.env.TRANSLATE_PER_GUEST || 5);
+const TRANSLATE_IP_DAILY = Number(process.env.TRANSLATE_IP_DAILY || 12);
+const TRANSLATE_MAX_CHARS = 200;
+
+const translateLimitBody = () => ({
+  success: false,
+  error_code: 'TRANSLATE_LIMIT',
+  message: '今天的免費翻譯次數用完了。免費註冊後每天都有 AI 額度，還能邀請另一半一起把話說開。',
+  remaining: 0,
+});
+
+router.post(
+  '/translate',
+  [
+    body('guest_id').custom(validGuestId).withMessage('訪客編號格式不正確，請重新整理頁面再試'),
+    body('text').isString().trim()
+      .isLength({ min: 2, max: TRANSLATE_MAX_CHARS })
+      .withMessage(`請輸入 2–${TRANSLATE_MAX_CHARS} 字的一句話`),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, message: errors.array()[0].msg, error_code: 'VALIDATION_ERROR' });
+    }
+    const guestId = req.body.guest_id;
+    const ipHash = hashIp(req.ip);
+    const text = String(req.body.text).trim();
+    try {
+      const u = await db.query(
+        `SELECT
+           COUNT(*) FILTER (WHERE guest_id = $1 AND created_at >= NOW() - INTERVAL '24 hours')::int AS guest_used,
+           COUNT(*) FILTER (WHERE ip_hash = $2 AND created_at >= NOW() - INTERVAL '24 hours')::int AS ip_used
+         FROM guest_ai_usage
+         WHERE kind = $3 AND (guest_id = $1 OR ip_hash = $2) AND created_at >= NOW() - INTERVAL '24 hours'`,
+        [guestId, ipHash, TRANSLATE_KIND]
+      );
+      const guestUsed = u.rows[0]?.guest_used || 0;
+      const ipUsed = u.rows[0]?.ip_used || 0;
+      const remainingBefore = Math.max(0, Math.min(TRANSLATE_PER_GUEST - guestUsed, TRANSLATE_IP_DAILY - ipUsed));
+      if (remainingBefore <= 0) {
+        logInfo('guest_ai.translate_limit', { guestId, guestUsed, ipUsed, blocked: true });
+        return res.status(429).json(translateLimitBody());
+      }
+      const global = await db.query(
+        `SELECT COUNT(*)::int AS c FROM guest_ai_usage WHERE created_at >= NOW() - INTERVAL '24 hours'`
+      );
+      if ((global.rows[0]?.c || 0) >= GUEST_AI_GLOBAL_DAILY) {
+        logWarn('guest_ai.global_cap', { kind: TRANSLATE_KIND, cap: GUEST_AI_GLOBAL_DAILY });
+        return res.status(429).json(translateLimitBody());
+      }
+
+      const result = await llmService.generateThreadTranslations({
+        messages: [{ id: 'line', speaker: '說話的人', content: text }],
+        targetIds: ['line'],
+      });
+      const meta = result?._meta || {};
+      const t = (result?.translations || []).find((x) => x.id === 'line');
+      if (!t || !t.rewrite) {
+        logWarn('guest_ai.translate_empty', { guestId, provider: meta.provider, returned: meta.returned });
+        return res.status(502).json({
+          success: false,
+          error_code: 'TRANSLATE_EMPTY',
+          message: 'AI 這次沒有翻出來，這次不扣次數。換個說法、或寫得具體一點再試一次。',
+        });
+      }
+
+      await db.query(
+        `INSERT INTO guest_ai_usage (guest_id, ip_hash, kind, provider, model, duration_ms, cost_usd)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [guestId, ipHash, TRANSLATE_KIND, meta.provider || null, meta.model || null, meta.durationMs ?? null, meta.costUsd ?? null]
+      );
+      const remaining = remainingBefore - 1;
+      // Length only — the visitor's words are never logged or stored.
+      logInfo('guest_ai.translate', {
+        guestId, chars: text.length, provider: meta.provider, model: meta.model,
+        costUsd: meta.costUsd, durationMs: meta.durationMs, remaining,
+      });
+      res.json({
+        success: true,
+        translation: {
+          rewrite: String(t.rewrite),
+          need: String(t.need || ''),
+          emotions: (Array.isArray(t.emotions) ? t.emotions : [])
+            .filter((e) => e && typeof e.label === 'string')
+            .slice(0, 3)
+            .map((e) => ({ label: e.label, intensity: Number(e.intensity) || 0 })),
+        },
+        remaining,
+      });
+    } catch (err) {
+      logError('guest_ai.translate failed', { err: err.message });
+      res.status(500).json({ success: false, message: 'AI 暫時沒有回應，這次不扣次數。請稍後再試。', error_code: 'GUEST_AI_FAILED' });
+    }
+  }
+);
+
 // POST /api/guest-ai/:kind  { guest_id, ...input }
 router.post(
   '/:kind',
@@ -176,4 +282,4 @@ router.post(
 );
 
 module.exports = router;
-module.exports._internals = { GUEST_AI_LIMIT, KINDS, hashIp };
+module.exports._internals = { GUEST_AI_LIMIT, KINDS, hashIp, TRANSLATE_PER_GUEST, TRANSLATE_IP_DAILY };
