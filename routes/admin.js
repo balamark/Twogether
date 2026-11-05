@@ -332,7 +332,7 @@ adminApiRouter.get('/growth-funnel', async (req, res) => {
     const win = `>= $1::date AND %s < ($2::date + INTERVAL '1 day')`;
     const inWindow = (col) => `${col} ${win.replace('%s', col)}`;
 
-    const [acq, cohort, refTotals, refTop] = await Promise.all([
+    const [acq, cohort, refTotals, translateRow, refTop] = await Promise.all([
       db.query(
         `WITH pv AS (
            SELECT session_id, view, user_id, entered_at FROM page_views
@@ -379,6 +379,18 @@ adminApiRouter.get('/growth-funnel', async (req, res) => {
         [from, to]
       ),
       db.query(
+        `SELECT
+           (SELECT COUNT(DISTINCT session_id)::int FROM page_views
+             WHERE view = 'growth.translate.view' AND ${inWindow('entered_at')}) AS views,
+           (SELECT COUNT(*)::int FROM guest_ai_usage
+             WHERE kind = 'line_translate' AND ${inWindow('created_at')}) AS translations,
+           (SELECT COUNT(DISTINCT session_id)::int FROM page_views
+             WHERE view IN ('growth.translate.share_image', 'growth.translate.copy') AND ${inWindow('entered_at')}) AS shared,
+           (SELECT COUNT(DISTINCT session_id)::int FROM page_views
+             WHERE view IN ('growth.translate.app_click', 'growth.translate.limit_app_click') AND ${inWindow('entered_at')}) AS app_clicks`,
+        [from, to]
+      ),
+      db.query(
         `SELECT t.display_name, t.referral_code,
                 COUNT(tr.id)::int AS joined,
                 COUNT(tr.id) FILTER (WHERE tr.status = 'rewarded')::int AS rewarded
@@ -407,6 +419,12 @@ adminApiRouter.get('/growth-funnel', async (req, res) => {
         { key: 'paired', label: '配對成功', count: c.paired },
         { key: 'first_talk', label: '說開第一件事', count: c.first_talk },
         { key: 'paid', label: '付費 Premium', count: c.paid },
+      ],
+      translateTool: [
+        { key: 'views', label: '打開一句話翻譯（分頁）', count: translateRow.rows[0].views },
+        { key: 'translations', label: '翻譯次數', count: translateRow.rows[0].translations },
+        { key: 'shared', label: '分享圖卡／複製（分頁）', count: translateRow.rows[0].shared },
+        { key: 'app_clicks', label: '點進 App（分頁）', count: translateRow.rows[0].app_clicks },
       ],
       therapistReferrals: {
         landings: r.landings,
@@ -2300,6 +2318,7 @@ const ADMIN_HTML = `<!doctype html>
       $('growthFunnel').innerHTML =
         funnelSteps('訪客', g.acquisition || []) +
         funnelSteps('新註冊', g.activation || []) +
+        funnelSteps('一句話翻譯', g.translateTool || []) +
         '<h2 style="font-size:15px;font-weight:500;margin:16px 0 8px">諮商師邀請碼</h2>' +
         '<div class="arrows">點開邀請連結 <span class="rate">' + (tr.landings || 0) + '</span><span>·</span>' +
         '領取 <span class="rate">' + (tr.claimed || 0) + '</span>（新用戶 ' + (tr.newUsers || 0) + '）<span>·</span>' +

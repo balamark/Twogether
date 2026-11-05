@@ -328,6 +328,20 @@ app.get(['/support', '/support.html'], (req, res) => {
   res.type('html').send(supportHtmlCache);
 });
 
+// Public, no-login 一句話翻譯 tool (growth top-of-funnel): paste one line,
+// see the feeling + need under it, share it as an image. Self-contained static
+// page that calls the public POST /api/guest-ai/translate. '/translate.html'
+// is listed so the raw dist/ copy can never be served under a second URL.
+app.get(['/translate', '/translate.html'], (req, res) => {
+  logInfo('translate.page_view', {
+    path: req.path,
+    lang: typeof req.query.lang === 'string' ? req.query.lang.slice(0, 8) : null,
+    referrer: (req.get('referer') || '').slice(0, 120),
+  });
+  res.setHeader('Cache-Control', 'no-cache');
+  res.sendFile(path.join(__dirname, 'public', 'translate.html'));
+});
+
 // Public, no-login therapist recruitment / sign-up page. The SPA gates most
 // views behind auth, so this explicit route (registered before the static
 // catch-all) serves a self-contained static form that POSTs to the public
