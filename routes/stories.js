@@ -369,9 +369,9 @@ router.post(
     if (sendValidationError(req, res)) return;
     try {
       const userId = req.user.id;
-      const { tier, limit } = await resolveAiLimit(userId);
+      const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
       const usedToday = await countTodayAiUsage(userId);
-      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+      const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
       if (!limitCheck.ok) {
         logInfo('story.structure.limit', { userId, used: usedToday, limit, tier });
         return res.status(limitCheck.status).json(limitCheck.body);
@@ -480,9 +480,9 @@ router.post(
       let aiInsights = null;
       let aiSkipped = false;
       try {
-        const { tier, limit } = await resolveAiLimit(userId);
+        const { tier, limit, unlimitedAi } = await resolveAiLimit(userId);
         const usedToday = await countTodayAiUsage(userId);
-        const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday });
+        const limitCheck = checkLimit({ tier, key: 'icebreaker_per_day', used: usedToday, unlimited: unlimitedAi });
         if (!limitCheck.ok) {
           aiSkipped = true;
           logInfo('story.insight.limit', { userId, storyId: story.id, used: usedToday, limit, tier });
