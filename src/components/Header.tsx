@@ -203,7 +203,7 @@ const Header: React.FC<HeaderProps> = ({
                   className="flex items-center space-x-1 sm:space-x-1.5 border border-petal-rule hover:border-petal-ink px-2 sm:px-3 py-1.5 rounded-full transition-colors min-h-[40px] max-w-[140px] sm:max-w-none"
                 >
                   <User className="w-3.5 h-3.5 text-petal-ink-soft shrink-0" strokeWidth={1.5} />
-                  {/* Guests on a phone: icon only, so the logo + 免費註冊 + 語言 still fit. */}
+                  {/* Guests on a phone: icon only, so the logo + 登入/註冊 + 語言 still fit. */}
                   <span className={`${authState.isGuest ? 'hidden sm:inline ' : ''}font-body text-sm text-petal-ink truncate`}>
                     {authState.user?.nickname || t('header.userFallback')}
                   </span>
@@ -441,7 +441,14 @@ const Header: React.FC<HeaderProps> = ({
                 data-testid="header-auth-button"
                 className={`bg-petal-ink text-white ${authState.isGuest ? 'px-3 sm:px-5' : 'px-5'} py-2 rounded-full hover:bg-pink-700 transition-colors text-sm font-medium tracking-wide whitespace-nowrap`}
               >
-                {authState.isGuest ? t('header.guestSignUp') : t('header.signIn')}
+                {/* Guests include people who already have an account: the door must
+                    say 登入 too, not only 免費註冊. Phones get the shorter label. */}
+                {authState.isGuest ? (
+                  <>
+                    <span className="sm:hidden">{t('header.guestSignUpShort')}</span>
+                    <span className="hidden sm:inline">{t('header.guestSignUp')}</span>
+                  </>
+                ) : t('header.signIn')}
               </button>
             )}
 

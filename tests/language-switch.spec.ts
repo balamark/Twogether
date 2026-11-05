@@ -15,13 +15,13 @@ test.describe('language switch', () => {
     await expect(sw).toBeVisible();
     await expect(page.getByTestId('language-switch-zh-TW')).toHaveAttribute('aria-checked', 'true');
     await expect(page.getByTestId('nav-tab-home')).toContainText('今天');
-    // Signed-out visitors browse in 訪客模式, whose header door reads 免費註冊.
-    await expect(page.getByTestId('header-auth-button')).toContainText('免費註冊');
+    // Signed-out visitors browse in 訪客模式, whose header door reads 登入 / 註冊 (so returning users find login).
+    await expect(page.getByTestId('header-auth-button')).toContainText('登入');
 
     await page.getByTestId('language-switch-en').click();
     await expect(page.getByTestId('language-switch-en')).toHaveAttribute('aria-checked', 'true');
     await expect(page.getByTestId('nav-tab-home')).toContainText('Today');
-    await expect(page.getByTestId('header-auth-button')).toContainText('Sign up free');
+    await expect(page.getByTestId('header-auth-button')).toContainText('Sign in');
     await expect(page.locator('html')).toHaveAttribute('lang', 'en');
 
     await page.reload();

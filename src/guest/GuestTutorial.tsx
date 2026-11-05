@@ -114,7 +114,7 @@ function PrivacyScene() {
         {tr('不用註冊，送你 5 次真的 AI（整理和諮商師各算一次）。你寫的內容只存在這個瀏覽器分頁，關掉就消失；送去給 AI 的文字只拿來產生回覆，不會被保存。', 'No sign-up, and 5 real AI tries on us (organizing and the counselor each use one). What you write stays in this browser tab and is gone when you close it; text sent to the AI is only used for the reply, never stored.')}
       </p>
       <p className="mt-2 font-body text-[11px] text-petal-muted motion-safe:animate-guest-rise" style={d(900)}>
-        {tr('想留下紀錄、邀請另一半？隨時按右上角「免費註冊」。', 'Want to keep it and invite your partner? Tap "Sign up free" any time.')}
+        {tr('想留下紀錄、邀請另一半？隨時按右上角「登入 / 註冊」；已經有帳號的話也從那裡登入。', 'Want to keep it and invite your partner? Tap "Sign in / Sign up" at the top right any time. Already have an account? Sign in there too.')}
       </p>
     </div>
   );
