@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Calendar, X, MessageSquareHeart, Sparkles, Play, ListChecks } from 'lucide-react';
+import { Calendar, X, MessageSquareHeart, Sparkles, Play, ListChecks, Zap, Clock } from 'lucide-react';
 import apiService from '../services/api';
 import type { IntimacyRequest, AlternativePlan } from '../services/api';
 import { useTimezone } from '../contexts/TimezoneContext';
-import { formatDateTime } from '../utils/datetime';
+import { formatDateTime, formatRelativeOrDate } from '../utils/datetime';
 import { useScrollLock } from '../hooks/useScrollLock';
 import IntimacyRequestActionPanel from './IntimacyRequestActionPanel';
 import { tr } from '../i18n/tr';
@@ -83,6 +83,65 @@ const LinkedPlans: React.FC<{ ids: string[]; onOpenPlan?: (planId: string) => vo
   );
 };
 
+// "還有 3 小時" / "還有 2 天" / "已過 1 小時" — how far away a scheduled time is,
+// so the recipient doesn't have to do date math against the absolute stamp.
+function relativeUntil(iso: string): string {
+  const diff = new Date(iso).getTime() - Date.now();
+  if (Number.isNaN(diff)) return '';
+  const abs = Math.abs(diff);
+  const minute = 60 * 1000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  const [zh, en] = abs < hour
+    ? [`${Math.max(1, Math.round(abs / minute))} 分鐘`, `${Math.max(1, Math.round(abs / minute))} min`]
+    : abs < day
+    ? [`${Math.round(abs / hour)} 小時`, `${Math.round(abs / hour)} h`]
+    : [`${Math.round(abs / day)} 天`, `${Math.round(abs / day)} d`];
+  return diff >= 0 ? tr(`還有 ${zh}`, `in ${en}`) : tr(`已過 ${zh}`, `${en} ago`);
+}
+
+// When is this invitation for? Without this the recipient can't tell a
+// "right now" invite from a booking (the only date shown used to be the small
+// sent/expiry footnote).
+const WhenBanner: React.FC<{ request: IntimacyRequest; tz: string }> = ({ request, tz }) => {
+  if (request.scheduledTime) {
+    return (
+      <div
+        className="mb-3 flex items-start gap-3 rounded-xl border border-petal-rose-deep/30 bg-petal-rose-soft/40 px-4 py-3"
+        data-testid="request-when-scheduled"
+      >
+        <Calendar className="w-5 h-5 mt-0.5 shrink-0 text-petal-rose-deep" />
+        <div className="min-w-0">
+          <div className="text-xs text-petal-muted">{tr('預約邀請・約在這個時間', 'Scheduled invitation · planned for')}</div>
+          <div className="text-base font-semibold text-petal-ink">
+            {formatDateTime(request.scheduledTime, tz, { alwaysShowTz: true })}
+          </div>
+          <div className="text-xs text-petal-rose-deep mt-0.5">{relativeUntil(request.scheduledTime)}</div>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div
+      className="mb-3 flex items-start gap-3 rounded-xl border border-amber-300/60 bg-amber-50 px-4 py-3"
+      data-testid="request-when-now"
+    >
+      <Zap className="w-5 h-5 mt-0.5 shrink-0 text-amber-600" />
+      <div className="min-w-0">
+        <div className="text-xs text-petal-muted">{tr('立即邀請・沒有預約時間', 'Invite-now · no set time')}</div>
+        <div className="text-base font-semibold text-petal-ink">
+          {tr('對方想在收到後盡快一起', 'They\'d like to do this as soon as you can')}
+        </div>
+        <div className="text-xs text-amber-700 mt-0.5 inline-flex items-center gap-1">
+          <Clock className="w-3.5 h-3.5" />
+          {tr('發出於', 'Sent')} {formatRelativeOrDate(request.createdAt, tz)}
+          {request.expiresAt && <>{tr('・', ' · ')}{tr('有效至', 'valid until')} {formatDateTime(request.expiresAt, tz)}</>}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ALTERNATIVE_CATEGORY_LABEL: Record<string, string> = {
   physical: tr('肢體親密', 'Physical intimacy'),
   emotional: tr('情感親密', 'Emotional intimacy'),
@@ -148,12 +207,7 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
             <div className="text-xs uppercase tracking-[0.12em] text-petal-muted mb-1.5">
               {negotiation ? tr('💬 替代方案協商', '💬 Talk about alternatives') : tr('原邀請', 'Original invitation')}
             </div>
-            {request.scheduledTime && (
-              <div className="inline-flex items-center gap-1.5 text-sm text-petal-ink-soft mb-2">
-                <Calendar className="w-4 h-4" />
-                <span>{tr('預約', 'Scheduled')} {formatDateTime(request.scheduledTime, tz, { alwaysShowTz: true })}</span>
-              </div>
-            )}
+            {!negotiation && <WhenBanner request={request} tz={tz} />}
             <p className="text-petal-ink text-sm leading-relaxed whitespace-pre-wrap break-words">
               {request.messageContent}
             </p>
@@ -282,7 +336,7 @@ const IntimacyRequestDetailModal: React.FC<IntimacyRequestDetailModalProps> = ({
           {/* Action panel — only for received pending */}
           {direction === 'received' && canRespond && (
             <section>
-              <div className="text-xs uppercase tracking-[0.12em] text-petal-muted mb-2">{tr('如何回應', 'How they responded')}</div>
+              <div className="text-xs uppercase tracking-[0.12em] text-petal-muted mb-2">{tr('如何回應', 'How to respond')}</div>
               <IntimacyRequestActionPanel
                 request={request}
                 onResponded={onResponded}
