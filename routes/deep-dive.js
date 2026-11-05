@@ -601,4 +601,28 @@ router.post('/:id/abandon', [param('id').isUUID()], async (req, res) => {
   }
 });
 
+// DELETE /:id — the owner cancels and deletes the whole journey (letters,
+// partner response and all, via ON DELETE CASCADE). This is the "我不想繼續了"
+// exit: without it an unfinished journey kept the 首頁 resume banner up forever.
+router.delete('/:id', [param('id').isUUID()], async (req, res) => {
+  if (sendValidationError(req, res)) return;
+  try {
+    const access = await assertJourneyAccess(req.params.id, req.user.id);
+    if (!access) {
+      logWarn('deep_dive.delete not_found', { userId: req.user.id, journeyId: req.params.id });
+      return res.status(404).json({ success: false, message: '找不到這段情緒深潛，可能已經刪除了。重新整理頁面即可。', error_code: 'DEEP_DIVE_NOT_FOUND' });
+    }
+    if (access.viewerRole !== 'owner') {
+      logWarn('deep_dive.delete not_owner', { userId: req.user.id, journeyId: access.journey.id });
+      return res.status(403).json({ success: false, message: '只有開始這段深潛的人可以刪除它。你可以按「稍後再說」先把提醒收起來。', error_code: 'DEEP_DIVE_NOT_OWNER' });
+    }
+    await db.query('DELETE FROM deep_dive_journeys WHERE id = $1 AND created_by = $2', [access.journey.id, req.user.id]);
+    logInfo('deep_dive.delete', { userId: req.user.id, journeyId: access.journey.id, status: access.journey.status, step: access.journey.current_step });
+    res.json({ success: true });
+  } catch (err) {
+    logError('Deep dive delete failed', { err: err.message, stack: err.stack, journeyId: req.params.id });
+    res.status(500).json({ success: false, message: '暫時沒辦法刪除，請稍後再試一次。' });
+  }
+});
+
 module.exports = router;

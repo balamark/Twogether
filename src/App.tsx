@@ -719,6 +719,24 @@ const LoveTimeApp = () => {
   }, [authState.isAuthenticated]);
   useEffect(() => { refreshActiveDeepDive(); }, [refreshActiveDeepDive]);
 
+  // Owner cancels + deletes an unfinished journey (from the resume banner or the
+  // journey layer). Optimistic (playbook §R7): the banner disappears at once; on
+  // failure it comes back and we say why.
+  const deleteDeepDive = useCallback(async (journeyId: string) => {
+    const previous = activeDeepDive;
+    if (previous?.id === journeyId) setActiveDeepDive(null);
+    try {
+      await apiService.deleteDeepDive(journeyId);
+      showNotification({ type: 'success', title: tr('已刪除這段情緒深潛', 'Emotion deep dive deleted'), message: tr('想再探索時，隨時可以重新開始。', 'You can start a new one whenever you\'re ready.') });
+      refreshActiveDeepDive();
+    } catch (err) {
+      const e = err as { message?: string; error_code?: string };
+      if (e?.error_code === 'DEEP_DIVE_NOT_FOUND') { refreshActiveDeepDive(); return; }
+      if (previous?.id === journeyId) setActiveDeepDive(previous);
+      showNotification({ type: 'error', title: tr('沒辦法刪除這段深潛', 'Couldn\'t delete this deep dive'), message: e?.message || tr('請稍後再試一次。', 'Please try again in a moment.') });
+    }
+  }, [activeDeepDive, refreshActiveDeepDive, showNotification]);
+
   // Contextual entry: the conversation (EventDetail) opens 情緒深潛 by dispatching
   // a window event, so the deep-dive layer stays owned by App without prop drills.
   useEffect(() => {
@@ -2959,6 +2977,7 @@ const LoveTimeApp = () => {
             fromNickname={!activeDeepDive ? incomingDeepDive?.from_nickname : null}
             onResume={() => setDeepDiveIntent({ type: 'open', journeyId: (activeDeepDive || incomingDeepDive)!.id })}
             onDismiss={() => setDeepDiveBannerDismissed(true)}
+            onDelete={activeDeepDive ? () => deleteDeepDive(activeDeepDive.id) : undefined}
           />
         </div>
       )}
@@ -2970,6 +2989,7 @@ const LoveTimeApp = () => {
         onClose={() => setDeepDiveIntent(null)}
         onNotify={showNotification}
         onChanged={refreshActiveDeepDive}
+        onDelete={(id) => { setDeepDiveIntent(null); deleteDeepDive(id); }}
         companionShortName={resolveCompanion(authState.user?.selected_therapist).name}
       />
 

@@ -121,4 +121,49 @@ test.describe('情緒深潛 Emotional Deep Dive', () => {
     await page.getByTestId('deep-dive-situation').fill('我不想活了');
     await expect(page.getByTestId('deep-dive-safety-exit')).toBeVisible();
   });
+
+  test('an unfinished journey can be deleted from the 首頁 resume banner', async ({ page }) => {
+    // Routes registered later win: this overrides the "no active journey" stub.
+    let active: unknown = journeyAt('MEMORY_EXPLORATION');
+    await page.route('**/api/deep-dive/active', async (route) =>
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, journey: active }) })
+    );
+    let deleted = false;
+    await page.route(`**/api/deep-dive/${JOURNEY_ID}`, async (route) => {
+      if (route.request().method() === 'DELETE') {
+        deleted = true;
+        active = null;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true }) });
+      }
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, journey: active }) });
+    });
+
+    await page.goto('/');
+    await expect(page.getByTestId('deep-dive-resume-banner')).toBeVisible();
+    await page.getByTestId('deep-dive-resume-delete').click();
+    // Keeping it backs out without deleting.
+    await page.getByTestId('deep-dive-delete-cancel').click();
+    await expect(page.getByTestId('deep-dive-resume-banner')).toBeVisible();
+    await page.getByTestId('deep-dive-resume-delete').click();
+    await page.getByTestId('deep-dive-delete-confirm-btn').click();
+    await expect(page.getByTestId('deep-dive-resume-banner')).toHaveCount(0);
+    await expect(page.getByTestId('deep-dive-delete-confirm')).toHaveCount(0);
+    await expect.poll(() => deleted).toBe(true);
+  });
+
+  test('the journey layer has a delete option for the owner', async ({ page }) => {
+    let deleted = false;
+    await page.route(`**/api/deep-dive/${JOURNEY_ID}`, async (route) => {
+      if (route.request().method() === 'DELETE') {
+        deleted = true;
+        return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true }) });
+      }
+      return route.fallback();
+    });
+    await openFromMenu(page);
+    await page.getByTestId('deep-dive-delete').click();
+    await page.getByTestId('deep-dive-delete-confirm-btn').click();
+    await expect(page.getByTestId('deep-dive-journey-view')).toHaveCount(0);
+    await expect.poll(() => deleted).toBe(true);
+  });
 });
