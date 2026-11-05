@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Heart, Clock, Send, Sparkles, X, RefreshCw, Wand2, ThumbsUp, ThumbsDown, Check } from 'lucide-react';
+import { Heart, Clock, Send, Sparkles, X, RefreshCw, Wand2, ThumbsUp, ThumbsDown, Check, ChevronDown, ChevronUp, ArrowDownUp } from 'lucide-react';
 import { apiService } from '../services/api';
 import type {
   IntimacyTemplate,
@@ -29,6 +29,8 @@ export interface FormScript {
   image?: string;
   tags?: string[];
   duration?: string;
+  /** ISO creation time — custom / marketplace scripts only; drives 最新優先 sort. */
+  createdAt?: string;
 }
 
 interface IntimacyRequestFormProps {
@@ -45,6 +47,38 @@ interface IntimacyRequestFormProps {
 }
 
 type Step = 'category' | 'script' | 'aimsg' | 'reconcile' | 'guidance' | 'template' | 'customize' | 'confirm';
+
+// Short labels for the compact progress bar ("2/5 選擇劇本").
+const STEP_LABEL: Record<Step, string> = {
+  category: tr('選擇類型', 'Type'),
+  script: tr('選擇劇本', 'Script'),
+  aimsg: tr('挑選訊息', 'Message'),
+  reconcile: tr('選擇事件', 'Event'),
+  guidance: tr('挑選步驟', 'Steps'),
+  template: tr('選擇範本', 'Template'),
+  customize: tr('編輯訊息', 'Edit'),
+  confirm: tr('確認發送', 'Confirm'),
+};
+
+type ScriptSort = 'newest' | 'oldest';
+
+// Newest-created first by default. Built-in scripts have no createdAt, so they
+// sort after every dated (custom / marketplace) script and keep their order.
+function sortScripts(list: FormScript[], order: ScriptSort): FormScript[] {
+  const time = (s: FormScript) => {
+    const t = s.createdAt ? new Date(s.createdAt).getTime() : NaN;
+    return Number.isNaN(t) ? null : t;
+  };
+  return list
+    .map((s, i) => ({ s, i, t: time(s) }))
+    .sort((a, b) => {
+      if (a.t === null && b.t === null) return a.i - b.i;
+      if (a.t === null) return order === 'newest' ? 1 : -1;
+      if (b.t === null) return order === 'newest' ? -1 : 1;
+      return order === 'newest' ? b.t - a.t : a.t - b.t;
+    })
+    .map((x) => x.s);
+}
 
 // Reconciliation intensity levels (low → high). The goal is a neutral, face-
 // saving opener for someone who can't yet bring themselves to apologize.
@@ -154,6 +188,8 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
   // Roleplay branch state
   const [scriptCategory, setScriptCategory] = useState<'all' | FormScript['category']>('all');
   const [scriptTag, setScriptTag] = useState<string | null>(null);
+  const [tagsExpanded, setTagsExpanded] = useState(false);
+  const [scriptSort, setScriptSort] = useState<ScriptSort>('newest');
   const [favoriteScripts, setFavoriteScripts] = useState<FormScript[]>([]);
   const [selectedScript, setSelectedScript] = useState<FormScript | null>(null);
   const [aiSummary, setAiSummary] = useState('');
@@ -230,12 +266,15 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
 
   const filteredScripts = useMemo(
     () =>
-      ownedScripts.filter(
-        (s) =>
-          (scriptCategory === 'all' || s.category === scriptCategory) &&
-          (!scriptTag || (s.tags || []).includes(scriptTag)),
+      sortScripts(
+        ownedScripts.filter(
+          (s) =>
+            (scriptCategory === 'all' || s.category === scriptCategory) &&
+            (!scriptTag || (s.tags || []).includes(scriptTag)),
+        ),
+        scriptSort,
       ),
-    [ownedScripts, scriptCategory, scriptTag],
+    [ownedScripts, scriptCategory, scriptTag, scriptSort],
   );
 
   const fetchTemplatesByCategory = useCallback(async () => {
@@ -362,6 +401,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
             script: f.script,
             tags: f.tags,
             duration: f.duration,
+            createdAt: f.createdAt,
           })),
         );
       } catch (err) {
@@ -592,6 +632,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
     setError(null);
     setScriptCategory('all');
     setScriptTag(null);
+    setTagsExpanded(false);
     setSelectedScript(null);
     setAiSummary('');
     setAiMessages([]);
@@ -637,46 +678,42 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg max-w-2xl w-full max-h-[min(90vh,calc(100dvh-80px))] overflow-y-auto overscroll-contain">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-gray-200">
           <div className="flex items-center space-x-3">
             <Heart className="w-6 h-6 text-pink-500" />
-            <h3 className="text-xl font-semibold text-gray-900">{tr('發送親密邀請', 'Send an intimacy invitation')}</h3>
+            <h3 className="text-lg sm:text-xl font-semibold text-gray-900">{tr('發送親密邀請', 'Send an intimacy invitation')}</h3>
           </div>
           <button onClick={handleClose} className="text-gray-400 hover:text-gray-600 transition-colors">
             <X className="w-6 h-6" />
           </button>
         </div>
 
-        {/* Progress Steps */}
-        <div className="p-6 border-b border-gray-100">
-          <div className="flex items-center space-x-4">
+        {/* Progress — one slim row so the step content gets the screen. */}
+        <div className="px-4 sm:px-6 py-2 border-b border-gray-100" data-testid="intimacy-progress">
+          <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+            <span>
+              <span className="font-medium text-pink-600">{flowSteps.indexOf(currentStep) + 1}</span>
+              /{flowSteps.length} {STEP_LABEL[currentStep]}
+            </span>
+          </div>
+          <div className="flex gap-1">
             {flowSteps.map((step, index) => (
-              <div key={step} className={`flex items-center ${index < flowSteps.length - 1 ? 'flex-1' : ''}`}>
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-                    currentStep === step
-                      ? 'bg-pink-500 text-white'
-                      : flowSteps.indexOf(currentStep) > index
-                      ? 'bg-green-500 text-white'
-                      : 'bg-gray-200 text-gray-600'
-                  }`}
-                >
-                  {index + 1}
-                </div>
-                {index < flowSteps.length - 1 && (
-                  <div
-                    className={`flex-1 h-px mx-2 ${
-                      flowSteps.indexOf(currentStep) > index ? 'bg-green-500' : 'bg-gray-200'
-                    }`}
-                  />
-                )}
-              </div>
+              <div
+                key={step}
+                className={`h-1 flex-1 rounded-full ${
+                  currentStep === step
+                    ? 'bg-pink-500'
+                    : flowSteps.indexOf(currentStep) > index
+                    ? 'bg-green-500'
+                    : 'bg-gray-200'
+                }`}
+              />
             ))}
           </div>
         </div>
 
         {/* Content */}
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-600 text-sm">{error}</p>
@@ -735,11 +772,43 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                 ))}
               </div>
 
-              {/* Tag chips */}
-              {allTags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
+              {/* Tag filter (collapsed by default — dozens of chips buried the
+                  list on phones) + sort order */}
+              <div className="flex items-center justify-between gap-2">
+                {allTags.length > 0 ? (
                   <button
-                    onClick={() => setScriptTag(null)}
+                    type="button"
+                    data-testid="roleplay-tags-toggle"
+                    onClick={() => setTagsExpanded((v) => !v)}
+                    aria-expanded={tagsExpanded}
+                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs border transition-colors ${
+                      scriptTag ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-600 border-gray-200 hover:border-pink-300'
+                    }`}
+                  >
+                    {scriptTag ? `#${scriptTag}` : tr(`標籤篩選 (${allTags.length})`, `Filter by tag (${allTags.length})`)}
+                    {tagsExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                  </button>
+                ) : (
+                  <span />
+                )}
+                <label className="inline-flex items-center gap-1 text-xs text-gray-500">
+                  <ArrowDownUp className="w-3.5 h-3.5" />
+                  <span className="sr-only">{tr('排序', 'Sort')}</span>
+                  <select
+                    data-testid="roleplay-sort"
+                    value={scriptSort}
+                    onChange={(e) => setScriptSort(e.target.value as ScriptSort)}
+                    className="bg-transparent border-none text-xs text-gray-600 focus:ring-0 py-0 pl-0 pr-6"
+                  >
+                    <option value="newest">{tr('最新建立', 'Newest first')}</option>
+                    <option value="oldest">{tr('最早建立', 'Oldest first')}</option>
+                  </select>
+                </label>
+              </div>
+              {allTags.length > 0 && tagsExpanded && (
+                <div className="flex flex-wrap gap-2" data-testid="roleplay-tag-list">
+                  <button
+                    onClick={() => { setScriptTag(null); setTagsExpanded(false); }}
                     className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
                       !scriptTag ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200'
                     }`}
@@ -749,7 +818,10 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                   {allTags.map((tag) => (
                     <button
                       key={tag}
-                      onClick={() => setScriptTag((cur) => (cur === tag ? null : tag))}
+                      onClick={() => {
+                        setScriptTag((cur) => (cur === tag ? null : tag));
+                        setTagsExpanded(false);
+                      }}
                       className={`px-2.5 py-1 rounded-full text-xs border transition-colors ${
                         scriptTag === tag
                           ? 'bg-gray-800 text-white border-gray-800'
