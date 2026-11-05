@@ -41,6 +41,7 @@ import IntimacyRequestForm from './components/IntimacyRequestForm';
 import NotificationInbox from './components/NotificationInbox';
 import MomentResponseBar from './components/MomentResponseBar';
 import PairingInvitationHandler from './components/PairingInvitationHandler';
+import TherapistReferralCard from './components/TherapistReferralCard';
 import { PairingInviteShare } from './components/PairingInviteShare';
 import PairingReminderBanner from './components/PairingReminderBanner';
 import DeepDiveJourneyView, { type DeepDiveIntent } from './components/deepdive/DeepDiveJourneyView';
@@ -731,6 +732,10 @@ const LoveTimeApp = () => {
   }, []);
 
   const [showAuthModal, setShowAuthModal] = useState(false);
+  // 成長漏斗: every time a visitor (logged out or guest) opens sign-up.
+  useEffect(() => {
+    if (showAuthModal && (!authState.isAuthenticated || authState.isGuest)) trackAction('onboarding.auth.open');
+  }, [showAuthModal, authState.isAuthenticated, authState.isGuest]);
   const [showPairingPrompt, setShowPairingPrompt] = useState(false);
   const [pairingPromptDismissed, setPairingPromptDismissed] = useState(
     localStorage.getItem('pairingPromptDismissed') === 'true'
@@ -3236,6 +3241,18 @@ const LoveTimeApp = () => {
             currentView={currentView}
           />
         )}
+
+        {/* 諮商師專屬邀請碼: arrived via a therapist's ?tref= link. */}
+        <TherapistReferralCard
+          isAuthenticated={authState.isAuthenticated}
+          isGuest={!!authState.isGuest}
+          partnerConnected={!!authState.partnerConnected}
+          onSignUp={() => setShowAuthModal(true)}
+          onClaimed={() => {
+            apiService.getBillingStatus().then(setBillingStatus).catch(() => { /* badge just stays stale */ });
+          }}
+          showNotification={showNotification}
+        />
 
         {/* Main Content */}
         <div className="max-w-6xl mx-auto">

@@ -151,6 +151,8 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       // 舊通知沒有 coupleId 時，App 會退回開啟最新一筆 client。
       case 'dedicated_client_added':
       case 'dedicated_client_message':
+      case 'dedicated_client_summary':
+      case 'therapist_referral_rewarded':
         onNavigate('counselor', notification.coupleId);
         break;
       // Partner-action notifications (services/notificationService.js): route each

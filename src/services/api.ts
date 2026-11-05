@@ -2034,11 +2034,51 @@ export interface TherapistClientCouple {
   partnerNames: string[];
   canComment: boolean;
   since: string;
+  // Joined through this therapist's referral code (諮商師邀請碼).
+  referredByMe?: boolean;
+  // 「個案把摘要帶來了」— how many 諮商摘要 the couple has compiled + the newest.
+  summaryCount?: number;
+  latestSummaryAt?: string | null;
+}
+
+// 諮商師專屬邀請碼 — the therapist's own code/link and what it has earned.
+export interface TherapistReferral {
+  code: string;
+  link: string;
+  premiumDays: number;
+  joined: number;
+  rewarded: number;
+  pending: number;
+  feeDiscount: number;
+  discountPerCouple: number;
+  discountMax: number;
+  feeFloor: number;
+  standardFeeRate: number;
+}
+
+export interface TherapistReferralPreview {
+  therapist: { id: string; displayName: string; title: string | null; photoUrl: string | null };
+  premiumDays: number;
+}
+
+export type TherapistReferralClaimStatus = 'rewarded' | 'already_rewarded' | 'pending_pair' | 'other_therapist';
+
+export interface TherapistReferralClaim {
+  status: TherapistReferralClaimStatus;
+  message: string;
+  days: number;
+  expiresAt: string | null;
+  dedicatedSet: boolean;
+  therapist: { id: string; displayName: string };
 }
 
 export interface TherapistEarnings {
   introSessionsUsed: number;
   introSessionsRemaining: number;
+  // Rate before the referral discount; currentFeeRate already includes it.
+  baseFeeRate?: number;
+  referredCouples?: number;
+  referralDiscount?: number;
   currentFeeRate: number;
   paidSessionCount: number;
   totalNetTwd: number;
@@ -6371,6 +6411,45 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to set meeting link:', error);
       this.throwApiError(error, tr('設定會議連結失敗，請稍後再試', 'Couldn\'t set the meeting link. Please try again in a moment'));
+    }
+  }
+
+  // --- 諮商師專屬邀請碼 (therapist referral codes) --------------------------
+
+  async getMyTherapistReferral(): Promise<TherapistReferral> {
+    try {
+      const response = await apiClient.get('/therapists/me/referral');
+      return response.data?.referral as TherapistReferral;
+    } catch (error: unknown) {
+      console.error('Failed to fetch therapist referral:', error);
+      this.throwApiError(error, tr('無法取得你的邀請碼，請稍後再試', 'Couldn\'t load your invite code. Please try again in a moment'));
+    }
+  }
+
+  async previewTherapistReferral(code: string): Promise<TherapistReferralPreview> {
+    try {
+      const response = await apiClient.get(`/therapists/referral/${encodeURIComponent(code)}`);
+      return { therapist: response.data?.therapist, premiumDays: response.data?.premiumDays ?? 30 };
+    } catch (error: unknown) {
+      this.throwApiError(error, tr('無法讀取邀請碼，請稍後再試', 'Couldn\'t read the invite code. Please try again in a moment'));
+    }
+  }
+
+  async claimTherapistReferral(code: string, makeDedicated: boolean): Promise<TherapistReferralClaim> {
+    try {
+      const response = await apiClient.post('/therapists/referral/claim', { code, makeDedicated });
+      const d = response.data ?? {};
+      return {
+        status: d.status,
+        message: d.message,
+        days: d.days ?? 0,
+        expiresAt: d.expires_at ?? null,
+        dedicatedSet: d.dedicatedSet === true,
+        therapist: d.therapist,
+      };
+    } catch (error: unknown) {
+      console.error('Failed to claim therapist referral:', error);
+      this.throwApiError(error, tr('領取失敗，請稍後再試；邀請碼會保留，下次打開 App 會自動再試', 'Claiming failed. Please try again in a moment — your code is kept and we\'ll retry next time you open the app'));
     }
   }
 

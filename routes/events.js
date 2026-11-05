@@ -696,6 +696,8 @@ router.get(
         [coupleId, days, inputHash, JSON.stringify(result), rows.length]
       );
 
+      notifyDedicatedTherapistOfSummary(coupleId, userId, periodLabel, rows.length);
+
       res.json({
         success: true,
         summary: result,
@@ -859,6 +861,26 @@ router.get('/communication-pattern', async (req, res) => {
     res.status(500).json({ success: false, message: '溝通模式暫時無法產生，請稍後再試' });
   }
 });
+
+// 「個案把摘要帶來了」— a fresh 諮商摘要 pings the couple's 專屬心理師 so they
+// can read it before the session. Fire-and-forget; never blocks the response.
+function notifyDedicatedTherapistOfSummary(coupleId, userId, periodLabel, eventCount) {
+  (async () => {
+    const r = await db.query(
+      `SELECT t.user_id FROM couple_therapists ct JOIN therapists t ON t.id = ct.therapist_id
+        WHERE ct.couple_id = $1 AND ct.status = 'active' AND t.status = 'approved'`,
+      [coupleId]
+    );
+    const therapistUserId = r.rows[0]?.user_id;
+    if (!therapistUserId) return;
+    await db.query(
+      `INSERT INTO notifications (user_id, notification_type, title, content, related_user_id, priority, couple_id)
+       VALUES ($1, 'dedicated_client_summary', $2, $3, $4, 1, $5)`,
+      [therapistUserId, '個案把諮商摘要帶來了', `${periodLabel}・${eventCount} 件事件，打開「我輔導的伴侶」就能先讀`, userId, coupleId]
+    );
+    logInfo('events.therapy_summary.therapist_notified', { coupleId, therapistUserId });
+  })().catch((err) => logWarn('therapy summary therapist notify failed', { coupleId, err: err.message }));
+}
 
 // Reusable: the couple's previously generated 諮商摘要 snapshots, newest first.
 // Shared by the couple's own /therapy-summary/history endpoint and the dedicated

@@ -1,5 +1,19 @@
 {
 "exact": {
+"你還沒有諮商師檔案，先到「成為諮商師」送出申請": "You don't have a counselor profile yet. Apply under \"Become a counselor\" first.",
+"你的諮商師檔案通過審核後，就會拿到專屬邀請碼": "You'll get your own invite code once your counselor profile is approved.",
+"無法取得你的邀請碼，請稍後再試": "Couldn't load your invite code. Please try again in a moment.",
+"這組諮商師邀請碼無效或已停用，請和你的諮商師確認代碼": "This counselor invite code is invalid or no longer active. Please double-check it with your counselor.",
+"無法讀取邀請碼，請稍後再試": "Couldn't read the invite code. Please try again in a moment.",
+"請輸入邀請碼": "Please enter an invite code",
+"這是你自己的邀請碼——把連結傳給你的個案，他們加入後就會顯示在這裡": "This is your own invite code — send the link to your clients and they'll show up here once they join.",
+"你們已經領過諮商師邀請的 Premium 了": "You've already claimed the Premium from a counselor invite.",
+"你之前已經透過另一位諮商師的邀請加入，Premium 只能領一次": "You already joined through another counselor's invite — the Premium gift can only be claimed once.",
+"領取失敗，請稍後再試；邀請碼會保留，下次打開 App 會自動再試": "Claiming failed. Please try again in a moment — your invite code is kept and we'll retry next time you open the app.",
+"有伴侶透過你的邀請碼加入": "A couple joined with your invite code",
+"他們已把你設為專屬心理師，之後帶來的諮商摘要會出現在「我輔導的伴侶」": "They made you their dedicated therapist — the summaries they bring will appear under \"Couples I support\".",
+"你的邀請碼帶來一對伴侶": "Your invite code brought in a couple",
+"個案把諮商摘要帶來了": "A client couple brought their counseling summary",
 "試玩伴侶今天回得夠多了。免費註冊後，邀請你真正的另一半來回覆你吧。": "The sample partner has replied plenty for now. Sign up free and invite your real partner to reply to you.",
 "試玩的 5 次 AI 已經用完了。免費註冊後每天都有 AI 額度，還能邀請另一半一起用。": "You've used all 5 preview AI tries. Sign up free for a daily AI allowance — and invite your partner to use it together.",
 "訪客編號格式不正確，請重新整理頁面再試": "The guest id looks invalid. Please refresh the page and try again.",
@@ -2062,6 +2076,26 @@
 [
 "{0}婉拒了你的禮物兌換",
 "{0} declined your gift redemption"
+],
+[
+"已啟用 Premium {0} 天，這是 {1} 送你們的",
+"Premium is on for {0} days — a gift from {1}"
+],
+[
+"邀請已記下！和另一半配對成功後，就會自動送你們 Premium {0} 天",
+"Invite saved! Once you pair with your partner, you'll automatically get {0} days of Premium."
+],
+[
+"{0} 現在可以檢視你們的牆、好好說話與諮商摘要",
+"{0} can now view your wall, conversations and counseling summaries"
+],
+[
+"已有 {0} 對伴侶透過你的邀請碼加入，視訊諮商平台費減免 {1}%",
+"{0} couples have joined with your invite code — your video-session platform fee is now {1} points lower"
+],
+[
+"{0}・{1} 件事件，打開「我輔導的伴侶」就能先讀",
+"{0} · {1} events — open \"Couples I support\" to read it ahead of the session"
 ]
 ]
 }

@@ -27,6 +27,7 @@ const receipts = require('../lib/receipts');
 const qaPool = require('../lib/qaPool');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 const dedicatedSpaceRoutes = require('./dedicated-space');
+const therapistReferrals = require('../lib/therapistReferrals');
 // Reusable read/write helpers for a dedicated therapist's view of a couple's
 // wall and 好好說話 (events) content. These modules don't require this one, so
 // there's no require cycle.
@@ -56,13 +57,17 @@ const genMerchantTradeNo = () => {
 // Compute the platform fee split for a therapist's next paid session. A session
 // counts toward the intro window only once it is paid AND completed, so we count
 // counts_toward_intro rows to decide the rate for the NEXT charge.
+// Couples the therapist brought in with their referral code (諮商師邀請碼)
+// lower the rate further — see lib/therapistReferrals.js.
 const computeFeeSplit = async (therapistId, price) => {
   const introUsed = await db.query(
     `SELECT COUNT(*)::int AS c FROM therapist_consultations
        WHERE therapist_id = $1 AND counts_toward_intro = true`,
     [therapistId]
   );
-  const feeRate = introUsed.rows[0].c < INTRO_SESSION_LIMIT ? PLATFORM_FEE_RATE.intro : PLATFORM_FEE_RATE.standard;
+  const baseRate = introUsed.rows[0].c < INTRO_SESSION_LIMIT ? PLATFORM_FEE_RATE.intro : PLATFORM_FEE_RATE.standard;
+  const discount = therapistReferrals.feeDiscountFor(await therapistReferrals.countRewardedReferrals(therapistId));
+  const feeRate = therapistReferrals.applyFeeDiscount(baseRate, discount);
   const platformFee = Math.floor((price * feeRate) / 100);
   const therapistNet = price - platformFee;
   return { feeRate, platformFee, therapistNet };
@@ -1523,6 +1528,186 @@ router.delete('/dedicated', authenticateToken, async (req, res) => {
   }
 });
 
+// ===========================================================================
+// 諮商師專屬邀請碼 (therapist referral codes). A therapist hands their link /
+// code to the couples they already see; the couple gets a Premium month once
+// paired (and may add the therapist as 專屬心理師 in the same step), and each
+// rewarded couple lowers the therapist's platform fee. lib/therapistReferrals.js.
+// ===========================================================================
+
+const referralLink = (code) => `${appBaseUrl()}/?tref=${encodeURIComponent(code)}`;
+
+// GET /api/therapists/me/referral — the logged-in therapist's code, link and
+// what it has earned so far. Mints the code on first ask.
+router.get('/me/referral', authenticateToken, async (req, res) => {
+  try {
+    const t = await db.query(
+      `SELECT id, status FROM therapists WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`,
+      [req.user.id]
+    );
+    const therapist = t.rows[0];
+    if (!therapist) {
+      return res.status(404).json({ success: false, error_code: 'NO_THERAPIST_PROFILE', message: '你還沒有諮商師檔案，先到「成為諮商師」送出申請' });
+    }
+    if (therapist.status !== 'approved') {
+      return res.status(403).json({ success: false, error_code: 'THERAPIST_NOT_APPROVED', message: '你的諮商師檔案通過審核後，就會拿到專屬邀請碼' });
+    }
+    const code = await therapistReferrals.ensureCodeForTherapist(therapist.id);
+    const stats = await therapistReferrals.referralStatsFor(therapist.id);
+    const discount = therapistReferrals.feeDiscountFor(stats.rewarded);
+    logInfo('therapist_referral.dashboard_view', { userId: req.user.id, therapistId: therapist.id, rewarded: stats.rewarded });
+    res.json({
+      success: true,
+      referral: {
+        code,
+        link: referralLink(code),
+        premiumDays: therapistReferrals.REFERRAL_PREMIUM_DAYS,
+        joined: stats.total,
+        rewarded: stats.rewarded,
+        pending: stats.pending,
+        feeDiscount: discount,
+        discountPerCouple: therapistReferrals.FEE_DISCOUNT_PER_COUPLE,
+        discountMax: therapistReferrals.FEE_DISCOUNT_MAX,
+        feeFloor: therapistReferrals.FEE_FLOOR,
+        standardFeeRate: therapistReferrals.applyFeeDiscount(PLATFORM_FEE_RATE.standard, discount),
+      },
+    });
+  } catch (error) {
+    logError('Failed to load therapist referral', { userId: req.user?.id, err: error.message });
+    res.status(500).json({ success: false, message: '無法取得你的邀請碼，請稍後再試' });
+  }
+});
+
+// GET /api/therapists/referral/:code — public preview of who invited you (for
+// the landing card a referred visitor sees before signing up).
+router.get('/referral/:code', async (req, res) => {
+  try {
+    const therapist = await therapistReferrals.findTherapistByCode(req.params.code);
+    if (!therapist) {
+      return res.status(404).json({
+        success: false,
+        error_code: 'THERAPIST_REF_INVALID',
+        message: '這組諮商師邀請碼無效或已停用，請和你的諮商師確認代碼',
+      });
+    }
+    logInfo('therapist_referral.preview', { therapistId: therapist.id, userId: req.user?.id || null });
+    res.json({
+      success: true,
+      therapist: {
+        id: therapist.id,
+        displayName: therapist.display_name,
+        title: therapist.title || null,
+        photoUrl: therapist.photo_url || null,
+      },
+      premiumDays: therapistReferrals.REFERRAL_PREMIUM_DAYS,
+    });
+  } catch (error) {
+    logError('Failed to preview therapist referral', { err: error.message });
+    res.status(500).json({ success: false, message: '無法讀取邀請碼，請稍後再試' });
+  }
+});
+
+// POST /api/therapists/referral/claim { code, makeDedicated? } — attribute
+// the caller to the therapist, grant the Premium month when paired, and
+// optionally add the therapist as the couple's 專屬心理師 (explicit opt-in).
+router.post('/referral/claim', authenticateToken, [
+  body('code').isString().trim().isLength({ min: 1, max: 16 }).withMessage('請輸入邀請碼'),
+  body('makeDedicated').optional().isBoolean(),
+], async (req, res) => {
+  if (!handleValidation(req, res)) return;
+  const userId = req.user.id;
+  try {
+    const therapist = await therapistReferrals.findTherapistByCode(req.body.code);
+    if (!therapist) {
+      logInfo('therapist_referral.claim_invalid', { userId });
+      return res.status(404).json({
+        success: false,
+        error_code: 'THERAPIST_REF_INVALID',
+        message: '這組諮商師邀請碼無效或已停用，請和你的諮商師確認代碼',
+      });
+    }
+    if (therapist.user_id === userId) {
+      return res.status(400).json({
+        success: false,
+        error_code: 'THERAPIST_REF_SELF',
+        message: '這是你自己的邀請碼——把連結傳給你的個案，他們加入後就會顯示在這裡',
+      });
+    }
+
+    const result = await therapistReferrals.claimReferral({ userId, therapist });
+    logInfo('therapist_referral.claim', { userId, therapistId: therapist.id, status: result.status });
+
+    // Opt-in: make them the couple's 專屬心理師 (same rules as POST /dedicated).
+    let dedicatedSet = false;
+    if (req.body.makeDedicated === true && result.status !== 'other_therapist') {
+      const couple = await findCoupleForMember(userId);
+      // Paired couples only: a solo draft couple is replaced at pairing time,
+      // which would silently drop the link.
+      if (couple && couple.user2_id) {
+        const existing = await db.query(
+          `SELECT therapist_id FROM couple_therapists WHERE couple_id = $1 AND status = 'active'`,
+          [couple.id]
+        );
+        if (existing.rows[0]?.therapist_id === therapist.id) {
+          dedicatedSet = true;
+        } else {
+          await db.transaction(async (client) => {
+            await client.query(
+              `UPDATE couple_therapists SET status = 'revoked', revoked_at = NOW(), revoked_by = $2
+                WHERE couple_id = $1 AND status = 'active'`,
+              [couple.id, userId]
+            );
+            await client.query(
+              `INSERT INTO couple_therapists (couple_id, therapist_id, added_by, can_comment)
+               VALUES ($1, $2, $3, false)`,
+              [couple.id, therapist.id, userId]
+            );
+          });
+          dedicatedSet = true;
+          logInfo('therapist.dedicated.set', { userId, coupleId: couple.id, therapistId: therapist.id, canComment: false, via: 'referral' });
+          (async () => {
+            const partnerId = couple.user1_id === userId ? couple.user2_id : couple.user1_id;
+            await insertNotification(partnerId, 'dedicated_therapist_added', '你們新增了專屬心理師',
+              `${therapist.display_name} 現在可以檢視你們的牆、好好說話與諮商摘要`, userId, 1, couple.id);
+            await insertNotification(therapist.user_id, 'dedicated_client_added', '有伴侶透過你的邀請碼加入',
+              '他們已把你設為專屬心理師，之後帶來的諮商摘要會出現在「我輔導的伴侶」', userId, 1, couple.id);
+          })().catch((err) => logWarn('notify referral dedicated failed', { err: err.message }));
+        }
+      }
+    }
+
+    if (result.status === 'rewarded') {
+      (async () => {
+        const rewarded = await therapistReferrals.countRewardedReferrals(therapist.id);
+        const discount = therapistReferrals.feeDiscountFor(rewarded);
+        await insertNotification(therapist.user_id, 'therapist_referral_rewarded', '你的邀請碼帶來一對伴侶',
+          `已有 ${rewarded} 對伴侶透過你的邀請碼加入，視訊諮商平台費減免 ${discount}%`, userId, 1, result.referral.couple_id);
+      })().catch((err) => logWarn('notify referral rewarded failed', { err: err.message }));
+    }
+
+    const name = therapist.display_name;
+    const days = therapistReferrals.REFERRAL_PREMIUM_DAYS;
+    const messages = {
+      rewarded: `已啟用 Premium ${days} 天，這是 ${name} 送你們的`,
+      already_rewarded: '你們已經領過諮商師邀請的 Premium 了',
+      pending_pair: `邀請已記下！和另一半配對成功後，就會自動送你們 Premium ${days} 天`,
+      other_therapist: '你之前已經透過另一位諮商師的邀請加入，Premium 只能領一次',
+    };
+    res.json({
+      success: true,
+      status: result.status,
+      message: messages[result.status],
+      days: result.status === 'rewarded' ? days : 0,
+      expires_at: result.expiresAt || null,
+      dedicatedSet,
+      therapist: { id: therapist.id, displayName: name },
+    });
+  } catch (error) {
+    logError('Therapist referral claim failed', { userId, err: error.message, stack: error.stack });
+    res.status(500).json({ success: false, message: '領取失敗，請稍後再試；邀請碼會保留，下次打開 App 會自動再試' });
+  }
+});
+
 // --- Therapist side: my client couples ------------------------------------
 
 // GET /api/therapists/clients — couples that added the logged-in therapist.
@@ -1531,14 +1716,22 @@ router.get('/clients', authenticateToken, async (req, res) => {
     const result = await db.query(
       `SELECT ct.couple_id, ct.can_comment, ct.created_at,
               c.couple_name,
-              u1.nickname AS partner1_name, u2.nickname AS partner2_name
+              u1.nickname AS partner1_name, u2.nickname AS partner2_name,
+              EXISTS (SELECT 1 FROM therapist_referrals tr
+                       WHERE tr.therapist_id = t.id
+                         AND (tr.couple_id = c.id OR tr.user_id IN (c.user1_id, c.user2_id))) AS referred_by_me,
+              ts.summary_count, ts.latest_summary_at
          FROM couple_therapists ct
          JOIN therapists t ON t.id = ct.therapist_id
          JOIN couples c ON c.id = ct.couple_id
          LEFT JOIN users u1 ON u1.id = c.user1_id
          LEFT JOIN users u2 ON u2.id = c.user2_id
+         LEFT JOIN LATERAL (
+           SELECT COUNT(*)::int AS summary_count, MAX(created_at) AS latest_summary_at
+             FROM therapy_summaries WHERE couple_id = c.id
+         ) ts ON true
         WHERE t.user_id = $1 AND t.status = 'approved' AND ct.status = 'active'
-        ORDER BY ct.created_at DESC`,
+        ORDER BY ts.latest_summary_at DESC NULLS LAST, ct.created_at DESC`,
       [req.user.id]
     );
     res.json({
@@ -1549,6 +1742,9 @@ router.get('/clients', authenticateToken, async (req, res) => {
         partnerNames: [r.partner1_name, r.partner2_name].filter(Boolean),
         canComment: r.can_comment === true,
         since: r.created_at,
+        referredByMe: r.referred_by_me === true,
+        summaryCount: r.summary_count || 0,
+        latestSummaryAt: r.latest_summary_at || null,
       })),
     });
   } catch (error) {
@@ -2364,6 +2560,9 @@ router.get('/me/earnings', authenticateToken, async (req, res) => {
       [therapistId]
     );
     const introCount = introUsed.rows[0].c;
+    const baseFeeRate = introCount < INTRO_SESSION_LIMIT ? PLATFORM_FEE_RATE.intro : PLATFORM_FEE_RATE.standard;
+    const referredCouples = await therapistReferrals.countRewardedReferrals(therapistId);
+    const referralDiscount = therapistReferrals.feeDiscountFor(referredCouples);
     const paid = await db.query(`
       SELECT tc.id, tc.price_twd, tc.fee_rate, tc.platform_fee_twd, tc.therapist_net_twd,
              tc.paid_at, tc.status, tc.scheduled_at, tc.preferred_time
@@ -2378,7 +2577,10 @@ router.get('/me/earnings', authenticateToken, async (req, res) => {
       earnings: {
         introSessionsUsed: introCount,
         introSessionsRemaining: Math.max(0, INTRO_SESSION_LIMIT - introCount),
-        currentFeeRate: introCount < INTRO_SESSION_LIMIT ? PLATFORM_FEE_RATE.intro : PLATFORM_FEE_RATE.standard,
+        baseFeeRate,
+        currentFeeRate: therapistReferrals.applyFeeDiscount(baseFeeRate, referralDiscount),
+        referredCouples,
+        referralDiscount,
         paidSessionCount: paid.rows.length,
         totalNetTwd: totalNet,
         sessions: paid.rows.map((r) => ({

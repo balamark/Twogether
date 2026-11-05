@@ -9,6 +9,7 @@ const newebpay = require('../lib/newebpay');
 const receipts = require('../lib/receipts');
 const emailService = require('../services/emailService');
 const { logInfo, logWarn, logError } = require('../lib/logger');
+const therapistReferrals = require('../lib/therapistReferrals');
 
 const router = express.Router();
 
@@ -167,6 +168,38 @@ router.post(
 
       const couponResult = await db.query(`SELECT * FROM coupons WHERE code = $1`, [code]);
       const coupon = couponResult.rows[0];
+      // Not a coupon? It may be a therapist's referral code (諮商師邀請碼),
+      // which people naturally type into the same box.
+      if (!coupon) {
+        const therapist = await therapistReferrals.findTherapistByCode(code);
+        if (therapist && therapist.user_id !== req.user.id) {
+          const result = await therapistReferrals.claimReferral({ userId: req.user.id, therapist });
+          logInfo('billing.coupon.therapist_referral', { userId: req.user.id, therapistId: therapist.id, status: result.status });
+          if (result.status === 'rewarded') {
+            return res.json({
+              success: true,
+              message: `已啟用 Premium ${result.days} 天，這是 ${therapist.display_name} 送你們的`,
+              days: result.days,
+              expires_at: result.expiresAt,
+              tier: 'premium',
+            });
+          }
+          if (result.status === 'pending_pair') {
+            return res.status(404).json({
+              success: false,
+              error_code: 'NO_COMPLETE_COUPLE',
+              message: `邀請已記下！和另一半配對成功後，就會自動送你們 Premium ${therapistReferrals.REFERRAL_PREMIUM_DAYS} 天`,
+            });
+          }
+          return res.status(409).json({
+            success: false,
+            error_code: 'COUPON_ALREADY_REDEEMED',
+            message: result.status === 'other_therapist'
+              ? '你之前已經透過另一位諮商師的邀請加入，Premium 只能領一次'
+              : '你們已經領過諮商師邀請的 Premium 了',
+          });
+        }
+      }
       if (!coupon || !coupon.active) {
         return res.status(404).json({ success: false, message: '優惠碼無效', error_code: 'COUPON_INVALID' });
       }

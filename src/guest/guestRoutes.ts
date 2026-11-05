@@ -701,6 +701,8 @@ export const PUBLIC_GETS: RegExp[] = [
   /^\/feedback\/approved$/,
   /^\/intimacy-plans\/samples$/,
   /^\/therapists$/,
+  // 諮商師邀請碼 preview: who invited this visitor (public, read-only).
+  /^\/therapists\/referral\/[A-Za-z0-9]{1,16}$/,
   /^\/stories$/,
   /^\/stories\/[0-9a-f-]{36}$/,
   // A pairing-invite lookup is public: the invitee hasn't signed up yet.
