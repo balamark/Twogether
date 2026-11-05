@@ -1,5 +1,10 @@
 -- 溫柔提醒 tone catalog becomes admin-managed (/admin →「溫柔提醒」).
 --
+-- (Merged as 110_intimacy_nudge_tones, colliding with 110_reenable_rls_public:
+-- the migrator refuses duplicate versions, and any database that already
+-- recorded 110 would have skipped this file. Renumbered to 113; everything here
+-- is idempotent, so re-running it is a no-op.)
+--
 -- Until now the platform-voiced reminders on the 已經幾天沒有親密了 card were a
 -- hard-coded list in lib/intimacyNudgeTones.js. They now live here so the admin
 -- can add, edit, hide and delete them without a deploy. `{days}` in sample /
@@ -60,3 +65,7 @@ VALUES
   ('teammates', '隊友風', 'Teammates', '🤝', '你們是最好的隊友，已經 {days} 天沒有一起「充電」了。找個時間，好好為彼此加油打氣吧！', 'You two are the best teammates, and it''s been {days} days since you last recharged together. Find some time to cheer each other on!', FALSE, 310),
   ('literary', '文青風', 'Literary', '📖', '已經 {days} 天沒有記錄親密時光了。日子再忙，也別忘了在彼此的故事裡，留一頁給今天。', 'It''s been {days} days since you recorded an intimate moment. However busy life gets, save a page in your shared story for today.', FALSE, 320)
 ON CONFLICT (id) DO NOTHING;
+
+-- Supabase exposes public tables via its REST API with the anon key; RLS with
+-- no policies blocks that (the backend connects as postgres and bypasses RLS).
+ALTER TABLE public.intimacy_nudge_tones ENABLE ROW LEVEL SECURITY;
