@@ -76,6 +76,9 @@ adds a fragment file in `changelog/`; CI compiles them into the block below —
 see `CLAUDE.md`.)
 
 <!-- changelog:begin (generated from changelog/*.md — edit those, not this) -->
+### 2026-11-05
+- **登入按鈕更好找**: 試玩時右上角的按鈕從「免費註冊」改成「登入 / 免費註冊」（手機顯示「登入 / 註冊」），已經有帳號的人不會再找不到登入入口。
+
 ### 2026-11-03
 - **提醒伴侶回覆對話**: 說開一件事的對話標題旁多了一個分享小圖示。可以一鍵送站內通知提醒伴侶回覆（有綁 LINE 也會收到），或複製連結、直接用 LINE 傳給 TA——伴侶點開就會直接打開那一則對話，不用自己找。
 
