@@ -294,6 +294,7 @@ export const ROUTES: GuestRoute[] = [
   { method: 'get', re: P('/activity'), handler: ({ db }) => ok({ activities: activityFeed(db) }) },
   { method: 'get', re: P('/deep-dive/active'), handler: () => ok({ journey: null }) },
   { method: 'get', re: P('/deep-dive/inbox'), handler: () => ok({ journeys: [] }) },
+  { method: 'delete', re: P('/deep-dive/:id'), handler: () => ok({}) },
 
   // ── 金幣 / 感情存款 ─────────────────────────────────────────────────────────
   { method: 'get', re: P('/coins/balance'), handler: ({ db }) => ok({ balance: balanceOf(db, ME), available: balanceOf(db, ME), paired: true }) },

@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  ArrowLeft, ArrowRight, Compass, Loader2, Sparkles, Heart, Lock, Check, PauseCircle,
+  ArrowLeft, ArrowRight, Compass, Loader2, Sparkles, Heart, Lock, Check, PauseCircle, Trash2,
 } from 'lucide-react';
 import { apiService } from '../../services/api';
 import type { DeepDiveJourney, DeepDiveStep, DeepDiveState, DeepDiveValidation } from '../../services/api';
@@ -30,6 +30,9 @@ interface Props {
   // Called whenever the journey advances/finishes so App can refresh its
   // resume banner state.
   onChanged?: () => void;
+  // Owner-only: cancel + permanently delete this journey. App closes the layer
+  // and runs the delete optimistically.
+  onDelete?: (journeyId: string) => void;
   companionShortName?: string;
 }
 
@@ -126,7 +129,8 @@ const Frame: React.FC<{ children: React.ReactNode; footer?: React.ReactNode }> =
   </>
 );
 
-const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify, onChanged, companionShortName = 'Luma' }) => {
+const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify, onChanged, onDelete, companionShortName = 'Luma' }) => {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   useScrollLock(open);
   const [journey, setJourney] = useState<DeepDiveJourney | null>(null);
   const [step, setStep] = useState<DeepDiveStep>('CURRENT_EMOTION');
@@ -201,6 +205,7 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
     setLoading(true);
     setReflection(null);
     setCrisis(false);
+    setConfirmDelete(false);
     (async () => {
       try {
         const j = intent.type === 'open'
@@ -761,8 +766,30 @@ const DeepDiveJourneyView: React.FC<Props> = ({ open, onClose, intent, onNotify,
             {journey?.role === 'owner' && journey.status === 'in_progress' && progress && (
               <div className="font-body text-xs text-petal-muted" data-testid="deep-dive-progress">{progress}</div>
             )}
+            {journey?.role === 'owner' && onDelete && !confirmDelete && (
+              <button type="button" onClick={() => setConfirmDelete(true)} data-testid="deep-dive-delete"
+                className="mt-1 inline-flex items-center gap-1 font-body text-xs text-petal-muted hover:text-petal-rose-deep">
+                <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />{tr('不想繼續，刪除', 'Stop and delete')}
+              </button>
+            )}
           </div>
         </div>
+        {journey?.role === 'owner' && onDelete && confirmDelete && (
+          <div className="mb-4 rounded-2xl border border-petal-rule bg-petal-rose-soft/25 px-4 py-3" data-testid="deep-dive-delete-confirm">
+            <p className="font-body text-sm text-petal-ink">{tr('確定要刪除這段情緒深潛嗎？', 'Delete this emotion deep dive?')}</p>
+            <p className="font-body text-[11px] text-petal-muted mt-0.5">
+              {journey.status !== 'in_progress'
+                ? tr('你寫的信（包括已分享給伴侶的那封）和 TA 的回應都會一起刪除，無法復原。', 'Your letters (including the one shared with your partner) and their response will be deleted. This can\'t be undone.')
+                : tr('你寫的內容都會一起刪除，無法復原。如果只是累了，可以按「暫停，稍後再走」。', 'Everything you wrote will be deleted. This can\'t be undone. If you\'re just tired, tap "Pause, continue later" instead.')}
+            </p>
+            <div className="flex items-center justify-end gap-2 mt-2">
+              <button type="button" onClick={() => setConfirmDelete(false)} data-testid="deep-dive-delete-cancel"
+                className="rounded-full border border-petal-rule text-petal-ink px-4 py-1.5 text-sm font-body">{tr('保留', 'Keep it')}</button>
+              <button type="button" onClick={() => { setConfirmDelete(false); onDelete(journey.id); }} data-testid="deep-dive-delete-confirm-btn"
+                className="rounded-full bg-petal-rose-deep text-white px-4 py-1.5 text-sm font-medium hover:opacity-90">{tr('刪除這段深潛', 'Delete this deep dive')}</button>
+            </div>
+          </div>
+        )}
         {renderScreen()}
       </div>
     </div>,

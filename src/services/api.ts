@@ -5074,6 +5074,16 @@ class ApiService {
     }
   }
 
+  // Owner cancels + permanently deletes a journey (and all its letters).
+  async deleteDeepDive(id: string): Promise<void> {
+    try {
+      await apiClient.delete(`/deep-dive/${id}`);
+    } catch (error: unknown) {
+      console.error('Failed to delete deep dive:', error);
+      this.throwApiError(error, tr('暫時沒辦法刪除，請稍後再試一次', 'Couldn\'t delete right now. Please try again in a moment'));
+    }
+  }
+
   // ---- 引導模式 (Therapist Mode) ----
 
   // Current facilitation session state + scoreboard (null when none started).
