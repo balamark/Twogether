@@ -62,8 +62,17 @@ hub（前三個）與「成長」（真實故事），用戶選單（Header 右�
 未登入導覽為 5 顆（+訪客限定 Premium），`LoggedOutPreview` 對 `home`/`grow` 有專屬範例，
 並用 `ExploreLinks` 保留未登入者前往 角色扮演／我們的牆／專業諮商師／真實故事 的路徑
 （testid 與登入後的入口卡一致）。
-另有用戶選單（Header 右上）：金幣商店、最近動態、愛情旅程、真實故事、角色扮演、我們的牆、
+另有用戶選單（Header 右上）：金幣商店、最近動態、愛情旅程、真實故事、關係解方手冊、角色扮演、我們的牆、
 專業諮商師、訊息紀錄、愛的語言、情緒深潛、意見回饋、使用說明、設定、升級 Premium。
+
+**關係解方手冊 Relationship Playbook（2026-11-06）**：公開的「常卡住的循環 + 說法模板」圖書館，
+view id `playbooks`，**網址跟著頁面走**（`/playbooks`、`/playbooks/<slug>`，server 端另外輸出 SEO/OG
+與文章 HTML，見 `lib/playbooks/render.js`）。不是主分頁：入口在 成長（`grow-playbooks-entry`，放在配對
+gate 之上）、用戶選單（`user-menu-playbooks`）、未登入 今天/成長 的 `ExploreLinks`
+（`home-playbooks-entry`／`grow-playbooks-entry`），nav 高亮算 成長。內容全部免登入可讀；收藏與「我的經驗」
+需帳號（訪客存在分頁裡），未登入時是三段式 gate。每份手冊固定七段（發生了什麼／雙方真正的感受／
+為什麼一直重複／換個方式說／替代方案／建立共同約定／一起回顧），內容與新增方式見
+`docs/RELATIONSHIP_PLAYBOOK.md`。
 
 ### 既有的上手機制
 - 註冊後：AI 諮商師選擇 modal（`AiCompanionPicker.tsx`）→ 配對邀請 modal。

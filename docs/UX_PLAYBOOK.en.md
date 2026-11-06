@@ -47,6 +47,20 @@ logged out (therapists precedent) and absorbed 公開問答. Logged-out nav show
 Plus the user menu (top right): coin shop, activity feed, feedback, help,
 settings, Premium upgrade.
 
+**關係解方手冊 Relationship Playbook (2026-11-06)**: a public library of
+"cycles couples get stuck in + what to say instead". View id `playbooks`; **the
+URL follows the page** (`/playbooks`, `/playbooks/<slug>`, and the server also
+emits per-page SEO/OG tags and the article HTML, see `lib/playbooks/render.js`).
+Not a main tab: entries live in Grow (`grow-playbooks-entry`, above the pairing
+gate), the user menu (`user-menu-playbooks`) and the logged-out `ExploreLinks`
+on Today/Grow (`home-playbooks-entry` / `grow-playbooks-entry`); the nav
+highlights Grow. All content is readable without an account; saving and "My
+experience" notes need one (guests keep them in the tab), with a three-part
+gate when signed out. Every playbook has the same seven sections (situation /
+hidden feelings / negative cycle / better conversation / alternatives /
+agreement / reflect together). Content model and how to add one:
+`docs/RELATIONSHIP_PLAYBOOK.md`.
+
 ### Existing onboarding machinery
 - After sign-up: AI companion picker modal (`AiCompanionPicker.tsx`) → pairing
   invite modal → getting-started checklist card.

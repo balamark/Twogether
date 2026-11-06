@@ -41,6 +41,8 @@ const deepDiveRoutes = require('./routes/deep-dive');
 const aiCompanionRoutes = require('./routes/ai-companions');
 const aiUsageRoutes = require('./routes/ai-usage');
 const storyRoutes = require('./routes/stories');
+const playbookRoutes = require('./routes/playbooks');
+const playbookPages = require('./lib/playbooks/render');
 const pollRoutes = require('./routes/polls');
 const lineRoutes = require('./routes/line');
 const scriptFavoritesRoutes = require('./routes/script-favorites');
@@ -238,6 +240,8 @@ app.use('/api/conflict', conflictInterventionRoutes);
 app.use('/api/deep-dive', deepDiveRoutes);
 app.use('/api/ai-companions', aiCompanionRoutes);
 app.use('/api/ai-usage', aiUsageRoutes);
+// 關係解方手冊: public Playbook content + private saves/reflections.
+app.use('/api/playbooks', playbookRoutes);
 app.use('/api/stories', storyRoutes.router);
 app.use('/api/admin/stories', adminAuth, storyRoutes.adminRouter);
 app.use('/api/polls', pollRoutes.router);
@@ -356,6 +360,61 @@ app.get('/robots.txt', (req, res) => {
     `Sitemap: https://${canonicalHost || 'twogether.fun'}/sitemap.xml`,
     ''
   ].join('\n'));
+});
+
+// 關係解方手冊 public pages. The SPA renders them, but crawlers and link
+// scrapers need per-page <title>/OG tags and the article text without JS, so
+// these routes serve dist/index.html with that head + body filled in
+// (lib/playbooks/render.js). Registered before the static middleware. In dev
+// (no dist/ build) they fall through to Vite/the catch-all.
+let spaTemplateCache = null;
+function spaTemplate() {
+  if (spaTemplateCache) return spaTemplateCache;
+  try {
+    // Vite builds with base './', so the shell links "./assets/…". That only
+    // resolves from "/"; on /playbooks/<slug> it would ask for
+    // /playbooks/assets/… and get HTML back. Make the bundle links root-absolute.
+    const html = fs
+      .readFileSync(path.join(__dirname, 'dist', 'index.html'), 'utf8')
+      .replace(/(src|href)="\.\/assets\//g, '$1="/assets/');
+    if (process.env.NODE_ENV === 'production') spaTemplateCache = html;
+    return html;
+  } catch {
+    return null;
+  }
+}
+const playbookLocale = (req) => (req.query.lang === 'en' ? 'en' : 'zh-TW');
+app.get(['/playbooks', '/playbooks/'], (req, res, next) => {
+  const template = spaTemplate();
+  if (!template) return next();
+  logInfo('playbooks.page_view', { page: 'library', lang: playbookLocale(req) });
+  res.setHeader('Cache-Control', 'no-cache');
+  res.type('html').send(playbookPages.renderLibrary(template, { locale: playbookLocale(req), host: canonicalHost }));
+});
+app.get('/playbooks/:slug', (req, res, next) => {
+  const template = spaTemplate();
+  if (!template) return next();
+  const html = playbookPages.renderPlaybook(template, req.params.slug, { locale: playbookLocale(req), host: canonicalHost });
+  if (!html) {
+    logInfo('playbooks.page_not_found', { slug: String(req.params.slug).slice(0, 80) });
+    // Unknown slug: the SPA shows the library with a "not found" note.
+    return res.status(404).type('html').send(template);
+  }
+  logInfo('playbooks.page_view', { page: 'detail', slug: req.params.slug, lang: playbookLocale(req) });
+  res.setHeader('Cache-Control', 'no-cache');
+  res.type('html').send(html);
+});
+
+// sitemap.xml = the static public/ list + every published Playbook (both
+// languages), so new Playbooks are indexed without hand-editing the file.
+let sitemapCache = null;
+app.get('/sitemap.xml', (req, res) => {
+  if (!sitemapCache) {
+    const base = fs.readFileSync(path.join(__dirname, 'public', 'sitemap.xml'), 'utf8');
+    sitemapCache = base.replace('</urlset>', `${playbookPages.sitemapEntries(canonicalHost)}\n</urlset>`);
+  }
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.type('application/xml').send(sitemapCache);
 });
 
 // Serve static files from the frontend build

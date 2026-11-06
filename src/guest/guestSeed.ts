@@ -172,6 +172,22 @@ export function buildSeed(): GuestDb {
       created_at: iso(200),
     },
     love_moments: seedMoments(),
+    // 關係解方手冊: 小安 saved the 冷戰 Playbook and noted what happens to them.
+    playbook_saves: [{ slug: 'silent-treatment', savedAt: iso(4, 22) }],
+    playbook_reflections: [{
+      id: 'gpbr-1',
+      slug: 'silent-treatment',
+      experience: tr(
+        '上週為了要不要回他家過年吵架，他一句話都不說就去洗澡，我一直追著問，他就更不說話。我們其實都想把事情講開，只是一個想馬上談、一個需要先冷靜。',
+        'Last week we argued about spending the holidays at his parents\' place. He went quiet and went to shower, I kept chasing him with questions, and he went even quieter. We both want to talk it out; one of us just wants to talk now and the other needs to calm down first.',
+      ),
+      answers: [{
+        question: tr('什麼方法幫助我們冷靜下來？', 'What helped us calm down?'),
+        answer: tr('他說「給我 30 分鐘」之後真的回來找我，那次就沒有冷戰到隔天。', 'When he said "give me 30 minutes" and then actually came back, we didn\'t stay cold until the next day.'),
+      }],
+      createdAt: iso(4, 22),
+      updatedAt: iso(4, 22),
+    }],
     cycle_records: [
       { id: 'gc-1', tracked_by: ME, start_date: ymd(33), length_days: 5, notes: '', created_at: iso(33) },
       { id: 'gc-2', tracked_by: ME, start_date: ymd(5), length_days: 5, notes: '', created_at: iso(5) },
@@ -230,4 +246,4 @@ export function buildSeed(): GuestDb {
     feedback_mine: [],
   };
 }
-buildSeed.VERSION = 3;
+buildSeed.VERSION = 4;

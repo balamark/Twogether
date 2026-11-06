@@ -714,6 +714,61 @@ export const ROUTES: GuestRoute[] = [
     return ok();
   } },
 
+  // ── 關係解方手冊 Relationship Playbook (private side) ────────────────────
+  // The library + Playbook content are PUBLIC_GETS (real server). Saves and
+  // 我的經驗 reflections stay in this tab, like everything else a guest writes.
+  { method: 'get', re: P('/playbooks/me'), handler: ({ db }) => {
+    const refl = t(db, 'playbook_reflections');
+    const bySlug = new Map<string, { slug: string; count: number; lastAt: string }>();
+    for (const r of refl) {
+      const slug = str(r.slug);
+      const cur = bySlug.get(slug);
+      if (!cur) bySlug.set(slug, { slug, count: 1, lastAt: str(r.createdAt) });
+      else { cur.count += 1; if (str(r.createdAt) > cur.lastAt) cur.lastAt = str(r.createdAt); }
+    }
+    return ok({ saved: t(db, 'playbook_saves'), reflections: [...bySlug.values()] });
+  } },
+  { method: 'put', re: P('/playbooks/:slug/save'), handler: ({ db, params }) => {
+    const saves = t(db, 'playbook_saves');
+    if (!saves.some((x) => x.slug === params.slug)) saves.unshift({ slug: params.slug, savedAt: now() });
+    return ok({ saved: true, message: tr('已收藏，之後可以在「關係解方手冊」最上方找到它', 'Saved. You\'ll find it at the top of Relationship Playbooks.') });
+  } },
+  { method: 'delete', re: P('/playbooks/:slug/save'), handler: ({ db, params }) => {
+    db.playbook_saves = t(db, 'playbook_saves').filter((x) => x.slug !== params.slug);
+    return ok({ saved: false });
+  } },
+  { method: 'get', re: P('/playbooks/:slug/reflections'), handler: ({ db, params }) => ok({
+    reflections: t(db, 'playbook_reflections')
+      .filter((r) => r.slug === params.slug)
+      .sort((a, b) => str(b.createdAt).localeCompare(str(a.createdAt))),
+  }) },
+  { method: 'post', re: P('/playbooks/:slug/reflections'), handler: ({ db, params, body }) => {
+    const experience = str(body.experience).trim();
+    if (!experience) {
+      throw new GuestError(400, tr('先寫下一兩句你們發生的事，再按儲存', 'Write a sentence or two about what happened between you, then save.'), 'REFLECTION_EMPTY');
+    }
+    if (experience.length > 4000) {
+      throw new GuestError(400, tr('經驗紀錄最多 4000 字，請精簡一些再儲存', 'Notes can be up to 4000 characters. Please shorten it a little, then save.'), 'REFLECTION_TOO_LONG');
+    }
+    const answers = (Array.isArray(body.answers) ? body.answers : [])
+      .filter((a): a is Row => !!a && typeof a === 'object')
+      .map((a) => ({ question: str(a.question).slice(0, 300), answer: str(a.answer).trim().slice(0, 2000) }))
+      .filter((a) => a.answer);
+    const at = now();
+    const reflection = { id: gid('pbr'), slug: params.slug, experience, answers, createdAt: at, updatedAt: at };
+    t(db, 'playbook_reflections').unshift(reflection);
+    return ok({ reflection, message: tr('已儲存，只有你看得到這則經驗紀錄', 'Saved. Only you can see this note.') });
+  } },
+  { method: 'delete', re: P('/playbooks/reflections/:id'), handler: ({ db, params }) => {
+    const before = t(db, 'playbook_reflections');
+    const after = before.filter((r) => r.id !== params.id);
+    db.playbook_reflections = after;
+    if (after.length === before.length) {
+      throw new GuestError(404, tr('找不到這則經驗紀錄，它可能已經被刪除了', 'We couldn\'t find this note. It may already have been deleted.'), 'REFLECTION_NOT_FOUND');
+    }
+    return ok();
+  } },
+
   // ── 角色扮演 roleplay ──────────────────────────────────────────────────────
   { method: 'get', re: P('/custom-scripts'), handler: ({ db }) => ok({ custom_scripts: t(db, 'custom_scripts') }) },
   { method: 'get', re: P('/script-favorites'), handler: ({ db }) => ok({ favorites: t<string>(db, 'script_favorites') }) },
@@ -760,6 +815,10 @@ export const PUBLIC_GETS: RegExp[] = [
   /^\/therapists$/,
   /^\/stories$/,
   /^\/stories\/[0-9a-f-]{36}$/,
+  // 關係解方手冊: the library and each Playbook are public content ("me" is
+  // the private saves/reflections summary, answered from the guest DB).
+  /^\/playbooks$/,
+  /^\/playbooks\/(?!me$)[a-z0-9-]+$/,
   // A pairing-invite lookup is public: the invitee hasn't signed up yet.
   /^\/pairing-requests\/invitation\/[^/]+$/,
 ];
