@@ -15,11 +15,16 @@ import { parseDigits, digitsValue } from '../utils/digits';
 type GiftFields = Omit<CoinGift, 'id' | 'isCustom' | 'createdBy'>;
 
 interface CoinShopViewProps {
-  /** Built-in gifts still shown (removed/replaced ones already filtered out). */
+  /** The whole built-in catalog; each partner hides entries on their own list. */
   defaultGifts: CoinGift[];
-  /** How many built-in gifts this couple removed — drives 恢復預設禮品. */
-  hiddenDefaultCount: number;
+  /** Built-in gift keys I removed/replaced on my list — drives 恢復預設禮品. */
+  hiddenDefaults: string[];
+  /** Built-in gift keys my partner removed from their list (read-only for me). */
+  partnerHiddenDefaults: string[];
+  /** Both partners' custom gifts; `createdBy` says whose list each is on. */
   customGifts: CoinGift[];
+  myUserId: string | null;
+  partnerNickname: string;
   addCustomGift: (
     title: string,
     description: string,
@@ -45,15 +50,27 @@ const EMPTY_GIFT: GiftFields = { title: '', description: '', cost: 1000, categor
 // can be redeemed but not edited/removed yet (there's no row to target).
 const isPending = (gift: CoinGift) => gift.id.startsWith('temp-');
 
-// 感情存款 page: both partners' deposit accounts (DepositPanel) plus the gift shop
-// where you spend your own deposit on a gift from your partner — the partner
-// has to agree before anything is deducted. Defined at module scope (not inside App) so its
+type Side = 'mine' | 'partner';
+
+const categoryLabel = (category: CoinGift['category']) =>
+  category === 'service' ? tr('服務', 'Service') :
+  category === 'experience' ? tr('體驗', 'Experience') :
+  category === 'physical' ? tr('實物', 'Physical') : tr('親密', 'Intimate');
+
+// 感情存款 page: both partners' deposit accounts (DepositPanel) plus the gift
+// shop, split in two: 我的禮品 (my own list — I add/edit/remove them and spend
+// my deposit on one, which my partner then gives me once they agree) and TA 的
+// 禮品 (my partner's list, read-only — what they're saving up for, so I know
+// what a deposit to them buys). Nothing is deducted until the partner agrees. Defined at module scope (not inside App) so its
 // identity is stable across App re-renders — a nested definition would remount
 // on every render and wipe the in-progress "add custom gift" form. See issue #41.
 const CoinShopView = ({
   defaultGifts,
-  hiddenDefaultCount,
+  hiddenDefaults,
+  partnerHiddenDefaults,
   customGifts,
+  myUserId,
+  partnerNickname,
   addCustomGift,
   updateGift,
   removeGift,
@@ -79,7 +96,20 @@ const CoinShopView = ({
   // Two-step remove (no blocking window.confirm): first tap arms it on that card.
   const [confirmingRemoveId, setConfirmingRemoveId] = useState<string | null>(null);
 
-  const allGifts = [...defaultGifts, ...customGifts];
+  const [side, setSide] = useState<Side>('mine');
+  // A gift with no creator yet (optimistic copy) is always mine.
+  const isMine = (gift: CoinGift) => !gift.createdBy || gift.createdBy === myUserId;
+  const myGifts = [
+    ...defaultGifts.filter(g => !hiddenDefaults.includes(g.id)),
+    ...customGifts.filter(isMine),
+  ];
+  const partnerGifts = paired
+    ? [...defaultGifts.filter(g => !partnerHiddenDefaults.includes(g.id)), ...customGifts.filter(g => !isMine(g))]
+    : [];
+  const hiddenDefaultCount = defaultGifts.filter(g => hiddenDefaults.includes(g.id)).length;
+  const partnerBalance = summary?.partner?.balance ?? 0;
+  const onPartnerSide = side === 'partner';
+  const shownGifts = onPartnerSide ? partnerGifts : myGifts;
 
   const openAddModal = () => {
     setEditingGift(null);
@@ -205,9 +235,12 @@ const CoinShopView = ({
               {tr('用感情存款', 'Spend on a ')}<em className="not-italic font-light italic text-pink-600">{tr('兌換禮品', 'gift')}</em>
             </h3>
             <p className="font-body text-sm text-petal-muted mt-1">
-              {tr('一起設計你們想要的禮品；兌換要等對方同意後才會扣款。', 'Design the gifts you both want; a redemption is deducted only after the other agrees.')}
+              {onPartnerSide
+                ? tr(`這是${partnerNickname}想兌換的禮品——${partnerNickname}用自己的存款兌換，由你來實現；為${partnerNickname}存款，就能讓${partnerNickname}早點換到。`, `These are the gifts ${partnerNickname} wants. ${partnerNickname} spends their own deposit and you make it happen; adding to ${partnerNickname}'s Love Bank gets them there sooner.`)
+                : tr(`這是你自己的禮品清單：用你的感情存款兌換，${partnerNickname}同意後才會扣款。`, `This is your own gift list: spend your Love Bank on one, and it's deducted only after ${partnerNickname} agrees.`)}
             </p>
           </div>
+          {!onPartnerSide && (
           <div className="flex flex-col items-start md:items-end gap-2">
             <div className="flex flex-wrap items-center gap-2">
               {hiddenDefaultCount > 0 && (
@@ -230,10 +263,62 @@ const CoinShopView = ({
               </button>
             </div>
           </div>
+          )}
+        </div>
+
+        <div role="tablist" aria-label={tr('誰的禮品', 'Whose gifts')} className="mt-5 inline-flex rounded-full border border-petal-rule bg-petal-cream-2 p-1 font-body text-[13px]">
+          {([
+            ['mine', tr('我的禮品', 'My gifts'), myGifts.length],
+            ['partner', tr(`${partnerNickname}的禮品`, `${partnerNickname}'s gifts`), paired ? partnerGifts.length : null],
+          ] as const).map(([key, text, count]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={side === key}
+              onClick={() => { setSide(key); setConfirmingRemoveId(null); }}
+              data-testid={`gift-side-${key}`}
+              className={`min-h-[36px] px-4 rounded-full transition-colors ${
+                side === key ? 'bg-white text-petal-ink shadow-sm font-medium' : 'text-petal-muted hover:text-petal-ink'
+              }`}
+            >
+              {text}
+              {count !== null && <span className="ml-1.5 text-petal-muted">{count}</span>}
+            </button>
+          ))}
         </div>
       </div>
 
-      {allGifts.length === 0 && (
+      {onPartnerSide && summary && !paired && (
+        <div className="bg-white rounded-2xl border border-dashed border-petal-rule p-8 text-center max-w-lg mx-auto" data-testid="partner-gifts-unpaired">
+          <div className="text-3xl mb-3">💞</div>
+          <p className="font-display text-lg text-petal-ink mb-2">
+            {tr('配對後，就能看到另一半想要的小幸福', 'Once you pair up, you can see the little joys your partner wants')}
+          </p>
+          <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-5">
+            {tr('還沒有配對，所以這裡還沒有 TA 的禮品。現在可以先在「我的禮品」整理你的清單，例如「🎬 電影之夜 · 800」。', 'You\'re not paired yet, so there\'s no partner list here. Meanwhile, set up your own under "My gifts", e.g. "🎬 Movie night · 800".')}
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <button type="button" onClick={onInvitePartner} className="rounded-full bg-petal-ink px-4 py-1.5 font-body text-[13px] font-medium text-petal-cream hover:bg-petal-ink/85 transition-colors">{tr('邀請另一半', 'Invite your partner')}</button>
+            <button type="button" onClick={() => setSide('mine')} className="px-4 py-2 rounded-md text-sm font-body text-petal-ink-soft hover:text-petal-ink">{tr('看我的禮品', 'See my gifts')}</button>
+          </div>
+        </div>
+      )}
+
+      {onPartnerSide && paired && partnerGifts.length === 0 && (
+        <div className="bg-white rounded-2xl border border-dashed border-petal-rule p-8 text-center max-w-lg mx-auto" data-testid="partner-gifts-empty">
+          <div className="text-3xl mb-3">🎁</div>
+          <p className="font-display text-lg text-petal-ink mb-2">
+            {tr(`知道${partnerNickname}想要什麼，存款才存得有方向`, `Knowing what ${partnerNickname} wants gives your deposits a direction`)}
+          </p>
+          <p className="font-body text-sm text-petal-ink-soft leading-relaxed mb-5">
+            {tr(`${partnerNickname}的清單目前是空的。可以問問${partnerNickname}想放什麼，例如「💆 睡前肩頸按摩 · 800」；你也可以先整理自己的清單。`, `${partnerNickname}'s list is empty for now. Ask what they'd like on it, e.g. "💆 A bedtime shoulder rub · 800" — or set up your own list first.`)}
+          </p>
+          <button type="button" onClick={() => setSide('mine')} className="rounded-full bg-petal-ink px-4 py-1.5 font-body text-[13px] font-medium text-petal-cream hover:bg-petal-ink/85 transition-colors">{tr('整理我的禮品', 'Set up my gifts')}</button>
+        </div>
+      )}
+
+      {!onPartnerSide && myGifts.length === 0 && (
         <div className="bg-white rounded-2xl border border-dashed border-petal-rule p-8 text-center max-w-lg mx-auto" data-testid="gift-shop-empty">
           <div className="text-3xl mb-3">🎁</div>
           <p className="font-display text-lg text-petal-ink mb-2">
@@ -257,7 +342,31 @@ const CoinShopView = ({
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {allGifts.map((gift) => {
+        {shownGifts.map((gift) => {
+          if (onPartnerSide) {
+            const partnerCan = partnerBalance >= gift.cost;
+            return (
+              <div key={`partner-${gift.id}`} className="bg-white rounded-xl border border-petal-rule p-3 flex flex-col" data-testid="partner-gift-card">
+                <div className="text-xl leading-none pt-1 opacity-75 saturate-75">{gift.icon}</div>
+                <h3 className="font-display text-[15px] font-medium leading-snug tracking-tight text-petal-ink mt-2 line-clamp-2">{gift.title}</h3>
+                <p className="font-body text-xs text-petal-ink-soft leading-snug mt-0.5 line-clamp-2" title={gift.description}>{gift.description}</p>
+                <div className="flex items-center justify-between gap-1 mt-auto pt-2">
+                  <span className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted">{categoryLabel(gift.category)}</span>
+                  <span className="font-display text-sm text-petal-ink whitespace-nowrap">
+                    <Coins className="inline w-3 h-3 mr-0.5 -mt-0.5 text-petal-rose-deep" strokeWidth={1.5} />
+                    {gift.cost.toLocaleString()}
+                  </span>
+                </div>
+                <div className={`mt-2 w-full min-h-[36px] px-2 rounded-full font-body text-xs flex items-center justify-center text-center ${
+                  partnerCan ? 'bg-petal-rose-soft/25 text-petal-ink' : 'bg-petal-cream-2 text-petal-muted'
+                }`}>
+                  {partnerCan
+                    ? tr(`${partnerNickname}的存款夠換了`, `${partnerNickname} can redeem this`)
+                    : tr(`${partnerNickname}還差 ${(gift.cost - partnerBalance).toLocaleString()}`, `${partnerNickname} is ${(gift.cost - partnerBalance).toLocaleString()} short`)}
+                </div>
+              </div>
+            );
+          }
           const canRedeem = paired && available >= gift.cost;
           const label = !summary
             ? (summaryQuery.error ? tr('暫時無法兌換', 'Can\'t redeem right now') : tr('讀取中…', 'Loading…'))
@@ -321,11 +430,7 @@ const CoinShopView = ({
                 <h3 className="font-display text-[15px] font-medium leading-snug tracking-tight text-petal-ink mt-1 line-clamp-2">{gift.title}</h3>
                 <p className="font-body text-xs text-petal-ink-soft leading-snug mt-0.5 line-clamp-2" title={gift.description}>{gift.description}</p>
                 <div className="flex items-center justify-between gap-1 mt-auto pt-2">
-                  <span className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted">
-                    {gift.category === 'service' ? tr('服務', 'Service') :
-                     gift.category === 'experience' ? tr('體驗', 'Experience') :
-                     gift.category === 'physical' ? tr('實物', 'Physical') : tr('親密', 'Intimate')}
-                  </span>
+                  <span className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted">{categoryLabel(gift.category)}</span>
                   <span className="font-display text-sm text-petal-ink whitespace-nowrap">
                     <Coins className="inline w-3 h-3 mr-0.5 -mt-0.5 text-petal-rose-deep" strokeWidth={1.5} />
                     {gift.cost.toLocaleString()}

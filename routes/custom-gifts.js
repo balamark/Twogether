@@ -16,13 +16,18 @@ const DEFAULT_GIFT_KEYS = ['massage', 'dinner', 'movie_night', 'oral_service', '
 // All custom gift routes require authentication
 router.use(authenticateToken);
 
-const findCoupleId = async (userId, client = db) => {
+const findCouple = async (userId, client = db) => {
   const coupleResult = await client.query(
-    'SELECT id FROM couples WHERE user1_id = $1 OR user2_id = $1',
+    'SELECT id, user1_id, user2_id FROM couples WHERE user1_id = $1 OR user2_id = $1',
     [userId]
   );
-  return coupleResult.rows.length > 0 ? coupleResult.rows[0].id : null;
+  const couple = coupleResult.rows[0];
+  if (!couple) return { coupleId: null, partnerId: null };
+  const partnerId = couple.user1_id === userId ? couple.user2_id : couple.user1_id;
+  return { coupleId: couple.id, partnerId: partnerId || null };
 };
+
+const findCoupleId = async (userId, client = db) => (await findCouple(userId, client)).coupleId;
 
 const toApiGift = (gift) => ({
   id: gift.id,
@@ -36,21 +41,24 @@ const toApiGift = (gift) => ({
   createdAt: gift.created_at
 });
 
-// Hide a default gift for the caller's scope (couple when paired, else
-// personal). Idempotent: hiding an already-hidden key is a no-op.
-const hideDefaultGift = (client, coupleId, userId, giftKey) => (
-  coupleId
-    ? client.query(`
-        INSERT INTO hidden_default_gifts (couple_id, user_id, gift_key)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (couple_id, gift_key) WHERE couple_id IS NOT NULL DO NOTHING
-      `, [coupleId, userId, giftKey])
-    : client.query(`
-        INSERT INTO hidden_default_gifts (couple_id, user_id, gift_key)
-        VALUES (NULL, $1, $2)
-        ON CONFLICT (user_id, gift_key) WHERE couple_id IS NULL DO NOTHING
-      `, [userId, giftKey])
-);
+// Hide a default gift on the caller's own list (each partner has their own —
+// 我的禮品 / TA 的禮品). Idempotent: hiding an already-hidden key is a no-op.
+const hideDefaultGift = (client, coupleId, userId, giftKey) => client.query(`
+  INSERT INTO hidden_default_gifts (couple_id, user_id, gift_key)
+  VALUES ($1, $2, $3)
+  ON CONFLICT (user_id, gift_key) DO NOTHING
+`, [coupleId, userId, giftKey]);
+
+// The gift exists but belongs to the partner's list: say so instead of a
+// generic "not found", and point at what the caller can do instead.
+const rejectNotOwner = (res, userId, giftId, action) => {
+  logWarn(`${action} custom gift rejected: partner's gift`, { user_id: userId, gift_id: giftId });
+  return res.status(403).json({
+    success: false,
+    message: '這是 TA 的禮品，只有 TA 能修改或移除；想要類似的禮品，可以在「我的禮品」新增一個',
+    error_code: 'GIFT_NOT_OWNER'
+  });
+};
 
 // Postgres INTEGER max: the only limit on a gift's price.
 const GIFT_COST_MAX = 2147483647;
@@ -91,34 +99,49 @@ const rejectInvalid = (req, res) => {
   return true;
 };
 
-// Get custom gifts for user's couple or personal gifts, plus which default
-// gifts this couple has removed/replaced.
+// Both partners' gift lists: every custom gift carries created_by (the list
+// it's on), plus which built-in gifts each partner removed/replaced on their
+// own list. The partner's list is read-only for the caller.
 router.get('/', async (req, res) => {
   try {
     const userId = req.user.id;
-    const coupleId = await findCoupleId(userId);
+    const { coupleId, partnerId } = await findCouple(userId);
+    const owners = partnerId ? [userId, partnerId] : [userId];
 
-    // Get custom gifts for the couple OR personal gifts created by this user
+    // A partner's gifts made before pairing (couple_id NULL) are still theirs.
     const [giftsResult, hiddenResult] = await Promise.all([
       db.query(`
         SELECT
           id, title, description, cost, category, icon,
           created_by, created_at, updated_at
         FROM custom_gifts
-        WHERE couple_id = $1 OR (couple_id IS NULL AND created_by = $2)
+        WHERE created_by = ANY($2::uuid[])
+          AND (couple_id = $1 OR couple_id IS NULL)
         ORDER BY created_at DESC
-      `, [coupleId, userId]),
+      `, [coupleId, owners]),
       db.query(`
-        SELECT gift_key
+        SELECT user_id, gift_key
         FROM hidden_default_gifts
-        WHERE couple_id = $1 OR (couple_id IS NULL AND user_id = $2)
-      `, [coupleId, userId])
+        WHERE user_id = ANY($1::uuid[])
+      `, [owners])
     ]);
+
+    const hiddenFor = (id) => [...new Set(hiddenResult.rows.filter(r => r.user_id === id).map(r => r.gift_key))];
+    const gifts = giftsResult.rows.map(toApiGift);
+
+    logInfo('Gift lists loaded', {
+      user_id: userId,
+      paired: !!partnerId,
+      mine: gifts.filter(g => g.createdBy === userId).length,
+      partner: partnerId ? gifts.filter(g => g.createdBy === partnerId).length : 0
+    });
 
     res.json({
       success: true,
-      custom_gifts: giftsResult.rows.map(toApiGift),
-      hidden_defaults: [...new Set(hiddenResult.rows.map(r => r.gift_key))]
+      custom_gifts: gifts,
+      hidden_defaults: hiddenFor(userId),
+      partner_id: partnerId,
+      partner_hidden_defaults: partnerId ? hiddenFor(partnerId) : []
     });
 
   } catch (error) {
@@ -183,8 +206,8 @@ router.post('/', [
   }
 });
 
-// Restore every removed/replaced default gift. Replacement copies stay as
-// custom gifts — the couple can remove those separately if they want.
+// Restore every built-in gift the caller removed/replaced on their own list.
+// Replacement copies stay as custom gifts — they can remove those separately.
 router.delete('/defaults/hidden', async (req, res) => {
   try {
     const userId = req.user.id;
@@ -192,8 +215,8 @@ router.delete('/defaults/hidden', async (req, res) => {
 
     const result = await db.query(`
       DELETE FROM hidden_default_gifts
-      WHERE couple_id = $1 OR (couple_id IS NULL AND user_id = $2)
-    `, [coupleId, userId]);
+      WHERE user_id = $1
+    `, [userId]);
 
     logInfo('Default gifts restored', { user_id: userId, couple_id: coupleId, restored: result.rowCount });
 
@@ -209,7 +232,7 @@ router.delete('/defaults/hidden', async (req, res) => {
   }
 });
 
-// Remove (hide) one built-in default gift for this couple.
+// Remove (hide) one built-in default gift from the caller's own list.
 router.delete('/defaults/:key', async (req, res) => {
   try {
     const userId = req.user.id;
@@ -249,7 +272,7 @@ router.put('/:id', giftValidators(true), async (req, res) => {
     const userId = req.user.id;
     const updates = req.body;
 
-    // Verify gift ownership - check if user created it or is in the couple
+    // Visible to both partners, but only the one whose list it's on can edit.
     const giftResult = await db.query(`
       SELECT cg.*
       FROM custom_gifts cg
@@ -269,6 +292,7 @@ router.put('/:id', giftValidators(true), async (req, res) => {
         error_code: 'GIFT_NOT_FOUND'
       });
     }
+    if (giftResult.rows[0].created_by !== userId) return rejectNotOwner(res, userId, giftId, 'Update');
 
     // Build update query
     const updateFields = [];
@@ -333,9 +357,9 @@ router.delete('/:id', async (req, res) => {
     const giftId = req.params.id;
     const userId = req.user.id;
 
-    // Verify gift ownership - check if user created it or is in the couple
+    // Visible to both partners, but only the one whose list it's on can remove.
     const giftResult = await db.query(`
-      SELECT cg.id, cg.title, cg.icon
+      SELECT cg.id, cg.title, cg.icon, cg.created_by
       FROM custom_gifts cg
       LEFT JOIN couples c ON cg.couple_id = c.id
       WHERE cg.id = $1 AND (
@@ -353,6 +377,7 @@ router.delete('/:id', async (req, res) => {
         error_code: 'GIFT_NOT_FOUND'
       });
     }
+    if (giftResult.rows[0].created_by !== userId) return rejectNotOwner(res, userId, giftId, 'Delete');
 
     await db.query('DELETE FROM custom_gifts WHERE id = $1', [giftId]);
 

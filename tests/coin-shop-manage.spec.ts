@@ -187,6 +187,63 @@ test.describe('Coin shop gift management', () => {
     await expect.poll(() => calls.find((c) => c.url.endsWith('/coins/deposits'))?.body ?? '').toContain('"kind":"thanks"');
   });
 
+  test('splits into 我的禮品 / TA 的禮品; the partner list is read-only', async ({ page }) => {
+    test.setTimeout(60000);
+    await setup(page, {
+      success: true, paired: true,
+      me: { balance: 1600, available: 1600 }, partner: { balance: 300 }, average: 950,
+      awaiting_me: [], awaiting_partner: [], recent: [],
+    });
+    await page.route('**/api/custom-gifts', (route) =>
+      route.request().method() === 'GET'
+        ? route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              success: true,
+              custom_gifts: [
+                { id: CUSTOM_ID, title: '我的禮品', description: '自訂', cost: 300, category: 'service', icon: '🎈', isCustom: true, createdBy: FAKE_USER.id },
+                { id: '88888888-8888-8888-8888-888888888888', title: '拉麵約會', description: 'TA 想要', cost: 250, category: 'experience', icon: '🍜', isCustom: true, createdBy: '22222222-2222-2222-2222-222222222222' },
+              ],
+              hidden_defaults: ['shopping'],
+              partner_hidden_defaults: ['massage', 'dinner', 'movie_night', 'oral_service', 'babysitting'],
+            }),
+          })
+        : route.fallback(),
+    );
+    await openShop(page);
+
+    // Mine: 6 built-ins − 1 hidden + my custom; the partner's gift isn't here.
+    await expect(page.getByTestId('gift-card')).toHaveCount(6);
+    await expect(page.getByTestId('gift-card').filter({ hasText: '拉麵約會' })).toHaveCount(0);
+
+    await page.getByTestId('gift-side-partner').click();
+    const partnerCards = page.getByTestId('partner-gift-card');
+    // Partner: only 購物基金 left of the built-ins + their custom gift.
+    await expect(partnerCards).toHaveCount(2);
+    await expect(partnerCards.filter({ hasText: '我的禮品' })).toHaveCount(0);
+    const ramen = partnerCards.filter({ hasText: '拉麵約會' });
+    await expect(ramen).toContainText('存款夠換了');
+    await expect(partnerCards.filter({ hasText: '購物基金' })).toContainText('還差 4,700');
+    // Read-only: no edit / remove / redeem on the partner's list.
+    await expect(page.getByTestId('edit-gift')).toHaveCount(0);
+    await expect(page.getByTestId('remove-gift')).toHaveCount(0);
+    await expect(page.getByTestId('redeem-gift')).toHaveCount(0);
+    await expect(page.getByTestId('add-gift-button')).toHaveCount(0);
+
+    await page.getByTestId('gift-side-mine').click();
+    await expect(page.getByTestId('gift-card')).toHaveCount(6);
+  });
+
+  test('unpaired: TA 的禮品 shows a gate with an invite CTA', async ({ page }) => {
+    test.setTimeout(60000);
+    await setup(page);
+    await openShop(page);
+    await page.getByTestId('gift-side-partner').click();
+    await expect(page.getByTestId('partner-gifts-unpaired')).toContainText('邀請另一半');
+    await expect(page.getByTestId('partner-gift-card')).toHaveCount(0);
+  });
+
   test('unpaired: three-part gate and redeem disabled', async ({ page }) => {
     test.setTimeout(60000);
     await setup(page);

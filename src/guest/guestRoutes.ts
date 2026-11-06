@@ -47,6 +47,16 @@ const now = () => new Date().toISOString();
 const days = (isoStr: string) => Math.floor((Date.now() - Date.parse(isoStr)) / 86400000);
 const str = (v: unknown) => (typeof v === 'string' ? v : v == null ? '' : String(v));
 
+// A custom gift the guest may change: it must exist and be on their own list.
+function ownGift(db: GuestDb, id: string): Row {
+  const gift = t(db, 'custom_gifts').find((g) => g.id === id);
+  if (!gift) throw new GuestError(404, tr('找不到禮品或無權限修改', 'Gift not found, or you don\'t have permission to edit it'), 'GIFT_NOT_FOUND');
+  if (gift.createdBy !== ME) {
+    throw new GuestError(403, tr('這是 TA 的禮品，只有 TA 能修改或移除；想要類似的禮品，可以在「我的禮品」新增一個', 'This gift is on your partner\'s list, so only they can edit or remove it. Want something similar? Add one under "My gifts"'), 'GIFT_NOT_OWNER');
+  }
+  return gift;
+}
+
 // Path helper: '/events/:id/messages' → RegExp with named groups.
 const P = (pattern: string) =>
   new RegExp(`^${pattern.replace(/:(\w+)/g, '(?<$1>[^/]+)')}/?$`);
@@ -339,7 +349,53 @@ export const ROUTES: GuestRoute[] = [
   } },
   { method: 'put', re: P('/coins/rates'), handler: ({ body }) => ok({ rates: body.rates || {} }) },
   { method: 'get', re: P('/coins/rates'), handler: () => ok({ rates: {} }) },
-  { method: 'get', re: P('/custom-gifts'), handler: ({ db }) => ok({ custom_gifts: t(db, 'custom_gifts'), hidden_defaults: [] }) },
+  // 感情存款 gift lists: 我的禮品 (editable) + TA 的禮品 (read-only), like the server.
+  { method: 'get', re: P('/custom-gifts'), handler: ({ db }) => {
+    const hidden = t(db, 'hidden_default_gifts');
+    const keysOf = (id: string) => hidden.filter((h) => h.user_id === id).map((h) => str(h.gift_key));
+    return ok({
+      custom_gifts: [...t(db, 'custom_gifts')].sort((a, b) => str(b.createdAt).localeCompare(str(a.createdAt))),
+      hidden_defaults: keysOf(ME),
+      partner_id: PARTNER,
+      partner_hidden_defaults: keysOf(PARTNER),
+    });
+  } },
+  { method: 'post', re: P('/custom-gifts'), handler: ({ db, body }) => {
+    const gift: Row = {
+      id: gid('gg'), title: str(body.title), description: str(body.description), cost: Number(body.cost) || 1,
+      category: str(body.category) || 'service', icon: str(body.icon) || '🎁', isCustom: true, createdBy: ME, createdAt: now(),
+    };
+    t(db, 'custom_gifts').push(gift);
+    const key = body.replaces_default ? str(body.replaces_default) : null;
+    if (key && !t(db, 'hidden_default_gifts').some((h) => h.user_id === ME && h.gift_key === key)) {
+      t(db, 'hidden_default_gifts').push({ user_id: ME, gift_key: key });
+    }
+    return ok({ message: key ? tr('禮品更新成功', 'Gift updated') : tr('禮品創建成功', 'Gift created'), custom_gift: gift, replaced_default: key });
+  } },
+  { method: 'delete', re: P('/custom-gifts/defaults/hidden'), handler: ({ db }) => {
+    const all = t(db, 'hidden_default_gifts');
+    const kept = all.filter((h) => h.user_id !== ME);
+    db.hidden_default_gifts = kept;
+    return ok({ message: tr('已恢復預設禮品', 'Default gifts restored'), restored: all.length - kept.length });
+  } },
+  { method: 'delete', re: P('/custom-gifts/defaults/:key'), handler: ({ db, params }) => {
+    if (!t(db, 'hidden_default_gifts').some((h) => h.user_id === ME && h.gift_key === params.key)) {
+      t(db, 'hidden_default_gifts').push({ user_id: ME, gift_key: params.key });
+    }
+    return ok({ message: tr('禮品刪除成功', 'Gift deleted') });
+  } },
+  { method: 'put', re: P('/custom-gifts/:id'), handler: ({ db, params, body }) => {
+    const gift = ownGift(db, params.id);
+    for (const k of ['title', 'description', 'cost', 'category', 'icon']) {
+      if (body[k] !== undefined) gift[k] = k === 'cost' ? Number(body[k]) || gift.cost : str(body[k]);
+    }
+    return ok({ message: tr('禮品更新成功', 'Gift updated'), custom_gift: gift });
+  } },
+  { method: 'delete', re: P('/custom-gifts/:id'), handler: ({ db, params }) => {
+    ownGift(db, params.id);
+    db.custom_gifts = t(db, 'custom_gifts').filter((g) => g.id !== params.id);
+    return ok({ message: tr('禮品刪除成功', 'Gift deleted') });
+  } },
 
   // ── 說開一件事 events ───────────────────────────────────────────────────────
   { method: 'get', re: P('/events/analytics'), handler: ({ db }) => {

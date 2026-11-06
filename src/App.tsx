@@ -25,7 +25,7 @@ import EventsView from './components/EventsView';
 import TherapistsView from './components/TherapistsView';
 import LoggedOutPreview, { CommunicationPrinciples } from './components/LoggedOutPreview';
 import { trackAction } from './utils/track';
-import { isGuestActive, buildGuestUser } from './guest/guestMode';
+import { isGuestActive, buildGuestUser, currentUserId } from './guest/guestMode';
 import { ensureGuestDb, resetGuestDb, wipeGuestDb } from './guest/guestDb';
 import GuestBanner from './guest/GuestBanner';
 import GuestCoach from './guest/GuestCoach';
@@ -688,6 +688,8 @@ const LoveTimeApp = () => {
   const [customGifts, setCustomGifts] = useState<CoinGift[]>([]);
   // Keys of built-in gifts this couple removed (or replaced with an edit).
   const [hiddenDefaultGifts, setHiddenDefaultGifts] = useState<string[]>([]);
+  // Built-in gifts the partner removed from their own list (TA 的禮品, read-only).
+  const [partnerHiddenDefaultGifts, setPartnerHiddenDefaultGifts] = useState<string[]>([]);
   // Without a stored token the visitor starts as a guest right away (no flash
   // of the signed-out shell); the mount effect below restores a real session.
   const [authState, setAuthState] = useState<AuthState>(() => {
@@ -1723,9 +1725,10 @@ const LoveTimeApp = () => {
 
         // Load custom gifts from backend
         try {
-          const { gifts, hiddenDefaults } = await apiService.getCustomGifts();
+          const { gifts, hiddenDefaults, partnerHiddenDefaults } = await apiService.getCustomGifts();
           setCustomGifts(gifts as ApiCustomGift[]);
           setHiddenDefaultGifts(hiddenDefaults);
+          setPartnerHiddenDefaultGifts(partnerHiddenDefaults);
         } catch (giftError) {
           console.error('Failed to load custom gifts:', giftError);
         }
@@ -2326,13 +2329,13 @@ const LoveTimeApp = () => {
       }) as CoinGift;
 
       // Update local state
-      setCustomGifts(prev => [...prev, newGift]);
+      setCustomGifts(prev => [...prev, { ...newGift, createdBy: newGift.createdBy ?? currentUserId() ?? undefined }]);
       added = true;
 
       showNotification({
         type: 'success',
         title: tr('禮品已添加！', 'Gift added!'),
-        message: tr(`${title} 已加入禮品商店`, `${title} was added to the gift shop`),
+        message: tr(`${title} 已加入你的禮品清單，TA 也看得到`, `${title} was added to your gift list — your partner can see it too`),
         duration: 3000
       });
 
@@ -2368,7 +2371,7 @@ const LoveTimeApp = () => {
     }
     const tempId = `temp-${gift.id}-${Date.now()}`;
     setHiddenDefaultGifts(prev => (prev.includes(gift.id) ? prev : [...prev, gift.id]));
-    setCustomGifts(prev => [{ ...fields, id: tempId, isCustom: true }, ...prev]);
+    setCustomGifts(prev => [{ ...fields, id: tempId, isCustom: true, createdBy: currentUserId() ?? undefined }, ...prev]);
     try {
       const saved = await apiService.createCustomGift({ ...fields, replaces_default: gift.id }) as CoinGift;
       setCustomGifts(prev => prev.map(g => (g.id === tempId ? saved : g)));
@@ -2690,9 +2693,12 @@ const LoveTimeApp = () => {
         );
       case 'shop': return (
         <CoinShopView
-          defaultGifts={defaultGifts.filter(g => !hiddenDefaultGifts.includes(g.id))}
-          hiddenDefaultCount={defaultGifts.filter(g => hiddenDefaultGifts.includes(g.id)).length}
+          defaultGifts={defaultGifts}
+          hiddenDefaults={hiddenDefaultGifts}
+          partnerHiddenDefaults={partnerHiddenDefaultGifts}
           customGifts={customGifts}
+          myUserId={currentUserId()}
+          partnerNickname={nicknames.partner2 || tr('TA', 'Partner')}
           addCustomGift={addCustomGift}
           updateGift={updateGift}
           removeGift={removeGift}

@@ -4437,13 +4437,15 @@ class ApiService {
   }
 
   // Custom Gifts API
-  // Custom gifts plus the keys of built-in gifts this couple removed/replaced.
-  async getCustomGifts(): Promise<{ gifts: unknown[]; hiddenDefaults: string[] }> {
+  // Both partners' custom gifts (createdBy = whose list) plus the keys of the
+  // built-in gifts each of them removed/replaced on their own list.
+  async getCustomGifts(): Promise<{ gifts: unknown[]; hiddenDefaults: string[]; partnerHiddenDefaults: string[] }> {
     try {
       const response = await apiClient.get('/custom-gifts');
       return {
         gifts: response.data.custom_gifts || [],
         hiddenDefaults: response.data.hidden_defaults || [],
+        partnerHiddenDefaults: response.data.partner_hidden_defaults || [],
       };
     } catch (error) {
       console.error('Failed to fetch custom gifts:', error);
@@ -4494,7 +4496,7 @@ class ApiService {
     }
   }
 
-  // Remove a built-in gift from this couple's shop.
+  // Remove a built-in gift from the caller's own gift list.
   async hideDefaultGift(key: string): Promise<void> {
     try {
       await apiClient.delete(`/custom-gifts/defaults/${encodeURIComponent(key)}`);
