@@ -195,6 +195,7 @@
 "禮品更新成功": "Gift updated",
 "更新禮品失敗": "Couldn't update the gift",
 "找不到禮品或無權限刪除": "Gift not found, or you don't have permission to delete it",
+"這是 TA 的禮品，只有 TA 能修改或移除；想要類似的禮品，可以在「我的禮品」新增一個": "This gift is on your partner's list, so only they can edit or remove it. Want something similar? Add one under \"My gifts\"",
 "禮品刪除成功": "Gift deleted",
 "刪除禮品失敗": "Couldn't delete the gift",
 "創建禮品失敗，請稍後再試": "Couldn't create the gift. Please try again in a moment",

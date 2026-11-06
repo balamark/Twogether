@@ -206,6 +206,17 @@ export function buildSeed(): GuestDb {
       { id: 'gd-4', kind: 'thanks', status: 'confirmed', amount: 50, note: tr('謝謝你煮晚餐', 'Thanks for cooking dinner'), gift_icon: '🍳', category: null, owner_id: ME, created_by: PARTNER, created_at: iso(11, 22), responded_at: iso(11, 22) },
     ],
     balances: { [ME]: 320, [PARTNER]: 280 },
+    // 感情存款 gift lists — each partner has their own (created_by), and hides
+    // built-in gifts on their own list only.
+    custom_gifts: [
+      { id: 'gg-1', title: tr('早上幫我泡一杯咖啡', 'Make me a morning coffee'), description: tr('週末早上，端到床邊的那種', 'On a weekend morning, brought to bed'), cost: 120, category: 'service', icon: '☕', isCustom: true, createdBy: ME, createdAt: iso(14) },
+      { id: 'gg-2', title: tr('一晚不被打擾的遊戲時間', 'A gaming night, no interruptions'), description: tr('打完這場就去睡，保證', 'Bed right after this match, promise'), cost: 250, category: 'experience', icon: '🎮', isCustom: true, createdBy: PARTNER, createdAt: iso(9) },
+      { id: 'gg-3', title: tr('週末帶我去吃那家拉麵', 'Take me to that ramen place this weekend'), description: tr('排隊也沒關係，我們一起排', 'Even if there\'s a line, we\'ll wait together'), cost: 400, category: 'experience', icon: '🍜', isCustom: true, createdBy: PARTNER, createdAt: iso(4) },
+    ],
+    hidden_default_gifts: [
+      { user_id: PARTNER, gift_key: 'babysitting' },
+      { user_id: PARTNER, gift_key: 'shopping' },
+    ],
     script_favorites: [],
     intimacy_requests: [
       {
@@ -219,4 +230,4 @@ export function buildSeed(): GuestDb {
     feedback_mine: [],
   };
 }
-buildSeed.VERSION = 2;
+buildSeed.VERSION = 3;
