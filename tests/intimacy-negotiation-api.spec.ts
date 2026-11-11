@@ -283,3 +283,26 @@ test('a negotiation invite links only this couple\'s live plans; other types ign
   });
   expect(tooMany.status()).toBe(400);
 });
+
+// Regression: a DB trigger (migration 009) used to insert a second copy of the
+// invite / reply notification next to the route's own insert, so 通知中心
+// showed every 親密邀請 twice. Exactly one per event now.
+test('an invite and its reply each create exactly one notification', async () => {
+  const created = await a.post(`${API}/intimacy-requests`, {
+    data: { message: '今晚一起散步嗎', request_type: 'romantic' },
+  });
+  expect(created.status(), await created.text()).toBe(201);
+  const id = (await created.json()).intimacy_request.id;
+
+  const countFor = async (ctx: APIRequestContext, type: string) => {
+    const res = await ctx.get(`${API}/intimacy-requests/notifications?notification_type=${type}&limit=200`);
+    expect(res.status(), await res.text()).toBe(200);
+    return (await res.json()).notifications.filter((n: { intimacy_request_id: string }) => n.intimacy_request_id === id).length;
+  };
+
+  expect(await countFor(b, 'intimacy_request')).toBe(1);
+
+  const accept = await b.put(`${API}/intimacy-requests/${id}/respond`, { data: { response: 'accepted' } });
+  expect(accept.status(), await accept.text()).toBe(200);
+  expect(await countFor(a, 'request_response')).toBe(1);
+});
