@@ -76,6 +76,9 @@ adds a fragment file in `changelog/`; CI compiles them into the block below —
 see `CLAUDE.md`.)
 
 <!-- changelog:begin (generated from changelog/*.md — edit those, not this) -->
+### 2026-11-11
+- **通知中心不再重複**: 親密邀請與「邀請被接受／婉拒」的通知過去會出現兩則一模一樣的，現在每個邀請只會通知一次，舊的重複通知也已清除。
+
 ### 2026-11-06
 - **兌換禮品分成「我的禮品 / TA 的禮品」**: 感情存款的禮品商店現在分成兩邊，每個人有自己的禮品清單、可以自由新增、修改、移除；切到 TA 的那一邊就能看到另一半想兌換什麼、還差多少存款，知道該為 TA 存什麼。
 
