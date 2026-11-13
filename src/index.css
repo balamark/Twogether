@@ -123,6 +123,7 @@ video {
 
 /* 次級表面 / 淡色 chip 底 → surface-2 */
 .dark .bg-petal-rose-soft,
+.dark .bg-purple-200,
 .dark .bg-petal-cream-2\/40,
 .dark .bg-petal-cream-2\/50,
 .dark .bg-slate-200,
@@ -313,6 +314,7 @@ video {
 .dark .bg-pink-50\/60,
 .dark .bg-rose-50\/60,
 .dark .bg-petal-rose-soft\/10,
+.dark .bg-petal-rose-soft\/15,
 .dark .bg-petal-rose-soft\/20,
 .dark .bg-petal-rose-soft\/25,
 .dark .bg-petal-rose-soft\/30,
@@ -332,7 +334,8 @@ video {
 .dark .border-rose-200 { border-color: rgba(212,147,138,0.4) !important; }
 
 /* purple 其實是鼠尾草綠（見 tailwind.config.js）——深底上提亮一階。 */
-.dark .text-purple-600 { color: #A8B89E !important; }
+.dark .text-purple-600,
+.dark .text-purple-700 { color: #A8B89E !important; }
 
 /* ────────────────────────────────────────────────────────────────────────
    半透明的淺色面／分隔實色。bg-white/80 之類疊在內容上當「毛玻璃」卡面，
