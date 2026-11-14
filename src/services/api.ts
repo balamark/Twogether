@@ -715,6 +715,74 @@ export interface StoryVoteCounts {
 
 export type StoryKind = 'story' | 'article';
 
+// --- 關係解方手冊 Relationship Playbook (public content; lib/playbooks/) ---
+
+export type PlaybookApplyTarget = 'intimacy' | 'event';
+
+export interface PlaybookSummary {
+  id: string;
+  slug: string;
+  emoji: string;
+  category: string;
+  categoryLabel: string;
+  title: string;
+  subtitle: string;
+  hook: string;
+  tags: string[];
+  estimatedReadingMinutes: number;
+}
+
+export interface PlaybookPerspective {
+  role: string;
+  emotions: string[];
+  underlyingNeeds: string[];
+}
+
+export interface PlaybookScript {
+  label: string;
+  script: string;
+}
+
+export interface Playbook extends PlaybookSummary {
+  version: number;
+  publishedAt?: string;
+  situation: { summary: string; examples: string[] };
+  hiddenFeelings: { partnerA: PlaybookPerspective; partnerB: PlaybookPerspective; coreInsight: string };
+  negativeCycle: { steps: string[]; consequences: string[] };
+  betterConversation: {
+    partnerA: PlaybookScript;
+    partnerB: PlaybookScript;
+    elements?: { name: string; desc: string }[];
+  };
+  alternativeSolutions: { id: string; title: string; emotionalNeedAddressed: string }[];
+  alternativesNote?: string;
+  agreement: { title: string; statements: string[] };
+  reflectionQuestions: string[];
+  safetyNotes: string[];
+  relatedPlaybooks: string[];
+  related: PlaybookSummary[];
+  apply: PlaybookApplyTarget;
+}
+
+export interface PlaybookLibrary {
+  playbooks: PlaybookSummary[];
+  categories: { key: string; label: string }[];
+}
+
+export interface MyPlaybooks {
+  saved: { slug: string; savedAt: string }[];
+  reflections: { slug: string; count: number; lastAt: string }[];
+}
+
+export interface PlaybookReflection {
+  id: string;
+  slug: string;
+  experience: string;
+  answers: { question: string; answer: string }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface StorySummary {
   id: string;
   title: string;
@@ -2783,6 +2851,50 @@ class ApiService {
   async getAiUsageToday(): Promise<AiUsageToday> {
     const response = await apiClient.get('/ai-usage/today');
     return response.data.usage as AiUsageToday;
+  }
+
+  // --- 關係解方手冊 Relationship Playbook ---
+  // Library + detail are public (no login; guest mode passes them through to
+  // the server). Saves and reflections are private to the signed-in user.
+
+  async getPlaybooks(): Promise<PlaybookLibrary> {
+    const response = await apiClient.get('/playbooks');
+    return { playbooks: response.data.playbooks || [], categories: response.data.categories || [] };
+  }
+
+  async getPlaybook(slug: string): Promise<Playbook> {
+    const response = await apiClient.get(`/playbooks/${encodeURIComponent(slug)}`);
+    return response.data.playbook as Playbook;
+  }
+
+  async getMyPlaybooks(): Promise<MyPlaybooks> {
+    const response = await apiClient.get('/playbooks/me');
+    return { saved: response.data.saved || [], reflections: response.data.reflections || [] };
+  }
+
+  async savePlaybook(slug: string): Promise<void> {
+    await apiClient.put(`/playbooks/${encodeURIComponent(slug)}/save`);
+  }
+
+  async unsavePlaybook(slug: string): Promise<void> {
+    await apiClient.delete(`/playbooks/${encodeURIComponent(slug)}/save`);
+  }
+
+  async getPlaybookReflections(slug: string): Promise<PlaybookReflection[]> {
+    const response = await apiClient.get(`/playbooks/${encodeURIComponent(slug)}/reflections`);
+    return (response.data.reflections || []) as PlaybookReflection[];
+  }
+
+  async createPlaybookReflection(
+    slug: string,
+    input: { experience: string; answers: { question: string; answer: string }[] },
+  ): Promise<PlaybookReflection> {
+    const response = await apiClient.post(`/playbooks/${encodeURIComponent(slug)}/reflections`, input);
+    return response.data.reflection as PlaybookReflection;
+  }
+
+  async deletePlaybookReflection(id: string): Promise<void> {
+    await apiClient.delete(`/playbooks/reflections/${encodeURIComponent(id)}`);
   }
 
   // --- 真實故事 (Relationship Wisdom Archive) ---

@@ -1,5 +1,17 @@
 {
 "exact": {
+"內容格式不正確，請檢查後再送出一次": "Some of the content isn't in the right format. Please check it and send again.",
+"找不到這份手冊，它可能已經下架；回到手冊列表看看其他主題吧": "We couldn't find this playbook. It may have been taken down. Head back to the playbook list to explore other topics.",
+"暫時讀不到你收藏的手冊，請稍後重新整理再試": "We couldn't load your saved playbooks right now. Please refresh in a moment.",
+"已收藏，之後可以在「關係解方手冊」最上方找到它": "Saved. You'll find it at the top of Relationship Playbooks.",
+"收藏沒有成功，請稍後再按一次": "Saving didn't work. Please tap again in a moment.",
+"取消收藏沒有成功，請稍後再按一次": "Removing it from your saved list didn't work. Please tap again in a moment.",
+"暫時讀不到你的經驗紀錄，請稍後重新整理再試": "We couldn't load your notes right now. Please refresh in a moment.",
+"先寫下一兩句你們發生的事，再按儲存": "Write a sentence or two about what happened between you, then save.",
+"已儲存，只有你看得到這則經驗紀錄": "Saved. Only you can see this note.",
+"經驗紀錄沒有存成功，你寫的內容還在，請稍後再按一次儲存": "Your note didn't save. What you wrote is still here, so please tap Save again in a moment.",
+"找不到這則經驗紀錄，它可能已經被刪除了": "We couldn't find this note. It may already have been deleted.",
+"刪除沒有成功，請稍後再試一次": "Deleting didn't work. Please try again in a moment.",
 "試玩伴侶今天回得夠多了。免費註冊後，邀請你真正的另一半來回覆你吧。": "The sample partner has replied plenty for now. Sign up free and invite your real partner to reply to you.",
 "試玩的 5 次 AI 已經用完了。免費註冊後每天都有 AI 額度，還能邀請另一半一起用。": "You've used all 5 preview AI tries. Sign up free for a daily AI allowance — and invite your partner to use it together.",
 "訪客編號格式不正確，請重新整理頁面再試": "The guest id looks invalid. Please refresh the page and try again.",
@@ -1143,6 +1155,14 @@
 "提醒沒送出，請稍後再試；也可以複製連結用 LINE 傳給伴侶。": "The reminder didn't go through. Try again later, or copy the link and send it to your partner on LINE."
 },
 "patterns": [
+[
+"經驗紀錄最多 {0} 字，請精簡一些再儲存",
+"Notes can be up to {0} characters. Please shorten it a little, then save."
+],
+[
+"這份手冊最多保存 {0} 則經驗紀錄，刪掉幾則舊的就能再新增",
+"You can keep up to {0} notes per playbook. Delete a few older ones to add more."
+],
 [
 "{0} {1}rating 必須為 up 或 down",
 "{0} {1} rating must be up or down"

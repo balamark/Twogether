@@ -12,6 +12,8 @@ const DB_KEY = 'tw_guest_db_v1';
 const ALLOWED = [
   /\/api\/auth\//, /\/api\/track\//, /\/api\/feature-flags$/, /\/api\/feedback\/approved$/,
   /\/api\/intimacy-plans\/samples$/, /\/api\/guest-ai\//, /\/api\/therapists$/, /\/api\/stories(\/[0-9a-f-]{36})?$/,
+  // 關係解方手冊: the public library + Playbook content (never /playbooks/me).
+  /\/api\/playbooks(\/(?!me$)[a-z0-9-]+)?$/,
 ];
 
 function watchNetwork(page: Page): string[] {

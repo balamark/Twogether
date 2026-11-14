@@ -1172,7 +1172,12 @@ const ExploreLinks: React.FC<{ view: string; onNavigate?: (view: string) => void
       { label: tr('看看我們的牆', 'See our wall'), target: 'wall', testId: 'us-wall-card' },
     ] :
     view === 'grow' ? [
+      { label: tr('看看關係解方手冊', 'See the Relationship Playbook'), target: 'playbooks', testId: 'grow-playbooks-entry' },
       { label: tr('看看真實故事', 'See real stories'), target: 'stories', testId: 'grow-stories-entry' },
+    ] :
+    // 關係解方手冊 is the public "is this us?" door: offer it from 今天 too.
+    view === 'home' ? [
+      { label: tr('伴侶常卡住的 8 種循環', '8 patterns couples get stuck in'), target: 'playbooks', testId: 'home-playbooks-entry' },
     ] : [];
   if (links.length === 0) return null;
   return (

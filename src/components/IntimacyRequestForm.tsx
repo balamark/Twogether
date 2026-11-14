@@ -44,6 +44,8 @@ interface IntimacyRequestFormProps {
   onViewScript?: (title: string) => void;
   /** 替代方案協商: open the 共同方案 tab (closes the modal). */
   onOpenPlans?: () => void;
+  /** Open straight on this invitation type (e.g. 'negotiation' from 關係解方手冊). */
+  initialCategory?: string | null;
 }
 
 type Step = 'category' | 'script' | 'aimsg' | 'reconcile' | 'guidance' | 'template' | 'customize' | 'confirm';
@@ -174,6 +176,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
   scripts = [],
   onViewScript,
   onOpenPlans,
+  initialCategory,
 }) => {
   const [currentStep, setCurrentStep] = useState<Step>('category');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
@@ -435,6 +438,15 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
       setCurrentStep('template');
     }
   };
+
+  // Opened from a 關係解方手冊 CTA: skip the type picker once per opening.
+  useEffect(() => {
+    if (isOpen && initialCategory && currentStep === 'category' && !selectedCategory) {
+      handleCategorySelect(initialCategory);
+    }
+    // Only on open / when the requested type changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialCategory]);
 
   const toggleGuidancePhrase = function (phraseKey: string) {
     setGuidanceSelected((prev) => {

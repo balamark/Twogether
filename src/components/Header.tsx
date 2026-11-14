@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown, MessageSquarePlus, Activity, LifeBuoy, Compass, BookOpen, Play, StickyNote, HeartHandshake, HeartPulse } from 'lucide-react';
+import { User, LogOut, Coins, Heart, Bell, Send, Settings, Trophy, Inbox, Crown, MessageSquarePlus, Activity, LifeBuoy, Compass, BookOpen, Play, StickyNote, HeartHandshake, HeartPulse, BookMarked } from 'lucide-react';
 import type { BillingStatus } from '../services/api';
 import LanguageSwitch from './LanguageSwitch';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -34,6 +34,8 @@ interface HeaderProps {
   onShowActivity: () => void;
   onShowJourney: () => void;
   onShowStories: () => void;
+  /** 關係解方手冊 (public Relationship Playbook library). */
+  onShowPlaybooks: () => void;
   onShowRoleplay: () => void;
   onShowWall: () => void;
   onShowEmotionCheck: () => void;
@@ -77,6 +79,7 @@ const Header: React.FC<HeaderProps> = ({
   onShowActivity,
   onShowJourney,
   onShowStories,
+  onShowPlaybooks,
   onShowRoleplay,
   onShowWall,
   onShowEmotionCheck,
@@ -284,6 +287,17 @@ const Header: React.FC<HeaderProps> = ({
                       >
                         <BookOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
                         <span>{t('menu.stories')}</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          onShowPlaybooks();
+                          setShowUserMenu(false);
+                        }}
+                        data-testid="user-menu-playbooks"
+                        className="w-full flex items-center space-x-2 px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
+                      >
+                        <BookMarked className="w-3.5 h-3.5" strokeWidth={1.5} />
+                        <span>{t('menu.playbooks')}</span>
                       </button>
                       <button
                         onClick={() => {

@@ -49,6 +49,8 @@ import type { DeepDiveJourney, DeepDiveInboxItem } from './services/api';
 import AiCompanionOnboarding from './components/AiCompanionPicker';
 import HelpView from './components/HelpView';
 import StoriesView from './components/StoriesView';
+import PlaybooksView from './components/playbooks/PlaybooksView';
+import { isPlaybooksPath, slugFromLocation } from './components/playbooks/playbookShared';
 import { resolveCompanion } from './utils/aiCompanions';
 import { apiService, getTokenExpiry, clearAuthStorage } from './services/api';
 import { clearQueryCache } from './services/queryCache';
@@ -555,7 +557,7 @@ const PERSISTED_VIEWS = new Set([
   'home', 'talk', 'us', 'grow',
   'record', 'calendar', 'rediscover', 'see-you', 'secret', 'daily-love', 'achievements', 'conflict', 'events', 'roleplay', 'wall',
   'therapists', 'counselor', 'stories', 'shop', 'journey', 'intimacy-history', 'settings', 'activity',
-  'feedback', 'love-language', 'upgrade', 'pricing', 'foreplay', 'games', 'communicate', 'help',
+  'feedback', 'love-language', 'upgrade', 'pricing', 'foreplay', 'games', 'communicate', 'help', 'playbooks',
 ]);
 
 const LoveTimeApp = () => {
@@ -570,6 +572,8 @@ const LoveTimeApp = () => {
     if (typeof window === 'undefined') return 'home';
     const p = window.location.pathname;
     if (p.startsWith('/billing/result') || p.startsWith('/booking/result')) return 'home';
+    // Public 關係解方手冊 links (/playbooks, /playbooks/<slug>) open the Playbook.
+    if (isPlaybooksPath()) return 'playbooks';
     try {
       const saved = localStorage.getItem(VIEW_STORAGE_KEY);
       if (saved && PERSISTED_VIEWS.has(saved)) return saved;
@@ -804,6 +808,13 @@ const LoveTimeApp = () => {
   // purchase) the upload modal re-opens pre-filled so no work is lost.
   const [pendingScriptDraft, setPendingScriptDraft] = useState<PendingScriptDraft | null>(null);
   const [showIntimacyRequestForm, setShowIntimacyRequestForm] = useState(false);
+  // Invitation type to open the form on (關係解方手冊 →「替代方案協商」); cleared on close.
+  const [intimacyFormCategory, setIntimacyFormCategory] = useState<string | null>(null);
+  useEffect(() => {
+    if (!showIntimacyRequestForm) setIntimacyFormCategory(null);
+  }, [showIntimacyRequestForm]);
+  // Slug from the URL the app was opened on (/playbooks/<slug>), read once.
+  const [initialPlaybookSlug] = useState<string | null>(() => slugFromLocation());
   const [showNotificationInbox, setShowNotificationInbox] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   // The header bell badge and the inbox share this count: it's fetched on login
@@ -2530,6 +2541,35 @@ const LoveTimeApp = () => {
   // their own sign-in prompts: a guest is a visitor there, not the sample couple.
   const visitorAuthState: AuthState = authState.isGuest ? { ...authState, isAuthenticated: false } : authState;
 
+  // 關係解方手冊「這聽起來像你們嗎？」CTA → the matching in-app flow.
+  const handlePlaybookApply = (target: 'intimacy' | 'event') => {
+    if (target === 'intimacy') {
+      if (!partnerConnected) {
+        showNotification({
+          type: 'info',
+          title: tr('先邀請另一半加入', 'Invite your partner first'),
+          message: tr('「替代方案協商」是傳給另一半的邀請，配對後就能用。現在可以先收藏手冊、寫下你的經驗。', '"Talk about alternatives" is an invitation sent to your partner, so it works once you\'re paired. Meanwhile, save the playbook and note your experience.'),
+        });
+        openPairingPrompt();
+        return;
+      }
+      setIntimacyFormCategory('negotiation');
+      setShowIntimacyRequestForm(true);
+      return;
+    }
+    setPendingEventsCompose(true);
+    setCurrentView('events');
+  };
+  const playbooksView = (as: AuthState) => (
+    <PlaybooksView
+      authState={as}
+      showNotification={showNotification}
+      setShowAuthModal={setShowAuthModal}
+      initialSlug={initialPlaybookSlug}
+      onApply={handlePlaybookApply}
+    />
+  );
+
   const renderView = () => {
     // Show login prompt for private content when not authenticated
     if (!authState.isAuthenticated) {
@@ -2561,6 +2601,8 @@ const LoveTimeApp = () => {
             onFindTherapist={() => setCurrentView('therapists')}
           />
         );
+        // 關係解方手冊 is public content: the real view, read-only actions gated.
+        case 'playbooks': return playbooksView(authState);
         // Each nav tab previews its own feature (read-only) instead of all
         // falling through to one generic login wall. See LoggedOutPreview.
         default: return <LoggedOutPreview view={currentView} onSignUp={() => setShowAuthModal(true)} scripts={defaultRoleplayScripts} onNavigate={setCurrentView} />;
@@ -2836,6 +2878,7 @@ const LoveTimeApp = () => {
         onCycleRecordsChange={setCycleRecords}
       />;
       case 'activity': return <ActivityView showNotification={showNotification} />;
+      case 'playbooks': return playbooksView(authState);
       case 'help': return <HelpView onFeedback={() => setCurrentView('feedback')} />;
       case 'stories': return (
         <StoriesView
@@ -2957,6 +3000,7 @@ const LoveTimeApp = () => {
         onShowActivity={() => setCurrentView('activity')}
         onShowJourney={() => setCurrentView('journey')}
         onShowStories={() => setCurrentView('stories')}
+        onShowPlaybooks={() => setCurrentView('playbooks')}
         onShowRoleplay={() => setCurrentView('roleplay')}
         onShowWall={() => setCurrentView('wall')}
         onShowEmotionCheck={() => setCurrentView('conflict')}
@@ -3186,7 +3230,7 @@ const LoveTimeApp = () => {
               (item.id === 'us' && ['record', 'calendar', 'rediscover', 'see-you', 'secret', 'daily-love', 'journey', 'wall'].includes(currentView)) ||
               // 'achievements' is a legacy deep-link id that now renders GrowView,
               // so it must light up 成長 — not 我們.
-              (item.id === 'grow' && ['achievements', 'stories'].includes(currentView));
+              (item.id === 'grow' && ['achievements', 'stories', 'playbooks'].includes(currentView));
             return (
               <button
                 key={item.id}
@@ -3385,6 +3429,7 @@ const LoveTimeApp = () => {
       <IntimacyRequestForm
         isOpen={showIntimacyRequestForm}
         onClose={() => setShowIntimacyRequestForm(false)}
+        initialCategory={intimacyFormCategory}
         scripts={[...defaultRoleplayScripts, ...customScripts]}
         onViewScript={(title) => {
           setShowIntimacyRequestForm(false);

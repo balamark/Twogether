@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, BookOpen, ChevronRight } from 'lucide-react';
+import { TrendingUp, BookOpen, BookMarked, ChevronRight } from 'lucide-react';
 import { AchievementsView } from './AchievementsView';
 import EventAnalytics from './EventAnalytics';
 import SoloModeGate from './SoloModeGate';
@@ -31,6 +31,24 @@ const StoriesTeaserCard: React.FC<{ onGoToStories: () => void }> = ({ onGoToStor
   </button>
 );
 
+// 關係解方手冊 entry — public content, so like 真實故事 it sits above the
+// pairing gate (solo users can read and save Playbooks too).
+const PlaybooksTeaserCard: React.FC<{ onOpen: () => void }> = ({ onOpen }) => (
+  <button
+    type="button"
+    onClick={onOpen}
+    data-testid="grow-playbooks-entry"
+    className="w-full flex items-center gap-3 bg-white border border-petal-rule rounded-2xl px-4 py-3.5 text-left hover:border-petal-ink transition-colors"
+  >
+    <BookMarked className="w-4 h-4 text-petal-rose-deep shrink-0" strokeWidth={1.5} />
+    <span className="min-w-0 flex-1">
+      <span className="block font-display text-sm text-petal-ink">{tr('🧭 關係解方手冊', '🧭 Relationship Playbook')}</span>
+      <span className="block font-body text-[11px] text-petal-muted">{tr('常卡住的 8 種循環，和可以直接說出口的話', '8 patterns couples get stuck in, and words you can actually say')}</span>
+    </span>
+    <ChevronRight className="w-4 h-4 text-petal-muted shrink-0" strokeWidth={1.5} />
+  </button>
+);
+
 // 🌱 成長 — stats/badges (AchievementsView), the AI-detected communication
 // pattern + KPIs/charts (EventAnalytics), and a teaser into 真實故事.
 const GrowView: React.FC<GrowViewProps> = ({ authState, onInvitePartner, onNavigate }) => {
@@ -46,7 +64,12 @@ const GrowView: React.FC<GrowViewProps> = ({ authState, onInvitePartner, onNavig
   // 真實故事 is explicitly solo-friendly (you can read and publish without a
   // partner), so its entry card sits ABOVE the pairing gate — gating the only
   // way into it would make a solo-usable feature unreachable from the nav.
-  const storiesCard = <StoriesTeaserCard onGoToStories={() => onNavigate('stories')} />;
+  const storiesCard = (
+    <div className="space-y-2">
+      <PlaybooksTeaserCard onOpen={() => onNavigate('playbooks')} />
+      <StoriesTeaserCard onGoToStories={() => onNavigate('stories')} />
+    </div>
+  );
 
   if (!authState.partnerConnected) {
     return (
@@ -58,6 +81,11 @@ const GrowView: React.FC<GrowViewProps> = ({ authState, onInvitePartner, onNavig
           valueLine={tr("配對之後，這裡會累積你們的統計、AI 觀察到的溝通模式，以及一起達成的里程碑。", 'Once you\'re paired, your stats, the communication patterns AI notices, and milestones you reach together will build up here.')}
           onInvite={onInvitePartner}
           alternatives={[
+            {
+              label: tr('讀關係解方手冊', 'Read the Relationship Playbook'),
+              desc: tr('看懂常卡住的循環，拿到可以直接說出口的話。', 'Understand the cycles couples get stuck in and get words you can actually say.'),
+              onClick: () => onNavigate('playbooks'),
+            },
             {
               label: tr('逛逛真實故事', 'Browse real stories'),
               desc: tr('看看其他伴侶怎麼把關係經營得更好。', 'See how other couples nurture their relationships.'),
