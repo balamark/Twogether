@@ -54,7 +54,12 @@ jobs:
   e2e:
     needs: [changes]
     if: ${{ needs.changes.outputs.app == 'true' }}
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: Playwright's WebKit build is linked against
+    # the distro's ICU (libicudata.so.74 on 24.04). When ubuntu-latest moved
+    # to a newer image every Mobile Safari spec died at launch with "error
+    # while loading shared libraries: libicudata.so.74". Bump this together
+    # with a Playwright upgrade that supports the newer image.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -89,12 +94,19 @@ jobs:
         # webServer polls for readiness — without a build it 404s forever.
         run: npm run build
 
+      # The browsers are built per distro, so the cache must never cross OS
+      # images. runner.os is just "Linux"; the runner's ImageOS env var
+      # (ubuntu24, …) isn't visible to ${{ }} expressions, so read it here.
+      - name: Runner image
+        id: image
+        run: echo "os=${ImageOS:-unknown}" >> "$GITHUB_OUTPUT"
+
       - name: Cache Playwright browsers
         id: pw-cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          key: playwright-${{ runner.os }}-${{ steps.image.outputs.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install Playwright browsers
         # webkit is needed by the "Mobile Safari" project, which runs the specs
