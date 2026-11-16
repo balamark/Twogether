@@ -23,6 +23,7 @@ export const iso = (daysAgo: number, hour = 20, minute = 0): string => {
   d.setHours(hour, minute, 0, 0);
   return d.toISOString();
 };
+const hoursAgo = (h: number): string => new Date(Date.now() - h * 3600000).toISOString();
 export const ymd = (daysAgo: number): string => {
   const d = new Date(Date.now() - daysAgo * DAY);
   const p = (n: number) => String(n).padStart(2, '0');
@@ -244,6 +245,23 @@ export function buildSeed(): GuestDb {
       },
     ],
     feedback_mine: [],
+    // 回頭接住 — 阿哲 circled back after last night's argument (the open
+    // event above), waiting for 小安's answer; plus an older one 小安 sent
+    // that 阿哲 caught, so the 30-day count isn't zero.
+    repairs: [
+      {
+        id: 'grp-1', status: 'sent', sender_id: PARTNER, kind: 'validate',
+        text: tr('我想了一下，你那時會那麼生氣，其實是有原因的：說好的晚餐我遲到又沒先說，讓你一個人在那邊等。那種感覺一定很不好受。', 'I\'ve been thinking — it makes sense you got so upset: I was late for our dinner without telling you and left you waiting there alone. That must have felt awful.'),
+        remind_at: hoursAgo(4), reminded_at: hoursAgo(4), sent_at: hoursAgo(3),
+        response: null, response_note: null, responded_at: null, created_at: hoursAgo(6),
+      },
+      {
+        id: 'grp-2', status: 'sent', sender_id: ME, kind: 'own_part',
+        text: tr('剛剛我的語氣太衝了，那不是我想對你說話的方式。', 'My tone earlier was too harsh. That\'s not how I want to talk to you.'),
+        remind_at: null, reminded_at: null, sent_at: iso(12, 22), response: 'received', response_note: null,
+        responded_at: iso(12, 22, 20), created_at: iso(12, 22),
+      },
+    ],
   };
 }
-buildSeed.VERSION = 4;
+buildSeed.VERSION = 5;

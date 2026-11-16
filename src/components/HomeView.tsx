@@ -3,6 +3,7 @@ import { Sparkles, Activity, TrendingUp, ChevronRight } from 'lucide-react';
 import GettingStartedCard from './GettingStartedCard';
 import RelationshipDashboard from './RelationshipDashboard';
 import InfoHint from './InfoHint';
+import RepairCard from './repair/RepairCard';
 import { useRelationshipSummary, useActivityFeed } from '../hooks/usePageData';
 import { formatDateTime } from '../utils/datetime';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -262,6 +263,16 @@ const HomeView: React.FC<HomeViewProps> = ({
         </div>
       </div>
       <TodayActions onGoToDailyLove={onGoToDailyLove} onGoToTalk={onGoToTalk} onGoToGrow={onGoToGrow} />
+      {/* 回頭接住: the small repair move after a fight (Gottman's repair attempt).
+          Right under the positive-first actions, because a note from the partner
+          waiting for an answer is the most time-sensitive thing on this page. */}
+      <RepairCard
+        paired={authState.partnerConnected}
+        partnerName={authState.user?.partnerNickname || tr('另一半', 'your partner')}
+        showNotification={showNotification}
+        onInvitePartner={onInvitePartner}
+        onGoToTalk={onGoToTalk}
+      />
       <GettingStartedCard
         companionPicked={!!authState.user?.selected_therapist}
         paired={authState.partnerConnected}

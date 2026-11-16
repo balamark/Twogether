@@ -61,6 +61,20 @@ hidden feelings / negative cycle / better conversation / alternatives /
 agreement / reflect together). Content model and how to add one:
 `docs/RELATIONSHIP_PLAYBOOK.md`.
 
+**回頭接住 Repair attempts (2026-11-16)**: the small step after a fight that ended
+in "forget it" (Gottman's repair attempt + emotional validation). Lighter than
+說開一件事: no thread, no AI, no quota. Not a main tab: the card lives on 今天
+(`home-repair-card`, right under 今天想做什麼), with a second entry above the
+說開一件事 list (`events-repair-entry`) and an alternative on the unpaired gate.
+The card shows only the most urgent thing: ① a note from the partner awaiting an
+answer (被接住了 / 想再聊聊 / 還需要一點時間 — the last is never framed as a
+rejection) ② a 冷靜後提醒我 reminder that came due ③ otherwise a compact entry +
+the last note's status + the 30-day count of times they caught each other.
+Reminders have no cron: `GET /api/repair` and the unread-count poll sweep due
+ones (`routes/repair.js`). Unpaired users can set reminders and copy the note to
+send over LINE. The wording hint (但是 / 你也 / 算了) runs on-device and only
+suggests, never blocks.
+
 ### Existing onboarding machinery
 - After sign-up: AI companion picker modal (`AiCompanionPicker.tsx`) → pairing
   invite modal → getting-started checklist card.

@@ -19,6 +19,7 @@ const {
 } = require('../lib/intimacyNudgeTones');
 const { translateString } = require('../middleware/locale');
 const { notifyPartnerAction } = require('../services/notificationService');
+const { sweepDueRepairReminders } = require('./repair');
 
 const router = express.Router();
 
@@ -1331,6 +1332,10 @@ router.get('/notifications/unread-count', async (req, res) => {
   try {
     const userId = req.user.id;
     logInfo('Getting unread notification count', { userId });
+
+    // 回頭接住 「冷靜後提醒我」 rides this poll (every open app makes it), so a
+    // due reminder lands in the inbox without a cron. Throttled + never throws.
+    await sweepDueRepairReminders();
 
     // Count unread notifications for the user
     const result = await db.query(`

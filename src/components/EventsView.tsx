@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Sparkles, BarChart3, ChevronLeft, Plus } from 'lucide-react';
+import RepairComposer from './repair/RepairComposer';
 import EventHistoryList from './EventHistoryList';
 import ComposeEventFlow from './ComposeEventFlow';
 import EventDetail from './EventDetail';
@@ -101,6 +102,21 @@ export default function EventsView({
     }
   }, [initialSubView, onInitialSubViewConsumed, setViewState]);
 
+  // 回頭接住 composer — the lighter path for "we fought, I don't want a whole
+  // conversation, I just want to reach back" (src/components/repair/).
+  const [repairOpen, setRepairOpen] = useState(false);
+  const partnerName = authState.user?.partnerNickname || tr('另一半', 'your partner');
+  const repairComposer = repairOpen && (
+    <RepairComposer
+      paired={authState.partnerConnected}
+      partnerName={partnerName}
+      source="events"
+      onClose={() => setRepairOpen(false)}
+      showNotification={showNotification}
+      onInvitePartner={onInvitePartner}
+    />
+  );
+
   const openDetail = (id: string, opts?: { replace?: boolean }) => {
     setSelectedEventId(id, opts);
     setViewState('detail', opts);
@@ -125,12 +141,19 @@ export default function EventsView({
 
   if (!authState.partnerConnected) {
     return (
+      <>
+      {repairComposer}
       <SoloModeGate
         icon={Sparkles}
         title={tr("吵架了？AI 幫你們把話說開", 'Had a fight? AI helps you talk it through')}
         valueLine={tr("配對之後，你可以把當下的委屈原封不動寫下來（可以罵、可以很火），AI 會整理成對方聽得進去的說法，讓對方先接住你的情緒，再一起把事情解決。", 'Once paired, you can write down what hurt exactly as you feel it (vent, be angry). The AI turns it into words your partner can hear, so they can hold your feelings first, and then you solve it together.')}
         onInvite={onInvitePartner ?? (() => {})}
         alternatives={[
+          {
+            label: tr('剛吵完？先回頭接住 TA 一句', 'Just had a fight? Circle back with one line'),
+            desc: tr('選一句「你會生氣是有原因的」這類的話，複製用 LINE 傳給 TA。', 'Pick a line like "it makes sense you were upset", copy it and send it on LINE.'),
+            onClick: () => setRepairOpen(true),
+          },
           {
             label: tr('做愛的語言測驗', 'Take the love language quiz'),
             desc: tr('5 分鐘了解自己最需要被愛的方式，配對後可以看到彼此的結果。', 'Learn in 5 minutes how you most need to be loved. Once paired, you can see each other\'s results.'),
@@ -148,6 +171,7 @@ export default function EventsView({
           },
         ]}
       />
+      </>
     );
   }
 
@@ -212,6 +236,19 @@ export default function EventsView({
                 </button>
               </div>
             </div>
+            <button
+              type="button"
+              data-testid="events-repair-entry"
+              onClick={() => setRepairOpen(true)}
+              className="w-full mb-4 flex items-center gap-3 rounded-2xl border border-petal-rule bg-white px-4 py-3 text-left hover:border-petal-ink transition-colors"
+            >
+              <span className="text-lg shrink-0" aria-hidden>🕊️</span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-display text-sm text-petal-ink">{tr('不想長談，只想先和好一點？', 'Not up for a long talk — just want to reach back?')}</span>
+                <span className="block font-body text-[12px] text-petal-muted">{tr(`冷靜之後回頭對${partnerName}說一句，也是修復。`, `Once you've calmed down, one line back to ${partnerName} is a repair too.`)}</span>
+              </span>
+              <span className="shrink-0 font-body text-[13px] text-petal-ink underline underline-offset-2">{tr('回頭接住', 'Circle back')}</span>
+            </button>
             <EventHistoryList
               key={refreshKey}
               onOpenEvent={openDetail}
@@ -255,6 +292,7 @@ export default function EventsView({
           </>
         )}
       </div>
+      {repairComposer}
     </div>
   );
 }

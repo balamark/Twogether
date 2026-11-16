@@ -205,6 +205,15 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       case 'story_comment':
         onNavigate('stories');
         break;
+      // 回頭接住 — a note to answer, an answer to my note, or my 冷靜後提醒我
+      // reminder: all of it lives on the 今天 card.
+      case 'repair_sent':
+      case 'repair_response_received':
+      case 'repair_response_talk':
+      case 'repair_response_need_time':
+      case 'repair_reminder':
+        onNavigate('home');
+        break;
       // 關係之屋提醒（每週檢視 / 好久沒親密 / 說句欣賞的話）→ 首頁的關係儀表板。
       case 'relationship_checkin_due':
       case 'relationship_intimacy_gap':

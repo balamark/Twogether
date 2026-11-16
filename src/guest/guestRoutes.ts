@@ -122,6 +122,34 @@ function activityFeed(db: GuestDb): Row[] {
   return items.sort((a, b) => str(b.date).localeCompare(str(a.date))).slice(0, 30);
 }
 
+// 回頭接住 repair attempts: the same overview the server builds (routes/repair.js).
+// The sample partner answers the guest's note 被接住了 once it has sat for a
+// few seconds, so the whole loop is visible without a second account.
+const REPAIR_KINDS = new Set(['validate', 'thanks', 'own_part', 'care', 'pause', 'light']);
+const REPAIR_RESPONSES = new Set(['received', 'talk', 'need_time']);
+function repairOverview(db: GuestDb): Row {
+  const rows = t(db, 'repairs');
+  const cutoff = Date.now() - 30 * 86400000;
+  for (const r of rows) {
+    if (r.status === 'sent' && r.sender_id === ME && !r.response && Date.now() - Date.parse(str(r.sent_at)) > 8000) {
+      r.response = 'received';
+      r.responded_at = now();
+    }
+  }
+  const view = (r: Row): Row => ({ ...r, direction: r.sender_id === ME ? 'outgoing' : 'incoming' });
+  const recent = rows.filter((r) => r.status === 'sent' && Date.parse(str(r.sent_at)) >= cutoff);
+  return ok({
+    paired: true,
+    reminders: rows.filter((r) => r.status === 'scheduled' && r.sender_id === ME).map(view),
+    notes: recent.sort((a, b) => str(b.sent_at).localeCompare(str(a.sent_at))).map(view),
+    stats: {
+      sent: recent.filter((r) => r.sender_id === ME).length,
+      received: recent.filter((r) => r.sender_id === PARTNER).length,
+      caught: recent.filter((r) => r.response === 'received').length,
+    },
+  });
+}
+
 const ACHIEVEMENTS = (db: GuestDb) => {
   const moments = t(db, 'love_moments').length;
   const resolved = t(db, 'events').filter((e) => e.status === 'resolved').length;
@@ -712,6 +740,55 @@ export const ROUTES: GuestRoute[] = [
   { method: 'delete', re: P('/journey/:id'), handler: ({ db, params }) => {
     db.journey = t(db, 'journey').filter((x) => x.id !== params.id);
     return ok();
+  } },
+
+  // ── 回頭接住 repair attempts ─────────────────────────────────────────────
+  { method: 'get', re: P('/repair'), handler: ({ db }) => repairOverview(db) },
+  { method: 'post', re: P('/repair/reminders'), handler: ({ db, body }) => {
+    const at = Date.parse(str(body.remind_at));
+    const delta = at - Date.now();
+    if (Number.isNaN(at) || delta < 9 * 60000 || delta > 48 * 3600000) {
+      throw new GuestError(400, tr('提醒時間要在 10 分鐘到 48 小時之內，請重新選一個時間', 'Reminders can be set 10 minutes to 48 hours ahead. Please pick another time.'), 'REPAIR_REMIND_TIME_INVALID');
+    }
+    const rows = t(db, 'repairs');
+    if (rows.filter((r) => r.status === 'scheduled' && r.sender_id === ME).length >= 3) {
+      throw new GuestError(409, tr('你已經設了 3 個還沒到的提醒。先取消一個，或現在就寫一句給對方吧', 'You already have 3 upcoming reminders. Cancel one first — or write your partner a line right now.'), 'REPAIR_REMINDER_LIMIT');
+    }
+    const row: Row = { id: gid('grp'), status: 'scheduled', sender_id: ME, kind: null, text: null, remind_at: new Date(at).toISOString(), reminded_at: null, sent_at: null, response: null, response_note: null, responded_at: null, created_at: now() };
+    rows.unshift(row);
+    return ok({ reminder: { ...row, direction: 'outgoing' } });
+  } },
+  { method: 'delete', re: P('/repair/reminders/:id'), handler: ({ db, params }) => {
+    const before = t(db, 'repairs');
+    db.repairs = before.filter((r) => !(r.id === params.id && r.status === 'scheduled' && r.sender_id === ME));
+    if ((db.repairs as Row[]).length === before.length) {
+      throw new GuestError(404, tr('找不到這個提醒，它可能已經取消了', 'We couldn\'t find this reminder. It may already have been cancelled.'), 'REPAIR_NOT_FOUND');
+    }
+    return ok();
+  } },
+  { method: 'post', re: P('/repair'), handler: ({ db, body }) => {
+    const kind = str(body.kind);
+    const text = str(body.text).trim();
+    if (!REPAIR_KINDS.has(kind)) throw new GuestError(400, tr('請先選一種想說的方式，再送出', 'Pick a way you\'d like to say it first, then send.'), 'REPAIR_KIND_INVALID');
+    if (!text) throw new GuestError(400, tr('先寫一句想對 TA 說的話，再送出', 'Write a line you\'d like to say to your partner first, then send.'), 'REPAIR_TEXT_EMPTY');
+    if (text.length > 500) throw new GuestError(400, tr('修復小紙條最多 500 字。短短一句就夠了，請精簡一些再送出', 'Repair notes can be up to 500 characters. A single line is enough — please shorten it, then send.'), 'REPAIR_TEXT_TOO_LONG');
+    const rows = t(db, 'repairs');
+    const reminderId = str(body.reminder_id);
+    if (reminderId) db.repairs = rows.filter((r) => r.id !== reminderId);
+    const row: Row = { id: gid('grp'), status: 'sent', sender_id: ME, kind, text, remind_at: null, reminded_at: null, sent_at: now(), response: null, response_note: null, responded_at: null, created_at: now() };
+    t(db, 'repairs').unshift(row);
+    return ok({ note: { ...row, direction: 'outgoing' } });
+  } },
+  { method: 'post', re: P('/repair/:id/respond'), handler: ({ db, params, body }) => {
+    const response = str(body.response);
+    if (!REPAIR_RESPONSES.has(response)) throw new GuestError(400, tr('請選一個回應，再送出', 'Pick a response, then send.'), 'REPAIR_RESPONSE_INVALID');
+    const row = t(db, 'repairs').find((r) => r.id === params.id && r.status === 'sent' && r.sender_id === PARTNER);
+    if (!row) throw new GuestError(404, tr('找不到這張小紙條，它可能已經被移除了', 'We couldn\'t find this note. It may have been removed.'), 'REPAIR_NOT_FOUND');
+    if (row.response) throw new GuestError(409, tr('你已經回應過這張小紙條了。想多說一些，可以到「說開一件事」慢慢聊', 'You\'ve already responded to this note. If there\'s more to say, talk it through slowly in "Talk it through".'), 'REPAIR_ALREADY_RESPONDED');
+    row.response = response;
+    row.response_note = str(body.note).trim().slice(0, 300) || null;
+    row.responded_at = now();
+    return ok({ note: { ...row, direction: 'incoming' } });
   } },
 
   // ── 關係解方手冊 Relationship Playbook (private side) ────────────────────

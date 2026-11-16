@@ -715,6 +715,34 @@ export interface StoryVoteCounts {
 
 export type StoryKind = 'story' | 'article';
 
+// --- 回頭接住 Repair attempts (routes/repair.js) ---
+// Keys, not labels: the copy for each kind/response lives in
+// src/components/repair/repairCopy.ts.
+export type RepairKind = 'validate' | 'thanks' | 'own_part' | 'care' | 'pause' | 'light';
+export type RepairResponseKind = 'received' | 'talk' | 'need_time';
+
+export interface RepairAttempt {
+  id: string;
+  status: 'scheduled' | 'sent';
+  direction: 'outgoing' | 'incoming';
+  kind: RepairKind | null;
+  text: string | null;
+  remind_at: string | null;
+  reminded_at: string | null;
+  sent_at: string | null;
+  response: RepairResponseKind | null;
+  response_note: string | null;
+  responded_at: string | null;
+  created_at: string;
+}
+
+export interface RepairOverview {
+  paired: boolean;
+  reminders: RepairAttempt[];
+  notes: RepairAttempt[];
+  stats: { sent: number; received: number; caught: number };
+}
+
 // --- 關係解方手冊 Relationship Playbook (public content; lib/playbooks/) ---
 
 export type PlaybookApplyTarget = 'intimacy' | 'event';
@@ -2851,6 +2879,42 @@ class ApiService {
   async getAiUsageToday(): Promise<AiUsageToday> {
     const response = await apiClient.get('/ai-usage/today');
     return response.data.usage as AiUsageToday;
+  }
+
+  // --- 回頭接住 Repair attempts ---
+  // No LLM involved (templates + an on-device wording hint), so no AI_TIMEOUT.
+
+  async getRepairOverview(): Promise<RepairOverview> {
+    const response = await apiClient.get('/repair');
+    return {
+      paired: !!response.data.paired,
+      reminders: response.data.reminders || [],
+      notes: response.data.notes || [],
+      stats: response.data.stats || { sent: 0, received: 0, caught: 0 },
+    };
+  }
+
+  async setRepairReminder(remindAt: string): Promise<RepairAttempt> {
+    const response = await apiClient.post('/repair/reminders', { remind_at: remindAt });
+    return response.data.reminder as RepairAttempt;
+  }
+
+  async cancelRepairReminder(id: string): Promise<void> {
+    await apiClient.delete(`/repair/reminders/${encodeURIComponent(id)}`);
+  }
+
+  async sendRepair(input: { kind: RepairKind; text: string; reminderId?: string | null }): Promise<RepairAttempt> {
+    const response = await apiClient.post('/repair', {
+      kind: input.kind,
+      text: input.text,
+      reminder_id: input.reminderId || undefined,
+    });
+    return response.data.note as RepairAttempt;
+  }
+
+  async respondRepair(id: string, response: RepairResponseKind, note?: string): Promise<RepairAttempt> {
+    const res = await apiClient.post(`/repair/${encodeURIComponent(id)}/respond`, { response, note: note || undefined });
+    return res.data.note as RepairAttempt;
   }
 
   // --- 關係解方手冊 Relationship Playbook ---

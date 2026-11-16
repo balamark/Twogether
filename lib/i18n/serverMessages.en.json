@@ -1152,7 +1152,34 @@
 "一小時內已經提醒過對方了，給 TA 一點時間。也可以複製連結，用 LINE 親自傳給 TA。": "You already reminded your partner within the last hour, so give them a little time. You can also copy the link and send it to them yourself on LINE.",
 "伴侶在等你回覆這段對話": "Your partner is waiting for your reply in this conversation",
 "已提醒伴侶，TA 點通知就會直接打開這段對話。": "Reminder sent. Tapping the notification takes your partner straight to this conversation.",
-"提醒沒送出，請稍後再試；也可以複製連結用 LINE 傳給伴侶。": "The reminder didn't go through. Try again later, or copy the link and send it to your partner on LINE."
+"提醒沒送出，請稍後再試；也可以複製連結用 LINE 傳給伴侶。": "The reminder didn't go through. Try again later, or copy the link and send it to your partner on LINE.",
+"暫時讀不到回頭接住的紀錄，請稍後重新整理再試": "We couldn't load your repair notes right now. Please refresh in a moment.",
+"提醒時間要在 10 分鐘到 48 小時之內，請重新選一個時間": "Reminders can be set 10 minutes to 48 hours ahead. Please pick another time.",
+"你已經設了 3 個還沒到的提醒。先取消一個，或現在就寫一句給對方吧": "You already have 3 upcoming reminders. Cancel one first — or write your partner a line right now.",
+"提醒沒有設定成功，請稍後再按一次": "The reminder wasn't set. Please tap again in a moment.",
+"找不到這個提醒，它可能已經取消了": "We couldn't find this reminder. It may already have been cancelled.",
+"提醒沒有取消成功，請稍後再試一次": "The reminder wasn't cancelled. Please try again in a moment.",
+"請先選一種想說的方式，再送出": "Pick a way you'd like to say it first, then send.",
+"先寫一句想對 TA 說的話，再送出": "Write a line you'd like to say to your partner first, then send.",
+"修復小紙條最多 500 字。短短一句就夠了，請精簡一些再送出": "Repair notes can be up to 500 characters. A single line is enough — please shorten it, then send.",
+"還沒和另一半配對，小紙條沒有地方送。你可以先複製這句話用 LINE 傳給 TA，或邀請 TA 一起加入 Twogether": "You're not paired with your partner yet, so there's nowhere to send the note. Copy it and send it over LINE, or invite them to join Twogether.",
+"24 小時內最多送出 10 張小紙條。給 TA 一點時間讀完、消化一下；想說的話更多，可以到「說開一件事」慢慢談": "You can send up to 10 notes in 24 hours. Give your partner some time to read and take it in; if there's more to say, talk it through slowly in \"Talk it through\".",
+"小紙條沒有送出去，你寫的內容還在，請稍後再按一次送出": "The note wasn't sent. What you wrote is still here — please tap Send again in a moment.",
+"請選一個回應，再送出": "Pick a response, then send.",
+"回應最多 300 字，請精簡一些再送出": "Responses can be up to 300 characters. Please shorten it, then send.",
+"找不到這張小紙條，它可能已經被移除了": "We couldn't find this note. It may have been removed.",
+"你已經回應過這張小紙條了。想多說一些，可以到「說開一件事」慢慢聊": "You've already responded to this note. If there's more to say, talk it through slowly in \"Talk it through\".",
+"回應沒有送出去，請稍後再按一次": "Your response wasn't sent. Please tap again in a moment.",
+"🕊️ 冷靜一點了嗎？回頭接住對方一句": "🕊️ Calmer now? Circle back with one kind line",
+"吵完架之後，事情過去了，情緒不一定。現在說一句「你那時會生氣，其實是有原因的」，就是修復的開始。": "After a fight, the issue may pass but the feelings don't always. Saying \"It makes sense you were upset back then\" now is where repair begins.",
+"回頭接住你，傳來一張小紙條": "circled back with a note for you",
+"打開 App 看看 TA 想對你說的話": "Open the app to see what they want to tell you",
+"說：被你接住了": "says: I felt understood",
+"你踏出的那一步，TA 收到了": "The step you took reached them",
+"收到了你的小紙條，想再和你聊聊": "got your note and would like to talk some more",
+"找個彼此都放鬆的時間，或到「說開一件事」慢慢談": "Find a time when you're both relaxed, or talk it through slowly in \"Talk it through\"",
+"收到了你的小紙條，還需要一點時間": "got your note and needs a little more time",
+"這不是拒絕。你已經踏出第一步了，給 TA 一點空間就好": "This isn't a no. You've taken the first step — just give them a little space"
 },
 "patterns": [
 [
@@ -2086,6 +2113,38 @@
 [
 "{0}婉拒了你的禮物兌換",
 "{0} declined your gift redemption"
+],
+[
+"{0} {1}回頭接住你，傳來一張小紙條",
+"{0} {1} circled back with a note for you"
+],
+[
+"{0}回頭接住你，傳來一張小紙條",
+"{0} circled back with a note for you"
+],
+[
+"{0} {1}說：被你接住了",
+"{0} {1} says: I felt understood"
+],
+[
+"{0}說：被你接住了",
+"{0} says: I felt understood"
+],
+[
+"{0} {1}收到了你的小紙條，想再和你聊聊",
+"{0} {1} got your note and would like to talk some more"
+],
+[
+"{0}收到了你的小紙條，想再和你聊聊",
+"{0} got your note and would like to talk some more"
+],
+[
+"{0} {1}收到了你的小紙條，還需要一點時間",
+"{0} {1} got your note and needs a little more time"
+],
+[
+"{0}收到了你的小紙條，還需要一點時間",
+"{0} got your note and needs a little more time"
 ]
 ]
 }

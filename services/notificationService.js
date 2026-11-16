@@ -68,6 +68,12 @@ const CATALOG = {
   // 情緒深潛 — emotional deep dive (tone: 分享/一起，先讀完，不是被回報)
   deep_dive_shared: { emoji: '💌', verb: '想讓你更了解 TA 的感受', fallback: '打開 App，先花點時間讀完 TA 想分享的', priority: 2 },
   deep_dive_partner_responded: { emoji: '💛', verb: '回應了你分享的感受', fallback: '打開 App 看看 TA 的理解與回應', priority: 2 },
+  // 回頭接住 — repair attempts (routes/repair.js). Tone: a small move back
+  // toward each other, never a verdict; 還需要一點時間 is not a rejection.
+  repair_sent: { emoji: '💛', verb: '回頭接住你，傳來一張小紙條', fallback: '打開 App 看看 TA 想對你說的話', priority: 2 },
+  repair_response_received: { emoji: '💛', verb: '說：被你接住了', fallback: '你踏出的那一步，TA 收到了' },
+  repair_response_talk: { emoji: '💬', verb: '收到了你的小紙條，想再和你聊聊', fallback: '找個彼此都放鬆的時間，或到「說開一件事」慢慢談', priority: 2 },
+  repair_response_need_time: { emoji: '🕊️', verb: '收到了你的小紙條，還需要一點時間', fallback: '這不是拒絕。你已經踏出第一步了，給 TA 一點空間就好' },
   // 共同設定 / 個人資料
   couple_settings_updated: { emoji: '⚙️', verb: '更新了你們的共同設定', fallback: '打開 App 查看更新後的設定' },
   profile_updated: { emoji: '👤', verb: '更新了個人資料', fallback: '打開 App 看看 TA 的更新' },
