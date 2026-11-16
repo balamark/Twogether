@@ -55,7 +55,7 @@ import { resolveCompanion } from './utils/aiCompanions';
 import { apiService, getTokenExpiry, clearAuthStorage } from './services/api';
 import { clearQueryCache } from './services/queryCache';
 import { clearResponseCache } from './services/responseCache';
-import type { CycleRecord, BillingStatus, PairingInvitationSummary, MomentResponse, MomentReactionKey } from './services/api';
+import type { CycleRecord, BillingStatus, PairingInvitationSummary, MomentResponse, MomentReactionKey, MomentCheckin } from './services/api';
 import { buildPairingAcceptLink } from './utils/pairingLink';
 import { pickPendingInvite } from './utils/pairingReminder';
 import { getPrimaryTimezone, formatYmdInTz, browserTz } from './utils/datetime';
@@ -116,6 +116,9 @@ export interface IntimateRecord {
   // 快速回應 — pre-digested by the backend into "mine" and "theirs".
   myResponse?: MomentResponse | null;
   partnerResponse?: MomentResponse | null;
+  // 感受小調查 — "剛剛的感覺如何？" answers, mine / theirs.
+  myCheckin?: MomentCheckin | null;
+  partnerCheckin?: MomentCheckin | null;
 }
 
 interface Nicknames {

@@ -11,7 +11,9 @@ import { apiService } from '../services/api';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { Button } from './ui/Button';
 import MomentResponseBar from './MomentResponseBar';
-import type { CycleRecord, DayStatus, MomentReactionKey } from '../services/api';
+import { MomentCheckinCard, CheckinSummary } from './MomentCheckinCard';
+import { isCheckinPending } from '../utils/intimacyStats';
+import type { CycleRecord, DayStatus, MomentReactionKey, MomentCheckinAnswer } from '../services/api';
 import type { IntimateRecord, AuthState, Notification } from '../App';
 import { tr, isEnglish } from '../i18n/tr';
 
@@ -289,6 +291,14 @@ const CalendarView = ({
       return;
     }
     focusRefetchedRef.current = null;
+    // A「剛剛的感覺如何？」tap lands on the survey card, not the timeline row.
+    const focused = intimateRecords.find((r) => r.apiId === focusRecordApiId);
+    if (focused && isCheckinPending(focused.myCheckin)) {
+      setCheckinLater((prev) => prev.filter((id) => id !== focusRecordApiId));
+      setScrollToCheckin(true);
+      onFocusRecordConsumed?.();
+      return;
+    }
     setViewMode('timeline');
     setHighlightRecordApiId(focusRecordApiId);
     setScrollToRecordApiId(focusRecordApiId);
@@ -310,6 +320,75 @@ const CalendarView = ({
     const t = window.setTimeout(() => setHighlightRecordApiId(null), FOCUS_FLASH_MS);
     return () => window.clearTimeout(t);
   }, [highlightRecordApiId]);
+
+  // --- 感受小調查 ("剛剛的感覺如何？") -------------------------------------
+  // A check-in addressed to me shows as a card above the calendar once it's
+  // due (2h after the partner logged the moment). 稍後再說 hides it for this
+  // session only; 這次不填 closes it for good.
+  const [checkinLater, setCheckinLater] = useState<string[]>([]);
+  const [scrollToCheckin, setScrollToCheckin] = useState(false);
+  const pendingCheckin = React.useMemo(
+    () => intimateRecords
+      .filter((r) => r.apiId && !checkinLater.includes(r.apiId) && isCheckinPending(r.myCheckin))
+      .sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time))[0] ?? null,
+    [intimateRecords, checkinLater]
+  );
+  useEffect(() => {
+    if (!scrollToCheckin) return;
+    document.querySelector<HTMLElement>('[data-testid="moment-checkin-card"]')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setScrollToCheckin(false);
+  }, [scrollToCheckin, pendingCheckin]);
+
+  const patchRecord = (apiId: string, fields: Partial<IntimateRecord>) =>
+    setIntimateRecords((prev) => prev.map((r) => (r.apiId === apiId ? { ...r, ...fields } : r)));
+
+  // Optimistic (playbook §R7): the card closes on tap; a failure puts it back
+  // with the server's own message.
+  const submitCheckin = async (record: IntimateRecord, answer: MomentCheckinAnswer) => {
+    if (!record.apiId) return;
+    const previous = record.myCheckin ?? null;
+    patchRecord(record.apiId, {
+      myCheckin: { ...(previous || {}), ...answer, answered_at: new Date().toISOString(), dismissed_at: null },
+    });
+    showNotification({
+      type: 'success',
+      title: tr('謝謝你分享 💗', 'Thanks for sharing 💗'),
+      message: tr('已經告訴另一半你最喜歡哪裡；月曆下方的滿意度也更新了。', 'We let your partner know what you liked, and the satisfaction stats below the calendar are updated.'),
+      duration: 3500,
+    });
+    try {
+      const result = await apiService.answerMomentCheckin(record.apiId, answer);
+      patchRecord(record.apiId, { myCheckin: result.my_checkin, partnerCheckin: result.partner_checkin });
+    } catch (error) {
+      patchRecord(record.apiId, { myCheckin: previous });
+      showNotification({
+        type: 'error',
+        title: tr('感受沒有送出', 'Your answers didn\'t send'),
+        message: error instanceof Error && error.message ? error.message : tr('請稍後再試一次，卡片還在月曆上方。', 'Please try again in a moment; the card is still above the calendar.'),
+        duration: 6000,
+      });
+    }
+  };
+
+  const dismissCheckin = async (record: IntimateRecord) => {
+    if (!record.apiId) return;
+    const previous = record.myCheckin ?? null;
+    patchRecord(record.apiId, { myCheckin: { ...(previous || {}), dismissed_at: new Date().toISOString() } });
+    try {
+      await apiService.dismissMomentCheckin(record.apiId);
+    } catch (error) {
+      // Not worth interrupting for: it just comes back next visit.
+      setCheckinLater((prev) => [...prev, record.apiId as string]);
+      patchRecord(record.apiId, { myCheckin: previous });
+      showNotification({
+        type: 'info',
+        title: tr('先幫你收起來了', 'Hidden for now'),
+        message: error instanceof Error && error.message ? error.message : tr('這次沒關成功，下次打開時還會看到，再按一次 ✕ 就好。', 'It didn\'t close for good this time; tap ✕ again next time you see it.'),
+        duration: 4000,
+      });
+    }
+  };
 
   const recordsByDate = React.useMemo(() => {
     const map = new Map<string, IntimateRecord[]>();
@@ -611,6 +690,17 @@ const CalendarView = ({
         </div>
       </div>
 
+      {pendingCheckin && (
+        <MomentCheckinCard
+          key={pendingCheckin.apiId}
+          record={pendingCheckin}
+          recorderNickname={pendingCheckin.recordedByNickname || partnerNickname}
+          onSubmit={submitCheckin}
+          onDismiss={dismissCheckin}
+          onLater={(r) => r.apiId && setCheckinLater((prev) => [...prev, r.apiId as string])}
+        />
+      )}
+
       {/* 一起走過的每一天 — the same records as either a month heatmap or a
           chronological list. Both modes render in THIS slot (and share the
           header + 記錄今天 button) so flipping the toggle visibly swaps one view
@@ -755,6 +845,8 @@ const CalendarView = ({
                         "{record.notes}"
                       </p>
                     )}
+                    <CheckinSummary checkin={record.partnerCheckin} who={tr(`${partnerNickname}的感受`, `${partnerNickname} felt`)} />
+                    <CheckinSummary checkin={record.myCheckin} who={tr('你的感受', 'You felt')} />
                     {record.photo && (
                       <img
                         src={record.photo}
@@ -809,9 +901,11 @@ const CalendarView = ({
         )}
       </div>
 
-      {/* Intimacy Stats — 4 cards */}
+      {/* Intimacy stats — follow the month the calendar is showing */}
       <IntimacyStatsCards
         records={intimateRecords}
+        year={calendarMonth.getFullYear()}
+        month={calendarMonth.getMonth()}
         birthDate={authState.user?.birth_date}
         onOpenSettings={() => setCurrentView('settings')}
         onNudgePartner={onNudgePartner}

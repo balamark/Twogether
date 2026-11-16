@@ -236,6 +236,23 @@ export const ROUTES: GuestRoute[] = [
     db.love_moments = t(db, 'love_moments').filter((x) => x.id !== params.id);
     return ok();
   } },
+  // 感受小調查 — stays in the tab like everything else; nothing leaves the browser.
+  { method: 'put', re: P('/love-moments/:id/checkin'), handler: ({ db, params, body }) => {
+    const m = t(db, 'love_moments').find((x) => x.id === params.id);
+    if (!m) throw new GuestError(404, tr('找不到這則記錄，它可能已經被刪除了。', 'We couldn\'t find this record. It may have been deleted.'), 'LOVE_MOMENT_NOT_FOUND');
+    const at = now();
+    m.my_checkin = {
+      ...((m.my_checkin as Row) || {}), due_at: (m.my_checkin as Row)?.due_at ?? at, answered_at: at, dismissed_at: null,
+      satisfaction: Number(body.satisfaction) || null, liked: Array.isArray(body.liked) ? body.liked : [],
+      timing: body.timing ?? null, note: body.note ?? null,
+    };
+    return ok({ my_checkin: m.my_checkin, partner_checkin: m.partner_checkin ?? null });
+  } },
+  { method: 'post', re: P('/love-moments/:id/checkin/dismiss'), handler: ({ db, params }) => {
+    const m = t(db, 'love_moments').find((x) => x.id === params.id);
+    if (m && m.my_checkin) m.my_checkin = { ...(m.my_checkin as Row), dismissed_at: now() };
+    return ok();
+  } },
   { method: 'post', re: P('/love-moments/appreciation-questions'), handler: () => ok({
     questions: [
       tr('今天 TA 做的哪件小事讓你覺得被照顧？', 'What small thing did they do today that made you feel cared for?'),

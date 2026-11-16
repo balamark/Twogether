@@ -60,6 +60,28 @@ interface IntimateRecord {
   // Pre-digested by the backend so the UI doesn't have to work out who is who.
   myResponse?: MomentResponse | null;
   partnerResponse?: MomentResponse | null;
+  // 感受小調查 — mine / theirs, same digest as 快速回應.
+  myCheckin?: MomentCheckin | null;
+  partnerCheckin?: MomentCheckin | null;
+}
+
+// 感受小調查 ("剛剛的感覺如何？"). `liked` / `timing` hold keys; labels live in
+// src/components/MomentCheckinCard.tsx and lib/momentCheckins.js.
+export interface MomentCheckin {
+  due_at?: string | null;
+  answered_at?: string | null;
+  dismissed_at?: string | null;
+  satisfaction?: number | null;
+  liked?: string[];
+  timing?: string | null;
+  note?: string | null;
+}
+
+export interface MomentCheckinAnswer {
+  satisfaction: number;
+  liked: string[];
+  timing: string | null;
+  note: string | null;
 }
 
 interface ApiIntimateRecord {
@@ -78,6 +100,8 @@ interface ApiIntimateRecord {
   recorded_by?: { id?: string; nickname?: string };
   my_response?: MomentResponse | null;
   partner_response?: MomentResponse | null;
+  my_checkin?: MomentCheckin | null;
+  partner_checkin?: MomentCheckin | null;
 }
 
 export interface CycleRecord {
@@ -2308,8 +2332,9 @@ class ApiService {
   // Intimate Records
   async getIntimateRecords(): Promise<IntimateRecord[]> {
     try {
-      const response = await apiClient.get('/love-moments');
-      console.log('Raw love-moments response:', response.data); // Debug log
+      // The whole history: the calendar pages through months and the stats
+      // (平均間隔, 總記錄…) need every record, not the server's default 20.
+      const response = await apiClient.get('/love-moments', { params: { limit: 2000 } });
       
       // Handle the backend response format { success: true, love_moments: [...] }
       const loveMoments = response.data?.love_moments || response.data;
@@ -2358,6 +2383,24 @@ class ApiService {
       my_response: response.data?.my_response ?? null,
       partner_response: response.data?.partner_response ?? null,
     };
+  }
+
+  // 感受小調查: answer (or re-answer) "剛剛的感覺如何？". Throws with the
+  // server's specific message + error_code preserved by the interceptor.
+  async answerMomentCheckin(
+    momentId: string,
+    answer: MomentCheckinAnswer
+  ): Promise<{ my_checkin: MomentCheckin | null; partner_checkin: MomentCheckin | null }> {
+    const response = await apiClient.put(`/love-moments/${momentId}/checkin`, answer);
+    return {
+      my_checkin: response.data?.my_checkin ?? null,
+      partner_checkin: response.data?.partner_checkin ?? null,
+    };
+  }
+
+  // 這次不填 — closes the prompt for good.
+  async dismissMomentCheckin(momentId: string): Promise<void> {
+    await apiClient.post(`/love-moments/${momentId}/checkin/dismiss`);
   }
 
   async createIntimateRecord(record: Omit<IntimateRecord, 'id' | 'timestamp'>): Promise<IntimateRecord> {
@@ -3083,6 +3126,8 @@ class ApiService {
       recordedByNickname: apiRecord.recorded_by?.nickname,
       myResponse: apiRecord.my_response ?? null,
       partnerResponse: apiRecord.partner_response ?? null,
+      myCheckin: apiRecord.my_checkin ?? null,
+      partnerCheckin: apiRecord.partner_checkin ?? null,
     };
   }
 

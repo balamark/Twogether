@@ -1,5 +1,11 @@
 {
 "exact": {
+"剛剛的感覺如何？": "How was it just now?",
+"花 10 秒說說哪裡最喜歡、這個時間點適不適合，下次可以照著來 💗": "Take 10 seconds to share what you liked and whether the timing worked, so next time can be just as good 💗",
+"請先選一個整體感覺（1–5），其他題目都可以略過。": "Pick an overall feeling (1–5) first; you can skip the other questions.",
+"有個選項已經不支援了，請重新整理後再選一次。": "One of the options is no longer supported. Refresh the page and choose again.",
+"感受沒有存到，請稍後再試一次；你填的內容還留在畫面上。": "Your answers weren't saved. Please try again in a moment; what you filled in is still on screen.",
+"暫時無法關閉這份小調查，請稍後再試。": "Couldn't close this check-in right now. Please try again in a moment.",
 "內容格式不正確，請檢查後再送出一次": "Some of the content isn't in the right format. Please check it and send again.",
 "找不到這份手冊，它可能已經下架；回到手冊列表看看其他主題吧": "We couldn't find this playbook. It may have been taken down. Head back to the playbook list to explore other topics.",
 "暫時讀不到你收藏的手冊，請稍後重新整理再試": "We couldn't load your saved playbooks right now. Please refresh in a moment.",
@@ -2086,6 +2092,18 @@
 [
 "{0}婉拒了你的禮物兌換",
 "{0} declined your gift redemption"
+],
+[
+"{0} 分享了剛剛的感受",
+"{0} shared how it felt"
+],
+[
+"整體感覺 {0}/5，打開記錄看看 TA 最喜歡哪裡、下次想怎麼約",
+"Overall {0}/5. Open the record to see what they liked most and how they'd like it next time"
+],
+[
+"想對 TA 說的話最多 {0} 字，更長的心情可以寫進這則記錄的備註。",
+"A note to them can be at most {0} characters. Longer thoughts fit better in the record's notes."
 ]
 ]
 }
