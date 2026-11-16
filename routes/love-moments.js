@@ -11,6 +11,7 @@ const llmService = require('../services/llmService');
 const { resolveAiLimit, countTodayAiUsage, recordAiUsage } = require('../lib/aiUsage');
 const { checkLimit, getCoupleIdForUser } = require('../lib/entitlements');
 const { creditPositiveInteraction, reverseAutoDeposit } = require('../lib/loveBankAuto');
+const momentCheckins = require('../lib/momentCheckins');
 
 const router = express.Router();
 
@@ -197,6 +198,12 @@ router.post('/', [
       targetId: momentId,
     });
 
+    // 感受小調查: ask the partner "剛剛的感覺如何？" two hours from now (only
+    // for a moment that just happened; back-filled records stay quiet).
+    await momentCheckins.scheduleCheckin({
+      momentId, recorderId: userId, coupleId, momentDate: moment.moment_date,
+    });
+
     res.status(201).json({
       success: true,
       message: '愛情時刻記錄成功',
@@ -223,8 +230,12 @@ router.post('/', [
 router.get('/', async (req, res) => {
   try {
     const userId = req.user.id;
-    const { page = 1, limit = 20, month } = req.query;
-    
+    const { page = 1, month } = req.query;
+    // The calendar + stats need the couple's whole history (it used to stop at
+    // the default 20, so 總記錄/月平均 under-counted). Capped so a bad param
+    // can't ask for the world.
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 20, 1), 2000);
+
     const offset = (page - 1) * limit;
 
     // Find user's couple (optional for unpaired users)
@@ -283,6 +294,7 @@ router.get('/', async (req, res) => {
     // One batched read for the whole page's 快速回應, digested per moment so the
     // UI never has to work out who is who.
     const responsesByMoment = await fetchResponsesForMoments(result.rows.map(r => r.id));
+    const checkinsByMoment = await momentCheckins.fetchCheckinsForMoments(result.rows.map(r => r.id));
 
     const loveMoments = result.rows.map(row => ({
       id: row.id,
@@ -299,7 +311,8 @@ router.get('/', async (req, res) => {
         id: row.recorded_by_id,
         nickname: row.recorded_by_nickname
       },
-      ...digestResponses(responsesByMoment[row.id], userId)
+      ...digestResponses(responsesByMoment[row.id], userId),
+      ...momentCheckins.digestCheckins(checkinsByMoment[row.id], userId),
     }));
 
     res.json({
@@ -307,8 +320,11 @@ router.get('/', async (req, res) => {
       love_moments: loveMoments,
       total,
       page: parseInt(page),
-      limit: parseInt(limit)
+      limit
     });
+
+    // Deliver any 感受小調查 that came due (no cron — fire-and-forget).
+    momentCheckins.sweepDueCheckins();
 
   } catch (error) {
     logError('Get love moments failed', { err: error.message, stack: error.stack });
@@ -351,6 +367,7 @@ router.get('/:id', async (req, res) => {
 
     const moment = result.rows[0];
     const responsesByMoment = await fetchResponsesForMoments([moment.id]);
+    const checkinsByMoment = await momentCheckins.fetchCheckinsForMoments([moment.id]);
 
     res.json({
       success: true,
@@ -369,7 +386,8 @@ router.get('/:id', async (req, res) => {
           id: moment.recorded_by_id,
           nickname: moment.recorded_by_nickname
         },
-        ...digestResponses(responsesByMoment[moment.id], userId)
+        ...digestResponses(responsesByMoment[moment.id], userId),
+        ...momentCheckins.digestCheckins(checkinsByMoment[moment.id], userId),
       }
     });
 
@@ -498,6 +516,109 @@ router.put('/:id/response', async (req, res) => {
   } catch (error) {
     logDbError('Set love moment response error:', error, { user_id: userId, moment_id: momentId });
     res.status(500).json(errorResponseBody('無法送出回應，請稍後再試一次。', error));
+  }
+});
+
+// 感受小調查 — answer "剛剛的感覺如何？" for a record. Either partner may
+// answer (the scheduled prompt goes to whoever didn't record it). Upsert: a
+// second answer replaces the first.
+router.put('/:id/checkin', async (req, res) => {
+  const userId = req.user.id;
+  const momentId = req.params.id;
+  try {
+    const parsed = momentCheckins.validateAnswer(req.body);
+    if (parsed.error_code) {
+      logWarn('love_moment.checkin.invalid', { user_id: userId, moment_id: momentId, error_code: parsed.error_code });
+      return res.status(400).json({ success: false, error_code: parsed.error_code, message: parsed.message });
+    }
+    const access = await db.query(`
+      SELECT lm.id, lm.recorded_by
+        FROM love_moments lm
+        LEFT JOIN couples c ON lm.couple_id = c.id
+       WHERE lm.id = $1 AND (
+         lm.recorded_by = $2 OR
+         (c.id IS NOT NULL AND (c.user1_id = $2 OR c.user2_id = $2))
+       )
+    `, [momentId, userId]);
+    if (access.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error_code: 'LOVE_MOMENT_NOT_FOUND',
+        message: '找不到這則記錄，它可能已經被刪除了。',
+      });
+    }
+    const { satisfaction, liked, timing, note } = parsed.value;
+    const existing = await db.query(
+      'SELECT answered_at FROM love_moment_checkins WHERE moment_id = $1 AND user_id = $2',
+      [momentId, userId]
+    );
+    const firstAnswer = !existing.rows[0]?.answered_at;
+    await db.query(
+      `INSERT INTO love_moment_checkins
+         (moment_id, user_id, due_at, notified_at, answered_at, satisfaction, liked, timing, note)
+       VALUES ($1, $2, NOW(), NOW(), NOW(), $3, $4, $5, $6)
+       ON CONFLICT (moment_id, user_id)
+       DO UPDATE SET answered_at = NOW(),
+                     dismissed_at = NULL,
+                     notified_at = COALESCE(love_moment_checkins.notified_at, NOW()),
+                     satisfaction = EXCLUDED.satisfaction,
+                     liked = EXCLUDED.liked,
+                     timing = EXCLUDED.timing,
+                     note = EXCLUDED.note,
+                     updated_at = NOW()`,
+      [momentId, userId, satisfaction, liked, timing, note]
+    );
+    logInfo('love_moment.checkin.answered', {
+      user_id: userId, moment_id: momentId, satisfaction, liked_count: liked.length, timing, has_note: !!note, first: firstAnswer,
+    });
+
+    // Tell whoever recorded it that their partner shared how it felt — the
+    // whole point is learning what works for the two of you. In-app + LINE
+    // only (never email), and the LINE line carries no intimate detail.
+    const recorderId = access.rows[0].recorded_by;
+    if (firstAnswer && recorderId && recorderId !== userId) {
+      try {
+        const who = req.user.nickname || 'TA';
+        const title = `${who} 分享了剛剛的感受`;
+        // Whole-string copy so middleware/locale.js can translate it; the
+        // details (最喜歡 / 時間點) are on the record itself.
+        const content = `整體感覺 ${satisfaction}/5，打開記錄看看 TA 最喜歡哪裡、下次想怎麼約`;
+        await db.query(
+          `INSERT INTO notifications (user_id, notification_type, title, content, related_user_id, priority, target_id)
+           VALUES ($1, 'love_moment_checkin_answered', $2, $3, $4, 1, $5)`,
+          [recorderId, title, content, userId, String(momentId)]
+        );
+        lineService.pushToUserIfLinked(db, recorderId, `💗 Twogether｜${title}\n打開 App 看看 TA 最喜歡哪裡 👉 https://twogether.fun`);
+      } catch (err) {
+        logWarn('love_moment.checkin.notify_recorder_failed', { moment_id: momentId, err: err.message });
+      }
+    }
+
+    const refreshed = await momentCheckins.fetchCheckinsForMoments([momentId]);
+    res.json({ success: true, ...momentCheckins.digestCheckins(refreshed[momentId], userId) });
+  } catch (error) {
+    logDbError('Answer love moment checkin error:', error, { user_id: userId, moment_id: momentId });
+    res.status(500).json(errorResponseBody('感受沒有存到，請稍後再試一次；你填的內容還留在畫面上。', error));
+  }
+});
+
+// 稍後再說 / 這次不填 — hides the prompt for good (no re-fire).
+router.post('/:id/checkin/dismiss', async (req, res) => {
+  const userId = req.user.id;
+  const momentId = req.params.id;
+  try {
+    const result = await db.query(
+      `UPDATE love_moment_checkins
+          SET dismissed_at = NOW(), notified_at = COALESCE(notified_at, NOW()), updated_at = NOW()
+        WHERE moment_id = $1 AND user_id = $2 AND answered_at IS NULL
+        RETURNING moment_id`,
+      [momentId, userId]
+    );
+    logInfo('love_moment.checkin.dismissed', { user_id: userId, moment_id: momentId, found: result.rowCount > 0 });
+    res.json({ success: true });
+  } catch (error) {
+    logDbError('Dismiss love moment checkin error:', error, { user_id: userId, moment_id: momentId });
+    res.status(500).json(errorResponseBody('暫時無法關閉這份小調查，請稍後再試。', error));
   }
 });
 

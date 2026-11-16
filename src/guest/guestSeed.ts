@@ -32,30 +32,49 @@ export const ymd = (daysAgo: number): string => {
 const me = () => ({ id: ME, nickname: guestNickname() });
 const partner = () => ({ id: PARTNER, nickname: guestPartnerNickname() });
 
+// 感受小調查 answers ("剛剛的感覺如何？") — same shape as routes/love-moments.js.
+const answered = (satisfaction: number, liked: string[], timing: string | null, note: string | null, at: string): Row => ({
+  due_at: at, answered_at: at, dismissed_at: null, satisfaction, liked, timing, note,
+});
+const plus2h = (isoStr: string) => new Date(Date.parse(isoStr) + 2 * 3600000).toISOString();
+
 function seedMoments(): Row[] {
-  const rows: [number, string, string, string, string, string][] = [
-    // daysAgo, who, activity, notes, location, description
-    [2, PARTNER, 'intimate', tr('週末早上賴床，誰都不想先起來。', 'Lazy weekend morning, neither wanted to get up first.'), tr('家裡', 'Home'), ''],
-    [6, ME, 'date', tr('河堤散步聊了好久，買了兩杯珍奶。', 'Long walk by the river, two bubble teas.'), tr('大稻埕', 'Dadaocheng'), tr('散步約會', 'Walking date')],
-    [11, ME, 'intimate', tr('他煮了晚餐，還記得我不吃香菜。', 'He cooked dinner and remembered I hate coriander.'), tr('家裡', 'Home'), ''],
-    [19, PARTNER, 'date', tr('第一次一起去看海。風很大，但誰都不想先說要走。', 'First trip to the sea together. Windy, but neither wanted to leave first.'), tr('福隆', 'Fulong'), tr('一日小旅行', 'Day trip')],
-    [27, ME, 'intimate', '', tr('家裡', 'Home'), ''],
-    [41, PARTNER, 'intimate', tr('一起看完一整季影集。', 'Binged a whole season together.'), tr('家裡', 'Home'), ''],
-    [58, ME, 'date', tr('紀念日晚餐，他偷偷訂了窗邊的位子。', 'Anniversary dinner; he secretly booked the window table.'), tr('信義區', 'Xinyi'), tr('紀念日', 'Anniversary')],
+  const rows: [number, string, string, string, string, string, number, number, string][] = [
+    // daysAgo, who, activity, notes, location, description, hour, minute, duration
+    [2, PARTNER, 'intimate', tr('週末早上賴床，誰都不想先起來。', 'Lazy weekend morning, neither wanted to get up first.'), tr('家裡', 'Home'), '', 9, 30, tr('30-60分鐘', '30–60 min')],
+    [6, ME, 'date', tr('河堤散步聊了好久，買了兩杯珍奶。', 'Long walk by the river, two bubble teas.'), tr('大稻埕', 'Dadaocheng'), tr('散步約會', 'Walking date'), 19, 0, ''],
+    [9, PARTNER, 'intimate', '', tr('家裡', 'Home'), '', 22, 0, tr('15-30分鐘', '15–30 min')],
+    [11, ME, 'intimate', tr('他煮了晚餐，還記得我不吃香菜。', 'He cooked dinner and remembered I hate coriander.'), tr('家裡', 'Home'), '', 21, 30, tr('30-60分鐘', '30–60 min')],
+    [19, PARTNER, 'date', tr('第一次一起去看海。風很大，但誰都不想先說要走。', 'First trip to the sea together. Windy, but neither wanted to leave first.'), tr('福隆', 'Fulong'), tr('一日小旅行', 'Day trip'), 15, 0, ''],
+    [27, ME, 'intimate', '', tr('家裡', 'Home'), '', 21, 0, tr('1小時以上', 'Over 1 hour')],
+    [41, PARTNER, 'intimate', tr('一起看完一整季影集。', 'Binged a whole season together.'), tr('家裡', 'Home'), '', 23, 30, ''],
+    [58, ME, 'date', tr('紀念日晚餐，他偷偷訂了窗邊的位子。', 'Anniversary dinner; he secretly booked the window table.'), tr('信義區', 'Xinyi'), tr('紀念日', 'Anniversary'), 19, 30, ''],
   ];
-  return rows.map(([days, who, type, notes, location, description], i) => ({
+  // Who answered what. 阿哲 answers the visitor's records; the visitor already
+  // answered one of his, and one is still waiting (the 2-days-ago morning) so
+  // the 剛剛的感覺如何？ card shows on the calendar.
+  const checkins: Record<number, { mine?: Row; theirs?: Row }> = {
+    0: { mine: { due_at: plus2h(iso(2, 9, 30)), answered_at: null, dismissed_at: null, satisfaction: null, liked: [], timing: null, note: null } },
+    2: { mine: answered(4, ['closeness', 'pace'], 'perfect', null, iso(9, 23, 59)) },
+    3: { theirs: answered(5, ['atmosphere', 'aftercare'], 'perfect', tr('下次也這樣抱著睡', 'Let\'s fall asleep like that again'), iso(10, 0, 10)) },
+    5: { theirs: answered(4, ['foreplay', 'atmosphere'], 'weekend', null, iso(26, 0, 30)) },
+    6: { mine: answered(4, ['closeness'], 'earlier', null, iso(40, 2, 0)) },
+  };
+  return rows.map(([days, who, type, notes, location, description, hour, minute, duration], i) => ({
     id: `gm-${i + 1}`,
-    moment_date: iso(days, 21, 30),
-    created_at: iso(days, 22, 10),
+    moment_date: iso(days, hour, minute),
+    created_at: iso(days, hour, minute),
     notes,
     location,
     description,
-    duration: type === 'date' ? tr('3 小時', '3 hours') : '',
+    duration,
     activity_type: type,
     coins_earned: 10,
     recorded_by: who === ME ? me() : partner(),
     my_response: null,
-    partner_response: who === ME && i === 1 ? { reaction: 'love', note: tr('下次再去！', 'Let\'s go again!'), created_at: iso(days, 23) } : null,
+    partner_response: who === ME && i === 1 ? { reaction: 'love', note: tr('下次再去！', 'Let\'s go again!'), updated_at: iso(days, 23) } : null,
+    my_checkin: checkins[i]?.mine ?? null,
+    partner_checkin: checkins[i]?.theirs ?? null,
   }));
 }
 
@@ -246,4 +265,4 @@ export function buildSeed(): GuestDb {
     feedback_mine: [],
   };
 }
-buildSeed.VERSION = 4;
+buildSeed.VERSION = 5;

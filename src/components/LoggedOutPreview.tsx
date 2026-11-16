@@ -203,19 +203,32 @@ const SampleStats: React.FC = () => {
       <div className="flex items-center justify-end mb-2">
         <SampleTag />
       </div>
-      <div className="grid grid-cols-2 gap-2.5">
-        <div className="bg-petal-cream border border-petal-rule rounded-md p-3">
-          <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-rose-deep mb-1">{tr('本週次數', 'This week')}</div>
-          <div className="font-display italic font-light text-2xl text-petal-rose-deep">0</div>
+      {/* Mirrors the live per-month stats (IntimacyStatsCards): hero + tiles. */}
+      <div className="grid grid-cols-2 rounded-2xl border border-petal-rule-soft bg-white overflow-hidden">
+        <div className="p-3">
+          <div className="font-body text-[10px] text-petal-muted">{tr('本月次數', 'This month')}</div>
+          <div className="mt-1 font-display text-3xl font-medium text-petal-ink leading-none">1</div>
+          <div className="mt-1.5 font-body text-[10px] text-petal-rose-deep">{tr('▼ 比上月少 3 次', '▼ 3 fewer than last month')}</div>
         </div>
-        <div className="bg-petal-cream border border-petal-rule rounded-md p-3">
-          <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-sage-deep mb-1">{tr('本月次數', 'This month')}</div>
-          <div className="font-display italic font-light text-2xl text-petal-sage-deep">1</div>
+        <div className="p-3 border-l border-petal-rule-soft bg-petal-rose-soft/40">
+          <div className="font-body text-[10px] text-petal-muted">{tr('距離上次親密', 'Since last time')}</div>
+          <div className={`mt-1 font-display font-medium leading-none ${nudge.numberClass}`}>16</div>
         </div>
-        <div className="bg-petal-rose-soft/40 border border-petal-rose-soft rounded-md p-3 col-span-2">
-          <div className="font-body text-[10px] uppercase tracking-[0.12em] text-petal-muted mb-1">{tr('已經幾天沒有親密了', 'Days since last intimacy')}</div>
-          <div className={`font-display italic font-light leading-none ${nudge.numberClass}`}>16</div>
-        </div>
+      </div>
+      <div className="mt-2 grid grid-cols-3 gap-2">
+        {[
+          { label: tr('平均間隔', 'Avg gap'), value: '6.5', unit: tr('天', 'days') },
+          { label: tr('滿意度', 'Satisfaction'), value: '4.5', unit: '/ 5' },
+          { label: tr('平均時長', 'Avg length'), value: '45', unit: tr('分鐘', 'min') },
+        ].map((t) => (
+          <div key={t.label} className="bg-white rounded-xl border border-petal-rule-soft px-3 py-2.5">
+            <div className="font-body text-[10px] text-petal-muted">{t.label}</div>
+            <div className="mt-0.5 flex items-baseline gap-1">
+              <span className="font-display text-xl font-medium text-petal-ink leading-none">{t.value}</span>
+              <span className="font-body text-[10px] text-petal-muted">{t.unit}</span>
+            </div>
+          </div>
+        ))}
       </div>
       {nudge.hint && (
         <p className="mt-2 font-body text-xs text-petal-rose-deep text-center leading-snug">{nudge.hint}</p>

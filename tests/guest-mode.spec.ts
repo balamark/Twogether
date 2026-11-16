@@ -90,6 +90,37 @@ test.describe('guest mode', () => {
     expect(leaks).toEqual([]);
   });
 
+  test('感受小調查 + per-month stats work on the sample couple', async ({ page }) => {
+    await skipTour(page);
+    const leaks = watchNetwork(page);
+    await page.goto('/');
+    await page.getByTestId('nav-tab-us').click();
+    await page.getByTestId('us-calendar-entry').click();
+
+    // 阿哲 logged a moment 2 days ago → the visitor is asked how it felt.
+    const card = page.getByTestId('moment-checkin-card');
+    await expect(card).toBeVisible();
+    await expect(page.getByTestId('moment-checkin-submit')).toBeDisabled();
+    await page.getByTestId('moment-checkin-satisfaction-5').click();
+    await page.getByTestId('moment-checkin-liked-foreplay').click();
+    await page.getByTestId('moment-checkin-timing-perfect').click();
+    await page.getByTestId('moment-checkin-submit').click();
+    await expect(card).toHaveCount(0);
+    // Saved in the background after the card closes (optimistic, §R7).
+    const saved = () => page.evaluate((k) => JSON.parse(sessionStorage.getItem(k) || '{}')
+      .love_moments.find((m: { id: string }) => m.id === 'gm-1').my_checkin, DB_KEY);
+    await expect.poll(saved).toMatchObject({ satisfaction: 5, liked: ['foreplay'], timing: 'perfect' });
+
+    // Stats follow the calendar's month.
+    const stats = page.getByTestId('intimacy-month-stats');
+    await expect(page.getByTestId('stat-satisfaction')).not.toContainText('—');
+    const month = await stats.getAttribute('data-month');
+    await page.getByTitle('上一個月').click();
+    await expect(stats).not.toHaveAttribute('data-month', month!);
+    await expect(page.getByTestId('days-since-last-card')).toHaveCount(0);
+    expect(leaks).toEqual([]);
+  });
+
   test('重置試玩資料 restores the sample couple', async ({ page }) => {
     await skipTour(page);
     await page.goto('/');

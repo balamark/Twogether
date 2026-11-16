@@ -159,6 +159,8 @@ const NotificationInbox: React.FC<NotificationInboxProps> = ({
       case 'love_moment_created':
       case 'love_moment_updated':
       case 'love_moment_response':
+      case 'love_moment_checkin': // 感受小調查 ask → the survey card on the calendar
+      case 'love_moment_checkin_answered': // partner's answer → the record
         onNavigate('record', notification.targetId);
         break;
       case 'love_moment_deleted':

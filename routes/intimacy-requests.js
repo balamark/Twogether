@@ -19,6 +19,7 @@ const {
 } = require('../lib/intimacyNudgeTones');
 const { translateString } = require('../middleware/locale');
 const { notifyPartnerAction } = require('../services/notificationService');
+const { sweepDueCheckins } = require('../lib/momentCheckins');
 
 const router = express.Router();
 
@@ -1330,6 +1331,9 @@ router.delete('/:id', async (req, res) => {
 router.get('/notifications/unread-count', async (req, res) => {
   try {
     const userId = req.user.id;
+    // 感受小調查 that came due land in the inbox before we count it (no cron;
+    // throttled to once a minute per process, never throws).
+    await sweepDueCheckins();
     logInfo('Getting unread notification count', { userId });
 
     // Count unread notifications for the user
@@ -1543,6 +1547,7 @@ router.get('/notifications', async (req, res) => {
   try {
     const userId = req.user.id;
     const { notification_type, is_read, limit = 50, offset = 0 } = req.query;
+    await sweepDueCheckins();
 
     logInfo('Getting notifications', { userId, type: notification_type || 'all', is_read, limit });
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Send, Sparkles, RefreshCw, X, HelpCircle } from 'lucide-react';
 import apiService from '../services/api';
-import type { NudgeSuggestion } from '../services/api';
+import type { NudgeSuggestion, MomentCheckin } from '../services/api';
 import { useCachedQuery, userKey } from '../services/queryCache';
 import type { Notification } from '../App';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -10,6 +10,8 @@ import { formatDate, formatYmdInTz } from '../utils/datetime';
 import { tr, dateLocale } from '../i18n/tr';
 import { RHYTHM_STRIP_BG, RHYTHM_STRIP_HEIGHT, rhythmOffsetLabel } from './rhythmDisplay';
 import type { RhythmDay } from '../utils/cycle';
+import { computeMonthStats } from '../utils/intimacyStats';
+import { SLOT_LABELS, likedLabel } from './momentCheckinOptions';
 
 interface IntimateRecord {
   id: number;
@@ -25,6 +27,8 @@ interface IntimateRecord {
   roleplayScript?: string;
   coinsEarned?: number;
   activityType?: string;
+  myCheckin?: MomentCheckin | null;
+  partnerCheckin?: MomentCheckin | null;
 }
 
 interface Achievement {
@@ -795,6 +799,9 @@ function IntimacyNudgeButton({
 
 interface IntimacyStatsCardsProps {
   records: IntimateRecord[];
+  /** The month the calendar is showing (0-based month). Defaults to now. */
+  year?: number;
+  month?: number;
   birthDate?: string | null;
   onOpenSettings?: () => void;
   // Opens the 親密邀請 flow; shown as a CTA when the gap gets long. Only pass
@@ -939,40 +946,57 @@ function HealthReferenceHint({
   );
 }
 
-export function IntimacyStatsCards({ records, birthDate, onOpenSettings, onNudgePartner, partnerConnected, showNotification }: IntimacyStatsCardsProps) {
+function StatTile({ label, value, unit, caption, testId }: { label: string; value: string; unit?: string; caption?: string; testId?: string }) {
+  return (
+    <div className="bg-white rounded-xl border border-petal-rule-soft px-3.5 py-3 min-w-0" data-testid={testId}>
+      <div className="font-body text-[11px] text-petal-muted truncate">{label}</div>
+      <div className="mt-1 flex items-baseline gap-1">
+        <span className="font-display text-2xl font-medium tracking-tight text-petal-ink leading-none">{value}</span>
+        {unit && value !== '—' && <span className="font-body text-xs text-petal-muted">{unit}</span>}
+      </div>
+      {caption && <div className="mt-1 font-body text-[10px] text-petal-muted leading-snug truncate">{caption}</div>}
+    </div>
+  );
+}
+
+export function IntimacyStatsCards({ records, year, month, birthDate, onOpenSettings, onNudgePartner, partnerConnected, showNotification }: IntimacyStatsCardsProps) {
+  const now = new Date();
+  const viewYear = year ?? now.getFullYear();
+  const viewMonth = month ?? now.getMonth();
+  const isCurrentMonth = viewYear === now.getFullYear() && viewMonth === now.getMonth();
+
+  // All-time numbers + "right now" (本週 / 距離上次) — independent of the month shown.
   const derived = useMemo(() => {
     if (!records || records.length === 0) {
-      return { total: 0, monthlyAvg: 0, weeklyAvg: 0, thisWeek: 0, thisMonth: 0, daysSinceLast: null as number | null };
+      return { total: 0, monthlyAvg: 0, weeklyAvg: 0, thisWeek: 0, daysSinceLast: null as number | null };
     }
-    const now = new Date();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
+    const today = new Date();
+    const startOfWeek = new Date(today);
+    startOfWeek.setDate(today.getDate() - today.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const thisWeek = records.filter(r => new Date(r.date) >= startOfWeek).length;
-    const thisMonth = records.filter(r => new Date(r.date) >= startOfMonth).length;
 
     const earliest = records.reduce((min, r) => (r.date < min ? r.date : min), records[0].date);
     const latest = records.reduce((max, r) => (r.date > max ? r.date : max), records[0].date);
     const earliestDate = new Date(earliest);
     const monthsSpan = Math.max(
       1,
-      (now.getFullYear() - earliestDate.getFullYear()) * 12 + (now.getMonth() - earliestDate.getMonth()) + 1
+      (today.getFullYear() - earliestDate.getFullYear()) * 12 + (today.getMonth() - earliestDate.getMonth()) + 1
     );
-    const monthlyAvg = records.length / monthsSpan;
-
     const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-    const weeksSpan = Math.max(1, Math.ceil((now.getTime() - earliestDate.getTime()) / msPerWeek));
-    const weeklyAvg = records.length / weeksSpan;
+    const weeksSpan = Math.max(1, Math.ceil((today.getTime() - earliestDate.getTime()) / msPerWeek));
 
     const latestDate = new Date(latest);
     latestDate.setHours(0, 0, 0, 0);
-    const today = new Date(now);
-    today.setHours(0, 0, 0, 0);
-    const daysSinceLast = Math.max(0, Math.floor((today.getTime() - latestDate.getTime()) / (24 * 60 * 60 * 1000)));
+    const midnight = new Date(today);
+    midnight.setHours(0, 0, 0, 0);
+    const daysSinceLast = Math.max(0, Math.floor((midnight.getTime() - latestDate.getTime()) / (24 * 60 * 60 * 1000)));
 
-    return { total: records.length, monthlyAvg, weeklyAvg, thisWeek, thisMonth, daysSinceLast };
+    return { total: records.length, monthlyAvg: records.length / monthsSpan, weeklyAvg: records.length / weeksSpan, thisWeek, daysSinceLast };
   }, [records]);
+
+  // Everything else follows the month the calendar is showing.
+  const ms = useMemo(() => computeMonthStats(records || [], viewYear, viewMonth), [records, viewYear, viewMonth]);
 
   const age = ageFromBirthDate(birthDate);
   const recommendation = age !== null ? weeklyRecommendationForAge(age) : null;
@@ -982,13 +1006,29 @@ export function IntimacyStatsCards({ records, birthDate, onOpenSettings, onNudge
   // the /admin 功能開關 panel (feature flag `show_weekly_average`).
   const showWeeklyAvg = useFeatureFlag('show_weekly_average');
 
+  const monthLabel = new Date(viewYear, viewMonth, 1).toLocaleDateString(dateLocale(), { year: 'numeric', month: 'long' });
+  const delta = ms.count - ms.prevCount;
+  const fmt1 = (n: number | null) => (n === null ? '—' : (Math.round(n * 10) / 10).toString());
+  const fmtInt = (n: number | null) => (n === null ? '—' : String(Math.round(n)));
+
+  const insights: { key: string; text: string }[] = [];
+  if (ms.topLiked.length > 0) {
+    insights.push({ key: 'liked', text: tr(`最喜歡：${ms.topLiked.slice(0, 3).map(likedLabel).join('、')}`, `Liked most: ${ms.topLiked.slice(0, 3).map(likedLabel).join(', ')}`) });
+  }
+  if (ms.bestRatedSlot) {
+    insights.push({ key: 'best-slot', text: tr(`${SLOT_LABELS[ms.bestRatedSlot]}的感受最好`, `${SLOT_LABELS[ms.bestRatedSlot]} felt best`) });
+  }
+  if (ms.perfectTimingCount > 0) {
+    insights.push({ key: 'timing', text: tr(`${ms.perfectTimingCount} 次覺得時間剛剛好，下次可以再約同個時段`, `${ms.perfectTimingCount}× "timing was just right": same slot next time`) });
+  }
+
   return (
-    <div className="space-y-3">
-      {/* Section label with an on-demand health-reference (?) hint (replaces the
-          old always-on banner). */}
+    <div className="space-y-3" data-testid="intimacy-month-stats" data-month={`${viewYear}-${String(viewMonth + 1).padStart(2, '0')}`}>
+      {/* Section label follows the calendar's month; the (?) holds the
+          on-demand health reference. */}
       <div className="flex items-center justify-between">
         <span className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted">
-          {tr('近況節奏', 'Recent rhythm')}
+          {tr(`${monthLabel} · 親密數據`, `${monthLabel} · Intimacy stats`)}
         </span>
         <HealthReferenceHint
           recommendation={recommendation}
@@ -997,48 +1037,93 @@ export function IntimacyStatsCards({ records, birthDate, onOpenSettings, onNudge
         />
       </div>
 
-      {/* Recent / actionable metrics */}
-      <div className={`grid grid-cols-2 ${showWeeklyAvg ? 'md:grid-cols-4' : 'md:grid-cols-3'} gap-3 sm:gap-4`}>
-        {showWeeklyAvg && (
-          <div className="bg-white rounded-md p-5 border border-petal-rule" data-testid="weekly-avg-card">
-            <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1.5">{tr('周平均', 'Weekly average')}</div>
-            <div className="font-display italic font-light text-3xl text-petal-ink">
-              {hasRecords ? derived.weeklyAvg.toFixed(1) : '—'}
+      {/* Hero: this month's count (+ vs last month) and, for the current
+          month, how long it's been. */}
+      <div className={`grid ${isCurrentMonth ? 'grid-cols-2' : 'grid-cols-1'} rounded-2xl border border-petal-rule-soft bg-white overflow-hidden`}>
+        <div className="p-4 sm:p-5" data-testid="month-count-card">
+          <div className="font-body text-[11px] text-petal-muted">{isCurrentMonth ? tr('本月次數', 'This month') : tr('當月次數', 'That month')}</div>
+          <div className="mt-1 flex items-baseline gap-1.5">
+            <span className="font-display text-4xl font-medium tracking-tight text-petal-ink leading-none">{ms.count}</span>
+            <span className="font-body text-xs text-petal-muted">{tr('次', 'times')}</span>
+          </div>
+          <div className="mt-2 font-body text-[11px] leading-snug">
+            {ms.count === 0 && ms.prevCount === 0 ? (
+              <span className="text-petal-muted">{tr('這個月還沒有記錄', 'No records this month')}</span>
+            ) : (
+              <span className={delta > 0 ? 'text-petal-sage-deep' : delta < 0 ? 'text-petal-rose-deep' : 'text-petal-muted'}>
+                {delta > 0 ? '▲' : delta < 0 ? '▼' : '＝'} {delta === 0 ? tr('和上月一樣', 'Same as last month') : tr(`比上月${delta > 0 ? '多' : '少'} ${Math.abs(delta)} 次`, `${Math.abs(delta)} ${delta > 0 ? 'more' : 'fewer'} than last month`)}
+              </span>
+            )}
+            {isCurrentMonth && (
+              <span className="block text-petal-muted">{tr(`本週 ${derived.thisWeek} 次`, `${derived.thisWeek} this week`)}</span>
+            )}
+          </div>
+        </div>
+        {isCurrentMonth ? (
+          <div
+            className={`p-4 sm:p-5 border-l border-petal-rule-soft transition-colors ${
+              nudge.tier >= 3 ? 'bg-petal-rose-soft/40' : nudge.tier >= 1 ? 'bg-petal-rose-soft/20' : ''
+            }`}
+            data-testid="days-since-last-card"
+          >
+            <div className="font-body text-[11px] text-petal-muted">{tr('距離上次親密', 'Since last time')}</div>
+            <div className="mt-1 flex items-baseline gap-1.5">
+              <span className={`font-display font-medium tracking-tight leading-none transition-all ${nudge.tier === 0 ? 'text-4xl text-petal-ink' : nudge.numberClass}`}>
+                {derived.daysSinceLast === null ? '—' : derived.daysSinceLast}
+              </span>
+              {derived.daysSinceLast !== null && <span className="font-body text-xs text-petal-muted">{tr('天', 'days')}</span>}
             </div>
+            {nudge.hint && (
+              <p className="mt-2 font-body text-[11px] text-petal-rose-deep leading-snug" data-testid="days-since-last-hint">
+                {nudge.hint}
+              </p>
+            )}
           </div>
-        )}
-        <div className="bg-petal-rose-soft/30 rounded-md p-5 border border-petal-rose-soft">
-          <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-rose-deep mb-1.5">{tr('本週次數', 'This week')}</div>
-          <div className="font-display italic font-light text-3xl text-petal-rose-deep">{derived.thisWeek}</div>
-        </div>
-        <div className="bg-petal-sage/15 rounded-md p-5 border border-petal-sage/40">
-          <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-sage-deep mb-1.5">{tr('本月次數', 'This month')}</div>
-          <div className="font-display italic font-light text-3xl text-petal-sage-deep">{derived.thisMonth}</div>
-        </div>
-        <div
-          className={`rounded-md p-5 border transition-colors ${
-            nudge.tier >= 3
-              ? 'bg-petal-rose-soft/40 border-petal-rose-soft'
-              : nudge.tier >= 1
-                ? 'bg-petal-rose-soft/20 border-petal-rose-soft'
-                : 'bg-white border-petal-rule'
-          }`}
-          data-testid="days-since-last-card"
-        >
-          <div className="font-body text-[11px] uppercase tracking-[0.12em] text-petal-muted mb-1.5">{tr('已經幾天沒有親密了', 'Days since last intimacy')}</div>
-          <div className={`font-display italic font-light leading-none transition-all ${nudge.numberClass}`}>
-            {derived.daysSinceLast === null ? '—' : derived.daysSinceLast}
-          </div>
-          {nudge.hint && (
-            <p className="mt-2 font-body text-xs text-petal-rose-deep leading-snug" data-testid="days-since-last-hint">
-              {nudge.hint}
-            </p>
-          )}
-        </div>
+        ) : null}
       </div>
 
+      {/* The month at a glance — one quiet grid, same shape for every number. */}
+      <div className="grid grid-cols-3 gap-2">
+        <StatTile testId="stat-avg-gap" label={tr('平均間隔', 'Avg gap')} value={fmt1(ms.avgGap)} unit={tr('天', 'days')} />
+        <StatTile testId="stat-longest-gap" label={tr('最長間隔', 'Longest gap')} value={fmtInt(ms.longestGap)} unit={tr('天', 'days')} />
+        <StatTile testId="stat-shortest-gap" label={tr('最短間隔', 'Shortest gap')} value={fmtInt(ms.shortestGap)} unit={tr('天', 'days')} />
+        <StatTile
+          testId="stat-avg-duration"
+          label={tr('平均時長', 'Avg length')}
+          value={fmtInt(ms.avgDurationMin)}
+          unit={tr('分鐘', 'min')}
+          caption={ms.durationSamples > 0 ? tr(`依 ${ms.durationSamples} 筆時長`, `from ${ms.durationSamples}`) : tr('記錄時填時長', 'Add a duration')}
+        />
+        <StatTile
+          testId="stat-satisfaction"
+          label={tr('滿意度', 'Satisfaction')}
+          value={fmt1(ms.satisfaction)}
+          unit="/ 5"
+          caption={ms.satisfactionSamples > 0 ? tr(`依 ${ms.satisfactionSamples} 份感受`, `from ${ms.satisfactionSamples} check-ins`) : tr('記錄 2 小時後問另一半', 'Asked 2h after a record')}
+        />
+        <StatTile
+          testId="stat-top-slot"
+          label={tr('常見時段', 'Usual time')}
+          value={ms.topSlot ? SLOT_LABELS[ms.topSlot] : '—'}
+        />
+        {showWeeklyAvg && (
+          <StatTile testId="weekly-avg-card" label={tr('周平均', 'Weekly average')} value={hasRecords ? derived.weeklyAvg.toFixed(1) : '—'} />
+        )}
+      </div>
+
+      {/* What the 感受小調查 taught you this month. */}
+      {insights.length > 0 && (
+        <ul className="flex flex-wrap gap-1.5" data-testid="intimacy-insights">
+          {insights.map((i) => (
+            <li key={i.key} className="px-3 py-1.5 rounded-full bg-petal-rose-soft/25 border border-petal-rose-soft font-body text-xs text-petal-rose-deep">
+              {i.text}
+            </li>
+          ))}
+        </ul>
+      )}
+
       {/* When the gap is long, offer a one-tap way to reach out. */}
-      {nudge.showInvite && onNudgePartner && (
+      {isCurrentMonth && nudge.showInvite && onNudgePartner && (
         <button
           type="button"
           onClick={onNudgePartner}
@@ -1053,7 +1138,7 @@ export function IntimacyStatsCards({ records, birthDate, onOpenSettings, onNudge
       {/* Lighter, always-available option: let Twogether (the platform) phrase a
           gentle, neutral reminder (three choices) so it doesn't feel like a demand
           from you. */}
-      {partnerConnected && showNotification && hasRecords && derived.daysSinceLast !== null && (
+      {isCurrentMonth && partnerConnected && showNotification && hasRecords && derived.daysSinceLast !== null && (
         <IntimacyNudgeButton days={derived.daysSinceLast} showNotification={showNotification} />
       )}
 
