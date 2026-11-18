@@ -18,6 +18,15 @@ When you ship a user-facing UI feature change:
    plain language, emoji ok) and give it to the user to share publicly. The thread
    post goes in the chat reply, not the repo (unless asked).
 
+## Positioning & privacy policy (every public-facing copy change)
+
+- One positioning line everywhere: `src/content/positioning.ts`
+  (「把諮商帶回日常的伴侶練習工具」). Static pages in `public/` copy it verbatim;
+  `tests/public-positioning.spec.ts` fails on drift. Use it for social bios too.
+- `public/privacy.html` (`/privacy`) must describe what the code actually does.
+  New data type, new vendor/AI provider, or new sharing/public path → update
+  the policy (and its effective date) in the same change.
+
 ## Guest mode / 訪客模式 (every UI feature change)
 
 Visitors without an account run the **real app** on a sample couple

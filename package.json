@@ -1,7 +1,7 @@
 {
   "name": "twogether",
   "version": "1.0.0",
-  "description": "Twogether - Couples Relationship Tracking App (Combined Frontend + Backend)",
+  "description": "Twogether - Therapy Companion for couples: brings counseling into everyday life (Combined Frontend + Backend)",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
