@@ -477,11 +477,17 @@ router.post('/reset-password', async (req, res) => {
 
     const passwordHash = await bcrypt.hash(password, 12);
     await db.query(
-      `UPDATE users SET password_hash = $1, password_reset_token = NULL, password_reset_expires = NULL WHERE id = $2`,
+      `UPDATE users
+          SET password_hash = $1, password_reset_token = NULL, password_reset_expires = NULL,
+              password_changed_at = NOW()
+        WHERE id = $2`,
       [passwordHash, u.id]
     );
-    logInfo('Password reset completed', { userId: u.id });
-    return authPage(res, { ok: true, title: '密碼已更新', message: '你的密碼已成功更新，請用新密碼登入。', body: '<a class="btn" href="/">回到 Twogether 登入</a>' });
+    // password_changed_at signs out every device still holding an older token
+    // (middleware/auth.js isRevoked); drop the cached row so it applies now.
+    invalidateUserCache(u.id);
+    logInfo('Password reset completed', { userId: u.id, otherSessionsRevoked: true });
+    return authPage(res, { ok: true, title: '密碼已更新', message: '你的密碼已成功更新，其他裝置上的登入也已全部登出。請用新密碼登入。', body: '<a class="btn" href="/">回到 Twogether 登入</a>' });
   } catch (error) {
     logError('Reset password failed', { err: error.message });
     return authPage(res, { ok: false, status: 500, title: '發生錯誤', message: '重設密碼時發生錯誤，請稍後再試。', body: '<a class="btn" href="/">回到 Twogether</a>' });

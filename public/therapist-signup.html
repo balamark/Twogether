@@ -399,7 +399,8 @@
       docList.innerHTML = docUrls.map(function (u, i) {
         return '<div style="display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:4px;">' +
           '<span>📎 文件 ' + (i + 1) + '</span>' +
-          '<a href="' + esc(u) + '" target="_blank" rel="noopener" style="color:var(--rose);">檢視</a>' +
+          // Stored privately (admin-only), so there's nothing to open here.
+          '<span style="color:var(--muted);">已上傳，僅管理員可檢視</span>' +
           '<span data-rmdoc="' + i + '" style="cursor:pointer; color:var(--muted);">移除</span></div>';
       }).join('');
       docList.querySelectorAll('[data-rmdoc]').forEach(function (el) {

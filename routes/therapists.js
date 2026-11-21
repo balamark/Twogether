@@ -19,9 +19,10 @@ const { v4: uuidv4 } = require('uuid');
 const { body, query: queryValidator, validationResult } = require('express-validator');
 const db = require('../database/db');
 const { authenticateToken, optionalAuth, generateToken } = require('../middleware/auth');
-const { uploadToSupabase } = require('../lib/supabase-storage');
+const { uploadToSupabase, createSignedUrl } = require('../lib/supabase-storage');
 const emailService = require('../services/emailService');
 const ecpay = require('../lib/ecpay');
+const { pickProvider, providerUnavailable } = require('../lib/paymentProviders');
 const newebpay = require('../lib/newebpay');
 const receipts = require('../lib/receipts');
 const qaPool = require('../lib/qaPool');
@@ -317,9 +318,18 @@ router.get('/focus-areas', (req, res) => {
 
 // --- Uploads (public, used by the no-login sign-up form) -----------------
 
-// Shared handler: process an uploaded buffer and push it to Supabase storage,
-// returning the public URL. Photos are resized; documents (incl. PDFs) are
-// stored as-is. Filenames are random UUIDs so document URLs aren't guessable.
+// Identity / license documents live in a PRIVATE bucket: the upload returns a
+// storage ref (storage://therapist-documents/<name>), not a URL, and only the
+// admin dashboard can open one, through a 5-minute signed link
+// (GET /api/admin/therapists/:id/documents/:index). Profile photos are public
+// on purpose — they're shown in the directory.
+const DOCUMENT_BUCKET = 'therapist-documents';
+const DOCUMENT_REF_RE = /^storage:\/\/therapist-documents\/[0-9a-f-]{36}-\d{13}\.(jpg|jpeg|png|webp|pdf)$/;
+const isDocumentRef = (v) => typeof v === 'string' && DOCUMENT_REF_RE.test(v);
+
+// Shared handler: process an uploaded buffer and push it to Supabase storage.
+// Photos are resized and get a public URL; documents (incl. PDFs) are stored
+// as-is in the private bucket and get a storage ref. Names are random UUIDs.
 const handleUpload = async (req, res, { kind }) => {
   try {
     if (uploadRateLimited(req.ip)) {
@@ -354,9 +364,13 @@ const handleUpload = async (req, res, { kind }) => {
       mimeType = 'application/pdf';
     }
 
-    const fileName = `therapist-${kind}/${uuidv4()}-${Date.now()}.${outExt}`;
-    const url = await uploadToSupabase(buffer, fileName, mimeType);
-    logInfo('Therapist asset uploaded', { kind, ip: req.ip });
+    let url;
+    if (kind === 'document') {
+      url = await uploadToSupabase(buffer, `${uuidv4()}-${Date.now()}.${outExt}`, mimeType, DOCUMENT_BUCKET, { isPublic: false });
+    } else {
+      url = await uploadToSupabase(buffer, `therapist-${kind}/${uuidv4()}-${Date.now()}.${outExt}`, mimeType);
+    }
+    logInfo('Therapist asset uploaded', { kind, private: kind === 'document', ip: req.ip });
     return res.status(201).json({ success: true, url });
   } catch (error) {
     logError('Therapist upload failed', { kind, err: error.message });
@@ -547,6 +561,16 @@ router.post('/me/documents', authenticateToken, [
   body('url').isString().trim().isLength({ min: 1, max: 1000 }).withMessage('文件網址無效'),
 ], async (req, res) => {
   if (!handleValidation(req, res)) return;
+  // Only refs our own upload-document endpoint issued: a free-form URL would
+  // be shown to the admin as a link (javascript:, phishing, …).
+  if (!isDocumentRef(req.body.url.trim())) {
+    logWarn('Therapist document rejected: not an uploaded document', { userId: req.user.id });
+    return res.status(400).json({
+      success: false,
+      error_code: 'DOCUMENT_REF_INVALID',
+      message: '請用「上傳文件」按鈕上傳證明文件，不能直接貼上網址',
+    });
+  }
   try {
     const existing = await loadOwnTherapist(req.user.id);
     if (!existing) {
@@ -1805,7 +1829,16 @@ router.post('/apply', optionalAuth, [
     }
     const langs = sanitizeStringArray(languages);
     const customSpecialties = sanitizeCustomSpecialties(req.body.customSpecialties);
-    const identityDocuments = sanitizeStringArray(req.body.identityDocuments).slice(0, 10);
+    const submittedDocuments = sanitizeStringArray(req.body.identityDocuments);
+    if (submittedDocuments.some((d) => !isDocumentRef(d))) {
+      logWarn('Therapist apply rejected: document is not an uploaded document', { count: submittedDocuments.length });
+      return res.status(400).json({
+        success: false,
+        error_code: 'DOCUMENT_REF_INVALID',
+        message: '證明文件需透過「上傳文件」按鈕上傳，請移除後重新上傳一次',
+      });
+    }
+    const identityDocuments = submittedDocuments.slice(0, 10);
     // Keep the email exactly as entered (trimmed) to match the case-sensitive
     // register/login flow — so the credentials we hand back log in cleanly.
     const email = contactEmail.trim();
@@ -2094,13 +2127,11 @@ router.post('/consultations/:id/meeting-link', authenticateToken, [
 // order, and returns the form params the frontend auto-submits.
 router.post('/consultations/:id/pay', authenticateToken, async (req, res) => {
   try {
-    const provider = req.body && req.body.provider === 'newebpay' ? 'newebpay' : 'ecpay';
-    if (provider === 'newebpay' && !newebpay.isConfigured()) {
-      return res.status(503).json({
-        success: false,
-        error_code: 'NEWEBPAY_UNAVAILABLE',
-        message: '藍新金流暫時無法使用，請改用綠界 ECPay 付款',
-      });
+    const provider = pickProvider(req.body && req.body.provider);
+    const unavailable = providerUnavailable(provider);
+    if (unavailable) {
+      logWarn(`session.${provider}_unconfigured`, { userId: req.user.id, consultationId: req.params.id });
+      return res.status(503).json({ success: false, ...unavailable });
     }
 
     const access = await loadConsultationAccess(req.params.id, req.user.id);
@@ -2266,6 +2297,12 @@ router.post('/sessions/ecpay/callback', async (req, res) => {
     }
     if (order.status === 'paid') return res.send('1|OK'); // idempotent
 
+    // An ECPay callback may only settle an order that was sent to ECPay.
+    if (order.provider !== 'ecpay') {
+      logWarn('session.callback.provider_mismatch', { merchantTradeNo, expected: order.provider, got: 'ecpay' });
+      return res.status(400).send('0|Provider Mismatch');
+    }
+
     if (Number(payload.TradeAmt) !== Number(order.amount)) {
       logWarn('session.callback.amount_mismatch', { merchantTradeNo, expected: order.amount, got: payload.TradeAmt });
       return res.status(400).send('0|Amount Mismatch');
@@ -2319,6 +2356,11 @@ router.post('/sessions/newebpay/callback', async (req, res) => {
       return res.send('1|OK');
     }
     if (order.status === 'paid') return res.send('1|OK'); // idempotent
+
+    if (order.provider !== 'newebpay') {
+      logWarn('session.callback.provider_mismatch', { merchantTradeNo, expected: order.provider, got: 'newebpay' });
+      return res.status(400).send('0|Provider Mismatch');
+    }
 
     if (Number(parsed.amount) !== Number(order.amount)) {
       logWarn('session.callback.amount_mismatch', { merchantTradeNo, expected: order.amount, got: parsed.amount, provider: 'newebpay' });
@@ -2552,6 +2594,38 @@ const REVIEW_STATUS = {
   suspend: 'suspended',
   reactivate: 'approved',
 };
+
+// GET /api/admin/therapists/:id/documents/:index — open one identity document.
+// Private refs get a 5-minute signed link; documents uploaded before the
+// private bucket existed are public Supabase URLs and are passed through only
+// if they really point at our storage. Anything else is never linked.
+adminRouter.get('/:id/documents/:index', async (req, res) => {
+  const index = Number.parseInt(req.params.index, 10);
+  try {
+    const r = await db.query('SELECT identity_documents FROM therapists WHERE id = $1', [req.params.id]);
+    const doc = r.rows[0] && Number.isInteger(index) ? (r.rows[0].identity_documents || [])[index] : undefined;
+    if (!doc) {
+      return res.status(404).type('text').send('找不到這份文件，可能已被諮商師移除。請重新整理管理頁後再試。');
+    }
+    const legacyPrefix = process.env.SUPABASE_URL ? `${process.env.SUPABASE_URL}/storage/v1/object/public/` : null;
+    let target;
+    if (isDocumentRef(doc)) {
+      target = await createSignedUrl(doc, 300);
+    } else if (legacyPrefix && doc.startsWith(legacyPrefix)) {
+      target = doc;
+    } else {
+      logWarn('Admin document view refused: not a storage document', { therapistId: req.params.id, index });
+      return res.status(422).type('text').send('這份文件不是透過上傳功能存的，無法安全開啟。請請諮商師重新上傳。');
+    }
+    logInfo('Admin viewed therapist document', { therapistId: req.params.id, index, legacy: !isDocumentRef(doc) });
+    res.set('Cache-Control', 'no-store');
+    return res.redirect(302, target);
+  } catch (error) {
+    logError('Admin document view failed', { therapistId: req.params.id, index, err: error.message });
+    return res.status(502).type('text').send('暫時無法開啟文件（儲存空間沒有回應），請稍後再試。');
+  }
+});
+
 adminRouter.post('/:id/review', express.json(), async (req, res) => {
   try {
     const action = req.body && req.body.action;

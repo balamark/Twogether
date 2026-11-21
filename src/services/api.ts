@@ -1522,7 +1522,7 @@ export const clearAuthStorage = (): void => {
   clearResponseCache();
 };
 
-export type SessionExpiredReason = 'expired' | 'invalid' | 'manual';
+export type SessionExpiredReason = 'expired' | 'invalid' | 'manual' | 'password_changed';
 
 // Module-level guard so we only dispatch the expiration event once per
 // "logged-in session". A burst of parallel requests (each returning 401) would
@@ -1801,7 +1801,7 @@ apiClient.interceptors.response.use(
       // user back to login" regardless of whether the status is 401 or 403.
       // The backend (middleware/auth.js) uses 401 for "no/invalid token" and
       // 403 for "jwt.verify failed (expired/malformed)".
-      const sessionExpiredCodes = new Set(['TOKEN_EXPIRED', 'TOKEN_INVALID', 'TOKEN_MISSING']);
+      const sessionExpiredCodes = new Set(['TOKEN_EXPIRED', 'TOKEN_INVALID', 'TOKEN_MISSING', 'TOKEN_REVOKED']);
       const isAuthEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
 
       // Handle specific error cases
@@ -1814,10 +1814,15 @@ apiClient.interceptors.response.use(
           authError.data = data;
           throw authError;
         } else {
-          // Token expired or invalid for authenticated requests
+          // Token expired or invalid for authenticated requests. TOKEN_REVOKED =
+          // the password was changed (reset on another device), which signs
+          // out every older session — say so instead of "expired".
           clearAuthStorage();
-          dispatchSessionExpired('expired');
-          const authError = new Error(tr('登錄已過期，請重新登錄', 'Your session has expired. Please sign in again')) as Error & { error_code?: string; status?: number; data?: unknown };
+          const revoked = errorCode === 'TOKEN_REVOKED';
+          dispatchSessionExpired(revoked ? 'password_changed' : 'expired');
+          const authError = new Error(revoked
+            ? tr('你的密碼已經變更，請用新密碼重新登入', 'Your password was changed. Please sign in with your new password')
+            : tr('登錄已過期，請重新登錄', 'Your session has expired. Please sign in again')) as Error & { error_code?: string; status?: number; data?: unknown };
           authError.error_code = errorCode;
           authError.status = status;
           authError.data = data;

@@ -5,6 +5,7 @@ const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { getCoupleIdForUser, getCoupleTier, getActiveExpiry } = require('../lib/entitlements');
 const ecpay = require('../lib/ecpay');
+const { pickProvider, providerUnavailable } = require('../lib/paymentProviders');
 const newebpay = require('../lib/newebpay');
 const receipts = require('../lib/receipts');
 const emailService = require('../services/emailService');
@@ -282,16 +283,13 @@ router.post(
       });
     }
 
-    const provider = req.body.provider === 'newebpay' ? 'newebpay' : 'ecpay';
+    const provider = pickProvider(req.body.provider);
 
     try {
-      if (provider === 'newebpay' && !newebpay.isConfigured()) {
-        logWarn('billing.newebpay_unconfigured', { userId: req.user.id, plan: req.body.plan });
-        return res.status(503).json({
-          success: false,
-          message: '藍新金流暫時無法使用，請改用綠界 ECPay 付款',
-          error_code: 'NEWEBPAY_UNAVAILABLE',
-        });
+      const unavailable = providerUnavailable(provider);
+      if (unavailable) {
+        logWarn(`billing.${provider}_unconfigured`, { userId: req.user.id, plan: req.body.plan });
+        return res.status(503).json({ success: false, ...unavailable });
       }
 
       const coupleId = await getCoupleIdForUser(req.user.id);
@@ -527,6 +525,12 @@ router.post('/ecpay/callback', async (req, res) => {
     // Already granted — idempotent ack.
     if (order.status === 'paid') return res.send('1|OK');
 
+    // An ECPay callback may only settle an order that was sent to ECPay.
+    if (order.provider !== 'ecpay') {
+      logWarn('billing.callback.provider_mismatch', { merchantTradeNo, expected: order.provider, got: 'ecpay' });
+      return res.status(400).send('0|Provider Mismatch');
+    }
+
     // Guard against amount tampering.
     if (Number(payload.TradeAmt) !== Number(order.amount)) {
       logWarn('billing.callback.amount_mismatch', {
@@ -601,6 +605,11 @@ router.post('/newebpay/callback', async (req, res) => {
 
     // Already granted — idempotent ack.
     if (order.status === 'paid') return res.send('1|OK');
+
+    if (order.provider !== 'newebpay') {
+      logWarn('billing.callback.provider_mismatch', { merchantTradeNo, expected: order.provider, got: 'newebpay' });
+      return res.status(400).send('0|Provider Mismatch');
+    }
 
     // Guard against amount tampering.
     if (Number(parsed.amount) !== Number(order.amount)) {
