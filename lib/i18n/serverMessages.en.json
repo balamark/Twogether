@@ -1163,7 +1163,8 @@
 "綠界 ECPay 尚未開放，請改用藍新金流付款": "ECPay isn't available yet. Please pay with NewebPay instead",
 "線上付款暫時無法使用，請稍後再試或聯絡客服": "Online payment is temporarily unavailable. Please try again later or contact support",
 "請用「上傳文件」按鈕上傳證明文件，不能直接貼上網址": "Please upload your document with the Upload document button; pasted links aren't accepted",
-"證明文件需透過「上傳文件」按鈕上傳，請移除後重新上傳一次": "Documents must be uploaded with the Upload document button. Please remove it and upload it again"
+"證明文件需透過「上傳文件」按鈕上傳，請移除後重新上傳一次": "Documents must be uploaded with the Upload document button. Please remove it and upload it again",
+"這個 Email 已經有 Twogether 帳號了。為了保護帳號安全，請先登入 Twogether，再回到這個頁面送出申請；如果這不是你的帳號，請改用你自己的 Email。": "This email already has a Twogether account. To keep that account safe, sign in to Twogether first and then come back to this page to apply. If it isn't your account, use your own email."
 },
 "patterns": [
 [

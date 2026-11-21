@@ -1844,18 +1844,27 @@ router.post('/apply', optionalAuth, [
     const email = contactEmail.trim();
 
     // --- Resolve / provision the therapist's user account ------------------
-    // Priority: an already-logged-in user → reuse. Else an existing account
-    // matching the contact email → link (don't reset their password). Else
-    // create a fresh account and hand back generated credentials.
+    // A logged-in user applies as themselves. Logged out, we only ever CREATE
+    // a fresh account: an email that already has one must log in first.
+    // (Linking by email let anyone attach a therapist profile — and its
+    // consultations, payouts and admin review — to someone else's account
+    // just by knowing their address.) Case-insensitive so a re-cased copy of
+    // an existing address can't slip through as a lookalike second account.
     let userId = req.user ? req.user.id : null;
     let credentials = null;          // { email, password } for brand-new accounts
-    let accountExisted = false;      // true when we linked to a pre-existing login
 
     if (!userId) {
-      const existing = await db.query('SELECT id FROM users WHERE email = $1', [email]);
+      const existing = await db.query('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [email]);
       if (existing.rows.length > 0) {
-        userId = existing.rows[0].id;
-        accountExisted = true;
+        logWarn('Therapist apply blocked: email belongs to an existing account, login required', {
+          existingUserId: existing.rows[0].id,
+          ip: req.ip,
+        });
+        return res.status(409).json({
+          success: false,
+          error_code: 'ACCOUNT_EXISTS_LOGIN_REQUIRED',
+          message: '這個 Email 已經有 Twogether 帳號了。為了保護帳號安全，請先登入 Twogether，再回到這個頁面送出申請；如果這不是你的帳號，請改用你自己的 Email。',
+        });
       } else {
         const tempPassword = generateTempPassword();
         const passwordHash = await bcrypt.hash(tempPassword, 12);
@@ -1921,7 +1930,7 @@ router.post('/apply', optionalAuth, [
     }).catch((err) => logWarn('Therapist verification email failed', { err: err.message }));
 
     logInfo('Therapist application submitted', {
-      userId, therapistId: result.rows[0].id, accountCreated: !!credentials, accountExisted,
+      userId, therapistId: result.rows[0].id, accountCreated: !!credentials, loggedIn: !!req.user,
     });
 
     res.status(201).json({
@@ -1933,11 +1942,10 @@ router.post('/apply', optionalAuth, [
         createdAt: result.rows[0].created_at,
       },
       // Login guidance for the applicant. `credentials` is only present for a
-      // freshly-created account; never echo a password for an existing login.
+      // freshly-created account; a logged-in applicant gets created: false.
       account: {
         email,
         created: !!credentials,
-        existed: accountExisted,
         password: credentials ? credentials.password : null,
       },
       emailVerificationSent: true,

@@ -198,6 +198,41 @@ test.describe('security hardening', () => {
     }
   });
 
+  test('applying logged out with someone else\'s email does not touch their account', async () => {
+    const victim = { email: `sec-victim-${STAMP}@twogether.app`, nickname: '帳號主人', password: 'test123456' };
+    const victimToken = await register(victim);
+    const base = { displayName: '冒用者', focusAreas: ['couple'], rateTwd: 1000 };
+
+    const anon = await request.newContext();
+    const asVictim = await authed(victimToken);
+    try {
+      // Same address, and a re-cased copy of it: both refused, nothing created.
+      for (const contactEmail of [victim.email, victim.email.toUpperCase()]) {
+        const res = await anon.post(`${API}/therapists/apply`, { data: { ...base, contactEmail } });
+        expect(res.status()).toBe(409);
+        expect((await res.json()).error_code).toBe('ACCOUNT_EXISTS_LOGIN_REQUIRED');
+      }
+      const rows = await withDb(async (db) => (await db.query(
+        'SELECT t.id FROM therapists t JOIN users u ON u.id = t.user_id WHERE u.email = $1', [victim.email],
+      )).rows);
+      expect(rows).toHaveLength(0);
+      expect((await asVictim.get(`${API}/therapists/me`)).status()).toBe(404);
+
+      // The account owner can still apply — logged in, as themselves.
+      const own = await asVictim.post(`${API}/therapists/apply`, {
+        data: { ...base, displayName: '帳號主人本人', contactEmail: victim.email },
+      });
+      expect(own.status(), await own.text()).toBe(201);
+      const body = await own.json();
+      expect(body.account).toMatchObject({ created: false, password: null });
+      const me = await asVictim.get(`${API}/therapists/me`);
+      expect(me.ok(), await me.text()).toBeTruthy();
+    } finally {
+      await anon.dispose();
+      await asVictim.dispose();
+    }
+  });
+
   test('a crafted email cannot inject attributes into the admin users table', async ({ browser }) => {
     // Accepted by express-validator isEmail (quoted local part).
     const email = `"\\"onmouseover=window.__pwned=1//${STAMP}"@example.com`;
