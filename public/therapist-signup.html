@@ -318,6 +318,19 @@
     var result = document.getElementById('result');
     var submit = document.getElementById('submit');
 
+    // Same origin as the app, so a logged-in visitor's token is right here.
+    // Sending it makes the application belong to that account (the server only
+    // creates NEW accounts for logged-out applicants).
+    function authToken() {
+      try { return localStorage.getItem('authToken'); } catch (e) { return null; }
+    }
+    function applyHeaders() {
+      var h = { 'Content-Type': 'application/json' };
+      var t = authToken();
+      if (t) h.Authorization = 'Bearer ' + t;
+      return h;
+    }
+
     function show(kind, html) {
       result.className = 'result ' + kind;
       result.innerHTML = html;
@@ -399,7 +412,8 @@
       docList.innerHTML = docUrls.map(function (u, i) {
         return '<div style="display:flex; align-items:center; gap:8px; font-size:13px; margin-bottom:4px;">' +
           '<span>📎 文件 ' + (i + 1) + '</span>' +
-          '<a href="' + esc(u) + '" target="_blank" rel="noopener" style="color:var(--rose);">檢視</a>' +
+          // Stored privately (admin-only), so there's nothing to open here.
+          '<span style="color:var(--muted);">已上傳，僅管理員可檢視</span>' +
           '<span data-rmdoc="' + i + '" style="cursor:pointer; color:var(--muted);">移除</span></div>';
       }).join('');
       docList.querySelectorAll('[data-rmdoc]').forEach(function (el) {
@@ -462,7 +476,7 @@
       submit.textContent = '送出中…';
       fetch('/api/therapists/apply', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: applyHeaders(),
         body: JSON.stringify(payload)
       })
         .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, b: b }; }); })
@@ -480,11 +494,6 @@
                 '<div style="font-size:14px;">臨時密碼：<code>' + esc(acct.password) + '</code></div>' +
                 '<div style="font-size:13px; color:var(--muted); margin-top:8px;">請記下這組密碼並盡快登入，登入後即可在「我的諮商師檔案」編輯姓名、費率、照片等所有資料。</div>' +
                 '</div>';
-            } else if (acct.existed) {
-              loginBlock =
-                '<div style="margin-top:12px; font-size:14px; text-align:left;">' +
-                '這個 Email（<code>' + esc(acct.email) + '</code>）已經有 Twogether 帳號，請用你原本的密碼登入，' +
-                '即可在「我的諮商師檔案」編輯資料。</div>';
             } else {
               loginBlock =
                 '<div style="margin-top:12px; font-size:14px; text-align:left;">' +
@@ -495,8 +504,12 @@
               '📧 我們已寄出一封驗證信到 <code>' + esc(acct.email) + '</code>，請點擊信中的連結完成 Email 驗證。</div>';
             show('ok', '<div style="font-weight:600;">✓ 申請已送出！我們會在審核通過後與你聯繫。</div>' + loginBlock + verifyBlock);
             form.style.display = 'none';
+          } else if (res.b && res.b.error_code === 'ACCOUNT_EXISTS_LOGIN_REQUIRED') {
+            show('err', esc(res.b.message) +
+              '<div style="margin-top:10px;"><a href="/" style="color:var(--rose); font-weight:600;">前往登入 Twogether →</a>' +
+              '<div style="font-size:13px; color:var(--muted); margin-top:4px;">登入後從「諮商師」頁最下方的「想加入 Twogether？」回到這裡，你填的內容需要重新輸入。</div></div>');
           } else {
-            show('err', (res.b && res.b.message) || '送出失敗，請稍後再試');
+            show('err', esc((res.b && res.b.message) || '送出失敗，請稍後再試'));
           }
         })
         .catch(function () { show('err', '網路錯誤，請稍後再試'); })
