@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { apiService } from '../services/api';
 import type { Notification } from '../App';
-import { tr } from '../i18n/tr';
+import { tr, getLocale } from '../i18n/tr';
 
 interface AuthModalProps {
   onClose: () => void;
@@ -399,6 +399,21 @@ const AuthModal = ({
                 <span>{tr('註冊帳號 →', 'Create account →')}</span>
               )}
             </button>
+            {/* Consent notice: intimacy / cycle records are PDPA Art. 6 special
+                data, so sign-up must point at the policy before the account exists. */}
+            <p className="text-center font-body text-xs text-petal-muted leading-relaxed" data-testid="auth-privacy-notice">
+              {tr('註冊即表示你年滿 18 歲，並同意我們依', 'By signing up you confirm you are 18 or older and agree to our ')}
+              <a
+                href={`/privacy?lang=${getLocale()}`}
+                target="_blank"
+                rel="noopener"
+                data-testid="auth-privacy-link"
+                className="text-pink-600 hover:text-pink-700 underline underline-offset-2 mx-0.5"
+              >
+                {tr('隱私權政策', 'Privacy Policy')}
+              </a>
+              {tr('處理你的資料。你們的紀錄只有你們兩人看得到，我們不賣資料、不放廣告。', '. Your records are visible only to the two of you; we never sell data or show ads.')}
+            </p>
           </form>
         )}
 

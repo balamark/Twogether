@@ -58,6 +58,8 @@ const zhTW = {
   'footer.areYouCounselor': '你是諮商師？',
   'footer.counselorSignIn': '登入',
   'footer.counselorApply': '申請入駐',
+  'footer.privacy': '隱私權政策',
+  'help.privacyPage': '隱私權政策：我們怎麼保護你們的資料',
 };
 
 export type MessageKey = keyof typeof zhTW;
@@ -119,6 +121,8 @@ const en: Record<MessageKey, string> = {
   'footer.areYouCounselor': 'Are you a counselor? ',
   'footer.counselorSignIn': 'Sign in',
   'footer.counselorApply': 'Apply to join',
+  'footer.privacy': 'Privacy',
+  'help.privacyPage': 'Privacy policy: how we protect your data',
 };
 
 export const MESSAGES: Record<'zh-TW' | 'en', Record<MessageKey, string>> = {

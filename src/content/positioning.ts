@@ -12,6 +12,12 @@ import { tr } from '../i18n/tr';
 // Keep every user-facing surface (landing page, logged-out showroom, the
 // 心理諮商 tab, the AI companion onboarding, README, index.html) pointing at
 // these strings so the message stays consistent. See CLAUDE.md.
+//
+// The static public pages (public/pricing.html, support.html, privacy.html,
+// therapist-signup.html) can't import this file, so they copy the tagline
+// verbatim; tests/public-positioning.spec.ts fails if any of them drifts or
+// brings back an old framing (e.g. 「親密關係追蹤 App」). Social bios (Threads,
+// LINE OA, App Store subtitle) should use POSITIONING_TAGLINE too.
 
 /** The headline one-liner. Used on the logged-out hero and the 心理諮商 tab. */
 export const POSITIONING_ONE_LINER =

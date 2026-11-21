@@ -3379,6 +3379,14 @@ const LoveTimeApp = () => {
             >
               {t('footer.support')}
             </a>
+            <span className="mx-1.5 text-petal-rule">·</span>
+            <a
+              href={`/privacy?lang=${locale}`}
+              data-testid="footer-privacy-link"
+              className="text-pink-600 hover:text-pink-700 underline underline-offset-2"
+            >
+              {t('footer.privacy')}
+            </a>
           </p>
           <p className="font-body text-[11px] text-petal-muted/80" data-testid="build-info">
             v{__APP_VERSION__} | {import.meta.env.MODE} |{' '}

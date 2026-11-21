@@ -283,54 +283,54 @@ app.use('/api', adminRoutes.publicRouter);
 app.use('/api/admin', adminAuth, adminRoutes.adminApiRouter);
 app.get('/admin', adminAuth, adminRoutes.htmlHandler);
 
+// Public, no-login static pages (pricing / support / privacy). Each carries a
+// {{SUPPORT_EMAIL}} placeholder so the support mailbox lives in exactly one
+// place (lib/supportContact.json); render each once and cache it — the files
+// never change at runtime. Every route also lists its '*.html' path: Vite
+// copies public/ verbatim into dist/, so the raw-placeholder copy sits on disk
+// and only these routes (registered before the static middleware) shadow it.
+const publicPageCache = new Map();
+function servePublicPage(file, logEvent) {
+  return (req, res) => {
+    if (!publicPageCache.has(file)) {
+      publicPageCache.set(
+        file,
+        fs
+          .readFileSync(path.join(__dirname, 'public', file), 'utf8')
+          .replace(/\{\{SUPPORT_EMAIL\}\}/g, SUPPORT_EMAIL)
+      );
+    }
+    if (logEvent) {
+      logInfo(logEvent, {
+        path: req.path,
+        lang: typeof req.query.lang === 'string' ? req.query.lang.slice(0, 8) : null,
+        acceptLanguage: (req.get('accept-language') || '').slice(0, 32),
+      });
+    }
+    res.setHeader('Cache-Control', 'no-cache');
+    res.type('html').send(publicPageCache.get(file));
+  };
+}
+
 // Public, no-login sales/pricing page. ECPay (綠界) requires a publicly
 // reachable URL that shows the products for sale, their prices, and the
 // refund/contact policy — WITHOUT any login. The SPA gates most views behind
 // auth, so this explicit route (registered before the static/catch-all) serves
 // a self-contained static page that is always public. Prices here MUST stay in
 // sync with the PLANS catalog in routes/billing.js.
-//
-// The page carries a {{SUPPORT_EMAIL}} placeholder instead of a hardcoded
-// address so the support mailbox lives in exactly one place
-// (lib/supportContact.json) for both this page and the React app. Rendered once
-// and cached — the file never changes at runtime.
-//
-// '/pricing.html' is in the path list on purpose: Vite copies public/ verbatim
-// into dist/, so dist/pricing.html still holds the raw placeholder. Registering
-// here (before the static middleware below) means that copy can never be served
-// — same shadowing pattern as the /robots.txt route.
-let pricingHtmlCache = null;
-app.get(['/pricing', '/membership', '/plans', '/pricing.html'], (req, res) => {
-  if (!pricingHtmlCache) {
-    pricingHtmlCache = fs
-      .readFileSync(path.join(__dirname, 'public', 'pricing.html'), 'utf8')
-      .replace(/\{\{SUPPORT_EMAIL\}\}/g, SUPPORT_EMAIL);
-  }
-  res.setHeader('Cache-Control', 'no-cache');
-  res.type('html').send(pricingHtmlCache);
-});
+app.get(['/pricing', '/membership', '/plans', '/pricing.html'], servePublicPage('pricing.html'));
 
 // Public, no-login customer-support page (English by default, with an
 // EN / 繁中 switch; the in-app counterpart is HelpView). App Store review and
 // overseas visitors need a support URL that works without an account, so like
-// /pricing this is a self-contained static page with the same {{SUPPORT_EMAIL}}
-// placeholder substitution. '/support.html' is listed so the raw dist/ copy
-// (Vite copies public/ verbatim) can never be served.
-let supportHtmlCache = null;
-app.get(['/support', '/support.html'], (req, res) => {
-  if (!supportHtmlCache) {
-    supportHtmlCache = fs
-      .readFileSync(path.join(__dirname, 'public', 'support.html'), 'utf8')
-      .replace(/\{\{SUPPORT_EMAIL\}\}/g, SUPPORT_EMAIL);
-  }
-  logInfo('support.page_view', {
-    path: req.path,
-    lang: typeof req.query.lang === 'string' ? req.query.lang.slice(0, 8) : null,
-    acceptLanguage: (req.get('accept-language') || '').slice(0, 32),
-  });
-  res.setHeader('Cache-Control', 'no-cache');
-  res.type('html').send(supportHtmlCache);
-});
+// /pricing this is a self-contained static page.
+app.get(['/support', '/support.html'], servePublicPage('support.html', 'support.page_view'));
+
+// Public, no-login privacy policy (繁中 / EN switch). Linked from the app
+// footer, the sign-up form, HelpView and every public page; App Store and the
+// payment providers need it reachable without an account. Keep it in sync with
+// what the code actually does (vendors: docs/VENDOR_CONTRACTS.zh-TW.md).
+app.get(['/privacy', '/privacy-policy', '/privacy.html'], servePublicPage('privacy.html', 'privacy.page_view'));
 
 // Public, no-login therapist recruitment / sign-up page. The SPA gates most
 // views behind auth, so this explicit route (registered before the static

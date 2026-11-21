@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="zh-Hant" data-lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Twogether 隱私權政策</title>
+    <meta
+      name="description"
+      content="Twogether 隱私權政策：我們蒐集哪些資料、為什麼、誰看得到、AI 怎麼處理、保存多久，以及你如何查詢、更正或刪除。不賣資料、不放廣告、不用第三方追蹤。Twogether privacy policy in English and Traditional Chinese."
+    />
+    <meta name="robots" content="index, follow" />
+    <!-- Also served at /privacy-policy and /privacy.html; canonicalize onto /privacy. -->
+    <link rel="canonical" href="https://twogether.fun/privacy" />
+    <link rel="alternate" hreflang="zh-Hant" href="https://twogether.fun/privacy?lang=zh-TW" />
+    <link rel="alternate" hreflang="en" href="https://twogether.fun/privacy?lang=en" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" content="#fbf7f2" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Twogether" />
+    <meta property="og:locale" content="zh_TW" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta property="og:title" content="Twogether 隱私權政策" />
+    <meta property="og:description" content="你們寫下的親密紀錄只屬於你們兩人。不賣資料、不放廣告、不用第三方追蹤，隨時可要求刪除。" />
+    <meta property="og:url" content="https://twogether.fun/privacy" />
+    <meta property="og:image" content="https://twogether.fun/images/og-image.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Noto+Serif+TC:wght@500;600&family=Noto+Sans+TC:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Same palette as public/support.html, public/pricing.html and the app's petal-* tokens. */
+      :root {
+        --cream: #fbf7f2;
+        --cream-2: #f2ebdf;
+        --rose: #d4938a;
+        --rose-deep: #b86e64;
+        --sage-deep: #7d8f75;
+        --ink: #2a2520;
+        --ink-soft: #5a4f45;
+        --muted: #8a7e72;
+        --rule: #d9cfc1;
+        --rule-soft: #e8dfd0;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        background: var(--cream);
+        color: var(--ink);
+        font-family: "Noto Sans TC", system-ui, -apple-system, sans-serif;
+        line-height: 1.75;
+        -webkit-font-smoothing: antialiased;
+      }
+      h1, h2, h3 { font-family: "Fraunces", "Noto Serif TC", Georgia, serif; font-weight: 600; }
+      a { color: var(--rose-deep); }
+      .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+
+      /* One page, two languages: every translatable node exists twice and the
+         <html data-lang> attribute decides which one shows. */
+      html[data-lang="en"] .zh, html[data-lang="zh-TW"] .en { display: none !important; }
+
+      header.site { background: var(--cream-2); border-bottom: 1px solid var(--rule-soft); }
+      header.site .wrap {
+        display: flex; align-items: center; justify-content: space-between; gap: 12px;
+        padding-top: 14px; padding-bottom: 14px;
+      }
+      .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); }
+      .brand .logo { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, var(--rose), var(--sage-deep)); }
+      .brand .name { font-family: "Fraunces", serif; font-size: 20px; font-weight: 600; }
+
+      .lang-switch { display: inline-flex; border: 1px solid var(--rule); border-radius: 999px; padding: 2px; }
+      .lang-switch button {
+        font: inherit; font-size: 13px; font-weight: 500; border: 0; background: transparent; cursor: pointer;
+        color: var(--ink-soft); min-height: 32px; min-width: 44px; padding: 0 10px; border-radius: 999px;
+      }
+      .lang-switch button[aria-checked="true"] { background: var(--ink); color: var(--cream); }
+
+      .hero { padding: 40px 0 8px; }
+      .hero h1 { font-size: 34px; line-height: 1.2; margin: 0 0 8px; }
+      .hero p { color: var(--ink-soft); margin: 0 0 4px; font-size: 16px; }
+      .hero .meta { color: var(--muted); font-size: 13px; }
+
+      .promise {
+        margin: 20px 0 8px; padding: 18px 20px; border-radius: 18px;
+        background: #fff; border: 1px solid var(--rule-soft);
+      }
+      .promise h2 { margin: 0 0 8px; font-size: 19px; }
+      .promise ul { margin: 0; padding-left: 20px; color: var(--ink-soft); font-size: 15px; }
+      .promise li { margin-bottom: 4px; }
+
+      nav.toc { margin: 16px 0 4px; font-size: 14px; color: var(--muted); }
+      nav.toc ol { margin: 6px 0 0; padding-left: 20px; columns: 2; column-gap: 24px; }
+      nav.toc a { text-decoration: none; }
+
+      section { padding: 14px 0; border-top: 1px solid var(--rule-soft); }
+      section h2 { font-size: 21px; margin: 6px 0 8px; scroll-margin-top: 16px; }
+      section h3 { font-size: 16px; margin: 14px 0 4px; }
+      section p, section ul { color: var(--ink-soft); font-size: 15px; margin: 0 0 10px; }
+      section li { margin-bottom: 4px; }
+
+      table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 4px 0 12px; background: #fff; border-radius: 12px; overflow: hidden; }
+      th, td { text-align: left; vertical-align: top; padding: 9px 10px; border-bottom: 1px solid var(--rule-soft); color: var(--ink-soft); }
+      th { color: var(--ink); font-weight: 600; background: var(--cream-2); }
+      .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+      .btn {
+        display: inline-block; padding: 9px 18px; border-radius: 999px; text-decoration: none;
+        background: var(--rose-deep); color: #fff; font-weight: 600; font-size: 15px; word-break: break-all;
+      }
+
+      footer.site { border-top: 1px solid var(--rule-soft); margin-top: 24px; padding: 20px 0 36px; color: var(--muted); font-size: 13px; }
+      footer.site a { margin-right: 14px; }
+
+      @media (max-width: 520px) {
+        .hero h1 { font-size: 28px; }
+        .brand .name { font-size: 18px; }
+        nav.toc ol { columns: 1; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="site">
+      <div class="wrap">
+        <a class="brand" href="/">
+          <span class="logo" aria-hidden="true"></span>
+          <span class="name">Twogether</span>
+        </a>
+        <div class="lang-switch" role="radiogroup" aria-label="Language / 介面語言" data-testid="privacy-language-switch">
+          <button type="button" role="radio" data-set-lang="zh-TW" lang="zh-Hant" aria-label="繁體中文" aria-checked="true">繁中</button>
+          <button type="button" role="radio" data-set-lang="en" lang="en" aria-label="English" aria-checked="false">EN</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <div class="hero">
+        <h1 data-testid="privacy-title">
+          <span class="zh" lang="zh-Hant">隱私權政策</span>
+          <span class="en">Privacy Policy</span>
+        </h1>
+        <!-- Positioning copy mirrors src/content/positioning.ts (POSITIONING_TAGLINE). -->
+        <p>
+          <span class="zh" lang="zh-Hant">Twogether 是把諮商帶回日常的伴侶練習工具。你們在這裡寫下的，常常是最私密的事——所以我們把怎麼對待這些資料，用白話完整寫在這裡。</span>
+          <span class="en">Twogether is a couples practice tool that brings counseling into everyday life. What you write here is often the most private part of your life, so this page explains, in plain language, exactly how we handle it.</span>
+        </p>
+        <p class="meta">
+          <span class="zh" lang="zh-Hant">生效日期：2026 年 11 月 18 日</span>
+          <span class="en">Effective: November 18, 2026</span>
+        </p>
+      </div>
+
+      <div class="promise" data-testid="privacy-promise">
+        <h2><span class="zh" lang="zh-Hant">先說重點</span><span class="en">The short version</span></h2>
+        <ul>
+          <li>
+            <span class="zh" lang="zh-Hant"><strong>不賣資料、不放廣告、不用第三方追蹤工具。</strong>我們的收入只來自 Premium 會員與諮商預約。</span>
+            <span class="en"><strong>We don't sell your data, show ads, or use third-party trackers.</strong> We make money only from Premium and counseling bookings.</span>
+          </li>
+          <li>
+            <span class="zh" lang="zh-Hant">你們的紀錄只有<strong>你們兩人</strong>看得到；只有你主動選擇時，才會分享給諮商師或匿名公開。</span>
+            <span class="en">Your records are visible only to <strong>the two of you</strong>. A counselor sees something, or it becomes public (anonymously), only when you choose.</span>
+          </li>
+          <li>
+            <span class="zh" lang="zh-Hant">AI 只在你使用會用到 AI 的功能時，處理產生回覆所需的那段文字；依 AI 供應商的商業條款，這些內容預設不會被拿去訓練模型。</span>
+            <span class="en">The AI only processes the text it needs, and only when you use a feature that involves AI. Under our AI provider's commercial terms, that content is not used to train its models by default.</span>
+          </li>
+          <li>
+            <span class="zh" lang="zh-Hant">你可以隨時查詢、更正、匯出或<strong>要求刪除</strong>你的資料。</span>
+            <span class="en">You can view, correct, get a copy of, or <strong>ask us to delete</strong> your data at any time.</span>
+          </li>
+        </ul>
+      </div>
+
+      <nav class="toc" aria-label="Contents">
+        <span class="zh" lang="zh-Hant">目錄</span><span class="en">Contents</span>
+        <ol>
+          <li><a href="#who"><span class="zh" lang="zh-Hant">誰負責你的資料</span><span class="en">Who is responsible</span></a></li>
+          <li><a href="#collect"><span class="zh" lang="zh-Hant">我們蒐集哪些資料</span><span class="en">What we collect</span></a></li>
+          <li><a href="#sensitive"><span class="zh" lang="zh-Hant">親密與健康相關資料</span><span class="en">Intimacy &amp; health data</span></a></li>
+          <li><a href="#use"><span class="zh" lang="zh-Hant">我們怎麼使用</span><span class="en">How we use it</span></a></li>
+          <li><a href="#share"><span class="zh" lang="zh-Hant">誰看得到</span><span class="en">Who can see it</span></a></li>
+          <li><a href="#ai"><span class="zh" lang="zh-Hant">AI 與你的資料</span><span class="en">AI and your data</span></a></li>
+          <li><a href="#vendors"><span class="zh" lang="zh-Hant">服務供應商與存放地點</span><span class="en">Service providers &amp; location</span></a></li>
+          <li><a href="#retention"><span class="zh" lang="zh-Hant">保存多久</span><span class="en">How long we keep it</span></a></li>
+          <li><a href="#rights"><span class="zh" lang="zh-Hant">你的權利</span><span class="en">Your rights</span></a></li>
+          <li><a href="#storage"><span class="zh" lang="zh-Hant">瀏覽器儲存與 Cookie</span><span class="en">Browser storage &amp; cookies</span></a></li>
+          <li><a href="#security"><span class="zh" lang="zh-Hant">資料安全</span><span class="en">Security</span></a></li>
+          <li><a href="#age"><span class="zh" lang="zh-Hant">年齡限制</span><span class="en">Age requirement</span></a></li>
+          <li><a href="#changes"><span class="zh" lang="zh-Hant">政策更新與聯絡我們</span><span class="en">Changes &amp; contact</span></a></li>
+        </ol>
+      </nav>
+
+      <section>
+        <h2 id="who"><span class="zh" lang="zh-Hant">1. 誰負責你的資料</span><span class="en">1. Who is responsible for your data</span></h2>
+        <p>
+          <span class="zh" lang="zh-Hant">Twogether（twogether.fun 與其 App）目前由個人經營者營運，是依《個人資料保護法》蒐集、處理與利用你個人資料的負責者。任何隱私問題，請寫信到 <a href="mailto:{{SUPPORT_EMAIL}}">{{SUPPORT_EMAIL}}</a>。</span>
+          <span class="en">Twogether (twogether.fun and its app) is currently run by an individual operator, who is responsible for collecting, processing and using your personal data under Taiwan's Personal Data Protection Act (PDPA). For any privacy question, email <a href="mailto:{{SUPPORT_EMAIL}}">{{SUPPORT_EMAIL}}</a>.</span>
+        </p>
+      </section>
+
+      <section>
+        <h2 id="collect"><span class="zh" lang="zh-Hant">2. 我們蒐集哪些資料</span><span class="en">2. What we collect</span></h2>
+        <ul>
+          <li>
+            <span class="zh" lang="zh-Hant"><strong>帳號資料</strong>：Email、顯示名稱、密碼（只存不可逆的雜湊值，我們看不到你的密碼）、語言與時區偏好、配對關係。</span>
+            <span class="en"><strong>Account data</strong>: email, display name, password (stored only as an irreversible hash; we can't see it), language and time-zone preferences, and who you're paired with.</span>
+          </li>
+          <li>
+            <span class="zh" lang="zh-Hant"><strong>你們寫下與上傳的內容</strong>：事件紀錄與對話、說開一件事的草稿與送出版本、我們的牆、心情與每日狀態、愛的紀錄、評估與健檢答案、照片，以及你們與 AI 功能的對話。</span>
+            <span class="en"><strong>Content you write or upload</strong>: event records and conversations, drafts and sent versions in "Talk it through", your wall, moods and daily status, love records, check-in and assessment answers, photos, and your conversations with AI features.</span>
+          </li>
+          <li>
+            <span class="zh" lang="zh-Hant"><strong>親密與健康相關資料</strong>：只有你主動填寫時才會有，詳見下一段。</span>
+            <span class="en"><strong>Intimacy and health data</strong>: only if you choose to record it. See the next section.</span>
+          </li>
+          <li>
+            <span class="zh" lang="zh-Hant"><strong>諮商相關</strong>：預約紀錄，以及你們在專屬諮商空間與諮商師之間的訊息、「下次要談」與晤談摘要。</span>
+            <span class="en"><strong>Counseling</strong>: bookings, and the messages, "next time" topics and session notes you share with a counselor in your dedicated space.</span>
+          </li>
+          <li>
+            <span class="zh" lang="zh-Hant"><strong>付款資料</strong>：訂單、方案、金額、付款方式、金流交易序號，以及你填寫的收據抬頭與統一編號。<strong>信用卡號不會經過也不會存放在 Twogether</strong>，全程由綠界 ECPay 或藍新金流 NewebPay 處理。</span>
+            <span class="en"><strong>Payment data</strong>: orders, plan, amount, payment method, the payment provider's transaction number, and any receipt title or tax ID you enter. <strong>Your card number never passes through or is stored by Twogether</strong>; ECPay or NewebPay handles it end to end.</span>
+          </li>
+          <li>
+            <span class="zh" lang="zh-Hant"><strong>通知設定</strong>：Email 通知偏好；若你綁定 LINE 通知，會存你的 LINE 使用者 ID。</span>
+            <span class="en"><strong>Notifications</strong>: your email notification preferences, and your LINE user ID if you connect LINE notifications.</span>
+          </li>
+          <li>
+            <span class="zh" lang="zh-Hant"><strong>使用與技術紀錄</strong>：登入時間與 IP 位址（帳號安全用）、你開啟了哪些頁面與停留多久（我們自己記錄，不用第三方分析工具）、錯誤與效能日誌（含瀏覽器類型）。</span>
+            <span class="en"><strong>Usage and technical logs</strong>: sign-in times and IP address (for account security), which screens you open and for how long (recorded by us, with no third-party analytics), and error and performance logs (including browser type).</span>
+          </li>
+          <li>
+            <span class="zh" lang="zh-Hant"><strong>意見回饋</strong>：你寄給我們的回饋；若你對某則 AI 回覆按「倒讚」，我們會保存那則回覆與當下的對話片段，用來找出 AI 出錯的原因。</span>
+            <span class="en"><strong>Feedback</strong>: feedback you send us. If you give an AI reply a thumbs-down, we keep that reply and the surrounding conversation snippet so we can find out what went wrong.</span>
+          </li>
+        </ul>
+        <p>
+          <span class="zh" lang="zh-Hant">不提供某些資料（例如親密紀錄或生理週期）不影響你使用其他功能，只是那個功能無法運作。</span>
+          <span class="en">If you don't provide some data (for example intimacy records or cycle tracking), everything else still works; only that feature won't.</span>
+        </p>
+        <p>
+          <span class="zh" lang="zh-Hant"><strong>訪客模式</strong>：還沒註冊就試用時，範例資料只存在你這個瀏覽器分頁裡，關掉就消失，不會傳到我們的伺服器。唯一例外是你按下 AI 試用功能時，那段文字會送去 AI 產生回覆，但我們不會保存文字內容。</span>
+          <span class="en"><strong>Guest mode</strong>: when you try Twogether without an account, the sample data lives only in that browser tab and disappears when you close it; it is not sent to our servers. The one exception: when you use an AI try-out, that text is sent to the AI to generate a reply, and we don't store the text.</span>
+        </p>
+      </section>
+
+      <section>
+        <h2 id="sensitive"><span class="zh" lang="zh-Hant">3. 親密與健康相關資料</span><span class="en">3. Intimacy and health data</span></h2>
+        <p>
+          <span class="zh" lang="zh-Hant">親密時光紀錄（日期、時長、滿意度、心情）與生理週期，屬於《個人資料保護法》第 6 條所稱與「性生活」及「健康」相關的特種個人資料。我們對這類資料的承諾：</span>
+          <span class="en">Intimacy records (dates, duration, satisfaction, mood) and menstrual-cycle data are special categories of personal data under Article 6 of Taiwan's PDPA, as they relate to sex life and health. Our commitments for this data:</span>
+        </p>
+        <ul>
+          <li>
+            <span class="zh" lang="zh-Hant">只在你<strong>主動填寫</strong>時蒐集，並以你的同意為依據；你可以隨時停止填寫或刪除。</span>
+            <span class="en">Collected only when <strong>you choose to enter it</strong>, based on your consent. You can stop or delete it at any time.</span>
+          </li>
+          <li>
+            <span class="zh" lang="zh-Hant">只用來在 App 裡呈現給你們兩人看（例如節奏、提醒），不做廣告、不分享給任何第三方、不公開。</span>
+            <span class="en">Used only to show it back to the two of you in the app (for example your rhythm and reminders). Never used for ads, shared with third parties, or made public.</span>
+          </li>
+          <li>
+            <span class="zh" lang="zh-Hant">不會出現在公開故事、公開問答或任何對外內容中。</span>
+            <span class="en">Never appears in public stories, public Q&amp;A or anything outside your account.</span>
+          </li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 id="use"><span class="zh" lang="zh-Hant">4. 我們怎麼使用</span><span class="en">4. How we use your data</span></h2>
+        <ul>
+          <li><span class="zh" lang="zh-Hant">提供 App 的功能：記錄、配對共享、提醒與通知。</span><span class="en">To run the app: records, sharing with your partner, reminders and notifications.</span></li>
+          <li><span class="zh" lang="zh-Hant">在你使用 AI 功能時產生回覆（見第 6 段）。</span><span class="en">To generate replies when you use AI features (see section 6).</span></li>
+          <li><span class="zh" lang="zh-Hant">處理付款、開立與寄送電子收據、處理退款。</span><span class="en">To process payments, issue and email receipts, and handle refunds.</span></li>
+          <li><span class="zh" lang="zh-Hant">回覆你的客服信件與意見回饋。</span><span class="en">To answer your support emails and feedback.</span></li>
+          <li><span class="zh" lang="zh-Hant">維護帳號與系統安全、防止濫用、排除錯誤。</span><span class="en">To keep accounts and systems secure, prevent abuse and fix bugs.</span></li>
+          <li><span class="zh" lang="zh-Hant">以統計方式了解哪些功能有幫助，用來改善產品。</span><span class="en">To understand, in aggregate, which features help so we can improve them.</span></li>
+        </ul>
+        <p>
+          <span class="zh" lang="zh-Hant">我們<strong>不會</strong>把你的資料用於廣告、賣給任何人，或做與上述目的無關的事。</span>
+          <span class="en">We do <strong>not</strong> use your data for advertising, sell it to anyone, or use it for anything unrelated to the purposes above.</span>
+        </p>
+      </section>
+
+      <section>
+        <h2 id="share"><span class="zh" lang="zh-Hant">5. 誰看得到</span><span class="en">5. Who can see your data</span></h2>
+        <h3><span class="zh" lang="zh-Hant">你的另一半</span><span class="en">Your partner</span></h3>
+        <p>
+          <span class="zh" lang="zh-Hant">配對後，日曆、紀錄與我們的牆是兩人共享的。「說開一件事」的原始草稿只有 AI 看得到，對方只會看到你選擇送出的版本；「情緒深潛」裡寫給自己的信只屬於你。</span>
+          <span class="en">Once paired, your calendar, records and wall are shared between the two of you. In "Talk it through", your raw draft is seen only by the AI; your partner sees only the version you choose to send. Letters to yourself in Emotion deep dive stay private to you.</span>
+        </p>
+        <h3><span class="zh" lang="zh-Hant">你選擇的諮商師</span><span class="en">A counselor you choose</span></h3>
+        <p>
+          <span class="zh" lang="zh-Hant">只有你們預約或綁定專屬諮商師後，諮商師才看得到你們在專屬諮商空間裡分享的內容。解除綁定後，諮商師會立即失去存取權。諮商師是獨立執業的專業人員，對晤談內容另負其專業保密義務。</span>
+          <span class="en">A counselor sees only what you share in your dedicated counseling space, and only after you book or link them. Unlinking removes their access immediately. Counselors are independent professionals with their own professional confidentiality duties.</span>
+        </p>
+        <h3><span class="zh" lang="zh-Hant">公開內容（只有你選擇時）</span><span class="en">Public content (only when you choose)</span></h3>
+        <p>
+          <span class="zh" lang="zh-Hant">真實故事只有在你投稿時才會公開；公開問答需要雙方都同意才會發布，任何一方都能撤回。公開內容一律匿名，不顯示你的 Email 或真實姓名。</span>
+          <span class="en">A story becomes public only if you submit it. A public Q&amp;A is published only when both sides agree, and either side can withdraw it. Public content is always anonymous and never shows your email or real name.</span>
+        </p>
+        <h3><span class="zh" lang="zh-Hant">Twogether 營運者</span><span class="en">The Twogether operator</span></h3>
+        <p>
+          <span class="zh" lang="zh-Hant">我們只在處理你的客服請求、排除錯誤、維護安全或法律要求時，才會在必要範圍內查看帳號資料，不會隨意瀏覽你們的紀錄。</span>
+          <span class="en">We look at account data only as far as needed to handle your support request, fix a bug, keep the service secure or comply with the law. We don't browse your records.</span>
+        </p>
+        <h3><span class="zh" lang="zh-Hant">法律要求</span><span class="en">Legal requests</span></h3>
+        <p>
+          <span class="zh" lang="zh-Hant">只有在法院或主管機關依法要求時，才會提供必要範圍的資料；在法律允許的情況下，我們會先通知你。</span>
+          <span class="en">We disclose data only when a court or authority legally requires it, and only what is required. Where the law allows, we'll tell you first.</span>
+        </p>
+      </section>
+
+      <section>
+        <h2 id="ai"><span class="zh" lang="zh-Hant">6. AI 與你的資料</span><span class="en">6. AI and your data</span></h2>
+        <p>
+          <span class="zh" lang="zh-Hant">Twogether 的 AI 功能使用 Anthropic 的 Claude API。當你使用這些功能時，產生回覆所需的那段內容（例如你的草稿與相關事件脈絡）會加密傳送給 Anthropic 處理，回覆再傳回給你。會用到 AI 的地方包括：訊息整理與改寫、AI 諮商師、情緒深潛、諮商話題與摘要、角色扮演劇本、牆上的翻譯，以及兩個會自動附上 AI 結果的動作——完成婚姻健檢時的雙方總結、投稿真實故事時的 AI 洞察與內容檢查。</span>
+          <span class="en">Twogether's AI features use Anthropic's Claude API. When you use one, the content needed to answer (for example your draft and the related event context) is sent over an encrypted connection to Anthropic, and the reply is sent back to you. AI is used for: message rewriting, the AI counselor, Emotion deep dive, counseling topics and summaries, role-play scripts, wall translations, and two actions that automatically include an AI result: the joint summary when you finish a relationship check-in, and the insights and content check when you submit a story.</span>
+        </p>
+        <ul>
+          <li><span class="zh" lang="zh-Hant">依 Anthropic 的商業服務條款，透過 API 送出的內容預設不會用來訓練其模型；Anthropic 可能為安全與防止濫用目的短期保存。</span><span class="en">Under Anthropic's commercial terms, content sent through the API is not used to train its models by default; Anthropic may keep it briefly for safety and abuse prevention.</span></li>
+          <li><span class="zh" lang="zh-Hant">只有在你進行上述動作時才會傳送；我們不會在背景定期把你們的紀錄送給 AI 分析。親密時光紀錄與生理週期不會送給 AI。</span><span class="en">Content is sent only when you take one of the actions above. We never send your records to the AI in the background. Intimacy records and cycle data are never sent to the AI.</span></li>
+          <li><span class="zh" lang="zh-Hant">AI 是日常練習的陪伴，不是診斷或治療；專業協助請找合格心理師。</span><span class="en">The AI keeps you company in daily practice; it is not diagnosis or treatment. For professional help, see a qualified therapist.</span></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2 id="vendors"><span class="zh" lang="zh-Hant">7. 服務供應商與存放地點</span><span class="en">7. Service providers and where data is stored</span></h2>
+        <p>
+          <span class="zh" lang="zh-Hant">我們只把資料交給提供服務所必需的供應商，且只交付該服務需要的部分。部分供應商的伺服器位於台灣以外（例如美國、日本或其他亞洲地區），因此你的資料可能會跨境傳輸與存放。</span>
+          <span class="en">We share data only with providers we need to run the service, and only the part each one needs. Some providers' servers are outside Taiwan (for example in the US, Japan or elsewhere in Asia), so your data may be transferred and stored across borders.</span>
+        </p>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th><span class="zh" lang="zh-Hant">供應商</span><span class="en">Provider</span></th>
+                <th><span class="zh" lang="zh-Hant">用途</span><span class="en">Purpose</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>Supabase</td><td><span class="zh" lang="zh-Hant">資料庫與照片儲存（亞洲區）</span><span class="en">Database and photo storage (Asia region)</span></td></tr>
+              <tr><td>Google Cloud</td><td><span class="zh" lang="zh-Hant">網站主機與系統日誌</span><span class="en">Hosting and system logs</span></td></tr>
+              <tr><td>Anthropic</td><td><span class="zh" lang="zh-Hant">AI 功能（見第 6 段）</span><span class="en">AI features (see section 6)</span></td></tr>
+              <tr><td>Resend</td><td><span class="zh" lang="zh-Hant">寄送通知信、密碼重設信與電子收據</span><span class="en">Notification, password-reset and receipt emails</span></td></tr>
+              <tr><td>LINE</td><td><span class="zh" lang="zh-Hant">LINE 通知（僅限你自行綁定時）</span><span class="en">LINE notifications (only if you connect LINE)</span></td></tr>
+              <tr><td><span class="zh" lang="zh-Hant">綠界 ECPay、藍新金流 NewebPay</span><span class="en">ECPay, NewebPay</span></td><td><span class="zh" lang="zh-Hant">處理付款（信用卡資料只存在金流端）</span><span class="en">Payment processing (card data stays with them)</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section>
+        <h2 id="retention"><span class="zh" lang="zh-Hant">8. 保存多久</span><span class="en">8. How long we keep it</span></h2>
+        <ul>
+          <li><span class="zh" lang="zh-Hant"><strong>帳號與你們的內容</strong>：保存到你刪除該內容或刪除帳號為止。刪除帳號會永久刪除配對、紀錄、訊息與照片，無法復原。</span><span class="en"><strong>Your account and content</strong>: kept until you delete that content or your account. Deleting your account permanently removes your pairing, records, messages and photos, and can't be undone.</span></li>
+          <li><span class="zh" lang="zh-Hant"><strong>付款訂單與收據</strong>：即使刪除帳號，仍會依稅務與會計法令規定的期間保存，之後刪除。</span><span class="en"><strong>Payment orders and receipts</strong>: kept for the period required by tax and accounting law, even after account deletion, then deleted.</span></li>
+          <li><span class="zh" lang="zh-Hant"><strong>系統日誌與備份</strong>：會在保存週期結束後自動輪替刪除。</span><span class="en"><strong>System logs and backups</strong>: deleted automatically when their retention cycle ends.</span></li>
+        </ul>
+        <p>
+          <span class="zh" lang="zh-Hant">解除配對目前透過來信申請。因為共享內容同時屬於你們兩人，我們會在處理前先跟你確認這些內容要保留或刪除。</span>
+          <span class="en">Unpairing is currently done by emailing us. Because shared content belongs to both of you, we'll confirm with you whether to keep or delete it before we do anything.</span>
+        </p>
+      </section>
+
+      <section>
+        <h2 id="rights"><span class="zh" lang="zh-Hant">9. 你的權利</span><span class="en">9. Your rights</span></h2>
+        <p>
+          <span class="zh" lang="zh-Hant">依《個人資料保護法》第 3 條，你可以隨時：</span>
+          <span class="en">Under Article 3 of Taiwan's PDPA, you can at any time:</span>
+        </p>
+        <ul>
+          <li><span class="zh" lang="zh-Hant">查詢或請求閱覽你的資料；</span><span class="en">ask what data we hold and view it;</span></li>
+          <li><span class="zh" lang="zh-Hant">請求製給複製本（匯出）；</span><span class="en">ask for a copy (export);</span></li>
+          <li><span class="zh" lang="zh-Hant">請求補充或更正；</span><span class="en">ask us to complete or correct it;</span></li>
+          <li><span class="zh" lang="zh-Hant">請求停止蒐集、處理或利用；</span><span class="en">ask us to stop collecting, processing or using it;</span></li>
+          <li><span class="zh" lang="zh-Hant">請求刪除。</span><span class="en">ask us to delete it.</span></li>
+        </ul>
+        <p>
+          <span class="zh" lang="zh-Hant">大部分內容可以直接在 App 裡修改或刪除。其他請求，請用帳號的 Email 寫信到 <a href="mailto:{{SUPPORT_EMAIL}}">{{SUPPORT_EMAIL}}</a>，我們確認是你本人後處理：查詢與複製本會在 15 天內、更正與刪除會在 30 天內回覆（如需延長，會先告訴你原因）。</span>
+          <span class="en">You can edit or delete most content directly in the app. For anything else, email <a href="mailto:{{SUPPORT_EMAIL}}">{{SUPPORT_EMAIL}}</a> from the address on your account. Once we've confirmed it's you, we'll answer requests to view or copy within 15 days, and to correct or delete within 30 days (if we need longer, we'll tell you why first).</span>
+        </p>
+        <p><a class="btn" href="mailto:{{SUPPORT_EMAIL}}?subject=Privacy%20request" data-testid="privacy-request-email">{{SUPPORT_EMAIL}}</a></p>
+        <p>
+          <span class="zh" lang="zh-Hant">Email 通知可以從每封信底部的連結退訂，LINE 通知可以在 App 設定中解除綁定。</span>
+          <span class="en">You can unsubscribe from emails with the link at the bottom of each one, and disconnect LINE notifications in the app's settings.</span>
+        </p>
+      </section>
+
+      <section>
+        <h2 id="storage"><span class="zh" lang="zh-Hant">10. 瀏覽器儲存與 Cookie</span><span class="en">10. Browser storage and cookies</span></h2>
+        <p>
+          <span class="zh" lang="zh-Hant">我們只用瀏覽器的本機儲存空間來記住你的登入狀態、語言選擇與介面偏好，以及訪客模式的範例資料（只存在該分頁）。我們不使用廣告 Cookie，也不使用第三方追蹤或分析工具。</span>
+          <span class="en">We use your browser's local storage only to remember your sign-in, language and interface preferences, plus guest-mode sample data (kept only in that tab). We don't use advertising cookies or any third-party tracking or analytics tools.</span>
+        </p>
+      </section>
+
+      <section>
+        <h2 id="security"><span class="zh" lang="zh-Hant">11. 資料安全</span><span class="en">11. Security</span></h2>
+        <p>
+          <span class="zh" lang="zh-Hant">所有連線都經 HTTPS 加密；密碼以不可逆的雜湊值儲存；照片不會被公開列出；資料庫只能由後端存取。沒有任何系統能保證百分之百安全，但如果發生可能影響你資料的事件，我們會依法儘速通知你，並說明我們採取的措施。</span>
+          <span class="en">All connections use HTTPS; passwords are stored as irreversible hashes; photos are never publicly listed; and the database is reachable only from our backend. No system is 100% secure, but if an incident could affect your data, we'll notify you promptly as the law requires and explain what we're doing about it.</span>
+        </p>
+      </section>
+
+      <section>
+        <h2 id="age"><span class="zh" lang="zh-Hant">12. 年齡限制</span><span class="en">12. Age requirement</span></h2>
+        <p>
+          <span class="zh" lang="zh-Hant">Twogether 包含親密關係相關功能，設計給年滿 18 歲的成年人使用。未滿 18 歲請勿註冊；若我們得知有未成年人的帳號，會將其刪除。</span>
+          <span class="en">Twogether includes intimacy features and is meant for adults aged 18 or over. Please don't sign up if you're under 18. If we learn that an account belongs to a minor, we'll delete it.</span>
+        </p>
+      </section>
+
+      <section>
+        <h2 id="changes"><span class="zh" lang="zh-Hant">13. 政策更新與聯絡我們</span><span class="en">13. Changes and contact</span></h2>
+        <p>
+          <span class="zh" lang="zh-Hant">如果政策有重大變更（例如新增資料用途或新的供應商），我們會在 App 內或以 Email 事先通知，並更新本頁最上方的生效日期。有任何問題，歡迎寫信到 <a href="mailto:{{SUPPORT_EMAIL}}">{{SUPPORT_EMAIL}}</a>。</span>
+          <span class="en">If we make a material change (such as a new use of data or a new provider), we'll tell you in the app or by email beforehand and update the effective date at the top of this page. Questions are always welcome at <a href="mailto:{{SUPPORT_EMAIL}}">{{SUPPORT_EMAIL}}</a>.</span>
+        </p>
+      </section>
+    </main>
+
+    <footer class="site">
+      <div class="wrap">
+        <a href="/"><span class="zh" lang="zh-Hant">開啟 Twogether</span><span class="en">Open Twogether</span></a>
+        <a href="/pricing"><span class="zh" lang="zh-Hant">付費方案</span><span class="en">Pricing</span></a>
+        <a href="/support"><span class="zh" lang="zh-Hant">客服中心</span><span class="en">Support</span></a>
+        <a href="/therapist-signup"><span class="zh" lang="zh-Hant">成為諮商師</span><span class="en">For counselors</span></a>
+        <div style="margin-top:10px;">© 2026 Twogether</div>
+      </div>
+    </footer>
+
+    <script>
+      // Language: ?lang= wins, then the app's saved choice (same localStorage
+      // key as src/i18n/LanguageContext.ts), then the browser language.
+      (function () {
+        var KEY = 'twogether.locale';
+        function apply(lang, persist) {
+          var root = document.documentElement;
+          root.setAttribute('data-lang', lang);
+          root.setAttribute('lang', lang === 'en' ? 'en' : 'zh-Hant');
+          document.title = lang === 'en' ? 'Twogether Privacy Policy' : 'Twogether 隱私權政策';
+          var btns = document.querySelectorAll('[data-set-lang]');
+          for (var i = 0; i < btns.length; i++) {
+            btns[i].setAttribute('aria-checked', btns[i].getAttribute('data-set-lang') === lang ? 'true' : 'false');
+          }
+          if (persist) {
+            try { localStorage.setItem(KEY, lang); } catch (e) { /* private mode */ }
+          }
+        }
+        var initial = 'zh-TW';
+        try {
+          var q = new URLSearchParams(location.search).get('lang');
+          var saved = localStorage.getItem(KEY);
+          if (q === 'en' || q === 'zh-TW') initial = q;
+          else if (saved === 'en' || saved === 'zh-TW') initial = saved;
+          else if (!/^zh/i.test(navigator.language || '')) initial = 'en';
+        } catch (e) { /* keep 繁中 */ }
+        apply(initial, false);
+        var btns = document.querySelectorAll('[data-set-lang]');
+        for (var i = 0; i < btns.length; i++) {
+          btns[i].addEventListener('click', function () { apply(this.getAttribute('data-set-lang'), true); });
+        }
+      })();
+    </script>
+  </body>
+</html>

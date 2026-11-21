@@ -33,16 +33,28 @@ export default function HelpView({ onFeedback }: { onFeedback?: () => void }) {
           </a>
           {t('help.supportTail')}
         </p>
-        <a
-          href={`/support?lang=${locale}`}
-          target="_blank"
-          rel="noopener"
-          data-testid="help-support-page-link"
-          className="mt-2 inline-flex items-center gap-1 text-sm text-petal-rose-deep underline underline-offset-2"
-        >
-          {t('help.supportPage')}
-          <ExternalLink className="w-3.5 h-3.5" />
-        </a>
+        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+          <a
+            href={`/support?lang=${locale}`}
+            target="_blank"
+            rel="noopener"
+            data-testid="help-support-page-link"
+            className="inline-flex items-center gap-1 text-sm text-petal-rose-deep underline underline-offset-2"
+          >
+            {t('help.supportPage')}
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+          <a
+            href={`/privacy?lang=${locale}`}
+            target="_blank"
+            rel="noopener"
+            data-testid="help-privacy-page-link"
+            className="inline-flex items-center gap-1 text-sm text-petal-rose-deep underline underline-offset-2"
+          >
+            {t('help.privacyPage')}
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+        </div>
       </header>
 
       {/* 設計理念：Twogether 怎麼幫你溝通（三個原則）。文案來源同推廣頁與 README，
