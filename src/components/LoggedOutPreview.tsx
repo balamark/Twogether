@@ -1449,7 +1449,7 @@ const LoggedOutPreview: React.FC<LoggedOutPreviewProps> = ({ view, onSignUp, scr
 
         <p className="mt-6 text-center font-body text-xs text-petal-muted flex items-center justify-center gap-1.5">
           <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
-          <span>{tr('支援信用卡、LINE Pay、ATM 與超商 · 由綠界 ECPay 或藍新金流安全付款', 'Credit card, LINE Pay, ATM and convenience stores · Secure payment by ECPay or NewebPay')}</span>
+          <span>{tr('支援信用卡、ATM 與超商 · 由藍新金流安全付款', 'Credit card, ATM and convenience stores · Secure payment by NewebPay')}</span>
         </p>
         <p className="mt-3 text-center font-body text-xs text-petal-muted">
           {tr('想了解更多？', 'Want to know more?')}

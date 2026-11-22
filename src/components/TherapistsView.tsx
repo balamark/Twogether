@@ -19,6 +19,7 @@ import { useScrollLock } from '../hooks/useScrollLock';
 import { FOCUS_AREAS, focusLabel, formatNtd } from './therapistShared';
 import { POSITIONING_ONE_LINER, POSITIONING_SUBLINE, NOT_A_SUBSTITUTE } from '../content/positioning';
 import PaymentMethodPicker from './PaymentMethodPicker';
+import { DEFAULT_PAYMENT_PROVIDER } from '../utils/paymentProviders';
 import { FocusFilter } from './FocusFilter';
 import TherapistProfileModal from './TherapistProfileModal';
 import TherapySummaryCard from './TherapySummaryCard';
@@ -734,7 +735,7 @@ const ConsultationSessionActions: React.FC<{
 }> = ({ c, onChanged, showNotification }) => {
   const [busy, setBusy] = useState(false);
   const [provider, setProvider] = useState<MeetingProvider>('meet');
-  const [payProvider, setPayProvider] = useState<PaymentProvider>('ecpay');
+  const [payProvider, setPayProvider] = useState<PaymentProvider>(DEFAULT_PAYMENT_PROVIDER);
   const [url, setUrl] = useState('');
 
   if (c.bookingType !== 'scheduled') return null;
@@ -865,7 +866,7 @@ const VideoBookingModal: React.FC<{
 }> = ({ therapistId, therapistName, priceTwd, sessionMinutes, sourceConsultationId, onClose, showNotification }) => {
   const [message, setMessage] = useState('');
   const [preferredTime, setPreferredTime] = useState('');
-  const [payProvider, setPayProvider] = useState<PaymentProvider>('ecpay');
+  const [payProvider, setPayProvider] = useState<PaymentProvider>(DEFAULT_PAYMENT_PROVIDER);
   const [busy, setBusy] = useState(false);
 
   const proceed = async () => {
@@ -892,7 +893,7 @@ const VideoBookingModal: React.FC<{
           <span className="font-display text-lg text-pink-600">{formatNtd(priceTwd)}</span>
         </div>
         <p className="font-body text-xs text-petal-muted">
-          {tr('視訊以 Zoom / Google Meet 進行，諮商師接受預約後會提供會議連結。付款由綠界 ECPay 或藍新金流處理。', 'Sessions take place on Zoom / Google Meet; the counselor shares a meeting link once they accept. Payment is handled by ECPay or NewebPay.')}
+          {tr('視訊以 Zoom / Google Meet 進行，諮商師接受預約後會提供會議連結。付款由藍新金流處理。', 'Sessions take place on Zoom / Google Meet; the counselor shares a meeting link once they accept. Payment is handled by NewebPay.')}
         </p>
         <div>
           <label className={fieldLabel}>{tr('希望的時段（選填）', 'Preferred times (optional)')}</label>
@@ -1681,10 +1682,12 @@ const ProfileEditorModal: React.FC<{
           <label className={fieldLabel}>{tr('證照 / 身分證明文件', 'License / identity documents')}</label>
           {documents.length > 0 && (
             <div className="space-y-1 mb-2">
+              {/* Documents sit in private storage (only the admin can open them
+                  to verify you), so they're listed, not linked. */}
               {documents.map((u, i) => (
-                <a key={u} href={u} target="_blank" rel="noopener noreferrer" className="block font-body text-xs text-pink-600 underline underline-offset-2">
-                  {tr('📎 文件', '📎 Document')} {i + 1}
-                </a>
+                <div key={u} className="font-body text-xs text-petal-ink-soft">
+                  {tr('📎 文件', '📎 Document')} {i + 1} · {tr('已上傳，僅管理員可檢視', 'uploaded, visible to admins only')}
+                </div>
               ))}
             </div>
           )}

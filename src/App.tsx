@@ -1486,8 +1486,12 @@ const LoveTimeApp = () => {
       setShowAuthModal(true);
       showNotification({
         type: 'warning',
-        title: tr('登入已過期', 'Session expired'),
-        message: detail?.reason === 'invalid'
+        title: detail?.reason === 'password_changed'
+          ? tr('密碼已變更', 'Password changed')
+          : tr('登入已過期', 'Session expired'),
+        message: detail?.reason === 'password_changed'
+          ? tr('你的密碼剛被重設，所有裝置都已登出。請用新密碼重新登入；如果不是你本人操作，請立即再重設一次密碼。', 'Your password was just reset, so every device was signed out. Sign in with the new password. If this wasn\'t you, reset it again right away.')
+          : detail?.reason === 'invalid'
           ? tr('登入資訊已失效，請重新登入', 'Your sign-in is no longer valid. Please sign in again')
           : tr('為了你的帳號安全，請重新登入', 'For your account\'s security, please sign in again'),
         duration: 6000

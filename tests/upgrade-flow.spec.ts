@@ -138,8 +138,11 @@ test.describe('Premium upgrade flow', () => {
   test('clicking 升級 starts a checkout and posts to ECPay', async ({ page }) => {
     // Intercept the checkout call and assert it fires; return a fake ECPay form.
     let checkoutPlan: string | null = null;
+    let checkoutProvider: string | null = null;
     await page.route('**/api/billing/checkout**', async (route) => {
-      checkoutPlan = JSON.parse(route.request().postData() || '{}').plan;
+      const sent = JSON.parse(route.request().postData() || '{}');
+      checkoutPlan = sent.plan;
+      checkoutProvider = sent.provider;
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -167,6 +170,9 @@ test.describe('Premium upgrade flow', () => {
     await page.getByTestId('upgrade-button-pass_90').click();
 
     await expect.poll(() => checkoutPlan, { timeout: 5000 }).toBe('pass_90');
+    // 綠界 is hidden until its production keys exist: the default is 藍新.
+    expect(checkoutProvider).toBe('newebpay');
+    await expect(page.getByTestId('payment-provider-ecpay')).toHaveCount(0);
     await expect.poll(() => ecpaySubmitted, { timeout: 5000 }).toBe(true);
   });
 
