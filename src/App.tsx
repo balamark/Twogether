@@ -232,6 +232,9 @@ interface User {
   // Public-share anonymity preference (署名 vs 匿名) — drives the story
   // compose flow's anonymity notice; the server snapshots the real value.
   public_share_show_nickname?: boolean;
+  // Creator-marketplace opt-in. Absent or false hides scripts tagged 18+
+  // (and explicit/intense intensity tags) from the marketplace.
+  show_adult_scripts?: boolean;
   createdAt: string;
 }
 
@@ -1110,6 +1113,7 @@ const LoveTimeApp = () => {
         email_verified?: boolean;
         selected_therapist?: string | null;
         public_share_show_nickname?: boolean;
+        show_adult_scripts?: boolean;
         created_at?: string;
       };
 
@@ -1125,6 +1129,7 @@ const LoveTimeApp = () => {
         email_verified: userData.email_verified,
         selected_therapist: userData.selected_therapist ?? null,
         public_share_show_nickname: userData.public_share_show_nickname,
+        show_adult_scripts: userData.show_adult_scripts === true,
         partnerCode: generatePartnerCode(),
         createdAt: userData.created_at || new Date().toISOString()
       };
@@ -1344,6 +1349,39 @@ const LoveTimeApp = () => {
       setCurrentView(next ? 'counselor' : 'home');
       return next;
     });
+  };
+
+  const handleToggleShowAdultScripts = async (next: boolean) => {
+    if (!authState.user || showAdultSaveRef.current) return;
+    const previous = authState.user.show_adult_scripts === true;
+    const updated: AuthState = {
+      ...authState,
+      user: { ...authState.user, show_adult_scripts: next },
+    };
+    setAuthState(updated);
+    persistAuthState(updated);
+    // Guests have no users row. /auth/* is not mocked, so a real request would
+    // 401 and sign them out. The marketplace preview is empty for guests.
+    if (authState.isGuest) return;
+    showAdultSaveRef.current = true;
+    try {
+      await apiService.updateShowAdultScripts(next);
+    } catch (err) {
+      const rolled: AuthState = {
+        ...authState,
+        user: { ...authState.user, show_adult_scripts: previous },
+      };
+      setAuthState(rolled);
+      persistAuthState(rolled);
+      showNotification({
+        type: 'error',
+        title: tr('無法更新設定', 'Couldn\'t update the setting'),
+        message: (err as Error)?.message || tr('無法更新「顯示 18+ 劇本」，請稍後再試', 'Couldn\'t update “Show 18+ scripts”. Please try again in a moment'),
+        duration: 5000,
+      });
+    } finally {
+      showAdultSaveRef.current = false;
+    }
   };
 
   const handleLogout = async () => {
@@ -1799,6 +1837,7 @@ const LoveTimeApp = () => {
   // Held in refs so the document listeners register once instead of on every
   // render (showNotification is re-created each render).
   const mediaBlockNotifiedRef = useRef(false);
+  const showAdultSaveRef = useRef(false);
   const mediaBlockCtxRef = useRef({ show: showNotification, view: currentView });
   mediaBlockCtxRef.current = { show: showNotification, view: currentView };
 
@@ -2864,6 +2903,8 @@ const LoveTimeApp = () => {
             onInitialScriptConsumed={() => setPendingScriptTitle(null)}
             initialMarketplaceScriptId={pendingMarketplaceScriptId}
             onInitialMarketplaceConsumed={() => setPendingMarketplaceScriptId(null)}
+            showAdultScripts={authState.user?.show_adult_scripts === true}
+            onEnableAdultScripts={() => handleToggleShowAdultScripts(true)}
             renderGames={() => <GamesView
               customMemoryQuestions={customMemoryQuestions}
               customEmotions={customEmotions}
@@ -3050,6 +3091,8 @@ const LoveTimeApp = () => {
         isTherapist={isTherapist}
         counselorMode={counselorMode}
         onToggleCounselorMode={handleToggleCounselorMode}
+        showAdultScripts={authState.user?.show_adult_scripts === true}
+        onToggleShowAdultScripts={handleToggleShowAdultScripts}
       />
 
       {/* 情緒深潛 resume banner — dismissible, does not re-fire same session (R4).

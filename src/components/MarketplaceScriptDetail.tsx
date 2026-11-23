@@ -23,6 +23,8 @@ interface Props {
   // Display-time parsing (placeholder → nickname substitution). When omitted,
   // the raw content is shown.
   parseContent?: (content: string) => string;
+  // Turns on users.show_adult_scripts, then this view reloads the script.
+  onEnableAdultScripts?: () => Promise<void> | void;
 }
 
 const REPORT_REASONS: { value: ScriptReportReason; label: string }[] = [
@@ -40,6 +42,7 @@ export default function MarketplaceScriptDetail({
   onUnpublish,
   showNotification,
   parseContent,
+  onEnableAdultScripts,
 }: Props) {
   const [script, setScript] = useState<MarketplaceScriptDetailType | null>(null);
   const [ratings, setRatings] = useState<ScriptRatingEntry[]>([]);
@@ -52,6 +55,8 @@ export default function MarketplaceScriptDetail({
   const [reportDetail, setReportDetail] = useState('');
   const [draftStars, setDraftStars] = useState(0);
   const [draftReview, setDraftReview] = useState('');
+  const [adultHidden, setAdultHidden] = useState(false);
+  const [enablingAdult, setEnablingAdult] = useState(false);
 
   useScrollLock(true);
 
@@ -73,6 +78,7 @@ export default function MarketplaceScriptDetail({
 
   const loadDetail = useCallback(async () => {
     setLoading(true);
+    setAdultHidden(false);
     try {
       const [detail, list] = await Promise.all([
         apiService.getMarketplaceScript(scriptId),
@@ -85,6 +91,12 @@ export default function MarketplaceScriptDetail({
         setDraftReview(detail.myRating.reviewText || '');
       }
     } catch (err) {
+      const code = (err as { error_code?: string }).error_code;
+      if (code === 'ADULT_SCRIPTS_HIDDEN') {
+        setScript(null);
+        setAdultHidden(true);
+        return;
+      }
       showNotification({
         type: 'error',
         title: tr('載入失敗', 'Couldn\'t load'),
@@ -294,7 +306,45 @@ export default function MarketplaceScriptDetail({
           </div>
         </div>
 
-        {loading || !script ? (
+        {adultHidden && !loading ? (
+          <div className="px-6 sm:px-8 py-16 text-center" data-testid="adult-scripts-hidden">
+            <p className="font-display text-xl font-light text-petal-ink">
+              {tr('這是 18+ 劇本', 'This is an 18+ script')}
+            </p>
+            <p className="mt-3 font-body text-sm text-petal-ink-soft leading-relaxed max-w-sm mx-auto">
+              {tr(
+                '創作市集預設不顯示 18+ 劇本。到右上角的個人選單打開「顯示 18+ 劇本」，或按下面的按鈕，就能看這份劇本。',
+                'The creator marketplace hides 18+ scripts unless you opt in. Turn on “Show 18+ scripts” in the profile menu at the top right, or use the button below, to open this one.'
+              )}
+            </p>
+            {onEnableAdultScripts && (
+              <button
+                type="button"
+                data-testid="adult-scripts-enable"
+                disabled={enablingAdult}
+                onClick={async () => {
+                  setEnablingAdult(true);
+                  try {
+                    await onEnableAdultScripts();
+                    await loadDetail();
+                  } catch (err) {
+                    showNotification({
+                      type: 'error',
+                      title: tr('無法更新設定', 'Couldn\'t update the setting'),
+                      message: (err as Error)?.message || tr('請稍後再試', 'Please try again in a moment'),
+                      duration: 5000,
+                    });
+                  } finally {
+                    setEnablingAdult(false);
+                  }
+                }}
+                className="mt-6 inline-flex items-center justify-center rounded-full bg-petal-ink text-white px-5 py-2.5 font-body text-sm hover:bg-pink-700 disabled:opacity-60"
+              >
+                {enablingAdult ? tr('開啟中…', 'Turning on…') : tr('顯示 18+ 劇本', 'Show 18+ scripts')}
+              </button>
+            )}
+          </div>
+        ) : loading || !script ? (
           <div className="p-12 text-center font-display italic font-light text-petal-muted">
             {tr('載入中…', 'Loading…')}
           </div>

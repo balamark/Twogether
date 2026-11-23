@@ -61,6 +61,10 @@ interface RoleplayViewProps {
   // ?market=<uuid> deep link: open this marketplace script's detail once.
   initialMarketplaceScriptId?: string | null;
   onInitialMarketplaceConsumed?: () => void;
+  // Mirrors users.show_adult_scripts. Part of the marketplace cache key so
+  // turning it on refetches the list instead of painting the filtered one.
+  showAdultScripts?: boolean;
+  onEnableAdultScripts?: () => Promise<void> | void;
   renderGames?: () => React.ReactNode;
 }
 
@@ -180,6 +184,8 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   onInitialScriptConsumed,
   initialMarketplaceScriptId,
   onInitialMarketplaceConsumed,
+  showAdultScripts = false,
+  onEnableAdultScripts,
   renderGames,
 }) => {
   const tz = useTimezone();
@@ -262,7 +268,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   // Both lists are cached (src/services/queryCache.ts): returning to 劇本 or
   // switching back to 市集 paints the last list instantly, refreshed quietly.
   const marketplace = useCachedQuery<MarketplaceScript[]>(
-    mainTab === 'marketplace' ? userKey('/marketplace', 'list', marketplaceSort, marketplaceCategory, debouncedMarketplaceQuery) : null,
+    mainTab === 'marketplace' ? userKey('/marketplace', 'list', marketplaceSort, marketplaceCategory, debouncedMarketplaceQuery, showAdultScripts ? '18' : 'safe') : null,
     () => apiService.getMarketplaceScripts({
       sort: marketplaceSort,
       category: marketplaceCategory === 'all' ? undefined : marketplaceCategory,
@@ -285,7 +291,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   }, [marketplace.error]);
 
   // Quiet on failure — the section just stays empty.
-  const favorited = useCachedQuery<MarketplaceScript[]>(userKey('/marketplace', 'favorites'), () => apiService.getFavoritedMarketplaceScripts());
+  const favorited = useCachedQuery<MarketplaceScript[]>(userKey('/marketplace', 'favorites', showAdultScripts ? '18' : 'safe'), () => apiService.getFavoritedMarketplaceScripts());
   const favoritedMarketplace = favorited.data ?? EMPTY_MARKET;
   const loadFavoritedMarketplace = favorited.refetch;
   // Re-check when the favorites set changes (not on mount — the hook loads).
@@ -1263,6 +1269,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           } : undefined}
           showNotification={showNotification}
           parseContent={parseScriptContent}
+          onEnableAdultScripts={onEnableAdultScripts}
         />
       )}
 
