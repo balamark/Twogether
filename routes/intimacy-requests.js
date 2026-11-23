@@ -372,6 +372,8 @@ router.post('/script-messages', [
   body('scriptBody').optional({ nullable: true }).isLength({ max: 8000 }),
   body('category').optional({ nullable: true }).isLength({ max: 50 }),
   body('regenerate').optional().isBoolean(),
+  // Analytics only: 'marketplace' = picked straight from 創作市集 in the form.
+  body('scriptSource').optional({ nullable: true }).isIn(['owned', 'marketplace']),
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -381,6 +383,7 @@ router.post('/script-messages', [
 
   const userId = req.user.id;
   const { scriptId, scriptTitle, scriptScenario, scriptBody, category, regenerate } = req.body;
+  const scriptSource = req.body.scriptSource || 'owned';
 
   try {
 
@@ -399,7 +402,7 @@ router.post('/script-messages', [
         );
         if (cached.rows.length > 0) {
           const row = cached.rows[0];
-          logInfo('intimacy.script_messages.cache_hit', { userId, scriptId, scriptTitle });
+          logInfo('intimacy.script_messages.cache_hit', { userId, scriptId, scriptTitle, scriptSource });
           return res.json({ success: true, summary: row.summary || '', messages: row.messages || [], cached: true });
         }
       } catch (cacheErr) {
@@ -417,7 +420,7 @@ router.post('/script-messages', [
       return res.status(limitCheck.status).json(limitCheck.body);
     }
 
-    logInfo('intimacy.script_messages.input', { userId, scriptId, scriptTitle, category, senderGender, regenerate: !!regenerate, hasBody: !!scriptBody });
+    logInfo('intimacy.script_messages.input', { userId, scriptId, scriptTitle, scriptSource, category, senderGender, regenerate: !!regenerate, hasBody: !!scriptBody });
 
     const result = await llmService.generateRoleplayMessages({
       title: scriptTitle,

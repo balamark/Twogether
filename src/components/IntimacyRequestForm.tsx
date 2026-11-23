@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Heart, Clock, Send, Sparkles, X, RefreshCw, Wand2, ThumbsUp, ThumbsDown, Check, ChevronDown, ChevronUp, ArrowDownUp } from 'lucide-react';
+import { Heart, Clock, Send, Sparkles, X, RefreshCw, Wand2, ThumbsUp, ThumbsDown, Check, ChevronDown, ChevronUp, ArrowDownUp, Search, Store } from 'lucide-react';
 import { apiService } from '../services/api';
 import type {
   IntimacyTemplate,
+  MarketplaceScript,
   RoleplayMessageSuggestion,
   EventRecord,
   ReconciliationIntensity,
@@ -17,6 +18,8 @@ import { getTimezoneShortLabel } from '../utils/timezone-options';
 import { tr } from '../i18n/tr';
 import { thumbSrc } from '../utils/script';
 import { useAlternativePlanSamples } from '../data/alternativePlanSamples';
+import { useCachedQuery, userKey } from '../services/queryCache';
+import StarRating from './StarRating';
 
 // Minimal shape we need from a roleplay script — structurally satisfied by both
 // the built-in defaults and custom/marketplace scripts passed in from App.
@@ -31,6 +34,8 @@ export interface FormScript {
   duration?: string;
   /** ISO creation time — custom / marketplace scripts only; drives 最新優先 sort. */
   createdAt?: string;
+  /** Picked straight from 創作市集 (not owned / favorited) — analytics only. */
+  fromMarketplace?: boolean;
 }
 
 interface IntimacyRequestFormProps {
@@ -63,6 +68,25 @@ const STEP_LABEL: Record<Step, string> = {
 };
 
 type ScriptSort = 'newest' | 'oldest';
+type ScriptSource = 'mine' | 'marketplace';
+type MarketSort = 'rating' | 'recent' | 'popular';
+
+// One page of 創作市集 in the picker; search covers the rest.
+const MARKET_PAGE = 60;
+const EMPTY_MARKET: MarketplaceScript[] = [];
+
+const toFormScript = (m: MarketplaceScript, fromMarketplace: boolean): FormScript => ({
+  id: m.id,
+  title: m.title,
+  category: m.category,
+  scenario: m.scenario,
+  script: m.script,
+  image: m.thumbnailUrl ?? undefined,
+  tags: m.tags,
+  duration: m.duration,
+  createdAt: m.createdAt,
+  fromMarketplace,
+});
 
 // Newest-created first by default. Built-in scripts have no createdAt, so they
 // sort after every dated (custom / marketplace) script and keep their order.
@@ -194,6 +218,16 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
   const [tagsExpanded, setTagsExpanded] = useState(false);
   const [scriptSort, setScriptSort] = useState<ScriptSort>('newest');
   const [favoriteScripts, setFavoriteScripts] = useState<FormScript[]>([]);
+  // 我的劇本 (defaults + custom + favorites) or browse all of 創作市集 directly,
+  // so a marketplace script doesn't have to be favorited before it can be sent.
+  const [scriptSource, setScriptSource] = useState<ScriptSource>('mine');
+  const [marketSort, setMarketSort] = useState<MarketSort>('rating');
+  const [marketQuery, setMarketQuery] = useState('');
+  const [debouncedMarketQuery, setDebouncedMarketQuery] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedMarketQuery(marketQuery.trim()), 350);
+    return () => clearTimeout(t);
+  }, [marketQuery]);
   const [selectedScript, setSelectedScript] = useState<FormScript | null>(null);
   const [aiSummary, setAiSummary] = useState('');
   const [aiMessages, setAiMessages] = useState<RoleplayMessageSuggestion[]>([]);
@@ -279,6 +313,24 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
       ),
     [ownedScripts, scriptCategory, scriptTag, scriptSort],
   );
+
+  // 創作市集 list — fetched only while that source is on screen, cached so
+  // flipping between the two sources (or 返回選劇本) paints instantly. The server
+  // already hides 18+ scripts unless the viewer opted in.
+  const marketplace = useCachedQuery<MarketplaceScript[]>(
+    isOpen && currentStep === 'script' && scriptSource === 'marketplace'
+      ? userKey('/marketplace', 'invite-picker', marketSort, scriptCategory, debouncedMarketQuery)
+      : null,
+    () =>
+      apiService.getMarketplaceScripts({
+        sort: marketSort,
+        category: scriptCategory === 'all' ? undefined : scriptCategory,
+        q: debouncedMarketQuery || undefined,
+        limit: MARKET_PAGE,
+      }),
+  );
+  const marketScripts = marketplace.data ?? EMPTY_MARKET;
+  const ownedIds = useMemo(() => new Set(ownedScripts.map((s) => s.id)), [ownedScripts]);
 
   const fetchTemplatesByCategory = useCallback(async () => {
     try {
@@ -395,18 +447,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
       try {
         const favs = await apiService.getFavoritedMarketplaceScripts();
         if (cancelled) return;
-        setFavoriteScripts(
-          favs.map((f) => ({
-            id: f.id,
-            title: f.title,
-            category: f.category as FormScript['category'],
-            scenario: f.scenario,
-            script: f.script,
-            tags: f.tags,
-            duration: f.duration,
-            createdAt: f.createdAt,
-          })),
-        );
+        setFavoriteScripts(favs.map((f) => toFormScript(f, false)));
       } catch (err) {
         // Non-fatal — the user can still pick from default/custom scripts.
         console.error('Failed to load favorited marketplace scripts:', err);
@@ -494,6 +535,7 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
         scriptBody: script.script,
         category: script.category,
         regenerate,
+        scriptSource: script.fromMarketplace ? 'marketplace' : 'owned',
       });
       setAiSummary(res.summary);
       setAiMessages(res.messages.filter((m) => m.text && m.text.trim()));
@@ -645,6 +687,8 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
     setScriptCategory('all');
     setScriptTag(null);
     setTagsExpanded(false);
+    setScriptSource('mine');
+    setMarketQuery('');
     setSelectedScript(null);
     setAiSummary('');
     setAiMessages([]);
@@ -765,7 +809,29 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                 </button>
               </div>
 
-              {/* Category tabs */}
+              {/* Source: the couple's own scripts, or all of 創作市集 */}
+              <div className="grid grid-cols-2 gap-1 p-1 bg-gray-100 rounded-lg" role="tablist" aria-label={tr('劇本來源', 'Script source')}>
+                {([
+                  { id: 'mine', label: tr('🎭 我的劇本', '🎭 My scripts') },
+                  { id: 'marketplace', label: tr('🛍️ 創作市集', '🛍️ Marketplace') },
+                ] as { id: ScriptSource; label: string }[]).map((src) => (
+                  <button
+                    key={src.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={scriptSource === src.id}
+                    data-testid={`roleplay-source-${src.id}`}
+                    onClick={() => setScriptSource(src.id)}
+                    className={`py-1.5 rounded-md text-sm font-medium transition-colors ${
+                      scriptSource === src.id ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    {src.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Category tabs (shared by both sources) */}
               <div className="flex flex-wrap gap-2">
                 {SCRIPT_CATEGORY_TABS.map((tab) => (
                   <button
@@ -784,6 +850,8 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
                 ))}
               </div>
 
+              {scriptSource === 'mine' ? (
+              <>
               {/* Tag filter (collapsed by default — dozens of chips buried the
                   list on phones) + sort order */}
               <div className="flex items-center justify-between gap-2">
@@ -883,8 +951,135 @@ const IntimacyRequestForm: React.FC<IntimacyRequestFormProps> = ({
               ) : (
                 <div className="text-center py-10 text-gray-500 text-sm">
                   <p>{tr('這個分類／標籤下還沒有你擁有的劇本。', 'You don\'t have any scripts in this category/tag yet.')}</p>
-                  <p className="mt-1">{tr('可以到「角色扮演」建立自訂劇本，或從創作市集收藏劇本後再回來。', 'Create a custom script in "Role play", or save one from the creator marketplace and come back.')}</p>
+                  <p className="mt-1">{tr('可以到「角色扮演」建立自訂劇本，或直接從創作市集挑一個。', 'Create a custom script in "Role play", or pick one straight from the marketplace.')}</p>
+                  <button
+                    type="button"
+                    data-testid="roleplay-empty-to-marketplace"
+                    onClick={() => setScriptSource('marketplace')}
+                    className="mt-3 inline-flex items-center gap-1 px-4 py-2 rounded-full bg-pink-500 text-white text-sm hover:bg-pink-600"
+                  >
+                    <Store className="w-4 h-4" /> {tr('逛創作市集', 'Browse the marketplace')}
+                  </button>
                 </div>
+              )}
+              </>
+              ) : (
+              <>
+              {/* 創作市集: server-side search + sort, no favoriting needed */}
+              <div className="flex items-center gap-2">
+                <label className="flex-1 min-w-0 flex items-center gap-2 px-3 py-1.5 border border-gray-200 rounded-full focus-within:border-pink-300">
+                  <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                  <span className="sr-only">{tr('搜尋創作市集', 'Search the marketplace')}</span>
+                  <input
+                    type="search"
+                    data-testid="roleplay-market-search"
+                    value={marketQuery}
+                    onChange={(e) => setMarketQuery(e.target.value)}
+                    maxLength={100}
+                    placeholder={tr('搜尋劇本名稱、情境', 'Search scripts')}
+                    className="flex-1 min-w-0 bg-transparent border-none p-0 text-sm focus:ring-0 focus:outline-none"
+                  />
+                </label>
+                <label className="inline-flex items-center gap-1 text-xs text-gray-500 flex-shrink-0">
+                  <ArrowDownUp className="w-3.5 h-3.5" />
+                  <span className="sr-only">{tr('排序', 'Sort')}</span>
+                  <select
+                    data-testid="roleplay-market-sort"
+                    value={marketSort}
+                    onChange={(e) => setMarketSort(e.target.value as MarketSort)}
+                    className="bg-transparent border-none text-xs text-gray-600 focus:ring-0 py-0 pl-0 pr-6"
+                  >
+                    <option value="rating">{tr('評分最高', 'Top rated')}</option>
+                    <option value="popular">{tr('最多人評', 'Most reviewed')}</option>
+                    <option value="recent">{tr('最新上架', 'Newest')}</option>
+                  </select>
+                </label>
+              </div>
+
+              {marketplace.loading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3" data-testid="roleplay-market-loading" aria-busy="true">
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="h-[88px] rounded-lg bg-gray-100 animate-pulse" />
+                  ))}
+                </div>
+              ) : marketplace.error ? (
+                <div className="text-center py-8 text-sm text-gray-600" data-testid="roleplay-market-error">
+                  <p>{tr('創作市集暫時載入不了，可能是網路不穩。', 'The marketplace didn\'t load — the connection may be unstable.')}</p>
+                  <p className="mt-1 text-gray-500">{tr('可以重試，或先從「我的劇本」挑一個。', 'Try again, or pick one from "My scripts" for now.')}</p>
+                  <button
+                    type="button"
+                    onClick={() => marketplace.refetch()}
+                    className="mt-3 inline-flex items-center gap-1 px-4 py-2 rounded-full border border-pink-300 text-pink-600 hover:bg-pink-50"
+                  >
+                    <RefreshCw className="w-4 h-4" /> {tr('重試', 'Retry')}
+                  </button>
+                </div>
+              ) : marketScripts.length > 0 ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {marketScripts.map((m) => (
+                      <button
+                        key={m.id}
+                        data-testid={`roleplay-market-script-${m.id}`}
+                        onClick={() => handleSelectScript(toFormScript(m, !ownedIds.has(m.id)))}
+                        className="flex gap-3 p-3 border border-gray-200 rounded-lg hover:border-pink-300 hover:bg-pink-50 transition-colors text-left"
+                      >
+                        <div className="w-16 h-16 flex-shrink-0 rounded-md bg-petal-cream-2 overflow-hidden flex items-center justify-center">
+                          {m.thumbnailUrl ? (
+                            <img
+                              src={thumbSrc(m.thumbnailUrl) ?? m.thumbnailUrl}
+                              alt={m.title}
+                              loading="lazy"
+                              decoding="async"
+                              className="w-full h-full object-contain"
+                              onError={(e) => {
+                                if (e.currentTarget.getAttribute('src') !== m.thumbnailUrl) e.currentTarget.setAttribute('src', m.thumbnailUrl!);
+                              }}
+                            />
+                          ) : (
+                            <span className="text-2xl">🎭</span>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-900 text-sm line-clamp-2">{m.title}</p>
+                          <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{m.scenario}</p>
+                          <div className="mt-1 flex items-center gap-2 min-w-0">
+                            <span className="text-[11px] text-gray-400 truncate">by {m.authorName}</span>
+                            <StarRating value={m.avgStars} count={m.ratingCount} showCount size={11} />
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  {marketScripts.length >= MARKET_PAGE && (
+                    <p className="text-center text-xs text-gray-400">
+                      {tr(`先顯示前 ${MARKET_PAGE} 個，用上方搜尋找更多。`, `Showing the first ${MARKET_PAGE} — search above to find more.`)}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-10 text-gray-500 text-sm" data-testid="roleplay-market-empty">
+                  {debouncedMarketQuery ? (
+                    <>
+                      <p>{tr(`創作市集裡沒有符合「${debouncedMarketQuery}」的劇本。`, `No marketplace scripts match "${debouncedMarketQuery}".`)}</p>
+                      <p className="mt-1">{tr('換個關鍵字或分類，或切回「我的劇本」。', 'Try another keyword or category, or switch back to "My scripts".')}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p>{tr('這個分類在創作市集還沒有劇本。', 'No marketplace scripts in this category yet.')}</p>
+                      <p className="mt-1">{tr('換個分類看看，或從「我的劇本」挑一個。', 'Try another category, or pick one from "My scripts".')}</p>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setScriptSource('mine')}
+                    className="mt-3 inline-flex items-center gap-1 px-4 py-2 rounded-full border border-pink-300 text-pink-600 hover:bg-pink-50"
+                  >
+                    {tr('看我的劇本', 'See my scripts')}
+                  </button>
+                </div>
+              )}
+              </>
               )}
             </div>
           )}
