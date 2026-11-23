@@ -620,6 +620,8 @@ const LoveTimeApp = () => {
   // mounts (the modal only exists inside CalendarView). Consumed once.
   const [pendingAddRecord, setPendingAddRecord] = useState(false);
   const [pendingScriptTitle, setPendingScriptTitle] = useState<string | null>(null);
+  // ?market=<uuid> — open that creator-marketplace script after sign-in.
+  const [pendingMarketplaceScriptId, setPendingMarketplaceScriptId] = useState<string | null>(null);
   // Open 親密邀請紀錄 straight on its 共同方案 tab (from the invite modal).
   const [pendingIntimacyTab, setPendingIntimacyTab] = useState<'plans' | null>(null);
   const [intimateRecords, setIntimateRecords] = useState<IntimateRecord[]>([]);
@@ -906,6 +908,30 @@ const LoveTimeApp = () => {
       window.history.replaceState(window.history.state, document.title, newUrl);
     }
   }, []);
+
+  // ?market=<uuid> deep link (marketplace bot / shared script URL): stash it,
+  // then open that marketplace detail once a real account is signed in.
+  // Guests keep the id in sessionStorage so signing up in this tab still lands
+  // on the script. Invalid ids are ignored.
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const marketParam = urlParams.get('market');
+    if (marketParam && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(marketParam)) {
+      try { sessionStorage.setItem('pendingMarketplaceDeepLink', marketParam); } catch { /* storage disabled */ }
+      urlParams.delete('market');
+      const rest = urlParams.toString();
+      window.history.replaceState(window.history.state, document.title, window.location.pathname + (rest ? `?${rest}` : ''));
+    }
+  }, []);
+  useEffect(() => {
+    if (!authState.isAuthenticated || authState.isGuest) return;
+    let stored: string | null = null;
+    try { stored = sessionStorage.getItem('pendingMarketplaceDeepLink'); } catch { /* storage disabled */ }
+    if (!stored) return;
+    try { sessionStorage.removeItem('pendingMarketplaceDeepLink'); } catch { /* ignore */ }
+    setPendingMarketplaceScriptId(stored);
+    setCurrentView('roleplay');
+  }, [authState.isAuthenticated, authState.isGuest, setCurrentView]);
 
   // ?script=<title> deep link (from invitation emails): stash it, then open
   // the script in the roleplay view once the user is authenticated.
@@ -2836,6 +2862,8 @@ const LoveTimeApp = () => {
             onUnpublishScript={unpublishScript}
             initialScriptTitle={pendingScriptTitle}
             onInitialScriptConsumed={() => setPendingScriptTitle(null)}
+            initialMarketplaceScriptId={pendingMarketplaceScriptId}
+            onInitialMarketplaceConsumed={() => setPendingMarketplaceScriptId(null)}
             renderGames={() => <GamesView
               customMemoryQuestions={customMemoryQuestions}
               customEmotions={customEmotions}

@@ -314,6 +314,9 @@ jobs:
           _NEWEBPAY_HASH_KEY: ${{ secrets.NEWEBPAY_HASH_KEY }}
           _NEWEBPAY_HASH_IV: ${{ secrets.NEWEBPAY_HASH_IV }}
           _NEWEBPAY_MODE: ${{ vars.NEWEBPAY_MODE || 'stage' }}
+          _MARKETPLACE_BOT_API_KEY: ${{ secrets.MARKETPLACE_BOT_API_KEY }}
+          _MARKETPLACE_BOT_AUTHOR_ID: ${{ secrets.MARKETPLACE_BOT_AUTHOR_ID }}
+          _MARKETPLACE_BOT_AUTHOR_EMAIL: ${{ secrets.MARKETPLACE_BOT_AUTHOR_EMAIL }}
         run: |
           echo "🚀 Deploying Twogether app directly to App Engine..."
           # Create app.yaml with actual environment variables
@@ -486,6 +489,9 @@ jobs:
           _NEWEBPAY_HASH_KEY: ${{ secrets.NEWEBPAY_HASH_KEY }}
           _NEWEBPAY_HASH_IV: ${{ secrets.NEWEBPAY_HASH_IV }}
           _NEWEBPAY_MODE: stage
+          _MARKETPLACE_BOT_API_KEY: ${{ secrets.MARKETPLACE_BOT_API_KEY }}
+          _MARKETPLACE_BOT_AUTHOR_ID: ${{ secrets.MARKETPLACE_BOT_AUTHOR_ID }}
+          _MARKETPLACE_BOT_AUTHOR_EMAIL: ${{ secrets.MARKETPLACE_BOT_AUTHOR_EMAIL }}
         run: |
           echo "🚀 Deploying PR #${{ github.event.pull_request.number }} to staging..."
           envsubst < app.staging.yaml > app.staging.yaml.tmp && mv app.staging.yaml.tmp app.staging.yaml
