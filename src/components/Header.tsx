@@ -55,6 +55,10 @@ interface HeaderProps {
   isTherapist?: boolean;
   counselorMode?: boolean;
   onToggleCounselorMode?: () => void;
+  // Creator-marketplace opt-in. The switch updates immediately and stays in
+  // the menu so the new state is visible.
+  showAdultScripts?: boolean;
+  onToggleShowAdultScripts?: (next: boolean) => void;
 }
 
 // Short M/D for the header badge (full date lives on the upgrade page).
@@ -94,6 +98,8 @@ const Header: React.FC<HeaderProps> = ({
   isTherapist = false,
   counselorMode = false,
   onToggleCounselorMode,
+  showAdultScripts = false,
+  onToggleShowAdultScripts,
 }) => {
   const { t, locale } = useLanguage();
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -417,6 +423,25 @@ const Header: React.FC<HeaderProps> = ({
                         <LifeBuoy className="w-3.5 h-3.5" strokeWidth={1.5} />
                         <span>{t('menu.help')}</span>
                       </button>
+                      {onToggleShowAdultScripts && (
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-checked={showAdultScripts}
+                          data-testid="user-menu-show-adult-scripts"
+                          onClick={() => onToggleShowAdultScripts(!showAdultScripts)}
+                          className="w-full flex items-center justify-between gap-3 px-3 py-2 font-body text-sm text-petal-ink-soft hover:bg-petal-cream-2 rounded-md transition-colors"
+                        >
+                          <span>{t('menu.showAdultScripts')}</span>
+                          <span
+                            className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${showAdultScripts ? 'bg-petal-ink' : 'bg-petal-rule'}`}
+                          >
+                            <span
+                              className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${showAdultScripts ? 'translate-x-4' : 'translate-x-0.5'}`}
+                            />
+                          </span>
+                        </button>
+                      )}
                       <button
                         onClick={() => {
                           onShowSettings();

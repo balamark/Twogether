@@ -85,6 +85,16 @@ function sampleScript(overrides: Record<string, unknown> = {}) {
   };
 }
 
+async function allowAdultScripts(api: APIRequestContext) {
+  const { token } = await userToken(api);
+  const res = await api.put(`${API}/auth/user/show-adult-scripts`, {
+    headers: { Authorization: `Bearer ${token}` },
+    data: { show_adult_scripts: true },
+  });
+  expect(res.ok(), await res.text()).toBeTruthy();
+  return token;
+}
+
 async function userToken(api: APIRequestContext) {
   const res = await api.post(`${API}/auth/login`, { data: TEST_USER });
   expect(res.ok(), await res.text()).toBeTruthy();
@@ -364,7 +374,7 @@ test.describe('marketplace bot API', () => {
     expect(created.sourceKey).toBe(sourceKey);
     createdIds.push(created.id);
 
-    const { token } = await userToken(request);
+    const token = await allowAdultScripts(request);
     const detail = await request.get(`${API}/marketplace/scripts/${created.id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -441,6 +451,7 @@ test.describe('marketplace bot API', () => {
     expect(published.status(), await published.text()).toBe(200);
     expect((await published.json()).published).toBe(true);
 
+    await allowAdultScripts(request);
     const visible = await request.get(`${API}/marketplace/scripts/${body.id}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -517,6 +528,7 @@ test.describe('marketplace bot API', () => {
     const created = await createdRes.json();
     createdIds.push(created.id);
 
+    await allowAdultScripts(request);
     const { token, user } = await userToken(request);
     await page.addInitScript(({ token: authToken, user: authUser }) => {
       const storedUser = {

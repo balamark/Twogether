@@ -140,7 +140,7 @@ router.post('/login', [
 
     // Find user
     const userResult = await db.query(
-      'SELECT id, nickname, email, gender, birth_date, timezone, email_notifications_enabled, cycle_tracking_enabled, public_share_show_nickname, selected_therapist, email_verified, password_hash, created_at FROM users WHERE email = $1',
+      'SELECT id, nickname, email, gender, birth_date, timezone, email_notifications_enabled, cycle_tracking_enabled, public_share_show_nickname, show_adult_scripts, selected_therapist, email_verified, password_hash, created_at FROM users WHERE email = $1',
       [email]
     );
 
@@ -197,6 +197,7 @@ router.post('/login', [
         email_notifications_enabled: user.email_notifications_enabled !== false,
         cycle_tracking_enabled: user.cycle_tracking_enabled === true,
         public_share_show_nickname: user.public_share_show_nickname !== false,
+        show_adult_scripts: user.show_adult_scripts === true,
         selected_therapist: user.selected_therapist || null,
         email_verified: user.email_verified === true,
         created_at: user.created_at
@@ -222,6 +223,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         u.email_notifications_enabled,
         u.cycle_tracking_enabled,
         u.public_share_show_nickname,
+        u.show_adult_scripts,
         u.selected_therapist,
         u.email_verified,
         u.created_at, u.last_login,
@@ -268,6 +270,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         email_notifications_enabled: userData.email_notifications_enabled !== false,
         cycle_tracking_enabled: userData.cycle_tracking_enabled === true,
         public_share_show_nickname: userData.public_share_show_nickname !== false,
+        show_adult_scripts: userData.show_adult_scripts === true,
         selected_therapist: userData.selected_therapist || null,
         email_verified: userData.email_verified === true,
         created_at: userData.created_at,
@@ -771,6 +774,43 @@ router.put('/user/public-share-nickname', authenticateToken, [
   } catch (error) {
     logError('Update public-share nickname pref failed', { err: error.message, stack: error.stack });
     res.status(500).json({ success: false, message: '更新公開分享設定失敗' });
+  }
+});
+
+// Toggle whether the creator marketplace shows 18+ role scripts.
+router.put('/user/show-adult-scripts', authenticateToken, [
+  body('show_adult_scripts')
+    .isBoolean()
+    .withMessage('show_adult_scripts 必須為布林值')
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: '驗證失敗',
+        error_code: 'SHOW_ADULT_SCRIPTS_INVALID',
+        errors: errors.array(),
+      });
+    }
+    const enabled = req.body.show_adult_scripts === true;
+    await db.query(
+      `UPDATE users SET show_adult_scripts = $1 WHERE id = $2`,
+      [enabled, req.user.id]
+    );
+    logInfo('user.show_adult_scripts', { userId: req.user.id, enabled });
+    res.json({
+      success: true,
+      message: enabled ? '已開啟顯示 18+ 劇本' : '已關閉顯示 18+ 劇本',
+      show_adult_scripts: enabled,
+    });
+  } catch (error) {
+    logError('Update show-adult-scripts pref failed', { err: error.message, stack: error.stack });
+    res.status(500).json({
+      success: false,
+      message: '更新「顯示 18+ 劇本」失敗，請稍後再試',
+      error_code: 'SHOW_ADULT_SCRIPTS_FAILED',
+    });
   }
 });
 

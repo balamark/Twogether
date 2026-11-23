@@ -69,6 +69,8 @@ There is no separate marketplace table, and no columns for acts, role names, int
 
 `content` is capped at 150,000 characters, matching the in-app editor. The same ceilings apply when that script is edited again in the app.
 
+Every bot script is tagged `18+` (and `強度:清淡|中等|露骨|激烈`). Viewers only see those scripts in the marketplace list, search, and `?market=` link after they turn on **顯示 18+ 劇本** in the profile menu. That setting defaults to off. The author's own 我的劇本 list is not filtered.
+
 | Limit | Max |
 | --- | --- |
 | `title` | 300 |

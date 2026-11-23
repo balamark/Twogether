@@ -3508,6 +3508,17 @@ class ApiService {
     }
   }
 
+  async updateShowAdultScripts(enabled: boolean): Promise<void> {
+    try {
+      await apiClient.put('/auth/user/show-adult-scripts', {
+        show_adult_scripts: enabled,
+      });
+    } catch (error: unknown) {
+      console.error('Failed to update show-adult-scripts pref:', error);
+      throw new Error((error as ApiErrorResponse)?.message || tr('無法更新「顯示 18+ 劇本」，請稍後再試', 'Couldn\'t update “Show 18+ scripts”. Please try again in a moment'));
+    }
+  }
+
   async updatePublicShareNickname(enabled: boolean): Promise<void> {
     try {
       await apiClient.put('/auth/user/public-share-nickname', {
