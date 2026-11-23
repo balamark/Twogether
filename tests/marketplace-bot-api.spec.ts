@@ -8,6 +8,8 @@ async function botLib() {
       body: { error_code: string; message: string; errors: Array<{ field: string }> };
     };
     roleTokens: (a: { gender: string | null }, b: { gender: string | null }) => { a: string; b: string };
+    botAuthorRef: (id: string | undefined, email: string | undefined) => { id: string | null; email: string | null };
+    DEFAULT_BOT_AUTHOR_EMAIL: string;
   }>;
 }
 
@@ -148,6 +150,20 @@ test.describe('marketplace bot script mapping', () => {
     }));
     expect(oneLine.ok).toBe(false);
     expect(oneLine.body.message).toContain('至少寫兩句');
+  });
+
+  test('a missing or placeholder author id falls back to wangmark510@gmail.com', async () => {
+    const { botAuthorRef, DEFAULT_BOT_AUTHOR_EMAIL } = await botLib();
+    const uuid = '8f1c2c2e-3b4a-4d5e-9f60-112233445566';
+    expect(DEFAULT_BOT_AUTHOR_EMAIL).toBe('wangmark510@gmail.com');
+    expect(botAuthorRef(undefined, undefined)).toEqual({ id: null, email: 'wangmark510@gmail.com' });
+    expect(botAuthorRef('', '')).toEqual({ id: null, email: 'wangmark510@gmail.com' });
+    expect(botAuthorRef('null', 'null')).toEqual({ id: null, email: 'wangmark510@gmail.com' });
+    expect(botAuthorRef('$_MARKETPLACE_BOT_AUTHOR_ID', '$_MARKETPLACE_BOT_AUTHOR_EMAIL'))
+      .toEqual({ id: null, email: 'wangmark510@gmail.com' });
+    expect(botAuthorRef('${_MARKETPLACE_BOT_AUTHOR_ID}', '')).toEqual({ id: null, email: 'wangmark510@gmail.com' });
+    expect(botAuthorRef('not-a-uuid', 'Other@Example.com')).toEqual({ id: null, email: 'other@example.com' });
+    expect(botAuthorRef(uuid, 'other@example.com')).toEqual({ id: uuid, email: null });
   });
 
   test('compares the API key in constant time, including different lengths', async () => {

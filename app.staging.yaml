@@ -49,8 +49,9 @@ env_variables:
   # different secret. Empty author falls back to wangmark510@gmail.com in code;
   # that account must exist in the staging database.
   MARKETPLACE_BOT_API_KEY: $_MARKETPLACE_BOT_API_KEY
-  MARKETPLACE_BOT_AUTHOR_ID: $_MARKETPLACE_BOT_AUTHOR_ID
-  MARKETPLACE_BOT_AUTHOR_EMAIL: $_MARKETPLACE_BOT_AUTHOR_EMAIL
+  # Quoted so an empty secret stays "" instead of a YAML null ("null" is not a UUID).
+  MARKETPLACE_BOT_AUTHOR_ID: "$_MARKETPLACE_BOT_AUTHOR_ID"
+  MARKETPLACE_BOT_AUTHOR_EMAIL: "$_MARKETPLACE_BOT_AUTHOR_EMAIL"
   # NewebPay 藍新 MPG — shares prod's merchant keys. MODE is pinned to "stage"
   # in deploy.yml so staging never sends real charges.
   NEWEBPAY_MERCHANT_ID: $_NEWEBPAY_MERCHANT_ID

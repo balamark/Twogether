@@ -13,26 +13,10 @@ const {
   scriptUnchanged,
   successMessage,
   publicMarketUrl,
+  botAuthorRef,
 } = require('../lib/marketplaceBotScript');
 
 const router = express.Router();
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-// Official account that owns bot uploads when no author env var is set.
-// Logging into the app as this user is how those scripts are edited.
-const DEFAULT_BOT_AUTHOR_EMAIL = 'wangmark510@gmail.com';
-
-function authorConfigError() {
-  return {
-    status: 503,
-    body: {
-      success: false,
-      message: 'MARKETPLACE_BOT_AUTHOR_ID 不是有效的使用者 UUID。拿掉這個設定就會改用預設作者 wangmark510@gmail.com。',
-      error_code: 'BOT_AUTHOR_NOT_CONFIGURED',
-    },
-  };
-}
 
 function authorMissingError(who) {
   return {
@@ -50,16 +34,15 @@ function authorMissingError(who) {
 // couple_id stays NULL: attaching the author's couple would drop the whole
 // catalog into that couple's private library and notify their partner.
 async function resolveAuthor() {
-  const id = (process.env.MARKETPLACE_BOT_AUTHOR_ID || '').trim();
-  const email = (process.env.MARKETPLACE_BOT_AUTHOR_EMAIL || '').trim().toLowerCase()
-    || DEFAULT_BOT_AUTHOR_EMAIL;
-  if (id && !UUID_RE.test(id)) return authorConfigError();
-
-  const result = id
-    ? await db.query('SELECT id, nickname FROM users WHERE id = $1', [id])
-    : await db.query('SELECT id, nickname FROM users WHERE LOWER(email) = $1', [email]);
+  const ref = botAuthorRef(
+    process.env.MARKETPLACE_BOT_AUTHOR_ID,
+    process.env.MARKETPLACE_BOT_AUTHOR_EMAIL,
+  );
+  const result = ref.id
+    ? await db.query('SELECT id, nickname FROM users WHERE id = $1', [ref.id])
+    : await db.query('SELECT id, nickname FROM users WHERE LOWER(email) = $1', [ref.email]);
   const author = result.rows[0];
-  if (!author) return authorMissingError(id || email);
+  if (!author) return authorMissingError(ref.id || ref.email);
   return { author };
 }
 
