@@ -23,17 +23,6 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // Logging into the app as this user is how those scripts are edited.
 const DEFAULT_BOT_AUTHOR_EMAIL = 'wangmark510@gmail.com';
 
-function authorConfigError() {
-  return {
-    status: 503,
-    body: {
-      success: false,
-      message: 'MARKETPLACE_BOT_AUTHOR_ID 不是有效的使用者 UUID。拿掉這個設定就會改用預設作者 wangmark510@gmail.com。',
-      error_code: 'BOT_AUTHOR_NOT_CONFIGURED',
-    },
-  };
-}
-
 function authorMissingError(who) {
   return {
     status: 503,
@@ -50,10 +39,15 @@ function authorMissingError(who) {
 // couple_id stays NULL: attaching the author's couple would drop the whole
 // catalog into that couple's private library and notify their partner.
 async function resolveAuthor() {
-  const id = (process.env.MARKETPLACE_BOT_AUTHOR_ID || '').trim();
+  let id = (process.env.MARKETPLACE_BOT_AUTHOR_ID || '').trim();
   const email = (process.env.MARKETPLACE_BOT_AUTHOR_EMAIL || '').trim().toLowerCase()
     || DEFAULT_BOT_AUTHOR_EMAIL;
-  if (id && !UUID_RE.test(id)) return authorConfigError();
+  // A blank or non-UUID id (for example an empty secret that envsubst turned
+  // into a placeholder) must not block the default author email.
+  if (id && !UUID_RE.test(id)) {
+    logWarn('marketplace_bot.author_id_ignored', { reason: 'not_a_uuid' });
+    id = '';
+  }
 
   const result = id
     ? await db.query('SELECT id, nickname FROM users WHERE id = $1', [id])

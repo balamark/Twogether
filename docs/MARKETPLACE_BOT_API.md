@@ -17,7 +17,7 @@ Set these on the **server only**. Do not prefix them with `VITE_` — that would
 | Variable | Required | Purpose |
 | --- | --- | --- |
 | `MARKETPLACE_BOT_API_KEY` | yes, in production | Bearer token. Compared in constant time. Missing or wrong key → **401**. If this variable is unset, every call returns **503** `BOT_API_DISABLED`. |
-| `MARKETPLACE_BOT_AUTHOR_ID` | no | `users.id` (UUID) of the account that owns the upload. Wins when set. |
+| `MARKETPLACE_BOT_AUTHOR_ID` | no | `users.id` (UUID) of the account that owns the upload. Wins when it is a UUID. Any other value is ignored. |
 | `MARKETPLACE_BOT_AUTHOR_EMAIL` | no | Email of that account. When both author vars are empty, the author is `wangmark510@gmail.com`. |
 
 The author must already be a registered Twogether user in **that** database (production and staging are separate). With no author env var, that user is `wangmark510@gmail.com`. The marketplace shows their nickname. Uploads are personal scripts (`couple_id` is left empty) so they do not land in a couple's private library or ping a partner. Signing into the app as that account shows the scripts under 我的劇本, where they can be edited or deleted. `/admin` is a separate password and does not own these rows.
