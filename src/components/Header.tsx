@@ -434,10 +434,13 @@ const Header: React.FC<HeaderProps> = ({
                         >
                           <span>{t('menu.showAdultScripts')}</span>
                           <span
-                            className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${showAdultScripts ? 'bg-petal-ink' : 'bg-petal-rule'}`}
+                            aria-hidden="true"
+                            className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${showAdultScripts ? 'bg-petal-ink' : 'bg-petal-rule'}`}
                           >
+                            {/* In-flow knob (like the other switches): an absolute
+                                knob with no `left` sat past the track on iOS Safari. */}
                             <span
-                              className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${showAdultScripts ? 'translate-x-4' : 'translate-x-0.5'}`}
+                              className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${showAdultScripts ? 'translate-x-4' : 'translate-x-0.5'}`}
                             />
                           </span>
                         </button>

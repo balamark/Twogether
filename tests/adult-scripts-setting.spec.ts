@@ -129,7 +129,18 @@ test.describe('show 18+ scripts setting', () => {
     await page.getByTestId('marketplace-detail-close').click();
 
     await page.getByTestId('user-menu-toggle').click();
-    await expect(page.getByTestId('user-menu-show-adult-scripts')).toHaveAttribute('aria-checked', 'true');
+    const toggle = page.getByTestId('user-menu-show-adult-scripts');
+    await expect(toggle).toHaveAttribute('aria-checked', 'true');
+    // The white knob stays inside its track, at the right end when on.
+    const knobInTrack = () => toggle.evaluate((el) => {
+      const track = el.querySelector('span[aria-hidden]')!.getBoundingClientRect();
+      const knob = el.querySelector('span[aria-hidden] > span')!.getBoundingClientRect();
+      return { inside: knob.left >= track.left && knob.right <= track.right, rightHalf: knob.left > track.left + track.width / 4 };
+    });
+    await expect.poll(knobInTrack).toEqual({ inside: true, rightHalf: true });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-checked', 'false');
+    await expect.poll(knobInTrack).toEqual({ inside: true, rightHalf: false });
 
     await request.delete(`${API}/custom-scripts/${id}`, { headers: auth(token) });
   });
