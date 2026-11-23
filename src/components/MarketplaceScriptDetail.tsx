@@ -55,6 +55,22 @@ export default function MarketplaceScriptDetail({
 
   useScrollLock(true);
 
+  // Reading mode: the script text is the point of this view, so the header
+  // and the action bar slide away while the reader scrolls down and come
+  // back on any scroll up (or at the very end, where the actions belong).
+  const [chromeHidden, setChromeHidden] = useState(false);
+  const lastScrollRef = useRef(0);
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const y = el.scrollTop;
+    const delta = y - lastScrollRef.current;
+    const nearEnd = el.scrollHeight - el.clientHeight - y < 48;
+    if (nearEnd || y < 48) setChromeHidden(false);
+    else if (delta > 6) setChromeHidden(true);
+    else if (delta < -6) setChromeHidden(false);
+    lastScrollRef.current = y;
+  };
+
   const loadDetail = useCallback(async () => {
     setLoading(true);
     try {
@@ -209,26 +225,73 @@ export default function MarketplaceScriptDetail({
   return (
     <div
       data-testid="marketplace-detail-modal"
-      className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-petal-ink/40 backdrop-blur-sm flex items-stretch sm:items-center justify-center z-50 sm:p-4"
       onClick={onClose}
     >
+      {/* Full-screen sheet on phones (every pixel goes to the script text);
+          a centred card from sm up. */}
       <div
-        className="relative bg-petal-cream rounded-md shadow-petal max-w-4xl w-full max-h-[min(90vh,calc(100dvh-80px))] border border-petal-rule overflow-y-auto overscroll-contain"
+        className="relative bg-petal-cream sm:rounded-md shadow-petal max-w-4xl w-full h-[100dvh] sm:h-auto sm:max-h-[min(90vh,calc(100dvh-80px))] sm:border border-petal-rule overflow-y-auto overscroll-contain"
         onClick={(e) => e.stopPropagation()}
+        onScroll={handleScroll}
+        data-testid="marketplace-detail-scroller"
       >
-        <div className="sticky top-0 z-10 bg-petal-cream/95 backdrop-blur-sm flex items-center justify-between px-5 sm:px-8 py-3 border-b border-petal-rule">
-          <span className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted">
-            {tr('— 創作市集 劇本', '— Creator marketplace script')}
-          </span>
-          <button
-            type="button"
-            onClick={onClose}
-            data-testid="marketplace-detail-close"
-            aria-label={tr("關閉", 'Close')}
-            className="w-8 h-8 inline-flex items-center justify-center rounded-full hover:bg-petal-cream-2 transition-colors"
-          >
-            <X className="w-4 h-4" strokeWidth={1.5} />
-          </button>
+        <div
+          data-testid="marketplace-detail-header"
+          className={`sticky top-0 z-10 bg-petal-cream/95 backdrop-blur-sm border-b border-petal-rule transition-transform duration-200 ${
+            chromeHidden ? '-translate-y-full' : 'translate-y-0'
+          }`}
+        >
+          <div className="safe-pt sm:hidden" />
+          <div className="flex items-center gap-1 pl-4 pr-2 sm:px-8 py-1.5 sm:py-2">
+            <span className="flex-1 min-w-0 truncate font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted">
+              {tr('— 創作市集 劇本', '— Creator marketplace script')}
+            </span>
+            {/* Secondary actions live up here as compact icon buttons so they
+                don't eat reading space at the bottom. */}
+            {script && !script.isAuthor && (
+              <button
+                type="button"
+                onClick={() => setShowReport(true)}
+                data-testid="marketplace-detail-report-button"
+                aria-label={tr('檢舉', 'Report')}
+                title={tr('檢舉', 'Report')}
+                className="h-9 min-w-9 px-2 inline-flex items-center justify-center gap-1.5 rounded-full text-petal-muted hover:bg-petal-cream-2 hover:text-petal-rose-deep font-body text-sm transition-colors"
+              >
+                <Flag className="w-4 h-4" strokeWidth={1.5} />
+                <span className="sr-only sm:not-sr-only">{tr('檢舉', 'Report')}</span>
+              </button>
+            )}
+            {script && (
+              <button
+                type="button"
+                onClick={handleFavoriteClick}
+                data-testid="marketplace-detail-favorite-button"
+                aria-pressed={script.isFavorited}
+                title={script.isFavorited ? tr('已收藏', 'Saved') : tr('收藏', 'Save')}
+                className={`h-9 min-w-9 px-2 inline-flex items-center justify-center gap-1.5 rounded-full font-body text-sm transition-colors hover:bg-petal-cream-2 ${
+                  script.isFavorited ? 'text-petal-rose-deep' : 'text-petal-ink-soft hover:text-petal-ink'
+                }`}
+              >
+                <Heart
+                  className={`w-4 h-4 ${script.isFavorited ? 'fill-petal-rose-deep' : ''}`}
+                  strokeWidth={1.5}
+                />
+                <span className="sr-only sm:not-sr-only">
+                  {script.isFavorited ? tr('已收藏', 'Saved') : tr('收藏', 'Save')}
+                </span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              data-testid="marketplace-detail-close"
+              aria-label={tr("關閉", 'Close')}
+              className="w-9 h-9 shrink-0 inline-flex items-center justify-center rounded-full hover:bg-petal-cream-2 transition-colors"
+            >
+              <X className="w-4 h-4" strokeWidth={1.5} />
+            </button>
+          </div>
         </div>
 
         {loading || !script ? (
@@ -237,7 +300,7 @@ export default function MarketplaceScriptDetail({
           </div>
         ) : (
           <>
-            <div className="px-5 sm:px-8 pt-5 pb-4 border-b border-petal-rule">
+            <div className="px-4 sm:px-8 pt-4 sm:pt-5 pb-3 sm:pb-4 border-b border-petal-rule">
               <h3 className="font-display text-xl sm:text-2xl font-light tracking-tight text-petal-ink mb-1">
                 {script.title}
               </h3>
@@ -265,9 +328,9 @@ export default function MarketplaceScriptDetail({
               </div>
             </div>
 
-            <div className="px-5 sm:px-8 py-5">
-              <div className="bg-petal-cream-2/40 p-4 sm:p-6 rounded-md border border-petal-rule-soft mb-6">
-                <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-3 flex items-center">
+            <div className="px-2 sm:px-8 py-3 sm:py-5">
+              <div className="bg-petal-cream-2/40 px-3 py-3 sm:p-6 rounded-md border border-petal-rule-soft mb-6">
+                <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-2 sm:mb-3 flex items-center">
                   <Play className="w-3.5 h-3.5 mr-1.5 text-petal-rose-deep" strokeWidth={1.5} />
                   {tr('劇本對話', 'Script dialogue')}
                 </h4>
@@ -277,7 +340,7 @@ export default function MarketplaceScriptDetail({
               </div>
 
               {!script.isAuthor && (
-                <div className="mb-6">
+                <div className="mb-6 px-2 sm:px-0">
                   <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-3">
                     {script.myRating ? tr('你的評分', 'Your rating') : tr('寫下你的評分', 'Write your rating')}
                   </h4>
@@ -330,7 +393,7 @@ export default function MarketplaceScriptDetail({
                 </div>
               )}
 
-              <div className="mb-6">
+              <div className="mb-6 px-2 sm:px-0">
                 <h4 className="font-body text-[11px] font-medium uppercase tracking-[0.14em] text-petal-muted mb-3">
                   {tr('評論（', 'Reviews (')}{ratings.length}{tr('）', ')')}
                 </h4>
@@ -364,50 +427,28 @@ export default function MarketplaceScriptDetail({
               </div>
             </div>
 
-            <div className="sticky bottom-0 z-10 px-5 sm:px-8 py-4 border-t border-petal-rule bg-petal-cream/95 backdrop-blur-sm flex flex-col sm:flex-row justify-end gap-2 safe-pb">
+            <div
+              data-testid="marketplace-detail-actions"
+              className={`sticky bottom-0 z-10 px-4 sm:px-8 py-2 sm:py-3 border-t border-petal-rule bg-petal-cream/95 backdrop-blur-sm flex items-center justify-end gap-2 safe-pb transition-transform duration-200 ${
+                chromeHidden ? 'translate-y-full' : 'translate-y-0'
+              }`}
+            >
               {script.isAuthor && onUnpublish && (
                 <button
                   type="button"
                   onClick={() => setShowUnpublishConfirm(true)}
                   data-testid="marketplace-detail-unpublish-button"
-                  className="px-4 py-2 border border-petal-rule text-petal-muted hover:border-petal-rose-deep hover:text-petal-rose-deep rounded-md font-body text-sm transition-colors inline-flex items-center gap-1.5 sm:mr-auto"
+                  className="px-3 py-2 border border-petal-rule text-petal-muted hover:border-petal-rose-deep hover:text-petal-rose-deep rounded-md font-body text-sm transition-colors inline-flex items-center gap-1.5 mr-auto"
                 >
                   <EyeOff className="w-3.5 h-3.5" strokeWidth={1.5} />
                   {tr('取消發布', 'Unpublish')}
                 </button>
               )}
-              {!script.isAuthor && (
-                <button
-                  type="button"
-                  onClick={() => setShowReport(true)}
-                  data-testid="marketplace-detail-report-button"
-                  className="px-4 py-2 border border-petal-rule text-petal-muted hover:border-petal-rose-deep hover:text-petal-rose-deep rounded-md font-body text-sm transition-colors inline-flex items-center gap-1.5"
-                >
-                  <Flag className="w-3.5 h-3.5" strokeWidth={1.5} />
-                  {tr('檢舉', 'Report')}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={handleFavoriteClick}
-                data-testid="marketplace-detail-favorite-button"
-                className={`px-4 py-2 rounded-md font-body text-sm transition-colors inline-flex items-center gap-1.5 border ${
-                  script.isFavorited
-                    ? 'bg-petal-rose-soft border-petal-rose-deep text-petal-rose-deep'
-                    : 'border-petal-rule text-petal-ink-soft hover:border-petal-ink hover:text-petal-ink'
-                }`}
-              >
-                <Heart
-                  className={`w-3.5 h-3.5 ${script.isFavorited ? 'fill-petal-rose-deep' : ''}`}
-                  strokeWidth={1.5}
-                />
-                {script.isFavorited ? tr('已收藏', 'Saved') : tr('收藏', 'Save')}
-              </button>
               <button
                 type="button"
                 onClick={() => onPlay(script)}
                 data-testid="marketplace-detail-play-button"
-                className="px-5 py-2 bg-petal-ink text-petal-cream rounded-md font-display italic text-base hover:bg-pink-700 transition-colors inline-flex items-center gap-1.5"
+                className="flex-1 sm:flex-none justify-center px-5 py-2 bg-petal-ink text-petal-cream rounded-md font-display italic text-base hover:bg-pink-700 transition-colors inline-flex items-center gap-1.5"
               >
                 <Play className="w-4 h-4" strokeWidth={1.5} />
                 {tr('立刻玩', 'Play now')}
