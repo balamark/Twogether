@@ -946,7 +946,8 @@ ADMIN_PASSWORD=pick-a-long-random-password
 # Marketplace bot — server-side upload into 創作市集.
 # Docs: docs/MARKETPLACE_BOT_API.md
 # MARKETPLACE_BOT_API_KEY=generate-a-long-random-string
-# MARKETPLACE_BOT_AUTHOR_EMAIL=official@twogether.fun
+# Author defaults to wangmark510@gmail.com when this is unset.
+# MARKETPLACE_BOT_AUTHOR_EMAIL=wangmark510@gmail.com
 ```
 
 ## 🔧 Supabase Setup

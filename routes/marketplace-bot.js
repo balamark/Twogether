@@ -19,23 +19,27 @@ const router = express.Router();
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// Official account that owns bot uploads when no author env var is set.
+// Logging into the app as this user is how those scripts are edited.
+const DEFAULT_BOT_AUTHOR_EMAIL = 'wangmark510@gmail.com';
+
 function authorConfigError() {
   return {
     status: 503,
     body: {
       success: false,
-      message: '劇本上傳 API 還沒指定作者帳號。請設定 MARKETPLACE_BOT_AUTHOR_ID（使用者 UUID）或 MARKETPLACE_BOT_AUTHOR_EMAIL（已註冊的 Email）。',
+      message: 'MARKETPLACE_BOT_AUTHOR_ID 不是有效的使用者 UUID。拿掉這個設定就會改用預設作者 wangmark510@gmail.com。',
       error_code: 'BOT_AUTHOR_NOT_CONFIGURED',
     },
   };
 }
 
-function authorMissingError() {
+function authorMissingError(who) {
   return {
     status: 503,
     body: {
       success: false,
-      message: '找不到設定的作者帳號。請確認 MARKETPLACE_BOT_AUTHOR_ID 或 MARKETPLACE_BOT_AUTHOR_EMAIL 對應一個已經註冊的 Twogether 帳號。',
+      message: `找不到作者帳號（${who}）。請確認這個帳號已經在這個環境註冊。`,
       error_code: 'BOT_AUTHOR_NOT_FOUND',
     },
   };
@@ -47,15 +51,15 @@ function authorMissingError() {
 // catalog into that couple's private library and notify their partner.
 async function resolveAuthor() {
   const id = (process.env.MARKETPLACE_BOT_AUTHOR_ID || '').trim();
-  const email = (process.env.MARKETPLACE_BOT_AUTHOR_EMAIL || '').trim().toLowerCase();
-  if (!id && !email) return authorConfigError();
+  const email = (process.env.MARKETPLACE_BOT_AUTHOR_EMAIL || '').trim().toLowerCase()
+    || DEFAULT_BOT_AUTHOR_EMAIL;
   if (id && !UUID_RE.test(id)) return authorConfigError();
 
   const result = id
     ? await db.query('SELECT id, nickname FROM users WHERE id = $1', [id])
     : await db.query('SELECT id, nickname FROM users WHERE LOWER(email) = $1', [email]);
   const author = result.rows[0];
-  if (!author) return authorMissingError();
+  if (!author) return authorMissingError(id || email);
   return { author };
 }
 

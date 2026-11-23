@@ -15,3 +15,6 @@
 
 # Node.js dependencies:
 node_modules/
+
+# Minted on the staging runner only. Never upload it as source.
+staging-marketplace-bot-key.txt

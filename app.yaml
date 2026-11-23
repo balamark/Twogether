@@ -49,8 +49,9 @@ env_variables:
   ADMIN_PASSWORD: $_ADMIN_PASSWORD
   # Marketplace bot (POST /api/bot/marketplace/scripts). Server-only; never
   # exposed to the browser bundle. Unset key → the endpoint returns 503.
-  # AUTHOR_ID (users.id UUID) wins over AUTHOR_EMAIL. The account must already
-  # exist in this database. See docs/MARKETPLACE_BOT_API.md.
+  # AUTHOR_ID (users.id UUID) wins over AUTHOR_EMAIL. When both are empty the
+  # author is wangmark510@gmail.com, who must already exist in this database.
+  # See docs/MARKETPLACE_BOT_API.md.
   MARKETPLACE_BOT_API_KEY: $_MARKETPLACE_BOT_API_KEY
   MARKETPLACE_BOT_AUTHOR_ID: $_MARKETPLACE_BOT_AUTHOR_ID
   MARKETPLACE_BOT_AUTHOR_EMAIL: $_MARKETPLACE_BOT_AUTHOR_EMAIL

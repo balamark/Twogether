@@ -1167,8 +1167,7 @@
 "這個 Email 已經有 Twogether 帳號了。為了保護帳號安全，請先登入 Twogether，再回到這個頁面送出申請；如果這不是你的帳號，請改用你自己的 Email。": "This email already has a Twogether account. To keep that account safe, sign in to Twogether first and then come back to this page to apply. If it isn't your account, use your own email.",
 "需要有效的 Bearer API 金鑰。請在 Authorization 標頭帶上伺服器核發的金鑰。": "A valid Bearer API key is required. Send the server-issued key in the Authorization header.",
 "劇本上傳 API 尚未設定。請在伺服器環境變數設定 MARKETPLACE_BOT_API_KEY 後再試。": "The script upload API isn't configured yet. Set MARKETPLACE_BOT_API_KEY in the server environment and try again.",
-"劇本上傳 API 還沒指定作者帳號。請設定 MARKETPLACE_BOT_AUTHOR_ID（使用者 UUID）或 MARKETPLACE_BOT_AUTHOR_EMAIL（已註冊的 Email）。": "The script upload API doesn't have an author account yet. Set MARKETPLACE_BOT_AUTHOR_ID (a user UUID) or MARKETPLACE_BOT_AUTHOR_EMAIL (a registered email).",
-"找不到設定的作者帳號。請確認 MARKETPLACE_BOT_AUTHOR_ID 或 MARKETPLACE_BOT_AUTHOR_EMAIL 對應一個已經註冊的 Twogether 帳號。": "The configured author account wasn't found. Check that MARKETPLACE_BOT_AUTHOR_ID or MARKETPLACE_BOT_AUTHOR_EMAIL matches a registered Twogether account.",
+"MARKETPLACE_BOT_AUTHOR_ID 不是有效的使用者 UUID。拿掉這個設定就會改用預設作者 wangmark510@gmail.com。": "MARKETPLACE_BOT_AUTHOR_ID is not a valid user UUID. Remove it to use the default author, wangmark510@gmail.com.",
 "這個 sourceKey 已經屬於另一個帳號，請換一組外部編號，或改設定成原本的作者。": "This sourceKey already belongs to another account. Use a different external id, or point the author setting at the original account.",
 "劇本已發布到創作市集": "Script published to the creator marketplace",
 "劇本已更新並發布到創作市集": "Script updated and published to the creator marketplace",
@@ -2195,6 +2194,10 @@
 [
 "整份劇本有 {0} 個字，超過 50000 字上限。請縮短旁白或對白後再送。",
 "The script is {0} characters, over the 50,000 limit. Please shorten the narration or dialogue and send again."
+],
+[
+"找不到作者帳號（{0}）。請確認這個帳號已經在這個環境註冊。",
+"No author account ({0}) was found. Register that account in this environment first."
 ]
 ]
 }

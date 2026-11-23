@@ -44,8 +44,10 @@ env_variables:
   # Admin dashboard (/admin) Basic-Auth password. Without it, adminAuth returns
   # 503 "Admin disabled". Shares the prod ADMIN_PASSWORD secret.
   ADMIN_PASSWORD: $_ADMIN_PASSWORD
-  # Marketplace bot. Same secrets as prod; the author account must exist in the
-  # staging database. Unset key → POST /api/bot/marketplace/scripts returns 503.
+  # Marketplace bot. Staging uses STAGING_MARKETPLACE_BOT_API_KEY, or a key
+  # minted during the PR deploy when that secret is empty. Production uses a
+  # different secret. Empty author falls back to wangmark510@gmail.com in code;
+  # that account must exist in the staging database.
   MARKETPLACE_BOT_API_KEY: $_MARKETPLACE_BOT_API_KEY
   MARKETPLACE_BOT_AUTHOR_ID: $_MARKETPLACE_BOT_AUTHOR_ID
   MARKETPLACE_BOT_AUTHOR_EMAIL: $_MARKETPLACE_BOT_AUTHOR_EMAIL

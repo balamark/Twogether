@@ -16,11 +16,11 @@ Set these on the **server only**. Do not prefix them with `VITE_` — that would
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `MARKETPLACE_BOT_API_KEY` | yes | Bearer token. Compared in constant time. Missing or wrong key → **401**. If this variable is unset, every call returns **503** `BOT_API_DISABLED`. |
-| `MARKETPLACE_BOT_AUTHOR_ID` | one of these | `users.id` (UUID) of the account that owns the upload. Wins when both are set. |
-| `MARKETPLACE_BOT_AUTHOR_EMAIL` | one of these | Email of that account, used when the id is unset. |
+| `MARKETPLACE_BOT_API_KEY` | yes, in production | Bearer token. Compared in constant time. Missing or wrong key → **401**. If this variable is unset, every call returns **503** `BOT_API_DISABLED`. |
+| `MARKETPLACE_BOT_AUTHOR_ID` | no | `users.id` (UUID) of the account that owns the upload. Wins when set. |
+| `MARKETPLACE_BOT_AUTHOR_EMAIL` | no | Email of that account. When both author vars are empty, the author is `wangmark510@gmail.com`. |
 
-The author must already be a registered Twogether user in **that** database (production and staging are separate). The marketplace shows their nickname as the author. Uploads are personal scripts (`couple_id` is left empty) so they do not land in a couple's private library or ping a partner. The author still sees them under 我的劇本 and can edit or delete them in the app.
+The author must already be a registered Twogether user in **that** database (production and staging are separate). With no author env var, that user is `wangmark510@gmail.com`. The marketplace shows their nickname. Uploads are personal scripts (`couple_id` is left empty) so they do not land in a couple's private library or ping a partner. Signing into the app as that account shows the scripts under 我的劇本, where they can be edited or deleted. `/admin` is a separate password and does not own these rows.
 
 Generate a key without spaces or `$` so it stays a single App Engine env value:
 
@@ -38,11 +38,12 @@ SELECT id, email, nickname FROM users WHERE email = 'the-official-account@exampl
 
 Production and staging run on **Google App Engine**. Deploy (`.github/workflows/deploy.yml`) runs `envsubst` on `app.yaml` / `app.staging.yaml` and reads:
 
-- GitHub **secret** `MARKETPLACE_BOT_API_KEY`
-- GitHub **secret** `MARKETPLACE_BOT_AUTHOR_ID` (optional if email is set)
-- GitHub **secret** `MARKETPLACE_BOT_AUTHOR_EMAIL` (optional if id is set)
+- GitHub **secret** `MARKETPLACE_BOT_API_KEY` (production)
+- GitHub **secret** `STAGING_MARKETPLACE_BOT_API_KEY` (staging only; optional — if it is empty, the pull-request deploy mints a key and uploads it as the one-day artifact `staging-marketplace-bot-key`)
+- GitHub **secret** `MARKETPLACE_BOT_AUTHOR_ID` (optional)
+- GitHub **secret** `MARKETPLACE_BOT_AUTHOR_EMAIL` (optional; empty uses `wangmark510@gmail.com`)
 
-Add the secrets in the repo settings, then **redeploy**. App Engine only picks up env vars at deploy time. An empty key leaves the endpoint disabled (503), which is what you get until the secrets exist.
+Add a production key in the repo settings, then **redeploy**. App Engine only picks up env vars at deploy time. An empty production key leaves the endpoint disabled (503). Staging does not use the production key.
 
 Locally, put the same names in `.env` (see `env.example`). They are not read by the Vite client.
 
@@ -161,8 +162,8 @@ Re-send the same file with the same `sourceKey` to update, or to no-op when noth
 
 Deploy to `main` runs migration **119** (`custom_scripts.source_key`) before the new version goes live, then redeploys App Engine. You still need to:
 
-1. Add the GitHub secrets above (the author must exist in the production database).
+1. Confirm GitHub secret `MARKETPLACE_BOT_API_KEY` is set. The author defaults to `wangmark510@gmail.com`, who must exist in the production database.
 2. Let that deploy finish — or re-run it — so the key is actually on the instance.
-3. Send one script and open the returned `url` while logged in. It should open in 創作市集 and read as a normal script.
+3. Send one script and open the returned `url` while logged in as that author. It should open in 創作市集 and read as a normal script.
 
-Staging (pull-request deploys) uses the same secret names and its own database, so the author account has to exist there too.
+Staging (pull-request deploys) has its own database and its own key (`STAGING_MARKETPLACE_BOT_API_KEY`, or a key minted for that deploy). `wangmark510@gmail.com` has to exist there too.
