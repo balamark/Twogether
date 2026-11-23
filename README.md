@@ -76,6 +76,9 @@ adds a fragment file in `changelog/`; CI compiles them into the block below —
 see `CLAUDE.md`.)
 
 <!-- changelog:begin (generated from changelog/*.md — edit those, not this) -->
+### 2026-11-23
+- **市集劇本連結**: 創作市集的劇本現在有自己的連結（網址帶 `?market=`）。登入後會直接打開那一則，不用再去市集裡翻。
+
 ### 2026-11-21
 - **重設密碼會登出所有裝置**: 重設密碼後，其他手機或電腦上的舊登入會自動失效，畫面會清楚說明「密碼已變更，請用新密碼重新登入」，不讓別人繼續留在你的帳號裡。
 - **付款暫時只提供藍新金流**: 綠界 ECPay 設定完成前先隱藏，升級與視訊諮商付款都改走藍新金流（信用卡、ATM、超商）。
