@@ -53,21 +53,41 @@ There is no separate marketplace table, and no columns for acts, role names, int
 
 | Request field | Stored as |
 | --- | --- |
-| `title` | `custom_scripts.title` (1–100) |
-| `summary` | `custom_scripts.scenario` (the card blurb, 1–500) |
+| `title` | `custom_scripts.title` (1–300) |
+| `summary` | `custom_scripts.scenario` (the card blurb, 1–1500) |
 | `genre` | `custom_scripts.category`: `romantic` / `adventurous` / `school` / `bold` (繁中 aliases 浪漫 / 冒險 / 校園 / 大膽). Omitted → chosen from `intensity` (`mild` → romantic, `moderate` → adventurous, `explicit` or `intense` → bold). |
 | `intensity` | No rating column. Always adds tags `18+` and `強度:清淡\|中等\|露骨\|激烈`, and a `【尺度】18+・…・雙方合意` line at the top of the script. This endpoint is for adult (18+) scripts, including when intensity is `mild`. |
 | `roleA` / `roleB` | Rendered into the top of `content` as `【角色】`. Dialogue uses `[男]` / `[女]` when one role is `male` and the other is `female` (the player swaps those for the couple's nicknames). Any other gender pair uses `[partner1]` / `[partner2]`, which play for every couple. |
-| `acts[]` | Rendered into `content` as `第一幕` … with `（旁白：…）` narration and `角色: 對白` lines — the same shape a pasted script uses. 1–8 acts; 4 is the usual script. At least two spoken lines. |
+| `acts[]` | Rendered into `content` as `第一幕` … with `（旁白：…）` narration and `角色: 對白` lines — the same shape a pasted script uses. 1–24 acts; 4 is the usual script. At least two spoken lines. |
 | `safewordNotes` | A `（安全詞：…）` line in `content`. Not a separate column. |
 | `tags` | `custom_scripts.tags`, plus the `18+` and intensity tags above. |
-| `location` | `custom_scripts.location` (optional, ≤50). |
+| `location` | `custom_scripts.location` (optional, ≤150). |
 | `duration` | `custom_scripts.duration`. Omitted → `15-30分鐘`, the in-app default. |
 | `coverImageUrl` | `thumbnail_url` and the first `custom_script_photos` row. Stored as the URL; the server does not download it. `http` or `https` only. Send `null` on a re-upload to clear it. Omit the field to leave the current cover. |
 | `publish` | `custom_scripts.is_public`. Omitted → `true`, which is also the in-app default, so the script is on the marketplace. `false` saves a draft (not listed, detail URL 404s until you publish). |
 | `sourceKey` | `custom_scripts.source_key`. Optional. Same key updates that row (ratings and favorites stay) instead of inserting another. Identical content returns 200 and does not write. Omit it to always create a new script. |
 
-`content` is capped at 50,000 characters, matching the in-app limit.
+`content` is capped at 150,000 characters, matching the in-app editor. The same ceilings apply when that script is edited again in the app.
+
+| Limit | Max |
+| --- | --- |
+| `title` | 300 |
+| `summary` | 1500 |
+| role `name` | 120 |
+| role `description` | 600 |
+| acts | 24 |
+| act `title` | 120 |
+| act `narration` | 6000 |
+| lines per act | 240 |
+| lines in the whole script | 1200 |
+| line `text` | 3000 |
+| line `direction` | 120 |
+| `tags` | 36, each ≤72 |
+| `location` / `duration` | 150 |
+| `safewordNotes` | 1500 |
+| `coverImageUrl` | 6000 |
+| `sourceKey` | 360 |
+| rendered `content` | 150000 |
 
 Bot uploads do **not** count toward the author's free-tier custom-script quota.
 

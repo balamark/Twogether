@@ -31,6 +31,12 @@ const COMMON_LOCATIONS = [
 // Per-script photo cap — mirrors MAX_SCRIPT_PHOTOS in routes/custom-scripts.js.
 export const MAX_SCRIPT_PHOTOS = 30;
 
+// Mirrors SCRIPT_CONTENT_MAX / SCRIPT_LOCATION_MAX in routes/custom-scripts.js.
+const SCRIPT_CONTENT_MAX = 150000;
+const SCRIPT_LOCATION_MAX = 150;
+const SCRIPT_TITLE_MAX = 300;
+const SCRIPT_SCENARIO_MAX = 1500;
+
 interface ScriptUploadModalProps {
   /** When set, the form opens in edit mode and pre-fills from this script. */
   editingScript: RoleplayScript | null;
@@ -381,6 +387,7 @@ const ScriptUploadModal = ({
                 onChange={(e) => setScriptData(prev => ({ ...prev, title: e.target.value }))}
                 className="w-full px-3 py-2.5 border border-petal-rule rounded-md focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink bg-white"
                 placeholder={tr("例如：浪漫晚餐", 'e.g. Romantic dinner')}
+                maxLength={SCRIPT_TITLE_MAX}
                 required
               />
             </div>
@@ -417,6 +424,7 @@ const ScriptUploadModal = ({
               onChange={(e) => setScriptData(prev => ({ ...prev, scenario: e.target.value }))}
               className="w-full px-3 py-2.5 border border-petal-rule rounded-md focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink bg-white"
               placeholder={tr("簡短描述這個劇本的情境", 'Briefly describe this script\'s scenario')}
+              maxLength={SCRIPT_SCENARIO_MAX}
               required
             />
           </div>
@@ -430,7 +438,7 @@ const ScriptUploadModal = ({
               name="script-location"
               type="text"
               list="script-location-options"
-              maxLength={50}
+              maxLength={SCRIPT_LOCATION_MAX}
               value={scriptData.location}
               onChange={(e) => setScriptData(prev => ({ ...prev, location: e.target.value }))}
               data-testid="script-location-input"
@@ -502,9 +510,9 @@ const ScriptUploadModal = ({
               rows={10}
               required
             />
-            <div className={`mt-1 font-body text-[11px] text-right ${scriptData.content.length > 50000 ? 'text-red-500 font-medium' : 'text-petal-muted'}`}>
-              {scriptData.content.length.toLocaleString()} {tr('/ 50,000 字', '/ 50,000 characters')}
-              {scriptData.content.length > 50000 && tr(` · 超出 ${(scriptData.content.length - 50000).toLocaleString()} 字`, ` · ${(scriptData.content.length - 50000).toLocaleString()} over`)}
+            <div className={`mt-1 font-body text-[11px] text-right ${scriptData.content.length > SCRIPT_CONTENT_MAX ? 'text-red-500 font-medium' : 'text-petal-muted'}`}>
+              {scriptData.content.length.toLocaleString()} {tr('/ 150,000 字', '/ 150,000 characters')}
+              {scriptData.content.length > SCRIPT_CONTENT_MAX && tr(` · 超出 ${(scriptData.content.length - SCRIPT_CONTENT_MAX).toLocaleString()} 字`, ` · ${(scriptData.content.length - SCRIPT_CONTENT_MAX).toLocaleString()} over`)}
             </div>
           </div>
 

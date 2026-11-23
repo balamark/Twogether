@@ -23,6 +23,14 @@ const router = express.Router();
 // Max photos a single custom script may carry (cover + extras).
 const MAX_SCRIPT_PHOTOS = 30;
 
+// Same ceilings as the marketplace bot upload (lib/marketplaceBotScript.js
+// LIMITS). A script saved at the bot maximum must still edit and play here.
+const SCRIPT_TITLE_MAX = 300;
+const SCRIPT_SCENARIO_MAX = 1500;
+const SCRIPT_LOCATION_MAX = 150;
+const SCRIPT_DURATION_MAX = 150;
+const SCRIPT_CONTENT_MAX = 150000;
+
 // Accept both the legacy single `thumbnail` field and the new `photos[]` field
 // so old clients keep working while the modal sends a multi-photo series.
 const scriptPhotoUploadRaw = createMediaMulter({ maxFiles: MAX_SCRIPT_PHOTOS + 1 }).fields([
@@ -184,25 +192,25 @@ router.get('/', async (req, res) => {
 // when content-type is not multipart.
 router.post('/', scriptPhotoUpload, [
   body('title')
-    .isLength({ min: 1, max: 100 })
-    .withMessage('標題必須在1-100個字符之間'),
+    .isLength({ min: 1, max: SCRIPT_TITLE_MAX })
+    .withMessage(`標題必須在1-${SCRIPT_TITLE_MAX}個字符之間`),
   body('category')
     .isIn(['romantic', 'adventurous', 'school', 'bold'])
     .withMessage('無效的劇本類別'),
   body('scenario')
-    .isLength({ min: 1, max: 500 })
-    .withMessage('情境描述必須在1-500個字符之間'),
+    .isLength({ min: 1, max: SCRIPT_SCENARIO_MAX })
+    .withMessage(`情境描述必須在1-${SCRIPT_SCENARIO_MAX}個字符之間`),
   body('location')
     .optional({ values: 'falsy' })
-    .isLength({ max: 50 })
-    .withMessage('場景地點不能超過50個字符'),
+    .isLength({ max: SCRIPT_LOCATION_MAX })
+    .withMessage(`場景地點不能超過${SCRIPT_LOCATION_MAX}個字符`),
   body('content')
-    .isLength({ min: 1, max: 50000 })
-    .withMessage('劇本內容必須在1-50000個字符之間'),
+    .isLength({ min: 1, max: SCRIPT_CONTENT_MAX })
+    .withMessage(`劇本內容必須在1-${SCRIPT_CONTENT_MAX}個字符之間`),
   body('duration')
     .optional()
-    .isLength({ max: 50 })
-    .withMessage('時長描述不能超過50個字符'),
+    .isLength({ max: SCRIPT_DURATION_MAX })
+    .withMessage(`時長描述不能超過${SCRIPT_DURATION_MAX}個字符`),
   body('isPublic')
     .optional()
     .isBoolean()
@@ -357,28 +365,28 @@ router.post('/', scriptPhotoUpload, [
 router.put('/:id', scriptPhotoUpload, [
   body('title')
     .optional()
-    .isLength({ min: 1, max: 100 })
-    .withMessage('標題必須在1-100個字符之間'),
+    .isLength({ min: 1, max: SCRIPT_TITLE_MAX })
+    .withMessage(`標題必須在1-${SCRIPT_TITLE_MAX}個字符之間`),
   body('category')
     .optional()
     .isIn(['romantic', 'adventurous', 'school', 'bold'])
     .withMessage('無效的劇本類別'),
   body('scenario')
     .optional()
-    .isLength({ min: 1, max: 500 })
-    .withMessage('情境描述必須在1-500個字符之間'),
+    .isLength({ min: 1, max: SCRIPT_SCENARIO_MAX })
+    .withMessage(`情境描述必須在1-${SCRIPT_SCENARIO_MAX}個字符之間`),
   body('location')
     .optional({ values: 'falsy' })
-    .isLength({ max: 50 })
-    .withMessage('場景地點不能超過50個字符'),
+    .isLength({ max: SCRIPT_LOCATION_MAX })
+    .withMessage(`場景地點不能超過${SCRIPT_LOCATION_MAX}個字符`),
   body('content')
     .optional()
-    .isLength({ min: 1, max: 50000 })
-    .withMessage('劇本內容必須在1-50000個字符之間'),
+    .isLength({ min: 1, max: SCRIPT_CONTENT_MAX })
+    .withMessage(`劇本內容必須在1-${SCRIPT_CONTENT_MAX}個字符之間`),
   body('duration')
     .optional()
-    .isLength({ max: 50 })
-    .withMessage('時長描述不能超過50個字符'),
+    .isLength({ max: SCRIPT_DURATION_MAX })
+    .withMessage(`時長描述不能超過${SCRIPT_DURATION_MAX}個字符`),
   body('isPublic')
     .optional()
     .isBoolean()
@@ -676,8 +684,8 @@ router.post('/:id/share', async (req, res) => {
 router.post('/ai-parse-roles', [
   body('content')
     .isString()
-    .isLength({ min: 1, max: 50000 })
-    .withMessage('劇本內容必須在1-50000個字符之間'),
+    .isLength({ min: 1, max: SCRIPT_CONTENT_MAX })
+    .withMessage(`劇本內容必須在1-${SCRIPT_CONTENT_MAX}個字符之間`),
 ], async (req, res) => {
   const userId = req.user.id;
   try {
@@ -732,8 +740,8 @@ router.post('/ai-parse-roles', [
 // the user-supplied URL is never fetched, so there's no SSRF surface.
 const GDOC_ID_PATTERN = /docs\.google\.com\/document\/d\/([a-zA-Z0-9_-]{10,})/;
 const GDOC_TIMEOUT_MS = 10000;
-// Matches the content max length (50k chars) with headroom for trimming.
-const GDOC_MAX_CHARS = 60000;
+// Same ceiling as the script content field, so an imported doc still saves.
+const GDOC_MAX_CHARS = SCRIPT_CONTENT_MAX;
 
 router.post('/import-gdoc', [
   body('url')
@@ -801,13 +809,13 @@ router.post('/import-gdoc', [
       logInfo('custom_scripts.import_gdoc.too_long', { userId, docId, chars: text.length });
       return res.status(422).json({
         success: false,
-        message: `文件內容約 ${text.length.toLocaleString()} 字，超過劇本 50,000 字上限。請先在文件中縮短內容再匯入。`,
+        message: `文件內容約 ${text.length.toLocaleString('en-US')} 字，超過劇本 ${SCRIPT_CONTENT_MAX.toLocaleString('en-US')} 字上限。請先在文件中縮短內容再匯入。`,
         error_code: 'GDOC_TOO_LONG',
       });
     }
 
     // First non-empty line doubles as a title suggestion for empty forms.
-    const suggestedTitle = (text.split('\n').find((l) => l.trim()) || '').trim().slice(0, 100);
+    const suggestedTitle = (text.split('\n').find((l) => l.trim()) || '').trim().slice(0, SCRIPT_TITLE_MAX);
 
     logInfo('custom_scripts.import_gdoc.success', { userId, docId, chars: text.length });
     res.json({ success: true, content: text, suggestedTitle });

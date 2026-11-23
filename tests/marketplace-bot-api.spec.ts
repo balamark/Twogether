@@ -10,6 +10,7 @@ async function botLib() {
     roleTokens: (a: { gender: string | null }, b: { gender: string | null }) => { a: string; b: string };
     botAuthorRef: (id: string | undefined, email: string | undefined) => { id: string | null; email: string | null };
     DEFAULT_BOT_AUTHOR_EMAIL: string;
+    LIMITS: Record<string, number>;
   }>;
 }
 
@@ -136,6 +137,102 @@ test.describe('marketplace bot script mapping', () => {
       { gender: 'female' },
     )).toEqual({ a: '[partner1]', b: '[partner2]' });
     expect(roleTokens({ gender: null }, { gender: null })).toEqual({ a: '[partner1]', b: '[partner2]' });
+  });
+
+  test('accepts every field at the tripled maximum and rejects one character or item over', async () => {
+    const { validateBotScript, LIMITS } = await botLib();
+    const fill = (n: number) => '字'.repeat(n);
+    const line = (text: string, direction?: string) => ({ role: 'a' as const, text, ...(direction ? { direction } : {}) });
+    const act = (lines: Array<{ role: 'a'; text: string; direction?: string }>, narration = '旁白') => ({
+      title: '幕',
+      narration,
+      lines,
+    });
+    const atMax = sampleScript({
+      title: fill(LIMITS.title),
+      summary: fill(LIMITS.summary),
+      location: fill(LIMITS.location),
+      duration: fill(LIMITS.duration),
+      safewordNotes: fill(LIMITS.safeword),
+      sourceKey: `k${'a'.repeat(LIMITS.sourceKey - 1)}`,
+      coverImageUrl: `https://example.com/${'a'.repeat(LIMITS.coverUrl - 'https://example.com/'.length)}`,
+      tags: Array.from({ length: LIMITS.tags }, (_, i) => `${i}${fill(LIMITS.tag)}`.slice(0, LIMITS.tag)),
+      roleA: { name: fill(LIMITS.name), description: fill(LIMITS.description), gender: 'female' },
+      roleB: { name: fill(LIMITS.name), description: fill(LIMITS.description), gender: 'male' },
+      acts: [act([
+        line(fill(LIMITS.line), fill(LIMITS.direction)),
+        line('第二句'),
+      ], fill(LIMITS.narration))],
+    });
+    const accepted = validateBotScript(atMax);
+    expect(accepted.ok, JSON.stringify(accepted.ok ? null : accepted.body.errors)).toBe(true);
+
+    const over: Array<[string, Record<string, unknown>]> = [
+      ['title', { title: fill(LIMITS.title + 1) }],
+      ['summary', { summary: fill(LIMITS.summary + 1) }],
+      ['location', { location: fill(LIMITS.location + 1) }],
+      ['duration', { duration: fill(LIMITS.duration + 1) }],
+      ['safewordNotes', { safewordNotes: fill(LIMITS.safeword + 1) }],
+      ['sourceKey', { sourceKey: `k${'a'.repeat(LIMITS.sourceKey)}` }],
+      ['coverImageUrl', { coverImageUrl: `https://example.com/${'a'.repeat(LIMITS.coverUrl)}` }],
+      ['tags', { tags: Array.from({ length: LIMITS.tags + 1 }, (_, i) => `t${i}`) }],
+      ['roleA.name', { roleA: { name: fill(LIMITS.name + 1), description: '粉絲', gender: 'female' } }],
+      ['roleA.description', { roleA: { name: '小安', description: fill(LIMITS.description + 1), gender: 'female' } }],
+      ['acts', { acts: Array.from({ length: LIMITS.acts + 1 }, () => act([line('一'), line('二')])) }],
+      ['acts[0].narration', { acts: [act([line('一'), line('二')], fill(LIMITS.narration + 1))] }],
+      ['acts[0].lines[0].text', { acts: [act([line(fill(LIMITS.line + 1)), line('二')])] }],
+      ['acts[0].lines[0].direction', { acts: [act([line('一', fill(LIMITS.direction + 1)), line('二')])] }],
+    ];
+    for (const [field, override] of over) {
+      const rejected = validateBotScript(sampleScript(override));
+      expect(rejected.ok, field).toBe(false);
+      expect(rejected.body.errors.some((e) => e.field === field), field).toBe(true);
+    }
+
+    const manyLines = validateBotScript(sampleScript({
+      acts: [act(Array.from({ length: LIMITS.linesPerAct }, (_, i) => line(`句${i}`)))],
+    }));
+    expect(manyLines.ok, JSON.stringify(manyLines.ok ? null : manyLines.body.errors)).toBe(true);
+    const tooManyLines = validateBotScript(sampleScript({
+      acts: [act(Array.from({ length: LIMITS.linesPerAct + 1 }, (_, i) => line(`句${i}`)))],
+    }));
+    expect(tooManyLines.ok).toBe(false);
+    expect(tooManyLines.body.errors.some((e) => e.field === 'acts[0].lines')).toBe(true);
+
+    const perAct = Math.ceil(LIMITS.linesTotal / LIMITS.acts);
+    const full = validateBotScript(sampleScript({
+      acts: Array.from({ length: LIMITS.acts }, () => act(
+        Array.from({ length: perAct }, (_, i) => line(`句${i}`)),
+      )),
+    }));
+    expect(full.ok, JSON.stringify(full.ok ? null : full.body.errors)).toBe(true);
+  });
+
+  test('a line at the new maximum still parses as dialogue', async () => {
+    const { validateBotScript, LIMITS } = await botLib();
+    const text = '對'.repeat(LIMITS.line);
+    const validated = validateBotScript(sampleScript({
+      acts: [{
+        title: '長句',
+        narration: '旁白',
+        lines: [
+          { role: 'a', text },
+          { role: 'b', text: '收到。', direction: '慢'.repeat(LIMITS.direction) },
+        ],
+      }],
+    }));
+    expect(validated.ok).toBe(true);
+    // Same steps as parseScript in src/utils/script.ts: swap the role token,
+    // then keep the whole line after the colon (the (.*) group has no cap).
+    const played = validated.value.content.split('\n').map((raw: string) => {
+      const line = raw.trim().replaceAll('[女]', '小安').replaceAll('[男]', '阿哲');
+      const match = line.match(DIALOGUE_LINE);
+      if (!match) return line;
+      const [, speaker, dialogue] = match;
+      return `${speaker}: "${dialogue}"`;
+    }).join('\n');
+    expect(played).toContain(`小安: "${text}"`);
+    expect(played).toContain(`（${'慢'.repeat(LIMITS.direction)}）：「收到。」`);
   });
 
   test('rejects a script that cannot be played and names the field', async () => {
@@ -348,6 +445,69 @@ test.describe('marketplace bot API', () => {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(visible.status(), await visible.text()).toBe(200);
+  });
+
+  test('saves a script at the new column maxima and lets the app editor keep it', async ({ request }) => {
+    const { LIMITS } = await botLib();
+    const fill = (n: number) => '長'.repeat(n);
+    const title = fill(LIMITS.title);
+    const summary = fill(LIMITS.summary);
+    const location = fill(LIMITS.location);
+    const duration = fill(LIMITS.duration);
+    const sourceKey = `k${'b'.repeat(LIMITS.sourceKey - 1)}`;
+    const narration = fill(LIMITS.narration);
+    const lineText = fill(LIMITS.line);
+    const createdRes = await botPost(request, sampleScript({
+      title,
+      summary,
+      location,
+      duration,
+      sourceKey,
+      publish: false,
+      coverImageUrl: undefined,
+      acts: [{
+        title: '長幕',
+        narration,
+        lines: [
+          { role: 'a', text: lineText },
+          { role: 'b', text: '收到。' },
+        ],
+      }],
+    }));
+    expect(createdRes.status(), await createdRes.text()).toBe(201);
+    const created = await createdRes.json();
+    createdIds.push(created.id);
+
+    const { token } = await userToken(request);
+    const mine = await request.get(`${API}/custom-scripts`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const row = (await mine.json()).custom_scripts.find((s: { id: string }) => s.id === created.id);
+    expect(row.title).toBe(title);
+    expect(row.scenario).toBe(summary);
+    expect(row.location).toBe(location);
+    expect(row.duration).toBe(duration);
+    expect(row.script).toContain(narration);
+    expect(row.script).toContain(lineText);
+
+    const saved = await request.put(`${API}/custom-scripts/${created.id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      data: {
+        title,
+        category: row.category,
+        scenario: summary,
+        location,
+        content: row.script,
+        duration,
+        tags: row.tags,
+        isPublic: false,
+      },
+    });
+    expect(saved.status(), await saved.text()).toBe(200);
+    const updated = (await saved.json()).custom_script;
+    expect(updated.title).toBe(title);
+    expect(updated.script).toContain(lineText);
+    expect(updated.duration).toBe(duration);
   });
 
   test('?market= opens the published script like any other marketplace detail', async ({ page, request }) => {
