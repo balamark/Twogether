@@ -942,6 +942,12 @@ EMAIL_REPLY_TO=support@twogether.fun
 
 # Admin funnel dashboard (gates /admin and /api/admin/*)
 ADMIN_PASSWORD=pick-a-long-random-password
+
+# Marketplace bot — server-side upload into 創作市集.
+# Docs: docs/MARKETPLACE_BOT_API.md
+# MARKETPLACE_BOT_API_KEY=generate-a-long-random-string
+# Author defaults to wangmark510@gmail.com when this is unset.
+# MARKETPLACE_BOT_AUTHOR_EMAIL=wangmark510@gmail.com
 ```
 
 ## 🔧 Supabase Setup
@@ -1022,6 +1028,9 @@ All API routes are prefixed with `/api/`:
 - `GET /api/intimacy-requests/intimacy-templates` - Get all intimacy templates
 - `GET /api/intimacy-requests/intimacy-templates/:category` - Get templates by category
 - `GET /api/intimacy-requests/alternative-intimacy-options` - Get alternative intimacy options
+
+### Marketplace bot (server-to-server)
+- `POST /api/bot/marketplace/scripts` — create or update a role-play script and publish it to 創作市集. Authenticated with `Authorization: Bearer $MARKETPLACE_BOT_API_KEY` (not a user login). Request shape, field mapping, and a curl example: [docs/MARKETPLACE_BOT_API.md](docs/MARKETPLACE_BOT_API.md).
 
 ### Notifications
 - `GET /api/intimacy-requests/notifications` - Get user notifications

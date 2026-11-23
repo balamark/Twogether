@@ -274,9 +274,12 @@ router.post('/', scriptPhotoUpload, [
     // this user's personal scripts) so the number matches what the user sees.
     const tier = await getCoupleTier(coupleId);
     if (Number.isFinite(getLimit(tier, 'custom_scripts_total'))) {
+      // Bot catalog rows (source_key set) are the official marketplace upload,
+      // not this account's personal quota. See routes/marketplace-bot.js.
       const countResult = await db.query(
         `SELECT COUNT(*)::int AS c FROM custom_scripts
-          WHERE couple_id = $1 OR (couple_id IS NULL AND created_by = $2)`,
+          WHERE (couple_id = $1 OR (couple_id IS NULL AND created_by = $2))
+            AND source_key IS NULL`,
         [coupleId, userId]
       );
       const used = countResult.rows[0]?.c || 0;

@@ -5,7 +5,9 @@ const QUIET = process.env.NODE_ENV === 'test' && process.env.LOG_VERBOSE !== '1'
 
 // Free-text fields that can carry large (and sometimes explicit) user content —
 // e.g. a custom roleplay script. Always summarized regardless of length.
-const ALWAYS_SUMMARIZE = new Set(['content', 'scenario', 'script']);
+const ALWAYS_SUMMARIZE = new Set([
+  'content', 'scenario', 'script', 'summary', 'safewordNotes', 'narration', 'text',
+]);
 const MAX_STRING = 200;
 
 // A request slower than this is logged as `slow_request` (warning) so Cloud
@@ -20,7 +22,10 @@ function summarizeBody(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return body;
   const out = {};
   for (const [key, value] of Object.entries(body)) {
-    if (typeof value === 'string' && (ALWAYS_SUMMARIZE.has(key) || value.length > MAX_STRING)) {
+    // Act/line arrays are the explicit script. Log the count, never the text.
+    if (key === 'acts' || key === 'lines') {
+      out[key] = Array.isArray(value) ? `Array(${value.length})` : '<redacted>';
+    } else if (typeof value === 'string' && (ALWAYS_SUMMARIZE.has(key) || value.length > MAX_STRING)) {
       out[key] = `<${value.length} chars>`;
     } else {
       out[key] = value;

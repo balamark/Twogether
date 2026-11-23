@@ -96,6 +96,11 @@ export default defineConfig({
         JWT_SECRET: process.env.JWT_SECRET || 'dev-secret-do-not-use-in-prod',
         // Enables the /admin dashboard in tests (adminAuth 503s without it).
         ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'test-admin-pw',
+        // Marketplace bot (tests/marketplace-bot-api.spec.ts). The author is the
+        // shared e2e account global-setup registers. Not a production secret.
+        MARKETPLACE_BOT_API_KEY: 'test-marketplace-bot-key',
+        MARKETPLACE_BOT_AUTHOR_EMAIL: 'test-e2e@twogether.app',
+        FRONTEND_URL: 'http://localhost:5174',
         // Deterministic + free: without this, a local .env with
         // LLM_PROVIDER=claude leaks into the test server and e2e runs bill
         // real Anthropic tokens with non-deterministic output.

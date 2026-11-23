@@ -58,6 +58,9 @@ interface RoleplayViewProps {
   onUnpublishScript?: (scriptId: string) => Promise<void>;
   initialScriptTitle?: string | null;
   onInitialScriptConsumed?: () => void;
+  // ?market=<uuid> deep link: open this marketplace script's detail once.
+  initialMarketplaceScriptId?: string | null;
+  onInitialMarketplaceConsumed?: () => void;
   renderGames?: () => React.ReactNode;
 }
 
@@ -175,6 +178,8 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   onUnpublishScript,
   initialScriptTitle,
   onInitialScriptConsumed,
+  initialMarketplaceScriptId,
+  onInitialMarketplaceConsumed,
   renderGames,
 }) => {
   const tz = useTimezone();
@@ -246,6 +251,14 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     return () => clearTimeout(t);
   }, [marketplaceQuery]);
   const [marketplaceDetailId, setMarketplaceDetailId] = useHistoryState<string | null>('roleplay:market', null, { scrollTop: false });
+  // Open a shared marketplace link (?market=<uuid>) on the detail the player
+  // already uses, then drop the pending id so a later render doesn't reopen it.
+  useEffect(() => {
+    if (!initialMarketplaceScriptId) return;
+    setMainTab('marketplace');
+    setMarketplaceDetailId(initialMarketplaceScriptId);
+    onInitialMarketplaceConsumed?.();
+  }, [initialMarketplaceScriptId, onInitialMarketplaceConsumed, setMainTab, setMarketplaceDetailId]);
   // Both lists are cached (src/services/queryCache.ts): returning to 劇本 or
   // switching back to 市集 paints the last list instantly, refreshed quietly.
   const marketplace = useCachedQuery<MarketplaceScript[]>(

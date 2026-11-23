@@ -314,6 +314,9 @@ jobs:
           _NEWEBPAY_HASH_KEY: ${{ secrets.NEWEBPAY_HASH_KEY }}
           _NEWEBPAY_HASH_IV: ${{ secrets.NEWEBPAY_HASH_IV }}
           _NEWEBPAY_MODE: ${{ vars.NEWEBPAY_MODE || 'stage' }}
+          _MARKETPLACE_BOT_API_KEY: ${{ secrets.MARKETPLACE_BOT_API_KEY }}
+          _MARKETPLACE_BOT_AUTHOR_ID: ${{ secrets.MARKETPLACE_BOT_AUTHOR_ID }}
+          _MARKETPLACE_BOT_AUTHOR_EMAIL: ${{ secrets.MARKETPLACE_BOT_AUTHOR_EMAIL }}
         run: |
           echo "🚀 Deploying Twogether app directly to App Engine..."
           # Create app.yaml with actual environment variables
@@ -486,10 +489,33 @@ jobs:
           _NEWEBPAY_HASH_KEY: ${{ secrets.NEWEBPAY_HASH_KEY }}
           _NEWEBPAY_HASH_IV: ${{ secrets.NEWEBPAY_HASH_IV }}
           _NEWEBPAY_MODE: stage
+          # Staging-only key. Production keeps secrets.MARKETPLACE_BOT_API_KEY.
+          # When this secret is empty the step mints a key and uploads it as a
+          # one-day artifact named staging-marketplace-bot-key. The value is
+          # never echoed.
+          _MARKETPLACE_BOT_API_KEY: ${{ secrets.STAGING_MARKETPLACE_BOT_API_KEY }}
+          _MARKETPLACE_BOT_AUTHOR_ID: ${{ secrets.MARKETPLACE_BOT_AUTHOR_ID }}
+          _MARKETPLACE_BOT_AUTHOR_EMAIL: ${{ secrets.MARKETPLACE_BOT_AUTHOR_EMAIL }}
         run: |
           echo "🚀 Deploying PR #${{ github.event.pull_request.number }} to staging..."
+          if [ -z "${_MARKETPLACE_BOT_API_KEY}" ]; then
+            _MARKETPLACE_BOT_API_KEY="$(openssl rand -hex 32)"
+            umask 077
+            printf '%s' "${_MARKETPLACE_BOT_API_KEY}" > staging-marketplace-bot-key.txt
+            echo "Minted a new staging marketplace bot key (artifact staging-marketplace-bot-key)."
+          fi
+          export _MARKETPLACE_BOT_API_KEY
           envsubst < app.staging.yaml > app.staging.yaml.tmp && mv app.staging.yaml.tmp app.staging.yaml
           gcloud app deploy app.staging.yaml --quiet --project=${{ env.PROJECT_ID }}
+
+      - name: Upload minted staging bot key
+        if: always() && hashFiles('staging-marketplace-bot-key.txt') != ''
+        uses: actions/upload-artifact@v5
+        with:
+          name: staging-marketplace-bot-key
+          path: staging-marketplace-bot-key.txt
+          retention-days: 1
+          if-no-files-found: ignore
 
       - name: Comment staging URL on PR
         uses: actions/github-script@v8
