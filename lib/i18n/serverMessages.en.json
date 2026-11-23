@@ -201,6 +201,7 @@
 "更新暱稱失敗": "Couldn't update the nickname",
 "無法獲取自訂禮品": "Couldn't load custom gifts",
 "標題必須在1-100個字符之間": "Title must be 1–100 characters",
+"標題必須在1-300個字符之間": "Title must be 1–300 characters",
 "描述必須在1-500個字符之間": "Description must be 1–500 characters",
 "花費必須是大於 0 的整數": "Cost must be a whole number greater than 0",
 "兌換金額必須是大於 0 的整數": "The redemption cost must be a whole number greater than 0",
@@ -271,10 +272,10 @@
 "15-30分鐘": "15–30 min",
 "無法獲取自訂劇本": "Couldn't load custom scripts",
 "無效的劇本類別": "Invalid script category",
-"情境描述必須在1-500個字符之間": "The scenario must be 1–500 characters",
-"場景地點不能超過50個字符": "The location can't exceed 50 characters",
-"劇本內容必須在1-50000個字符之間": "The script content must be 1–50000 characters",
-"時長描述不能超過50個字符": "The duration can't exceed 50 characters",
+"情境描述必須在1-1500個字符之間": "The scenario must be 1–1500 characters",
+"場景地點不能超過150個字符": "The location can't exceed 150 characters",
+"劇本內容必須在1-150000個字符之間": "The script content must be 1–150000 characters",
+"時長描述不能超過150個字符": "The duration can't exceed 150 characters",
 "isPublic 必須是布林值": "isPublic must be a boolean",
 "劇本創建成功": "Script created",
 "創建劇本失敗": "Couldn't create the script",
@@ -1175,26 +1176,26 @@
 "這份劇本和已儲存的內容一樣，沒有另外建立一則。": "This matches the script already saved, so nothing new was created.",
 "上傳劇本失敗，請稍後再試。若持續發生，請查看伺服器日誌裡的 marketplace_bot。": "The upload failed. Try again in a moment. If it keeps happening, check the server logs for marketplace_bot.",
 "請提供 JSON 物件，包含 title、summary、roleA、roleB、acts、intensity。": "Send a JSON object with title, summary, roleA, roleB, acts, and intensity.",
-"標題必須是 1–100 個字。": "The title must be 1–100 characters.",
-"簡介必須是 1–500 個字，它會顯示在市集卡片上。": "The summary must be 1–500 characters. It shows on the marketplace card.",
+"標題必須是 1–300 個字。": "The title must be 1–300 characters.",
+"簡介必須是 1–1500 個字，它會顯示在市集卡片上。": "The summary must be 1–1500 characters. It shows on the marketplace card.",
 "請提供角色 A（roleA），包含 name，以及選填的 description、gender。": "Provide role A (roleA) with a name, and optionally a description and gender.",
 "請提供角色 B（roleB），包含 name，以及選填的 description、gender。": "Provide role B (roleB) with a name, and optionally a description and gender.",
-"請提供角色 A 的名字（1–40 個字）。": "Give role A a name (1–40 characters).",
-"請提供角色 B 的名字（1–40 個字）。": "Give role B a name (1–40 characters).",
-"角色描述必須是文字，而且不能超過 200 個字。": "A role description must be text, and no longer than 200 characters.",
-"角色描述不能超過 200 個字，請縮短後再送。": "A role description can't be longer than 200 characters. Please shorten it and send again.",
-"請提供 acts 陣列（1–8 幕）。每一幕要有 narration 或 lines。": "Provide an acts array (1–8 acts). Each act needs a narration or lines.",
+"請提供角色 A 的名字（1–120 個字）。": "Give role A a name (1–120 characters).",
+"請提供角色 B 的名字（1–120 個字）。": "Give role B a name (1–120 characters).",
+"角色描述必須是文字，而且不能超過 600 個字。": "A role description must be text, and no longer than 600 characters.",
+"角色描述不能超過 600 個字，請縮短後再送。": "A role description can't be longer than 600 characters. Please shorten it and send again.",
+"請提供 acts 陣列（1–24 幕）。每一幕要有 narration 或 lines。": "Provide an acts array (1–24 acts). Each act needs a narration or lines.",
 "請提供尺度 intensity：mild、moderate、explicit 或 intense。": "Provide an intensity: mild, moderate, explicit, or intense.",
 "intensity 只能是 mild、moderate、explicit 或 intense。": "intensity must be mild, moderate, explicit, or intense.",
 "genre 只能是 romantic、adventurous、school、bold（或 浪漫、冒險、校園、大膽）。": "genre must be romantic, adventurous, school, or bold.",
-"tags 最多 12 個，每個不超過 24 個字。": "Use at most 12 tags, each no longer than 24 characters.",
+"tags 最多 36 個，每個不超過 72 個字。": "Use at most 36 tags, each no longer than 72 characters.",
 "封面必須是 http 或 https 網址，不能帶帳號密碼。": "The cover must be an http or https URL, with no username or password in it.",
-"封面網址太長。請換一個 2000 字以內的 http 或 https 網址。": "That cover URL is too long. Use an http or https URL under 2000 characters.",
-"location 不能超過 50 個字。": "location can't be longer than 50 characters.",
-"duration 不能超過 50 個字。": "duration can't be longer than 50 characters.",
-"safewordNotes 不能超過 500 個字。": "safewordNotes can't be longer than 500 characters.",
+"封面網址太長。請換一個 6000 字以內的 http 或 https 網址。": "That cover URL is too long. Use an http or https URL under 6000 characters.",
+"location 不能超過 150 個字。": "location can't be longer than 150 characters.",
+"duration 不能超過 150 個字。": "duration can't be longer than 150 characters.",
+"safewordNotes 不能超過 1500 個字。": "safewordNotes can't be longer than 1500 characters.",
 "publish 必須是 true 或 false。": "publish must be true or false.",
-"sourceKey 只能用英數、點、底線、冒號和連字號，最長 120 字（例如 2026-11-23-JUR-925）。": "sourceKey may only use letters, numbers, dots, underscores, colons, and hyphens, up to 120 characters (for example 2026-11-23-JUR-925).",
+"sourceKey 只能用英數、點、底線、冒號和連字號，最長 360 字（例如 2026-11-23-JUR-925）。": "sourceKey may only use letters, numbers, dots, underscores, colons, and hyphens, up to 360 characters (for example 2026-11-23-JUR-925).",
 "請至少寫兩句對白，這樣兩人才能一問一答。": "Write at least two lines of dialogue so the two roles can go back and forth.",
 "第 1 幕的 lines 必須是陣列。": "Act 1's lines must be an array.",
 "第 2 幕的 lines 必須是陣列。": "Act 2's lines must be an array.",
@@ -1419,8 +1420,8 @@
 "Shared \"{0}\" to your partner's inbox."
 ],
 [
-"文件內容約 {0} 字，超過劇本 50,000 字上限。請先在文件中縮短內容再匯入。",
-"The document is about {0} characters, over the 50,000-character script limit. Please shorten it in the document first, then import."
+"文件內容約 {0} 字，超過劇本 150,000 字上限。請先在文件中縮短內容再匯入。",
+"The document is about {0} characters, over the 150,000-character script limit. Please shorten it in the document first, then import."
 ],
 [
 "{0} {1}start_date 必須為 YYYY-MM-DD 格式",
@@ -2155,44 +2156,44 @@
 "Act {0} must be an object with an optional title and narration, plus a lines array."
 ],
 [
-"第 {0} 幕的標題不能超過 40 個字。",
-"Act {0}'s title can't be longer than 40 characters."
+"第 {0} 幕的標題不能超過 120 個字。",
+"Act {0}'s title can't be longer than 120 characters."
 ],
 [
-"第 {0} 幕的旁白不能超過 2000 個字，請縮短 narration。",
-"Act {0}'s narration can't be longer than 2000 characters. Please shorten it."
+"第 {0} 幕的旁白不能超過 6000 個字，請縮短 narration。",
+"Act {0}'s narration can't be longer than 6000 characters. Please shorten it."
 ],
 [
 "第 {0} 幕的 lines 必須是陣列。",
 "Act {0}'s lines must be an array."
 ],
 [
-"第 {0} 幕有 {1} 句對白，每一幕最多 80 句。請拆開或刪減。",
-"Act {0} has {1} lines. Each act can have at most 80. Split or cut some."
+"第 {0} 幕有 {1} 句對白，每一幕最多 240 句。請拆開或刪減。",
+"Act {0} has {1} lines. Each act can have at most 240. Split or cut some."
 ],
 [
 "第 {0} 幕第 {1} 句的 role 只能是 a 或 b。",
 "Act {0}, line {1}: role must be a or b."
 ],
 [
-"第 {0} 幕第 {1} 句的對白是空的，或超過 1000 個字。請寫上一句對白，並控制在 1000 字以內。",
-"Act {0}, line {1} is empty or longer than 1000 characters. Write a line and keep it within 1000 characters."
+"第 {0} 幕第 {1} 句的對白是空的，或超過 3000 個字。請寫上一句對白，並控制在 3000 字以內。",
+"Act {0}, line {1} is empty or longer than 3000 characters. Write a line and keep it within 3000 characters."
 ],
 [
-"第 {0} 幕第 {1} 句的 direction 不能超過 40 個字。",
-"Act {0}, line {1}: the stage direction can't be longer than 40 characters."
+"第 {0} 幕第 {1} 句的 direction 不能超過 120 個字。",
+"Act {0}, line {1}: the stage direction can't be longer than 120 characters."
 ],
 [
 "第 {0} 幕需要旁白（narration）或至少一句對白（lines）。",
 "Act {0} needs a narration or at least one line of dialogue."
 ],
 [
-"對白共有 {0} 句，超過 400 句上限。請刪減後再送。",
-"There are {0} lines of dialogue, over the 400-line limit. Please cut some and send again."
+"對白共有 {0} 句，超過 1200 句上限。請刪減後再送。",
+"There are {0} lines of dialogue, over the 1,200-line limit. Please cut some and send again."
 ],
 [
-"整份劇本有 {0} 個字，超過 50000 字上限。請縮短旁白或對白後再送。",
-"The script is {0} characters, over the 50,000 limit. Please shorten the narration or dialogue and send again."
+"整份劇本有 {0} 個字，超過 150000 字上限。請縮短旁白或對白後再送。",
+"The script is {0} characters, over the 150,000 limit. Please shorten the narration or dialogue and send again."
 ],
 [
 "找不到作者帳號（{0}）。請確認這個帳號已經在這個環境註冊。",

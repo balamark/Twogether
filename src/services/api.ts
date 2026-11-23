@@ -4100,7 +4100,7 @@ class ApiService {
   // Extract the most specific server-side error message from an axios failure.
   // Validation errors come back as { errors: [{ path, msg }] } — surfacing
   // errors[0].msg tells the user exactly which field was rejected (e.g.
-  // "劇本內容必須在1-50000個字符之間") instead of a generic "驗證失敗".
+  // "劇本內容必須在1-150000個字符之間") instead of a generic "驗證失敗".
   private extractScriptError(error: unknown, fallback: string): Error {
     const err = error as {
       message?: string;
