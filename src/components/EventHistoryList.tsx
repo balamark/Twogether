@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { Tag, CheckCircle2, Sprout, Lock, MessageSquareHeart } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Tag, Lock, MessageSquareHeart, ChevronRight } from 'lucide-react';
 import apiService, { type EventRecord, type EventStatus } from '../services/api';
 import { useCachedQuery, userKey } from '../services/queryCache';
 import { useTimezone } from '../contexts/TimezoneContext';
@@ -15,6 +15,10 @@ interface EventHistoryListProps {
   // Reports how many conversations exist under 全部 once loaded, so the page
   // can tell a first-timer from someone with history.
   onLoaded?: (total: number) => void;
+  // 分析 lives in 成長 now; the list ends with a quiet link there.
+  onGoToInsights?: () => void;
+  // Small (?) explainer shown at the end of the filter row.
+  infoHint?: ReactNode;
 }
 
 // 'resolve_pending' is deliberately absent: nothing produces it any more, and a
@@ -27,29 +31,22 @@ const STATUS_OPTIONS: { value: EventStatus | 'all'; label: string }[] = [
   { value: 'resolved', label: tr('已解決', 'Resolved') },
 ];
 
-function statusPill(status: EventStatus) {
-  switch (status) {
-    // 'resolve_pending' is a legacy row from the retired 標記為解決 handshake and
-    // reads as 未解決 — exactly how the detail view treats it too.
-    case 'open':
-    case 'resolve_pending':
-      return <span className="text-xs px-2 py-0.5 rounded-full bg-petal-rose/30 text-petal-ink">{tr('未解決', 'Open')}</span>;
-    case 'closing':
-      return (
-        <span className="text-xs px-2 py-0.5 rounded-full bg-petal-sage/20 text-petal-ink inline-flex items-center gap-1">
-          <Sprout className="w-3 h-3" />
-          {tr('收尾中', 'Wrapping up')}
-        </span>
-      );
-    case 'resolved':
-      return (
-        <span className="text-xs px-2 py-0.5 rounded-full bg-petal-sage/30 text-petal-ink inline-flex items-center gap-1">
-          <CheckCircle2 className="w-3 h-3" />
-          {tr('已解決', 'Resolved')}
-        </span>
-      );
-  }
-}
+// Status is read from a soft colour bar on the card's left edge instead of a
+// text pill on every row; the chips above carry the same colours as a legend.
+// 'resolve_pending' is a legacy row that reads as 未解決 everywhere.
+type StatusKey = 'open' | 'closing' | 'resolved';
+const statusKey = (status: EventStatus): StatusKey =>
+  status === 'closing' ? 'closing' : status === 'resolved' ? 'resolved' : 'open';
+const STATUS_BAR: Record<StatusKey, string> = {
+  open: 'bg-petal-rose-deep/70',
+  closing: 'bg-amber-400/80',
+  resolved: 'bg-petal-sage-deep/60',
+};
+const STATUS_LABEL: Record<StatusKey, string> = {
+  open: tr('未解決', 'Open'),
+  closing: tr('收尾中', 'Wrapping up'),
+  resolved: tr('已解決', 'Resolved'),
+};
 
 function formatDate(iso: string, tz: string) {
   if (!iso) return '';
@@ -68,6 +65,8 @@ export default function EventHistoryList({
   hideFilters,
   onCompose,
   onLoaded,
+  onGoToInsights,
+  infoHint,
 }: EventHistoryListProps) {
   const [status, setStatus] = useState<EventStatus | 'all'>('all');
   const tz = useTimezone();
@@ -79,6 +78,12 @@ export default function EventHistoryList({
   // the last list instantly and refreshes it in the background.
   const list = useCachedQuery(userKey('/events', 'list', status), () => apiService.listEvents({ status }));
   const events = list.data?.events ?? EMPTY_EVENTS;
+  // Counts survive a filter switch (every response carries all four), and the
+  // last known ones stay on the chips while the next filter loads.
+  const [counts, setCounts] = useState(list.data?.statusCounts ?? null);
+  useEffect(() => {
+    if (list.data?.statusCounts) setCounts(list.data.statusCounts);
+  }, [list.data]);
   const loading = list.loading;
   const error = list.error
     ? (list.error.message || tr('無法取得對話列表', 'Couldn\'t load conversations. Please try again in a moment.'))
@@ -88,31 +93,52 @@ export default function EventHistoryList({
     if (status === 'all' && list.data) onLoadedRef.current?.(list.data.total ?? list.data.events.length);
   }, [status, list.data]);
 
+  const filterChips = !hideFilters && (
+    <div className="flex items-center gap-2">
+      <div className="no-scrollbar flex gap-1.5 overflow-x-auto -mx-1 px-1 py-0.5 flex-1 min-w-0">
+        {STATUS_OPTIONS.map((opt) => {
+          const active = status === opt.value;
+          const n = counts ? counts[opt.value as keyof typeof counts] : null;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              data-testid={`events-filter-${opt.value}`}
+              onClick={() => setStatus(opt.value)}
+              className={`shrink-0 inline-flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-full border transition-colors ${
+                active
+                  ? 'bg-petal-ink text-petal-cream border-petal-ink'
+                  : 'border-petal-rule text-petal-ink hover:bg-petal-sage/20'
+              }`}
+            >
+              {opt.value !== 'all' && (
+                <span className={`w-1.5 h-1.5 rounded-full ${STATUS_BAR[opt.value as StatusKey]}`} aria-hidden />
+              )}
+              {opt.label}
+              {typeof n === 'number' && (
+                <span data-testid={`events-filter-count-${opt.value}`} className={active ? 'text-petal-cream/80' : 'text-petal-muted'}>
+                  {n}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {infoHint}
+    </div>
+  );
+
   if (loading) {
-    return <div className="p-8 text-center text-petal-ink-soft">{tr('載入中…', 'Loading…')}</div>;
+    return (
+      <div className="flex flex-col gap-3">
+        {filterChips}
+        <div className="p-8 text-center text-petal-ink-soft">{tr('載入中…', 'Loading…')}</div>
+      </div>
+    );
   }
   if (error) {
     return <div className="p-6 text-center text-red-500">{error}</div>;
   }
-  const filterChips = !hideFilters && (
-    <div className="flex flex-wrap gap-2">
-      {STATUS_OPTIONS.map((opt) => (
-        <button
-          key={opt.value}
-          type="button"
-          data-testid={`events-filter-${opt.value}`}
-          onClick={() => setStatus(opt.value)}
-          className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-            status === opt.value
-              ? 'bg-petal-ink text-petal-cream border-petal-ink'
-              : 'border-petal-rule text-petal-ink hover:bg-petal-sage/20'
-          }`}
-        >
-          {opt.label}
-        </button>
-      ))}
-    </div>
-  );
 
   if (events.length === 0) {
     // A filtered-to-empty list is NOT first-run onboarding. Rendering the
@@ -166,16 +192,21 @@ export default function EventHistoryList({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 pb-20">
       {filterChips}
 
-      {events.map((event) => (
+      {events.map((event) => {
+        const sk = statusKey(event.status);
+        return (
         <button
           key={event.id}
           type="button"
           onClick={() => onOpenEvent(event.id)}
-          className="w-full text-left bg-white border border-petal-rule-soft rounded-2xl p-4 shadow-sm hover:border-petal-rose/60 transition-colors"
+          data-status={sk}
+          aria-label={`${event.title}（${STATUS_LABEL[sk]}）`}
+          className="relative w-full text-left bg-white border border-petal-rule-soft rounded-2xl p-4 pl-5 shadow-sm hover:border-petal-rose/60 transition-colors overflow-hidden"
         >
+          <span className={`absolute left-0 top-0 bottom-0 w-1.5 ${STATUS_BAR[sk]}`} aria-hidden data-testid="event-status-bar" />
           <div className="flex items-start justify-between gap-3">
             <h3 className="font-serif text-petal-ink truncate flex-1 leading-snug">{event.title}</h3>
             <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -185,7 +216,6 @@ export default function EventHistoryList({
                   <span className="hidden sm:inline">{tr('私人', 'Private')}</span>
                 </span>
               )}
-              {statusPill(event.status)}
               {/* A 收尾中 row waiting on me looked identical to one waiting on my
                   partner — the single biggest reason the ceremony stalls. */}
               {event.closurePendingMe && (
@@ -227,7 +257,20 @@ export default function EventHistoryList({
             </div>
           )}
         </button>
-      ))}
+        );
+      })}
+
+      {onGoToInsights && (
+        <button
+          type="button"
+          onClick={onGoToInsights}
+          data-testid="events-insights-link"
+          className="self-center inline-flex items-center gap-1 mt-2 font-body text-xs text-petal-muted hover:text-petal-ink"
+        >
+          {tr('想看你們的溝通統計？到「成長」看看', 'Want your conversation stats? See them in Grow')}
+          <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.5} />
+        </button>
+      )}
     </div>
   );
 }

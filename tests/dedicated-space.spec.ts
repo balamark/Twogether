@@ -107,6 +107,7 @@ test.describe('專屬諮商空間 (dedicated counseling space)', () => {
     await stubApis(page);
     await page.goto('/');
     await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-switcher-toggle').click();
     await page.getByTestId('talk-therapists-entry').click();
 
     // Panel shows both entry points and the new-message badge.

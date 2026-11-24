@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test';
 import { seedAuth, seedClosure, seedQuota, EVENT_TITLE } from './helpers/closure';
 
-// 對話 lands straight on 說開一件事 (its core). The other four destinations
-// live in a thin sticky switcher present on every 對話-family view, so you hop
-// between them without going back. It replaced a card-hub landing page, which
-// replaced a two-item sub-tab row.
+// 對話 lands straight on 說開一件事 (its core). The sibling destinations live
+// in a sticky title dropdown (對話 / <current> ⌄) present on every 對話-family
+// view, so you hop between them without going back. Re-tapping the 對話 tab in
+// the bottom bar opens the same menu.
 //
-// What this pins: the direct landing, the five-chip switcher, jumping between
+// What this pins: the direct landing, the three-option menu, jumping between
 // destinations, and that the switcher is still there on a destination page.
 
 test.describe('對話 — a persistent switcher over 說開一件事', () => {
@@ -19,7 +19,7 @@ test.describe('對話 — a persistent switcher over 說開一件事', () => {
     await page.getByTestId('nav-tab-talk').click();
   });
 
-  test('對話 opens 說開一件事 directly, with a five-chip switcher and no sub-tab row', async ({
+  test('對話 opens 說開一件事 directly, with a three-option dropdown and no sub-tab row', async ({
     page,
   }) => {
     test.setTimeout(60000);
@@ -28,9 +28,13 @@ test.describe('對話 — a persistent switcher over 說開一件事', () => {
     await expect(page.getByRole('heading', { name: /說開一件事/ })).toBeVisible();
     await expect(page.locator(`text=${EVENT_TITLE}`).first()).toBeVisible();
 
-    // The switcher carries three chips, with 說開一件事 active. 情緒檢查 moved
-    // to the profile menu and 我們的牆 to a card on 我們.
+    // The menu is folded until opened; it carries three options, with
+    // 說開一件事 active. 情緒檢查 moved to the profile menu and 我們的牆 to a
+    // card on 我們.
     await expect(page.getByTestId('talk-switcher')).toBeVisible();
+    await expect(page.getByTestId('talk-switcher-toggle')).toContainText('說開一件事');
+    await expect(page.getByTestId('talk-roleplay-entry')).toHaveCount(0);
+    await page.getByTestId('talk-switcher-toggle').click();
     for (const id of [
       'talk-events-entry',
       'talk-roleplay-entry',
@@ -46,7 +50,13 @@ test.describe('對話 — a persistent switcher over 說開一件事', () => {
     await expect(page.getByTestId('communicate-subtab-events')).toHaveCount(0);
     await expect(page.getByTestId('communicate-subtab-harmony')).toHaveCount(0);
     await expect(page.getByTestId('events-compose-button')).toBeVisible();
-    await expect(page.getByTestId('events-analytics-button')).toBeVisible();
+    // No page hero (the switcher names the page); 開始對話 floats; 分析 moved
+    // to 成長, reached from a quiet link under the list.
+    await expect(page.getByTestId('events-hero')).toHaveCount(0);
+    await expect(page.getByTestId('events-analytics-button')).toHaveCount(0);
+    await expect(page.getByTestId('event-status-bar').first()).toBeVisible();
+    await page.getByTestId('events-insights-link').click();
+    await expect(page.getByTestId('nav-tab-grow')).toHaveAttribute('aria-current', 'page');
   });
 
   test('the switcher jumps straight to a sibling, and is still there when you arrive', async ({
@@ -54,9 +64,14 @@ test.describe('對話 — a persistent switcher over 說開一件事', () => {
   }) => {
     test.setTimeout(60000);
 
+    await page.getByTestId('talk-switcher-toggle').click();
     await page.getByTestId('talk-roleplay-entry').click();
     // Still switchable from here — no going back to find the others.
     await expect(page.getByTestId('talk-switcher')).toBeVisible();
+    await expect(page.getByTestId('talk-switcher-toggle')).toContainText('角色扮演');
+
+    // Re-tapping the active 對話 tab opens the menu instead of resetting.
+    await page.getByTestId('nav-tab-talk').click();
     await expect(page.getByTestId('talk-roleplay-entry')).toHaveAttribute('aria-selected', 'true');
 
     // Hop back to 說開一件事 from the destination itself.

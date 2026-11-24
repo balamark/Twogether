@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Heart, Sprout, Sparkles, BookOpen, PlusCircle, ChevronRight, Eye, Gift, MessageCircleHeart, Wrench, Users } from 'lucide-react';
+import { Heart, Sprout, Sparkles, BookOpen, ChevronRight, Eye, Gift, MessageCircleHeart, Wrench, Users } from 'lucide-react';
 import InfoHint from './InfoHint';
 import { useRelationshipSummary } from '../hooks/usePageData';
 import { trackAction } from '../utils/track';
@@ -93,19 +93,11 @@ const UsView: React.FC<UsViewProps> = ({ onNavigate }) => {
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6" data-testid="us-view">
-      <header className="border-b border-petal-rule pb-7">
-        <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-          {tr('— 我們', '— Us')}
-        </div>
-        <div className="flex items-center gap-2">
-          <h1 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05]">
-            {tr('我們', 'Us')}<em className="not-italic font-light italic text-pink-600"> ❤️</em>
-          </h1>
-          <InfoHint viewId="us" />
-        </div>
-        <p className="mt-3 font-display italic font-light text-base text-petal-muted">
-          {tr('記得我們為什麼相愛，也一起創造新的美好。', 'Remember why you fell in love, and keep making new good moments together.')}
-        </p>
+      <header className="flex items-center gap-2">
+        <h1 className="font-display text-2xl md:text-3xl font-light tracking-tight text-petal-ink">
+          {tr('我們', 'Us')}
+        </h1>
+        <InfoHint viewId="us" />
       </header>
 
       {/* The auto-counted 愛的存款 is paused (goodwill_meter); 感情存款 is the
@@ -126,13 +118,7 @@ const UsView: React.FC<UsViewProps> = ({ onNavigate }) => {
             {tr('留下那些讓你覺得「還好是你」的時刻。', 'Keep the moments that make you think, "glad it\'s you."')}
           </p>
           <div className="space-y-2.5 flex-1">
-            <Scenario
-              cue={tr("今天想存一點愛？", 'Want to save a little love today?')}
-              icon={PlusCircle}
-              action={tr("今天你還喜歡他什麼", 'What do you still love about them today?')}
-              onClick={() => { trackAction('us.love.daily'); onNavigate('daily-love'); }}
-              testId="us-scenario-daily-love"
-            />
+            {/* 今天存一點愛 is 今天's daily action; 我們 keeps to shared records. */}
             <Scenario
               cue={tr("有件小事想讓他知道你看見了？", 'A small thing you want them to know you noticed?')}
               icon={Eye}

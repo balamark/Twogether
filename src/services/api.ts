@@ -161,8 +161,18 @@ export interface DepositTransaction {
   responded_at: string | null;
 }
 
+/** Per-status totals for the 說開一件事 filter chips. */
+export interface EventStatusCounts {
+  all: number;
+  open: number;
+  closing: number;
+  resolved: number;
+}
+
 export interface DepositSummary {
   paired: boolean;
+  /** Net change of the average over the last 7 days (本週 +12). */
+  weekDelta: number;
   me: { balance: number; available: number };
   partner: { balance: number } | null;
   /** Read-only average of both balances. */
@@ -2741,6 +2751,7 @@ class ApiService {
         me: d.me || { balance: 0, available: 0 },
         partner: d.partner || null,
         average: d.average || 0,
+        weekDelta: d.week_delta || 0,
         awaitingMe: d.awaiting_me || [],
         awaitingPartner: d.awaiting_partner || [],
         recent: d.recent || [],
@@ -4930,7 +4941,7 @@ class ApiService {
     }
   }
 
-  async listEvents(filters: EventListFilters = {}): Promise<{ events: EventRecord[]; total: number }> {
+  async listEvents(filters: EventListFilters = {}): Promise<{ events: EventRecord[]; total: number; statusCounts: EventStatusCounts | null }> {
     try {
       const params: Record<string, string | number> = {};
       if (filters.status) params.status = filters.status;
@@ -4939,7 +4950,7 @@ class ApiService {
       if (filters.offset) params.offset = filters.offset;
       const response = await apiClient.get('/events', { params });
       const events = (response.data.events || []).map((row: unknown) => this.transformEvent(row));
-      return { events, total: response.data.total || 0 };
+      return { events, total: response.data.total || 0, statusCounts: response.data.status_counts ?? null };
     } catch (error: unknown) {
       console.error('Failed to list events:', error);
       this.throwApiError(error, tr('無法取得對話列表', 'Couldn\'t load conversations'));

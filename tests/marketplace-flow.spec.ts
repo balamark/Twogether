@@ -72,6 +72,7 @@ async function loginIfNeeded(page: Page) {
 
 async function gotoRoleplay(page: Page) {
   await page.getByTestId('nav-tab-talk').click();
+  await page.getByTestId('talk-switcher-toggle').click();
   const tab = page.getByTestId('talk-roleplay-entry');
   await expect(tab).toBeVisible({ timeout: 5000 });
   await tab.click();

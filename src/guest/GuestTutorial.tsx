@@ -147,7 +147,7 @@ const GuestTutorial: React.FC<Props> = ({ onClose, onStart }) => {
   return (
     // Non-blocking bottom card: the page (and the header's sign-up button) stays
     // usable behind it, so the tour never stands between a visitor and the app.
-    <div className="fixed inset-x-0 bottom-0 z-[70] flex justify-center px-4 pb-4 pointer-events-none safe-pb" role="dialog" aria-modal="false" aria-label={tr('試玩教學', 'Guest tour')} data-testid="guest-tutorial">
+    <div className="fixed inset-x-0 above-tabbar z-[70] flex justify-center px-4 pb-4 pointer-events-none" role="dialog" aria-modal="false" aria-label={tr('試玩教學', 'Guest tour')} data-testid="guest-tutorial">
       <div
         className="pointer-events-auto w-full max-w-sm rounded-2xl bg-petal-cream border border-petal-rule shadow-[0_12px_40px_-8px_rgba(42,37,32,0.35)] overflow-hidden"
         onPointerDown={() => setPaused(true)}

@@ -1,16 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Sparkles, BarChart3, ChevronLeft, Plus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Sparkles, Plus } from 'lucide-react';
 import EventHistoryList from './EventHistoryList';
 import ComposeEventFlow from './ComposeEventFlow';
 import EventDetail from './EventDetail';
-import EventAnalytics from './EventAnalytics';
 import SoloModeGate from './SoloModeGate';
 import InfoHint from './InfoHint';
 import { tr } from '../i18n/tr';
 import { useHistoryState } from '../hooks/useHistoryState';
-
-// Cached "this user has at least one conversation" flag for the hero size.
-const EVENTS_HAS_HISTORY_KEY = 'eventsHasHistory';
 
 type EventsSubView = 'list' | 'compose' | 'detail' | 'analytics';
 
@@ -59,20 +55,11 @@ export default function EventsView({
 }: EventsViewProps) {
   // History-backed so the browser's 上一頁 returns from a detail/compose to
   // the list (at the same scroll spot) instead of leaving the app.
-  const [view, setViewState] = useHistoryState<EventsSubView>('events:view', 'list');
+  const [rawView, setViewState] = useHistoryState<EventsSubView>('events:view', 'list');
+  // 分析 moved to 成長; an old history entry pointing at it just shows the list.
+  const view: EventsSubView = rawView === 'analytics' ? 'list' : rawView;
   const [selectedEventId, setSelectedEventId] = useHistoryState<string | null>('events:id', null);
   const [refreshKey, setRefreshKey] = useState(0);
-  // First-timers get the full hero (what this is, why it's safe); anyone with
-  // history gets a one-line title so the list starts higher on a phone. The
-  // last answer is cached so returning users don't see the big hero flash.
-  const [compactHero, setCompactHero] = useState<boolean>(() => {
-    try { return localStorage.getItem(EVENTS_HAS_HISTORY_KEY) === '1'; } catch { return false; }
-  });
-  const onHistoryLoaded = useCallback((total: number) => {
-    const has = total > 0;
-    setCompactHero(has);
-    try { localStorage.setItem(EVENTS_HAS_HISTORY_KEY, has ? '1' : '0'); } catch { /* storage unavailable */ }
-  }, []);
 
   // Leaving detail also clears the id in the same history entry, so the
   // in-app 返回 matches the entry below and acts as a browser back.
@@ -153,71 +140,36 @@ export default function EventsView({
 
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6">
-      {/* Same editorial header pattern as ConflictView (eyebrow + font-display +
-          italic sub-line) so the two halves of 好好說話 read as one feature
-          rather than two apps. Title matches the sub-tab chip you tapped. */}
-      {compactHero ? (
-        // Once there's history, the list is what matters: the hero shrinks to a
-        // single line and the explanation stays one tap away behind (?).
-        <header className="border-b border-petal-rule pb-3 mb-5" data-testid="events-hero" data-compact="true">
-          <h1 className="font-display text-2xl font-light tracking-tight text-petal-ink leading-tight flex items-center gap-2">
-            <span>{tr('說開', 'Talk it')}<span className="text-pink-600">{tr('一件事', ' through')}</span></span>
-            <InfoHint viewId="events" />
-          </h1>
-        </header>
-      ) : (
-        <header className="border-b border-petal-rule pb-7 mb-7" data-testid="events-hero" data-compact="false">
-          <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-            {tr('— 說開', '— Talk')}
-          </div>
-          <h1 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
-            {tr('說開', 'Talk it')}<em className="not-italic font-light italic text-pink-600">{tr('一件事', ' through')}</em>
-            <span className="align-middle ml-2"><InfoHint viewId="events" /></span>
-          </h1>
-          <p className="font-display italic font-light text-base text-petal-muted">
-            {tr('當下情緒不會直接送出 — AI 幫你整理成對方聽得進去的版本，由你決定要不要送。', 'Raw emotions are never sent directly. AI helps shape them into a version your partner can hear, and you decide whether to send it.')}
-          </p>
-        </header>
-      )}
+      {/* No page hero: the 對話 switcher above already names this page, so a
+          second big title + rule only pushed the list below the fold. The
+          heading stays for screen readers; the explanation lives in the (?)
+          next to the filters and in the first-run empty state. */}
+      <h1 className="sr-only">{tr('說開一件事', 'Talk it through')}</h1>
 
       <div>
         {/* Kept mounted (hidden) under an open event so going back returns
             to the same scroll spot without refetching the list. */}
         {(view === 'list' || view === 'detail') && (
           <div hidden={view !== 'list'}>
-            {/* The 歷史／開始對話／分析 row was a third row of pills before any
-                content on a 390px screen. 開始對話 is the primary action, so it
-                belongs in the list header; 分析 is rare enough to be an icon. */}
-            <div className="flex items-center justify-between gap-2 mb-4">
-              <h2 className="font-serif text-lg text-petal-ink">{tr('歷史對話', 'Past conversations')}</h2>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  data-testid="events-analytics-button"
-                  aria-label={tr("分析", 'Insights')}
-                  title={tr("分析", 'Insights')}
-                  onClick={() => setView('analytics')}
-                  className="p-2 rounded-full border border-petal-rule text-petal-ink hover:bg-petal-sage/20 transition-colors"
-                >
-                  <BarChart3 className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  data-testid="events-compose-button"
-                  onClick={() => setView('compose')}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-petal-rose-deep text-white text-sm font-medium shadow-sm hover:opacity-90 active:scale-[0.98] transition"
-                >
-                  <Plus className="w-4 h-4" />
-                  {tr('開始對話', 'Start a conversation')}
-                </button>
-              </div>
-            </div>
+            {/* 開始對話 is the page's primary action, so it's a floating button
+                (thumb reach, always visible while scrolling the history) rather
+                than a pill tucked beside a section title. */}
+            <button
+              type="button"
+              data-testid="events-compose-button"
+              onClick={() => setView('compose')}
+              className="fixed z-30 right-4 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:right-8 md:bottom-8 inline-flex items-center gap-1.5 pl-4 pr-5 py-3 rounded-full bg-petal-rose-deep text-white text-sm font-medium shadow-petal hover:opacity-90 active:scale-[0.98] transition"
+            >
+              <Plus className="w-5 h-5" strokeWidth={2} />
+              {tr('開始對話', 'Start a conversation')}
+            </button>
             <EventHistoryList
               key={refreshKey}
               onOpenEvent={openDetail}
               currentUserId={authState.user?.id || ''}
               onCompose={() => setView('compose')}
-              onLoaded={onHistoryLoaded}
+              onGoToInsights={onNavigate ? () => onNavigate('grow') : undefined}
+              infoHint={<InfoHint viewId="events" />}
             />
           </div>
         )}
@@ -238,21 +190,6 @@ export default function EventsView({
             onBack={() => setView('list')}
             showNotification={showNotification}
           />
-        )}
-        {view === 'analytics' && (
-          <>
-            {/* Without the tab row there is no other way back from 分析. */}
-            <button
-              type="button"
-              data-testid="events-analytics-back"
-              onClick={() => setView('list')}
-              className="mb-4 inline-flex items-center gap-1.5 text-sm text-petal-ink-soft hover:text-petal-ink"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              {tr('回到歷史對話', 'Back to past conversations')}
-            </button>
-            <EventAnalytics />
-          </>
         )}
       </div>
     </div>

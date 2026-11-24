@@ -96,6 +96,15 @@ video {
 .safe-pr { padding-right: env(safe-area-inset-right); }
 .safe-px { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
 
+/* Phones carry the fixed bottom tab bar (App.tsx main-tab-bar, 56px + home
+   indicator); floating bottom cards/buttons sit on top of it, not under it. */
+.above-tabbar { bottom: calc(3.5rem + env(safe-area-inset-bottom)); }
+@media (min-width: 768px) { .above-tabbar { bottom: 0; } }
+/* Anything scrolled into view (focus, anchors, scrollIntoView) stops above the
+   tab bar instead of landing underneath it. */
+html { scroll-padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)); }
+@media (min-width: 768px) { html { scroll-padding-bottom: 0; } }
+
 /* ────────────────────────────────────────────────────────────────────────
    Engineer Mode — Premium 限定的深色 IDE/終端機皮膚。
    由 EngineerModeContext 在 <html> 掛上 `.dark`（深色）與 `.eng-mode`

@@ -49,6 +49,7 @@ async function login(page: Page) {
 async function openTherapists(page: Page) {
   // 心理諮商 nests inside 對話 (Talk) as an entry card, not its own nav tab.
   await page.getByTestId('nav-tab-talk').click();
+  await page.getByTestId('talk-switcher-toggle').click();
   await page.getByTestId('talk-therapists-entry').click();
   await expect(page.getByTestId('therapists-view')).toBeVisible({ timeout: 10000 });
 }

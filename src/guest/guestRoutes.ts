@@ -332,6 +332,9 @@ export const ROUTES: GuestRoute[] = [
       me: { balance: balanceOf(db, ME), available: balanceOf(db, ME) },
       partner: { balance: balanceOf(db, PARTNER) },
       average: Math.round((balanceOf(db, ME) + balanceOf(db, PARTNER)) / 2),
+      week_delta: Math.round(rows
+        .filter((r) => r.status === 'confirmed' && Date.now() - new Date(str(r.responded_at ?? r.created_at)).getTime() < 7 * 86400000)
+        .reduce((sum, r) => sum + (r.kind === 'redeem' ? -Number(r.amount) : Number(r.amount)), 0) / 2),
       awaiting_me: rows.filter((r) => r.status === 'pending' && r.created_by === PARTNER),
       awaiting_partner: rows.filter((r) => r.status === 'pending' && r.created_by === ME),
       recent: rows.filter((r) => r.status !== 'pending').slice(0, 10),
@@ -449,10 +452,15 @@ export const ROUTES: GuestRoute[] = [
   { method: 'get', re: P('/events/therapy-topics/library'), handler: () => ok({ topics: [] }) },
   { method: 'get', re: P('/events'), handler: ({ db, query }) => {
     let ev = [...t(db, 'events')];
+    const counts = { all: ev.length, open: 0, closing: 0, resolved: 0 } as Record<string, number>;
+    for (const e of ev) {
+      const s = e.status === 'resolve_pending' ? 'open' : str(e.status);
+      if (s in counts && s !== 'all') counts[s] += 1;
+    }
     const status = query.get('status');
     if (status && status !== 'all') ev = ev.filter((e) => e.status === status);
     ev.sort((a, b) => str(b.updated_at).localeCompare(str(a.updated_at)));
-    return ok({ events: ev.map((e) => eventView(e, false)), total: ev.length });
+    return ok({ events: ev.map((e) => eventView(e, false)), total: ev.length, status_counts: counts });
   } },
   { method: 'post', re: P('/events/icebreaker'), handler: async ({ db, body }) => {
     const real = await callGuestAi(db, 'icebreaker', { rawText: str(body.rawText) });

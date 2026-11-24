@@ -85,6 +85,7 @@ test.describe.serial('Custom Script Upload and Persistence', () => {
   test('should upload a custom script and persist it in the database', async ({ page }) => {
     // Navigate to roleplay section
     await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-switcher-toggle').click();
     const roleplayTab = page.getByTestId('talk-roleplay-entry');
     await expect(roleplayTab).toBeVisible({ timeout: 5000 });
     await roleplayTab.click();
@@ -156,6 +157,7 @@ test.describe.serial('Custom Script Upload and Persistence', () => {
   test('should persist custom script after page reload', async ({ page }) => {
     // First, upload a script
     await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-switcher-toggle').click();
     const roleplayTab = page.getByTestId('talk-roleplay-entry');
     await expect(roleplayTab).toBeVisible({ timeout: 5000 });
     await roleplayTab.click();
@@ -193,6 +195,10 @@ test.describe.serial('Custom Script Upload and Persistence', () => {
 
     // Navigate back to roleplay section
     await page.getByTestId('nav-tab-talk').click();
+    // The reload restores 角色扮演, so re-tapping 對話 may already have opened the menu.
+    if ((await page.getByTestId('talk-switcher-menu').count()) === 0) {
+      await page.getByTestId('talk-switcher-toggle').click();
+    }
     const roleplayTabAfterReload = page.getByTestId('talk-roleplay-entry');
     await expect(roleplayTabAfterReload).toBeVisible({ timeout: 5000 });
     await roleplayTabAfterReload.click();
@@ -206,6 +212,7 @@ test.describe.serial('Custom Script Upload and Persistence', () => {
   test('should use custom script and create intimacy record', async ({ page }) => {
     // Navigate to roleplay section
     await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-switcher-toggle').click();
     const roleplayTab = page.getByTestId('talk-roleplay-entry');
     await expect(roleplayTab).toBeVisible({ timeout: 5000 });
     await roleplayTab.click();
@@ -247,6 +254,7 @@ test.describe.serial('Custom Script Upload and Persistence', () => {
   test('should display custom scripts in filtered view', async ({ page }) => {
     // Navigate to roleplay section
     await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-switcher-toggle').click();
     const roleplayTab = page.getByTestId('talk-roleplay-entry');
     await expect(roleplayTab).toBeVisible({ timeout: 5000 });
     await roleplayTab.click();
@@ -268,6 +276,7 @@ test.describe.serial('Custom Script Upload and Persistence', () => {
   test('should validate custom script form fields', async ({ page }) => {
     // Navigate to roleplay section
     await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-switcher-toggle').click();
     const roleplayTab = page.getByTestId('talk-roleplay-entry');
     await expect(roleplayTab).toBeVisible({ timeout: 5000 });
     await roleplayTab.click();
@@ -295,6 +304,7 @@ test.describe.serial('Custom Script Upload and Persistence', () => {
 
   test('a freshly created script shows created date, NEW tag, and a working share button', async ({ page }) => {
     await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-switcher-toggle').click();
     const roleplayTab = page.getByTestId('talk-roleplay-entry');
     await expect(roleplayTab).toBeVisible({ timeout: 5000 });
     await roleplayTab.click();

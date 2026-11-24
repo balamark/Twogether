@@ -1383,7 +1383,24 @@ router.get(
         offset,
       });
 
-      res.json({ success: true, events, total });
+      // Per-status counts for the filter chips (未解決 3 …). Same visibility
+      // rule as the list (my own private events included); legacy
+      // resolve_pending rows count as 未解決, matching how they display.
+      const countsResult = await db.query(
+        `SELECT CASE WHEN status = 'resolve_pending' THEN 'open' ELSE status END AS status,
+                COUNT(*)::int AS count
+           FROM events
+          WHERE couple_id = $1 AND (is_private = FALSE OR created_by = $2)
+          GROUP BY 1`,
+        [couple.couple_id, userId]
+      );
+      const statusCounts = { all: 0, open: 0, closing: 0, resolved: 0 };
+      for (const r of countsResult.rows) {
+        if (r.status in statusCounts) statusCounts[r.status] += r.count;
+        statusCounts.all += r.count;
+      }
+
+      res.json({ success: true, events, total, status_counts: statusCounts });
 
       // Lazy 72h auto-finalize sweep, fire-and-forget AFTER responding — there
       // is no cron in this app, so it rides the endpoint everyone hits when
