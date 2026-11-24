@@ -97,6 +97,7 @@ test.describe('Role script edit — thumbnail upload', () => {
 
     // Navigate to roleplay.
     await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-switcher-toggle').click();
     const roleplayTab = page.getByTestId('talk-roleplay-entry');
     await expect(roleplayTab).toBeVisible({ timeout: 5000 });
     await roleplayTab.click();

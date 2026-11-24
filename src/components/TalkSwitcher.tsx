@@ -1,76 +1,119 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { ChevronDown, Check, MessageCircleHeart, Drama, HeartHandshake } from 'lucide-react';
 import { tr } from '../i18n/tr';
 
-// The persistent switcher for the 對話 family. 對話 lands straight on 說開一件事
-// (its core); this thin sticky row is how you reach — and hop between — the
-// other destinations without going back. It replaced a card-hub landing page
-// (a whole screen of "我們要談什麼" you had to click past) and, before that, a
-// two-item sub-tab row: one compact, horizontally-scrolling strip now carries
-// the destinations and is the only chrome the section adds. 情緒檢查 moved to
-// the profile menu and 我們的牆 to a card on 我們, so the strip stays at three
-// chips that fit a 390px screen without scrolling.
+// The 對話 family switcher. 對話 (bottom tab bar) lands straight on 說開一件事;
+// this sticky title row names where you are and folds the sibling destinations
+// into one dropdown, so the 對話 section adds a single line of chrome instead of
+// a second row of capsule chips stacked on top of each view's own tabs.
 //
-// Sticky at top-0; ConflictView's own section nav sits at top-[52px] and stacks
-// *below* this row (see the comment there). The active chip is auto-centred so
-// on a 390px screen the current destination is always the one you can see.
+// Tapping the 對話 tab again while already in the section opens the same menu
+// (App bumps `openSignal`), so the bottom bar stays the one-thumb way in.
 
-const DESTINATIONS: { key: string; label: string; testId: string }[] = [
-  { key: 'events', label: tr('說開一件事', 'Talk it through'), testId: 'talk-events-entry' },
-  { key: 'roleplay', label: tr('角色扮演', 'Role play'), testId: 'talk-roleplay-entry' },
-  { key: 'therapists', label: tr('專業諮商師', 'Counselors'), testId: 'talk-therapists-entry' },
+const DESTINATIONS: { key: string; label: string; hint: string; testId: string; Icon: typeof Check }[] = [
+  { key: 'events', label: tr('說開一件事', 'Talk it through'), hint: tr('把卡住的事好好說開', 'Work through what\'s stuck, together'), testId: 'talk-events-entry', Icon: MessageCircleHeart },
+  { key: 'roleplay', label: tr('角色扮演', 'Role play'), hint: tr('劇本、創作市集與情趣遊戲', 'Scripts, creator marketplace and games'), testId: 'talk-roleplay-entry', Icon: Drama },
+  { key: 'therapists', label: tr('專業諮商師', 'Counselors'), hint: tr('找真人諮商師陪你們談', 'Talk it over with a real counselor'), testId: 'talk-therapists-entry', Icon: HeartHandshake },
 ];
 
 interface TalkSwitcherProps {
   /** The destination currently on screen — one of DESTINATIONS' keys. */
   current: string;
   onNavigate: (view: string) => void;
+  /** Bumped by App when the active 對話 tab is tapped again: opens the menu. */
+  openSignal?: number;
 }
 
-const TalkSwitcher: React.FC<TalkSwitcherProps> = ({ current, onNavigate }) => {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const activeRef = useRef<HTMLButtonElement>(null);
+const TalkSwitcher: React.FC<TalkSwitcherProps> = ({ current, onNavigate, openSignal = 0 }) => {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const active = DESTINATIONS.find((d) => d.key === current) ?? DESTINATIONS[0];
+
+  // Only a *new* signal opens the menu — not the value we mounted with, or
+  // every later visit to a 對話 page would pop it open.
+  const seenSignal = useRef(openSignal);
+  useEffect(() => {
+    if (openSignal !== seenSignal.current) {
+      seenSignal.current = openSignal;
+      setOpen(true);
+    }
+  }, [openSignal]);
 
   useEffect(() => {
-    const c = scrollRef.current;
-    const a = activeRef.current;
-    if (!c || !a) return;
-    // Centre the active chip by moving only the strip's own scrollLeft — never
-    // scrollIntoView, which would also yank the page vertically.
-    c.scrollLeft = a.offsetLeft - (c.clientWidth - a.clientWidth) / 2;
-  }, [current]);
+    if (!open) return;
+    const onDown = (e: MouseEvent | TouchEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('touchstart', onDown, { passive: true });
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('touchstart', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
 
   return (
     <div
-      className="sticky top-0 z-30 bg-petal-cream/95 backdrop-blur-sm border-b border-petal-rule"
+      ref={rootRef}
+      className="sticky top-0 z-30 bg-petal-cream/95 backdrop-blur-sm border-b border-petal-rule mb-6"
       data-testid="talk-switcher"
     >
-      <div
-        ref={scrollRef}
-        className="no-scrollbar max-w-4xl mx-auto px-4 md:px-6 py-2 flex gap-2 overflow-x-auto"
-        role="tablist"
-        aria-label={tr("對話", 'Talk')}
-      >
-        {DESTINATIONS.map((d) => {
-          const active = d.key === current;
-          return (
-            <button
-              key={d.key}
-              ref={active ? activeRef : undefined}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              data-testid={d.testId}
-              onClick={() => { if (!active) onNavigate(d.key); }}
-              className={`shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium border transition-colors ${
-                active
-                  ? 'bg-petal-ink text-petal-cream border-petal-ink'
-                  : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
-              }`}
-            >
-              {d.label}
-            </button>
-          );
-        })}
+      <div className="relative max-w-4xl mx-auto px-1 py-2">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          data-testid="talk-switcher-toggle"
+          className="inline-flex items-center gap-2 px-3 py-1.5 -ml-1 rounded-full hover:bg-petal-cream-2 transition-colors"
+        >
+          <span className="font-body text-xs text-petal-muted">{tr('對話', 'Talk')}</span>
+          <span className="text-petal-rule" aria-hidden>/</span>
+          <span className="font-display text-base font-medium tracking-tight text-petal-ink">{active.label}</span>
+          <ChevronDown
+            className={`w-4 h-4 text-petal-ink-soft transition-transform ${open ? 'rotate-180' : ''}`}
+            strokeWidth={1.5}
+          />
+        </button>
+
+        {open && (
+          <div
+            role="listbox"
+            aria-label={tr('對話', 'Talk')}
+            data-testid="talk-switcher-menu"
+            className="absolute left-0 top-full mt-1 w-[min(20rem,calc(100vw-2rem))] bg-petal-cream border border-petal-rule rounded-md shadow-petal p-1.5 z-40"
+          >
+            {DESTINATIONS.map((d) => {
+              const selected = d.key === current;
+              return (
+                <button
+                  key={d.key}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  data-testid={d.testId}
+                  onClick={() => {
+                    setOpen(false);
+                    if (!selected) onNavigate(d.key);
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-left transition-colors ${
+                    selected ? 'bg-petal-cream-2' : 'hover:bg-petal-cream-2'
+                  }`}
+                >
+                  <d.Icon className="w-4 h-4 text-petal-rose-deep shrink-0" strokeWidth={1.5} />
+                  <span className="flex-1 min-w-0">
+                    <span className="block font-body text-sm font-medium text-petal-ink">{d.label}</span>
+                    <span className="block font-body text-xs text-petal-muted truncate">{d.hint}</span>
+                  </span>
+                  {selected && <Check className="w-4 h-4 text-petal-ink shrink-0" strokeWidth={1.75} />}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );

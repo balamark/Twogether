@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Heart, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow, LayoutGrid, List, Gamepad2, ChevronDown, ArrowUp, ChevronLeft, ChevronRight, Share2, Search } from 'lucide-react';
+import { Heart, FileText, Plus, Filter, Play, Eye, Pencil, X, Store, ArrowDownWideNarrow, LayoutGrid, List, Gamepad2, ChevronDown, ArrowUp, ChevronLeft, ChevronRight, Share2, Search, SlidersHorizontal } from 'lucide-react';
 import type { Notification } from './ErrorNotification';
 import { useScrollLock } from '../hooks/useScrollLock';
 import { useHistoryState } from '../hooks/useHistoryState';
@@ -226,7 +226,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   // Scenario-location filter (場景地點) — an extra AND filter like activeTag.
   const [activeLocation, setActiveLocation] = useState<string | null>(null);
   const [collectionView, setCollectionView] = usePersistedViewMode('roleplayView:collection', 'grid');
-  const [marketplaceView, setMarketplaceView] = usePersistedViewMode('roleplayView:marketplace', 'grid');
+  const [marketplaceView, setMarketplaceView] = usePersistedViewMode('roleplayView:marketplace', 'list');
 
   // 收藏劇本 (marketplace favorites) is collapsed by default so the page stays
   // short on mobile; the choice sticks.
@@ -248,6 +248,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   const [mainTab, setMainTab] = useState<'mine' | 'marketplace' | 'games'>('mine');
   const [marketplaceSort, setMarketplaceSort] = useState<'rating' | 'recent' | 'popular'>('rating');
   const [marketplaceCategory, setMarketplaceCategory] = useState<'all' | RoleplayScript['category']>('all');
+  const [showMarketFilters, setShowMarketFilters] = useState(false);
   // Server-side text search (title / scenario / location) — debounced so we
   // don't fire a request per keystroke; stays fast at 1000+ scripts.
   const [marketplaceQuery, setMarketplaceQuery] = useState('');
@@ -644,14 +645,14 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
         key={opts.key}
         data-testid={opts.testId}
         onClick={opts.onClick}
-        className={`flex items-center gap-3 px-3 py-2.5 bg-white border border-petal-rule rounded-md hover:border-petal-rose transition-colors ${opts.onClick ? 'cursor-pointer' : ''}`}
+        className={`flex items-center gap-3 px-3.5 py-3 bg-white border border-petal-rule rounded-lg shadow-sm hover:border-petal-rose transition-colors ${opts.onClick ? 'cursor-pointer' : ''}`}
       >
-        <span className="text-base opacity-70 saturate-75 flex-shrink-0" aria-hidden>
+        <span className="w-10 h-10 inline-flex items-center justify-center text-2xl flex-shrink-0" aria-hidden>
           {meta?.emoji}
         </span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 min-w-0">
-            <h4 className="font-display text-sm font-medium tracking-tight text-petal-ink truncate">
+            <h4 className="font-display text-base font-medium tracking-tight text-petal-ink truncate">
               {opts.script.title}
             </h4>
             {opts.badge}
@@ -672,24 +673,26 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   };
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       {mainTab !== 'games' && (
-      <div className="border-b border-petal-rule pb-7">
-        <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-          {tr('— 劇本', '— Scripts')}
+      <div>
+        <div className="font-body text-xs text-petal-muted mb-2" data-testid="roleplay-breadcrumb">
+          {tr('角色扮演劇本', 'Role-play scripts')}
+          <span className="mx-1.5 text-petal-rule" aria-hidden>/</span>
+          <span className="text-petal-ink-soft">{mainTab === 'marketplace' ? tr('創作市集', 'Creator marketplace') : tr('我的劇本', 'My scripts')}</span>
         </div>
-        <h2 className="font-display text-2xl sm:text-3xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.1] md:leading-[1.05] mb-3">
+        <h2 className="font-display text-3xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.1] md:leading-[1.05] mb-2">
           {tr('角色', 'Role')}<em className="not-italic font-light italic text-pink-600">{tr('扮演', ' play')}</em>{tr('劇本', ' scripts')}
         </h2>
         <p className="font-display italic font-light text-base text-petal-muted">
-          {tr('點燃激情，重溫浪漫 — 慢慢來。', 'Spark passion, relive romance. Take it slow.')}
+          {tr('點燃激情，重溫浪漫', 'Spark passion, relive romance')}
         </p>
       </div>
       )}
 
-      {/* Main tabs — My Scripts vs Marketplace. Icons hide on the narrowest
-          phones and labels never wrap, so 「我的劇本」stays on one line. */}
-      <div className="flex items-stretch gap-0.5 sm:gap-1 mb-6 border-b border-petal-rule overflow-x-auto">
+      {/* Main tabs — My Scripts / Marketplace / Games as one horizontally
+          scrolling capsule row (labels never wrap). */}
+      <div className="no-scrollbar flex items-center gap-2 -mx-1 px-1 overflow-x-auto" role="tablist">
         {([
           { id: 'mine' as const, label: tr('我的劇本', 'My scripts'), icon: <FileText className="w-3.5 h-3.5" strokeWidth={1.5} /> },
           { id: 'marketplace' as const, label: tr('創作市集', 'Creator marketplace'), icon: <Store className="w-3.5 h-3.5" strokeWidth={1.5} /> },
@@ -700,15 +703,17 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
             <button
               key={t.id}
               type="button"
+              role="tab"
+              aria-selected={isActive}
               onClick={() => setMainTab(t.id)}
               data-testid={`roleplay-tab-${t.id}`}
-              className={`px-2.5 sm:px-4 py-2.5 font-display text-[15px] sm:text-base tracking-tight whitespace-nowrap transition-colors -mb-px border-b-2 inline-flex items-center gap-1.5 sm:gap-2 ${
+              className={`shrink-0 px-4 py-1.5 rounded-full border font-body text-sm whitespace-nowrap transition-colors inline-flex items-center gap-1.5 ${
                 isActive
-                  ? 'text-petal-ink border-petal-rose-deep font-medium'
-                  : 'text-petal-muted border-transparent hover:text-petal-ink'
+                  ? 'bg-petal-ink text-petal-cream border-petal-ink font-medium'
+                  : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
               }`}
             >
-              <span className="hidden xs:inline-flex">{t.icon}</span>
+              {t.icon}
               {t.label}
             </button>
           );
@@ -1065,8 +1070,8 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                               data-testid={`marketplace-favorite-play-${m.id}`}
                               className="bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                             >
-                              <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
                               {tr('開始', 'Start')}
+                              <Play className="w-3 h-3 inline ml-1" strokeWidth={1.75} />
                             </button>
                           </div>
                         </div>
@@ -1112,8 +1117,8 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                           data-testid={`marketplace-favorite-play-${m.id}`}
                           className="hidden sm:inline-flex bg-petal-rose-deep text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
                         >
-                          <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
                           {tr('開始', 'Start')}
+                          <Play className="w-3 h-3 inline ml-1" strokeWidth={1.75} />
                         </button>
                       </>
                     ),
@@ -1129,7 +1134,10 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
 
       {mainTab === 'marketplace' && (
         <div data-testid="roleplay-marketplace-tab">
-          <div className="flex flex-wrap items-center gap-2 mb-6">
+          {/* Sort + category on one row, then a full-width search whose right
+              edge holds the filter icon (display mode / reset) — one compact
+              control block instead of three wrapping rows. */}
+          <div className="flex items-center gap-2 mb-3">
             <PetalSelect
               value={marketplaceSort}
               onChange={(v) => setMarketplaceSort(v as 'rating' | 'recent' | 'popular')}
@@ -1158,30 +1166,65 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                 { value: 'bold', label: tr('大膽', 'Bold') },
               ]}
             />
-            <div className="ml-auto">
-              <ViewToggle mode={marketplaceView} setMode={setMarketplaceView} idPrefix="roleplay-marketplace" />
-            </div>
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-petal-muted" strokeWidth={1.5} />
-              <input
-                type="search"
-                value={marketplaceQuery}
-                onChange={(e) => setMarketplaceQuery(e.target.value)}
-                data-testid="marketplace-search"
-                placeholder={tr("搜尋市集劇本（標題、情境、地點）", 'Search marketplace scripts (title, scenario, location)')}
-                className="w-full pl-9 pr-8 py-2 border border-petal-rule rounded-md focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink bg-white"
-              />
+          </div>
+          <div className="relative mb-5">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-petal-muted" strokeWidth={1.5} />
+            <input
+              type="search"
+              value={marketplaceQuery}
+              onChange={(e) => setMarketplaceQuery(e.target.value)}
+              data-testid="marketplace-search"
+              placeholder={tr("搜尋市集劇本…", 'Search marketplace scripts…')}
+              aria-label={tr("搜尋市集劇本（標題、情境、地點）", 'Search marketplace scripts (title, scenario, location)')}
+              className="w-full pl-9 pr-20 py-2.5 border border-petal-rule rounded-md focus:outline-none focus:border-petal-rose-deep font-body text-sm text-petal-ink bg-white [&::-webkit-search-cancel-button]:hidden"
+            />
+            <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
               {marketplaceQuery && (
                 <button
+                  type="button"
                   onClick={() => setMarketplaceQuery('')}
                   data-testid="marketplace-search-clear"
                   aria-label={tr("清除搜尋", 'Clear search')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-petal-muted hover:text-petal-ink"
+                  className="p-1.5 text-petal-muted hover:text-petal-ink"
                 >
                   <X className="w-4 h-4" strokeWidth={1.5} />
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => setShowMarketFilters((v) => !v)}
+                data-testid="marketplace-filter-toggle"
+                aria-label={tr("顯示與篩選選項", 'Display & filter options')}
+                aria-expanded={showMarketFilters}
+                className={`p-1.5 rounded-md transition-colors ${showMarketFilters ? 'text-petal-ink bg-petal-cream-2' : 'text-petal-ink-soft hover:text-petal-ink'}`}
+              >
+                <SlidersHorizontal className="w-4 h-4" strokeWidth={1.5} />
+              </button>
             </div>
+            {showMarketFilters && (
+              <div
+                data-testid="marketplace-filter-panel"
+                className="absolute right-0 top-full mt-1.5 z-20 w-60 bg-petal-cream border border-petal-rule rounded-md shadow-petal p-3 space-y-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-body text-xs text-petal-muted">{tr('顯示方式', 'Display')}</span>
+                  <ViewToggle mode={marketplaceView} setMode={setMarketplaceView} idPrefix="roleplay-marketplace" />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMarketplaceSort('rating');
+                    setMarketplaceCategory('all');
+                    setMarketplaceQuery('');
+                    setShowMarketFilters(false);
+                  }}
+                  data-testid="marketplace-filter-reset"
+                  className="w-full text-left font-body text-xs text-petal-rose-deep hover:text-petal-ink"
+                >
+                  {tr('重設排序、分類與搜尋', 'Reset sort, category and search')}
+                </button>
+              </div>
+            )}
           </div>
 
           {marketplaceLoading ? (
@@ -1222,10 +1265,10 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleMarketplacePlay(m); }}
                           data-testid={`marketplace-play-${m.id}`}
-                          className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                          className="inline-flex items-center gap-1 bg-petal-rose-deep text-petal-cream pl-3.5 pr-3 py-1.5 rounded-full font-body text-sm hover:bg-pink-700 transition-colors"
                         >
-                          <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                          {tr('玩', 'Play')}
+                          {tr('開始', 'Start')}
+                          <Play className="w-3.5 h-3.5" strokeWidth={1.75} />
                         </button>
                       </div>
                     </div>
@@ -1233,7 +1276,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                 ))}
               </div>
             ) : (
-              <div className="flex flex-col gap-1.5" data-testid="marketplace-grid">
+              <div className="flex flex-col gap-3" data-testid="marketplace-grid">
                 {marketplaceScripts.map((m) =>
                   renderScriptListRow({
                     key: m.id,
@@ -1241,22 +1284,22 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
                     script: marketplaceToRoleplay(m),
                     onClick: () => setMarketplaceDetailId(m.id),
                     metaLine: (
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="font-body text-[11px] text-petal-muted truncate">by {m.authorName}</span>
-                        <StarRating value={m.avgStars} count={m.ratingCount} showCount size={11} />
+                      <div className="flex items-center gap-2 mt-0.5 min-w-0">
+                        <span className="font-body text-xs text-petal-muted truncate">by {m.authorName}</span>
+                        <StarRating value={m.avgStars} count={m.ratingCount} size={12} />
                       </div>
                     ),
                     actions: (
                       <>
-                        <FavoriteButton scriptId={m.id} className="w-7 h-7 hover:bg-petal-cream-2" />
+                        <FavoriteButton scriptId={m.id} className="w-9 h-9 hover:bg-petal-cream-2" />
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); handleMarketplacePlay(m); }}
                           data-testid={`marketplace-play-${m.id}`}
-                          className="bg-petal-ink text-petal-cream px-3 py-1 rounded-full font-body text-xs hover:bg-pink-700 transition-colors"
+                          className="inline-flex items-center gap-1 bg-petal-rose-deep text-petal-cream pl-3.5 pr-3 py-1.5 rounded-full font-body text-sm hover:bg-pink-700 transition-colors"
                         >
-                          <Play className="w-3 h-3 inline mr-1" strokeWidth={1.5} />
-                          {tr('玩', 'Play')}
+                          {tr('開始', 'Start')}
+                          <Play className="w-3.5 h-3.5" strokeWidth={1.75} />
                         </button>
                       </>
                     ),
@@ -1555,7 +1598,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
           data-testid="roleplay-back-to-top"
           aria-label={tr("回到最上面", 'Back to top')}
-          className="fixed bottom-6 right-4 sm:bottom-8 sm:right-8 z-40 w-11 h-11 inline-flex items-center justify-center rounded-full bg-petal-ink text-petal-cream shadow-petal border border-petal-ink/10 hover:bg-pink-700 transition-colors safe-pb"
+          className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-4 md:bottom-8 md:right-8 z-40 w-11 h-11 inline-flex items-center justify-center rounded-full bg-petal-ink text-petal-cream shadow-petal border border-petal-ink/10 hover:bg-pink-700 transition-colors"
         >
           <ArrowUp className="w-5 h-5" strokeWidth={1.5} />
         </button>

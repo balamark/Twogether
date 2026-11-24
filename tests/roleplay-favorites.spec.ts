@@ -59,6 +59,7 @@ test.describe.serial('Roleplay favorites — couple-shared 我的最愛劇本', 
   test.beforeEach(async ({ page }) => {
     await loginIfNeeded(page);
     await page.getByTestId('nav-tab-talk').click();
+    await page.getByTestId('talk-switcher-toggle').click();
     const roleplayTab = page.getByTestId('talk-roleplay-entry');
     await expect(roleplayTab).toBeVisible({ timeout: 5000 });
     await roleplayTab.click();
@@ -86,6 +87,10 @@ test.describe.serial('Roleplay favorites — couple-shared 我的最愛劇本', 
     await page.reload();
     await page.waitForLoadState('domcontentloaded');
     await page.getByTestId('nav-tab-talk').click();
+    // The reload restores 角色扮演, so re-tapping 對話 may already have opened the menu.
+    if ((await page.getByTestId('talk-switcher-menu').count()) === 0) {
+      await page.getByTestId('talk-switcher-toggle').click();
+    }
     await page.getByTestId('talk-roleplay-entry').click();
     await page.waitForTimeout(1500);
     await page.getByTestId('roleplay-filter-favorites').click();

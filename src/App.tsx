@@ -1086,11 +1086,8 @@ const LoveTimeApp = () => {
   useScrollLock(showDeleteConfirm && !!deletingRecord);
   useScrollLock(!!dayPickerDate);
 
-  const [showTagline, setShowTagline] = useState(true);
-  useEffect(() => {
-    const timer = setTimeout(() => setShowTagline(false), 10000);
-    return () => clearTimeout(timer);
-  }, []);
+  // Re-tapping the active 對話 tab opens the TalkSwitcher's destination menu.
+  const [talkMenuSignal, setTalkMenuSignal] = useState(0);
 
   // Authentication functions
   const generatePartnerCode = () => {
@@ -2843,7 +2840,7 @@ const LoveTimeApp = () => {
       case 'events':
         return (
           <div>
-            <TalkSwitcher current="events" onNavigate={setCurrentView} />
+            <TalkSwitcher current="events" onNavigate={setCurrentView} openSignal={talkMenuSignal} />
             <EventsView
               authState={authState}
               showNotification={showNotification}
@@ -2882,7 +2879,7 @@ const LoveTimeApp = () => {
       // active chip keeps you oriented either way.)
       case 'roleplay': return (
         <div>
-          <TalkSwitcher current="roleplay" onNavigate={setCurrentView} />
+          <TalkSwitcher current="roleplay" onNavigate={setCurrentView} openSignal={talkMenuSignal} />
           <RoleplayView
             defaultRoleplayScripts={defaultRoleplayScripts}
             customScripts={customScripts}
@@ -2996,7 +2993,7 @@ const LoveTimeApp = () => {
       />;
       case 'therapists': return (
         <div>
-          <TalkSwitcher current="therapists" onNavigate={setCurrentView} />
+          <TalkSwitcher current="therapists" onNavigate={setCurrentView} openSignal={talkMenuSignal} />
           <TherapistsView authState={visitorAuthState} showNotification={showNotification} mode="user" />
         </div>
       );
@@ -3286,20 +3283,16 @@ const LoveTimeApp = () => {
         </div>
       )}
 
-      <div className="container mx-auto px-4 py-10">
-        {/* Tagline */}
-        <div
-          className={`text-center overflow-hidden transition-all duration-700 ease-in-out ${
-            showTagline ? 'max-h-12 opacity-100 mb-10' : 'max-h-0 opacity-0 mb-0'
-          }`}
+      <div className="container mx-auto px-4 pt-6 pb-28 md:py-10">
+        {/* Navigation — a fixed bottom tab bar on phones (one-thumb reach, frees
+            the top of the screen for content); a centred pill row on md+. The
+            same buttons serve both, so the nav-tab-* testids stay unique. */}
+        <nav
+          aria-label={tr('主要導覽', 'Main navigation')}
+          data-testid="main-tab-bar"
+          className="fixed inset-x-0 bottom-0 z-40 bg-petal-cream/95 backdrop-blur-sm border-t border-petal-rule safe-pb safe-px md:static md:z-auto md:bg-transparent md:backdrop-blur-none md:border-0 md:p-0 md:mb-10"
         >
-          <p className="font-display italic font-light text-base text-petal-muted">
-            {tr('為熱戀中的你們 —', 'For the two of you in love — ')} <span className="text-petal-ink">{tr('記錄每一段親密時光', 'every intimate moment, recorded')}</span>
-          </p>
-        </div>
-
-        {/* Navigation */}
-        <div className="flex flex-wrap justify-center gap-1.5 mb-10">
+          <div className="flex max-w-lg mx-auto md:max-w-none md:flex-wrap md:justify-center md:gap-1.5">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -3312,20 +3305,31 @@ const LoveTimeApp = () => {
             return (
               <button
                 key={item.id}
-                onClick={() => setCurrentView(item.id)}
+                onClick={() => {
+                  // Already inside 對話: the tab opens its destination menu
+                  // instead of resetting you to 說開一件事.
+                  if (item.id === 'talk' && isActive) {
+                    setTalkMenuSignal((n) => n + 1);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    return;
+                  }
+                  setCurrentView(item.id);
+                }}
                 data-testid={`nav-tab-${item.id}`}
-                className={`flex items-center space-x-1.5 px-3.5 py-1.5 rounded-full transition-colors border ${
+                aria-current={isActive ? 'page' : undefined}
+                className={`flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[56px] py-1.5 transition-colors md:flex-none md:flex-row md:gap-1.5 md:min-h-0 md:px-3.5 md:py-1.5 md:rounded-full md:border ${
                   isActive
-                    ? 'bg-petal-ink text-petal-cream border-petal-ink'
-                    : 'bg-transparent text-petal-ink-soft border-petal-rule hover:border-petal-ink hover:text-petal-ink'
+                    ? 'text-petal-rose-deep md:bg-petal-ink md:text-petal-cream md:border-petal-ink'
+                    : 'text-petal-ink-soft hover:text-petal-ink md:bg-transparent md:border-petal-rule md:hover:border-petal-ink'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
-                <span className="font-body text-[13px] font-medium tracking-tight">{item.label}</span>
+                <Icon className="w-[22px] h-[22px] md:w-3.5 md:h-3.5" strokeWidth={isActive ? 1.75 : 1.5} />
+                <span className="font-body text-[11px] md:text-[13px] font-medium tracking-tight">{item.label}</span>
               </button>
             );
           })}
-        </div>
+          </div>
+        </nav>
 
         {/* Soft email-verification reminder — non-blocking; users can keep using
             the app. Shows only while authenticated and not yet verified. */}

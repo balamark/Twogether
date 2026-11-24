@@ -115,7 +115,7 @@ const GuestCoach: React.FC<Props> = ({ onSignUp, onOpenEvent }) => {
   }
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[65] flex justify-center px-4 pb-4 pointer-events-none safe-pb" role="status" aria-live="polite" data-testid="guest-coach" data-state={state.kind}>
+    <div className="fixed inset-x-0 above-tabbar z-[65] flex justify-center px-4 pb-4 pointer-events-none" role="status" aria-live="polite" data-testid="guest-coach" data-state={state.kind}>
       <div className="pointer-events-auto w-full max-w-sm rounded-2xl border border-petal-rule bg-petal-cream px-4 py-3 shadow-[0_12px_40px_-8px_rgba(42,37,32,0.35)]">
         <div className="flex items-start gap-2">
           <span className="mt-0.5">{icon}</span>
