@@ -1,0 +1,31 @@
+{
+  "displayName": "Twogether: site unreachable",
+  "documentation": {
+    "mimeType": "text/markdown",
+    "content": "The uptime check on https://twogether.fun/health is failing from more than one region.\n\nCheck App Engine → Versions in twogether-couples-app (is a version serving?), the latest \"Deploy to GCP\" run in GitHub Actions, and whether the Supabase project was auto-paused. Re-run or edit this policy with `scripts/setup-monitoring.sh`."
+  },
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Uptime check failing",
+      "conditionThreshold": {
+        "filter": "metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" AND metric.label.check_id=\"__UPTIME_CHECK_ID__\" AND resource.type=\"uptime_url\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "1200s",
+            "perSeriesAligner": "ALIGN_NEXT_OLDER",
+            "crossSeriesReducer": "REDUCE_COUNT_FALSE",
+            "groupByFields": ["resource.label.*"]
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 1,
+        "duration": "60s",
+        "trigger": { "count": 1 }
+      }
+    }
+  ],
+  "alertStrategy": { "autoClose": "1800s" },
+  "notificationChannels": ["__CHANNEL__"],
+  "severity": "CRITICAL"
+}
