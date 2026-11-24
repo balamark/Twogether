@@ -19,6 +19,8 @@
     "test:e2e:headed": "npx playwright test --headed",
     "test:e2e:debug": "npx playwright test --debug",
     "lint": "eslint .",
+    "lint:comments": "eslint -c eslint.comments.config.mjs --suppressions-location comment-suppressions.json .",
+    "lint:comments:prune": "eslint -c eslint.comments.config.mjs --suppressions-location comment-suppressions.json --prune-suppressions .",
     "changelog": "node scripts/build-changelog.mjs",
     "check:admin": "node scripts/check-admin-inline-script.js",
     "check:contrast": "node scripts/check-dark-contrast.js",

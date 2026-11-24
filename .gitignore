@@ -55,7 +55,8 @@ playwright-report/
 debug-*.png
 *-debug.png
 .gstack/
-.claude/
+.claude/*
+!.claude/skills/
 
 # Supabase CLI local cache (not project config)
 supabase/.temp/

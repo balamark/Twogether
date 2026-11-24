@@ -45,6 +45,9 @@ jobs:
               - 'tsconfig*.json'
               - 'playwright.config.ts'
               - 'eslint.config.js'
+              - 'eslint.comments.config.mjs'
+              - 'eslint-rules/**'
+              - 'comment-suppressions.json'
               - '.github/workflows/deploy.yml'
 
   # Playwright runs in 4 parallel shards — the suite is serial (workers: 1, see
@@ -201,6 +204,9 @@ jobs:
 
       - name: Validate Engineer Mode dark-theme contrast
         run: npm run check:contrast
+
+      - name: No new code comments (docs/adr/0001)
+        run: npm run lint:comments
 
       - name: Set up test database and run tests
         env:

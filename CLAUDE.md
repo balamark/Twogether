@@ -3,6 +3,16 @@
 Notes for anyone (human or AI) working in this repo. Keep this file short and
 current.
 
+## No code comments (every change)
+
+Don't write comments. The non-obvious *why* goes in an ADR under `docs/adr/`
+(see `docs/adr/README.md` for which ADR covers which module). Read a module's
+ADR before changing it.
+`npm run lint:comments` (CI) fails on any new comment. Existing ones are
+ratcheted in `comment-suppressions.json`, which may only shrink. Use
+`/delete-comment <slice>` to clear a slice, then `npm run lint:comments:prune`.
+Tool directives (`eslint-disable…`, `@ts-expect-error`) are allowed.
+
 ## Changelog & promo (every UI feature change)
 
 When you ship a user-facing UI feature change:

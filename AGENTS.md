@@ -12,7 +12,7 @@ npm run build              # Type-check (tsc -b) and produce Vite build into dis
 npm start                  # Serve the combined production build
 npm run migrate            # Apply pending database migrations
 ```
-Use `npm run test` for the full suite (backend integration + Playwright). To isolate suites, prefer `npm run test:backend` or `npm run test:e2e`. Lint locally with `npm run lint` before opening a PR.
+Use `npm run test` for the full suite (backend integration + Playwright). To isolate suites, prefer `npm run test:backend` or `npm run test:e2e`. Lint locally with `npm run lint` before opening a PR. Code carries no comments (`npm run lint:comments`, ratcheted via `comment-suppressions.json`); record non-obvious decisions in `docs/adr/` instead.
 
 ## Coding Style & Naming Conventions
 TypeScript and TSX files follow the ESLint configs in `eslint.config.js`; run `npm run lint -- --fix` to auto-resolve style issues. Use 2-space indentation, semicolons, and single quotes to match existing code. Components and hooks are PascalCase (e.g., `PairingInvitationHandler.tsx`), while services and utilities stay camelCase (`apiService.ts`). Keep React components functional and colocate related styles/assets under the same directory to mirror the current layout.

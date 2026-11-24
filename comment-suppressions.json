@@ -1,0 +1,1797 @@
+{
+  "database/db.js": {
+    "local/no-comments": {
+      "count": 13
+    }
+  },
+  "database/migrator.js": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "playwright.config.ts": {
+    "local/no-comments": {
+      "count": 35
+    }
+  },
+  "routes/achievements.js": {
+    "local/no-comments": {
+      "count": 22
+    }
+  },
+  "routes/activity.js": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "routes/admin.js": {
+    "local/no-comments": {
+      "count": 171
+    }
+  },
+  "routes/ai-companions.js": {
+    "local/no-comments": {
+      "count": 2
+    }
+  },
+  "routes/ai-feedback.js": {
+    "local/no-comments": {
+      "count": 14
+    }
+  },
+  "routes/ai-usage.js": {
+    "local/no-comments": {
+      "count": 5
+    }
+  },
+  "routes/assessments.js": {
+    "local/no-comments": {
+      "count": 14
+    }
+  },
+  "routes/auth.js": {
+    "local/no-comments": {
+      "count": 63
+    }
+  },
+  "routes/billing.js": {
+    "local/no-comments": {
+      "count": 86
+    }
+  },
+  "routes/coins.js": {
+    "local/no-comments": {
+      "count": 35
+    }
+  },
+  "routes/conflict-intervention.js": {
+    "local/no-comments": {
+      "count": 97
+    }
+  },
+  "routes/couples.js": {
+    "local/no-comments": {
+      "count": 22
+    }
+  },
+  "routes/custom-gifts.js": {
+    "local/no-comments": {
+      "count": 26
+    }
+  },
+  "routes/custom-scripts.js": {
+    "local/no-comments": {
+      "count": 87
+    }
+  },
+  "routes/cycle-records.js": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "routes/day-status.js": {
+    "local/no-comments": {
+      "count": 18
+    }
+  },
+  "routes/dedicated-space.js": {
+    "local/no-comments": {
+      "count": 41
+    }
+  },
+  "routes/deep-dive.js": {
+    "local/no-comments": {
+      "count": 57
+    }
+  },
+  "routes/email.js": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "routes/event-closure.js": {
+    "local/no-comments": {
+      "count": 157
+    }
+  },
+  "routes/events.js": {
+    "local/no-comments": {
+      "count": 336
+    }
+  },
+  "routes/feedback.js": {
+    "local/no-comments": {
+      "count": 14
+    }
+  },
+  "routes/guest-ai.js": {
+    "local/no-comments": {
+      "count": 25
+    }
+  },
+  "routes/intimacy-plans.js": {
+    "local/no-comments": {
+      "count": 29
+    }
+  },
+  "routes/intimacy-requests.js": {
+    "local/no-comments": {
+      "count": 122
+    }
+  },
+  "routes/journey.js": {
+    "local/no-comments": {
+      "count": 31
+    }
+  },
+  "routes/line.js": {
+    "local/no-comments": {
+      "count": 19
+    }
+  },
+  "routes/love-moments.js": {
+    "local/no-comments": {
+      "count": 82
+    }
+  },
+  "routes/marketplace.js": {
+    "local/no-comments": {
+      "count": 23
+    }
+  },
+  "routes/marriage-checkups.js": {
+    "local/no-comments": {
+      "count": 21
+    }
+  },
+  "routes/pairing-requests.js": {
+    "local/no-comments": {
+      "count": 20
+    }
+  },
+  "routes/photos.js": {
+    "local/no-comments": {
+      "count": 23
+    }
+  },
+  "routes/playbooks.js": {
+    "local/no-comments": {
+      "count": 15
+    }
+  },
+  "routes/polls.js": {
+    "local/no-comments": {
+      "count": 24
+    }
+  },
+  "routes/relationship.js": {
+    "local/no-comments": {
+      "count": 36
+    }
+  },
+  "routes/script-favorites.js": {
+    "local/no-comments": {
+      "count": 7
+    }
+  },
+  "routes/stats.js": {
+    "local/no-comments": {
+      "count": 18
+    }
+  },
+  "routes/stories.js": {
+    "local/no-comments": {
+      "count": 75
+    }
+  },
+  "routes/therapists.js": {
+    "local/no-comments": {
+      "count": 319
+    }
+  },
+  "routes/wall.js": {
+    "local/no-comments": {
+      "count": 151
+    }
+  },
+  "scripts/add-compliment-templates.js": {
+    "local/no-comments": {
+      "count": 4
+    }
+  },
+  "scripts/backfill-script-thumbnails.js": {
+    "local/no-comments": {
+      "count": 1
+    }
+  },
+  "scripts/build-changelog.mjs": {
+    "local/no-comments": {
+      "count": 15
+    }
+  },
+  "scripts/check-admin-inline-script.js": {
+    "local/no-comments": {
+      "count": 14
+    }
+  },
+  "scripts/check-dark-contrast.js": {
+    "local/no-comments": {
+      "count": 27
+    }
+  },
+  "scripts/check-rls.js": {
+    "local/no-comments": {
+      "count": 12
+    }
+  },
+  "scripts/create-review-account.js": {
+    "local/no-comments": {
+      "count": 14
+    }
+  },
+  "scripts/generate-og-image.mjs": {
+    "local/no-comments": {
+      "count": 12
+    }
+  },
+  "scripts/generate-roleplay-thumbs.mjs": {
+    "local/no-comments": {
+      "count": 11
+    }
+  },
+  "scripts/migrate.js": {
+    "local/no-comments": {
+      "count": 1
+    }
+  },
+  "scripts/perf/measure-pages.mjs": {
+    "local/no-comments": {
+      "count": 26
+    }
+  },
+  "scripts/repair-migration-ledger.js": {
+    "local/no-comments": {
+      "count": 24
+    }
+  },
+  "scripts/setup-test-db.js": {
+    "local/no-comments": {
+      "count": 11
+    }
+  },
+  "scripts/test-ci.js": {
+    "local/no-comments": {
+      "count": 9
+    }
+  },
+  "scripts/test-datetime.cjs": {
+    "local/no-comments": {
+      "count": 5
+    }
+  },
+  "scripts/verify-smtp.js": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "server.js": {
+    "local/no-comments": {
+      "count": 122
+    }
+  },
+  "services/characterMappingService.js": {
+    "local/no-comments": {
+      "count": 28
+    }
+  },
+  "services/emailService.js": {
+    "local/no-comments": {
+      "count": 90
+    }
+  },
+  "services/lineService.js": {
+    "local/no-comments": {
+      "count": 21
+    }
+  },
+  "services/llm/claudeProvider.js": {
+    "local/no-comments": {
+      "count": 367
+    }
+  },
+  "services/llm/mockProvider.js": {
+    "local/no-comments": {
+      "count": 84
+    }
+  },
+  "services/llmService.js": {
+    "local/no-comments": {
+      "count": 4
+    }
+  },
+  "services/notificationService.js": {
+    "local/no-comments": {
+      "count": 46
+    }
+  },
+  "src/App.tsx": {
+    "local/no-comments": {
+      "count": 402
+    }
+  },
+  "src/components/AchievementsView.tsx": {
+    "local/no-comments": {
+      "count": 60
+    }
+  },
+  "src/components/ActivityView.tsx": {
+    "local/no-comments": {
+      "count": 7
+    }
+  },
+  "src/components/AiCompanionPicker.tsx": {
+    "local/no-comments": {
+      "count": 13
+    }
+  },
+  "src/components/AiQuotaHint.tsx": {
+    "local/no-comments": {
+      "count": 3
+    }
+  },
+  "src/components/AiResponseFeedback.tsx": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "src/components/AlternativePlansPanel.tsx": {
+    "local/no-comments": {
+      "count": 31
+    }
+  },
+  "src/components/AppreciationPromptView.tsx": {
+    "local/no-comments": {
+      "count": 25
+    }
+  },
+  "src/components/ArticleComposeFlow.tsx": {
+    "local/no-comments": {
+      "count": 5
+    }
+  },
+  "src/components/AuthModal.tsx": {
+    "local/no-comments": {
+      "count": 17
+    }
+  },
+  "src/components/AutoGrowTextarea.tsx": {
+    "local/no-comments": {
+      "count": 13
+    }
+  },
+  "src/components/BookingResultView.tsx": {
+    "local/no-comments": {
+      "count": 3
+    }
+  },
+  "src/components/CalendarDatePicker.tsx": {
+    "local/no-comments": {
+      "count": 9
+    }
+  },
+  "src/components/CalendarView.tsx": {
+    "local/no-comments": {
+      "count": 84
+    }
+  },
+  "src/components/CoinShopView.tsx": {
+    "local/no-comments": {
+      "count": 35
+    }
+  },
+  "src/components/ComposeEventFlow.tsx": {
+    "local/no-comments": {
+      "count": 12
+    }
+  },
+  "src/components/ConflictBanner.tsx": {
+    "local/no-comments": {
+      "count": 12
+    }
+  },
+  "src/components/ConflictView.tsx": {
+    "local/no-comments": {
+      "count": 43
+    }
+  },
+  "src/components/CuratedReadingCard.tsx": {
+    "local/no-comments": {
+      "count": 2
+    }
+  },
+  "src/components/DailyLoveView.tsx": {
+    "local/no-comments": {
+      "count": 43
+    }
+  },
+  "src/components/DayRhythmCard.tsx": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "src/components/DedicatedSpace.tsx": {
+    "local/no-comments": {
+      "count": 28
+    }
+  },
+  "src/components/DedicatedSpaceModal.tsx": {
+    "local/no-comments": {
+      "count": 2
+    }
+  },
+  "src/components/DedicatedTherapistPanel.tsx": {
+    "local/no-comments": {
+      "count": 14
+    }
+  },
+  "src/components/DepositPanel.tsx": {
+    "local/no-comments": {
+      "count": 14
+    }
+  },
+  "src/components/DraftEmotionMeter.tsx": {
+    "local/no-comments": {
+      "count": 3
+    }
+  },
+  "src/components/EngineerTextEngine.tsx": {
+    "local/no-comments": {
+      "count": 22
+    }
+  },
+  "src/components/ErrorBoundary.tsx": {
+    "local/no-comments": {
+      "count": 14
+    }
+  },
+  "src/components/EventAnalytics.tsx": {
+    "local/no-comments": {
+      "count": 12
+    }
+  },
+  "src/components/EventDetail.tsx": {
+    "local/no-comments": {
+      "count": 144
+    }
+  },
+  "src/components/EventHistoryList.tsx": {
+    "local/no-comments": {
+      "count": 15
+    }
+  },
+  "src/components/EventShareMenu.tsx": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "src/components/EventsView.tsx": {
+    "local/no-comments": {
+      "count": 25
+    }
+  },
+  "src/components/FeedbackView.tsx": {
+    "local/no-comments": {
+      "count": 5
+    }
+  },
+  "src/components/FilterChip.tsx": {
+    "local/no-comments": {
+      "count": 1
+    }
+  },
+  "src/components/FocusFilter.tsx": {
+    "local/no-comments": {
+      "count": 4
+    }
+  },
+  "src/components/ForeplayView.tsx": {
+    "local/no-comments": {
+      "count": 14
+    }
+  },
+  "src/components/GamesView.tsx": {
+    "local/no-comments": {
+      "count": 3
+    }
+  },
+  "src/components/GettingStartedCard.tsx": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/components/GrowView.tsx": {
+    "local/no-comments": {
+      "count": 9
+    }
+  },
+  "src/components/GuideSessionView.tsx": {
+    "local/no-comments": {
+      "count": 28
+    }
+  },
+  "src/components/Header.tsx": {
+    "local/no-comments": {
+      "count": 23
+    }
+  },
+  "src/components/HelpView.tsx": {
+    "local/no-comments": {
+      "count": 7
+    }
+  },
+  "src/components/HomeView.tsx": {
+    "local/no-comments": {
+      "count": 21
+    }
+  },
+  "src/components/InfoHint.tsx": {
+    "local/no-comments": {
+      "count": 2
+    }
+  },
+  "src/components/IntimacyRequestActionPanel.tsx": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "src/components/IntimacyRequestDetailModal.tsx": {
+    "local/no-comments": {
+      "count": 17
+    }
+  },
+  "src/components/IntimacyRequestForm.tsx": {
+    "local/no-comments": {
+      "count": 73
+    }
+  },
+  "src/components/IntimacyRequestsHistory.tsx": {
+    "local/no-comments": {
+      "count": 11
+    }
+  },
+  "src/components/LanguageSwitch.tsx": {
+    "local/no-comments": {
+      "count": 2
+    }
+  },
+  "src/components/LineNotificationSettings.tsx": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/components/LoggedOutPreview.tsx": {
+    "local/no-comments": {
+      "count": 114
+    }
+  },
+  "src/components/LoveBankCard.tsx": {
+    "local/no-comments": {
+      "count": 11
+    }
+  },
+  "src/components/LoveBankRatesSettings.tsx": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/components/LoveLanguageView.tsx": {
+    "local/no-comments": {
+      "count": 8
+    }
+  },
+  "src/components/MarkdownContent.tsx": {
+    "local/no-comments": {
+      "count": 3
+    }
+  },
+  "src/components/MarketplaceScriptDetail.tsx": {
+    "local/no-comments": {
+      "count": 9
+    }
+  },
+  "src/components/MarriageCheckup.tsx": {
+    "local/no-comments": {
+      "count": 16
+    }
+  },
+  "src/components/MessageTranslationCard.tsx": {
+    "local/no-comments": {
+      "count": 14
+    }
+  },
+  "src/components/MomentCheckinCard.tsx": {
+    "local/no-comments": {
+      "count": 12
+    }
+  },
+  "src/components/MomentResponseBar.tsx": {
+    "local/no-comments": {
+      "count": 32
+    }
+  },
+  "src/components/MyStories.tsx": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/components/NotificationInbox.tsx": {
+    "local/no-comments": {
+      "count": 33
+    }
+  },
+  "src/components/OurJourneyView.tsx": {
+    "local/no-comments": {
+      "count": 40
+    }
+  },
+  "src/components/PairingInvitationHandler.tsx": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/components/PairingInviteShare.tsx": {
+    "local/no-comments": {
+      "count": 7
+    }
+  },
+  "src/components/PairingReminderBanner.tsx": {
+    "local/no-comments": {
+      "count": 18
+    }
+  },
+  "src/components/ParticipantAvatar.tsx": {
+    "local/no-comments": {
+      "count": 19
+    }
+  },
+  "src/components/PaymentMethodPicker.tsx": {
+    "local/no-comments": {
+      "count": 5
+    }
+  },
+  "src/components/PetalSelect.tsx": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/components/PollsView.tsx": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "src/components/PremiumExpiryBanner.tsx": {
+    "local/no-comments": {
+      "count": 16
+    }
+  },
+  "src/components/PrivateCoachDrawer.tsx": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "src/components/PublicQaView.tsx": {
+    "local/no-comments": {
+      "count": 16
+    }
+  },
+  "src/components/PurchaseReceipts.tsx": {
+    "local/no-comments": {
+      "count": 11
+    }
+  },
+  "src/components/RediscoverView.tsx": {
+    "local/no-comments": {
+      "count": 18
+    }
+  },
+  "src/components/RelationshipDashboard.tsx": {
+    "local/no-comments": {
+      "count": 25
+    }
+  },
+  "src/components/ReplyStepBar.tsx": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/components/RoleplayView.tsx": {
+    "local/no-comments": {
+      "count": 93
+    }
+  },
+  "src/components/ScriptUploadModal.tsx": {
+    "local/no-comments": {
+      "count": 47
+    }
+  },
+  "src/components/SessionProgress.tsx": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/components/SettingsView.tsx": {
+    "local/no-comments": {
+      "count": 54
+    }
+  },
+  "src/components/SoloModeGate.tsx": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/components/SophieInterventionOverlay.tsx": {
+    "local/no-comments": {
+      "count": 24
+    }
+  },
+  "src/components/SophieMessageCard.tsx": {
+    "local/no-comments": {
+      "count": 18
+    }
+  },
+  "src/components/StarRating.tsx": {
+    "local/no-comments": {
+      "count": 3
+    }
+  },
+  "src/components/StoriesView.tsx": {
+    "local/no-comments": {
+      "count": 13
+    }
+  },
+  "src/components/StoryComposeFlow.tsx": {
+    "local/no-comments": {
+      "count": 14
+    }
+  },
+  "src/components/StoryDetail.tsx": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "src/components/StoryList.tsx": {
+    "local/no-comments": {
+      "count": 13
+    }
+  },
+  "src/components/TalkSwitcher.tsx": {
+    "local/no-comments": {
+      "count": 15
+    }
+  },
+  "src/components/Testimonials.tsx": {
+    "local/no-comments": {
+      "count": 4
+    }
+  },
+  "src/components/TherapistClientView.tsx": {
+    "local/no-comments": {
+      "count": 12
+    }
+  },
+  "src/components/TherapistClientsPanel.tsx": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "src/components/TherapistProfileModal.tsx": {
+    "local/no-comments": {
+      "count": 12
+    }
+  },
+  "src/components/TherapistTurnCard.tsx": {
+    "local/no-comments": {
+      "count": 18
+    }
+  },
+  "src/components/TherapistsView.tsx": {
+    "local/no-comments": {
+      "count": 78
+    }
+  },
+  "src/components/TherapyNoteCard.tsx": {
+    "local/no-comments": {
+      "count": 3
+    }
+  },
+  "src/components/TherapySummaryCard.tsx": {
+    "local/no-comments": {
+      "count": 15
+    }
+  },
+  "src/components/TherapySummaryDetail.tsx": {
+    "local/no-comments": {
+      "count": 5
+    }
+  },
+  "src/components/TherapyTopicsCard.tsx": {
+    "local/no-comments": {
+      "count": 26
+    }
+  },
+  "src/components/ThreadRoleLegend.tsx": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "src/components/UpgradeView.tsx": {
+    "local/no-comments": {
+      "count": 24
+    }
+  },
+  "src/components/UsView.tsx": {
+    "local/no-comments": {
+      "count": 20
+    }
+  },
+  "src/components/WallPostComposer.tsx": {
+    "local/no-comments": {
+      "count": 71
+    }
+  },
+  "src/components/WallPostThread.tsx": {
+    "local/no-comments": {
+      "count": 30
+    }
+  },
+  "src/components/WallView.tsx": {
+    "local/no-comments": {
+      "count": 109
+    }
+  },
+  "src/components/closure/AssistOptions.tsx": {
+    "local/no-comments": {
+      "count": 3
+    }
+  },
+  "src/components/closure/CloseTogetherBar.tsx": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "src/components/closure/CloseTogetherModal.tsx": {
+    "local/no-comments": {
+      "count": 2
+    }
+  },
+  "src/components/closure/ClosurePanel.tsx": {
+    "local/no-comments": {
+      "count": 37
+    }
+  },
+  "src/components/closure/ClosureSkipModal.tsx": {
+    "local/no-comments": {
+      "count": 3
+    }
+  },
+  "src/components/closure/ClosureSummaryCard.tsx": {
+    "local/no-comments": {
+      "count": 9
+    }
+  },
+  "src/components/closure/ClosureWaitingCard.tsx": {
+    "local/no-comments": {
+      "count": 4
+    }
+  },
+  "src/components/closure/CommitmentCard.tsx": {
+    "local/no-comments": {
+      "count": 3
+    }
+  },
+  "src/components/closure/CommitmentComposer.tsx": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "src/components/deepdive/DeepDiveJourneyView.tsx": {
+    "local/no-comments": {
+      "count": 42
+    }
+  },
+  "src/components/deepdive/DeepDiveResumeBanner.tsx": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/components/deepdive/SafetyExitScreen.tsx": {
+    "local/no-comments": {
+      "count": 5
+    }
+  },
+  "src/components/intimacyStatus.ts": {
+    "local/no-comments": {
+      "count": 5
+    }
+  },
+  "src/components/momentCheckinOptions.ts": {
+    "local/no-comments": {
+      "count": 2
+    }
+  },
+  "src/components/playbooks/PlaybookDetail.tsx": {
+    "local/no-comments": {
+      "count": 9
+    }
+  },
+  "src/components/playbooks/PlaybookReflectionPanel.tsx": {
+    "local/no-comments": {
+      "count": 7
+    }
+  },
+  "src/components/playbooks/PlaybooksView.tsx": {
+    "local/no-comments": {
+      "count": 17
+    }
+  },
+  "src/components/playbooks/playbookShared.ts": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/components/rhythmDisplay.ts": {
+    "local/no-comments": {
+      "count": 5
+    }
+  },
+  "src/components/therapistShared.ts": {
+    "local/no-comments": {
+      "count": 8
+    }
+  },
+  "src/components/ui/Button.tsx": {
+    "local/no-comments": {
+      "count": 8
+    }
+  },
+  "src/components/ui/Spinner.tsx": {
+    "local/no-comments": {
+      "count": 4
+    }
+  },
+  "src/content/communicationPrinciples.en.ts": {
+    "local/no-comments": {
+      "count": 3
+    }
+  },
+  "src/content/communicationPrinciples.ts": {
+    "local/no-comments": {
+      "count": 23
+    }
+  },
+  "src/content/curatedReadings.tsx": {
+    "local/no-comments": {
+      "count": 8
+    }
+  },
+  "src/content/engineerLexicon.ts": {
+    "local/no-comments": {
+      "count": 33
+    }
+  },
+  "src/content/featureIntros.en.ts": {
+    "local/no-comments": {
+      "count": 4
+    }
+  },
+  "src/content/featureIntros.ts": {
+    "local/no-comments": {
+      "count": 7
+    }
+  },
+  "src/content/loveBankCategories.ts": {
+    "local/no-comments": {
+      "count": 4
+    }
+  },
+  "src/content/moodTags.ts": {
+    "local/no-comments": {
+      "count": 4
+    }
+  },
+  "src/content/positioning.ts": {
+    "local/no-comments": {
+      "count": 23
+    }
+  },
+  "src/content/positiveInteractions.ts": {
+    "local/no-comments": {
+      "count": 16
+    }
+  },
+  "src/content/supportContact.ts": {
+    "local/no-comments": {
+      "count": 5
+    }
+  },
+  "src/contexts/EngineerModeContext.ts": {
+    "local/no-comments": {
+      "count": 7
+    }
+  },
+  "src/contexts/EngineerModeProvider.tsx": {
+    "local/no-comments": {
+      "count": 12
+    }
+  },
+  "src/contexts/FeatureFlagsContext.ts": {
+    "local/no-comments": {
+      "count": 5
+    }
+  },
+  "src/contexts/FeatureFlagsProvider.tsx": {
+    "local/no-comments": {
+      "count": 3
+    }
+  },
+  "src/contexts/TimezoneContext.ts": {
+    "local/no-comments": {
+      "count": 3
+    }
+  },
+  "src/data/alternativePlanSamples.ts": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/data/conflictSteps.ts": {
+    "local/no-comments": {
+      "count": 3
+    }
+  },
+  "src/data/emotionAcceptance.ts": {
+    "local/no-comments": {
+      "count": 12
+    }
+  },
+  "src/data/loveLanguage.ts": {
+    "local/no-comments": {
+      "count": 9
+    }
+  },
+  "src/data/marriageCheckup.ts": {
+    "local/no-comments": {
+      "count": 17
+    }
+  },
+  "src/guest/GuestBanner.tsx": {
+    "local/no-comments": {
+      "count": 18
+    }
+  },
+  "src/guest/GuestCoach.tsx": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "src/guest/GuestTutorial.tsx": {
+    "local/no-comments": {
+      "count": 17
+    }
+  },
+  "src/guest/guestAi.ts": {
+    "local/no-comments": {
+      "count": 15
+    }
+  },
+  "src/guest/guestApi.ts": {
+    "local/no-comments": {
+      "count": 11
+    }
+  },
+  "src/guest/guestDb.ts": {
+    "local/no-comments": {
+      "count": 12
+    }
+  },
+  "src/guest/guestErrors.ts": {
+    "local/no-comments": {
+      "count": 2
+    }
+  },
+  "src/guest/guestMode.ts": {
+    "local/no-comments": {
+      "count": 19
+    }
+  },
+  "src/guest/guestPartner.ts": {
+    "local/no-comments": {
+      "count": 13
+    }
+  },
+  "src/guest/guestRoutes.ts": {
+    "local/no-comments": {
+      "count": 45
+    }
+  },
+  "src/guest/guestSeed.ts": {
+    "local/no-comments": {
+      "count": 16
+    }
+  },
+  "src/guest/guestSoften.ts": {
+    "local/no-comments": {
+      "count": 12
+    }
+  },
+  "src/hooks/useAiQuota.ts": {
+    "local/no-comments": {
+      "count": 4
+    }
+  },
+  "src/hooks/useAsyncAction.ts": {
+    "local/no-comments": {
+      "count": 13
+    }
+  },
+  "src/hooks/useDedicatedSpace.ts": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/hooks/useHistoryState.ts": {
+    "local/no-comments": {
+      "count": 51
+    }
+  },
+  "src/hooks/useMediaProtection.ts": {
+    "local/no-comments": {
+      "count": 19
+    }
+  },
+  "src/hooks/usePageData.ts": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/hooks/usePageTracking.ts": {
+    "local/no-comments": {
+      "count": 21
+    }
+  },
+  "src/hooks/useScrollLock.ts": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/i18n/LanguageContext.ts": {
+    "local/no-comments": {
+      "count": 8
+    }
+  },
+  "src/i18n/LanguageProvider.tsx": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "src/i18n/messages.ts": {
+    "local/no-comments": {
+      "count": 2
+    }
+  },
+  "src/i18n/tr.ts": {
+    "local/no-comments": {
+      "count": 17
+    }
+  },
+  "src/main.tsx": {
+    "local/no-comments": {
+      "count": 2
+    }
+  },
+  "src/services/api.ts": {
+    "local/no-comments": {
+      "count": 667
+    }
+  },
+  "src/services/queryCache.ts": {
+    "local/no-comments": {
+      "count": 34
+    }
+  },
+  "src/services/responseCache.ts": {
+    "local/no-comments": {
+      "count": 20
+    }
+  },
+  "src/tests/conflictState.test.ts": {
+    "local/no-comments": {
+      "count": 1
+    }
+  },
+  "src/tests/deepDive.test.ts": {
+    "local/no-comments": {
+      "count": 7
+    }
+  },
+  "src/tests/intimacy-nudge.test.ts": {
+    "local/no-comments": {
+      "count": 9
+    }
+  },
+  "src/tests/intimacyStats.test.ts": {
+    "local/no-comments": {
+      "count": 8
+    }
+  },
+  "src/tests/judgeExamples.test.ts": {
+    "local/no-comments": {
+      "count": 4
+    }
+  },
+  "src/tests/pairing.test.ts": {
+    "local/no-comments": {
+      "count": 28
+    }
+  },
+  "src/tests/reflectionJudge.test.ts": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/tests/roleplay-prompt.test.ts": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/tests/therapyCards.test.ts": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/tests/wallCounselor-prompt.test.ts": {
+    "local/no-comments": {
+      "count": 8
+    }
+  },
+  "src/utils/aiCompanions.ts": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/utils/conflictState.ts": {
+    "local/no-comments": {
+      "count": 37
+    }
+  },
+  "src/utils/cycle.ts": {
+    "local/no-comments": {
+      "count": 52
+    }
+  },
+  "src/utils/datetime.ts": {
+    "local/no-comments": {
+      "count": 25
+    }
+  },
+  "src/utils/digits.ts": {
+    "local/no-comments": {
+      "count": 4
+    }
+  },
+  "src/utils/idempotency.ts": {
+    "local/no-comments": {
+      "count": 4
+    }
+  },
+  "src/utils/intimacyStats.ts": {
+    "local/no-comments": {
+      "count": 18
+    }
+  },
+  "src/utils/pairingLink.ts": {
+    "local/no-comments": {
+      "count": 4
+    }
+  },
+  "src/utils/pairingReminder.ts": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "src/utils/perf.ts": {
+    "local/no-comments": {
+      "count": 42
+    }
+  },
+  "src/utils/script.ts": {
+    "local/no-comments": {
+      "count": 33
+    }
+  },
+  "src/utils/telemetry.ts": {
+    "local/no-comments": {
+      "count": 15
+    }
+  },
+  "src/utils/therapySummary.ts": {
+    "local/no-comments": {
+      "count": 3
+    }
+  },
+  "src/utils/threadRoles.ts": {
+    "local/no-comments": {
+      "count": 33
+    }
+  },
+  "src/utils/timezone-options.ts": {
+    "local/no-comments": {
+      "count": 2
+    }
+  },
+  "src/utils/track.ts": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "src/vite-env.d.ts": {
+    "local/no-comments": {
+      "count": 2
+    }
+  },
+  "tailwind.config.js": {
+    "local/no-comments": {
+      "count": 32
+    }
+  },
+  "test-integration.js": {
+    "local/no-comments": {
+      "count": 105
+    }
+  },
+  "test-notification-service.js": {
+    "local/no-comments": {
+      "count": 24
+    }
+  },
+  "tests/activity-feed.spec.ts": {
+    "local/no-comments": {
+      "count": 3
+    }
+  },
+  "tests/admin-dashboard.spec.ts": {
+    "local/no-comments": {
+      "count": 25
+    }
+  },
+  "tests/ai-companion.spec.ts": {
+    "local/no-comments": {
+      "count": 12
+    }
+  },
+  "tests/auth-autofill.spec.ts": {
+    "local/no-comments": {
+      "count": 8
+    }
+  },
+  "tests/build-info.spec.ts": {
+    "local/no-comments": {
+      "count": 4
+    }
+  },
+  "tests/calendar-adjacent-days.spec.ts": {
+    "local/no-comments": {
+      "count": 8
+    }
+  },
+  "tests/coin-shop-manage.spec.ts": {
+    "local/no-comments": {
+      "count": 13
+    }
+  },
+  "tests/communicate-nav.spec.ts": {
+    "local/no-comments": {
+      "count": 15
+    }
+  },
+  "tests/conflict-banner.spec.ts": {
+    "local/no-comments": {
+      "count": 7
+    }
+  },
+  "tests/custom-gifts-api.spec.ts": {
+    "local/no-comments": {
+      "count": 5
+    }
+  },
+  "tests/custom-script-api.spec.ts": {
+    "local/no-comments": {
+      "count": 9
+    }
+  },
+  "tests/custom-script.spec.ts": {
+    "local/no-comments": {
+      "count": 54
+    }
+  },
+  "tests/cycle-prediction.spec.ts": {
+    "local/no-comments": {
+      "count": 9
+    }
+  },
+  "tests/day-status-api.spec.ts": {
+    "local/no-comments": {
+      "count": 8
+    }
+  },
+  "tests/dedicated-space.spec.ts": {
+    "local/no-comments": {
+      "count": 11
+    }
+  },
+  "tests/deep-dive.spec.ts": {
+    "local/no-comments": {
+      "count": 18
+    }
+  },
+  "tests/deposits-api.spec.ts": {
+    "local/no-comments": {
+      "count": 16
+    }
+  },
+  "tests/destructive-action-guards.spec.ts": {
+    "local/no-comments": {
+      "count": 11
+    }
+  },
+  "tests/emotion-translation.spec.ts": {
+    "local/no-comments": {
+      "count": 16
+    }
+  },
+  "tests/events-acceptance.spec.ts": {
+    "local/no-comments": {
+      "count": 8
+    }
+  },
+  "tests/events-closure-api.spec.ts": {
+    "local/no-comments": {
+      "count": 51
+    }
+  },
+  "tests/events-closure-escape.spec.ts": {
+    "local/no-comments": {
+      "count": 13
+    }
+  },
+  "tests/events-closure-quota.spec.ts": {
+    "local/no-comments": {
+      "count": 14
+    }
+  },
+  "tests/events-closure.spec.ts": {
+    "local/no-comments": {
+      "count": 23
+    }
+  },
+  "tests/events-compose-edit.spec.ts": {
+    "local/no-comments": {
+      "count": 12
+    }
+  },
+  "tests/events-detail-edit.spec.ts": {
+    "local/no-comments": {
+      "count": 8
+    }
+  },
+  "tests/events-emotion-meter.spec.ts": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "tests/events-nudge-api.spec.ts": {
+    "local/no-comments": {
+      "count": 3
+    }
+  },
+  "tests/events-private-and-detail-api.spec.ts": {
+    "local/no-comments": {
+      "count": 17
+    }
+  },
+  "tests/events-reply.spec.ts": {
+    "local/no-comments": {
+      "count": 53
+    }
+  },
+  "tests/events-therapist-mode.spec.ts": {
+    "local/no-comments": {
+      "count": 16
+    }
+  },
+  "tests/events-therapy-note.spec.ts": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "tests/gift-lists-api.spec.ts": {
+    "local/no-comments": {
+      "count": 5
+    }
+  },
+  "tests/global-setup.ts": {
+    "local/no-comments": {
+      "count": 4
+    }
+  },
+  "tests/global-teardown.ts": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "tests/guest-mode.spec.ts": {
+    "local/no-comments": {
+      "count": 15
+    }
+  },
+  "tests/helpers/closure.ts": {
+    "local/no-comments": {
+      "count": 21
+    }
+  },
+  "tests/helpers/newebpay.ts": {
+    "local/no-comments": {
+      "count": 12
+    }
+  },
+  "tests/intimacy-negotiation-api.spec.ts": {
+    "local/no-comments": {
+      "count": 22
+    }
+  },
+  "tests/intimacy-negotiation-ui.spec.ts": {
+    "local/no-comments": {
+      "count": 14
+    }
+  },
+  "tests/intimacy-nudge.spec.ts": {
+    "local/no-comments": {
+      "count": 21
+    }
+  },
+  "tests/intimacy-record.spec.ts": {
+    "local/no-comments": {
+      "count": 56
+    }
+  },
+  "tests/intimacy-rhythm-ui.spec.ts": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "tests/intimate-record-response-ui.spec.ts": {
+    "local/no-comments": {
+      "count": 26
+    }
+  },
+  "tests/language-switch.spec.ts": {
+    "local/no-comments": {
+      "count": 9
+    }
+  },
+  "tests/line-notifications.spec.ts": {
+    "local/no-comments": {
+      "count": 11
+    }
+  },
+  "tests/llm-truncation.spec.ts": {
+    "local/no-comments": {
+      "count": 15
+    }
+  },
+  "tests/love-bank-rates-ui.spec.ts": {
+    "local/no-comments": {
+      "count": 3
+    }
+  },
+  "tests/love-language.spec.ts": {
+    "local/no-comments": {
+      "count": 9
+    }
+  },
+  "tests/marketplace-flow.spec.ts": {
+    "local/no-comments": {
+      "count": 34
+    }
+  },
+  "tests/media-protection.spec.ts": {
+    "local/no-comments": {
+      "count": 18
+    }
+  },
+  "tests/migrations-unique.spec.ts": {
+    "local/no-comments": {
+      "count": 5
+    }
+  },
+  "tests/mobile-tap-ergonomics.spec.ts": {
+    "local/no-comments": {
+      "count": 49
+    }
+  },
+  "tests/moment-checkins-api.spec.ts": {
+    "local/no-comments": {
+      "count": 14
+    }
+  },
+  "tests/notification-deep-link-ui.spec.ts": {
+    "local/no-comments": {
+      "count": 12
+    }
+  },
+  "tests/playbooks.spec.ts": {
+    "local/no-comments": {
+      "count": 9
+    }
+  },
+  "tests/pricing-page.spec.ts": {
+    "local/no-comments": {
+      "count": 12
+    }
+  },
+  "tests/public-positioning.spec.ts": {
+    "local/no-comments": {
+      "count": 9
+    }
+  },
+  "tests/receipt-issuance.spec.ts": {
+    "local/no-comments": {
+      "count": 51
+    }
+  },
+  "tests/reconciliation-opener.spec.ts": {
+    "local/no-comments": {
+      "count": 14
+    }
+  },
+  "tests/record-photo.spec.ts": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "tests/relationship.spec.ts": {
+    "local/no-comments": {
+      "count": 14
+    }
+  },
+  "tests/resolve-privacy-period-flows.spec.ts": {
+    "local/no-comments": {
+      "count": 28
+    }
+  },
+  "tests/role-script-edit-thumbnail.spec.ts": {
+    "local/no-comments": {
+      "count": 26
+    }
+  },
+  "tests/roleplay-favorites.spec.ts": {
+    "local/no-comments": {
+      "count": 20
+    }
+  },
+  "tests/roleplay-invitation.spec.ts": {
+    "local/no-comments": {
+      "count": 25
+    }
+  },
+  "tests/roleplay-photos.spec.ts": {
+    "local/no-comments": {
+      "count": 12
+    }
+  },
+  "tests/script-gender-roles.spec.ts": {
+    "local/no-comments": {
+      "count": 20
+    }
+  },
+  "tests/stories-flow.spec.ts": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
+  "tests/stories.spec.ts": {
+    "local/no-comments": {
+      "count": 9
+    }
+  },
+  "tests/therapist-flow.spec.ts": {
+    "local/no-comments": {
+      "count": 20
+    }
+  },
+  "tests/upgrade-flow.spec.ts": {
+    "local/no-comments": {
+      "count": 23
+    }
+  },
+  "tests/user-journey.spec.ts": {
+    "local/no-comments": {
+      "count": 23
+    }
+  },
+  "tests/ux-onboarding.spec.ts": {
+    "local/no-comments": {
+      "count": 15
+    }
+  },
+  "tests/wall-ai-counselor.spec.ts": {
+    "local/no-comments": {
+      "count": 17
+    }
+  },
+  "tests/wall-media-api.spec.ts": {
+    "local/no-comments": {
+      "count": 8
+    }
+  },
+  "tests/wall-media-edit-ui.spec.ts": {
+    "local/no-comments": {
+      "count": 18
+    }
+  },
+  "tests/wall-media-ui.spec.ts": {
+    "local/no-comments": {
+      "count": 13
+    }
+  },
+  "tests/wall-privacy-mood-ui.spec.ts": {
+    "local/no-comments": {
+      "count": 6
+    }
+  },
+  "tests/wall-privacy-mood.spec.ts": {
+    "local/no-comments": {
+      "count": 4
+    }
+  },
+  "tests/wall-read-reaction-ui.spec.ts": {
+    "local/no-comments": {
+      "count": 14
+    }
+  },
+  "tests/wall-templates-ui.spec.ts": {
+    "local/no-comments": {
+      "count": 13
+    }
+  },
+  "tests/wall-upload-progress-ui.spec.ts": {
+    "local/no-comments": {
+      "count": 15
+    }
+  },
+  "vite.config.ts": {
+    "local/no-comments": {
+      "count": 21
+    }
+  }
+}
