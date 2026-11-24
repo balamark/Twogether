@@ -100,6 +100,10 @@ video {
    indicator); floating bottom cards/buttons sit on top of it, not under it. */
 .above-tabbar { bottom: calc(3.5rem + env(safe-area-inset-bottom)); }
 @media (min-width: 768px) { .above-tabbar { bottom: 0; } }
+/* Anything scrolled into view (focus, anchors, scrollIntoView) stops above the
+   tab bar instead of landing underneath it. */
+html { scroll-padding-bottom: calc(4.5rem + env(safe-area-inset-bottom)); }
+@media (min-width: 768px) { html { scroll-padding-bottom: 0; } }
 
 /* ────────────────────────────────────────────────────────────────────────
    Engineer Mode — Premium 限定的深色 IDE/終端機皮膚。
