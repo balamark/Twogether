@@ -112,12 +112,22 @@ jobs:
         # webkit is needed by the "Mobile Safari" project, which runs the specs
         # guarding the iOS tap-offset / file-picker behaviour. On a cache hit only
         # the OS libraries are missing.
+        # Retried: a runner sometimes starts with only the Microsoft apt source
+        # loaded, so every Ubuntu package is "Unable to locate". A fresh
+        # `apt-get update` between attempts recovers instead of failing a shard.
         run: |
-          if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
-            npx playwright install-deps chromium webkit
-          else
-            npx playwright install --with-deps chromium webkit
-          fi
+          for attempt in 1 2 3; do
+            if [ "${{ steps.pw-cache.outputs.cache-hit }}" = "true" ]; then
+              npx playwright install-deps chromium webkit && exit 0
+            else
+              npx playwright install --with-deps chromium webkit && exit 0
+            fi
+            echo "Playwright dependency install failed (attempt $attempt); refreshing apt and retrying"
+            sudo apt-get clean
+            sudo apt-get update || true
+            sleep $((attempt * 15))
+          done
+          exit 1
 
       - name: Run Playwright tests (shard ${{ matrix.shard }}/4)
         env:
