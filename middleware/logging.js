@@ -3,7 +3,9 @@ const { logInfo, logWarn, logError } = require('../lib/logger');
 
 const QUIET = process.env.NODE_ENV === 'test' && process.env.LOG_VERBOSE !== '1';
 
-const ALWAYS_SUMMARIZE = new Set(['content', 'scenario', 'script']);
+const ALWAYS_SUMMARIZE = new Set([
+  'content', 'scenario', 'script', 'summary', 'safewordNotes', 'narration', 'text',
+]);
 const MAX_STRING = 200;
 
 const SLOW_REQUEST_MS = 1000;
@@ -12,7 +14,9 @@ function summarizeBody(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return body;
   const out = {};
   for (const [key, value] of Object.entries(body)) {
-    if (typeof value === 'string' && (ALWAYS_SUMMARIZE.has(key) || value.length > MAX_STRING)) {
+    if (key === 'acts' || key === 'lines') {
+      out[key] = Array.isArray(value) ? `Array(${value.length})` : '<redacted>';
+    } else if (typeof value === 'string' && (ALWAYS_SUMMARIZE.has(key) || value.length > MAX_STRING)) {
       out[key] = `<${value.length} chars>`;
     } else {
       out[key] = value;

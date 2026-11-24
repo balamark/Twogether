@@ -413,6 +413,8 @@ interface GenerateRoleplayMessagesInput {
   scriptBody?: string;
   category?: string;
   regenerate?: boolean;
+  /** Where the sender picked the script — logged server-side only. */
+  scriptSource?: 'owned' | 'marketplace';
 }
 
 interface RoleplayMessagesResult {
@@ -1522,7 +1524,7 @@ export const clearAuthStorage = (): void => {
   clearResponseCache();
 };
 
-export type SessionExpiredReason = 'expired' | 'invalid' | 'manual';
+export type SessionExpiredReason = 'expired' | 'invalid' | 'manual' | 'password_changed';
 
 // Module-level guard so we only dispatch the expiration event once per
 // "logged-in session". A burst of parallel requests (each returning 401) would
@@ -1683,6 +1685,14 @@ apiClient.defaults.adapter = guestAdapter(cachingAdapter(axios.getAdapter(apiCli
 // server answers, it just stops us abandoning a request that's still working.
 const AI_TIMEOUT = 60000;
 
+// Script text caps on the invitation endpoints (routes/intimacy-requests.js).
+// Scripts themselves may be much longer (custom/marketplace allow 1500-char
+// scenarios and 150k-char bodies), so clip instead of failing validation.
+const SCRIPT_SCENARIO_SEND_MAX = 500;
+const SCRIPT_BODY_SEND_MAX = 8000;
+const clipText = (s: string | undefined, max: number): string | undefined =>
+  s && s.length > max ? s.slice(0, max) : s;
+
 // The default 15s timeout is fine for JSON requests but far too short for a
 // multipart upload: a wall post can carry up to 4 files (images ≤10MB, videos
 // ≤30MB each), and on a mobile connection those bytes take much longer than
@@ -1801,7 +1811,7 @@ apiClient.interceptors.response.use(
       // user back to login" regardless of whether the status is 401 or 403.
       // The backend (middleware/auth.js) uses 401 for "no/invalid token" and
       // 403 for "jwt.verify failed (expired/malformed)".
-      const sessionExpiredCodes = new Set(['TOKEN_EXPIRED', 'TOKEN_INVALID', 'TOKEN_MISSING']);
+      const sessionExpiredCodes = new Set(['TOKEN_EXPIRED', 'TOKEN_INVALID', 'TOKEN_MISSING', 'TOKEN_REVOKED']);
       const isAuthEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register');
 
       // Handle specific error cases
@@ -1814,10 +1824,15 @@ apiClient.interceptors.response.use(
           authError.data = data;
           throw authError;
         } else {
-          // Token expired or invalid for authenticated requests
+          // Token expired or invalid for authenticated requests. TOKEN_REVOKED =
+          // the password was changed (reset on another device), which signs
+          // out every older session — say so instead of "expired".
           clearAuthStorage();
-          dispatchSessionExpired('expired');
-          const authError = new Error(tr('登錄已過期，請重新登錄', 'Your session has expired. Please sign in again')) as Error & { error_code?: string; status?: number; data?: unknown };
+          const revoked = errorCode === 'TOKEN_REVOKED';
+          dispatchSessionExpired(revoked ? 'password_changed' : 'expired');
+          const authError = new Error(revoked
+            ? tr('你的密碼已經變更，請用新密碼重新登入', 'Your password was changed. Please sign in with your new password')
+            : tr('登錄已過期，請重新登錄', 'Your session has expired. Please sign in again')) as Error & { error_code?: string; status?: number; data?: unknown };
           authError.error_code = errorCode;
           authError.status = status;
           authError.data = data;
@@ -3377,7 +3392,7 @@ class ApiService {
         request_type: requestType,
         roleplay_category: request.roleplayCategory,
         script_title: request.scriptTitle,
-        script_scenario: request.scriptScenario,
+        script_scenario: clipText(request.scriptScenario, SCRIPT_SCENARIO_SEND_MAX),
         scheduled_time: request.scheduledTime,
         alt_plan_ids: request.altPlanIds?.length ? request.altPlanIds : undefined,
       });
@@ -3500,6 +3515,17 @@ class ApiService {
     } catch (error: unknown) {
       console.error('Failed to change user email:', error);
       throw error;
+    }
+  }
+
+  async updateShowAdultScripts(enabled: boolean): Promise<void> {
+    try {
+      await apiClient.put('/auth/user/show-adult-scripts', {
+        show_adult_scripts: enabled,
+      });
+    } catch (error: unknown) {
+      console.error('Failed to update show-adult-scripts pref:', error);
+      throw new Error((error as ApiErrorResponse)?.message || tr('無法更新「顯示 18+ 劇本」，請稍後再試', 'Couldn\'t update “Show 18+ scripts”. Please try again in a moment'));
     }
   }
 
@@ -3723,11 +3749,14 @@ class ApiService {
       const response = await apiClient.post('/intimacy-requests/script-messages', {
         scriptId: input.scriptId,
         scriptTitle: input.scriptTitle,
-        scriptScenario: input.scriptScenario,
-        scriptBody: input.scriptBody,
+        scriptScenario: clipText(input.scriptScenario, SCRIPT_SCENARIO_SEND_MAX),
+        // The AI only needs the setup — and marketplace scripts can run to
+        // 150k chars, far past what this endpoint accepts.
+        scriptBody: clipText(input.scriptBody, SCRIPT_BODY_SEND_MAX),
         category: input.category,
         regenerate: input.regenerate,
-      });
+        scriptSource: input.scriptSource,
+      }, { timeout: AI_TIMEOUT });
       return {
         summary: response.data.summary || '',
         messages: (response.data.messages || []) as RoleplayMessageSuggestion[],
@@ -4095,7 +4124,7 @@ class ApiService {
   // Extract the most specific server-side error message from an axios failure.
   // Validation errors come back as { errors: [{ path, msg }] } — surfacing
   // errors[0].msg tells the user exactly which field was rejected (e.g.
-  // "劇本內容必須在1-50000個字符之間") instead of a generic "驗證失敗".
+  // "劇本內容必須在1-150000個字符之間") instead of a generic "驗證失敗".
   private extractScriptError(error: unknown, fallback: string): Error {
     const err = error as {
       message?: string;

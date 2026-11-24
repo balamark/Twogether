@@ -19,8 +19,10 @@
   logs group under one trace. The client log beacon echoes `X-Request-Id` back
   to link a UI failure to its backend run. The logger requires the context lazily
   to avoid a require cycle.
-- **Request bodies are summarized, not stored.** `content` / `scenario` /
-  `script` are always replaced by a size placeholder, because they can carry
+- **Request bodies are summarized, not stored.** `content`, `scenario`,
+  `script`, `summary`, `safewordNotes`, `narration` and `text` are always replaced
+  by a size placeholder. `acts` / `lines` arrays (the explicit script) are logged
+  as a count, never as text. These are replaced because they can carry
   large and sometimes explicit user content. Other long strings are cut at 200
   chars. The summary is shallow, since request bodies are flat.
 - **`slow_request` fires at 1000 ms** (a warning), so Cloud Logging can list slow

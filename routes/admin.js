@@ -2057,7 +2057,7 @@ const ADMIN_HTML = `<!doctype html>
       const renderRow = (r, isDead) => {
         const pct = r.reach_pct === null ? 0 : r.reach_pct;
         const widthPct = Math.min(100, pct * 100);
-        const label = (r.view + '').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+        const label = (r.view + '').replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]));
         const typePill = r.view_type === 'modal' ? '<span class="pill">modal</span>' : '';
         return '<tr' + (isDead ? ' style="opacity:0.55"' : '') + '>' +
           '<td>' + label + typePill + '</td>' +
@@ -2162,8 +2162,8 @@ const ADMIN_HTML = `<!doctype html>
           ? '<span class="badge yes">已配對</span>' +
             (u.paired_at ? '<div class="muted" style="font-size:11px;margin-top:2px">' + fmtDate(u.paired_at) + '</div>' : '')
           : '<span class="badge no">未配對</span>';
-        const nickname = (u.nickname || '').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
-        const email = (u.email || '').replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+        const nickname = (u.nickname || '').replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]));
+        const email = (u.email || '').replace(/[<>&"']/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c]));
         return '<tr>' +
           '<td><div>' + email + '</div><div class="muted" style="font-size:11px">' + nickname + '</div></td>' +
           '<td>' + fmtDate(u.created_at) + '</td>' +
@@ -2209,8 +2209,9 @@ const ADMIN_HTML = `<!doctype html>
       unverified: '未提交', submitted: '待審核', verified: '已驗證', rejected: '已退回'
     };
     function esc(s) {
-      return (s == null ? '' : String(s)).replace(/[<>&]/g, function (c) {
-        return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c];
+      // Quotes too: esc() output also lands inside attribute values.
+      return (s == null ? '' : String(s)).replace(/[<>&"']/g, function (c) {
+        return { '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }[c];
       });
     }
 
@@ -2249,7 +2250,9 @@ const ADMIN_HTML = `<!doctype html>
           ? '<span class="badge yes">Email 已驗證</span>'
           : '<span class="badge no">Email 未驗證</span>';
         var docs = (t.identity_documents || []).map(function (u, i) {
-          return '<a href="' + esc(u) + '" target="_blank" rel="noopener">文件' + (i + 1) + '</a>';
+          // Never link the stored value itself: the server opens it (signed
+          // link for private documents) after checking it's our storage.
+          return '<a href="/api/admin/therapists/' + encodeURIComponent(t.id) + '/documents/' + i + '" target="_blank" rel="noopener">文件' + (i + 1) + '</a>';
         }).join(' · ');
         var idStatus = '<div class="muted" style="font-size:11px;margin-top:3px">身分: ' +
           esc(IDENTITY_STATUS[t.identity_status] || t.identity_status || '—') + '</div>';

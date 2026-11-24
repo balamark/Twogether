@@ -3,6 +3,8 @@ const { body, param, query, validationResult } = require('express-validator');
 const db = require('../database/db');
 const { authenticateToken } = require('../middleware/auth');
 const { logDbError, errorResponseBody } = require('../lib/db-errors');
+const { logInfo } = require('../lib/logger');
+const { isAdultScriptTags, adultScriptSql } = require('../lib/adultScripts');
 
 const router = express.Router();
 
@@ -19,6 +21,23 @@ function rejectIfInvalid(req, res) {
     return true;
   }
   return false;
+}
+
+async function viewerShowsAdultScripts(userId) {
+  const row = await db.query(
+    'SELECT show_adult_scripts FROM users WHERE id = $1',
+    [userId]
+  );
+  return row.rows[0]?.show_adult_scripts === true;
+}
+
+function hideAdultScript(res, userId, scriptId) {
+  logInfo('marketplace.adult_hidden', { userId, scriptId: scriptId || null });
+  res.status(403).json({
+    success: false,
+    error_code: 'ADULT_SCRIPTS_HIDDEN',
+    message: '這是 18+ 劇本。到右上角的個人選單打開「顯示 18+ 劇本」就能看。',
+  });
 }
 
 function mapScriptRow(row) {
@@ -63,6 +82,7 @@ router.get(
       const q = (req.query.q || '').trim();
       const limit = req.query.limit || 30;
       const offset = req.query.offset || 0;
+      const showAdult = await viewerShowsAdultScripts(req.user.id);
 
       const params = [];
       const conditions = [];
@@ -81,6 +101,11 @@ router.get(
         conditions.push(
           `(title ILIKE $${params.length} OR scenario ILIKE $${params.length} OR location ILIKE $${params.length})`
         );
+      }
+      if (!showAdult) {
+        const adult = adultScriptSql('tags', params.length + 1);
+        params.push(...adult.params);
+        conditions.push(`NOT ${adult.sql}`);
       }
       const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
 
@@ -131,6 +156,9 @@ router.get(
       );
       if (scriptResult.rows.length === 0) {
         return res.status(404).json({ success: false, message: '找不到劇本' });
+      }
+      if (isAdultScriptTags(scriptResult.rows[0].tags) && !(await viewerShowsAdultScripts(userId))) {
+        return hideAdultScript(res, userId, scriptId);
       }
       const script = mapScriptRow(scriptResult.rows[0]);
 
@@ -187,6 +215,15 @@ router.get(
       const limit = req.query.limit || 20;
       const offset = req.query.offset || 0;
 
+      const scriptRow = await db.query(
+        'SELECT tags FROM custom_scripts WHERE id = $1 AND is_public = true',
+        [req.params.id]
+      );
+      if (scriptRow.rows.length && isAdultScriptTags(scriptRow.rows[0].tags)
+        && !(await viewerShowsAdultScripts(req.user.id))) {
+        return hideAdultScript(res, req.user.id, req.params.id);
+      }
+
       const result = await db.query(
         `SELECT r.id, r.stars, r.review_text, r.created_at, r.updated_at,
                 r.user_id, COALESCE(u.nickname, '匿名') AS author_name
@@ -235,7 +272,7 @@ router.post(
 
       // Block authors from rating their own scripts.
       const owner = await db.query(
-        'SELECT created_by, is_public FROM custom_scripts WHERE id = $1',
+        'SELECT created_by, is_public, tags FROM custom_scripts WHERE id = $1',
         [scriptId]
       );
       if (owner.rows.length === 0) {
@@ -246,6 +283,9 @@ router.post(
       }
       if (!owner.rows[0].is_public) {
         return res.status(400).json({ success: false, message: '此劇本未公開' });
+      }
+      if (isAdultScriptTags(owner.rows[0].tags) && !(await viewerShowsAdultScripts(userId))) {
+        return hideAdultScript(res, userId, scriptId);
       }
 
       await db.query(
@@ -299,6 +339,15 @@ router.post(
       const { reason } = req.body;
       const detail = req.body.detail || null;
 
+      const scriptRow = await db.query(
+        'SELECT tags FROM custom_scripts WHERE id = $1 AND is_public = true',
+        [req.params.id]
+      );
+      if (scriptRow.rows.length && isAdultScriptTags(scriptRow.rows[0].tags)
+        && !(await viewerShowsAdultScripts(req.user.id))) {
+        return hideAdultScript(res, req.user.id, req.params.id);
+      }
+
       await db.query(
         `INSERT INTO script_reports (script_id, reporter_user_id, reason, detail)
          VALUES ($1, $2, $3, $4)
@@ -345,6 +394,16 @@ router.get('/my-favorites', async (req, res) => {
     // Join via marketplace view first; fall back to raw custom_scripts for
     // scripts the author has since unpublished (so user keeps access).
     // Exclude scripts authored by the viewer's couple — those belong in 自訂劇本.
+    // Also drop 18+ favorites while the viewer has the marketplace setting off,
+    // so a saved adult script doesn't stay visible next to the marketplace.
+    const showAdult = await viewerShowsAdultScripts(userId);
+    const params = [coupleId, userId, ownerIds];
+    let adultClause = '';
+    if (!showAdult) {
+      const adult = adultScriptSql('s.tags', params.length + 1);
+      params.push(...adult.params);
+      adultClause = `AND NOT ${adult.sql}`;
+    }
     const result = await db.query(
       `SELECT s.id, s.title, s.category, s.scenario, s.content, s.tags, s.duration,
               s.thumbnail_url, s.is_public, s.created_by, s.created_at, s.updated_at,
@@ -361,8 +420,9 @@ router.get('/my-favorites', async (req, res) => {
          WHERE (($1::uuid IS NOT NULL AND f.couple_id = $1)
             OR ($1::uuid IS NULL AND f.couple_id IS NULL AND f.favorited_by = $2))
            AND s.created_by <> ALL($3::uuid[])
+           ${adultClause}
          ORDER BY f.created_at DESC`,
-      [coupleId, userId, ownerIds]
+      params
     );
 
     res.json({

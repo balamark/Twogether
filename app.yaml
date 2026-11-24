@@ -47,6 +47,15 @@ env_variables:
   # Admin funnel dashboard gate (/admin and /api/admin/*). Required to enable
   # the dashboard — middleware returns 503 when this is unset/empty.
   ADMIN_PASSWORD: $_ADMIN_PASSWORD
+  # Marketplace bot (POST /api/bot/marketplace/scripts). Server-only; never
+  # exposed to the browser bundle. Unset key → the endpoint returns 503.
+  # A UUID in AUTHOR_ID wins. Blank, "null", or a leftover $placeholder is
+  # ignored and the author is AUTHOR_EMAIL, or wangmark510@gmail.com.
+  # Quoted so an empty secret stays "" instead of a YAML null. See
+  # docs/MARKETPLACE_BOT_API.md.
+  MARKETPLACE_BOT_API_KEY: $_MARKETPLACE_BOT_API_KEY
+  MARKETPLACE_BOT_AUTHOR_ID: "$_MARKETPLACE_BOT_AUTHOR_ID"
+  MARKETPLACE_BOT_AUTHOR_EMAIL: "$_MARKETPLACE_BOT_AUTHOR_EMAIL"
   # LINE Messaging API: mirror in-app notifications to a user's LINE. The
   # channel access token is minted from these at runtime (services/lineService).
   LINE_CHANNEL_ID: $_LINE_CHANNEL_ID

@@ -24,18 +24,25 @@ const userCacheEnabled = process.env.NODE_ENV !== 'test';
 const loadUser = async (userId) => {
   if (userCacheEnabled) {
     const hit = userCache.get(userId);
-    if (hit && hit.expires > Date.now()) return { ...hit.user };
+    if (hit && hit.expires > Date.now()) return { user: { ...hit.user }, passwordChangedAt: hit.passwordChangedAt };
   }
   const userResult = await db.query(
-    'SELECT id, nickname, email, created_at FROM users WHERE id = $1',
+    'SELECT id, nickname, email, created_at, password_changed_at FROM users WHERE id = $1',
     [userId]
   );
-  const user = userResult.rows[0] || null;
-  if (userCacheEnabled && user) {
+  const row = userResult.rows[0];
+  if (!row) return { user: null, passwordChangedAt: null };
+  const { password_changed_at: passwordChangedAt, ...user } = row;
+  if (userCacheEnabled) {
     if (userCache.size >= USER_CACHE_MAX) userCache.clear();
-    userCache.set(userId, { user: { ...user }, expires: Date.now() + USER_CACHE_TTL_MS });
+    userCache.set(userId, { user: { ...user }, passwordChangedAt, expires: Date.now() + USER_CACHE_TTL_MS });
   }
-  return user;
+  return { user, passwordChangedAt };
+};
+
+const isRevoked = (decoded, passwordChangedAt) => {
+  if (!passwordChangedAt || typeof decoded.iat !== 'number') return false;
+  return Math.floor(new Date(passwordChangedAt).getTime() / 1000) > decoded.iat;
 };
 
 const invalidateUserCache = (userId) => {
@@ -57,7 +64,16 @@ const authenticateToken = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    const user = await loadUser(decoded.userId);
+    const { user, passwordChangedAt } = await loadUser(decoded.userId);
+
+    if (user && isRevoked(decoded, passwordChangedAt)) {
+      logWarn('Token rejected: issued before password change', { userId: user.id });
+      return res.status(401).json({
+        success: false,
+        message: '你的密碼已經變更，請用新密碼重新登入',
+        error_code: 'TOKEN_REVOKED'
+      });
+    }
 
     if (!user) {
       return res.status(401).json({
@@ -92,7 +108,8 @@ const optionalAuth = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    req.user = await loadUser(decoded.userId);
+    const { user, passwordChangedAt } = await loadUser(decoded.userId);
+    req.user = user && !isRevoked(decoded, passwordChangedAt) ? user : null;
   } catch (error) {
     req.user = null;
   }

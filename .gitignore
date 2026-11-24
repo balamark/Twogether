@@ -19,6 +19,7 @@ twogether.db
 .env.local
 .env.production
 .env.test
+staging-marketplace-bot-key.txt
 
 # Logs
 logs/

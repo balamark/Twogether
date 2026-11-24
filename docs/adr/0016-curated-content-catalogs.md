@@ -3,6 +3,8 @@
 - Status: accepted (recorded 2026-11-24 from code comments)
 - Covers: `lib/aiCompanions.js`, `lib/intimacyNudgeTones.js`, `lib/therapyTopicLibrary.js`, `lib/therapyCards.js`, `lib/playbooks/*`
 
+See also [0018](0018-marketplace-scripts.md) for marketplace scripts.
+
 ## AI 諮商師 companions
 
 - `lib/aiCompanions.js` is the single backend source of truth: the display copy for

@@ -47,6 +47,7 @@ const pollRoutes = require('./routes/polls');
 const lineRoutes = require('./routes/line');
 const scriptFavoritesRoutes = require('./routes/script-favorites');
 const marketplaceRoutes = require('./routes/marketplace');
+const marketplaceBotRoutes = require('./routes/marketplace-bot');
 const billingRoutes = require('./routes/billing');
 const therapistRoutes = require('./routes/therapists');
 const feedbackRoutes = require('./routes/feedback');
@@ -251,6 +252,9 @@ app.post('/api/line/webhook', lineRoutes.webhookHandler);
 app.use('/api/line', lineRoutes.router);
 app.use('/api/script-favorites', scriptFavoritesRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
+// Server-to-server marketplace upload. Own API key, not a user JWT — mounted
+// outside the marketplace router because that router requires authenticateToken.
+app.use('/api/bot/marketplace', marketplaceBotRoutes);
 // Billing: /status + /checkout are JWT-protected inside the router; the
 // /ecpay/callback (server-to-server) and /ecpay/return (browser POST-back) are
 // intentionally public — ECPay can't present a JWT. Auth is applied per-route.

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Sparkles, Check, Crown, Ticket, ChevronDown } from 'lucide-react';
 import { apiService, type BillingStatus, type BillingPlan, type PaymentProvider } from '../services/api';
 import PaymentMethodPicker from './PaymentMethodPicker';
+import { DEFAULT_PAYMENT_PROVIDER } from '../utils/paymentProviders';
 import { tr, dateLocale } from '../i18n/tr';
 import PurchaseReceipts from './PurchaseReceipts';
 
@@ -38,7 +39,7 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
   const [status, setStatus] = useState<BillingStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkoutPlan, setCheckoutPlan] = useState<string | null>(null);
-  const [provider, setProvider] = useState<PaymentProvider>('ecpay');
+  const [provider, setProvider] = useState<PaymentProvider>(DEFAULT_PAYMENT_PROVIDER);
   const [couponCode, setCouponCode] = useState('');
   const [redeeming, setRedeeming] = useState(false);
   // Optional receipt details (報帳用). Collapsed by default — most buyers don't
@@ -330,7 +331,7 @@ const UpgradeView: React.FC<UpgradeViewProps> = ({ reason, showNotification, onR
 
       <p className="mt-6 text-center font-body text-xs text-petal-muted flex items-center justify-center space-x-1.5">
         <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
-        <span>{tr('支援信用卡、LINE Pay、ATM 與超商 · 由綠界 ECPay 或藍新金流安全付款 · 一次性購買，不自動續約', 'Credit card, LINE Pay, ATM and convenience stores · Secure payment by ECPay or NewebPay · One-time purchase, never auto-renews')}</span>
+        <span>{tr('支援信用卡、ATM 與超商 · 由藍新金流安全付款 · 一次性購買，不自動續約', 'Credit card, ATM and convenience stores · Secure payment by NewebPay · One-time purchase, never auto-renews')}</span>
       </p>
       <p className="mt-2 text-center font-body text-xs text-petal-muted">
         {tr('每筆付款都會開立電子收據並寄到你的信箱', 'Every payment issues an electronic receipt, emailed to you')} ·{' '}

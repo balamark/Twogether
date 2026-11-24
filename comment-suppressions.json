@@ -11,7 +11,7 @@
   },
   "playwright.config.ts": {
     "local/no-comments": {
-      "count": 35
+      "count": 37
     }
   },
   "routes/achievements.js": {
@@ -51,12 +51,12 @@
   },
   "routes/auth.js": {
     "local/no-comments": {
-      "count": 63
+      "count": 66
     }
   },
   "routes/billing.js": {
     "local/no-comments": {
-      "count": 86
+      "count": 87
     }
   },
   "routes/coins.js": {
@@ -81,7 +81,7 @@
   },
   "routes/custom-scripts.js": {
     "local/no-comments": {
-      "count": 87
+      "count": 91
     }
   },
   "routes/cycle-records.js": {
@@ -136,7 +136,7 @@
   },
   "routes/intimacy-requests.js": {
     "local/no-comments": {
-      "count": 122
+      "count": 123
     }
   },
   "routes/journey.js": {
@@ -154,9 +154,14 @@
       "count": 82
     }
   },
+  "routes/marketplace-bot.js": {
+    "local/no-comments": {
+      "count": 10
+    }
+  },
   "routes/marketplace.js": {
     "local/no-comments": {
-      "count": 23
+      "count": 25
     }
   },
   "routes/marriage-checkups.js": {
@@ -206,7 +211,7 @@
   },
   "routes/therapists.js": {
     "local/no-comments": {
-      "count": 319
+      "count": 333
     }
   },
   "routes/wall.js": {
@@ -296,7 +301,7 @@
   },
   "server.js": {
     "local/no-comments": {
-      "count": 122
+      "count": 124
     }
   },
   "services/characterMappingService.js": {
@@ -336,7 +341,7 @@
   },
   "src/App.tsx": {
     "local/no-comments": {
-      "count": 402
+      "count": 414
     }
   },
   "src/components/AchievementsView.tsx": {
@@ -541,7 +546,7 @@
   },
   "src/components/Header.tsx": {
     "local/no-comments": {
-      "count": 23
+      "count": 26
     }
   },
   "src/components/HelpView.tsx": {
@@ -571,7 +576,7 @@
   },
   "src/components/IntimacyRequestForm.tsx": {
     "local/no-comments": {
-      "count": 73
+      "count": 82
     }
   },
   "src/components/IntimacyRequestsHistory.tsx": {
@@ -616,7 +621,7 @@
   },
   "src/components/MarketplaceScriptDetail.tsx": {
     "local/no-comments": {
-      "count": 9
+      "count": 15
     }
   },
   "src/components/MarriageCheckup.tsx": {
@@ -676,7 +681,7 @@
   },
   "src/components/PaymentMethodPicker.tsx": {
     "local/no-comments": {
-      "count": 5
+      "count": 2
     }
   },
   "src/components/PetalSelect.tsx": {
@@ -726,12 +731,12 @@
   },
   "src/components/RoleplayView.tsx": {
     "local/no-comments": {
-      "count": 93
+      "count": 100
     }
   },
   "src/components/ScriptUploadModal.tsx": {
     "local/no-comments": {
-      "count": 47
+      "count": 48
     }
   },
   "src/components/SessionProgress.tsx": {
@@ -816,7 +821,7 @@
   },
   "src/components/TherapistsView.tsx": {
     "local/no-comments": {
-      "count": 78
+      "count": 79
     }
   },
   "src/components/TherapyNoteCard.tsx": {
@@ -1131,12 +1136,12 @@
   },
   "src/guest/guestRoutes.ts": {
     "local/no-comments": {
-      "count": 45
+      "count": 48
     }
   },
   "src/guest/guestSeed.ts": {
     "local/no-comments": {
-      "count": 16
+      "count": 18
     }
   },
   "src/guest/guestSoften.ts": {
@@ -1211,7 +1216,7 @@
   },
   "src/services/api.ts": {
     "local/no-comments": {
-      "count": 667
+      "count": 675
     }
   },
   "src/services/queryCache.ts": {
@@ -1319,6 +1324,11 @@
       "count": 10
     }
   },
+  "src/utils/paymentProviders.ts": {
+    "local/no-comments": {
+      "count": 8
+    }
+  },
   "src/utils/perf.ts": {
     "local/no-comments": {
       "count": 42
@@ -1382,6 +1392,11 @@
   "tests/admin-dashboard.spec.ts": {
     "local/no-comments": {
       "count": 25
+    }
+  },
+  "tests/adult-scripts-setting.spec.ts": {
+    "local/no-comments": {
+      "count": 1
     }
   },
   "tests/ai-companion.spec.ts": {
@@ -1551,7 +1566,7 @@
   },
   "tests/guest-mode.spec.ts": {
     "local/no-comments": {
-      "count": 15
+      "count": 16
     }
   },
   "tests/helpers/closure.ts": {
@@ -1617,6 +1632,11 @@
   "tests/love-language.spec.ts": {
     "local/no-comments": {
       "count": 9
+    }
+  },
+  "tests/marketplace-bot-api.spec.ts": {
+    "local/no-comments": {
+      "count": 5
     }
   },
   "tests/marketplace-flow.spec.ts": {
@@ -1699,6 +1719,11 @@
       "count": 20
     }
   },
+  "tests/roleplay-invitation-marketplace.spec.ts": {
+    "local/no-comments": {
+      "count": 7
+    }
+  },
   "tests/roleplay-invitation.spec.ts": {
     "local/no-comments": {
       "count": 25
@@ -1712,6 +1737,11 @@
   "tests/script-gender-roles.spec.ts": {
     "local/no-comments": {
       "count": 20
+    }
+  },
+  "tests/security-hardening.spec.ts": {
+    "local/no-comments": {
+      "count": 18
     }
   },
   "tests/stories-flow.spec.ts": {
@@ -1731,7 +1761,7 @@
   },
   "tests/upgrade-flow.spec.ts": {
     "local/no-comments": {
-      "count": 23
+      "count": 24
     }
   },
   "tests/user-journey.spec.ts": {

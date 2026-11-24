@@ -39,4 +39,10 @@
   re-download photos.
 - 4xx responses are inspected (`validateStatus: () => true`) rather than thrown,
   so the body can be logged.
+- **Private buckets** (therapist identity documents) are created with
+  `public: false`. Their objects are stored as a reference,
+  `storage://<bucket>/<name>`, never as a URL. Only `createSignedUrl`
+  (5 minutes by default) turns a reference into something a browser can open.
+  Supabase returns `signedURL` relative to `/storage/v1`, so it gets prefixed
+  unless it's already absolute.
 - Outside production the upload is stubbed, which is a shortcut: #171.

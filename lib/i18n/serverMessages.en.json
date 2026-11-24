@@ -201,6 +201,7 @@
 "更新暱稱失敗": "Couldn't update the nickname",
 "無法獲取自訂禮品": "Couldn't load custom gifts",
 "標題必須在1-100個字符之間": "Title must be 1–100 characters",
+"標題必須在1-300個字符之間": "Title must be 1–300 characters",
 "描述必須在1-500個字符之間": "Description must be 1–500 characters",
 "花費必須是大於 0 的整數": "Cost must be a whole number greater than 0",
 "兌換金額必須是大於 0 的整數": "The redemption cost must be a whole number greater than 0",
@@ -271,10 +272,10 @@
 "15-30分鐘": "15–30 min",
 "無法獲取自訂劇本": "Couldn't load custom scripts",
 "無效的劇本類別": "Invalid script category",
-"情境描述必須在1-500個字符之間": "The scenario must be 1–500 characters",
-"場景地點不能超過50個字符": "The location can't exceed 50 characters",
-"劇本內容必須在1-50000個字符之間": "The script content must be 1–50000 characters",
-"時長描述不能超過50個字符": "The duration can't exceed 50 characters",
+"情境描述必須在1-1500個字符之間": "The scenario must be 1–1500 characters",
+"場景地點不能超過150個字符": "The location can't exceed 150 characters",
+"劇本內容必須在1-150000個字符之間": "The script content must be 1–150000 characters",
+"時長描述不能超過150個字符": "The duration can't exceed 150 characters",
 "isPublic 必須是布林值": "isPublic must be a boolean",
 "劇本創建成功": "Script created",
 "創建劇本失敗": "Couldn't create the script",
@@ -581,6 +582,11 @@
 "無法載入創作市集劇本": "Couldn't load creator marketplace scripts",
 "劇本 ID 必須是 UUID": "The script ID must be a UUID",
 "找不到劇本": "Script not found",
+"這是 18+ 劇本。到右上角的個人選單打開「顯示 18+ 劇本」就能看。": "This is an 18+ script. Turn on “Show 18+ scripts” in the profile menu at the top right to see it.",
+"已開啟顯示 18+ 劇本": "18+ scripts are now shown",
+"已關閉顯示 18+ 劇本": "18+ scripts are now hidden",
+"更新「顯示 18+ 劇本」失敗，請稍後再試": "Couldn't update “Show 18+ scripts”. Please try again in a moment",
+"show_adult_scripts 必須為布林值": "show_adult_scripts must be a boolean",
 "無法載入劇本詳情": "Couldn't load the script details",
 "無法載入評論": "Couldn't load reviews",
 "星等必須是 1-5": "The rating must be 1–5",
@@ -1158,7 +1164,52 @@
 "一小時內已經提醒過對方了，給 TA 一點時間。也可以複製連結，用 LINE 親自傳給 TA。": "You already reminded your partner within the last hour, so give them a little time. You can also copy the link and send it to them yourself on LINE.",
 "伴侶在等你回覆這段對話": "Your partner is waiting for your reply in this conversation",
 "已提醒伴侶，TA 點通知就會直接打開這段對話。": "Reminder sent. Tapping the notification takes your partner straight to this conversation.",
-"提醒沒送出，請稍後再試；也可以複製連結用 LINE 傳給伴侶。": "The reminder didn't go through. Try again later, or copy the link and send it to your partner on LINE."
+"提醒沒送出，請稍後再試；也可以複製連結用 LINE 傳給伴侶。": "The reminder didn't go through. Try again later, or copy the link and send it to your partner on LINE.",
+"你的密碼已經變更，請用新密碼重新登入": "Your password was changed. Please sign in with your new password",
+"綠界 ECPay 尚未開放，請改用藍新金流付款": "ECPay isn't available yet. Please pay with NewebPay instead",
+"線上付款暫時無法使用，請稍後再試或聯絡客服": "Online payment is temporarily unavailable. Please try again later or contact support",
+"請用「上傳文件」按鈕上傳證明文件，不能直接貼上網址": "Please upload your document with the Upload document button; pasted links aren't accepted",
+"證明文件需透過「上傳文件」按鈕上傳，請移除後重新上傳一次": "Documents must be uploaded with the Upload document button. Please remove it and upload it again",
+"這個 Email 已經有 Twogether 帳號了。為了保護帳號安全，請先登入 Twogether，再回到這個頁面送出申請；如果這不是你的帳號，請改用你自己的 Email。": "This email already has a Twogether account. To keep that account safe, sign in to Twogether first and then come back to this page to apply. If it isn't your account, use your own email.",
+"需要有效的 Bearer API 金鑰。請在 Authorization 標頭帶上伺服器核發的金鑰。": "A valid Bearer API key is required. Send the server-issued key in the Authorization header.",
+"劇本上傳 API 尚未設定。請在伺服器環境變數設定 MARKETPLACE_BOT_API_KEY 後再試。": "The script upload API isn't configured yet. Set MARKETPLACE_BOT_API_KEY in the server environment and try again.",
+"這個 sourceKey 已經屬於另一個帳號，請換一組外部編號，或改設定成原本的作者。": "This sourceKey already belongs to another account. Use a different external id, or point the author setting at the original account.",
+"劇本已發布到創作市集": "Script published to the creator marketplace",
+"劇本已更新並發布到創作市集": "Script updated and published to the creator marketplace",
+"劇本已存成草稿，創作市集還看不到。用同一組 sourceKey 再送一次，並把 publish 設為 true，就會上架。": "Saved as a draft, so it isn't on the marketplace yet. Send it again with the same sourceKey and publish set to true to list it.",
+"劇本已更新為草稿，創作市集目前看不到。要上架請用同一組 sourceKey 再送一次並把 publish 設為 true。": "Updated as a draft, so the marketplace can't see it. To list it, send it again with the same sourceKey and publish set to true.",
+"這份劇本和已儲存的內容一樣，沒有另外建立一則。": "This matches the script already saved, so nothing new was created.",
+"上傳劇本失敗，請稍後再試。若持續發生，請查看伺服器日誌裡的 marketplace_bot。": "The upload failed. Try again in a moment. If it keeps happening, check the server logs for marketplace_bot.",
+"請提供 JSON 物件，包含 title、summary、roleA、roleB、acts、intensity。": "Send a JSON object with title, summary, roleA, roleB, acts, and intensity.",
+"標題必須是 1–300 個字。": "The title must be 1–300 characters.",
+"簡介必須是 1–1500 個字，它會顯示在市集卡片上。": "The summary must be 1–1500 characters. It shows on the marketplace card.",
+"請提供角色 A（roleA），包含 name，以及選填的 description、gender。": "Provide role A (roleA) with a name, and optionally a description and gender.",
+"請提供角色 B（roleB），包含 name，以及選填的 description、gender。": "Provide role B (roleB) with a name, and optionally a description and gender.",
+"請提供角色 A 的名字（1–120 個字）。": "Give role A a name (1–120 characters).",
+"請提供角色 B 的名字（1–120 個字）。": "Give role B a name (1–120 characters).",
+"角色描述必須是文字，而且不能超過 600 個字。": "A role description must be text, and no longer than 600 characters.",
+"角色描述不能超過 600 個字，請縮短後再送。": "A role description can't be longer than 600 characters. Please shorten it and send again.",
+"請提供 acts 陣列（1–24 幕）。每一幕要有 narration 或 lines。": "Provide an acts array (1–24 acts). Each act needs a narration or lines.",
+"請提供尺度 intensity：mild、moderate、explicit 或 intense。": "Provide an intensity: mild, moderate, explicit, or intense.",
+"intensity 只能是 mild、moderate、explicit 或 intense。": "intensity must be mild, moderate, explicit, or intense.",
+"genre 只能是 romantic、adventurous、school、bold（或 浪漫、冒險、校園、大膽）。": "genre must be romantic, adventurous, school, or bold.",
+"tags 最多 36 個，每個不超過 72 個字。": "Use at most 36 tags, each no longer than 72 characters.",
+"封面必須是 http 或 https 網址，不能帶帳號密碼。": "The cover must be an http or https URL, with no username or password in it.",
+"封面網址太長。請換一個 6000 字以內的 http 或 https 網址。": "That cover URL is too long. Use an http or https URL under 6000 characters.",
+"location 不能超過 150 個字。": "location can't be longer than 150 characters.",
+"duration 不能超過 150 個字。": "duration can't be longer than 150 characters.",
+"safewordNotes 不能超過 1500 個字。": "safewordNotes can't be longer than 1500 characters.",
+"publish 必須是 true 或 false。": "publish must be true or false.",
+"sourceKey 只能用英數、點、底線、冒號和連字號，最長 360 字（例如 2026-11-23-JUR-925）。": "sourceKey may only use letters, numbers, dots, underscores, colons, and hyphens, up to 360 characters (for example 2026-11-23-JUR-925).",
+"請至少寫兩句對白，這樣兩人才能一問一答。": "Write at least two lines of dialogue so the two roles can go back and forth.",
+"第 1 幕的 lines 必須是陣列。": "Act 1's lines must be an array.",
+"第 2 幕的 lines 必須是陣列。": "Act 2's lines must be an array.",
+"第 3 幕的 lines 必須是陣列。": "Act 3's lines must be an array.",
+"第 4 幕的 lines 必須是陣列。": "Act 4's lines must be an array.",
+"第 5 幕的 lines 必須是陣列。": "Act 5's lines must be an array.",
+"第 6 幕的 lines 必須是陣列。": "Act 6's lines must be an array.",
+"第 7 幕的 lines 必須是陣列。": "Act 7's lines must be an array.",
+"第 8 幕的 lines 必須是陣列。": "Act 8's lines must be an array."
 },
 "patterns": [
 [
@@ -1374,8 +1425,8 @@
 "Shared \"{0}\" to your partner's inbox."
 ],
 [
-"文件內容約 {0} 字，超過劇本 50,000 字上限。請先在文件中縮短內容再匯入。",
-"The document is about {0} characters, over the 50,000-character script limit. Please shorten it in the document first, then import."
+"文件內容約 {0} 字，超過劇本 150,000 字上限。請先在文件中縮短內容再匯入。",
+"The document is about {0} characters, over the 150,000-character script limit. Please shorten it in the document first, then import."
 ],
 [
 "{0} {1}start_date 必須為 YYYY-MM-DD 格式",
@@ -2104,6 +2155,54 @@
 [
 "想對 TA 說的話最多 {0} 字，更長的心情可以寫進這則記錄的備註。",
 "A note to them can be at most {0} characters. Longer thoughts fit better in the record's notes."
+],
+[
+"第 {0} 幕必須是物件，包含選填的 title、narration，以及 lines 陣列。",
+"Act {0} must be an object with an optional title and narration, plus a lines array."
+],
+[
+"第 {0} 幕的標題不能超過 120 個字。",
+"Act {0}'s title can't be longer than 120 characters."
+],
+[
+"第 {0} 幕的旁白不能超過 6000 個字，請縮短 narration。",
+"Act {0}'s narration can't be longer than 6000 characters. Please shorten it."
+],
+[
+"第 {0} 幕的 lines 必須是陣列。",
+"Act {0}'s lines must be an array."
+],
+[
+"第 {0} 幕有 {1} 句對白，每一幕最多 240 句。請拆開或刪減。",
+"Act {0} has {1} lines. Each act can have at most 240. Split or cut some."
+],
+[
+"第 {0} 幕第 {1} 句的 role 只能是 a 或 b。",
+"Act {0}, line {1}: role must be a or b."
+],
+[
+"第 {0} 幕第 {1} 句的對白是空的，或超過 3000 個字。請寫上一句對白，並控制在 3000 字以內。",
+"Act {0}, line {1} is empty or longer than 3000 characters. Write a line and keep it within 3000 characters."
+],
+[
+"第 {0} 幕第 {1} 句的 direction 不能超過 120 個字。",
+"Act {0}, line {1}: the stage direction can't be longer than 120 characters."
+],
+[
+"第 {0} 幕需要旁白（narration）或至少一句對白（lines）。",
+"Act {0} needs a narration or at least one line of dialogue."
+],
+[
+"對白共有 {0} 句，超過 1200 句上限。請刪減後再送。",
+"There are {0} lines of dialogue, over the 1,200-line limit. Please cut some and send again."
+],
+[
+"整份劇本有 {0} 個字，超過 150000 字上限。請縮短旁白或對白後再送。",
+"The script is {0} characters, over the 150,000 limit. Please shorten the narration or dialogue and send again."
+],
+[
+"找不到作者帳號（{0}）。請確認這個帳號已經在這個環境註冊。",
+"No author account ({0}) was found. Register that account in this environment first."
 ]
 ]
 }

@@ -58,6 +58,13 @@ interface RoleplayViewProps {
   onUnpublishScript?: (scriptId: string) => Promise<void>;
   initialScriptTitle?: string | null;
   onInitialScriptConsumed?: () => void;
+  // ?market=<uuid> deep link: open this marketplace script's detail once.
+  initialMarketplaceScriptId?: string | null;
+  onInitialMarketplaceConsumed?: () => void;
+  // Mirrors users.show_adult_scripts. Part of the marketplace cache key so
+  // turning it on refetches the list instead of painting the filtered one.
+  showAdultScripts?: boolean;
+  onEnableAdultScripts?: () => Promise<void> | void;
   renderGames?: () => React.ReactNode;
 }
 
@@ -175,6 +182,10 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   onUnpublishScript,
   initialScriptTitle,
   onInitialScriptConsumed,
+  initialMarketplaceScriptId,
+  onInitialMarketplaceConsumed,
+  showAdultScripts = false,
+  onEnableAdultScripts,
   renderGames,
 }) => {
   const tz = useTimezone();
@@ -246,10 +257,18 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     return () => clearTimeout(t);
   }, [marketplaceQuery]);
   const [marketplaceDetailId, setMarketplaceDetailId] = useHistoryState<string | null>('roleplay:market', null, { scrollTop: false });
+  // Open a shared marketplace link (?market=<uuid>) on the detail the player
+  // already uses, then drop the pending id so a later render doesn't reopen it.
+  useEffect(() => {
+    if (!initialMarketplaceScriptId) return;
+    setMainTab('marketplace');
+    setMarketplaceDetailId(initialMarketplaceScriptId);
+    onInitialMarketplaceConsumed?.();
+  }, [initialMarketplaceScriptId, onInitialMarketplaceConsumed, setMainTab, setMarketplaceDetailId]);
   // Both lists are cached (src/services/queryCache.ts): returning to 劇本 or
   // switching back to 市集 paints the last list instantly, refreshed quietly.
   const marketplace = useCachedQuery<MarketplaceScript[]>(
-    mainTab === 'marketplace' ? userKey('/marketplace', 'list', marketplaceSort, marketplaceCategory, debouncedMarketplaceQuery) : null,
+    mainTab === 'marketplace' ? userKey('/marketplace', 'list', marketplaceSort, marketplaceCategory, debouncedMarketplaceQuery, showAdultScripts ? '18' : 'safe') : null,
     () => apiService.getMarketplaceScripts({
       sort: marketplaceSort,
       category: marketplaceCategory === 'all' ? undefined : marketplaceCategory,
@@ -272,7 +291,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
   }, [marketplace.error]);
 
   // Quiet on failure — the section just stays empty.
-  const favorited = useCachedQuery<MarketplaceScript[]>(userKey('/marketplace', 'favorites'), () => apiService.getFavoritedMarketplaceScripts());
+  const favorited = useCachedQuery<MarketplaceScript[]>(userKey('/marketplace', 'favorites', showAdultScripts ? '18' : 'safe'), () => apiService.getFavoritedMarketplaceScripts());
   const favoritedMarketplace = favorited.data ?? EMPTY_MARKET;
   const loadFavoritedMarketplace = favorited.refetch;
   // Re-check when the favorites set changes (not on mount — the hook loads).
@@ -346,21 +365,43 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
     );
     if (match) {
       handleViewScript(match);
-    } else if (customScripts.length === 0) {
-      // Custom scripts may still be loading (e.g. an email deep link opened
-      // this view right after login). Keep the title pending — this effect
-      // re-runs when customScripts arrive — instead of warning prematurely.
+      onInitialScriptConsumed?.();
       return;
-    } else {
-      showNotification({
-        type: 'warning',
-        title: tr('找不到劇本', 'Script not found'),
-        message: tr(`「${initialScriptTitle}」可能已被刪除或重新命名`, `"${initialScriptTitle}" may have been deleted or renamed`),
-        duration: 4000,
-      });
     }
-    onInitialScriptConsumed?.();
-  }, [initialScriptTitle, defaultRoleplayScripts, customScripts, handleViewScript, showNotification, onInitialScriptConsumed]);
+    // Not in the couple's library — an invitation can name a 創作市集 script
+    // the sender picked straight from the marketplace. Open its detail there.
+    let cancelled = false;
+    apiService
+      .getMarketplaceScripts({ q: initialScriptTitle.slice(0, 100), limit: 20 })
+      .then((list) => list.find((m) => m.title === initialScriptTitle) ?? null)
+      .catch(() => null)
+      .then((hit) => {
+        if (cancelled) return;
+        if (hit) {
+          setMainTab('marketplace');
+          setMarketplaceDetailId(hit.id);
+          onInitialScriptConsumed?.();
+          return;
+        }
+        // Custom scripts may still be loading (e.g. an email deep link opened
+        // this view right after login). Keep the title pending — this effect
+        // re-runs when customScripts arrive — instead of warning prematurely.
+        if (customScripts.length === 0) return;
+        showNotification({
+          type: 'warning',
+          title: tr('找不到劇本', 'Script not found'),
+          message: tr(
+            `「${initialScriptTitle}」可能已被刪除、改名，或是 18+ 劇本（到右上角個人選單打開「顯示 18+ 劇本」）`,
+            `"${initialScriptTitle}" may have been deleted or renamed, or it's an 18+ script (turn on "Show 18+ scripts" in the profile menu)`,
+          ),
+          duration: 5000,
+        });
+        onInitialScriptConsumed?.();
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialScriptTitle, defaultRoleplayScripts, customScripts, handleViewScript, showNotification, onInitialScriptConsumed, setMarketplaceDetailId]);
 
   const recordRoleplay = useCallback((script: RoleplayScript) => {
     const time = new Date().toLocaleTimeString(dateLocale(), {
@@ -1250,6 +1291,7 @@ const RoleplayView: React.FC<RoleplayViewProps> = ({
           } : undefined}
           showNotification={showNotification}
           parseContent={parseScriptContent}
+          onEnableAdultScripts={onEnableAdultScripts}
         />
       )}
 

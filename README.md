@@ -76,6 +76,20 @@ adds a fragment file in `changelog/`; CI compiles them into the block below —
 see `CLAUDE.md`.)
 
 <!-- changelog:begin (generated from changelog/*.md — edit those, not this) -->
+### 2026-11-23
+- **「顯示 18+ 劇本」開關修正**: 打開後白色圓點會跑出開關外，現在開／關都會乖乖停在開關裡。
+- **親密邀請直接從創作市集選劇本**: 送「角色扮演」邀請時多了「我的劇本／創作市集」切換，可以直接搜尋、挑選市集裡的劇本，不用先加到我的最愛。對方收到後按「查看劇本」也能直接打開那份市集劇本；很長的市集劇本也不會再卡在「劇本資料不完整」。
+- **劇本可以寫得更長**: 自訂劇本的標題、情境、地點和正文上限都放寬了，長篇角色劇本可以完整上傳、儲存和播放。
+- **市集劇本連結**: 創作市集的劇本現在有自己的連結（網址帶 `?market=`）。登入後會直接打開那一則，不用再去市集裡翻。
+- **劇本閱讀模式**: 在手機上打開創作市集的劇本會直接全螢幕顯示，左右留白也縮小，一頁能讀到更多台詞。往下讀時上方標題列和下方按鈕會自動收起，往上滑或讀到最後就會再出現；「收藏」「檢舉」改成上方的小圖示，下方只留「立刻玩」。
+- **可以選擇要不要看 18+ 劇本**: 個人選單新增「顯示 18+ 劇本」，預設關閉。沒打開時，創作市集的清單、搜尋和分享連結都不會出現這類劇本。
+
+### 2026-11-21
+- **重設密碼會登出所有裝置**: 重設密碼後，其他手機或電腦上的舊登入會自動失效，畫面會清楚說明「密碼已變更，請用新密碼重新登入」，不讓別人繼續留在你的帳號裡。
+- **付款暫時只提供藍新金流**: 綠界 ECPay 設定完成前先隱藏，升級與視訊諮商付款都改走藍新金流（信用卡、ATM、超商）。
+- **諮商師證明文件改為私密保存**: 上傳的證照與身分文件只有管理員能在審核時開啟，不再是任何人拿到連結就能看。
+- **申請諮商師不會再綁到別人的帳號**: 用已經註冊過的 Email 申請成為諮商師時，需要先登入那個帳號才能送出，避免有人拿你的 Email 冒名申請。已登入的使用者在申請頁送出時，會直接用自己的帳號申請。
+
 ### 2026-11-18
 - **隱私權政策上線**: 新增公開的[隱私權政策](https://twogether.fun/privacy)（繁中／English），用白話說清楚我們蒐集什麼、誰看得到、AI 怎麼處理、保存多久，以及怎麼查詢與刪除你的資料：不賣資料、不放廣告、不用第三方追蹤。註冊畫面、頁尾、使用說明與所有公開頁面都能直接點到。
 - **一句話說清楚 Twogether**: 首頁、付費方案、客服中心現在都用同一句定位：「把諮商帶回日常的伴侶練習工具」，不再各說各的。
@@ -936,6 +950,12 @@ EMAIL_REPLY_TO=support@twogether.fun
 
 # Admin funnel dashboard (gates /admin and /api/admin/*)
 ADMIN_PASSWORD=pick-a-long-random-password
+
+# Marketplace bot — server-side upload into 創作市集.
+# Docs: docs/MARKETPLACE_BOT_API.md
+# MARKETPLACE_BOT_API_KEY=generate-a-long-random-string
+# Author defaults to wangmark510@gmail.com when this is unset.
+# MARKETPLACE_BOT_AUTHOR_EMAIL=wangmark510@gmail.com
 ```
 
 ## 🔧 Supabase Setup
@@ -1016,6 +1036,9 @@ All API routes are prefixed with `/api/`:
 - `GET /api/intimacy-requests/intimacy-templates` - Get all intimacy templates
 - `GET /api/intimacy-requests/intimacy-templates/:category` - Get templates by category
 - `GET /api/intimacy-requests/alternative-intimacy-options` - Get alternative intimacy options
+
+### Marketplace bot (server-to-server)
+- `POST /api/bot/marketplace/scripts` — create or update a role-play script and publish it to 創作市集. Authenticated with `Authorization: Bearer $MARKETPLACE_BOT_API_KEY` (not a user login). Request shape, field mapping, and a curl example: [docs/MARKETPLACE_BOT_API.md](docs/MARKETPLACE_BOT_API.md).
 
 ### Notifications
 - `GET /api/intimacy-requests/notifications` - Get user notifications

@@ -1,7 +1,7 @@
 # 0011. Dependency-free payment gateways & immutable receipts
 
 - Status: accepted (recorded 2026-11-24 from code comments)
-- Covers: `lib/ecpay.js`, `lib/newebpay.js`, `lib/receipts.js`
+- Covers: `lib/ecpay.js`, `lib/newebpay.js`, `lib/paymentProviders.js`, `lib/receipts.js`
 
 ## Gateways
 
@@ -17,8 +17,20 @@
   .NET encoding differs from `encodeURIComponent`: a space becomes `+`, and `~`
   and `'` are encoded. `-_.!*()` are already literal.
 
-  `MerchantTradeDate` uses the local `YYYY/MM/DD HH:mm:ss` format. ECPay's
-  published stage credentials are the default (shortcut: #173).
+  `MerchantTradeDate` uses the local `YYYY/MM/DD HH:mm:ss` format.
+- **Stage credentials are refused in production.** ECPay's published stage keys
+  are the default outside production (dev, e2e). In production,
+  `isConfigured()` requires the real merchant secrets: the stage
+  HashKey/HashIV are public, so accepting callbacks signed with them would let
+  anyone forge a "paid" callback and grant themselves Premium. While
+  `isConfigured()` is false, `verifyCallback` always fails, for both gateways.
+- **Callback signatures are compared in constant time** (`timingSafeEqual` on
+  equal-length buffers).
+- **One rule for choosing a gateway** (`lib/paymentProviders.js`), shared by
+  Premium checkout and paid video sessions, so both refuse a gateway the same
+  way. An explicit choice wins. Otherwise ECPay is used while it's configured,
+  and NewebPay otherwise. An unusable gateway gets a 503 body whose message
+  points at the other gateway only when that one works.
 - **NewebPay MPG 2.0:** the order fields, URL-encoded, are AES-256-CBC encrypted
   (PKCS7, hex) to make `TradeInfo`, and
   `TradeSha = upper(SHA256("HashKey=…&" + TradeInfo + "&HashIV=…"))`. The

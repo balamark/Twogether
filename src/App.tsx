@@ -232,6 +232,9 @@ interface User {
   // Public-share anonymity preference (署名 vs 匿名) — drives the story
   // compose flow's anonymity notice; the server snapshots the real value.
   public_share_show_nickname?: boolean;
+  // Creator-marketplace opt-in. Absent or false hides scripts tagged 18+
+  // (and explicit/intense intensity tags) from the marketplace.
+  show_adult_scripts?: boolean;
   createdAt: string;
 }
 
@@ -620,6 +623,8 @@ const LoveTimeApp = () => {
   // mounts (the modal only exists inside CalendarView). Consumed once.
   const [pendingAddRecord, setPendingAddRecord] = useState(false);
   const [pendingScriptTitle, setPendingScriptTitle] = useState<string | null>(null);
+  // ?market=<uuid> — open that creator-marketplace script after sign-in.
+  const [pendingMarketplaceScriptId, setPendingMarketplaceScriptId] = useState<string | null>(null);
   // Open 親密邀請紀錄 straight on its 共同方案 tab (from the invite modal).
   const [pendingIntimacyTab, setPendingIntimacyTab] = useState<'plans' | null>(null);
   const [intimateRecords, setIntimateRecords] = useState<IntimateRecord[]>([]);
@@ -907,6 +912,30 @@ const LoveTimeApp = () => {
     }
   }, []);
 
+  // ?market=<uuid> deep link (marketplace bot / shared script URL): stash it,
+  // then open that marketplace detail once a real account is signed in.
+  // Guests keep the id in sessionStorage so signing up in this tab still lands
+  // on the script. Invalid ids are ignored.
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const marketParam = urlParams.get('market');
+    if (marketParam && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(marketParam)) {
+      try { sessionStorage.setItem('pendingMarketplaceDeepLink', marketParam); } catch { /* storage disabled */ }
+      urlParams.delete('market');
+      const rest = urlParams.toString();
+      window.history.replaceState(window.history.state, document.title, window.location.pathname + (rest ? `?${rest}` : ''));
+    }
+  }, []);
+  useEffect(() => {
+    if (!authState.isAuthenticated || authState.isGuest) return;
+    let stored: string | null = null;
+    try { stored = sessionStorage.getItem('pendingMarketplaceDeepLink'); } catch { /* storage disabled */ }
+    if (!stored) return;
+    try { sessionStorage.removeItem('pendingMarketplaceDeepLink'); } catch { /* ignore */ }
+    setPendingMarketplaceScriptId(stored);
+    setCurrentView('roleplay');
+  }, [authState.isAuthenticated, authState.isGuest, setCurrentView]);
+
   // ?script=<title> deep link (from invitation emails): stash it, then open
   // the script in the roleplay view once the user is authenticated.
   useEffect(() => {
@@ -1084,6 +1113,7 @@ const LoveTimeApp = () => {
         email_verified?: boolean;
         selected_therapist?: string | null;
         public_share_show_nickname?: boolean;
+        show_adult_scripts?: boolean;
         created_at?: string;
       };
 
@@ -1099,6 +1129,7 @@ const LoveTimeApp = () => {
         email_verified: userData.email_verified,
         selected_therapist: userData.selected_therapist ?? null,
         public_share_show_nickname: userData.public_share_show_nickname,
+        show_adult_scripts: userData.show_adult_scripts === true,
         partnerCode: generatePartnerCode(),
         createdAt: userData.created_at || new Date().toISOString()
       };
@@ -1320,6 +1351,39 @@ const LoveTimeApp = () => {
     });
   };
 
+  const handleToggleShowAdultScripts = async (next: boolean) => {
+    if (!authState.user || showAdultSaveRef.current) return;
+    const previous = authState.user.show_adult_scripts === true;
+    const updated: AuthState = {
+      ...authState,
+      user: { ...authState.user, show_adult_scripts: next },
+    };
+    setAuthState(updated);
+    persistAuthState(updated);
+    // Guests have no users row. /auth/* is not mocked, so a real request would
+    // 401 and sign them out. The marketplace preview is empty for guests.
+    if (authState.isGuest) return;
+    showAdultSaveRef.current = true;
+    try {
+      await apiService.updateShowAdultScripts(next);
+    } catch (err) {
+      const rolled: AuthState = {
+        ...authState,
+        user: { ...authState.user, show_adult_scripts: previous },
+      };
+      setAuthState(rolled);
+      persistAuthState(rolled);
+      showNotification({
+        type: 'error',
+        title: tr('無法更新設定', 'Couldn\'t update the setting'),
+        message: (err as Error)?.message || tr('無法更新「顯示 18+ 劇本」，請稍後再試', 'Couldn\'t update “Show 18+ scripts”. Please try again in a moment'),
+        duration: 5000,
+      });
+    } finally {
+      showAdultSaveRef.current = false;
+    }
+  };
+
   const handleLogout = async () => {
     // 訪客模式 has no account to sign out of: the menu item resets the sample couple.
     if (authState.isGuest) {
@@ -1486,8 +1550,12 @@ const LoveTimeApp = () => {
       setShowAuthModal(true);
       showNotification({
         type: 'warning',
-        title: tr('登入已過期', 'Session expired'),
-        message: detail?.reason === 'invalid'
+        title: detail?.reason === 'password_changed'
+          ? tr('密碼已變更', 'Password changed')
+          : tr('登入已過期', 'Session expired'),
+        message: detail?.reason === 'password_changed'
+          ? tr('你的密碼剛被重設，所有裝置都已登出。請用新密碼重新登入；如果不是你本人操作，請立即再重設一次密碼。', 'Your password was just reset, so every device was signed out. Sign in with the new password. If this wasn\'t you, reset it again right away.')
+          : detail?.reason === 'invalid'
           ? tr('登入資訊已失效，請重新登入', 'Your sign-in is no longer valid. Please sign in again')
           : tr('為了你的帳號安全，請重新登入', 'For your account\'s security, please sign in again'),
         duration: 6000
@@ -1769,6 +1837,7 @@ const LoveTimeApp = () => {
   // Held in refs so the document listeners register once instead of on every
   // render (showNotification is re-created each render).
   const mediaBlockNotifiedRef = useRef(false);
+  const showAdultSaveRef = useRef(false);
   const mediaBlockCtxRef = useRef({ show: showNotification, view: currentView });
   mediaBlockCtxRef.current = { show: showNotification, view: currentView };
 
@@ -2832,6 +2901,10 @@ const LoveTimeApp = () => {
             onUnpublishScript={unpublishScript}
             initialScriptTitle={pendingScriptTitle}
             onInitialScriptConsumed={() => setPendingScriptTitle(null)}
+            initialMarketplaceScriptId={pendingMarketplaceScriptId}
+            onInitialMarketplaceConsumed={() => setPendingMarketplaceScriptId(null)}
+            showAdultScripts={authState.user?.show_adult_scripts === true}
+            onEnableAdultScripts={() => handleToggleShowAdultScripts(true)}
             renderGames={() => <GamesView
               customMemoryQuestions={customMemoryQuestions}
               customEmotions={customEmotions}
@@ -3018,6 +3091,8 @@ const LoveTimeApp = () => {
         isTherapist={isTherapist}
         counselorMode={counselorMode}
         onToggleCounselorMode={handleToggleCounselorMode}
+        showAdultScripts={authState.user?.show_adult_scripts === true}
+        onToggleShowAdultScripts={handleToggleShowAdultScripts}
       />
 
       {/* 情緒深潛 resume banner — dismissible, does not re-fire same session (R4).
