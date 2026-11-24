@@ -413,6 +413,8 @@ interface GenerateRoleplayMessagesInput {
   scriptBody?: string;
   category?: string;
   regenerate?: boolean;
+  /** Where the sender picked the script — logged server-side only. */
+  scriptSource?: 'owned' | 'marketplace';
 }
 
 interface RoleplayMessagesResult {
@@ -1682,6 +1684,14 @@ apiClient.defaults.adapter = guestAdapter(cachingAdapter(axios.getAdapter(apiCli
 // default; a higher ceiling has no cost — the promise resolves the moment the
 // server answers, it just stops us abandoning a request that's still working.
 const AI_TIMEOUT = 60000;
+
+// Script text caps on the invitation endpoints (routes/intimacy-requests.js).
+// Scripts themselves may be much longer (custom/marketplace allow 1500-char
+// scenarios and 150k-char bodies), so clip instead of failing validation.
+const SCRIPT_SCENARIO_SEND_MAX = 500;
+const SCRIPT_BODY_SEND_MAX = 8000;
+const clipText = (s: string | undefined, max: number): string | undefined =>
+  s && s.length > max ? s.slice(0, max) : s;
 
 // The default 15s timeout is fine for JSON requests but far too short for a
 // multipart upload: a wall post can carry up to 4 files (images ≤10MB, videos
@@ -3382,7 +3392,7 @@ class ApiService {
         request_type: requestType,
         roleplay_category: request.roleplayCategory,
         script_title: request.scriptTitle,
-        script_scenario: request.scriptScenario,
+        script_scenario: clipText(request.scriptScenario, SCRIPT_SCENARIO_SEND_MAX),
         scheduled_time: request.scheduledTime,
         alt_plan_ids: request.altPlanIds?.length ? request.altPlanIds : undefined,
       });
@@ -3739,11 +3749,14 @@ class ApiService {
       const response = await apiClient.post('/intimacy-requests/script-messages', {
         scriptId: input.scriptId,
         scriptTitle: input.scriptTitle,
-        scriptScenario: input.scriptScenario,
-        scriptBody: input.scriptBody,
+        scriptScenario: clipText(input.scriptScenario, SCRIPT_SCENARIO_SEND_MAX),
+        // The AI only needs the setup — and marketplace scripts can run to
+        // 150k chars, far past what this endpoint accepts.
+        scriptBody: clipText(input.scriptBody, SCRIPT_BODY_SEND_MAX),
         category: input.category,
         regenerate: input.regenerate,
-      });
+        scriptSource: input.scriptSource,
+      }, { timeout: AI_TIMEOUT });
       return {
         summary: response.data.summary || '',
         messages: (response.data.messages || []) as RoleplayMessageSuggestion[],

@@ -799,8 +799,53 @@ export const ROUTES: GuestRoute[] = [
     db.script_favorites = t<string>(db, 'script_favorites').filter((x) => x !== params.id);
     return ok();
   } },
-  { method: 'get', re: P('/marketplace/scripts'), handler: () => ok({ scripts: [] }) },
-  { method: 'get', re: P('/marketplace/my-favorites'), handler: () => ok({ scripts: [] }) },
+  // 創作市集: the seeded samples, filtered/sorted like routes/marketplace.js.
+  { method: 'get', re: P('/marketplace/scripts'), handler: ({ db, query }) => {
+    const category = query.get('category');
+    const q = (query.get('q') || '').trim().toLowerCase();
+    const sort = query.get('sort') || 'rating';
+    const limit = Number(query.get('limit')) || 30;
+    const list = t(db, 'marketplace_scripts')
+      .filter((m) => !category || m.category === category)
+      .filter((m) => !q || [m.title, m.scenario, m.location].some((f) => str(f).toLowerCase().includes(q)))
+      .sort((a, b) =>
+        sort === 'recent' ? Date.parse(str(b.createdAt)) - Date.parse(str(a.createdAt))
+        : sort === 'popular' ? Number(b.ratingCount) - Number(a.ratingCount)
+        : Number(b.avgStars) - Number(a.avgStars));
+    return ok({ scripts: list.slice(0, limit) });
+  } },
+  { method: 'get', re: P('/marketplace/my-favorites'), handler: ({ db }) => {
+    const favs = t<string>(db, 'script_favorites');
+    return ok({ scripts: t(db, 'marketplace_scripts').filter((m) => favs.includes(str(m.id))) });
+  } },
+  { method: 'get', re: P('/marketplace/scripts/:id/ratings'), handler: () => ok({ ratings: [] }) },
+  { method: 'get', re: P('/marketplace/scripts/:id'), handler: ({ db, params }) => {
+    const m = t(db, 'marketplace_scripts').find((x) => x.id === params.id);
+    if (!m) throw new GuestError(404, tr('找不到劇本，它可能已被作者下架', 'Script not found — the author may have taken it down'), 'SCRIPT_NOT_FOUND');
+    return ok({ script: { ...m, myRating: null, isFavorited: t<string>(db, 'script_favorites').includes(params.id), isAuthor: false } });
+  } },
+  { method: 'post', re: P('/marketplace/scripts/:id/rate'), handler: () => blocked() },
+  { method: 'post', re: P('/marketplace/scripts/:id/report'), handler: () => blocked() },
+
+  // 角色扮演 → AI 入戲開場邀請: on-device lines from the script's title, so the
+  // pick-a-script step (owned or 創作市集) lands on 5 real choices, not a blank.
+  { method: 'post', re: P('/intimacy-requests/script-messages/feedback'), handler: () => ok() },
+  { method: 'post', re: P('/intimacy-requests/script-messages'), handler: ({ body }) => {
+    const title = str(body.scriptTitle).trim() || tr('我們的劇本', 'our script');
+    const scenario = str(body.scriptScenario).trim();
+    const lines: [string, string, string][] = [
+      ['normal', tr('最溫和', 'Gentlest'), tr(`今晚想和你玩《${title}》，先當作我們剛在場景裡相遇，好嗎？`, `Want to play "${title}" with me tonight? Let's pretend we just met in that scene.`)],
+      ['mild', tr('微甜', 'Sweet'), tr(`想到等下要和你演《${title}》，我心跳有點快…你準備好入戲了嗎？`, `Thinking about playing "${title}" with you later makes my heart race… ready to get into character?`)],
+      ['moderate', tr('曖昧', 'Flirty'), tr(`《${title}》的氣氛我已經想像好了，今晚我想離你近一點，再近一點。`, `I've already pictured the mood of "${title}". Tonight I want to be closer to you, and closer still.`)],
+      ['explicit', tr('直接', 'Direct'), tr(`今晚就照《${title}》來，我想要你，現在就開始。`, `Tonight we follow "${title}". I want you — let's start now.`)],
+      ['intense', tr('最強烈', 'Most intense'), tr(`別等了，今晚的《${title}》，我要你完全屬於我。`, `Don't make me wait. Tonight's "${title}" — I want all of you.`)],
+    ];
+    return ok({
+      summary: tr(`${title}：${scenario || '一段專屬你們的角色扮演'}。一起入戲，今晚就從這裡開始。`, `${title}: ${scenario || 'a role play just for the two of you'}. Step into it together — tonight starts here.`),
+      messages: lines.map(([level, label, text]) => ({ level, label, text })),
+      cached: false,
+    });
+  } },
 
   // ── 親密邀請 intimacy requests ─────────────────────────────────────────────
   { method: 'get', re: P('/intimacy-requests'), handler: ({ db }) => ok({ requests: t(db, 'intimacy_requests'), intimacy_requests: t(db, 'intimacy_requests') }) },

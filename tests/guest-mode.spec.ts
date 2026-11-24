@@ -90,6 +90,26 @@ test.describe('guest mode', () => {
     expect(leaks).toEqual([]);
   });
 
+  test('親密邀請 → 角色扮演 can pick a sample 創作市集 script and get 5 openers', async ({ page }) => {
+    await skipTour(page);
+    const leaks = watchNetwork(page);
+    await page.goto('/');
+    // Guests have no header 親密邀請 button; 紀錄 → 我發送的 → 送出邀請 opens it.
+    await page.getByTestId('guest-menu-toggle').click();
+    await page.getByTestId('user-menu-intimacy-history').click();
+    await page.getByRole('tab', { name: /我發送的/ }).click();
+    await page.getByTestId('intimacy-empty-send').click();
+    await page.getByTestId('intimacy-category-roleplay').click();
+    await page.getByTestId('roleplay-source-marketplace').click();
+    const card = page.getByTestId('roleplay-market-script-gms-1');
+    await expect(card).toBeVisible();
+    await card.click();
+    for (const lvl of ['normal', 'mild', 'moderate', 'explicit', 'intense']) {
+      await expect(page.getByTestId(`roleplay-msg-${lvl}`)).toBeVisible();
+    }
+    expect(leaks).toEqual([]);
+  });
+
   test('感受小調查 + per-month stats work on the sample couple', async ({ page }) => {
     await skipTour(page);
     const leaks = watchNetwork(page);

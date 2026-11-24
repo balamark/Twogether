@@ -171,6 +171,36 @@ function seedWall(): Row[] {
   ];
 }
 
+// 創作市集 samples (MarketplaceScript shape, camelCase like the real API) so a
+// guest can browse the marketplace and pick one straight into 親密邀請.
+function seedMarketplace(): Row[] {
+  const script = (id: string, category: string, title: string, scenario: string, location: string, body: string, tags: string[], author: string, avgStars: number, ratingCount: number, daysAgo: number): Row => ({
+    id, title, category, scenario, location, script: body, tags, duration: tr('15-30分鐘', '15–30 min'),
+    thumbnailUrl: null, authorId: `guest-creator-${id}`, authorName: author, avgStars, ratingCount,
+    isPublic: true, isCustom: true, createdAt: iso(daysAgo), updatedAt: iso(daysAgo),
+  });
+  return [
+    script('gms-1', 'romantic',
+      tr('雨夜書店打烊前', 'The bookshop before closing on a rainy night'),
+      tr('下雨的夜晚，書店只剩你們兩個人，店員說再十分鐘就要打烊。', 'A rainy night, only the two of you left in the bookshop, and the clerk says it closes in ten minutes.'),
+      tr('書店', 'Bookshop'),
+      tr('【開場】雨打在玻璃上。你在詩集區假裝找書，其實一直在看對方。\n【互動】輪流唸一句書裡的句子給對方聽，唸到心動的那句就停下來。\n【收尾】撐同一把傘回家。', '[Opening] Rain on the windows. You pretend to browse poetry but keep looking at each other.\n[Together] Take turns reading a line aloud; stop at the one that makes your heart skip.\n[Ending] Walk home under one umbrella.'),
+      [tr('慢熱', 'slow burn'), tr('雨天', 'rainy day')], tr('小雨創作社', 'Drizzle Studio'), 4.8, 23, 6),
+    script('gms-2', 'adventurous',
+      tr('深夜密室逃脫：最後一道鎖', 'Late-night escape room: the last lock'),
+      tr('密室只剩最後一道密碼鎖，提示是「說出對方最近讓你心動的一件事」。', 'One code lock left. The hint: "say one thing your partner did lately that made your heart race."'),
+      tr('密室', 'Escape room'),
+      tr('【開場】燈光變暗，倒數計時開始。\n【互動】每答對一題對方的小祕密，就能靠近一步。\n【收尾】門打開時，給對方一個擁抱當作通關獎勵。', '[Opening] The lights dim and the countdown starts.\n[Together] Every right answer about your partner\'s little secrets earns a step closer.\n[Ending] When the door opens, a hug is the prize.'),
+      [tr('遊戲感', 'playful'), tr('默契', 'teamwork')], tr('週末腦洞', 'Weekend Ideas'), 4.6, 15, 12),
+    script('gms-3', 'school',
+      tr('畢業前的頂樓', 'The rooftop before graduation'),
+      tr('畢業典禮前一天，你們在學校頂樓，終於要把一直沒說的話說出口。', 'The day before graduation, on the school rooftop, finally saying what you never said.'),
+      tr('學校頂樓', 'School rooftop'),
+      tr('【開場】晚風吹著制服的衣角。\n【互動】各自說一件「當年其實很想做、卻沒敢做」的事，然後一起做一次。\n【收尾】約好明年的今天再來一次。', '[Opening] The evening breeze tugs at your uniforms.\n[Together] Each share one thing you wanted to do back then but didn\'t dare — then do it together.\n[Ending] Promise to come back on this day next year.'),
+      [tr('青春', 'nostalgic'), tr('告白', 'confession')], tr('阿光的劇本櫃', 'Kuang\'s Script Shelf'), 4.5, 9, 20),
+  ];
+}
+
 export function buildSeed(): GuestDb {
   return {
     version: buildSeed.VERSION,
@@ -253,6 +283,7 @@ export function buildSeed(): GuestDb {
       { user_id: PARTNER, gift_key: 'shopping' },
     ],
     script_favorites: [],
+    marketplace_scripts: seedMarketplace(),
     intimacy_requests: [
       {
         id: 'gir-1', requester_id: PARTNER, recipient_id: ME, request_type: 'intimate',
@@ -265,4 +296,4 @@ export function buildSeed(): GuestDb {
     feedback_mine: [],
   };
 }
-buildSeed.VERSION = 5;
+buildSeed.VERSION = 6;
