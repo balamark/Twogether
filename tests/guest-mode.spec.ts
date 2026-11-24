@@ -57,9 +57,13 @@ test.describe('guest mode', () => {
     await page.goto('/');
     await page.getByTestId('nav-tab-talk').click();
     await expect(page.getByText('說好的晚餐，他又遲到沒說')).toBeVisible();
+    // Filter chips carry per-status counts from the guest backend.
+    await expect(page.getByTestId('events-filter-count-all')).not.toHaveText('0');
     await page.getByTestId('nav-tab-us').click();
     await expect(page.getByTestId('guest-banner')).toBeVisible();
+    await expect(page.getByTestId('love-bank-week-delta')).toBeVisible();
     await page.getByTestId('nav-tab-grow').click();
+    await expect(page.getByTestId('grow-recap-card')).toBeVisible();
     await expect(page.getByText('你們的溝通模式').first()).toBeVisible();
     expect(leaks).toEqual([]);
   });

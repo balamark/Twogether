@@ -63,22 +63,41 @@ const LoveBankCard: React.FC<LoveBankCardProps> = ({ onOpen, compact = false }) 
     );
   }
 
-  // 我們: a section in the same shape as 我們正在愛 / 我們正在成長 (title
-  // outside, inner white card), on a soft blue so it reads as its own thing.
+  // 我們: one compact row — the number, how it moved this week, and the latest
+  // entry — instead of a big white block holding a lone number. The weekly
+  // change and the last entry are what make tapping in feel worth it.
+  const delta = summary.weekDelta ?? 0;
+  const latest = summary.recent.find((t) => t.status === 'confirmed');
+  const deltaTone = delta > 0
+    ? 'bg-petal-sage/25 text-petal-sage-deeper'
+    : delta < 0 ? 'bg-petal-rose-soft/50 text-petal-rose-deep' : 'bg-petal-cream-2 text-petal-muted';
   return (
-    <section data-testid="love-bank-card" className="rounded-3xl border border-sky-200 bg-sky-50/60 p-5 md:p-6">
-      <div className="relative flex items-center gap-2 mb-4">
+    <section data-testid="love-bank-card" className="rounded-3xl border border-sky-200 bg-sky-50/60 p-4 md:p-5">
+      <div className="relative flex items-center gap-2 mb-3">
         <PiggyBank className="w-5 h-5 text-sky-800" strokeWidth={1.5} />
-        <h2 className="font-display text-xl text-petal-ink">{tr('感情存款', 'Love Bank')}</h2>
+        <h2 className="font-display text-lg text-petal-ink">{tr('感情存款', 'Love Bank')}</h2>
         <div className="relative">{hint('left')}</div>
       </div>
       <button
         type="button"
         onClick={onOpen}
-        className="group w-full flex items-center gap-2 rounded-2xl bg-white/70 border border-petal-rule-soft px-4 py-4 hover:border-petal-ink transition-colors"
+        className="group w-full flex items-center gap-3 rounded-2xl bg-white/80 border border-petal-rule-soft px-4 py-3 text-left hover:border-petal-ink transition-colors"
       >
         <span data-testid="love-bank-average" className="font-display text-4xl font-light text-petal-ink leading-none">{summary.average}</span>
-        <ChevronRight className="ml-auto w-4 h-4 text-petal-muted group-hover:text-petal-ink shrink-0 transition-colors" strokeWidth={1.5} />
+        <span className="min-w-0 flex-1">
+          <span data-testid="love-bank-week-delta" className={`inline-block rounded-full px-2 py-0.5 font-body text-[11px] font-medium ${deltaTone}`}>
+            {delta === 0
+              ? tr('本週持平', 'Flat this week')
+              : tr(`本週 ${delta > 0 ? '+' : ''}${delta}`, `${delta > 0 ? '+' : ''}${delta} this week`)}
+          </span>
+          {latest && (
+            <span className="block mt-1 font-body text-[11px] text-petal-muted truncate" data-testid="love-bank-latest">
+              {tr('最近：', 'Latest: ')}{latest.note || tr('一筆存款', 'a deposit')}
+              {' '}{latest.kind === 'redeem' ? `−${latest.amount}` : `+${latest.amount}`}
+            </span>
+          )}
+        </span>
+        <ChevronRight className="w-4 h-4 text-petal-muted group-hover:text-petal-ink shrink-0 transition-colors" strokeWidth={1.5} />
       </button>
     </section>
   );

@@ -24,7 +24,7 @@ const StoriesTeaserCard: React.FC<{ onGoToStories: () => void }> = ({ onGoToStor
   >
     <BookOpen className="w-4 h-4 text-petal-rose-deep shrink-0" strokeWidth={1.5} />
     <span className="min-w-0 flex-1">
-      <span className="block font-display text-sm text-petal-ink">{tr('📚 真實故事', '📚 Real stories')}</span>
+      <span className="block font-display text-sm text-petal-ink">{tr('真實故事', 'Real stories')}</span>
       <span className="block font-body text-[11px] text-petal-muted">{tr('看看其他伴侶怎麼做到的', 'See how other couples made it work')}</span>
     </span>
     <ChevronRight className="w-4 h-4 text-petal-muted shrink-0" strokeWidth={1.5} />
@@ -42,7 +42,7 @@ const PlaybooksTeaserCard: React.FC<{ onOpen: () => void }> = ({ onOpen }) => (
   >
     <BookMarked className="w-4 h-4 text-petal-rose-deep shrink-0" strokeWidth={1.5} />
     <span className="min-w-0 flex-1">
-      <span className="block font-display text-sm text-petal-ink">{tr('🧭 關係解方手冊', '🧭 Relationship Playbook')}</span>
+      <span className="block font-display text-sm text-petal-ink">{tr('關係解方手冊', 'Relationship Playbook')}</span>
       <span className="block font-body text-[11px] text-petal-muted">{tr('常卡住的 8 種循環，和可以直接說出口的話', '8 patterns couples get stuck in, and words you can actually say')}</span>
     </span>
     <ChevronRight className="w-4 h-4 text-petal-muted shrink-0" strokeWidth={1.5} />
@@ -97,24 +97,26 @@ const GrowView: React.FC<GrowViewProps> = ({ authState, onInvitePartner, onNavig
     );
   }
 
+  // Personal first: your own numbers and the AI's observation are what make
+  // this tab worth opening; the static reading lives below its own heading.
   return (
     <div className="max-w-4xl mx-auto p-4 md:p-6 space-y-6">
-      <header className="border-b border-petal-rule pb-7">
-        <div className="font-body text-[11px] font-medium uppercase tracking-[0.18em] text-petal-muted mb-3">
-          {tr('— 成長', '— Grow')}
-        </div>
-        <h1 className="font-display text-4xl md:text-5xl font-light tracking-tight text-petal-ink leading-[1.05] mb-3">
-          {tr('我們正在', 'We are ')}<em className="not-italic font-light italic text-pink-600">{tr('成長', 'growing')}</em>
-          <span className="align-middle ml-2"><InfoHint viewId="grow" /></span>
+      <header className="flex items-center gap-2">
+        <h1 className="font-display text-2xl md:text-3xl font-light tracking-tight text-petal-ink">
+          {tr('我們正在', 'We are ')}<span className="text-pink-600">{tr('成長', 'growing')}</span>
         </h1>
-        <p className="font-display italic font-light text-base text-petal-muted">
-          {tr('統計、AI 觀察到的模式，和你們一起達成的里程碑。', 'Stats, patterns the AI noticed, and milestones you reached together.')}
-        </p>
+        <InfoHint viewId="grow" />
       </header>
 
-      {storiesCard}
       <EventAnalytics />
       <AchievementsView />
+
+      <section className="space-y-3 pt-2" data-testid="grow-reading-section">
+        <h2 className="font-body text-[11px] font-medium uppercase tracking-[0.16em] text-petal-muted">
+          {tr('延伸閱讀', 'Further reading')}
+        </h2>
+        {storiesCard}
+      </section>
     </div>
   );
 };

@@ -50,7 +50,13 @@ test.describe('對話 — a persistent switcher over 說開一件事', () => {
     await expect(page.getByTestId('communicate-subtab-events')).toHaveCount(0);
     await expect(page.getByTestId('communicate-subtab-harmony')).toHaveCount(0);
     await expect(page.getByTestId('events-compose-button')).toBeVisible();
-    await expect(page.getByTestId('events-analytics-button')).toBeVisible();
+    // No page hero (the switcher names the page); 開始對話 floats; 分析 moved
+    // to 成長, reached from a quiet link under the list.
+    await expect(page.getByTestId('events-hero')).toHaveCount(0);
+    await expect(page.getByTestId('events-analytics-button')).toHaveCount(0);
+    await expect(page.getByTestId('event-status-bar').first()).toBeVisible();
+    await page.getByTestId('events-insights-link').click();
+    await expect(page.getByTestId('nav-tab-grow')).toHaveAttribute('aria-current', 'page');
   });
 
   test('the switcher jumps straight to a sibling, and is still there when you arrive', async ({

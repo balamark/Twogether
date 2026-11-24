@@ -137,13 +137,14 @@ router.get('/summary', async (req, res) => {
         me: { balance: 0, available: 0 },
         partner: null,
         average: 0,
+        week_delta: 0,
         awaiting_me: [],
         awaiting_partner: [],
         recent: []
       });
     }
 
-    const [me, partner, pendingResult, recentResult] = await Promise.all([
+    const [me, partner, pendingResult, recentResult, weekResult] = await Promise.all([
       accountFor(db, couple.id, userId),
       accountFor(db, couple.id, couple.partnerId),
       db.query(`
@@ -156,6 +157,14 @@ router.get('/summary', async (req, res) => {
         WHERE couple_id = $1 AND status <> 'pending'
         ORDER BY COALESCE(responded_at, transaction_date) DESC
         LIMIT 30
+      `, [couple.id]),
+      // Net change of both balances over the last 7 days (same confirmed /
+      // redeem rules as accountFor), so the card can say 本週 +12.
+      db.query(`
+        SELECT COALESCE(SUM(CASE WHEN kind = 'redeem' THEN -amount ELSE amount END), 0) AS net
+        FROM coin_transactions
+        WHERE couple_id = $1 AND status = 'confirmed'
+          AND COALESCE(responded_at, transaction_date) >= NOW() - INTERVAL '7 days'
       `, [couple.id])
     ]);
 
@@ -166,6 +175,8 @@ router.get('/summary', async (req, res) => {
       me,
       partner: { balance: partner.balance },
       average: Math.round((me.balance + partner.balance) / 2),
+      // Change of the average over the last 7 days (net of both accounts / 2).
+      week_delta: Math.round(parseInt(weekResult.rows[0].net, 10) / 2),
       // Requests/redemptions the partner opened — only I can answer them.
       awaiting_me: pending.filter(t => !t.is_mine),
       awaiting_partner: pending.filter(t => t.is_mine),

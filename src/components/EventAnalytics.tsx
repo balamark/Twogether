@@ -11,10 +11,6 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import {
-  BarChart3,
-  TrendingUp,
-  CheckCircle2,
-  Clock3,
   HandHeart,
   X,
   Repeat,
@@ -26,7 +22,7 @@ import apiService, {
   type CommunicationPattern,
 } from '../services/api';
 import { useCachedQuery, userKey } from '../services/queryCache';
-import { useAiUsageToday } from '../hooks/usePageData';
+import { useAiUsageToday, useRelationshipSummary } from '../hooks/usePageData';
 import { getEmotionAcceptance } from '../data/emotionAcceptance';
 import { useScrollLock } from '../hooks/useScrollLock';
 import AiQuotaHint from './AiQuotaHint';
@@ -63,16 +59,7 @@ export default function EventAnalytics() {
 
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <KpiCard icon={TrendingUp} label={tr("近 7 日對話", 'Conversations, last 7 days')} value={data.counts.last7} />
-        <KpiCard icon={BarChart3} label={tr("近 30 日對話", 'Conversations, last 30 days')} value={data.counts.last30} />
-        <KpiCard icon={CheckCircle2} label={tr("解決率", 'Resolution rate')} value={`${data.resolutionRate}%`} />
-        <KpiCard
-          icon={Clock3}
-          label={tr("平均解決時數", 'Average hours to resolve')}
-          value={data.avgResolutionHours == null ? '—' : `${data.avgResolutionHours}h`}
-        />
-      </div>
+      <RelationshipRecapCard data={data} />
 
       {/* 模式原則：跨多次衝突的「你們反覆卡住的循環」第三方視角。 */}
       <CommunicationPatternCard />
@@ -354,23 +341,116 @@ function CommunicationPatternCard() {
   );
 }
 
-function KpiCard({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof TrendingUp;
-  label: string;
-  value: string | number;
-}) {
+// 730.4h means nothing to a couple; "約 30 天" does.
+function humanizeHours(h: number): string {
+  if (h < 1) return tr('不到 1 小時', 'under an hour');
+  if (h < 24) return tr(`約 ${Math.round(h)} 小時`, `about ${Math.round(h)} hours`);
+  const days = h / 24;
+  if (days < 60) return tr(`約 ${Math.max(1, Math.round(days))} 天`, `about ${Math.max(1, Math.round(days))} days`);
+  return tr(`約 ${Math.round(days / 30)} 個月`, `about ${Math.round(days / 30)} months`);
+}
+
+// A one-line takeaway from the numbers already on the card. Deterministic and
+// free (no AI call, no quota): the AI-written observation is the 溝通模式 card
+// right below, which the couple asks for explicitly.
+function recapInsight(total: number, resolved: number, pos: number, neg: number): string {
+  const open = total - resolved;
+  if (total === 0) {
+    return pos > 0
+      ? tr('這個月沒有需要說開的事，還一起留下了不少美好，好好享受。', 'Nothing needed talking through this month, and you kept plenty of good moments. Enjoy it.')
+      : tr('這個月很平靜。平靜的時候，也很適合存一點愛。', 'A calm month. Calm times are a great time to save a little love.');
+  }
+  if (open === 0) return tr('這個月的事都說開了，記得也謝謝彼此願意好好談。', 'Everything this month got talked through. Thank each other for being willing to.');
+  if (resolved / total < 0.5) {
+    return tr(`還有 ${open} 件沒說開的事，挑最小的一件先聊聊就好。`, `${open} thing${open > 1 ? 's are' : ' is'} still open. Start with the smallest one.`);
+  }
+  if (pos > neg) return tr('說開的比卡住的多，美好也比衝突多，你們走在對的方向。', 'More talked through than stuck, more good moments than conflicts. You\'re heading the right way.');
+  return tr('大部分的事都說開了，剩下的慢慢來。', 'Most things got talked through. Take the rest slowly.');
+}
+
+// 本月關係回顧 — one warm card instead of four KPI tiles: how many things you
+// talked through (with a progress bar), how long that usually takes, and the
+// 近兩週 interaction counts that used to sit on 今天.
+function RelationshipRecapCard({ data }: { data: EventAnalyticsData }) {
+  const { data: summary } = useRelationshipSummary();
+  const total = data.counts.last30;
+  const resolved = Math.round((data.resolutionRate / 100) * total);
+  const pos = summary?.positive14 ?? 0;
+  const neg = summary?.negative14 ?? 0;
+  const pct = total > 0 ? Math.round((resolved / total) * 100) : 0;
+
   return (
-    <div className="bg-petal-cream border border-petal-rule rounded-2xl p-4">
-      <div className="flex items-center gap-2 mb-2 text-petal-ink-soft">
-        <Icon className="w-4 h-4" />
-        <span className="text-xs">{label}</span>
+    <section
+      data-testid="grow-recap-card"
+      className="rounded-3xl border border-petal-rose-soft bg-gradient-to-b from-white to-petal-cream p-5 md:p-6 shadow-sm"
+    >
+      <div className="flex items-baseline justify-between gap-2 mb-3">
+        <h2 className="font-display text-xl text-petal-ink">{tr('本月關係回顧', 'This month together')}</h2>
+        <span className="font-body text-[11px] text-petal-muted">{tr('近 30 天', 'Last 30 days')}</span>
       </div>
-      <p className="text-2xl font-serif text-petal-ink">{value}</p>
-    </div>
+
+      <p className="font-body text-sm text-petal-ink-soft mb-2">
+        {total > 0
+          ? <>{tr('說開了 ', 'Talked through ')}<b className="font-display text-2xl text-petal-ink">{resolved}</b>{tr(` / ${total} 件事`, ` of ${total}`)}</>
+          : tr('這個月還沒有對話', 'No conversations yet this month')}
+      </p>
+      <div
+        className="h-2 rounded-full bg-petal-cream-2 overflow-hidden mb-4"
+        role="progressbar"
+        aria-valuenow={pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={tr('說開的比例', 'Share talked through')}
+      >
+        <div className="h-full rounded-full bg-petal-sage-deep/70 transition-all" style={{ width: `${pct}%` }} />
+      </div>
+
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 font-body text-sm mb-4">
+        <div>
+          <dt className="text-[11px] text-petal-muted">{tr('本週新對話', 'New this week')}</dt>
+          <dd className="text-petal-ink" data-testid="grow-recap-last7">{data.counts.last7} {tr('件', '')}</dd>
+        </div>
+        <div>
+          <dt className="text-[11px] text-petal-muted">{tr('通常多久說開', 'Usually resolved in')}</dt>
+          <dd className="text-petal-ink" data-testid="grow-recap-avg">
+            {data.avgResolutionHours == null ? tr('還沒有紀錄', 'Not yet') : humanizeHours(data.avgResolutionHours)}
+          </dd>
+        </div>
+        {summary?.paired && (
+          <>
+            <div>
+              <dt className="text-[11px] text-petal-muted">{tr('近兩週美好互動', 'Good moments, 2 weeks')}</dt>
+              <dd className="text-petal-ink">{pos} {tr('次', '')}</dd>
+            </div>
+            <div>
+              <dt className="text-[11px] text-petal-muted">{tr('近兩週衝突', 'Conflicts, 2 weeks')}</dt>
+              <dd className="text-petal-ink">{neg} {tr('次', '')}</dd>
+            </div>
+          </>
+        )}
+      </dl>
+
+      {summary?.paired && (
+        (typeof summary.daysSinceAppreciation === 'number' && summary.daysSinceAppreciation >= 3) ||
+        (typeof summary.daysSinceIntimacy === 'number' && summary.daysSinceIntimacy >= 7) ||
+        summary.checkin?.overdue
+      ) && (
+        <ul className="mb-4 space-y-1 font-body text-xs text-petal-rose-deep">
+          {typeof summary.daysSinceAppreciation === 'number' && summary.daysSinceAppreciation >= 3 && (
+            <li>{tr(`已經 ${summary.daysSinceAppreciation} 天沒說欣賞的話`, `${summary.daysSinceAppreciation} days without a word of appreciation`)}</li>
+          )}
+          {typeof summary.daysSinceIntimacy === 'number' && summary.daysSinceIntimacy >= 7 && (
+            <li>{tr(`已經 ${summary.daysSinceIntimacy} 天沒有親密時光`, `${summary.daysSinceIntimacy} days without intimacy`)}</li>
+          )}
+          {summary.checkin?.overdue && <li>{tr('關係檢視待完成', 'Relationship check-in due')}</li>}
+        </ul>
+      )}
+
+      <p className="flex items-start gap-2 rounded-2xl bg-white/80 border border-petal-rule-soft px-3.5 py-2.5 font-body text-[13px] text-petal-ink leading-relaxed" data-testid="grow-recap-insight">
+        <Lightbulb className="w-4 h-4 text-petal-rose-deep shrink-0 mt-0.5" strokeWidth={1.5} />
+        {recapInsight(total, resolved, pos, neg)}
+      </p>
+    </section>
   );
 }
 
