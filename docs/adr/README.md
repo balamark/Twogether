@@ -18,13 +18,18 @@ update the ADR in the same PR if the decision changes.
 | [0009](0009-sophie-conflict-mediator.md) | Sophie conflict mediator: heuristic detection & copy rules | `lib/conflictMediator.js` |
 | [0010](0010-freemium-entitlements.md) | Per-couple, time-boxed freemium | `lib/entitlements.js` |
 | [0011](0011-payment-gateways-and-receipts.md) | Dependency-free gateways & immutable receipts | `lib/ecpay.js`, `lib/newebpay.js`, `lib/paymentProviders.js`, `lib/receipts.js` |
-| [0012](0012-notification-fanout-and-email.md) | Notification fan-out & email | `lib/eventNotify.js`, `lib/emailUnsubscribe.js`, `lib/emailPage.js` |
+| [0012](0012-notification-fanout-and-email.md) | Notification fan-out & email | `lib/eventNotify.js`, `lib/emailUnsubscribe.js`, `lib/emailPage.js`, `services/notificationService.js`, `services/emailService.js`, `services/lineService.js` |
 | [0013](0013-feature-flags.md) | DB-backed feature flags | `lib/featureFlags.js` |
 | [0014](0014-media-uploads-and-storage.md) | Media pipeline & Supabase Storage | `lib/media-upload.js`, `lib/supabase-storage.js` |
 | [0015](0015-lazy-sweeps-instead-of-cron.md) | Lazy sweeps instead of cron | `lib/momentCheckins.js` |
 | [0016](0016-curated-content-catalogs.md) | Curated content catalogs | `lib/aiCompanions.js`, `lib/intimacyNudgeTones.js`, `lib/therapyTopicLibrary.js`, `lib/therapyCards.js`, `lib/playbooks/*` |
 | [0017](0017-love-bank-and-qa-pool.md) | 感情存款 auto-deposits & Q&A revenue pool | `lib/loveBankAuto.js`, `lib/qaPool.js` |
 | [0018](0018-marketplace-scripts.md) | Marketplace scripts: 18+ classification & bot import | `lib/adultScripts.js`, `lib/marketplaceBotScript.js` |
+| [0019](0019-llm-provider-engineering.md) | LLM provider: model, caching, token budgets & truncation | `services/llmService.js`, `services/llm/*` |
+| [0020](0020-ai-feature-principles.md) | What each AI feature is for | prompts in `services/llm/claudeProvider.js` |
+| [0021](0021-http-server-shell.md) | HTTP server shell: proxy, CSP, routing order, public pages & SEO | `server.js`, `vite.config.ts`, `tailwind.config.js` |
+| [0022](0022-database-access-and-migrations.md) | Database access & migrations | `database/*`, `scripts/migrate.js`, `scripts/check-rls.js`, `scripts/repair-migration-ledger.js` |
+| [0023](0023-dev-tooling-and-test-harness.md) | Dev tooling, CI guards & test harness | `scripts/*`, `playwright.config.ts`, `test-*.js` |
 
 Format: Context → Decision → Consequences. Keep each one short, and add a new
 ADR (or a dated amendment) rather than silently rewriting history.

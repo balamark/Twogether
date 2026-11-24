@@ -47,3 +47,13 @@ showed four kinds:
   - 1 directive kept
 - Not covered by the rule: SQL migrations (~1,370 comment lines, part of the
   applied schema history), shell, CSS, HTML and YAML.
+
+## Progress
+
+| Slice | Comments removed | Lines removed | Issues | ADRs |
+|---|---|---|---|---|
+| `middleware/`, `lib/` (+ comments main added during the PR) | 990 | 1,003 | #169–#173 (#173 fixed on main) | 0002–0018 |
+| `services/` | 640 | 685 | #175, #176 | 0012, 0019, 0020 |
+| `server.js`, `database/`, `scripts/`, root configs, `test-*.js` | 562 | 609 | #169, #171 updated | 0021–0023 |
+
+Remaining: `routes/`, `src/`, `tests/`. See `comment-suppressions.json`.

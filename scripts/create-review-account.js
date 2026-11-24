@@ -1,32 +1,5 @@
 #!/usr/bin/env node
 
-/**
- * Reviewer test account (審核用測試帳號)
- * ---------------------------------------------------------------------------
- * Payment-gateway shop reviews (藍新金流 / 綠界) ask for a working account +
- * password so their reviewer can walk the real purchase flow. Premium checkout
- * requires a COMPLETE couple, so a single account is not enough: this script
- * seeds two paired accounts (the reviewer and a stand-in partner), marks both
- * email-verified, and drops in a little sample data so the app isn't an empty
- * shell when they log in.
- *
- * It is idempotent — re-running resets the password and re-pairs if needed,
- * without duplicating users or sample rows. Safe to run against production,
- * which is the point: the reviewer tests the live site.
- *
- * Usage:
- *   node scripts/create-review-account.js            # generates a password
- *   REVIEW_ACCOUNT_PASSWORD='...' node scripts/create-review-account.js
- *
- * Env:
- *   REVIEW_ACCOUNT_EMAIL     default newebpay-review@twogether.fun
- *   REVIEW_PARTNER_EMAIL     default newebpay-review-partner@twogether.fun
- *   REVIEW_ACCOUNT_PASSWORD  default: a fresh random one, printed at the end
- *
- * The printed credentials are what you send to the gateway's 客服信箱. Rotate
- * them (re-run) once the review is done.
- */
-
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { v4: uuidv4 } = require('uuid');
@@ -35,15 +8,11 @@ const db = require('../database/db');
 const EMAIL = (process.env.REVIEW_ACCOUNT_EMAIL || 'newebpay-review@twogether.fun').toLowerCase();
 const PARTNER_EMAIL = (process.env.REVIEW_PARTNER_EMAIL || 'newebpay-review-partner@twogether.fun').toLowerCase();
 
-// Readable but not guessable: 3 base32-ish chunks. Only ever printed to the
-// operator's terminal, never logged server-side.
 function genPassword() {
   const raw = crypto.randomBytes(9).toString('base64').replace(/[+/=]/g, '');
   return `Review-${raw}`;
 }
 
-// Create the user, or reset the existing one's password. Either way the account
-// ends up verified so the reviewer never hits the "verify your email" banner.
 async function upsertUser(client, { email, nickname, passwordHash }) {
   const existing = await client.query('SELECT id FROM users WHERE email = $1', [email]);
   if (existing.rows[0]) {
@@ -67,9 +36,6 @@ async function upsertUser(client, { email, nickname, passwordHash }) {
   return { id, created: true };
 }
 
-// Pair the two accounts if they aren't already a complete couple. Any draft
-// (single-user) couples they hold are removed first — a user may only belong to
-// one couple, and a leftover draft would block the pairing.
 async function ensureCouple(client, userAId, userBId) {
   const paired = await client.query(
     `SELECT id FROM couples
@@ -94,8 +60,6 @@ async function ensureCouple(client, userAId, userBId) {
   return { coupleId, created: true };
 }
 
-// A few records so the dashboard, calendar and stats have something to show.
-// Keyed by notes text so a re-run doesn't pile up duplicates.
 async function ensureSampleMoments(client, coupleId, recordedBy) {
   const samples = [
     { daysAgo: 2, notes: '審核測試資料：一起看電影的晚上' },
@@ -127,7 +91,6 @@ async function main() {
   try {
     host = new URL(process.env.DATABASE_URL).host;
   } catch {
-    /* DATABASE_URL malformed or unset — db.query below will report it properly */
   }
   console.log(`Seeding reviewer accounts against ${host}…`);
 
@@ -148,8 +111,6 @@ async function main() {
     try {
       moments = await ensureSampleMoments(client, couple.coupleId, reviewer.id);
     } catch (err) {
-      // Sample data is a nicety; the credentials are the deliverable. Don't let
-      // a schema drift in love_moments cost us the accounts.
       console.warn(`  (sample data skipped: ${err.message})`);
     }
 
@@ -177,6 +138,6 @@ main()
   .then(() => process.exit(0))
   .catch(async (err) => {
     console.error('Failed to seed reviewer accounts:', err.message);
-    try { await db.close(); } catch { /* already closing */ }
+    try { await db.close(); } catch { }
     process.exit(1);
   });

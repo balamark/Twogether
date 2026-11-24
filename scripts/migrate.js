@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-// Load environment variables based on NODE_ENV
 const path = require('path');
 
 if (process.env.NODE_ENV === 'test') {

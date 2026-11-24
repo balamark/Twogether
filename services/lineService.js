@@ -1,12 +1,3 @@
-// LINE Messaging API integration: mirror in-app notifications to a user's LINE.
-// The channel access token is minted from LINE_CHANNEL_ID + LINE_CHANNEL_SECRET
-// (client_credentials, 30-day token) and cached in memory, so only the secret
-// needs to live in the environment.
-//
-// Observability (see memory: log every new feature): every push and webhook
-// path emits a structured `line.*` log via lib/logger so delivery and binding
-// are diagnosable from gcloud.
-
 const crypto = require('crypto');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 
@@ -19,16 +10,12 @@ function isConfigured() {
   return !!(CHANNEL_ID && CHANNEL_SECRET);
 }
 
-// Push copy principle: the notification should carry as much of the actual
-// content as fits — the user should only need to open the app when the text
-// is longer than the excerpt.
 function excerpt(text, n = 300) {
   const t = (text || '').toString().trim();
   if (!t) return '';
   return t.length > n ? `${t.slice(0, n)}……（打開 App 看完整內容）` : t;
 }
 
-// In-memory token cache. Tokens last 30 days; refresh a day early.
 let cachedToken = null;
 let cachedTokenExpiresAt = 0;
 
@@ -53,7 +40,6 @@ async function getChannelAccessToken() {
       return null;
     }
     cachedToken = data.access_token;
-    // expires_in is seconds; refresh 1 day early.
     cachedTokenExpiresAt = now + (Number(data.expires_in || 2592000) - 86400) * 1000;
     logInfo('line.token.issued', { expiresInSec: data.expires_in });
     return cachedToken;
@@ -63,8 +49,6 @@ async function getChannelAccessToken() {
   }
 }
 
-// Verify the X-Line-Signature header on an incoming webhook (HMAC-SHA256 of the
-// raw body with the channel secret, base64).
 function verifySignature(rawBody, signature) {
   if (!CHANNEL_SECRET || !signature) return false;
   const expected = crypto.createHmac('sha256', CHANNEL_SECRET).update(rawBody).digest('base64');
@@ -75,7 +59,6 @@ function verifySignature(rawBody, signature) {
   }
 }
 
-// Low-level push to a known LINE userId. Returns true on delivery.
 async function pushMessage(lineUserId, text) {
   const token = await getChannelAccessToken();
   if (!token || !lineUserId) return false;
@@ -106,7 +89,6 @@ async function pushMessage(lineUserId, text) {
 
 const REPLY_URL = 'https://api.line.me/v2/bot/message/reply';
 
-// Reply to a webhook event using its short-lived replyToken (free, immediate).
 async function replyMessage(replyToken, text) {
   const token = await getChannelAccessToken();
   if (!token || !replyToken) return false;
@@ -128,10 +110,6 @@ async function replyMessage(replyToken, text) {
   }
 }
 
-// Fire-and-forget mirror of an in-app notification to a user's LINE, gated by
-// linkage + the per-user opt-in. Safe to call unconditionally at notification
-// sites: it no-ops silently when LINE isn't configured or the user isn't
-// linked / opted out.
 async function pushToUserIfLinked(db, userId, text) {
   if (!isConfigured() || !userId || !text) return;
   try {

@@ -1,19 +1,4 @@
 {
-  "database/db.js": {
-    "local/no-comments": {
-      "count": 13
-    }
-  },
-  "database/migrator.js": {
-    "local/no-comments": {
-      "count": 10
-    }
-  },
-  "playwright.config.ts": {
-    "local/no-comments": {
-      "count": 37
-    }
-  },
   "routes/achievements.js": {
     "local/no-comments": {
       "count": 22
@@ -217,126 +202,6 @@
   "routes/wall.js": {
     "local/no-comments": {
       "count": 151
-    }
-  },
-  "scripts/add-compliment-templates.js": {
-    "local/no-comments": {
-      "count": 4
-    }
-  },
-  "scripts/backfill-script-thumbnails.js": {
-    "local/no-comments": {
-      "count": 1
-    }
-  },
-  "scripts/build-changelog.mjs": {
-    "local/no-comments": {
-      "count": 15
-    }
-  },
-  "scripts/check-admin-inline-script.js": {
-    "local/no-comments": {
-      "count": 14
-    }
-  },
-  "scripts/check-dark-contrast.js": {
-    "local/no-comments": {
-      "count": 27
-    }
-  },
-  "scripts/check-rls.js": {
-    "local/no-comments": {
-      "count": 12
-    }
-  },
-  "scripts/create-review-account.js": {
-    "local/no-comments": {
-      "count": 14
-    }
-  },
-  "scripts/generate-og-image.mjs": {
-    "local/no-comments": {
-      "count": 12
-    }
-  },
-  "scripts/generate-roleplay-thumbs.mjs": {
-    "local/no-comments": {
-      "count": 11
-    }
-  },
-  "scripts/migrate.js": {
-    "local/no-comments": {
-      "count": 1
-    }
-  },
-  "scripts/perf/measure-pages.mjs": {
-    "local/no-comments": {
-      "count": 26
-    }
-  },
-  "scripts/repair-migration-ledger.js": {
-    "local/no-comments": {
-      "count": 24
-    }
-  },
-  "scripts/setup-test-db.js": {
-    "local/no-comments": {
-      "count": 11
-    }
-  },
-  "scripts/test-ci.js": {
-    "local/no-comments": {
-      "count": 9
-    }
-  },
-  "scripts/test-datetime.cjs": {
-    "local/no-comments": {
-      "count": 5
-    }
-  },
-  "scripts/verify-smtp.js": {
-    "local/no-comments": {
-      "count": 10
-    }
-  },
-  "server.js": {
-    "local/no-comments": {
-      "count": 124
-    }
-  },
-  "services/characterMappingService.js": {
-    "local/no-comments": {
-      "count": 28
-    }
-  },
-  "services/emailService.js": {
-    "local/no-comments": {
-      "count": 90
-    }
-  },
-  "services/lineService.js": {
-    "local/no-comments": {
-      "count": 21
-    }
-  },
-  "services/llm/claudeProvider.js": {
-    "local/no-comments": {
-      "count": 367
-    }
-  },
-  "services/llm/mockProvider.js": {
-    "local/no-comments": {
-      "count": 84
-    }
-  },
-  "services/llmService.js": {
-    "local/no-comments": {
-      "count": 4
-    }
-  },
-  "services/notificationService.js": {
-    "local/no-comments": {
-      "count": 46
     }
   },
   "src/App.tsx": {
@@ -1369,21 +1234,6 @@
       "count": 2
     }
   },
-  "tailwind.config.js": {
-    "local/no-comments": {
-      "count": 32
-    }
-  },
-  "test-integration.js": {
-    "local/no-comments": {
-      "count": 105
-    }
-  },
-  "test-notification-service.js": {
-    "local/no-comments": {
-      "count": 24
-    }
-  },
   "tests/activity-feed.spec.ts": {
     "local/no-comments": {
       "count": 3
@@ -1817,11 +1667,6 @@
   "tests/wall-upload-progress-ui.spec.ts": {
     "local/no-comments": {
       "count": 15
-    }
-  },
-  "vite.config.ts": {
-    "local/no-comments": {
-      "count": 21
     }
   }
 }

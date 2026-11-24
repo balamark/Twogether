@@ -1,33 +1,23 @@
-/** @type {import('tailwindcss').Config} */
-// Soft Petal theme — editorial cream + dusty rose + sage.
-// pink/purple/rose scales are overridden so every existing
-// `bg-pink-500`, `text-purple-600` etc. picks up the new palette
-// without markup changes. See design-prototypes/01-soft-petal.html.
 export default {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
-  // Engineer Mode (Premium easter-egg) flips the app into a dark IDE/terminal
-  // skin by toggling `.dark` on <html>. Overrides live in src/index.css.
   darkMode: 'class',
   theme: {
     extend: {
-      // Extra-small breakpoint for phones — lets tab bars show icons only once
-      // there's room, keeping labels like 「我的劇本」on one line below it.
       screens: {
         xs: '400px',
       },
       colors: {
-        // Stock Tailwind scales remapped to Soft Petal so existing markup just works.
         pink: {
-          50:  '#FBF7F2', // cream
-          100: '#F2EBDF', // cream-deep
-          200: '#EBCFC8', // rose-soft
+          50:  '#FBF7F2',
+          100: '#F2EBDF',
+          200: '#EBCFC8',
           300: '#E0BCB2',
-          400: '#D4938A', // rose
-          500: '#D4938A', // primary accent — was hot pink #EC4899
-          600: '#B86E64', // rose-deep — was #DB2777
+          400: '#D4938A',
+          500: '#D4938A',
+          600: '#B86E64',
           700: '#955548',
           800: '#5A2A24',
           900: '#3D1A16',
@@ -36,10 +26,10 @@ export default {
           50:  '#F4F0E8',
           100: '#EAE4D6',
           200: '#D8E0D2',
-          300: '#A8B89E', // sage
+          300: '#A8B89E',
           400: '#94A689',
-          500: '#7D8F75', // sage-deep
-          600: '#677761', // was #9333EA
+          500: '#7D8F75',
+          600: '#677761',
           700: '#52614D',
           800: '#3E4A3A',
           900: '#2A3328',
@@ -57,7 +47,6 @@ export default {
           900: '#3D1A16',
         },
 
-        // Semantic tokens matching the Soft Petal prototype palette.
         petal: {
           cream:     '#FBF7F2',
           'cream-2': '#F2EBDF',
@@ -66,8 +55,6 @@ export default {
           'rose-deep':'#B86E64',
           sage:      '#A8B89E',
           'sage-deep':'#7D8F75',
-          // Vivid, higher-contrast sage for primary buttons — the muted
-          // sage-deep read as disabled on cream. White text clears WCAG-AA.
           'sage-deeper':'#556B47',
           ink:       '#2A2520',
           'ink-soft':'#5A4F45',
@@ -76,11 +63,6 @@ export default {
           'rule-soft':'#E8DFD0',
         },
 
-        // Vibrant conflict-intervention accents (approved 2026-09). The base
-        // `rose` scale is remapped to muted Soft-Petal above, so the punchy
-        // #F43F5E empathy/primary red lives here under its own name. violet /
-        // indigo / emerald / amber keep their stock Tailwind vibrancy (only
-        // pink/purple/rose were overridden), so those are used directly.
         vivid: {
           rose:         '#F43F5E',
           'rose-strong':'#E11D48',
@@ -88,7 +70,6 @@ export default {
           'rose-ink':   '#BE1E3C',
         },
 
-        // Legacy token aliases — kept so older references don't break.
         primary: {
           50:  '#FBF7F2',
           100: '#F2EBDF',
@@ -136,7 +117,6 @@ export default {
         'display':  ['Fraunces', 'Noto Serif TC', 'serif'],
         'serif-tc': ['Fraunces', 'Noto Serif TC', 'serif'],
         'body':     ['Manrope', 'Noto Sans TC', 'system-ui', 'sans-serif'],
-        // Legacy aliases — point to the same editorial faces.
         'romantic': ['Fraunces', 'Noto Serif TC', 'serif'],
         'elegant':  ['Fraunces', 'Noto Serif TC', 'serif'],
       },
@@ -153,11 +133,8 @@ export default {
         'glow':       'glow 2s ease-in-out infinite alternate',
         'scale-hover':'scale-hover 0.3s ease-in-out',
         'toast-in':   'toast-in 0.25s ease-out',
-        // The「+1 正向互動」celebration that floats up when a positive
-        // interaction is logged on the wall. Pops in, drifts up, fades out.
         'plus-one':   'plus-one 1.5s cubic-bezier(0.22, 1, 0.36, 1) forwards',
         'plus-one-burst': 'plus-one-burst 1.5s ease-out forwards',
-        // 訪客試玩 30 秒教學 (src/components/guest/GuestTutorial.tsx).
         'guest-rise':     'guest-rise 0.5s ease-out both',
         'guest-pop':      'guest-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both',
         'guest-type':     'guest-type 1.1s steps(20, end) both',

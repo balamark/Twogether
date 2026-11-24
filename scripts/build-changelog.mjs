@@ -1,18 +1,4 @@
 #!/usr/bin/env node
-// Compiles changelog fragments into README.md.
-//
-// Each user-facing change ships as its own file `changelog/YYYY-MM-DD-<slug>.md`
-// containing just the markdown bullet(s) for that change — one new file per PR,
-// so concurrent PRs never conflict. This script groups the fragments by the
-// date in the filename (newest first; same-date fragments merge under one
-// heading, ordered by filename) and rewrites the block between the
-// `changelog:begin` / `changelog:end` markers in README.md.
-//
-//   npm run changelog        (or: node scripts/build-changelog.mjs)
-//
-// CI (.github/workflows/changelog.yml) runs this on every push to main that
-// touches changelog/**, and commits the regenerated README. Keep this script
-// dependency-free (node stdlib only) — CI runs it without npm ci.
 
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -40,7 +26,6 @@ if (!names.length) {
   process.exit(1);
 }
 
-// Group by date; within a date keep filename order (already sorted).
 const byDate = new Map();
 for (const name of names) {
   const date = name.match(NAME_RE)[1];

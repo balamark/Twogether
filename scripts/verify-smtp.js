@@ -1,26 +1,16 @@
 #!/usr/bin/env node
-// Standalone SMTP connectivity check. Loads .env, runs nodemailer
-// transporter.verify() to perform the AUTH handshake without sending,
-// and optionally fires a test email when --to <addr> is passed.
-//
-//   node scripts/verify-smtp.js
-//   node scripts/verify-smtp.js --to you@example.com
 
 require('dotenv').config();
 const nodemailer = require('nodemailer');
 
 function maskEmail(addr) {
   if (!addr || typeof addr !== 'string') return '(unset)';
-  // Some providers use a fixed non-email SMTP login (Resend's is literally
-  // "resend"). Those aren't secrets and aren't addresses — show them as-is.
   if (!addr.includes('@')) return addr;
   const [user, domain] = addr.split('@');
   const head = user.slice(0, 1);
   return `${head}${'*'.repeat(Math.max(user.length - 1, 1))}@${domain}`;
 }
 
-// Mirrors EmailService._fromAddress() so this script exercises the same
-// sender the app would actually use.
 function fromAddress(smtpUser) {
   const configured = (process.env.EMAIL_FROM || '').trim();
   if (configured) {

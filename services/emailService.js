@@ -2,8 +2,6 @@ const nodemailer = require('nodemailer');
 const { logInfo, logWarn, logError } = require('../lib/logger');
 const { signUnsubscribeToken } = require('../lib/emailUnsubscribe');
 
-// Standard fields included with every SMTP-related log entry so that future
-// queries like `jsonPayload.code="EAUTH"` find them in a single hop.
 function smtpErrorFields(err) {
   return {
     err: err?.message,
@@ -14,7 +12,6 @@ function smtpErrorFields(err) {
   };
 }
 
-// Email service for sending pairing invitations
 class EmailService {
   constructor() {
     this.transporter = null;
@@ -57,13 +54,6 @@ class EmailService {
     return this.transporter !== null;
   }
 
-  // The invite a new user sends their partner. This is the one email that has
-  // to survive an unforgiving spam filter: it goes to someone with no prior
-  // relationship to us, from an address they've never seen. So it's written as
-  // a short personal note rather than a product pitch — no feature grid, no
-  // marketing gradients, one link — and it sets Reply-To to the inviter, which
-  // is both the strongest "a real person sent this" signal to the filter and
-  // genuinely useful to the recipient.
   async sendPairingInvitation({ senderName, senderEmail, recipientEmail, token, customMessage = '' }) {
     if (!this.isConfigured()) {
       throw new Error('Email service is not configured');
@@ -111,12 +101,9 @@ class EmailService {
 
     const mailOptions = {
       from: this._from(),
-      // Replies go to the person who actually sent the invite, not to us.
       replyTo: senderEmail || this._replyTo(),
       to: recipientEmail,
       subject: `${displayName} 邀請你一起用 Twogether`,
-      // The recipient has no account, so there's no subscription to cancel —
-      // only the mailto form applies here.
       headers: this._unsubscribeHeaders(null),
       text: textContent,
       html: htmlContent,
@@ -176,10 +163,6 @@ class EmailService {
     }
   }
 
-  // scriptInfo: { scriptTitle, scriptScenario } — set when the invitation came
-  // from a roleplay script. The email then names the script, quotes its 簡介,
-  // and deep-links straight to it (?script=…) so the recipient isn't left
-  // guessing what the in-character message is about.
   async sendIntimacyRequestNotification(senderName, recipientEmail, requestType, message = '', scriptInfo = {}) {
     logInfo('Sending intimacy request email', { kind: 'intimacy_request', requestType });
 
@@ -188,9 +171,6 @@ class EmailService {
       return;
     }
 
-    // A category the sender optionally tagged the message with. Kept as a quiet
-    // bit of context — the email is framed as "傳了一則訊息" (sent a message),
-    // not a grand 親密邀請, because that's all the action actually is.
     const typeTranslations = {
       general: '一般訊息',
       romantic: '浪漫時光',
@@ -429,10 +409,6 @@ class EmailService {
     }
   }
 
-  // Resolve the paired partner's email + opt-out status for a given user.
-  // Returns null when the user is unpaired, the partner row is missing, or
-  // the partner has opted out of email notifications. Callers treat null as
-  // "skip silently" — no errors, no logs.
   async getPartnerEmailIfOptedIn(db, userId) {
     if (!userId) return null;
     try {
@@ -454,9 +430,6 @@ class EmailService {
     }
   }
 
-  // Resolve a specific user's email + opt-out status. Used when the target
-  // is not the partner-of-the-actor (e.g. intimacy response → email original
-  // requester directly by user id).
   async getUserEmailIfOptedIn(db, userId) {
     if (!userId) return null;
     try {
@@ -474,9 +447,6 @@ class EmailService {
     }
   }
 
-  // Relationship-cultivation reminder (check-in due / intimacy gap / appreciation
-  // gap). Fired from GET /api/relationship/summary when a signal is overdue and
-  // past its cooldown. Respects the email opt-in (caller uses getUserEmailIfOptedIn).
   async sendRelationshipReminder({ recipientEmail, recipientName, recipientUserId = null, kind, days }) {
     if (!this.isConfigured() || !recipientEmail) return;
     const name = this._escape(recipientName || '');
@@ -518,8 +488,6 @@ class EmailService {
     }
   }
 
-  // Shared lightweight HTML wrapper used by the partner-activity emails so
-  // we don't repeat 100 lines of CSS per template.
   _activityEmailHtml({ headerEmoji, headerTitle, headerSubtitle, bodyHtml, ctaLabel = '💕 打開 Twogether 查看', ctaUrl, unsubscribeUrl }) {
     const frontendUrl = ctaUrl || process.env.FRONTEND_URL || 'https://twogether.fun';
     const footerOptOut = unsubscribeUrl
@@ -566,12 +534,6 @@ class EmailService {
 </html>`;
   }
 
-  // The bare address every outgoing mail is sent from. Prefer EMAIL_FROM (a
-  // brand-domain address like hello@twogether.fun, which is what makes
-  // SPF/DKIM/DMARC align with the twogether.fun links inside the mail); fall
-  // back to the SMTP login so existing deployments keep working unchanged.
-  // EMAIL_FROM accepts either "addr@host" or "Name <addr@host>" — the display
-  // name is supplied per-call so brand vs. therapist mail stay distinguishable.
   _fromAddress() {
     const configured = (process.env.EMAIL_FROM || '').trim();
     if (configured) {
@@ -585,24 +547,16 @@ class EmailService {
     return `"${displayName}" <${this._fromAddress()}>`;
   }
 
-  // Where replies land. Unset → nodemailer omits the header entirely.
   _replyTo() {
     return (process.env.EMAIL_REPLY_TO || '').trim() || undefined;
   }
 
-  // The HTTP one-click unsubscribe URL for a given recipient, or null when we
-  // can't sign one (no user id, or JWT_SECRET missing).
   _unsubscribeUrl(recipientUserId) {
     const token = signUnsubscribeToken(recipientUserId);
     if (!token) return null;
     return `${this._appBaseUrl()}/api/email/unsubscribe?t=${encodeURIComponent(token)}`;
   }
 
-  // List-Unsubscribe headers. Gmail and Yahoo downrank bulk senders that
-  // don't offer one-click unsubscribe (RFC 8058), so every opt-in-gated
-  // notification carries the HTTP form; transactional mail (verification,
-  // password reset, receipts, pairing invites to non-users) can only offer
-  // the mailto form since there's no subscription to cancel.
   _unsubscribeHeaders(recipientUserId) {
     const mailto = `<mailto:${this._fromAddress()}?subject=unsubscribe>`;
     const url = this._unsubscribeUrl(recipientUserId);
@@ -613,15 +567,10 @@ class EmailService {
     };
   }
 
-  // Strip CR/LF from a value destined for a mail header. Nicknames are only
-  // length-validated (routes/auth.js), so a newline in one would otherwise be
-  // interpolated straight into a Subject and could inject extra headers.
   _headerSafe(value = '') {
     return String(value).replace(/[\r\n]+/g, ' ').trim();
   }
 
-  // Single choke point for every outgoing mail, so header sanitising can't be
-  // forgotten by a future template.
   async _send(mailOptions) {
     return this.transporter.sendMail({
       ...mailOptions,
@@ -691,11 +640,6 @@ class EmailService {
     }
   }
 
-  // Generic partner-action email — the email mirror for services/notificationService.js.
-  // Any couple-shared action (love moment, gift, cycle record, checkup…) routes its
-  // email through here so we don't need a bespoke template per type. `title` is the
-  // already-composed headline ("💝 小明新增了一則愛的記錄"); `content` is the detail line.
-  // Best-effort and gated upstream by getUserEmailIfOptedIn.
   async sendPartnerActionNotification({ senderName, recipientEmail, recipientUserId = null, title, content = '' }) {
     if (!this.isConfigured()) return;
     if (!recipientEmail) return;
@@ -742,10 +686,6 @@ class EmailService {
     }
   }
 
-  // Platform-voiced「溫柔提醒」from the 已經幾天沒有親密了 card. Authored BY Twogether
-  // (a caring friend, not a monitor) — never attributed to the partner. Neutral,
-  // low-pressure, focused on reconnecting. Best-effort; the in-app reminder is
-  // the primary channel.
   async sendIntimacyReminderNudgeEmail({ partnerNickname, partnerEmail, message }) {
     if (!this.isConfigured()) return;
     if (!partnerEmail) return;
@@ -794,12 +734,9 @@ class EmailService {
     const safeSender = this._escape(senderName || '你的伴侶');
     const safeTitle = this._escape(eventTitle).slice(0, 200);
     const safeMessage = this._escape(messageContent || '').slice(0, 600);
-    // Named AI companion (e.g. Luma) when the counselor persona is known.
     const aiLabel = aiName ? `AI 諮商師 ${aiName}` : 'AI 諮商師';
     const safeAiLabel = this._escape(aiLabel);
 
-    // Tone guideline (docs/UX_PLAYBOOK.md R2): notifications are invitations to
-    // understand, not incident reports — 分享/情境/對話 over 開啟/事件/回報.
     const meta = {
       event_created:        { emoji: '📣', headline: '伴侶分享了一個情境',         subject: `📣 ${senderName || '你的伴侶'} 分享了一個情境` },
       event_reply:          { emoji: '💬', headline: '伴侶回覆了你們的對話',       subject: `💬 ${senderName || '你的伴侶'} 回覆了你們的對話` },
@@ -808,8 +745,6 @@ class EmailService {
       event_resolved:       { emoji: '✅', headline: '你們一起走過了這個情境',     subject: `✅ 你們一起走過了這個情境` },
       event_reopened:       { emoji: '🔄', headline: '伴侶想繼續聊聊這個情境',     subject: `🔄 ${senderName || '你的伴侶'} 想繼續聊聊這個情境` },
       event_nudge:          { emoji: '👋', headline: '伴侶在等你回覆這段對話',     subject: `👋 ${senderName || '你的伴侶'} 在等你回覆你們的對話` },
-      // 一起收尾 (migration 083). Invitation, never verdict — nobody is being
-      // told they were wrong, they're being asked to write down one small thing.
       event_closing_started:      { emoji: '🤝', headline: '伴侶想和你一起想想下次怎麼做', subject: `🤝 ${senderName || '你的伴侶'} 想和你一起想想下次怎麼做` },
       event_closure_partner_ready:{ emoji: '📝', headline: '伴侶寫好了下次願意做的事',     subject: `📝 ${senderName || '你的伴侶'} 寫好了下次願意做的事` },
       event_closure_done:         { emoji: '🌱', headline: '你們一起定下了下次的約定',     subject: '🌱 你們一起定下了下次的約定' },
@@ -861,9 +796,6 @@ class EmailService {
     }
   }
 
-  // Send a therapist their email-verification link after they sign up. The
-  // link points at the public GET /api/therapists/verify-email?token=… route,
-  // which flips email_verified true and shows a confirmation page.
   async sendTherapistEmailVerification({ recipientEmail, displayName, token }) {
     if (!this.isConfigured()) {
       logWarn('Email service not configured; skipping therapist verification email', { kind: 'therapist_verify' });
@@ -977,8 +909,6 @@ class EmailService {
     return (process.env.FRONTEND_URL || 'https://twogether.fun').replace(/\/$/, '');
   }
 
-  // Welcome + email verification, sent on sign-up. One email, not two: it
-  // greets the new user and asks them to confirm their address via the button.
   async sendWelcomeEmail({ recipientEmail, nickname, token }) {
     if (!this.isConfigured()) {
       logWarn('Email service not configured; skipping welcome email', { kind: 'welcome' });
@@ -1032,7 +962,6 @@ class EmailService {
     }
   }
 
-  // Password reset link. Caller guarantees the token + expiry are stored.
   async sendPasswordResetEmail({ recipientEmail, nickname, token }) {
     if (!this.isConfigured()) {
       logWarn('Email service not configured; skipping password reset email', { kind: 'password_reset' });
@@ -1087,9 +1016,6 @@ class EmailService {
     }
   }
 
-  // Confirmation link sent to the NEW address when a user changes their login
-  // email. Clicking it is what actually swaps users.email (see
-  // GET /api/auth/confirm-email-change). Caller guarantees the token is stored.
   async sendEmailChangeVerification({ recipientEmail, nickname, token }) {
     if (!this.isConfigured()) {
       logWarn('Email service not configured; skipping email-change verification', { kind: 'email_change_verify' });
@@ -1144,8 +1070,6 @@ class EmailService {
     }
   }
 
-  // Heads-up to the OLD address when an email change is requested, so a user
-  // notices (and can reset their password) if someone else triggered it.
   async sendEmailChangeRequestedNotice({ recipientEmail, nickname, newEmail }) {
     if (!this.isConfigured()) {
       logWarn('Email service not configured; skipping email-change notice', { kind: 'email_change_notice' });
@@ -1197,7 +1121,6 @@ class EmailService {
     }
   }
 
-  // Purchase receipt after a successful Premium payment. Sent to the buyer.
   async sendPaymentReceiptEmail({ recipientEmail, nickname, planLabel, amountTwd, days, orderNo, receiptNo, receiptTitle, receiptTaxId, paidAt, expiresAt }) {
     if (!this.isConfigured()) {
       logWarn('Email service not configured; skipping receipt email', { kind: 'payment_receipt' });
@@ -1210,9 +1133,6 @@ class EmailService {
       try { return new Date(d).toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' }); }
       catch { return String(d ?? ''); }
     };
-    // 收據編號 is the buyer's purchase document number (lib/receipts.js). It
-    // leads the table because that's what they'd quote when claiming expenses
-    // or contacting support; 抬頭/統編 only appear when they asked for them.
     const rows = [
       ...(receiptNo ? [['收據編號', this._escape(receiptNo)]] : []),
       ['方案', this._escape(planLabel || 'Premium')],
@@ -1282,8 +1202,6 @@ class EmailService {
     }
   }
 
-  // First-time consultation booking: notify the therapist there's a new case.
-  // Subsequent chat messages do NOT email — they create in-app notifications.
   async sendConsultationRequestToTherapist({ recipientEmail, therapistName, clientName, focusArea, message }) {
     if (!this.isConfigured() || !recipientEmail) return;
 
@@ -1328,7 +1246,6 @@ class EmailService {
     }
   }
 
-  // First-time consultation booking: confirm to the user that it went through.
   async sendConsultationBookingConfirmation({ recipientEmail, clientName, therapistName }) {
     if (!this.isConfigured() || !recipientEmail) return;
 
@@ -1371,9 +1288,6 @@ class EmailService {
     }
   }
 
-  // A user shares one of their custom role scripts with their partner to spark
-  // interest. Deliberately light on detail — the point is to nudge the partner
-  // to log in and take a look, not to reproduce the script in the email.
   async sendScriptShareEmail({ recipientEmail, sharerName, scriptTitle, scenario }) {
     if (!this.isConfigured() || !recipientEmail) return;
 
@@ -1381,10 +1295,6 @@ class EmailService {
     const safeTitle = this._escape(scriptTitle || '一個劇本');
     const safeScenario = this._escape(scenario || '').slice(0, 300);
 
-    // Deep-link straight to the shared script (?script=<title>) so the partner
-    // lands on it after login instead of the generic 角色扮演 tab. Uses the raw
-    // title (encodeURIComponent handles encoding); matches the convention in
-    // sendIntimacyRequestNotification and is resolved by App.tsx / RoleplayView.
     const frontendUrl = process.env.FRONTEND_URL || 'https://twogether.fun';
     const scriptUrl = scriptTitle
       ? `${frontendUrl}/?script=${encodeURIComponent(scriptTitle)}`

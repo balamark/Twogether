@@ -1,14 +1,4 @@
 #!/usr/bin/env node
-// Generates the social-sharing image (public/images/og-image.png, 1200×630)
-// and the iOS home-screen icon (public/apple-touch-icon.png, 180×180) from
-// inline SVG, rasterized with sharp. Run manually after changing the brand
-// mark or tagline, then commit the PNGs:
-//
-//   node scripts/generate-og-image.mjs
-//
-// The Chinese tagline needs a Traditional-Chinese font available to
-// fontconfig at render time (any Noto Sans TC / CJK or WenQuanYi install
-// works); the font-family list below falls back through the common ones.
 
 import sharp from 'sharp';
 import { writeFile } from 'node:fs/promises';
@@ -27,8 +17,6 @@ const MUTED = '#8a7e72';
 const SERIF = 'DejaVu Serif, Noto Serif TC, serif';
 const CJK = 'Noto Sans TC, Noto Sans CJK TC, WenQuanYi Zen Hei, sans-serif';
 
-// Interlocking-rings brand mark (same geometry as public/favicon.svg),
-// positioned via a wrapping <g transform>.
 const mark = (x, y, scale) => `
   <g transform="translate(${x} ${y}) scale(${scale})">
     <circle cx="32" cy="32" r="32" fill="url(#g)"/>
