@@ -1,8 +1,3 @@
-// Pluggable LLM service for the events × icebreaker feature.
-// Provider is chosen via the LLM_PROVIDER env var. Defaults to "mock".
-// To add a real provider (e.g. Claude), drop a `<name>Provider.js` file
-// under services/llm/ that exports the same `generateIcebreaker` shape.
-
 const { logWarn } = require('../lib/logger');
 
 const PROVIDER_NAME = process.env.LLM_PROVIDER || 'mock';

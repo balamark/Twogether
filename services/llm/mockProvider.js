@@ -1,7 +1,3 @@
-// Deterministic Mock provider for the icebreaker generator.
-// Given the same rawText it returns identical output — no randomness,
-// no timestamps. Real provider (e.g. Claude) can replace this later.
-
 const EMOTION_LEXICON = [
   { keys: ['生氣', '氣死', '火大', '討厭'], label: '憤怒' },
   { keys: ['難過', '傷心', '哭', '心痛'], label: '失落' },
@@ -86,9 +82,6 @@ function buildVersions({ summary, emotions, tags }) {
   const topEmotion = emotions[0] || '一些情緒';
   const topic = tags[0] && tags[0] !== '誤會' ? `${tags[0]}相關的事` : '剛剛發生的事';
 
-  // Deliberately does NOT embed the summary: the summary is the factual record
-  // shown at the top of the event; neutral is a feelings-forward opener message
-  // in the user's own first-person voice (never narrator).
   const neutral = `關於${topic}，剛剛發生了一些狀況，我現在心裡有「${topEmotion}」的感覺，想先把這份心情放在這裡讓你知道。`;
 
   const firm = `我感受到${topEmotion}，主要是因為${topic}。${summary} 我先把這件事提出來放著。`;
@@ -98,9 +91,7 @@ function buildVersions({ summary, emotions, tags }) {
   return { neutral, firm, warm };
 }
 
-// Second param (gender context) accepted for signature parity with the Claude
-// provider; the mock stays deterministic and ignores it.
-async function generateIcebreaker(rawText /* , { userGender, partnerGender } */) {
+async function generateIcebreaker(rawText ) {
   if (typeof rawText !== 'string' || rawText.trim().length === 0) {
     throw new Error('rawText is required');
   }
@@ -112,9 +103,6 @@ async function generateIcebreaker(rawText /* , { userGender, partnerGender } */)
   const tags = pickTags(rawText);
   const toxicityFlags = detectToxicity(rawText);
   const versions = buildVersions({ summary, emotions, tags });
-  // Mirrors the real provider's long-draft rule (services/llm/claudeProvider.js
-  // LONG_DRAFT_CHARS): only a long draft gets the 完整經過 panel, and it keeps
-  // the whole of the original rather than summarising it.
   const trimmed = rawText.trim();
   const detail = trimmed.length >= 400
     ? `我想把這件事完整說清楚。${maskToxicWords(trimmed)}`
@@ -146,7 +134,7 @@ function buildReplyVersions(rawReply) {
   return { neutral, firm, warm };
 }
 
-async function rewriteReply({ rawReply /* , eventSummary, recentMessages, createdBySelf */ }) {
+async function rewriteReply({ rawReply }) {
   if (typeof rawReply !== 'string' || rawReply.trim().length === 0) {
     throw new Error('rawReply is required');
   }
@@ -175,7 +163,7 @@ const ROLEPLAY_LEVELS = [
   { key: 'intense', label: '最強烈' },
 ];
 
-async function generateRoleplayMessages({ title, scenario, senderGender /* , scriptBody, category */ }) {
+async function generateRoleplayMessages({ title, scenario, senderGender }) {
   if (typeof title !== 'string' || title.trim().length === 0) {
     throw new Error('title is required');
   }
@@ -204,13 +192,7 @@ async function generateRoleplayMessages({ title, scenario, senderGender /* , scr
   };
 }
 
-// Deterministic counselor comment for a wall thread. Detects toxic phrasing in
-// the most recent reply (or the post) and, when found, appends a softer
-// rephrase suggestion. No randomness or timestamps — same input, same output.
-// `companion` (persona) is accepted for signature parity with the Claude
-// provider; the mock stays deterministic and persona-agnostic on purpose so
-// e2e content assertions don't depend on the picked companion.
-async function generateWallCounselorComment({ postContent, postAuthorName, replies, oneSided /* , moodTag, companion */ }) {
+async function generateWallCounselorComment({ postContent, postAuthorName, replies, oneSided }) {
   if (typeof postContent !== 'string' || postContent.trim().length === 0) {
     throw new Error('postContent is required');
   }
@@ -218,10 +200,6 @@ async function generateWallCounselorComment({ postContent, postAuthorName, repli
 
   const author = (postAuthorName || '對方').toString().trim() || '對方';
   const list = Array.isArray(replies) ? replies.filter((r) => !r.isAi) : [];
-  // A one-sided thread (only one partner has spoken) must be analyzed from that
-  // one voice alone — never fabricate the silent partner's feelings. When the
-  // caller flags it explicitly, honor that even if the lone speaker left several
-  // messages; otherwise fall back to "no non-AI reply yet".
   const twoSided = typeof oneSided === 'boolean' ? !oneSided : list.length > 0;
   const last = twoSided && list.length > 0 ? list[list.length - 1] : null;
   const lastName = last ? ((last.authorName || '另一位').toString().trim() || '另一位') : null;
@@ -258,8 +236,6 @@ async function generateWallCounselorComment({ postContent, postAuthorName, repli
   };
 }
 
-// Deterministic reconciliation openers. Same intensity (+ optional event) →
-// same three openers. These generic lines are the 不選對話 fallback. No randomness or timestamps. Real provider can replace.
 const RECONCILIATION_OPENERS = {
   goodwill: [
     { label: '輕鬆問候', text: '欸，今天吃飯了嗎？想到就問一下。' },
@@ -278,8 +254,6 @@ const RECONCILIATION_OPENERS = {
   ],
 };
 
-// With an event picked, the real provider anchors every opener to the event's
-// details; the mock mirrors that by weaving the event title into each line.
 const RECONCILIATION_EVENT_OPENERS = {
   goodwill: [
     { label: '重新安排', text: '「{t}」那件事沒照計畫走，你一定也很悶。我晚點手邊忙完，我們再重新安排一次？' },
@@ -321,9 +295,6 @@ async function generateReconciliationOpeners({ intensity, eventContext }) {
   };
 }
 
-// Deterministic batch of natural daily-appreciation questions (dev/test with no
-// real LLM). Rotates a fixed pool by a cheap hash of `avoid` so re-rolling
-// returns a different-looking set. The real provider replaces this.
 const MOCK_APPRECIATION_QUESTIONS = [
   '今天有沒有一個瞬間，讓你覺得「還好是他」？',
   '今天他做了什麼，讓你覺得被照顧？',
@@ -352,11 +323,7 @@ async function generateAppreciationQuestions({ avoid } = {}) {
   };
 }
 
-// Deterministic emotion-acceptance coaching for the receiver. Detects the
-// partner's dominant emotion from the latest [對方] message (or the event
-// summary) and returns a short empathy note + three validating responses. Same
-// input → same output. Real provider replaces this.
-async function generateEmotionAcceptance({ eventSummary, recentMessages /* , createdBySelf */ }) {
+async function generateEmotionAcceptance({ eventSummary, recentMessages }) {
   const startedAt = Date.now();
   const partnerLast = Array.isArray(recentMessages)
     ? [...recentMessages].reverse().find((m) => !m.fromSelf)
@@ -386,9 +353,6 @@ async function generateEmotionAcceptance({ eventSummary, recentMessages /* , cre
   };
 }
 
-// Deterministic marriage check-up summary. Finds the dimension with the biggest
-// score gap (the most worth talking about) and builds a neutral summary + three
-// talking points. Same input → same output.
 async function generateCheckupSummary({ dimensions, responseA, responseB }) {
   if (!Array.isArray(dimensions) || dimensions.length === 0) {
     throw new Error('dimensions is required');
@@ -441,9 +405,6 @@ async function generateCheckupSummary({ dimensions, responseA, responseB }) {
   };
 }
 
-// Deterministic stand-in for Claude's script role parsing: detect speaker
-// names (「名字：對白」 lines), assign the first speaker male and the second
-// female, everyone else unknown. Predictable for e2e tests.
 async function parseScriptRoles({ content }) {
   const startedAt = Date.now();
   const speakers = [];
@@ -469,8 +430,6 @@ async function parseScriptRoles({ content }) {
   };
 }
 
-// Deterministic story insights: fixed templates parameterized by title so e2e
-// assertions are stable; toxicity flags reuse the shared lexical detector.
 async function generateStoryInsights({ title, sections }) {
   const s = sections || {};
   const allText = [s.context, s.happened, s.impact, s.tried, s.repair, s.now]
@@ -505,8 +464,6 @@ async function generateStoryInsights({ title, sections }) {
   };
 }
 
-// Deterministic freeform structuring: split the raw text into 6 roughly-equal
-// slices, one per section, so the review step always has editable content.
 async function structureStory({ rawText }) {
   const text = (rawText || '').toString().trim();
   const keys = ['context', 'happened', 'impact', 'tried', 'repair', 'now'];
@@ -517,7 +474,6 @@ async function structureStory({ rawText }) {
     const size = Math.ceil(text.length / keys.length);
     keys.forEach((k, i) => {
       const slice = text.slice(i * size, (i + 1) * size).trim();
-      // Guarantee non-empty sections even for short input.
       sections[k] = slice.length > 0 ? slice : text.slice(0, Math.min(text.length, 12));
     });
   }
@@ -533,10 +489,6 @@ async function structureStory({ rawText }) {
   };
 }
 
-// Deterministic emotion/need translation for a thread. For each requested
-// message, picks a surface emotion from the lexicon, maps it to an underlying
-// need, and rewrites the line as a gentle first-person I-message. Same input →
-// same output; no randomness. Real provider (Claude) replaces this.
 const NEED_LEXICON = [
   { keys: ['家庭', '第一', '重要', '在乎'], need: '被重視', rewrite: '我最近很沒有安全感，希望我們的家能被放在更重要的位置。' },
   { keys: ['工作', '忙', '加班', '賺'], need: '被看見', rewrite: '我希望你能看見，我這麼努力，其實也是在照顧這個家。' },
@@ -585,7 +537,6 @@ async function generateThreadTranslations({ messages, targetIds }) {
       durationMs: Date.now() - startedAt,
       usage: { inputTokens: 0, outputTokens: 0, cacheCreateTokens: 0, cacheReadTokens: 0 },
       costUsd: 0,
-      // Same shape as the Claude provider so routes can read these uniformly.
       chunks: 1,
       truncatedChunks: 0,
       truncated: false,
@@ -596,9 +547,6 @@ async function generateThreadTranslations({ messages, targetIds }) {
   };
 }
 
-// Deterministic post-conflict therapy note. Picks the first two distinct human
-// speakers, maps each to a need via the lexicon, and builds a fixed-shape cycle
-// + repair + next-time line. Same input → same output. Real provider replaces.
 async function generateTherapyNote({ eventSummary, messages }) {
   const startedAt = Date.now();
   const humans = (Array.isArray(messages) ? messages : []).filter((m) => !m.isAi);
@@ -636,8 +584,6 @@ async function generateTherapyNote({ eventSummary, messages }) {
   };
 }
 
-// Deterministic per-message emotion meter for a composer draft. Reuses the
-// emotion + need + toxicity lexicons. Same input → same output.
 const EMOTION_EMOJI = {
   憤怒: '😠', 失落: '😢', 委屈: '🥺', 失望: '😔', 焦慮: '😰', 孤單: '😞',
   疲憊: '😮‍💨', 受傷: '💔', 複雜情緒: '💭',
@@ -680,10 +626,6 @@ async function analyzeDraft({ draft }) {
   };
 }
 
-// Deterministic Therapist Mode facilitator turn. Cycles through a fixed
-// exercise sequence by stepCount so a full session can be driven in tests
-// without the paid LLM. Same input → same output. Normalization goes through
-// the shared shapeFacilitatorTurn so mock and claude obey one contract.
 const { getCard: mockGetCard, shapeFacilitatorTurn } = require('../../lib/therapyCards');
 
 const MOCK_FACILITATION_SEQUENCE = [
@@ -703,7 +645,6 @@ async function generateFacilitatorTurn({ session } = {}) {
   const pick = MOCK_FACILITATION_SEQUENCE[idx];
   const done = step >= MOCK_FACILITATION_SEQUENCE.length - 1;
 
-  // Grade the previous response if the active card was evaluable.
   const prevCard = mockGetCard(s.activeCard);
   const evaluation = prevCard && prevCard.evaluable && s.turnOwnerRole
     ? { verdict: 'accurate', note: '你做到了，這就是重點。' }
@@ -732,9 +673,6 @@ async function generateFacilitatorTurn({ session } = {}) {
   );
 }
 
-// Deterministic 諮商摘要 (between-sessions therapy summary). Derives themes /
-// emotions from the precomputed stats and splits events by status, so tests can
-// drive the endpoint without the paid LLM. Same input → same output.
 async function generateTherapySummary({ periodLabel, events, stats }) {
   const startedAt = Date.now();
   const evs = Array.isArray(events) ? events : [];
@@ -771,11 +709,6 @@ async function generateTherapySummary({ periodLabel, events, stats }) {
   };
 }
 
-// Deterministic 話題建議 (Therapy Topics). Builds up to 3 topics from the top
-// recurring themes when not quiet; tops up with general relationship-
-// maintenance topics (and the product's own reassurance line) when quiet or
-// when themes run out, so the couple always gets 3-5 topics — same input →
-// same output, no live LLM needed.
 const GENERAL_MAINTENANCE_TOPICS = [
   {
     title: '我們有沒有花時間只做兩個人的事？',
@@ -833,8 +766,6 @@ async function generateTherapyTopics({ events, stats, quiet }) {
 async function generateCommunicationPatternSummary({ events, stats }) {
   const startedAt = Date.now();
   const evs = Array.isArray(events) ? events : [];
-  // Prefer the most frequent real cycle steps if we have them; otherwise a
-  // sensible default loop so the mock still renders something meaningful.
   const topSteps = (stats?.cycleStepCounts || [])
     .map((c) => c.step)
     .filter(Boolean)
@@ -866,13 +797,6 @@ async function generateCommunicationPatternSummary({ events, stats }) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// 一起收尾 (closure) — deterministic 幫我想一個 + AI 見解
-// ---------------------------------------------------------------------------
-// e2e drives the entire closing → resolved machine through this provider, so
-// both functions are fixed-output: option strings keyed only off `field`, one
-// fixed insight. Same shared shapers as claudeProvider — if the contract ever
-// changes, both move together or neither does.
 const { shapeClosureAssist, shapeClosureInsight } = require('../../lib/closureAi');
 
 const MOCK_CLOSURE_OPTIONS = {
@@ -923,9 +847,6 @@ async function generateClosureInsight({ commitments, sharedDecision } = {}) {
   );
 }
 
-// --- 情緒深潛 Emotional Deep Dive ------------------------------------------
-// Deterministic, guardrail-safe stand-ins. Same output shape as the claude
-// provider (via lib/deepDiveAi shapers) so the e2e journey runs on the mock.
 const { shapeDeepDiveReflection, shapeDeepDiveLetter } = require('../../lib/deepDiveAi');
 
 const MOCK_DEEP_DIVE_REFLECTIONS = {
@@ -968,7 +889,6 @@ async function generateDeepDiveLetter({ kind } = {}) {
   });
 }
 
-// 訪客模式：試玩伴侶回覆 — deterministic stand-in for local dev / tests.
 async function generateGuestPartnerReply({ recentMessages } = {}) {
   const last = Array.isArray(recentMessages) ? [...recentMessages].reverse().find((m) => m.fromSelf) : null;
   const heard = last && last.content ? `「${String(last.content).trim().slice(0, 20)}」` : '你說的';

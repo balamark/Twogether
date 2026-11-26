@@ -6,8 +6,6 @@ import { readFileSync } from 'node:fs'
 const version: string =
   JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version || '0.0.0'
 
-// Short commit hash of the build, baked into the bundle for the footer's
-// release line. Falls back gracefully where git isn't available.
 const commitHash = (() => {
   try {
     return execSync('git rev-parse --short HEAD', { encoding: 'utf8' }).trim()
@@ -16,12 +14,6 @@ const commitHash = (() => {
   }
 })()
 
-// Release time = the COMMIT's timestamp, not the build wall clock. This keeps
-// builds deterministic: the same commit always produces byte-identical
-// bundles. A wall-clock value here took production down — App Engine's Node
-// buildpack reruns `npm run build` at deploy time, and the container's
-// regenerated index.html pointed at a bundle hash the CI-uploaded static
-// files didn't have (blank page, entry JS 404).
 const commitTime = (() => {
   try {
     return execSync('git log -1 --format=%cI', { encoding: 'utf8' }).trim()
@@ -30,9 +22,7 @@ const commitTime = (() => {
   }
 })()
 
-// https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  // Define CSP based on environment
   const getCSP = () => {
     const baseCSP = [
       "default-src 'self'",
@@ -43,18 +33,12 @@ export default defineConfig(({ mode }) => {
       "worker-src 'self' blob:",
       "frame-src 'none'",
       "object-src 'none'",
-      // Allow the checkout form to POST to the hosted payment pages of BOTH
-      // gateways (stage + production hosts each). Miss one and the browser
-      // silently refuses the form submit, so that gateway's button does
-      // nothing — see lib/ecpay.js / lib/newebpay.js ENDPOINTS.
       "form-action 'self' https://payment-stage.ecpay.com.tw https://payment.ecpay.com.tw https://ccore.newebpay.com https://core.newebpay.com"
     ];
 
-    // Development-specific connect-src
     if (mode === 'development') {
       baseCSP.push("connect-src 'self' ws: wss: http://localhost:* https://gqhoebnveeaishflmkqv.supabase.co https://*.supabase.co https://*.supabase.io");
     } else {
-      // Production - more restrictive
       baseCSP.push("connect-src 'self' https://gqhoebnveeaishflmkqv.supabase.co https://*.supabase.co https://*.supabase.io");
     }
 
@@ -63,16 +47,12 @@ export default defineConfig(({ mode }) => {
 
   return {
   plugins: [react()],
-  // Build metadata for the footer release line — refreshed on every build,
-  // so each deployed commit shows its own version/time/hash.
   define: {
     __APP_VERSION__: JSON.stringify(version),
     __BUILD_TIME__: JSON.stringify(commitTime),
     __COMMIT_HASH__: JSON.stringify(commitHash),
   },
-  // Add the base path here for production builds
-  // This tells Vite to generate asset paths relative to the HTML file's location
-  base: './', // <--- ADD THIS LINE FOR STATIC HOSTING
+  base: './',
   server: {
     port: 5174,
     host: true,

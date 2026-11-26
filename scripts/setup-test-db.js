@@ -1,25 +1,13 @@
 #!/usr/bin/env node
 
-/**
- * Test Database Setup Script
- *
- * This script ensures the test database is properly set up and migrated
- * before running integration tests. It will:
- * 1. Create the test database if it doesn't exist
- * 2. Run all migrations to ensure schema is up to date
- * 3. Optionally clean existing data for fresh test runs
- */
-
 const { exec } = require('child_process');
 const { promisify } = require('util');
 const path = require('path');
 
 const execAsync = promisify(exec);
 
-// Set test environment
 process.env.NODE_ENV = 'test';
 
-// Load test environment variables
 require('dotenv').config({ path: path.join(__dirname, '..', '.env.test') });
 
 const QUIET = process.env.LOG_VERBOSE !== '1';
@@ -62,7 +50,6 @@ async function setupTestDatabase() {
 
   const url = assertLocalDatabaseUrl(dbUrl);
 
-  // Precondition: Postgres must be reachable.
   const port = url.port || '5432';
   try {
     await execAsync(`pg_isready -h ${url.hostname} -p ${port}`);
@@ -75,13 +62,11 @@ async function setupTestDatabase() {
   const dbName = dbUrl.split('/').pop();
   const baseUrl = dbUrl.substring(0, dbUrl.lastIndexOf('/'));
 
-  // 1. Create database if it doesn't exist (no-op if already present).
   await runCommand(
     `psql "${baseUrl}/postgres" -c "CREATE DATABASE ${dbName};" 2>/dev/null || true`,
     'Create test database'
   );
 
-  // 2. Run migrations (idempotent).
   const migrateSuccess = await runCommand(
     `NODE_ENV=test node ${path.join(__dirname, 'migrate.js')} migrate`,
     'Run database migrations'
@@ -93,10 +78,8 @@ async function setupTestDatabase() {
   }
 }
 
-// Optional: Clean data for fresh test runs
 async function cleanTestData() {
   if (process.argv.includes('--clean')) {
-    // Defense in depth — also guard the nuclear DELETE path.
     assertLocalDatabaseUrl(process.env.DATABASE_URL);
 
     const cleanCommands = [
@@ -117,7 +100,6 @@ async function cleanTestData() {
   }
 }
 
-// Run setup
 if (require.main === module) {
   setupTestDatabase()
     .then(() => cleanTestData())
@@ -127,7 +109,6 @@ if (require.main === module) {
     });
 }
 
-// Clean specific test users by email
 async function cleanupTestUsers(emailList) {
   if (!emailList || emailList.length === 0) {
     return;
@@ -135,7 +116,6 @@ async function cleanupTestUsers(emailList) {
 
   for (const email of emailList) {
     try {
-      // Clean up related data first (foreign key constraints)
       await runCommand(
         `psql "${process.env.DATABASE_URL}" -c "DELETE FROM love_moments WHERE couple_id IN (SELECT id FROM couples WHERE user1_id IN (SELECT id FROM users WHERE email = '${email}') OR user2_id IN (SELECT id FROM users WHERE email = '${email}'));"`,
         `Clean love moments for ${email}`

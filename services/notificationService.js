@@ -1,43 +1,18 @@
-// Partner-action notifications: the single seam for "let 另一半 know what I did".
-//
-// Historically each router hand-rolled its own 3-channel notify (in-app INSERT +
-// LINE push + email); see routes/events.js `notify()` and routes/wall.js
-// `notifyPartner()`. This module consolidates that pattern so every couple-shared
-// action can notify the partner with one call and identical delivery semantics:
-//
-//   notifyPartnerAction({ actorId, type, content })
-//
-// The in-app `notifications` row is always written (best-effort); LINE and email
-// are fire-and-forget mirrors gated by each user's opt-in. Nothing here ever
-// throws to the caller — a notification failure must never fail the user's
-// action. Unpaired / solo users have no partner, so every call no-ops silently.
-
 const db = require('../database/db');
 const lineService = require('./lineService');
 const emailService = require('./emailService');
 const { logInfo, logWarn } = require('../lib/logger');
 
-// --- Copy catalog ----------------------------------------------------------
-// One entry per action type: the emoji + the verb phrase that follows the
-// actor's nickname, plus a default body used when the caller has no specific
-// detail to pass (e.g. deletes). All copy is Traditional Chinese and specific —
-// never a vague "有新通知" (see CLAUDE.md messaging rules). `priority`: 1 low
-// (blue dot), 2 medium (yellow), 3 high (red) — matches NotificationInbox.tsx.
 const CATALOG = {
-  // 記錄時光 — love moments
   love_moment_created: { emoji: '💝', verb: '新增了一則愛的記錄', fallback: '打開 App 看看你們的甜蜜時光' },
   love_moment_updated: { emoji: '📝', verb: '更新了一則愛的記錄', fallback: '打開 App 看看更新後的記錄' },
   love_moment_deleted: { emoji: '🗑️', verb: '刪除了一則愛的記錄', fallback: '一則愛的記錄已被移除' },
-  // 週期紀錄 — cycle records (notified normally, per product decision)
   cycle_record_created: { emoji: '🌸', verb: '新增了一筆週期紀錄', fallback: '打開 App 查看週期紀錄' },
   cycle_record_updated: { emoji: '🌸', verb: '更新了週期紀錄', fallback: '打開 App 查看最新的週期紀錄' },
   cycle_record_deleted: { emoji: '🌸', verb: '刪除了一筆週期紀錄', fallback: '一筆週期紀錄已被移除' },
-  // 角色扮演 — custom scripts
   custom_script_created: { emoji: '🎭', verb: '建立了一個自訂劇本', fallback: '打開 App 看看新的劇本' },
   custom_script_updated: { emoji: '🎭', verb: '更新了一個自訂劇本', fallback: '打開 App 看看更新後的劇本' },
   custom_script_deleted: { emoji: '🎭', verb: '刪除了一個自訂劇本', fallback: '一個自訂劇本已被移除' },
-  // 親密邀請 — 替代方案協商 (negotiation responses + co-authored plans). Tone:
-  // never frame a no / not-now as something to fix (PRD acceptance criterion).
   negotiation_accepted: { emoji: '💬', verb: '願意和你一起討論替代方案', fallback: '打開 App，一起提出彼此都喜歡的方式', priority: 2 },
   negotiation_later: { emoji: '🕊️', verb: '想晚一點再討論替代方案', fallback: '對方記得這件事，等彼此都方便時再聊就好' },
   negotiation_declined: { emoji: '🕊️', verb: '目前還不想討論替代方案', fallback: '謝謝你願意開口。這是對方此刻的步調，你們的共同方案清單會一直保留著' },
@@ -46,11 +21,9 @@ const CATALOG = {
   alt_plan_approved: { emoji: '✅', verb: '認可了一個替代方案', fallback: '打開 App 查看你們的共同方案清單' },
   alt_plan_disabled: { emoji: '⏸️', verb: '停用了一個替代方案', fallback: '方案已移出共同清單，隨時可以再一起討論' },
   alt_plan_reactivated: { emoji: '🤝', verb: '重新啟用了一個替代方案', fallback: '需要你們再次確認，才會回到共同清單' },
-  // 商店 — custom gifts
   custom_gift_created: { emoji: '🎁', verb: '新增了一個客製禮物', fallback: '打開 App 看看新的禮物' },
   custom_gift_updated: { emoji: '🎁', verb: '更新了一個客製禮物', fallback: '打開 App 看看更新後的禮物' },
   custom_gift_deleted: { emoji: '🎁', verb: '刪除了一個客製禮物', fallback: '一個客製禮物已被移除' },
-  // 存款 — personal deposit accounts (routes/coins.js). Content is "金額｜原因".
   deposit_thanks: { emoji: '💝', verb: '為你存入了一筆感謝存款', fallback: '打開「感情存款」看看 TA 謝謝你什麼' },
   deposit_requested: { emoji: '🙋', verb: '申請了一筆存款，等你確認', fallback: '打開「感情存款」確認或婉拒', priority: 2 },
   deposit_confirmed: { emoji: '✅', verb: '確認了你的存款申請', fallback: '感情存款已存入你的帳戶' },
@@ -58,23 +31,17 @@ const CATALOG = {
   redemption_requested: { emoji: '🎁', verb: '想用感情存款兌換你的禮物，等你同意', fallback: '打開「感情存款」同意或婉拒', priority: 2 },
   redemption_approved: { emoji: '🎁', verb: '同意了你的禮物兌換', fallback: '感情存款已扣除，記得一起兌現這份心意' },
   redemption_declined: { emoji: '🕊️', verb: '婉拒了你的禮物兌換', fallback: '感情存款沒有被扣除，可以換個時間或換個禮物再試' },
-  // 愛的語言 — assessments & love wishes
   assessment_saved: { emoji: '📋', verb: '更新了關係評估', fallback: '打開 App 看看 TA 的評估結果' },
   love_wish_created: { emoji: '💫', verb: '許下了一個愛的願望', fallback: '打開 App 看看 TA 的願望' },
   love_wish_deleted: { emoji: '💫', verb: '移除了一個愛的願望', fallback: '一個愛的願望已被移除' },
-  // 婚姻健檢 — marriage checkups
   checkup_created: { emoji: '💑', verb: '發起了一次婚姻健檢', fallback: '打開 App 一起完成健檢', priority: 2 },
   checkup_response: { emoji: '💑', verb: '回覆了婚姻健檢', fallback: '打開 App 查看 TA 的回覆', priority: 2 },
-  // 情緒深潛 — emotional deep dive (tone: 分享/一起，先讀完，不是被回報)
   deep_dive_shared: { emoji: '💌', verb: '想讓你更了解 TA 的感受', fallback: '打開 App，先花點時間讀完 TA 想分享的', priority: 2 },
   deep_dive_partner_responded: { emoji: '💛', verb: '回應了你分享的感受', fallback: '打開 App 看看 TA 的理解與回應', priority: 2 },
-  // 共同設定 / 個人資料
   couple_settings_updated: { emoji: '⚙️', verb: '更新了你們的共同設定', fallback: '打開 App 查看更新後的設定' },
   profile_updated: { emoji: '👤', verb: '更新了個人資料', fallback: '打開 App 看看 TA 的更新' },
 };
 
-// Resolve the acting user's partner id via the standard couples CASE idiom.
-// Returns null for solo / unpaired couples (user2_id IS NULL) → callers no-op.
 async function getPartnerId(userId) {
   if (!userId) return null;
   try {
@@ -101,15 +68,6 @@ async function getNickname(userId) {
   }
 }
 
-// Core entry point. Notifies the actor's partner that `type` happened.
-//   actorId  – the user who performed the action (req.user.id)
-//   type     – a key in CATALOG
-//   content  – optional specific detail (the moment's note, the gift name…);
-//              falls back to the catalog's generic line when omitted
-//   priority – overrides the catalog/default priority when provided
-//   targetId – optional id of the exact item (e.g. the love moment) so tapping
-//              the notification can land on it, not just on its tab
-// Fire-and-forget: safe to call without await at an action site.
 async function notifyPartnerAction({ actorId, type, content = null, priority, targetId = null } = {}) {
   const entry = CATALOG[type];
   if (!entry) {
@@ -118,14 +76,13 @@ async function notifyPartnerAction({ actorId, type, content = null, priority, ta
   }
   try {
     const partnerId = await getPartnerId(actorId);
-    if (!partnerId) return; // solo / unpaired → nobody to notify
+    if (!partnerId) return;
 
     const actorNickname = (await getNickname(actorId)) || '你的另一半';
     const title = `${entry.emoji} ${actorNickname}${entry.verb}`;
     const body = (content && String(content).trim()) || entry.fallback;
     const prio = priority || entry.priority || 1;
 
-    // 1) In-app notification row (always written, best-effort).
     try {
       await db.query(
         `INSERT INTO notifications (user_id, notification_type, title, content, related_user_id, priority, target_id)
@@ -136,14 +93,12 @@ async function notifyPartnerAction({ actorId, type, content = null, priority, ta
       logWarn('partner_notification.insert_failed', { type, err: err.message });
     }
 
-    // 2) LINE mirror (no-ops unless partner linked + opted in).
     lineService.pushToUserIfLinked(
       db,
       partnerId,
       `${entry.emoji} Twogether｜${actorNickname}${entry.verb}\n「${lineService.excerpt(body)}」\n👉 https://twogether.fun`
     );
 
-    // 3) Email mirror (best-effort, honors per-user opt-out).
     try {
       const recipient = await emailService.getUserEmailIfOptedIn(db, partnerId);
       if (recipient) {
@@ -161,7 +116,6 @@ async function notifyPartnerAction({ actorId, type, content = null, priority, ta
 
     logInfo('partner_notification.sent', { type, actorId, partnerId });
   } catch (err) {
-    // Never let a notification failure bubble into the user's action.
     logWarn('notifyPartnerAction failed', { type, err: err.message });
   }
 }

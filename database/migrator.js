@@ -48,11 +48,6 @@ class Migrator {
         .filter(Boolean)
         .sort((a, b) => a.version - b.version);
 
-      // Guard against version collisions. The migrator keys applied migrations
-      // by integer version (PRIMARY KEY on _sqlx_migrations.version): once one
-      // file's version is recorded, another file with the same version is treated
-      // as already-applied and silently skipped — its SQL never runs. Fail loudly
-      // instead. (Exactly what hid the feature_flags table behind a duplicate 063.)
       const seenByVersion = new Map();
       for (const m of migrations) {
         if (seenByVersion.has(m.version)) {
@@ -84,12 +79,8 @@ class Migrator {
       const checksum = Buffer.from(require('crypto').createHash('sha256').update(sql).digest('hex'), 'hex');
 
       await db.transaction(async (client) => {
-        // Execute the migration
         await client.query(sql);
 
-        // Record the migration. UPSERT so a prior failed attempt (which leaves
-        // a success=false row for this version) doesn't wedge the retry with a
-        // duplicate-key error on the primary key.
         const executionTime = Date.now() - startTime;
         await client.query(`
           INSERT INTO _sqlx_migrations (version, description, installed_on, success, checksum, execution_time)
@@ -108,7 +99,6 @@ class Migrator {
     } catch (error) {
       console.error(`Migration ${migration.version} failed:`, error.message);
 
-      // Record failed migration
       try {
         const executionTime = Date.now() - startTime;
         await db.query(`

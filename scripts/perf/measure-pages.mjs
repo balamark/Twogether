@@ -1,25 +1,4 @@
 #!/usr/bin/env node
-// Page-to-page response time, measured the way a user feels it.
-//
-// Signs in, then for each view: opens it cold, opens it again (cached
-// revisit), and walks back through history with 上一頁. Timing comes from the
-// app's own instrumentation (src/utils/perf.ts → window.__twogetherPerf), the
-// same `page_ready` number production reports to Cloud Logging, so local runs
-// and prod dashboards agree. See docs/PERFORMANCE.md.
-//
-// Usage:
-//   PERF_EMAIL=… PERF_PASSWORD=… node scripts/perf/measure-pages.mjs [options]
-//
-// Options:
-//   --base=<url>        app origin (default http://localhost:5174, or PERF_BASE_URL)
-//   --views=a,b,c       view ids (default: main tabs + common sub-pages)
-//   --rounds=<n>        repeat the whole walk n times (default 2)
-//   --mobile            emulate a mid-range phone: 4× CPU slowdown + ~4G network
-//   --idle=<s>          wait this long between rounds (e.g. 35, past the 30s GET cache)
-//   --budget=<ms>       exit 1 if any revisit / back p95 exceeds this (default 300)
-//   --out=<file>        also write raw samples as JSON
-//
-// Exit code 1 when a budget is exceeded, so it can gate CI or a pre-release check.
 import { chromium } from 'playwright';
 import { writeFileSync } from 'node:fs';
 
@@ -67,7 +46,6 @@ if (await close.isVisible({ timeout: 1000 }).catch(() => false)) await close.cli
 
 const sampleCount = () => page.evaluate(() => window.__twogetherPerf?.samples.length ?? 0);
 
-// Wait for the next page_ready sample for `view` recorded after index `from`.
 async function waitReady(view, from) {
   const handle = await page.waitForFunction(
     ([v, i]) => window.__twogetherPerf?.samples.slice(i).find((s) => s.kind === 'page' && s.name === v) ?? null,
@@ -77,10 +55,7 @@ async function waitReady(view, from) {
   return handle.jsonValue();
 }
 
-// Switch view the same way the app does (useHistoryState keeps `view` in
-// history.state.tw), so menu-only pages are reachable without clicking menus.
 async function open(view) {
-  // Already showing it (e.g. home right after sign-in) → nothing to time.
   const current = await page.evaluate(() => window.history.state?.tw?.nav?.view ?? null);
   if (current === view) return null;
   const from = await sampleCount();
@@ -120,7 +95,6 @@ for (let round = 1; round <= ROUNDS; round++) {
       console.log(`timeout ${view} (no page_ready within ${READY_TIMEOUT}ms)`);
     }
   }
-  // 上一頁 through what we just opened.
   for (let i = VIEWS.length - 2; i >= 0; i--) {
     try {
       record('back', VIEWS[i], await back(VIEWS[i]));

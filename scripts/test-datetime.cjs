@@ -1,7 +1,4 @@
 #!/usr/bin/env node
-// Standalone round-trip test for the timezone math used in src/utils/datetime.ts.
-// Mirrors localInputToIsoInTz / isoToLocalInputInTz exactly so reviewers can verify
-// the algorithm without a JS test runner. Run with: node scripts/test-datetime.cjs
 
 function localInputToIsoInTz(localValue, tz) {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(localValue);
@@ -101,9 +98,7 @@ console.log('Europe/London (GMT, winter)');
 
 console.log('Cross-timezone scenario: Taipei sender, LA viewer');
 {
-  // Sender in Taipei picks "2026-05-30 20:00" (Taipei wall-clock)
   const iso = localInputToIsoInTz('2026-05-30T20:00', 'Asia/Taipei');
-  // Viewer in LA prefilling: same ISO → LA wall-clock should be 5:00 AM same day (PDT)
   const laWallClock = isoToLocalInputInTz(iso, 'America/Los_Angeles');
   assertEq(laWallClock, '2026-05-30T05:00', 'LA viewer sees 5:00 AM same day');
 }

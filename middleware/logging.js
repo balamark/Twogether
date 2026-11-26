@@ -3,26 +3,17 @@ const { logInfo, logWarn, logError } = require('../lib/logger');
 
 const QUIET = process.env.NODE_ENV === 'test' && process.env.LOG_VERBOSE !== '1';
 
-// Free-text fields that can carry large (and sometimes explicit) user content —
-// e.g. a custom roleplay script. Always summarized regardless of length.
 const ALWAYS_SUMMARIZE = new Set([
   'content', 'scenario', 'script', 'summary', 'safewordNotes', 'narration', 'text',
 ]);
 const MAX_STRING = 200;
 
-// A request slower than this is logged as `slow_request` (warning) so Cloud
-// Logging can list the slow routes directly (docs/PERFORMANCE.md).
 const SLOW_REQUEST_MS = 1000;
 
-// Replace large/free-text string fields in a request body with a size
-// placeholder before logging, so Cloud Logging keeps the useful metadata
-// (title, category, ids) without storing whole script payloads. Shallow only —
-// request bodies here are flat objects.
 function summarizeBody(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) return body;
   const out = {};
   for (const [key, value] of Object.entries(body)) {
-    // Act/line arrays are the explicit script. Log the count, never the text.
     if (key === 'acts' || key === 'lines') {
       out[key] = Array.isArray(value) ? `Array(${value.length})` : '<redacted>';
     } else if (typeof value === 'string' && (ALWAYS_SUMMARIZE.has(key) || value.length > MAX_STRING)) {
@@ -34,7 +25,6 @@ function summarizeBody(body) {
   return out;
 }
 
-// Enhanced request/response logging middleware
 const requestLogger = (req, res, next) => {
   if (QUIET) return next();
 
@@ -42,7 +32,6 @@ const requestLogger = (req, res, next) => {
   const originalSend = res.send;
   const originalJson = res.json;
 
-  // Log incoming request
   logInfo(`${req.method} ${req.path}`, {
     method: req.method,
     path: req.path,
@@ -53,7 +42,6 @@ const requestLogger = (req, res, next) => {
     user: req.user ? { id: req.user.id, nickname: req.user.nickname } : undefined,
   });
 
-  // Override res.send to log responses
   res.send = function(body) {
     const duration = Date.now() - start;
 
@@ -87,7 +75,6 @@ const requestLogger = (req, res, next) => {
           }, {}) : responseData,
       });
 
-      // Log errors in detail — structured for Cloud Logging.
       if (res.statusCode >= 400) {
         logError(`Error Response ${req.method} ${req.path}`, {
           method: req.method,
@@ -102,8 +89,6 @@ const requestLogger = (req, res, next) => {
       logError('Logging middleware (send) failed', { err: error.message, stack: error.stack });
     }
 
-    // Server-Timing lets the client (src/utils/perf.ts) split a slow call into
-    // time spent in this process vs. network / cold start / queueing.
     if (!res.headersSent) res.setHeader('Server-Timing', `app;dur=${duration}`);
     if (duration > SLOW_REQUEST_MS) {
       logWarn('slow_request', {
@@ -119,7 +104,6 @@ const requestLogger = (req, res, next) => {
     return originalSend.call(this, body);
   };
 
-  // Override res.json to log JSON responses
   res.json = function(obj) {
     const duration = Date.now() - start;
 
@@ -134,7 +118,6 @@ const requestLogger = (req, res, next) => {
         dataLength: obj && obj.data && Array.isArray(obj.data) ? obj.data.length : undefined,
       });
 
-      // Log detailed error information — structured for Cloud Logging.
       if (res.statusCode >= 400) {
         logError(`JSON Error Response ${req.method} ${req.path}`, {
           method: req.method,
@@ -156,7 +139,6 @@ const requestLogger = (req, res, next) => {
   next();
 };
 
-// Global error handler with detailed structured logging.
 const errorHandler = (err, req, res, next) => {
   logError(`Unhandled Error in ${req.method} ${req.path}`, {
     method: req.method,
@@ -176,7 +158,6 @@ const errorHandler = (err, req, res, next) => {
     },
   });
 
-  // Send error response
   const statusCode = err.statusCode || err.status || 500;
   const message = process.env.NODE_ENV === 'production'
     ? 'Internal server error'
@@ -195,7 +176,6 @@ const errorHandler = (err, req, res, next) => {
   });
 };
 
-// Async error wrapper
 const asyncHandler = (fn) => {
   return (req, res, next) => {
     Promise.resolve(fn(req, res, next)).catch(next);

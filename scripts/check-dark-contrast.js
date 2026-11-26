@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-// Guards Engineer Mode's dark theme against light-on-light (and dark-on-dark) text.
-//
-// The app's colours are hardcoded Tailwind utility classes, not CSS variables, so
-// the dark skin in src/index.css works by listing `.dark .<utility>` overrides. That
-// list is easy to forget: add a panel with `bg-blue-50` and, in dark mode, the panel
-// keeps its pale background while the `text-gray-900` inside it DOES get flipped to
-// near-white — an invisible row (this is exactly how the notification inbox broke).
-// The mirror image happens with `text-amber-900` on a background we flipped to dark.
-//
-// So: collect every light-surface / dark-ink utility the source actually uses, and
-// fail if src/index.css has no `.dark` override for it. Style-only check — it never
-// renders anything, so it's cheap enough to run next to `check:admin` in CI.
 
 const fs = require('fs');
 const path = require('path');
@@ -19,8 +7,6 @@ const ROOT = path.join(__dirname, '..');
 const SRC = path.join(ROOT, 'src');
 const CSS = path.join(SRC, 'index.css');
 
-// Palettes remapped to Soft Petal in tailwind.config.js (pink/rose/purple/... are
-// cream + dusty rose, so their low shades are light too) plus the stock scales.
 const PALETTES = [
   'gray', 'slate', 'zinc', 'neutral', 'stone',
   'red', 'orange', 'amber', 'yellow', 'lime', 'green', 'emerald', 'teal',
@@ -28,28 +14,17 @@ const PALETTES = [
   'primary', 'romantic', 'lavender', 'love',
 ].join('|');
 
-// Light surfaces: the 50/100/200 shades, white (incl. `/opacity` variants), and the
-// pale Soft Petal tokens. `-300` is excluded — it's already mid-tone enough to carry
-// dark ink, and the Soft Petal 300s are used as accents, not surfaces.
-//
-// `petal-sage` and `petal-rose` count as surfaces ONLY at low opacity: `bg-petal-sage`
-// at full strength is a mid-tone accent that carries dark ink fine, but `bg-petal-sage/20`
-// is a pale panel that needs a dark override (this is how ~90 sage-tinted panels stayed
-// invisible in Engineer Mode — the check simply wasn't looking at them).
 const LIGHT_BG = new RegExp(
   `\\bbg-(?:(?:(?:${PALETTES})-(?:50|100|200)|white|petal-(?:cream-2|cream|rose-soft|rule|muted))(?:\\/\\d+)?` +
     `|petal-(?:sage|rose)\\/(?:[1-9]|[1-3]\\d))\\b`,
   'g'
 );
 
-// Ink meant for light surfaces. 600 is included: on a dark tinted panel a 600 shade
-// lands around 3:1, under the 4.5:1 we want for body copy.
 const DARK_TEXT = new RegExp(
   `\\btext-(?:(?:${PALETTES})-(?:600|700|800|900)|petal-(?:ink-soft|ink|muted))\\b`,
   'g'
 );
 
-/** `bg-amber-50/60` is written `.bg-amber-50\/60` in CSS — normalise back. */
 const unescapeClass = (sel) => sel.replace(/\\(.)/g, '$1');
 
 function collectSourceFiles(dir, out = []) {
@@ -62,7 +37,6 @@ function collectSourceFiles(dir, out = []) {
 }
 
 function collectOverrides(css) {
-  // Matches `.dark .bg-blue-50`, `.dark .bg-amber-50\/60`, `.dark   .text-red-700`.
   const covered = new Set();
   for (const m of css.matchAll(/\.dark\s+\.((?:[\w-]|\\.)+)/g)) {
     covered.add(unescapeClass(m[1]));
@@ -73,7 +47,6 @@ function collectOverrides(css) {
 const covered = collectOverrides(fs.readFileSync(CSS, 'utf8'));
 const files = collectSourceFiles(SRC);
 
-// class name -> Set of files that use it
 const used = new Map();
 for (const file of files) {
   const code = fs.readFileSync(file, 'utf8');

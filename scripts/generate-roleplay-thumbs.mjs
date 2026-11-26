@@ -1,14 +1,3 @@
-// Builds web-sized WebP copies of the built-in roleplay cover art.
-//
-// The source PNGs in public/images/roleplay/ are 1.1–1.8MB each (~15MB for the
-// set), and the script list used to load every one of them just to paint small
-// cards — the "劇本縮圖很慢" complaint. This writes two variants per cover:
-//
-//   images/roleplay/<name>.webp        1280px long edge — detail / lightbox
-//   images/roleplay/thumb/<name>.webp   480px long edge — list cards
-//
-// Resize is `fit: 'inside'` (never crops — see CLAUDE.md "Never crop images").
-// Re-run after adding or replacing a cover:  node scripts/generate-roleplay-thumbs.mjs
 import { readdir, mkdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -17,7 +17,6 @@ async function addComplimentTemplates() {
   try {
     console.log('🚀 Adding compliment templates...');
 
-    // First check if intimacy_templates table exists, create if not
     await db.query(`
       CREATE TABLE IF NOT EXISTS intimacy_templates (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -33,7 +32,6 @@ async function addComplimentTemplates() {
 
     console.log('✅ Intimacy templates table ready');
 
-    // Check if compliment templates already exist
     const existingResult = await db.query(
       'SELECT COUNT(*) as count FROM intimacy_templates WHERE category = $1',
       ['compliment']
@@ -45,7 +43,6 @@ async function addComplimentTemplates() {
       return;
     }
 
-    // Insert compliment templates
     let insertedCount = 0;
     for (const template of complimentTemplates) {
       await db.query(`
@@ -63,7 +60,6 @@ async function addComplimentTemplates() {
   }
 }
 
-// Run if called directly
 if (require.main === module) {
   addComplimentTemplates()
     .then(() => {

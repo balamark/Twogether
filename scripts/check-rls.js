@@ -1,16 +1,4 @@
 #!/usr/bin/env node
-// Fails (exit 1) if any table in the public schema has Row-Level Security off.
-//
-// Why: Supabase serves every public table at https://<ref>.supabase.co/rest/v1/
-// to anyone holding the (public) anon key. A table without RLS is fully
-// readable/writable/deletable from the internet. Migration 063 enabled RLS on
-// the tables that existed then, but ~35 later tables forgot it and Supabase
-// flagged them (rls_disabled_in_public). Run this right after `npm run migrate`
-// so a new migration that forgets `ENABLE ROW LEVEL SECURITY` fails CI instead
-// of shipping an open table.
-//
-// The app itself is unaffected by RLS: the backend connects as `postgres`
-// (bypasses RLS), and the app never uses PostgREST.
 const db = require('../database/db');
 
 async function main() {

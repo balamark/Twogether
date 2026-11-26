@@ -4,7 +4,6 @@ const path = require('path');
 const QUIET = process.env.NODE_ENV === 'test' && process.env.LOG_VERBOSE !== '1';
 const { logWarn } = require('../lib/logger');
 
-// Load environment variables based on NODE_ENV
 if (process.env.NODE_ENV === 'test') {
   require('dotenv').config({ path: path.join(__dirname, '..', '.env.test') });
 } else if (process.env.NODE_ENV === 'development') {
@@ -13,7 +12,6 @@ if (process.env.NODE_ENV === 'test') {
   require('dotenv').config();
 }
 
-// Database connection configuration
 const isSupabase = process.env.DATABASE_URL?.includes('supabase.com');
 const isLocal = process.env.DATABASE_URL?.includes('localhost') || process.env.DATABASE_URL?.includes('127.0.0.1');
 
@@ -25,19 +23,13 @@ const pool = new Pool({
   } : isLocal ? false : {
     rejectUnauthorized: false
   },
-  // Add additional SSL options for Supabase
   ...(isSupabase && {
     sslmode: 'require'
   }),
-  // pg's default closes an idle connection after 10s, so the first tap after
-  // a short pause paid a fresh TCP + TLS handshake to the remote database
-  // (often 300ms+) before any query ran. Keep connections warm for 5 minutes
-  // and TCP keep-alive them so NATs/poolers don't silently drop them.
   idleTimeoutMillis: 5 * 60 * 1000,
   keepAlive: true,
 });
 
-// Test the connection
 pool.on('connect', () => {
   if (!QUIET) console.log('Connected to PostgreSQL database');
 });
@@ -48,7 +40,6 @@ pool.on('error', (err) => {
 
 const SLOW_QUERY_MS = 500;
 
-// Database query helper
 const query = async (text, params) => {
   const start = Date.now();
   try {
@@ -56,8 +47,6 @@ const query = async (text, params) => {
     if (!QUIET) {
       const duration = Date.now() - start;
       console.log('Query executed', { text: text.substring(0, 50) + '...', duration, rows: res.rowCount });
-      // Includes time waiting for a free pool connection, so a burst of
-      // parallel requests queueing on the pool shows up here too.
       if (duration > SLOW_QUERY_MS) {
         logWarn('slow_query', { text: text.replace(/\s+/g, ' ').trim().substring(0, 200), durationMs: duration, rows: res.rowCount, poolWaiting: pool.waitingCount, poolTotal: pool.totalCount });
       }
@@ -69,7 +58,6 @@ const query = async (text, params) => {
   }
 };
 
-// Transaction helper
 const transaction = async (callback) => {
   const client = await pool.connect();
   try {
@@ -85,7 +73,6 @@ const transaction = async (callback) => {
   }
 };
 
-// Close pool gracefully
 const close = async () => {
   if (!QUIET) console.log('Closing database connection pool...');
   await pool.end();

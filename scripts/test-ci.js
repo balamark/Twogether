@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-// CI Test Script - Starts server, runs tests, then cleans up
 const { spawn } = require('child_process');
 const { promisify } = require('util');
 
@@ -17,9 +16,7 @@ class CITestRunner {
     
     for (let i = 0; i < maxAttempts; i++) {
       try {
-        // Check if fetch is available (Node.js 18+)
         if (typeof fetch === 'undefined') {
-          // Fallback: use curl for health check
           const { execSync } = require('child_process');
           execSync('curl -f http://localhost:8080/health', { 
             stdio: 'ignore',
@@ -28,7 +25,6 @@ class CITestRunner {
           console.log('✅ Server is ready!');
           return true;
         } else {
-          // Use built-in fetch
           const response = await fetch(url, { 
             signal: AbortSignal.timeout(5000)
           });
@@ -38,7 +34,6 @@ class CITestRunner {
           }
         }
       } catch (error) {
-        // Server not ready yet, continue waiting
       }
       
       await sleep(1000);
@@ -73,7 +68,6 @@ class CITestRunner {
       process.exit(1);
     });
 
-    // Wait for server to be ready
     await this.waitForServer();
   }
 
@@ -113,7 +107,6 @@ class CITestRunner {
     if (this.serverProcess) {
       this.serverProcess.kill('SIGTERM');
       
-      // Give the server a moment to shut down gracefully
       await sleep(2000);
       
       if (!this.serverProcess.killed) {
@@ -139,7 +132,6 @@ class CITestRunner {
   }
 }
 
-// Handle cleanup on process signals
 const testRunner = new CITestRunner();
 
 process.on('SIGINT', async () => {
@@ -154,5 +146,4 @@ process.on('SIGTERM', async () => {
   process.exit(1);
 });
 
-// Run the tests
 testRunner.run();

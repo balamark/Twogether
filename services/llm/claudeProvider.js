@@ -1,17 +1,3 @@
-// Claude provider for the events × icebreaker generator.
-// Selected when LLM_PROVIDER=claude. Requires ANTHROPIC_API_KEY.
-//
-// Output shape mirrors mockProvider.generateIcebreaker:
-//   { title, summary, emotions, tags, toxicityFlags, versions: {neutral, firm, warm} }
-//
-// Notes:
-// - Uses Claude Haiku 4.5 (cheap + fast, ideal for short rewrites).
-// - The system prompt is `cache_control: ephemeral` so the 5-minute prompt
-//   cache amortizes it across consecutive previews from the same couple.
-// - Output is forced into JSON via a tool-use schema for determinism.
-// - On any provider failure, callers see a thrown error and the route
-//   returns a 500 — falling back to the mock would silently hide outages.
-
 const Anthropic = require('@anthropic-ai/sdk');
 const { logInfo, logWarn } = require('../../lib/logger');
 const { pickableCards, CARD_IDS, shapeFacilitatorTurn } = require('../../lib/therapyCards');
@@ -35,22 +21,12 @@ const { getRequestContext } = require('../../middleware/request-context');
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 
-// The judge (second-layer review) can run on a different model than the primary
-// generator; defaults to the same one. A stronger model (e.g. sonnet) can be
-// pinned via ANTHROPIC_JUDGE_MODEL when perspective accuracy matters more than
-// cost. The whole judge step is gated by REFLECTION_JUDGE_ENABLED (default on)
-// so it can be turned off without a code rollback.
 const JUDGE_MODEL = process.env.ANTHROPIC_JUDGE_MODEL || MODEL;
 const REFLECTION_JUDGE_ENABLED = !['0', 'false', 'off'].includes(
   String(process.env.REFLECTION_JUDGE_ENABLED || '').toLowerCase()
 );
-// The judge must never blow the overall latency budget: bound each judge call
-// so a slow judge degrades to "return the primary output" instead of hanging.
 const JUDGE_TIMEOUT_MS = Number(process.env.REFLECTION_JUDGE_TIMEOUT_MS || 20000);
 
-// Per-million-token prices (USD). Keep in sync with
-// https://docs.anthropic.com/en/docs/about-claude/pricing — Haiku 4.5 row.
-// Cache write = 1.25× input; cache read = 0.10× input.
 const PRICING = {
   'claude-haiku-4-5-20251001': { in: 1.0, out: 5.0, cacheWrite: 1.25, cacheRead: 0.1 },
   'claude-sonnet-4-6':         { in: 3.0, out: 15.0, cacheWrite: 3.75, cacheRead: 0.3 },
@@ -67,12 +43,6 @@ function estimateCostUSD(model, usage) {
   return (inTok * p.in + outTok * p.out + cacheW * p.cacheWrite + cacheR * p.cacheRead) / 1_000_000;
 }
 
-// Interface language. When the request came from a user who picked English in
-// the top-right switch (X-Locale: en → middleware/locale.js stores it on the
-// request context), every generation gets one extra system block asking for
-// English user-facing text. Fixed labels / enum values / JSON keys the prompts
-// define stay exactly as specified, so parsers keyed on them keep working.
-// Appended LAST so cached system-prompt prefixes stay cache hits.
 const ENGLISH_DIRECTIVE = `Interface language: English.
 The person using the app chose English. Write every piece of natural-language text a user will read (advice, rewrites, summaries, questions, letters, translations of feelings, suggestions) in natural, warm English, even though these instructions and the conversation may be in Chinese.
 Keep the required output format exactly: JSON keys, enum values, ids, and any fixed labels or option values these instructions say to use must stay exactly as specified (do not translate them).
@@ -102,23 +72,9 @@ function getClient() {
   return client;
 }
 
-// Punctuation style appended to every user-facing generation prompt. zh-TW
-// readers expect colons/parentheses; em dashes read like translated English
-// (docs/UX_PLAYBOOK.md §R2).
 const PUNCTUATION_RULE = `
 
 標點規則（所有產生的文字一律適用）：不要使用破折號（——、—、–）。需要補充或轉折時，改用冒號、括號或直接分成兩句。`;
-
-// ---------------------------------------------------------------------------
-// Reflection judge (LLM-as-judge, second-layer review)
-// ---------------------------------------------------------------------------
-// After a primary generation (情緒翻譯 / AI 諮商師 回應), a judge LLM reads the
-// SAME speaker-labeled context the primary model saw plus the primary output,
-// and grades it — chiefly for 你/我 perspective/attribution errors (the bug this
-// exists to catch), plus groundedness and fluency. A `hard` verdict makes the
-// caller regenerate once with the judge's critique. The judge never blocks the
-// user: any failure/timeout returns a pass-through verdict. Shape/threshold
-// logic lives in lib/reflectionJudge.js so it stays unit-testable.
 
 const JUDGE_SYSTEM_PROMPT = `你是一位嚴謹的品質檢查員（第二層審查）。有一個 AI 剛替一對伴侶產生了「情緒翻譯」或「諮商回應」。你的工作不是重寫，而是判斷這份輸出能不能直接呈現給使用者。請永遠以繁體中文思考並回覆。
 
@@ -163,11 +119,6 @@ const JUDGE_TOOL_SCHEMA = {
   },
 };
 
-// Grade one primary output. `context` and `output` are plain strings the caller
-// has already rendered (the same labeled thread the primary model saw, and the
-// primary result). Returns a verdict from lib/reflectionJudge with a `_meta`
-// carrying this call's usage/cost so the caller can fold it into its billed
-// total. NEVER throws: on disable/error/timeout it returns a pass-through.
 async function judgeResponse({ surface, context, output }) {
   if (!REFLECTION_JUDGE_ENABLED) return passthroughVerdict('disabled');
   const outText = (output == null ? '' : String(output)).trim();
@@ -186,10 +137,6 @@ async function judgeResponse({ surface, context, output }) {
 
   const startedAt = Date.now();
   try {
-    // Phase 2: fold in admin-curated negative examples for this surface, as a
-    // SECOND system block after the cache-controlled base so the shared prefix
-    // stays byte-identical and cacheable. getCuratedExamples is fail-open ([]),
-    // and the block is clearly-delimited data (never instructions).
     const system = [
       {
         type: 'text',
@@ -243,8 +190,6 @@ async function judgeResponse({ surface, context, output }) {
     });
     return verdict;
   } catch (err) {
-    // Fail-open: a flaky judge must never withhold a response the primary model
-    // already produced.
     logWarn('llm.claude.reflection_judge.failed', {
       surface,
       durationMs: Date.now() - startedAt,
@@ -254,9 +199,6 @@ async function judgeResponse({ surface, context, output }) {
   }
 }
 
-// Sum a judge/regen verdict's usage + cost into a running total object shaped
-// like the translation usageTotal ({inputTokens, outputTokens, cacheCreateTokens,
-// cacheReadTokens}). Returns the cost so callers can also add it to a scalar.
 function foldJudgeUsage(usageTotal, verdict) {
   const u = (verdict && verdict._meta && verdict._meta.usage) || {};
   usageTotal.inputTokens += u.inputTokens || 0;
@@ -288,14 +230,6 @@ const SYSTEM_PROMPT = `你是一個專為情侶設計的「破冰」AI 助手，
 
 回應請呼叫 emit_icebreaker tool，不要輸出其他文字。`;
 
-// Appended to SYSTEM_PROMPT only for long drafts (see LONG_DRAFT_CHARS). A
-// 1000–2000 字 draft compressed into a ≤200 字 summary plus three 1–3 句 versions
-// loses the specifics — which are exactly what the couple needs to discuss. The
-// `detail` field is the second panel that keeps all of it.
-//
-// Kept as a separate suffix so the cached system prefix stays byte-identical for
-// short drafts (the common case); the cache breakpoint sits on the whole system
-// block, so appending this only re-caches on the long-draft path.
 const LONG_DRAFT_PROMPT = `
 
 9. detail：完整經過 —— 這次的原文很長，summary 與三個版本一定裝不下。請把原文「全部」的內容改寫成一段可以直接給伴侶看的完整敘述：
@@ -305,9 +239,6 @@ const LONG_DRAFT_PROMPT = `
 - 不要新增原文沒有的事實、不要替任何一方辯護或道歉、不要下結論或給建議。
 - 長度沒有上限，寧可長也不要漏掉原文的內容。`;
 
-// Drafts at or above this many characters get the `detail` panel. Below it the
-// summary + three versions already carry the whole message, and asking for a
-// full rewrite would just restate them at extra cost.
 const LONG_DRAFT_CHARS = 400;
 
 const TOOL_SCHEMA = {
@@ -383,8 +314,6 @@ const TOOL_SCHEMA = {
   },
 };
 
-// Long-draft variant: same contract plus the required `detail` panel. Built by
-// cloning TOOL_SCHEMA so the two can never drift apart.
 const TOOL_SCHEMA_LONG = {
   ...TOOL_SCHEMA,
   input_schema: {
@@ -471,15 +400,9 @@ const REPLY_REWRITE_TOOL_SCHEMA = {
   },
 };
 
-// The rewrite prompt forbids shortening ("草稿長就改寫得長…不要刪節"), and warm is
-// firm plus a sentence, so a max-length 2000-char draft needs room for three
-// full-length zh-TW versions. 4096 was not enough: generation stopped mid
-// tool_use, the JSON never parsed, and the user got three blank cards.
 const REWRITE_MAX_TOKENS = 8192;
 
 function rewriteTooLongError(truncated) {
-  // Same code either way (the UI handles it as one recoverable case), but say
-  // which one actually happened so the suggested fix is the right one.
   const err = new Error(
     truncated
       ? '草稿太長，AI 改寫沒能完成。請縮短草稿，或分成兩則分開改寫送出。'
@@ -490,9 +413,6 @@ function rewriteTooLongError(truncated) {
   return err;
 }
 
-// Pull the three versions out of a rewrite response. Reports truncation and any
-// blank version instead of quietly substituting '' — a blank version is never a
-// usable answer, and silently returning one is what hid this bug.
 function parseRewriteResponse(response) {
   const truncated = response?.stop_reason === 'max_tokens';
   const toolUse = (response?.content || []).find(
@@ -511,14 +431,6 @@ function parseRewriteResponse(response) {
   const blank = Object.keys(versions).filter((k) => !versions[k]);
   return { out, versions, truncated, blank };
 }
-
-// ---------------------------------------------------------------------------
-// Roleplay invitation messages
-// ---------------------------------------------------------------------------
-// Given a roleplay script a couple owns, summarize its setup and produce five
-// in-character opening invitation messages the sender can send to their partner
-// to kick off the roleplay. The five messages escalate in suggestiveness so the
-// sender can pick the boldness that fits the moment.
 
 const ROLEPLAY_LEVELS = [
   { key: 'normal', label: '普通暗示' },
@@ -557,9 +469,6 @@ const ROLEPLAY_TOOL_SCHEMA = {
   input_schema: {
     type: 'object',
     properties: {
-      // Declared first so the model commits to the sender's perspective
-      // before writing any message text (regression: a male sender got
-      // messages voiced as the script's female protagonist).
       senderRole: {
         type: 'string',
         maxLength: 50,
@@ -584,10 +493,6 @@ const ROLEPLAY_TOOL_SCHEMA = {
   },
 };
 
-// The perspective directive leads the user content and spells out the
-// sender→role mapping imperatively. A single "傳送者性別：男性" line proved
-// too weak: with a female-protagonist script the model voiced the messages
-// as the protagonist despite the system-prompt rule.
 function senderPerspectiveDirective(senderGender) {
   if (senderGender === 'male') {
     return '傳送者性別：男性。傳送者在這個劇本中扮演「男性角色」— 請先從劇本找出男性角色（senderRole 填他的名字或身分），5 則訊息全部以這個男性角色的第一人稱撰寫，邀請對象是劇本中的女性角色。絕對不可以用女性角色自稱、不可以說出女性角色的台詞。';
@@ -598,8 +503,6 @@ function senderPerspectiveDirective(senderGender) {
   return '傳送者性別：未指定。請以中性、不限定自身性別的傳送者視角撰寫（senderRole 填「未指定」），不要以劇本中的特定角色自稱。';
 }
 
-// Exported for prompt-contract tests (src/tests/roleplay-prompt.test.ts):
-// guards the gender-perspective regression without a live API call.
 function buildRoleplayUserContent({ title, scenario, scriptBody, category, senderGender }) {
   return [
     senderPerspectiveDirective(senderGender),
@@ -655,8 +558,6 @@ async function generateRoleplayMessages({ title, scenario, scriptBody, category,
   }
   const out = toolUse.input || {};
 
-  // Re-key the model output by our canonical level order so the UI always gets
-  // exactly five labelled, ordered messages even if the model omits/reorders one.
   const byLevel = new Map();
   for (const m of Array.isArray(out.messages) ? out.messages : []) {
     if (m && typeof m.level === 'string' && typeof m.text === 'string' && m.text.trim()) {
@@ -669,8 +570,6 @@ async function generateRoleplayMessages({ title, scenario, scriptBody, category,
     text: byLevel.get(key) || '',
   }));
 
-  // Log the role the model committed to, so "wrong voice" reports can be
-  // diagnosed from Cloud Logging (compare senderRole with senderGender).
   const senderRole = (out.senderRole || '').toString().trim();
   logInfo('llm.claude.roleplay_messages.role', { senderGender, senderRole });
 
@@ -693,8 +592,6 @@ async function generateRoleplayMessages({ title, scenario, scriptBody, category,
   };
 }
 
-// 男/女 pronoun hint for prompts; null when unknown or non-binary (the model
-// then avoids gendered pronouns rather than guessing).
 function genderHint(gender, who) {
   if (gender === 'male') return `${who}的性別：男性（第三人稱請用「他」）`;
   if (gender === 'female') return `${who}的性別：女性（第三人稱請用「她」）`;
@@ -707,8 +604,6 @@ async function generateIcebreaker(rawText, { userGender = null, partnerGender = 
     throw new Error('rawText is required');
   }
 
-  // Gender context rides in the user message (not the system prompt) so the
-  // cached system prefix stays byte-identical across users.
   const genderLines = [
     genderHint(userGender, '撰寫者（使用者本人）'),
     genderHint(partnerGender, '伴侶'),
@@ -717,9 +612,6 @@ async function generateIcebreaker(rawText, { userGender = null, partnerGender = 
     ? `${genderLines.join('\n')}\n\n原始情緒文字：\n${rawText}`
     : rawText;
 
-  // Long drafts additionally get the 完整經過 panel. The extra headroom is
-  // proportional to the draft: the rewrite restates every point, so it lands
-  // near the input's own length rather than at a fixed ceiling.
   const isLongDraft = rawText.trim().length >= LONG_DRAFT_CHARS;
   const maxTokens = isLongDraft
     ? Math.min(16000, 1024 + Math.ceil(rawText.trim().length * 2.5))
@@ -764,9 +656,6 @@ async function generateIcebreaker(rawText, { userGender = null, partnerGender = 
   }
   const out = toolUse.input;
 
-  // A detail panel cut off mid-sentence is worse than none: drop it and keep the
-  // (complete) summary + versions rather than showing the couple a truncated
-  // account of their own argument.
   const detail = (out.detail || '').toString().trim();
   if (isLongDraft && response.stop_reason === 'max_tokens') {
     logWarn('llm.claude.icebreaker.detail_truncated', {
@@ -899,15 +788,6 @@ async function rewriteReply({ rawReply, eventSummary, recentMessages, createdByS
   };
 }
 
-// ---------------------------------------------------------------------------
-// Wall counselor comment
-// ---------------------------------------------------------------------------
-// Given a wall post and its full reply thread between a couple, produce ONE
-// gentle, even-handed comment from an "AI 諮商師" (couples counselor). The
-// comment validates both partners' feelings and, when a message uses blaming /
-// absolute / contemptuous language, names the pattern softly and offers a
-// kinder rephrase. It is posted into the thread visible to both partners.
-
 const WALL_COUNSELOR_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴侶諮商師，正在閱讀一對伴侶在「我們的牆」上的一則貼文與底下的對話串。請永遠以繁體中文回覆。
 
 任務：寫出「一段」諮商師留言，會被貼進對話串、兩個人都看得到。你的目標是幫雙方降溫、被理解，而不是評斷對錯。
@@ -960,10 +840,6 @@ const WALL_COUNSELOR_TOOL_SCHEMA = {
   },
 };
 
-// Distinct human voices in a counselor thread: the post author plus every
-// non-AI replier, counted by display name. Callers that hold stable user IDs
-// should decide one-sidedness there and pass `oneSided` into the builder below;
-// this name-based count is the self-contained fallback used when they don't.
 function countHumanVoices({ postAuthorName, replies }) {
   const names = new Set();
   const author = (postAuthorName || '').toString().trim();
@@ -978,14 +854,6 @@ function countHumanVoices({ postAuthorName, replies }) {
   return names.size;
 }
 
-// Assemble the counselor's user turn (shared by the wall thread and the event
-// thread). Exported for prompt-contract regression tests. When the thread is
-// one-sided — only one partner has actually spoken and the other hasn't
-// responded yet — it appends an explicit, deterministic instruction so the model
-// empathizes ONLY with the person who spoke and never fabricates the silent
-// partner's feelings, words, or stance. This is the one-sided-analysis bug: the
-// counselor validated the feelings of a partner who had said nothing, reading
-// the poster's one-sided account as if it were two voices.
 function buildWallCounselorUserContent({ postContent, postAuthorName, moodTag, replies, oneSided }) {
   const lines = [];
   const author = (postAuthorName || '對方').toString().trim() || '對方';
@@ -1024,10 +892,6 @@ async function generateWallCounselorComment({ postContent, postAuthorName, moodT
 
   const userContent = buildWallCounselorUserContent({ postContent, postAuthorName, moodTag, replies, oneSided });
 
-  // Persona extension (selected AI companion, e.g. Luma / Kai). Appended as a
-  // separate system block AFTER the cache-controlled base prompt so the shared
-  // prefix stays cacheable across users with different companions. Personas
-  // adjust style only — the base prompt's therapeutic rules stay in charge.
   const system = [
     {
       type: 'text',
@@ -1047,9 +911,6 @@ async function generateWallCounselorComment({ postContent, postAuthorName, moodT
   let costTotal = 0;
   let lastModel = MODEL;
 
-  // One counselor generation. `extraDirective`, present only on a judge-triggered
-  // regeneration, is appended to the user turn (never the cached system block, so
-  // the shared prefix stays byte-identical and cacheable).
   const runOnce = async (extraDirective) => {
     const content = extraDirective ? `${userContent}\n${extraDirective}` : userContent;
     const callStartedAt = Date.now();
@@ -1092,10 +953,6 @@ async function generateWallCounselorComment({ postContent, postAuthorName, moodT
 
   let out = await runOnce();
 
-  // Second-layer review: catch 你/我 attribution errors (and fabrication) before
-  // the comment is shown, regenerating once with the judge's critique on a hard
-  // verdict. Judge + regen cost fold into the returned _meta, so the route still
-  // bills one `wall_counselor` unit. Fail-open via judgeResponse.
   if (REFLECTION_JUDGE_ENABLED && out.comment && out.comment.trim()) {
     const verdict = await judgeResponse({
       surface: SURFACE_COUNSELOR,
@@ -1128,21 +985,6 @@ async function generateWallCounselorComment({ postContent, postAuthorName, moodT
     },
   };
 }
-
-// ---------------------------------------------------------------------------
-// Reconciliation openers
-// ---------------------------------------------------------------------------
-// After a fight / cold war, the user often can't bring themselves to apologize
-// or send sweet love-notes. They need a face-saving opening line that tests
-// whether the partner is willing to reopen the conversation — a "step down"
-// rather than an admission of fault. Given a chosen intensity and an optional
-// past-event context, produce THREE short, ready-to-send openers.
-//
-// When an event IS picked, the openers must be anchored to its concrete
-// details (the trigger, the objects, the plans involved). An earlier version
-// told the model to stay away from the event entirely, which produced canned
-// "在忙嗎？有吃飯嗎" lines unrelated to the fight the user had just picked.
-// Generic everyday greetings are now only the fallback for "不選對話".
 
 const RECONCILIATION_INTENSITY_GUIDE = {
   goodwill:
@@ -1313,15 +1155,6 @@ async function generateReconciliationOpeners({ intensity, eventContext }) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Appreciation questions ("今天你還喜歡他什麼？")
-// ---------------------------------------------------------------------------
-// A daily micro-habit: one small, life-like question that nudges you to notice
-// one thing you appreciate about your partner today. The curated bank ships on
-// the client; this is the "讓 AI 想幾個新的" escape hatch for couples who want a
-// fresh batch. The whole point is that these read like a friend nudging you,
-// NOT a worksheet ("請表達你對伴侶的感謝") — so the prompt leans hard on
-// concrete, everyday, slightly playful moments.
 const APPRECIATION_QUESTIONS_SYSTEM_PROMPT = `你是一位很懂生活的伴侶關係設計師。你要為一個叫 Twogether 的 App 想一批「每日小問題」，讓使用者每天回答一題，慢慢養成「看見並感謝另一半」的習慣。請永遠以繁體中文回覆。
 
 任務：想出「八則」不同的每日小問題。
@@ -1418,16 +1251,6 @@ async function generateAppreciationQuestions({ avoid } = {}) {
     },
   };
 }
-
-// ---------------------------------------------------------------------------
-// Emotion acceptance ("接住情緒")
-// ---------------------------------------------------------------------------
-// The repair starts only once a feeling is *received* — not solved. The partner
-// who opened the event has already had their raw feeling softened by the
-// icebreaker; this helper coaches the *receiver*. Given the event summary and
-// recent thread, it returns a short empathy note (help the receiver SEE the
-// feeling) plus three ready-to-send "I receive you" responses that validate the
-// emotion without explaining, debating, or self-erasing apology.
 
 const EMOTION_ACCEPTANCE_SYSTEM_PROMPT = `你是一位溫柔、專業的伴侶情緒教練。情境：一方（[對方]）剛剛表達了情緒，正在寫回覆的人（[你]）想學會先「接住」這份情緒——讓對方覺得被看見、被肯定，而不是急著解釋、講道理、辯駁或自責到失去自己。請永遠以繁體中文回覆。
 
@@ -1562,15 +1385,6 @@ async function generateEmotionAcceptance({ eventSummary, recentMessages, created
   };
 }
 
-// ---------------------------------------------------------------------------
-// Marriage check-up summary ("婚姻檢查" neutral third party)
-// ---------------------------------------------------------------------------
-// Both partners independently rated a few relationship dimensions (1–5) with
-// optional notes, said thank-you for things the other does, and named one thing
-// to work on. Acting as a warm, neutral couples' counselor, read BOTH sets of
-// answers and produce a short, even-handed summary plus a few concrete talking
-// points for them to discuss together.
-
 const CHECKUP_SYSTEM_PROMPT = `你是一位溫柔、中立、專業的伴侶諮商師，正在主持一對伴侶的「婚姻檢查」。雙方各自誠實地為幾個關係面向打了分數（1～5）並留下想法，也寫下想感謝對方的事，和最想一起改善的一件事。請永遠以繁體中文回覆。
 
 你的任務：扮演「公正的第三方」，讀完雙方的答案後，幫他們把事情有系統地攤開來看清楚，產出：
@@ -1688,12 +1502,6 @@ async function generateCheckupSummary({ dimensions, responseA, responseB }) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Script role parsing (premium) — identify speaker names in a pasted roleplay
-// script and infer each character's gender so the client can rewrite them into
-// [男]/[女] tokens (which display-time parsing swaps for the couple's
-// nicknames). Only the opening slice of the script is sent: speaker names
-// repeat every line, so a few thousand characters are plenty to infer gender.
 const PARSE_ROLES_MAX_INPUT_CHARS = 6000;
 
 const PARSE_ROLES_SYSTEM_PROMPT = `你是劇本角色分析助手。使用者提供一段情侶角色扮演劇本，對白行的格式是「角色名：對白」或「角色名: 對白」。
@@ -1789,13 +1597,6 @@ async function parseScriptRoles({ content }) {
     },
   };
 }
-
-// ---------------------------------------------------------------------------
-// 真實故事 insights: three generalized repair-approach takeaways for a
-// published relationship story, shown to the author right after publishing
-// and to every reader on the story page. The same call doubles as the
-// post-moderation toxicity pre-check (flags feed the admin review queue).
-// ---------------------------------------------------------------------------
 
 const STORY_INSIGHT_SYSTEM_PROMPT = `你是一位溫柔、專業的伴侶關係研究者。一位使用者依照固定模板寫下了一則「真實關係故事」：背景、發生了什麼、情緒衝擊、試過什麼、有效的修復、現在的我們。請永遠以繁體中文回覆。
 
@@ -1927,13 +1728,6 @@ async function generateStoryInsights({ title, sections }) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// 真實故事 freeform structuring: the author pasted their whole story as one
-// block instead of filling the 6-section template. Split their own words into
-// the fixed sections (rearranging, lightly trimming; NOT rewriting the voice
-// or inventing content) so they can review and edit before publishing.
-// ---------------------------------------------------------------------------
-
 const STORY_STRUCTURE_SYSTEM_PROMPT = `你是一位貼心的編輯助手。一位使用者把他們的關係故事一次寫完了，沒有照模板分段。請永遠以繁體中文回覆。
 
 任務：把使用者的原文，依照固定的 6 個段落重新歸位：
@@ -2033,20 +1827,6 @@ async function structureStory({ rawText }) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Emotion / need translation ("情緒翻譯")
-// ---------------------------------------------------------------------------
-// The couple is stuck reading each other's messages as attacks. This is the
-// product's core move (design Stage 1 + Stage 2): for each message, look past
-// the surface complaint to the layered emotion (anger is usually the top layer;
-// fear / loneliness / need-for-reassurance sit underneath) and rewrite it as
-// the underlying NEED in a gentle first-person "I-message". The other partner
-// then reads a need, not an attack. The AI never judges who is right.
-//
-// Batched on purpose: one call translates every still-untranslated message in
-// the thread, so turning the lens on costs a single quota unit regardless of
-// thread length, and the model sees the whole exchange (the cycle) for context.
-
 const THREAD_TRANSLATION_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴侶諮商師，正在幫一對伴侶做「情緒翻譯」。他們正卡在把對方每一句話都聽成攻擊。你的工作不是分析誰對誰錯，而是替「每一句話」翻譯出底層真正的情緒與需求，讓對方聽到的不是指責，而是需要。請永遠以繁體中文回覆。
 
 核心理念：憤怒通常只是表層，底下才是真正重要的。例如「我很生氣」底下常常是「我很害怕」，再底下是「我怕失去你」。指責的話（你總是…、你根本沒有…、你眼裡只有…）背後，幾乎都藏著一個沒被說出口的需求（安全感、被重視、被陪伴、被信任、被肯定）。
@@ -2076,9 +1856,6 @@ const THREAD_TRANSLATION_TOOL_SCHEMA = {
         items: {
           type: 'object',
           properties: {
-            // Short integer ref (the #N shown in the prompt), mapped back to
-            // the real message id server-side. Integers are far more reliable
-            // for the model to echo than 36-char UUIDs.
             ref: { type: 'integer', description: '對應訊息的編號（提示中的 #N），原封不動回傳' },
             emotions: {
               type: 'array',
@@ -2093,10 +1870,6 @@ const THREAD_TRANSLATION_TOOL_SCHEMA = {
               },
             },
             need: { type: 'string', maxLength: 20, description: '核心需求詞，例如 安全感 / 被重視 / 被陪伴' },
-            // maxLength matters: without it the model matches the length of the
-            // source message, and a thread of long comments overran max_tokens —
-            // which truncated the whole tool_use JSON and dropped every
-            // translation silently. The prompt already asks for 1 to 2 sentences.
             rewrite: { type: 'string', maxLength: 120, description: '第一人稱「可能真正想表達的是」翻譯，1 到 2 句' },
           },
           required: ['ref', 'need', 'rewrite'],
@@ -2107,19 +1880,11 @@ const THREAD_TRANSLATION_TOOL_SCHEMA = {
   },
 };
 
-// Output budget for one translation batch. A single item costs roughly 200
-// output tokens (3 emotions + need + a rewrite capped at 120 chars), so 6
-// targets fit inside 4096 with a wide margin.
 const TRANSLATION_MAX_TOKENS = 4096;
 const TRANSLATION_CHUNK_SIZE = 6;
 const TRANSLATION_CONCURRENCY = 3;
-// Messages that are only context for this chunk get clipped: a wall post can be
-// 6000 chars, and resending every one of them in full on every chunk is what
-// makes this call slow and expensive. Targets always go in whole.
 const TRANSLATION_CONTEXT_CHARS = 300;
 
-// Split target refs into batches small enough that the model's reply cannot
-// overrun max_tokens. Exported for tests.
 function chunkTargets(refs, size = TRANSLATION_CHUNK_SIZE) {
   const list = Array.isArray(refs) ? refs : [];
   const step = Math.max(1, size);
@@ -2128,28 +1893,19 @@ function chunkTargets(refs, size = TRANSLATION_CHUNK_SIZE) {
   return out;
 }
 
-// Pull the translations out of one Claude response and map short refs back to
-// real message ids. Returns `truncated` so callers can tell "the model had
-// nothing to say" apart from "the model was cut off mid-JSON" — the latter used
-// to look identical and silently produced zero translations. Exported for tests.
 function parseTranslationResponse(response, refToId) {
   const truncated = response?.stop_reason === 'max_tokens';
   const toolUse = (response?.content || []).find(
     (b) => b.type === 'tool_use' && b.name === 'emit_thread_translations'
   );
   if (!toolUse) {
-    // A truncated response can stop before any complete block exists. That is a
-    // known, recoverable state (the caller retries smaller), not a provider bug.
     if (truncated) return { translations: [], truncated: true, returnedRefs: [] };
     throw new Error('Claude did not return a tool_use block');
   }
-  // When generation stops mid tool_use the partial JSON is unparseable, so the
-  // API hands back an empty/partial input rather than the array we asked for.
   const out = toolUse.input || {};
   const rawList = Array.isArray(out.translations) ? out.translations : [];
   const translations = rawList
     .map((t) => {
-      // Accept the ref as number or numeric string; map back to the real id.
       const ref = typeof t?.ref === 'number' ? t.ref : parseInt(t?.ref, 10);
       const id = refToId.get(ref);
       if (!id || typeof t.rewrite !== 'string' || !t.rewrite.trim()) return null;
@@ -2170,9 +1926,6 @@ function parseTranslationResponse(response, refToId) {
   return { translations, truncated, returnedRefs: rawList.map((t) => t?.ref) };
 }
 
-// Run `worker` over `items` with at most `limit` in flight. Chunks are
-// independent calls, so overlapping them keeps a long thread inside the 45s
-// client timeout instead of adding ~17s per chunk.
 async function mapWithConcurrency(items, limit, worker) {
   const results = new Array(items.length);
   let cursor = 0;
@@ -2187,9 +1940,6 @@ async function mapWithConcurrency(items, limit, worker) {
   return results;
 }
 
-// messages: [{ id, speaker: '[A]'|'[B]'|nickname, content }] — the full thread
-//   for context. targetIds: which message ids to actually translate (the ones
-//   not yet cached). context: { summary } optional topic to ground the model.
 async function generateThreadTranslations({ messages, targetIds, context }) {
   const all = Array.isArray(messages) ? messages : [];
   const wanted = Array.isArray(targetIds) && targetIds.length > 0
@@ -2205,9 +1955,6 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
     };
   }
 
-  // Relabel messages with short integer refs (#1, #2…) for the model, and keep
-  // a ref→real-id map. Models echo small integers reliably; full UUIDs they do
-  // not, which silently dropped every translation before.
   const refToId = new Map();
   const idToRef = new Map();
   all.forEach((m, i) => {
@@ -2217,8 +1964,6 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
   });
   const wantedRefs = wanted.map((id) => idToRef.get(id)).filter((r) => r != null);
 
-  // The thread is rendered per chunk: this chunk's targets in full, everything
-  // else clipped to keep the input (and the latency) down.
   const buildUserContent = (chunkRefs, extraDirective) => {
     const targetSet = new Set(chunkRefs);
     const lines = [];
@@ -2236,15 +1981,10 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
     });
     lines.push('');
     lines.push(`請只翻譯以下編號的訊息：${chunkRefs.map((r) => `#${r}`).join('、')}`);
-    // On a judge-triggered regeneration, the critique is appended so the model
-    // fixes the specific perspective/attribution error it was flagged for.
     if (extraDirective) lines.push(extraDirective);
     return lines.join('\n');
   };
 
-  // Render this chunk's translations back for the judge, each paired with its
-  // source line + speaker so the judge can check that every first-person "我"
-  // sits in the right speaker's voice.
   const renderTranslationsForJudge = (translations) =>
     translations
       .map((t) => {
@@ -2264,8 +2004,6 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
   let lastModel = MODEL;
   const prompts = [];
 
-  // One request for one batch of refs. Returns whatever parsed plus whether the
-  // model was cut off, so the caller can retry that batch smaller.
   const callChunk = async (chunkRefs, extraDirective) => {
     const userContent = buildUserContent(chunkRefs, extraDirective);
     prompts.push(userContent);
@@ -2317,11 +2055,6 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
     return parsed;
   };
 
-  // Second-layer review for one chunk: judge the translations, and on a hard
-  // verdict (a 你/我 perspective/attribution error) regenerate this chunk once
-  // with the critique. Judge + regen tokens are folded into the run totals, so
-  // the whole thing still bills as one `need_translation` unit. Never lowers the
-  // item count (a regen can't lose ground). Fail-open via judgeResponse.
   const judgeAndMaybeRegenerate = async (chunkRefs, translations) => {
     if (!REFLECTION_JUDGE_ENABLED || translations.length === 0) return translations;
     const verdict = await judgeResponse({
@@ -2347,8 +2080,6 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
     return improved;
   };
 
-  // Chunks are sized so this should not happen; if it does, halve the batch once
-  // rather than returning nothing.
   const translateChunk = async (chunkRefs) => {
     const parsed = await callChunk(chunkRefs);
     let translations = parsed.translations;
@@ -2368,7 +2099,6 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
         ]);
         halves.forEach((h) => { if (h.truncated) truncatedChunks += 1; });
         const retried = halves.flatMap((h) => h.translations);
-        // Keep whichever attempt produced more, so a retry can never lose ground.
         translations = retried.length >= parsed.translations.length ? retried : parsed.translations;
       }
     }
@@ -2379,7 +2109,6 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
   const chunks = chunkTargets(wantedRefs, TRANSLATION_CHUNK_SIZE);
   const perChunk = await mapWithConcurrency(chunks, TRANSLATION_CONCURRENCY, translateChunk);
 
-  // Later chunks win on the (impossible in practice) duplicate ref.
   const byId = new Map();
   perChunk.flat().forEach((t) => byId.set(t.id, t));
   const translations = [...byId.values()];
@@ -2401,17 +2130,6 @@ async function generateThreadTranslations({ messages, targetIds, context }) {
     },
   };
 }
-
-// ---------------------------------------------------------------------------
-// Therapy Note ("治療摘要") — post-conflict structured summary
-// ---------------------------------------------------------------------------
-// When a couple resolves an event, a plain "here's what you said" summary is
-// not what a therapist leaves them with. This produces a structured Therapy
-// Note (design Stage: 衝突後自動產生治療摘要): the biggest trigger, each side's
-// REAL underlying need, the negative cycle they fell into (pursue → withdraw →
-// pursue harder → shut down), what repair actually worked, and one concrete
-// sentence to try next time the same pattern shows up. Generated once when the
-// event is resolved and shared to both partners.
 
 const THERAPY_NOTE_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴侶諮商師。一對伴侶剛結束一次衝突並把事件標記為解決。請閱讀事件背景與完整對話，為他們寫一份「治療摘要」(Therapy Note)。請永遠以繁體中文回覆。
 
@@ -2468,8 +2186,6 @@ const THERAPY_NOTE_TOOL_SCHEMA = {
   },
 };
 
-// messages: [{ speaker, content, isAi }] — the full resolved thread, speaker
-// already labelled with the couple's nicknames.
 async function generateTherapyNote({ eventSummary, messages }) {
   const lines = [];
   if (eventSummary && typeof eventSummary === 'string') {
@@ -2547,14 +2263,6 @@ async function generateTherapyNote({ eventSummary, messages }) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Draft analysis ("即時情緒檢測") — per-message emotion meter for the composer
-// ---------------------------------------------------------------------------
-// Before a charged reply is sent, show the writer what it will actually do:
-// the layered emotions (with intensity), how the partner is likely to MIShear
-// it versus the real worry underneath, the need driving it, and a rewrite that
-// says the need instead of the attack. This is the "每一句訊息都有 AI 評估" panel.
-
 const DRAFT_ANALYSIS_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴侶諮商師，正在幫一個人「送出訊息前」檢查這句話。使用者打了一段要傳給伴侶的草稿，可能情緒還沒整理好。請永遠以繁體中文回覆。
 
 你的工作不是評斷對錯，而是幫使用者看見這句話送出去會發生什麼，然後給一個更靠近彼此的版本。請產出：
@@ -2614,8 +2322,6 @@ const DRAFT_ANALYSIS_TOOL_SCHEMA = {
   },
 };
 
-// draft: the in-progress reply text. eventSummary / recentMessages give the
-// model the conflict context so partnerHears is grounded in this relationship.
 async function analyzeDraft({ draft, eventSummary, recentMessages, userGender = null, partnerGender = null }) {
   if (typeof draft !== 'string' || draft.trim().length === 0) {
     throw new Error('draft is required');
@@ -2710,13 +2416,6 @@ async function analyzeDraft({ draft, eventSummary, recentMessages, userGender = 
   };
 }
 
-// Therapist Mode ("引導模式") — the facilitator turn
-// ---------------------------------------------------------------------------
-// The core reframe: the AI is NOT an advisor writing a wise paragraph. It is a
-// facilitator running a live, turn-based session — it picks ONE small exercise
-// (a "card"), directs ONE partner to do one thing, waits, scores it, then moves
-// on. Every call produces a single therapeutic *turn*, never a lecture.
-
 const FACILITATOR_SYSTEM_PROMPT = `你是一位正在主持「現場伴侶諮商」的引導者（facilitator），不是給建議的人。這對伴侶正卡在衝突裡。請永遠以繁體中文回覆。
 
 你的核心原則：
@@ -2765,10 +2464,6 @@ const FACILITATOR_TOOL_SCHEMA = {
   },
 };
 
-// thread: [{ role: 'A'|'B'|'facilitator', name, content, card? }] recent turns.
-// session: { activeCard, turnOwnerRole: 'A'|'B'|null, completedCards, stepCount }.
-// partners: { A: {name, gender}, B: {name, gender} }. companion: persona.
-// context: { summary }.
 async function generateFacilitatorTurn({ thread, session, partners, companion, context }) {
   const s = session || {};
   const p = partners || {};
@@ -2869,16 +2564,6 @@ async function generateFacilitatorTurn({ thread, session, partners, companion, c
   });
 }
 
-// ---------------------------------------------------------------------------
-// Therapy Mode summary ("諮商摘要") — the between-sessions digest
-// ---------------------------------------------------------------------------
-// Twogether is a Therapy Companion: the couple sees a therapist for ~1 hour a
-// week, and the real work happens in the other 167. This turns a window of
-// events into a summary the couple can bring INTO their next session, so the
-// therapist doesn't spend 30 minutes gathering what happened. It is NOT advice
-// and NOT a diagnosis — it organizes, and it hands the couple three questions
-// worth raising with a professional.
-
 const THERAPY_SUMMARY_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴侶諮商師的助理。一對伴侶在過去一段期間記錄了幾次衝突與溝通事件，他們準備帶著這份整理進入下一次的心理諮商。請閱讀事件清單與已算好的統計，為他們寫一份「諮商摘要」(Therapy Summary)。請永遠以繁體中文回覆。
 
 這份摘要的目的：讓他們進諮商室時，心理師不用從頭蒐集資訊，可以更快進入真正有價值的討論。你只做「整理」，不做診斷、不下指令、不評斷對錯、不選邊站。真正的治療由合格心理師負責。
@@ -2947,8 +2632,6 @@ const THERAPY_SUMMARY_TOOL_SCHEMA = {
   },
 };
 
-// events: [{ title, summary, status, tags, emotions, createdAt, resolvedAt, therapyNote }]
-// stats:  { themeCounts:[{tag,count}], emotionCounts:[{emotion,count}], repairedCount, unresolvedCount }
 async function generateTherapySummary({ periodLabel, events, stats }) {
   const evs = Array.isArray(events) ? events : [];
   const lines = [];
@@ -3043,15 +2726,6 @@ async function generateTherapySummary({ periodLabel, events, stats }) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Therapy Topics ("話題建議") — proactive discussion topics for the NEXT session
-// ---------------------------------------------------------------------------
-// The Therapy Summary above organizes what already happened. This looks
-// forward: even when nothing dramatic happened recently, it hands the couple
-// 3-5 things worth raising with their therapist. "No conflict" is not the
-// same as "no relationship problem" — a quiet couple should still get real,
-// grounded topics, never an empty result.
-
 const THERAPY_TOPICS_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴侶諮商師的助理。這對伴侶固定接受心理諮商，你的任務是在他們下次諮商「之前」，根據最近記錄的事件，主動整理出 3 到 5 個「值得帶去諮商聊聊」的話題——即使最近沒有明顯衝突。請永遠以繁體中文回覆。
 
 重要守則（務必遵守，這是本功能的倫理紅線）：
@@ -3101,8 +2775,6 @@ const THERAPY_TOPICS_TOOL_SCHEMA = {
   },
 };
 
-// events: [{ title, summary, status, tags, emotions, createdAt, resolvedAt, therapyNote }]
-// stats:  { themeCounts, emotionCounts, resolvedCount, unresolvedCount, daysSinceLastEvent }
 async function generateTherapyTopics({ periodLabel, appliedDays, events, stats, quiet }) {
   const evs = Array.isArray(events) ? events : [];
   const lines = [];
@@ -3191,10 +2863,6 @@ async function generateTherapyTopics({ periodLabel, appliedDays, events, stats, 
       .slice(0, max);
 
   const topics = cleanTopics(out.topics, 5);
-  // The whole contract of this feature is "never empty". If cleaning stripped
-  // everything (malformed / too-short model output), throw so the route's
-  // catch surfaces a retryable error — instead of caching an empty set (which
-  // would be charged AND permanently returned for this input hash).
   if (!topics.length) {
     throw new Error('Claude returned no usable therapy topics');
   }
@@ -3217,16 +2885,6 @@ async function generateTherapyTopics({ periodLabel, appliedDays, events, stats, 
     },
   };
 }
-
-// ---------------------------------------------------------------------------
-// Communication-pattern summary ("溝通模式" 第三方視角) — cross-conflict lens
-// ---------------------------------------------------------------------------
-// Single conflicts each get their own therapy note (with a per-event `cycle`).
-// This zooms out: reading several resolved events' cycles, toxicity flags and
-// themes, it names the ONE recurring loop the couple keeps falling into (like a
-// counselor who has watched them argue a few times), gently flags the rational
-// wrapping that hides sarcasm, and offers one small practice to step out of it.
-// This is the "模式" principle (see src/content/communicationPrinciples.ts).
 
 const COMMUNICATION_PATTERN_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴侶諮商師。你已經看過這對伴侶最近幾次衝突的整理筆記（每次的觸發點、真正的需求、當次的負向循環），現在請像一個看過他們吵過幾次架的第三方，幫他們看見「反覆出現的溝通模式」。請永遠以繁體中文回覆。
 
@@ -3261,8 +2919,6 @@ const COMMUNICATION_PATTERN_TOOL_SCHEMA = {
   },
 };
 
-// events: [{ title, trigger, needs, cycle, toxicityFlags, tags }] — recent
-// resolved events. stats: { cycleStepCounts, toxicityCounts, themeCounts }.
 async function generateCommunicationPatternSummary({ events, stats }) {
   const evs = Array.isArray(events) ? events : [];
   const lines = [];
@@ -3351,14 +3007,6 @@ async function generateCommunicationPatternSummary({ events, stats }) {
   };
 }
 
-// ---------------------------------------------------------------------------
-// 一起收尾 (closure) — 幫我想一個 + AI 見解
-// ---------------------------------------------------------------------------
-// Both calls come AFTER the humans have done the talking, which is the whole
-// point of the closure design: the couple writes, the AI comments. The assist
-// is opt-in (a user who knows what to write never spends a token) and the
-// insight fires once, after the event has already resolved.
-
 const CLOSURE_ASSIST_SYSTEM_PROMPT = `你是一位溫柔、專業、中立的伴侶諮商師。一對伴侶剛談完一次衝突，正在一起收尾：他們要各自寫下「下次我願意做的一件小事」，以及一個「下次這種情況我們怎麼辦」的共同決定。使用者按了「幫我想一個」，請給他 2 到 3 個可以直接改成自己的話的方向。請永遠以繁體中文回覆。
 
 守則：
@@ -3393,10 +3041,6 @@ const CLOSURE_ASSIST_TOOL_SCHEMA = {
   },
 };
 
-// field: 'commitment' | 'decision'. me/partner are nicknames. therapyNote is the
-// existing per-event note (migration 074) when the couple already has one — it
-// carries each side's underlying need, which is what makes a suggestion land
-// instead of reading generic.
 async function generateClosureAssist({ field, eventSummary, messages, therapyNote, me, partner, companion }) {
   const wanted = field === 'decision' ? 'decision' : 'commitment';
   const lines = [];
@@ -3510,8 +3154,6 @@ const CLOSURE_INSIGHT_TOOL_SCHEMA = {
   },
 };
 
-// commitments: [{ who, text }]. sharedDecision may be null — plenty of conflicts
-// only need 「我下次會先問一聲」.
 async function generateClosureInsight({ eventSummary, therapyNote, commitments, sharedDecision, companion }) {
   const lines = [];
   if (eventSummary) lines.push(`事件背景：${String(eventSummary).trim()}`, '');
@@ -3593,15 +3235,6 @@ async function generateClosureInsight({ eventSummary, therapyNote, commitments, 
   });
 }
 
-// ---------------------------------------------------------------------------
-// 情緒深潛 Emotional Deep Dive
-// ---------------------------------------------------------------------------
-// Two parametrized generators (reflection + letter) rather than six near-twin
-// functions. The per-step persona differs, but the output shape and guardrails
-// are shared, so they ride in DEEP_DIVE_GUARDRAILS and the two tool schemas.
-
-// The non-negotiable guardrails (PRD §33) + the safety exception, appended to
-// every deep-dive prompt. Breaking a guardrail is worse than being shallow.
 const DEEP_DIVE_GUARDRAILS = `
 
 共同守則（永遠優先，違反守則比不夠深入嚴重得多）：
@@ -3652,9 +3285,6 @@ const DEEP_DIVE_LETTER_TOOL_SCHEMA = {
   },
 };
 
-// Assemble the user message from whatever journey context the step needs. Only
-// the fields the user actually provided are included, so the cached system
-// prefix stays byte-identical across users (same trick as generateWallCounselorComment).
 function buildDeepDiveContext(context = {}) {
   const lines = [];
   const push = (label, value) => {
@@ -3675,8 +3305,6 @@ function buildDeepDiveContext(context = {}) {
   return lines.length ? lines.join('\n') : '（使用者尚未提供內容）';
 }
 
-// One short reflection + one exploratory question. `step` selects the persona
-// (emotion / memory / past / partner_mirror).
 async function generateDeepDiveReflection({ step, context, companion }) {
   const prompt = DEEP_DIVE_REFLECTION_PROMPTS[step] || DEEP_DIVE_REFLECTION_PROMPTS.emotion;
   const userContent = buildDeepDiveContext(context);
@@ -3734,7 +3362,6 @@ async function generateDeepDiveReflection({ step, context, companion }) {
   });
 }
 
-// A drafted letter (compassion / partner) the user then edits.
 async function generateDeepDiveLetter({ kind, context, companion }) {
   const prompt = DEEP_DIVE_LETTER_PROMPTS[kind] || DEEP_DIVE_LETTER_PROMPTS.partner;
   const userContent = buildDeepDiveContext(context);
@@ -3792,15 +3419,6 @@ async function generateDeepDiveLetter({ kind, context, companion }) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// 訪客模式：試玩伴侶回覆 (guest preview partner reply)
-// ---------------------------------------------------------------------------
-// A visitor without an account writes about a real frustration in the guest
-// preview; the sample partner (阿哲) answers so they can feel the loop and then
-// invite the AI counselor. The partner is believable, not ideal: he cares but
-// gets a little defensive or explains first, which is exactly the moment the
-// counselor helps with. Short, plain, no insults, never mentions being an AI.
-
 const GUEST_PARTNER_SYSTEM_PROMPT = `你在一個伴侶溝通 App 的「試玩模式」裡，扮演使用者的另一半（男生，平常溫和、很在乎對方，但被指出問題時容易先解釋或有點防衛）。使用者會把心裡的委屈或想法傳給你。請永遠以繁體中文回覆。
 
 請用另一半的口吻，回一則像真人傳訊息的回覆：
@@ -3830,7 +3448,6 @@ async function generateGuestPartnerReply({ eventSummary, recentMessages }) {
   if (Array.isArray(recentMessages) && recentMessages.length > 0) {
     lines.push('最近對話（最舊在前）：');
     for (const m of recentMessages) {
-      // fromSelf is from the USER's perspective; the model plays the partner.
       lines.push(`${m.fromSelf ? '[對方]' : '[你]'}：${(m.content || '').trim()}`);
     }
     lines.push('');
@@ -3902,11 +3519,8 @@ module.exports = {
   generateClosureInsight,
   generateDeepDiveReflection,
   generateDeepDiveLetter,
-  // Exported for prompt-contract regression tests only.
   buildRoleplayUserContent,
   buildWallCounselorUserContent,
-  // Exported so the max_tokens truncation paths can be tested without a live
-  // API call (getClient caches a module-level client and is not injectable).
   chunkTargets,
   parseTranslationResponse,
   parseRewriteResponse,

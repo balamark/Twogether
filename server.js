@@ -7,16 +7,12 @@ const session = require('express-session');
 const path = require('path');
 const fs = require('fs');
 
-// Official customer-support address. Single source of truth shared with the
-// React app via src/content/supportContact.ts — change it in one place.
 const { supportEmail: SUPPORT_EMAIL } = require('./lib/supportContact.json');
 
-// PostgreSQL session store for production
 const pgSession = require('connect-pg-simple')(session);
 
 const { logInfo, logError } = require('./lib/logger');
 
-// Import routes
 const authRoutes = require('./routes/auth');
 const coupleRoutes = require('./routes/couples');
 const loveMomentRoutes = require('./routes/love-moments');
@@ -59,7 +55,6 @@ const activityRoutes = require('./routes/activity');
 const emailRoutes = require('./routes/email');
 const adminRoutes = require('./routes/admin');
 
-// Import database and middleware
 const db = require('./database/db');
 const { requestLogger, errorHandler, asyncHandler } = require('./middleware/logging');
 const { requestContext } = require('./middleware/request-context');
@@ -70,23 +65,10 @@ const { localeMiddleware } = require('./middleware/locale');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// Trust exactly one hop for Google Cloud (GAE adds a single X-Forwarded-For
-// frontend). `true` would trust ALL hops, letting any client spoof their IP
-// via X-Forwarded-For — that breaks the funnel's distinct-IP signal and any
-// IP-based rate limiting. Adjust if a CDN ever sits in front of GAE.
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
 
-// Canonical host enforcement (SEO). Search Console reports "Page with
-// redirect" when it discovers host variants (www.<domain>, *.appspot.com)
-// of the same app. Permanently (301) redirect GET/HEAD page requests to the
-// canonical host derived from FRONTEND_URL so Google consolidates indexing
-// onto one origin. /api and /health are exempt — machine-to-machine callers
-// (ECPay callbacks, uptime checks) must never be bounced. On staging, where
-// FRONTEND_URL itself is the *.appspot.com host, nothing redirects; instead
-// every page is marked noindex so the staging clone never competes with prod
-// in search results.
 const canonicalHost = (() => {
   try { return new URL(process.env.FRONTEND_URL).hostname; } catch { return null; }
 })();
@@ -106,10 +88,6 @@ if (process.env.NODE_ENV === 'production' && canonicalHost) {
   });
 }
 
-// Session configuration. Cookie maxAge is kept in sync with the JWT TTL
-// (JWT_EXPIRES_IN) so the express-session cookie and the JWT can't expire at
-// wildly different times — both are the "session lifespan" from the user's
-// perspective.
 const sessionConfig = {
   secret: process.env.SESSION_SECRET || 'twogether-session-secret-2024',
   resave: false,
@@ -125,7 +103,6 @@ const sessionConfig = {
 
 console.log(`🔐 Session TTL: ${JWT_EXPIRES_IN} (${JWT_EXPIRES_IN_MS}ms)`);
 
-// Use PostgreSQL session store in production to avoid memory leaks
 if (process.env.NODE_ENV === 'production') {
   sessionConfig.store = new pgSession({
     pool: db.pool,
@@ -135,30 +112,16 @@ if (process.env.NODE_ENV === 'production') {
 
 app.use(session(sessionConfig));
 
-// Middleware
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      // Google Fonts stylesheet is hosted on fonts.googleapis.com (style-src)
-      // and the actual font files are served from fonts.gstatic.com (font-src).
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "data:", "https://fonts.gstatic.com"],
       scriptSrc: ["'self'", "'unsafe-inline'"],
-      // blob: is needed for URL.createObjectURL() previews (e.g. thumbnail
-      // preview in the custom script upload/edit modal).
       imgSrc: ["'self'", "data:", "blob:", "https:", "http:"],
-      // Roleplay script cover videos are served from Supabase storage over
-      // https. Without an explicit media-src, <video> falls back to
-      // default-src 'self' and the browser blocks them.
       mediaSrc: ["'self'", "data:", "blob:", "https:"],
       connectSrc: ["'self'", "https:"],
-      // Allow the checkout form to POST to the hosted payment pages of BOTH
-      // gateways (stage + production hosts each, mirroring lib/ecpay.js and
-      // lib/newebpay.js ENDPOINTS). A gateway missing here is silently broken:
-      // the browser refuses the form submit, the button sticks on 前往付款…
-      // and the buyer never reaches the payment page. Keep in sync with the
-      // dev-server CSP in vite.config.ts.
       formAction: [
         "'self'",
         "https://payment-stage.ecpay.com.tw", "https://payment.ecpay.com.tw",
@@ -168,7 +131,6 @@ app.use(helmet({
   }
 }));
 
-// CORS configuration for development and test (frontend on :5174 → backend on :8080)
 if (['development', 'test'].includes(process.env.NODE_ENV)) {
   app.use(cors({
     origin: process.env.CORS_ORIGIN || 'http://localhost:5174',
@@ -176,30 +138,21 @@ if (['development', 'test'].includes(process.env.NODE_ENV)) {
   }));
 }
 
-// Capture the raw JSON body so the LINE webhook can verify X-Line-Signature
-// against the exact bytes LINE signed.
 app.use(bodyParser.json({
   limit: '10mb',
   verify: (req, res, buf) => { req.rawBody = buf; },
 }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
-// Establish per-request context (request id + trace id) before any logging so
-// every log line for a request is correlated. Must run before requestLogger.
 app.use(requestContext);
 
-// Add comprehensive request/response logging
 app.use(requestLogger);
 
-// Health check endpoint
 app.get('/health', (req, res) => {
-  // dbIsLocal lets the e2e test harness verify it isn't pointed at a remote
-  // (prod/staging) database before it starts registering test users. We expose
-  // only a boolean, never the host or credentials.
   let dbIsLocal = false;
   try {
     dbIsLocal = ['localhost', '127.0.0.1', '::1'].includes(new URL(process.env.DATABASE_URL).hostname);
-  } catch { /* no/!valid DATABASE_URL → treat as not-local */ }
+  } catch { }
   res.status(200).json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
@@ -209,8 +162,6 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API routes
-// X-Locale: en → user-facing response strings are translated (middleware/locale.js).
 app.use('/api', localeMiddleware);
 app.use('/api/auth', authRoutes);
 app.use('/api/couples', coupleRoutes);
@@ -223,49 +174,31 @@ app.use('/api/coins', coinRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/intimacy-requests', intimacyRequestRoutes);
 app.use('/api/intimacy-plans', intimacyPlansRoutes);
-// 訪客模式 AI 試用 (public, 5 real AI calls per guest; text never stored).
 app.use('/api/guest-ai', guestAiRoutes);
 app.use('/api/pairing-requests', pairingRequestRoutes);
 app.use('/api/custom-scripts', customScriptsRoutes);
 app.use('/api/custom-gifts', customGiftsRoutes);
 app.use('/api/wall', wallRoutes);
 app.use('/api/journey', journeyRoutes);
-// 一起收尾 lives in its own router but shares the /api/events prefix (the
-// closure IS a step of an event). Mounted BEFORE the events router so its
-// /:id/closure/* paths are matched first rather than falling into /:id.
 app.use('/api/events', eventClosureRoutes);
 app.use('/api/events', eventRoutes);
-// Sophie 衝突即時介入 — holds a heated message, runs a short emotional
-// intervention, then releases the original (+ Sophie's lens) to the partner.
 app.use('/api/conflict', conflictInterventionRoutes);
 app.use('/api/deep-dive', deepDiveRoutes);
 app.use('/api/ai-companions', aiCompanionRoutes);
 app.use('/api/ai-usage', aiUsageRoutes);
-// 關係解方手冊: public Playbook content + private saves/reflections.
 app.use('/api/playbooks', playbookRoutes);
 app.use('/api/stories', storyRoutes.router);
 app.use('/api/admin/stories', adminAuth, storyRoutes.adminRouter);
 app.use('/api/polls', pollRoutes.router);
 app.use('/api/admin/polls', adminAuth, pollRoutes.adminRouter);
-// LINE webhook (unauthenticated, signature-verified) + authed link/settings.
 app.post('/api/line/webhook', lineRoutes.webhookHandler);
 app.use('/api/line', lineRoutes.router);
 app.use('/api/script-favorites', scriptFavoritesRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
-// Server-to-server marketplace upload. Own API key, not a user JWT — mounted
-// outside the marketplace router because that router requires authenticateToken.
 app.use('/api/bot/marketplace', marketplaceBotRoutes);
-// Billing: /status + /checkout are JWT-protected inside the router; the
-// /ecpay/callback (server-to-server) and /ecpay/return (browser POST-back) are
-// intentionally public — ECPay can't present a JWT. Auth is applied per-route.
 app.use('/api/billing', billingRoutes);
-// Additional mount for intimacy endpoints (frontend compatibility)
 app.use('/api/intimacy', intimacyRequestRoutes);
 
-// Human therapist directory. The public router handles browse + apply
-// (optionalAuth inside) and JWT-protected consultation booking. Admin
-// moderation (approve/reject applications) is Basic-Auth gated like the rest
-// of /api/admin/*.
 app.use('/api/therapists', therapistRoutes.router);
 app.use('/api/admin/therapists', adminAuth, therapistRoutes.adminRouter);
 app.use('/api/feedback', feedbackRoutes);
@@ -274,25 +207,12 @@ app.use('/api/assessments', assessmentRoutes);
 app.use('/api/relationship', relationshipRoutes);
 app.use('/api/marriage-checkups', marriageCheckupRoutes);
 app.use('/api/activity', activityRoutes);
-// Unsubscribe links from the List-Unsubscribe header + mail footers. Public by
-// design — mail clients fire these with no session, authenticated only by the
-// signed token in the URL (lib/emailUnsubscribe.js).
 app.use('/api/email', emailRoutes);
 
-// Admin funnel dashboard. The public router (POST /api/track/landing) is the
-// anonymous beacon fired from the frontend on the logged-out landing render.
-// The /api/admin/* JSON endpoints and the /admin HTML page are gated by
-// HTTP Basic Auth (ADMIN_PASSWORD env var).
 app.use('/api', adminRoutes.publicRouter);
 app.use('/api/admin', adminAuth, adminRoutes.adminApiRouter);
 app.get('/admin', adminAuth, adminRoutes.htmlHandler);
 
-// Public, no-login static pages (pricing / support / privacy). Each carries a
-// {{SUPPORT_EMAIL}} placeholder so the support mailbox lives in exactly one
-// place (lib/supportContact.json); render each once and cache it — the files
-// never change at runtime. Every route also lists its '*.html' path: Vite
-// copies public/ verbatim into dist/, so the raw-placeholder copy sits on disk
-// and only these routes (registered before the static middleware) shadow it.
 const publicPageCache = new Map();
 function servePublicPage(file, logEvent) {
   return (req, res) => {
@@ -316,39 +236,17 @@ function servePublicPage(file, logEvent) {
   };
 }
 
-// Public, no-login sales/pricing page. ECPay (綠界) requires a publicly
-// reachable URL that shows the products for sale, their prices, and the
-// refund/contact policy — WITHOUT any login. The SPA gates most views behind
-// auth, so this explicit route (registered before the static/catch-all) serves
-// a self-contained static page that is always public. Prices here MUST stay in
-// sync with the PLANS catalog in routes/billing.js.
 app.get(['/pricing', '/membership', '/plans', '/pricing.html'], servePublicPage('pricing.html'));
 
-// Public, no-login customer-support page (English by default, with an
-// EN / 繁中 switch; the in-app counterpart is HelpView). App Store review and
-// overseas visitors need a support URL that works without an account, so like
-// /pricing this is a self-contained static page.
 app.get(['/support', '/support.html'], servePublicPage('support.html', 'support.page_view'));
 
-// Public, no-login privacy policy (繁中 / EN switch). Linked from the app
-// footer, the sign-up form, HelpView and every public page; App Store and the
-// payment providers need it reachable without an account. Keep it in sync with
-// what the code actually does (vendors: docs/VENDOR_CONTRACTS.zh-TW.md).
 app.get(['/privacy', '/privacy-policy', '/privacy.html'], servePublicPage('privacy.html', 'privacy.page_view'));
 
-// Public, no-login therapist recruitment / sign-up page. The SPA gates most
-// views behind auth, so this explicit route (registered before the static
-// catch-all) serves a self-contained static form that POSTs to the public
-// /api/therapists/apply endpoint. Anyone can apply without an account.
 app.get(['/therapist-signup', '/become-a-therapist'], (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.sendFile(path.join(__dirname, 'public', 'therapist-signup.html'));
 });
 
-// robots.txt is generated per environment: prod invites crawlers and points
-// at the sitemap; noindex environments (staging on *.appspot.com) block all
-// crawling so the clone never gets indexed. Registered before the static
-// middleware so a stray dist/robots.txt can never shadow it.
 app.get('/robots.txt', (req, res) => {
   res.type('text/plain');
   res.setHeader('Cache-Control', 'public, max-age=3600');
@@ -366,18 +264,10 @@ app.get('/robots.txt', (req, res) => {
   ].join('\n'));
 });
 
-// 關係解方手冊 public pages. The SPA renders them, but crawlers and link
-// scrapers need per-page <title>/OG tags and the article text without JS, so
-// these routes serve dist/index.html with that head + body filled in
-// (lib/playbooks/render.js). Registered before the static middleware. In dev
-// (no dist/ build) they fall through to Vite/the catch-all.
 let spaTemplateCache = null;
 function spaTemplate() {
   if (spaTemplateCache) return spaTemplateCache;
   try {
-    // Vite builds with base './', so the shell links "./assets/…". That only
-    // resolves from "/"; on /playbooks/<slug> it would ask for
-    // /playbooks/assets/… and get HTML back. Make the bundle links root-absolute.
     const html = fs
       .readFileSync(path.join(__dirname, 'dist', 'index.html'), 'utf8')
       .replace(/(src|href)="\.\/assets\//g, '$1="/assets/');
@@ -401,7 +291,6 @@ app.get('/playbooks/:slug', (req, res, next) => {
   const html = playbookPages.renderPlaybook(template, req.params.slug, { locale: playbookLocale(req), host: canonicalHost });
   if (!html) {
     logInfo('playbooks.page_not_found', { slug: String(req.params.slug).slice(0, 80) });
-    // Unknown slug: the SPA shows the library with a "not found" note.
     return res.status(404).type('html').send(template);
   }
   logInfo('playbooks.page_view', { page: 'detail', slug: req.params.slug, lang: playbookLocale(req) });
@@ -409,8 +298,6 @@ app.get('/playbooks/:slug', (req, res, next) => {
   res.type('html').send(html);
 });
 
-// sitemap.xml = the static public/ list + every published Playbook (both
-// languages), so new Playbooks are indexed without hand-editing the file.
 let sitemapCache = null;
 app.get('/sitemap.xml', (req, res) => {
   if (!sitemapCache) {
@@ -421,22 +308,17 @@ app.get('/sitemap.xml', (req, res) => {
   res.type('application/xml').send(sitemapCache);
 });
 
-// Serve static files from the frontend build
 app.use(express.static(path.join(__dirname, 'dist'), {
   setHeaders: (res, path) => {
-    // Cache assets with hash for a year
     if (path.includes('/assets/')) {
       res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     } else {
-      // Don't cache HTML files
       res.setHeader('Cache-Control', 'no-cache');
     }
   }
 }));
 
-// Handle React Router - serve index.html for all non-API routes
 app.get('*', (req, res) => {
-  // Don't serve index.html for API routes
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({
       success: false,
@@ -444,7 +326,6 @@ app.get('*', (req, res) => {
     });
   }
   
-  // Don't serve index.html for static asset requests
   if (req.path.startsWith('/assets/')) {
     return res.status(404).json({
       success: false,
@@ -455,10 +336,8 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-// Error handling middleware (comprehensive logging)
 app.use(errorHandler);
 
-// Start server
 app.listen(PORT, async () => {
   logInfo('Twogether app started', {
     port: PORT,
@@ -467,7 +346,6 @@ app.listen(PORT, async () => {
     databaseConfigured: !!process.env.DATABASE_URL,
   });
 
-  // Test database connection
   try {
     await db.query('SELECT NOW()');
     logInfo('Database connection successful');
@@ -476,7 +354,6 @@ app.listen(PORT, async () => {
   }
 });
 
-// Graceful shutdown
 process.on('SIGTERM', () => {
   logInfo('SIGTERM received, shutting down');
   process.exit(0);

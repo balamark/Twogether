@@ -1,7 +1,3 @@
-// HTTP Basic Auth gate for the /admin dashboard and /api/admin endpoints.
-// Compares the password against process.env.ADMIN_PASSWORD using a constant-
-// time comparison so an attacker can't time-search the secret.
-
 const crypto = require('crypto');
 const { logWarn } = require('../lib/logger');
 
@@ -38,7 +34,6 @@ function adminAuth(req, res, next) {
     return unauthorized(res);
   }
 
-  // Format is "username:password". Username is ignored.
   const idx = decoded.indexOf(':');
   if (idx === -1) return unauthorized(res);
   const provided = decoded.slice(idx + 1);

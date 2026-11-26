@@ -1,9 +1,3 @@
-// Bearer API key for the marketplace bot (POST /api/bot/marketplace/scripts).
-// The key lives only in the server environment (MARKETPLACE_BOT_API_KEY). It is
-// never sent to the browser bundle. Comparison is constant-time: both values
-// are hashed to a fixed digest first, so a different length can't skip the
-// compare or throw.
-
 const crypto = require('crypto');
 const { logWarn } = require('../lib/logger');
 

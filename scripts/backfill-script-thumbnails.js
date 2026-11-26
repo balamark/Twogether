@@ -1,19 +1,5 @@
 #!/usr/bin/env node
 
-/**
- * Backfill card thumbnails for custom-script covers
- * ---------------------------------------------------------------------------
- * New uploads write `<name>.thumb.webp` next to each cover (lib/media-upload.js)
- * and the script list loads that instead of the 2048px original. Covers
- * uploaded before that change have no thumbnail, so the list falls back to the
- * full image for them. This script generates the missing ones.
- *
- * Idempotent: a cover whose thumbnail already answers 200 is skipped.
- *
- * Usage (needs the production DATABASE_URL + SUPABASE_* env):
- *   NODE_ENV=production node scripts/backfill-script-thumbnails.js [--dry-run]
- */
-
 const axios = require('axios');
 const sharp = require('sharp');
 const db = require('../database/db');
